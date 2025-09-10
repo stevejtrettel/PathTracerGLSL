@@ -79,6 +79,8 @@ export default class ShaderAssembler {
 
     // ---- internals ----
 
+
+
     private buildFragmentTemplate({
                                       uniformLines,
                                       chunksSource,
@@ -87,22 +89,31 @@ export default class ShaderAssembler {
         chunksSource: string;
     }): string {
         const header = `#version 300 es
-precision highp float;
-
-in vec2 v_uv;
-out vec4 outColor;
-
-${uniformLines.join("\n")}
-`;
-        const main = `
-void main() {
-  vec3 color = integrate(gl_FragCoord.xy);
-  color = display(color);
-  outColor = vec4(color, 1.0);
-}
-`;
+        precision highp float;
+        
+        in vec2 v_uv;
+        out vec4 outColor;
+        
+        // --- Engine global (minimal by design) ---
+        uniform vec2 u_resolution;
+        
+        ${uniformLines.join("\n")}
+        `;
+                const main = `
+        void main() {
+          vec3 color = integrate(gl_FragCoord.xy);   // provided by integrator
+          color = display(color);                    // provided by display
+          outColor = vec4(color, 1.0);
+        }
+        `;
         return [header.trim(), chunksSource.trim(), main.trim()].join("\n\n");
     }
+
+
+
+
+
+
 
     private makePrefix(namespace: string): string {
         const safe = namespace.replace(/[^\w]/g, "_");

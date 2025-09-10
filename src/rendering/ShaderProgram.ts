@@ -208,13 +208,11 @@ export default class ShaderProgram {
         return loc;
     }
 
-    getUniformLocation(name: string): WebGLUniformLocation {
-        const loc = this.gl.getUniformLocation(this.program, name);
-        if (!loc) {
-            throw new Error(`Uniform not found (or optimized out): ${name}`);
-        }
-        return loc;
+// After (tolerant):
+    getUniformLocation(name: string): WebGLUniformLocation | null {
+        return this.gl.getUniformLocation(this.program, name); // may be null if optimized out
     }
+
 
     delete(): void {
         this.gl.deleteProgram(this.program);
