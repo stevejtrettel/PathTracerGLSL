@@ -28,7 +28,8 @@ tracer.setContext({ geometry: { runtime: geo.runtime, frame } }); // runtime+fra
 tracer
     .use(new PinholeCameraPlugin({ fovYDeg: 60 }))
     .use(new SceneSDFDemoPlugin())     // provides scene.sdf
-    .use(new LambertIntegrator())      // provides integrator.integrate
+    //.use(new NormalIntegrator())      // provides integrator.integrate
+    .use(new LambertIntegrator({ animate: true, speed: 0.6, elevationY: 0.7 }))
     .use(new SRGBDisplayPlugin())      // display.display
     .build();                                     // build after all .use()
 

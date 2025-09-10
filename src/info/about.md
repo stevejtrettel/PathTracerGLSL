@@ -1,120 +1,205 @@
-# Modular Path Tracer — Project Overview
+# Project Overview
 
-## Philosophy
-This project is a **rendering laboratory** designed for mathematical clarity and modularity.  
-Core principles:
+## Purpose & philosophy
+This repository is a **research path tracer / ray marcher lab** built to be:
+- **Geometry-first.** Shaders compile *against a geometry platform* (Euclidean now; others later).
+- **Modular.** Cameras, integrators, displays, controls, and libraries are swappable **plugins**.
+- **Incremental & testable.** Small, self-contained units with obvious contracts.
+- **Readable.** Names and code mirror the math. No cleverness that hides intent.
 
-- **Geometry-first**: shaders compile *for a geometry platform* (Euclidean, hyperbolic, spherical).
-- **Plugin model**: cameras, integrators, displays, controls are modular, swappable units.
-- **Textbook readability**: code mirrors mathematics; each component has a single responsibility.
-- **Clean layering**: 
-  - `core` = declarative engine (no GPU, no strings).  
-  - `systems` = mechanics (shader assembly, uniform binding).  
-  - `rendering` = WebGL helpers (ProgramCache, FullscreenQuad).  
-  - `tracer` = ergonomic façade (`Tracer`) for building/running pipelines.
+## Layering (who does what)
+- **`core/`** — Pure TypeScript contracts & light utilities; *no WebGL* and no GLSL strings.  
+  Defines `Plugin`, `GLSLChunk`, `UniformDecl`, roles, `ChunkNames`, geometry contracts, `PipelineContext`.
+- **`systems/`** — “Compiler” mechanics: shader assembly, dependency resolution, uniform binding.
+    - `ShaderAssembler` (concatenate GLSL chunks, prefix uniforms, enforce contracts)
+    - `UniformManager` (lookup + set uniforms with an optional namespace prefix)
+    - `DependencyResolver` (toposort chunks by `deps`)
+- **`rendering/`** — WebGL helpers: `ShaderProgram`, `ProgramCache`, `FullscreenQuad`.
+- **`tracer/`** — Execution façade: `Tracer` wraps the engine + systems into `use → build → frame`.
+- **`plugins/`** — Actual swappable pieces per role (camera, integrator, display, lib, geometry shader).
+- **`geometry/`** — Runtime geometry modules (CPU-side) that pair with a shader plugin.
 
----
+## Roles & contracts
+Exactly **one active plugin per role** (except `"lib"` which is additive). Canonical roles today:
+- `"geometry"` — contributes **GLSL types + ops** the rest of the pipeline compiles against.
+- `"camera"` — must provide `camera.generateRay`:  
+  `Ray generateRay(vec2 filmUV /* in [0,1]^2 */);`
+- `"integrator"` — must provide `integrator.integrate`:  
+  `vec3 integrate(vec2 fragCoord /* in pixel coords */);`
+- `"display"` — must provide `display.display`:  
+  `vec3 display(vec3 hdr);` (tone map / gamut map to LDR)
+- `"controls"` — optional CPU-side interaction (no GLSL contract).
+- `"lib"` — helper code with no required function; provides named chunks (`scene.sdf`, utilities, etc).
 
-## Plugin Contracts
-Every plugin declares:
-- **namespace**: unique prefix for uniforms/functions.
-- **role**: integrator, camera, display, geometry, controls, etc.
-- **chunks()**: GLSL code contributions with names + dependencies.
-- **uniforms()**: declarations + default values (auto-namespaced).
-- **applyUniforms(view)**: set live values per frame.
+### Canonical chunk names
+Engine expects exactly one of each at link time:
+```ts
+ChunkNames = {
+  GeometryTypes:       "geometry.types",
+  GeometryOps:         "geometry.ops",
+  CameraGenerateRay:   "camera.generateRay",
+  IntegratorIntegrate: "integrator.integrate",
+  DisplayDisplay:      "display.display",
+  SceneSDF:            "scene.sdf",           // convenience name for demo scenes
+} as const;
+```
 
-### Roles
-- **Geometry**: defines `Point`, `Ray`, `Frame`, metric ops.
-- **Camera**: `generateRay(uv)` from film space to geometry ray.
-- **Integrator**: `integrate(fragCoord)` — evaluates estimator, sampling pattern, accumulation.
-- **Display**: `display(hdr)` — tone map HDR radiance to LDR.
-- **Controls**: update camera/parameters from input.
-- *(Scene, materials, lights are data — not plugins.)*
+## Geometry: the hybrid “module”
+A **geometry** is a *pair*:
+- a **shader plugin** (role `"geometry"`) that contributes:
+    - `geometry.types` — canonical types/aliases used by all GLSL
+    - `geometry.ops` — metric-aware ops (e.g., `dot_g`, `normalize_g`, constructors)
+- a **runtime** object that implements:
+  ```ts
+  interface GeometryRuntime<F extends GeoFrame> {
+    createDefaultFrame(): F;
+    moveLocal(frame: F, local: Vec3, speed: number, dt: number): void;
+    rotateLocal(frame: F, angular: Vec3, rotSpeed: number, dt: number): void;
+    stabilize?(frame: F): void;
+  }
+  ```
+Together they are exposed as:
+```ts
+interface GeometryModule<F extends GeoFrame> {
+  shader: Plugin;              // GLSL chunks provider
+  runtime: GeometryRuntime<F>; // CPU frame owner/updater
+}
+```
+**Euclidean v0** is our first module.
 
----
+### GLSL types & ops (Euclidean v0)
+We use a dual-form tangent API so both “just a direction” and “direction at a basepoint” are supported:
+```glsl
+// geometry.types
+#define Point vec3
+#define Dir   vec3
 
-## Shader Assembly
-- Each plugin contributes GLSL chunks with explicit dependencies.
-- `systems/ShaderAssembler` does:
-  1. Collect chunks from engine.plugins.
-  2. Topologically order by dependencies.
-  3. Inject **engine globals** (only `u_resolution`).
-  4. Concatenate into final fragment.
-- Result = `fragmentSrc` + namespace -> prefix map.
+struct Tangent { Point p; Dir v; };
+struct Ray     { Point o; Dir d; };
+struct Frame   { Point p; Dir f; Dir u; Dir r; };
 
----
+// geometry.ops
+Tangent at(Point p, Dir v);
+Ray     makeRay(Point o, Dir d);
+Tangent asTangent(Ray r);
+Ray     asRay(Tangent t);
 
-## Future File Tree (Goal)
+float   dot_g(Point p, Dir a, Dir b);
+float   dot_g(Tangent a, Tangent b);
+float   norm_g(Point p, Dir v);
+float   norm_g(Tangent a);
+Dir     normalize_g(Point p, Dir v);
+Tangent normalize_g(Tangent a);
+```
+In **Euclidean**, the metric ignores `Point p`; in curved geometries it won’t.
 
+## Uniforms: lifecycle & rules
+- **Plugins declare uniforms** with local names in TS:
+  ```ts
+  uniforms(): UniformDecl[] { return [{ name: "cam_pos", type: "vec3" }, ...]; }
+  ```
+- **Assembler** prefixes them at link time using the plugin’s `namespace`:
+    - prefix = `u_${namespace.replace(/[^\w]/g, "_")}_`
+    - e.g. camera `cam_pos` → `u_cam_pinhole_cam_pos`
+- **Chunks never declare uniforms.** They only *use* the local names; assembler handles declarations + namespace replacement.
+- **Uniform binding** happens in `Tracer.frame()` by calling optional `applyUniforms(view, ctx)` on each plugin:
+    - `view: UniformManager` is pre-scoped to the plugin’s prefix (so you call `set3f("cam_pos", ...)`).
+    - `ctx: PipelineContext` optionally carries `{ geometry: { runtime, frame } }` so the camera can pull `{p,f,u,r}`.
+
+**Engine globals** reserved (declared without prefix):
+- `uniform vec2 u_resolution;`
+- Future globals: `u_time`, `u_frame`, `u_history`, `u_sampleCount` (accumulation).
+
+## Shader assembly (what the assembler guarantees)
+- **Dedup & order.** All chunks are collected, toposorted by `deps`, and **geometry is placed first** (`types`, then `ops`).
+- **Contracts.** Fails fast if *exactly one* of `camera.generateRay` / `integrator.integrate` / `display.display` is not present.
+- **Uniform prefixing.** Replacement is applied per-plugin over its chunks (using the *same* `GLSLChunk` objects—important).
+- **Template.** Assembler wraps with a standard header & main:
+  ```glsl
+  #version 300 es
+  precision highp float;
+  in vec2 v_uv; out vec4 outColor;
+  uniform vec2 u_resolution;
+  /* prefixed uniform decls… */
+
+  /* concatenated chunks… */
+
+  void main() {
+    vec3 color = integrate(gl_FragCoord.xy);
+    color = display(color);
+    outColor = vec4(color, 1.0);
+  }
+  ```
+
+## Program caching
+`ProgramCache.get(vertexSrc, fragmentSrc, key)` compiles or reuses a `ShaderProgram`.
+- **Cache key** should include the engine shape **and** a **hash** of the shader sources to avoid “same roles, different code” collisions. (`engine:geo.cam.int.display + hash(fragment)`).
+- **Why hash?** Two distinct fragment sources can share the same role list; without hashing you might reuse a stale `ShaderProgram`.
+
+## File & directory layout (current shape)
 ```
 src/
-├── tracer/
-│   └── Tracer.ts              # Ergonomic façade for building/running
-│
-├── core/
-│   ├── Engine.ts              # Pure plugin registry (no GPU)
-│   └── types.ts               # Core interfaces (Plugin, Chunk, Uniform, Role)
-│
-├── systems/
-│   ├── ShaderAssembler.ts     # GLSL assembly (pure string logic)
-│   ├── DependencyResolver.ts  # Topo sort for chunk deps
-│   ├── UniformManager.ts      # Uniform binding helper
-│   └── ParameterSystem.ts     # (later) plugin parameter tracking
-│
-├── rendering/
-│   ├── ShaderProgram.ts       # WebGL program wrapper
-│   ├── ProgramCache.ts        # Compile/link caching
-│   └── FullscreenQuad.ts      # Screen-space rendering primitive
-│
-├── geometry/
-│   ├── EuclideanGeometryPlugin.ts   # Provides geometry.types/ops
-│   ├── HyperbolicGeometryPlugin.ts  # Future extension
-│   └── ...                          # Other geometries
-│
-├── camera/
-│   ├── PinholeCameraPlugin.ts       # Minimal pinhole camera
-│   ├── ThinLensCameraPlugin.ts      # Depth of field
-│   └── ...                          # Future optical models
-│
-├── integration/
-│   ├── TestIntegratorPlugin.ts      # Trivial constant-color
-│   ├── NormalsIntegrator.ts         # Raymarch normals
-│   ├── DirectLighting.ts            # One-bounce diffuse
-│   ├── PathTracer.ts                # Multi-bounce path tracing
-│   └── ...
-│
-├── display/
-│   ├── SRGBDisplayPlugin.ts         # Simple sRGB tonemap
-│   ├── ReinhardDisplayPlugin.ts     # Reinhard tone mapping
-│   └── ACESDisplayPlugin.ts         # ACES curve
-│
-├── controls/
-│   ├── OrbitControls.ts             # Mouse orbit
-│   ├── FPSControls.ts               # Keyboard fly
-│   └── ...
-│
-├── scene/
-│   ├── SceneLib.glsl                # SDF primitives
-│   ├── Material.glsl                # BSDFs
-│   └── ...
-│
-├── glsl/
-│   └── fullscreen.vert              # Common fullscreen vertex shader
-│
-└── main.ts                          # Example entrypoint / hotkeys
+  core/
+    types.ts                // contracts (Plugin, GLSLChunk, roles, ChunkNames, geometry, context)
+  systems/
+    ShaderAssembler.ts
+    DependencyResolver.ts
+    UniformManager.ts
+  rendering/
+    ShaderProgram.ts
+    ProgramCache.ts
+    FullscreenQuad.ts
+  tracer/
+    Tracer.ts               // façade: use → build → frame
+  geometry/
+    euclidean/
+      EuclideanRuntime.ts   // implements GeometryRuntime<EucFrame>
+      EuclideanModule.ts    // bundles shader + runtime
+    // future: hyperbolic/, spherical/, …
+  plugins/
+    geometry/
+      EuclideanGeometryPlugin.ts
+      glsl/
+        euclidean.types.glsl
+        euclidean.ops.glsl
+    camera/
+      PinholeCameraPlugin.ts
+    integration/
+      NormalsIntegrator.ts
+      LambertIntegrator.ts
+      RayDirDebug.ts
+    scene/
+      SceneSDFDemoPlugin.ts
+    display/
+      SRGBDisplay.ts
+  glsl/
+    fullscreen.vert.glsl
+main.ts
 ```
 
----
+## Build/execute lifecycle
+```ts
+// app/bootstrap
+const tracer = new Tracer({ canvas, vertexSrc });
+const { module: geo, frame } = createEuclideanModule();
 
-## Big-Picture Workflow
-1. **Configure**  
-   `tracer.use(geometry).use(camera).use(integrator).use(display)`
-2. **Assemble**  
-   `assembler.buildFragment(engine.list())`
-3. **Materialize**  
-   `program = programCache.get(vertex, fragment, key)`
-4. **Render**  
-   - Set engine globals (`u_resolution`).  
-   - Each plugin sets its own uniforms via prefixed `UniformManager`.  
-   - `fullscreenQuad.draw()`.
+tracer.use(geo.shader);
+tracer.setContext({ geometry: { runtime: geo.runtime, frame } });
 
+tracer
+  .use(new PinholeCameraPlugin({ fovYDeg: 60 }))
+  .use(new SceneSDFDemoPlugin())
+  .use(new LambertIntegrator({ animate: true })) // or NormalsIntegrator
+  .use(new SRGBDisplayPlugin())
+  .build();
+
+function resize() { /* set DPR-correct width/height; tracer.setSize() */ }
+requestAnimationFrame(function loop() { tracer.frame(); requestAnimationFrame(loop); });
+```
+
+## Conventions & guardrails
+- **Never declare uniforms inside GLSL chunks.** Let the assembler do it from `uniforms()`.
+- **Stable chunk names.** Use `ChunkNames` constants for `name` and `deps`.
+- **One call to `p.chunks()`** per plugin in the assembler (reuse the same objects for replacement).
+- **Short field names in GLSL**, clear function names in APIs (e.g., `Ray{ o,d }`, `Frame{ p,f,u,r }`).
+- **Namespaces matter.** Keep them stable: they determine uniform prefixes and cache keys.

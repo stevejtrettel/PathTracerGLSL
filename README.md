@@ -37,18 +37,6 @@ npm run dev
 npm run build
 ```
 
----
-
-## 🚀 Quick Start
-
-Open `src/main.ts` to see the current demo.  
-You can run it with Vite:
-
-```bash
-npm run dev
-```
-
-This launches a browser window with the current tracer demo.
 
 ---
 

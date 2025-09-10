@@ -1,120 +1,97 @@
-# Current Build Status
+# Current State & Next Steps
 
-## Functional
-- **Tracer façade (`tracer/Tracer.ts`)**
-  - Wraps engine + systems into an ergonomic API (use -> build -> frame).
-  - Manages shader program, uniform managers, quad draw.
-- **Core engine (`core/Engine.ts`)**
-  - Pure plugin registry; no GPU.
-- **Systems**
-  - `ShaderAssembler`: assembles fragments with `u_resolution` global.
-  - `UniformManager`: binds uniforms, tolerant to missing ones.
-  - `ProgramCache`: deduplicates shader programs.
-  - `FullscreenQuad`, `ShaderProgram`: working WebGL wrappers.
-- **Sandbox plugins**
-  - SolidColorPlugin, GradientColorPlugin — verified working.
-- **First real plugins**
-  - `TestIntegratorPlugin`: trivial integrator, returns constant color.
-  - `SRGBDisplayPlugin`: converts HDR vec3 -> clamped 0–1 sRGB.
+## What’s working (end-to-end)
+- **Assembler & engine path**
+  - Role-based plugin registry (`core/Engine`).
+  - `ShaderAssembler` with: uniform prefixing, duplicate chunk detection, geometry-first ordering, required-contract checks.
+  - **Fix in place:** assembler now calls `p.chunks()` **once per plugin** and reuses objects for prefixing (prevents missed replacements).
+- **Rendering path**
+  - `ShaderProgram`, `ProgramCache`, `FullscreenQuad`.
+  - `Tracer` with `use → build → frame`, DPR-aware resize, optional `PipelineContext`.
+- **Geometry v0**
+  - `EuclideanGeometryPlugin` (GLSL chunks: `geometry.types`, `geometry.ops`).
+  - `EuclideanRuntime` (CPU frame `{p,f,u,r}` + `moveLocal`, `rotateLocal`, `stabilize`).
+  - `EuclideanModule` bundles shader+runtime; app exposes `{ runtime, frame }` via `Tracer.setContext`.
+- **Camera**
+  - `PinholeCameraPlugin` — uniforms `cam_pos, cam_f, cam_u, cam_r, cam_fovY`; chunk `camera.generateRay`.
+- **Scene (demo)**
+  - `SceneSDFDemoPlugin` provides `scene.sdf` with a sphere and plane.
+- **Integrators**
+  - `RayDirDebug` (visualize ray direction).
+  - `NormalsIntegrator` (sphere tracing + normal visualization; includes `TMIN` guard).
+  - `LambertIntegrator` (Lambert shading with **parameterized light direction**; optional animation in TS).
+- **Display**
+  - `SRGBDisplay` (simple tonemap + linear→sRGB).
 
-## In-progress / placeholders
-- **Geometry**: not yet implemented. Needed before real ray-based integrators.
-- **Camera**: no plugin yet. Integrators currently bypass ray generation.
-- **Scene**: no primitives. Will start with hardcoded SDFs.
-- **Controls**: not touched yet.
+**Result:** lit sphere & plane visible, with rotating light when enabled.
 
-## Removed / refactored
-- Engine-owned `u_time`, `u_frame` -> **gone**.  
-  Only `u_resolution` is an engine global.  
-  Time/frames will be plugin-owned when needed.
+## What’s intentionally provisional
+- **Display pipeline** is a minimal tonemap + sRGB.
+- **Materials & scenes** are ad hoc (one demo SDF; no material system yet).
+- **Controls** role not implemented (no input → frame updates).
+- **Program cache key** currently built from namespaces; a fragment hash should be appended.
+- **No global `u_time`/`u_frame` yet** (we used `performance.now()` inside a plugin for light animation).
 
----
+## Hard-won rules (keep these)
+- Chunks **never** declare uniforms; all uniforms come from `Plugin.uniforms()`.
+- The assembler must reuse the **same `GLSLChunk` instances** throughout build to ensure uniform prefix replacement applies.
+- Camera → Integrator dependency: if an integrator doesn’t call `generateRay`, camera uniforms can be optimized out by the compiler.
+- Add a **`TMIN` self-intersection guard** to marchers to avoid immediate `t=0` hits.
 
-## Current File Tree
+## Quick code-quality passes (high priority, small)
+1. **Program cache key hashing.**  
+   Add a stable hash of `(vertexSrc + fragmentSrc)` to the `ProgramCache` key to prevent stale program reuse when source changes but namespaces don’t.
+2. **Assembler dev warnings.**  
+   Warn if any chunk source contains a `uniform` declaration (catches accidental redeclarations early).
+3. **UniformManager dev mode.**  
+   Keep `logMissing` toggleable; default `false`, but easy to enable during bring-up.
+4. **`Stage` usage sanity.**  
+   All current chunks are `"frag"`; keep it explicit in each plugin to avoid inference errors.
 
-```
-src/
-├── tracer/
-│   └── Tracer.ts
-│
-├── core/
-│   ├── Engine.ts
-│   └── types.ts
-│
-├── systems/
-│   ├── ShaderAssembler.ts
-│   ├── DependencyResolver.ts
-│   └── UniformManager.ts
-│
-├── rendering/
-│   ├── ShaderProgram.ts
-│   ├── ProgramCache.ts
-│   └── FullscreenQuad.ts
-│
-├── integration/
-│   ├── test_integrator.glsl
-│   └── TestIntegrator.ts
-│
-├── display/
-│   ├── srgb_display.ts
-│   └── SRGBDisplay.ts
-│
-├── glsl/
-│   └── fullscreen.vert
-│
-└── main.ts
-```
+## Stability tests to run next (no shading complexity yet)
+- **Multiple plugins declare uniforms.** Confirm assembler declares all, and `UniformManager` resolves each, no collisions.  
+  *Already Lambert (`light_dir`) + Camera uniforms; expand with a scene color parameter for another check.*
+- **Controls** (CPU only).  
+  A `controls` plugin that calls `geo.runtime.moveLocal/rotateLocal` each frame from WASD/mouse; no shader changes.  
+  *Exercises the `PipelineContext` path thoroughly.*
+- **Thin-lens camera** (new camera plugin).  
+  Add `cam_aperture`, `cam_focusDist`, `cam_fovY`. Generate rays with lens sampling (deterministic first).  
+  *Works with current integrator; no new engine plumbing.*
+- **Accumulation renderer (architecture only).**  
+  Add engine globals you already reserved: `u_history` (sampler2D), `u_sampleCount` (int), optionally `u_frame`.  
+  Render-to-texture and running average; verify stability and reset behavior.  
+  *Tests multi-pass state and uniform lifetimes without complex BRDFs.*
+- **Scene library expansion.**  
+  Add `albedo(Point p)` alongside `map(Point p)`; Lambert uses it.  
+  Include more primitives (boxes, torus, CSG) to stress deps/uniforms.
 
----
+## Geometry roadmap (next incremental geometry)
+- **Hyperbolic (shader-only first):**
+  - Provide `geometry.types` identical to Euclidean.
+  - Implement `geometry.ops` with position-dependent metric `dot_g(p, a, b)` in your preferred model (upper-half-space or ball).
+  - Keep Euclidean geodesic stepping initially; add `geodesicStep` later if desired.
+- **Runtime later:** mirror Euclidean’s runtime with the same `{p,f,u,r}` frame; add helpers for model transforms when needed.
 
-## Next Steps
+## Concrete next options (pick 1–2; each is self-contained)
+1) **Controls plugin (WASD + mouse)**
+  - Role `"controls"`, no GLSL. Reads/updates `ctx.geometry.frame`.
+  - **Accept:** camera moves smoothly; no shader edits.
+2) **Thin-lens camera**
+  - Uniforms: `cam_aperture`, `cam_focusDist`, `cam_fovY`.
+  - Deterministic sampling first; later tie into accumulation.
+3) **Accumulation scaffold**
+  - Add globals: `u_time`, `u_frame` in header.
+  - Add history texture + sample count, and a running-average path.
+4) **Scene: `albedo(p)` + more primitives**
+  - Keep `map(p)`; add `albedo(p)` and use in Lambert.
+  - Add a uniform color to scene to validate multiple-plugin uniform binding.
+5) **Hyperbolic geometry (shader-only)**
+  - New `HyperbolicGeometryPlugin` defining metric ops; compile and render to see differences immediately.
 
-### Step 1 — Euclidean Geometry Stub
-- `geometry.types`:
-  - `#define Point vec3`, `#define Tangent vec3`, etc.
-  - `struct Ray { Point origin; Tangent direction; }`
-  - `struct Frame { Point position; Tangent forward, up, right; }`
-- `geometry.ops`:
-  - `dot_g`, `norm_g`, `normalize_g`
-  - optional `GEPS = 1e-5` constant
-- `EuclideanGeometryPlugin.ts`: contributes the two chunks, no uniforms.
-
-### Step 2 — Minimal Camera Plugin
-- `PinholeCameraPlugin` with GLSL:
-  ```glsl
-  Ray generateRay(vec2 uv) {
-    return Ray(Point(0.0, 0.0, 0.0),
-               normalize(vec3(uv - 0.5, -1.0)));
-  }
-  ```
-- No uniforms at first; later add FOV, position.
-
-### Step 3 — Scene Lib
-- GLSL chunk with:
-  - `float sdfSphere(Point p, float r)`
-  - `float sdfPlane(Point p)`
-  - `Normal normalFromSDF(...)`
-- Included as "lib.sdf" so integrators can depend on it.
-
-### Step 4 — Two Real Integrators
-- **NormalsIntegrator**: raymarch scene, color = 0.5*(n+1).
-- **DirectLightingIntegrator**: Lambert shading from one directional light.
-- Both depend on geometry + camera + sdf lib.
-
-### Step 5 — Hot-Swap Demo
-- In `main.ts`, map keys:
-  - `3` -> NormalsIntegrator
-  - `4` -> DirectLightingIntegrator
-- Swap with `tracer.use(new IntegratorX()).build()`.
-
----
+## What (if anything) should be reworked
+- **Cache key hashing** (as above) — prevents subtle “stale program” bugs.
+- **Assembler guard** for `uniform` lines in chunks — catches class of errors early.
+- **Optionally**: add a `u_time` global as part of the engine header to avoid per-plugin `performance.now()` usage.
 
 ## Summary
-We have:
-- ✅ Infrastructure (Tracer, Engine, Systems, Rendering helpers).
-- ✅ Display plugin.
-- ✅ Test integrator.
-- ❌ Geometry/camera/scene not yet.
-- ❌ Real integrators not yet.
-
-Next: build the **Euclidean stub -> camera -> scene lib -> two integrators** pipeline. That gets us to the true use case: *swapping between integrators that actually trace a scene*.
+We have a stable core, a clean geometry abstraction, a working camera contract, and a demonstrable rendering path (scene → integrator → display). The next steps focus on **robustness** (cache key, dev guards), **interactivity** (controls), and **extensibility** (extra cameras, accumulation, and additional geometries). This keeps the system steady while opening doors for deeper research work.
