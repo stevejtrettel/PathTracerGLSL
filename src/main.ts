@@ -1,19 +1,33 @@
+// src/main.ts
 import ShaderProgram from "./rendering/ShaderProgram";
 import FullscreenQuad from "./rendering/FullscreenQuad";
+import ProgramCache from "./rendering/ProgramCache";
+
+import Uniforms from "./plugins/Uniforms";
+import type { ColorPlugin } from "./plugins/types";
 import SolidColorPlugin from "./plugins/SolidColorPlugin";
 import GradientColorPlugin from "./plugins/GradientColorPlugin";
-import Uniforms from "./plugins/Uniforms";
 
-class SolidColorApp {
+class App {
+    // DOM / GL
     private canvas: HTMLCanvasElement;
     private gl: WebGL2RenderingContext;
-    private program: ShaderProgram;
+
+    // Render resources
     private quad: FullscreenQuad;
-    private plugin: ColorPlugin;
-    private uniforms: Uniforms;
+    private cache: ProgramCache;
+    private program!: ShaderProgram;  // set in setPlugin
+    private uniforms!: Uniforms;      // set in setPlugin
+
+    // Active plugin
+    private plugin!: ColorPlugin;
+
+    // Pre-created plugins we can toggle between
+    private solid!: SolidColorPlugin;
+    private grad!: GradientColorPlugin;
 
     constructor() {
-        // 1) Canvas + GL2
+        // Canvas + GL2
         this.canvas = document.createElement("canvas");
         document.body.style.margin = "0";
         Object.assign(this.canvas.style, { width: "100vw", height: "100vh", display: "block" });
@@ -23,34 +37,51 @@ class SolidColorApp {
         if (!gl) throw new Error("WebGL2 not supported");
         this.gl = gl;
 
-        // 2) Vertex shader
-        const vert = `#version 300 es
-      layout(location = 0) in vec2 a_pos;
-      layout(location = 1) in vec2 a_uv;
-      out vec2 v_uv;
-      void main() {
-        v_uv = a_uv;
-        gl_Position = vec4(a_pos, 0.0, 1.0);
-      }
-    `;
-
-        // 3) Plugin + fragment shader
-        this.plugin =new GradientColorPlugin();
-            //new SolidColorPlugin([0.9, 0.2, 0.15]); // red-ish
-        const frag = this.plugin.getFragmentSource();
-
-        // 4) Program + quad + uniforms helper
-        this.program = new ShaderProgram(this.gl, vert, frag);
+        // Geometry helper + cache
         this.quad = new FullscreenQuad(this.gl);
-        this.uniforms = new Uniforms(this.gl, this.program /*, prefix: "" for now */);
+        this.cache = new ProgramCache(this.gl);
 
-        // 5) Resize + draw
+        // Create plugin instances with prefixes
+        this.solid = new SolidColorPlugin([0.9, 0.2, 0.15], 1.0, "u_solid_");
+        this.grad  = new GradientColorPlugin({ prefix: "u_grad_", tint: [1, 1, 1], speed: 0.5 });
+
+        // Start with one
+        this.setPlugin(this.solid, "u_solid_");
+
+        // Hot-swap keys
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "1") this.setPlugin(this.solid, "u_solid_");
+            if (e.key === "2") this.setPlugin(this.grad,  "u_grad_");
+        });
+
+        // Resize + RAF
         window.addEventListener("resize", () => this.resize());
         this.resize();
         requestAnimationFrame((t) => this.draw(t));
     }
 
-    private resize() {
+    /** Build (or reuse from cache) the program for a given plugin, then (re)bind Uniforms. */
+    private setPlugin(plugin: ColorPlugin, prefix: string): void {
+        this.plugin = plugin;
+
+        const vert = `#version 300 es
+      layout(location = 0) in vec2 a_pos;
+      layout(location = 1) in vec2 a_uv;
+      out vec2 v_uv;
+      void main() { v_uv = a_uv; gl_Position = vec4(a_pos, 0.0, 1.0); }
+    `;
+
+        const frag = this.plugin.getFragmentSource();
+
+        // Stable cache key: plugin class + prefix (good enough for the lab)
+        const key = `${plugin.constructor.name}:${prefix}`;
+
+        // Get or create program from cache, then bind uniforms helper
+        this.program = this.cache.get(vert, frag, key);
+        this.uniforms = new Uniforms(this.gl, this.program, prefix);
+    }
+
+    private resize(): void {
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const w = Math.floor(window.innerWidth * dpr);
         const h = Math.floor(window.innerHeight * dpr);
@@ -61,21 +92,18 @@ class SolidColorApp {
         this.gl.viewport(0, 0, w, h);
     }
 
-    private draw(_nowMs: number) {
+    private draw(_nowMs: number): void {
         const gl = this.gl;
 
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         this.program.use();
-
-        // Plugin sets its uniforms by local names through the helper
         this.plugin.applyUniforms(this.uniforms);
-
         this.quad.draw();
 
         requestAnimationFrame((t) => this.draw(t));
     }
 }
 
-new SolidColorApp();
+new App();
