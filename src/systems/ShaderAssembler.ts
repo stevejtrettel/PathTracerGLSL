@@ -37,11 +37,85 @@ export interface AssembledFragment {
 
 export default class ShaderAssembler {
 
+    // buildFragment(plugins: Plugin[]): AssembledFragment {
+    //     if (!plugins.length) throw new Error("ShaderAssembler: no active plugins.");
+    //
+    //     // Defensive: avoid uniform-prefix collisions
+    //     assertUniqueNamespaces(plugins);
+    //
+    //     // 1) Build uniform declarations + per-chunk replacement maps
+    //     const uniformSpec: AssembledFragment["uniforms"] = {};
+    //     const uniformDeclLines: string[] = [];
+    //     const replaceMap = new Map<GLSLChunk, Map<string, string>>();
+    //
+    //     for (const p of plugins) {
+    //         const prefix = this.makePrefix(p.namespace); // e.g., "u_display_srgb_"
+    //         const entries = p.uniforms().map((u) => ({
+    //             local: u.name,
+    //             prefixed: `${prefix}${u.name}`,
+    //             type: u.type,
+    //         }));
+    //
+    //         if (entries.length) {
+    //             uniformSpec[p.namespace] = { prefix, uniforms: entries };
+    //             for (const e of entries) uniformDeclLines.push(`uniform ${e.type} ${e.prefixed};`);
+    //         }
+    //
+    //         for (const chunk of p.chunks()) {
+    //             const m = new Map<string, string>();
+    //             for (const e of entries) m.set(e.local, e.prefixed);
+    //             replaceMap.set(chunk, m);
+    //         }
+    //     }
+    //
+    //     // 2) Collect chunks and enforce uniqueness
+    //     const chunks = plugins.flatMap((p) => p.chunks());
+    //     const byName = new Map<string, GLSLChunk>();
+    //     for (const c of chunks) {
+    //         if (byName.has(c.name)) {
+    //             throw new Error(`ShaderAssembler: duplicate chunk "${c.name}".`);
+    //         }
+    //         byName.set(c.name, c);
+    //     }
+    //
+    //     // 2a) Early sanity: fail fast on unknown declared dependencies
+    //     for (const c of chunks) {
+    //         const deps = c.deps ?? [];
+    //         for (const d of deps) {
+    //             if (!byName.has(d)) {
+    //                 throw new Error(`ShaderAssembler: chunk "${c.name}" depends on missing "${d}".`);
+    //             }
+    //         }
+    //     }
+    //
+    //     // 3) Topologically order + place geometry first
+    //     const orderedRaw = topoSortChunks(chunks);
+    //     const ordered = this.geometryFirst(orderedRaw);
+    //
+    //     // 4) Ensure required contracts exist (centralized)
+    //     this.assertRequiredChunks(byName);
+    //
+    //     // 5) Apply uniform prefixing & concatenate
+    //     const chunksSource = ordered
+    //         .map((c) => this.applyUniformPrefixing(c.source, replaceMap.get(c)))
+    //         .join("\n\n");
+    //
+    //     // 6) Build final fragment
+    //     const fragment = this.buildFragmentTemplate({
+    //         uniformLines: uniformDeclLines,
+    //         chunksSource,
+    //     });
+    //
+    //     return { fragment, uniforms: uniformSpec };
+    // }
+
+
     buildFragment(plugins: Plugin[]): AssembledFragment {
         if (!plugins.length) throw new Error("ShaderAssembler: no active plugins.");
-
-        // Defensive: avoid uniform-prefix collisions
         assertUniqueNamespaces(plugins);
+
+        // 0) Cache chunks per plugin (critical: call p.chunks() ONCE)
+        const chunksPerPlugin = new Map<Plugin, GLSLChunk[]>();
 
         // 1) Build uniform declarations + per-chunk replacement maps
         const uniformSpec: AssembledFragment["uniforms"] = {};
@@ -49,7 +123,7 @@ export default class ShaderAssembler {
         const replaceMap = new Map<GLSLChunk, Map<string, string>>();
 
         for (const p of plugins) {
-            const prefix = this.makePrefix(p.namespace); // e.g., "u_display_srgb_"
+            const prefix = this.makePrefix(p.namespace);
             const entries = p.uniforms().map((u) => ({
                 local: u.name,
                 prefixed: `${prefix}${u.name}`,
@@ -61,27 +135,29 @@ export default class ShaderAssembler {
                 for (const e of entries) uniformDeclLines.push(`uniform ${e.type} ${e.prefixed};`);
             }
 
-            for (const chunk of p.chunks()) {
-                const m = new Map<string, string>();
-                for (const e of entries) m.set(e.local, e.prefixed);
+            // Call once, reuse the same chunk objects everywhere
+            const chunks = p.chunks();
+            chunksPerPlugin.set(p, chunks);
+
+            // One replacement map per plugin (same for all its chunks)
+            const m = new Map<string, string>();
+            for (const e of entries) m.set(e.local, e.prefixed);
+            for (const chunk of chunks) {
                 replaceMap.set(chunk, m);
             }
         }
 
-        // 2) Collect chunks and enforce uniqueness
-        const chunks = plugins.flatMap((p) => p.chunks());
+        // 2) Collect chunks and enforce uniqueness (DO NOT call p.chunks() again)
+        const chunks: GLSLChunk[] = Array.from(chunksPerPlugin.values()).flat();
         const byName = new Map<string, GLSLChunk>();
         for (const c of chunks) {
-            if (byName.has(c.name)) {
-                throw new Error(`ShaderAssembler: duplicate chunk "${c.name}".`);
-            }
+            if (byName.has(c.name)) throw new Error(`ShaderAssembler: duplicate chunk "${c.name}".`);
             byName.set(c.name, c);
         }
 
-        // 2a) Early sanity: fail fast on unknown declared dependencies
+        // 2a) Early sanity on declared deps
         for (const c of chunks) {
-            const deps = c.deps ?? [];
-            for (const d of deps) {
+            for (const d of c.deps ?? []) {
                 if (!byName.has(d)) {
                     throw new Error(`ShaderAssembler: chunk "${c.name}" depends on missing "${d}".`);
                 }
@@ -92,7 +168,7 @@ export default class ShaderAssembler {
         const orderedRaw = topoSortChunks(chunks);
         const ordered = this.geometryFirst(orderedRaw);
 
-        // 4) Ensure required contracts exist (centralized)
+        // 4) Ensure required contracts exist
         this.assertRequiredChunks(byName);
 
         // 5) Apply uniform prefixing & concatenate
@@ -101,13 +177,12 @@ export default class ShaderAssembler {
             .join("\n\n");
 
         // 6) Build final fragment
-        const fragment = this.buildFragmentTemplate({
-            uniformLines: uniformDeclLines,
-            chunksSource,
-        });
+        const fragment = this.buildFragmentTemplate({ uniformLines: uniformDeclLines, chunksSource });
 
         return { fragment, uniforms: uniformSpec };
     }
+
+
 
     // ---- internals ----
 

@@ -59,7 +59,7 @@ The design goal is to configure and run the tracer with just a few lines of code
 
 ```ts
 import Tracer from "./app/Tracer";
-import fullscreenVert from "./glsl/fullscreen.vert";
+import fullscreenVert from "./glsl/fullscreen.vert.glsl";
 
 // Plugins
 import EuclideanGeometryPlugin from "./geometry/EuclideanGeometryPlugin";

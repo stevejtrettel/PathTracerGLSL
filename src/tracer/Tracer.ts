@@ -5,6 +5,7 @@ import ProgramCache from "../rendering/ProgramCache";
 import ShaderProgram from "../rendering/ShaderProgram";
 import FullscreenQuad from "../rendering/FullscreenQuad";
 import UniformManager from "../systems/UniformManager";
+import type { PipelineContext } from "../core/types";
 
 type NsToUniforms = Map<string, UniformManager>;
 
@@ -100,4 +101,24 @@ export default class Tracer {
         // base36 keeps it short and readable
         return (h >>> 0).toString(36);
     }
+
+    // inside class
+    private ctx: PipelineContext = {};
+    setContext(ctx: PipelineContext) { this.ctx = ctx; }
+
+    frame(): void {
+        const gl = this.gl;
+        this.program.use();
+
+        const noPrefix = new UniformManager(gl, this.program, "");
+        noPrefix.set2f("u_resolution", this.canvas.width, this.canvas.height);
+
+        for (const p of this.engine.list()) {
+            const view = this.nsViews.get(p.namespace);
+            (p as any).applyUniforms?.(view, this.ctx); // pass context (optional)
+        }
+
+        this.quad.draw();
+    }
+
 }

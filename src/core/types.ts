@@ -14,7 +14,8 @@ export interface GLSLChunk {
     /** The actual GLSL source (from a .frag/.glsl file). */
     source: string;
     /** Other chunk names this one needs before it. */
-    deps: string[];// Always present, [] if none
+   // deps: string[];// Always present, [] if none
+    deps?: readonly string[];   // ← accept readonly/literal arrays
 }
 
 
@@ -68,6 +69,48 @@ export const ChunkNames = {
     CameraGenerateRay: "camera.generateRay",
     IntegratorIntegrate: "integrator.integrate",
     DisplayDisplay: "display.display",
+    SceneSDF: "scene.sdf",           //for now
 } as const;
 
 
+
+
+
+
+
+
+// ---------- Geometry contracts (runtime) ----------
+export type Vec3 = { x: number; y: number; z: number };
+
+/** Opaque CPU-side frame; concrete geometries define their own fields. */
+export interface GeoFrame {
+    [key: string]: unknown;
+}
+
+/** Minimal runtime hooks every geometry provides (no library types). */
+export interface GeometryRuntime<F extends GeoFrame = GeoFrame> {
+    createDefaultFrame(): F;
+
+    /** Move in *local* [right, up, forward]. Units: world-units/sec. */
+    moveLocal(frame: F, local: Vec3, speed: number, dt: number): void;
+
+    /** Rotate about *local* axes: pitch (about right), yaw (about up), roll (about forward). */
+    rotateLocal(frame: F, angular: Vec3, rotSpeed: number, dt: number): void;
+
+    /** Optional re-orthonormalization / cleanup. */
+    stabilize?(frame: F): void;
+}
+
+/** A complete geometry module = shader plugin + runtime. */
+export interface GeometryModule<F extends GeoFrame = GeoFrame> {
+    shader: Plugin;                // contributes geometry.types / geometry.ops
+    runtime: GeometryRuntime<F>;   // owns and updates the frame
+}
+
+/** Optional context passed to plugins during uniform binding. */
+export interface PipelineContext<F extends GeoFrame = GeoFrame> {
+    geometry?: {
+        runtime: GeometryRuntime<F>;
+        frame: F;
+    };
+}
