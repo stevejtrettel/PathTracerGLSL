@@ -3,8 +3,8 @@ import ShaderProgram from "./ShaderProgram";
 /**
  * ProgramCache
  * - Caches ShaderProgram instances by a stable key.
- * - If you don't pass a key, it hashes the shader sources (djb2).
- * - Keeps your hot-swaps fast: compile once, reuse many times.
+ * - Key format: "<extraKey>|<vertexHash>:<fragmentHash>"
+ *   - If no extraKey is provided, the key is just "<vertexHash>:<fragmentHash>".
  */
 export default class ProgramCache {
     private gl: WebGL2RenderingContext;
@@ -14,25 +14,27 @@ export default class ProgramCache {
         this.gl = gl;
     }
 
-    /** Get or create a program. If key is omitted, we hash vert+frag. */
-    get(vertSrc: string, fragSrc: string, key?: string): ShaderProgram {
-        const k = key ?? this.hashPair(vertSrc, fragSrc);
-        const hit = this.cache.get(k);
+    /** Get or create a program. `extraKey` (e.g., "PluginName:prefix") is optional. */
+    get(vertSrc: string, fragSrc: string, extraKey?: string): ShaderProgram {
+        const key = this.makeKey(vertSrc, fragSrc, extraKey);
+        const hit = this.cache.get(key);
         if (hit) return hit;
 
         const prog = new ShaderProgram(this.gl, vertSrc, fragSrc);
-        this.cache.set(k, prog);
+        this.cache.set(key, prog);
         return prog;
     }
 
-    /** Optional: free everything (e.g., on teardown). */
     disposeAll(): void {
         for (const prog of this.cache.values()) prog.delete();
         this.cache.clear();
     }
 
-    private hashPair(a: string, b: string): string {
-        return `${this.djb2(a)}:${this.djb2(b)}`;
+    // --- internals ---
+
+    private makeKey(vertSrc: string, fragSrc: string, extraKey?: string): string {
+        const pair = `${this.djb2(vertSrc)}:${this.djb2(fragSrc)}`;
+        return extraKey ? `${extraKey}|${pair}` : pair;
     }
 
     private djb2(s: string): number {

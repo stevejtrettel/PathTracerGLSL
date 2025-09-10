@@ -44,7 +44,7 @@
 //             throw new Error(`Program linking failed: ${log}`);
 //         }
 //
-//         // Clean up shaders
+//         // Clean up glsl
 //         this.gl.deleteShader(vertShader);
 //         this.gl.deleteShader(fragShader);
 //
@@ -117,7 +117,7 @@
 //             throw new Error(`Program linking failed: ${log}`);
 //         }
 //
-//         // Clean up shaders
+//         // Clean up glsl
 //         this.gl.deleteShader(vertShader);
 //         this.gl.deleteShader(fragShader);
 //
@@ -182,7 +182,7 @@ export default class ShaderProgram {
         gl.attachShader(prog, fs);
         gl.linkProgram(prog);
 
-        // Clean up shaders after linking (they’re attached to the program now).
+        // Clean up glsl after linking (they’re attached to the program now).
         gl.deleteShader(vs);
         gl.deleteShader(fs);
 

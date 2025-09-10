@@ -1,5 +1,5 @@
-import ShaderProgram from "../rendering/ShaderProgram";
-import Uniforms from "./Uniforms";
+
+import UniformManager from "../systems/UniformManager";
 
 /**
  * Shared types for our test plugins (sandbox).
@@ -7,5 +7,5 @@ import Uniforms from "./Uniforms";
  */
 export interface ColorPlugin {
     getFragmentSource(): string;
-    applyUniforms(u: Uniforms): void;
+    applyUniforms(u: UniformManager): void;
 }
