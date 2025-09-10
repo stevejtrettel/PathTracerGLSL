@@ -6,9 +6,25 @@
  * - Builds a single fragment with canonical main()
  */
 
-import type { GLSLChunk, Plugin, UniformDecl } from "../core/types";
-import { ChunkNames } from "../core/types";
+import type { GLSLChunk, Plugin } from "../core/types";
+import {ChunkNames} from "../core/types";
 import { topoSortChunks } from "./DependencyResolver";
+
+
+
+function assertUniqueNamespaces(plugins: Plugin[]) {
+    const seen = new Set<string>();
+    for (const p of plugins) {
+        if (seen.has(p.namespace)) {
+            throw new Error(
+                `ShaderAssembler: duplicate plugin namespace "${p.namespace}". Namespaces must be unique.`,
+            );
+        }
+        seen.add(p.namespace);
+    }
+}
+
+
 
 export interface AssembledFragment {
     fragment: string;
@@ -20,8 +36,12 @@ export interface AssembledFragment {
 }
 
 export default class ShaderAssembler {
+
     buildFragment(plugins: Plugin[]): AssembledFragment {
         if (!plugins.length) throw new Error("ShaderAssembler: no active plugins.");
+
+        // Defensive: avoid uniform-prefix collisions
+        assertUniqueNamespaces(plugins);
 
         // 1) Build uniform declarations + per-chunk replacement maps
         const uniformSpec: AssembledFragment["uniforms"] = {};
@@ -52,19 +72,28 @@ export default class ShaderAssembler {
         const chunks = plugins.flatMap((p) => p.chunks());
         const byName = new Map<string, GLSLChunk>();
         for (const c of chunks) {
-            if (byName.has(c.name)) throw new Error(`ShaderAssembler: duplicate chunk "${c.name}".`);
+            if (byName.has(c.name)) {
+                throw new Error(`ShaderAssembler: duplicate chunk "${c.name}".`);
+            }
             byName.set(c.name, c);
+        }
+
+        // 2a) Early sanity: fail fast on unknown declared dependencies
+        for (const c of chunks) {
+            const deps = c.deps ?? [];
+            for (const d of deps) {
+                if (!byName.has(d)) {
+                    throw new Error(`ShaderAssembler: chunk "${c.name}" depends on missing "${d}".`);
+                }
+            }
         }
 
         // 3) Topologically order + place geometry first
         const orderedRaw = topoSortChunks(chunks);
         const ordered = this.geometryFirst(orderedRaw);
 
-        // 4) Ensure required contracts exist
-        if (!byName.has(ChunkNames.IntegratorIntegrate))
-            throw new Error(`ShaderAssembler: missing "${ChunkNames.IntegratorIntegrate}".`);
-        if (!byName.has(ChunkNames.DisplayDisplay))
-            throw new Error(`ShaderAssembler: missing "${ChunkNames.DisplayDisplay}".`);
+        // 4) Ensure required contracts exist (centralized)
+        this.assertRequiredChunks(byName);
 
         // 5) Apply uniform prefixing & concatenate
         const chunksSource = ordered
@@ -72,7 +101,10 @@ export default class ShaderAssembler {
             .join("\n\n");
 
         // 6) Build final fragment
-        const fragment = this.buildFragmentTemplate({ uniformLines: uniformDeclLines, chunksSource });
+        const fragment = this.buildFragmentTemplate({
+            uniformLines: uniformDeclLines,
+            chunksSource,
+        });
 
         return { fragment, uniforms: uniformSpec };
     }
@@ -142,4 +174,28 @@ private geometryFirst(list: GLSLChunk[]): GLSLChunk[] {
     );
     return [...types, ...ops, ...rest];
 }
+
+
+    private assertRequiredChunks(byName: Map<string, GLSLChunk>) {
+        const missing: string[] = [];
+        if (!byName.has(ChunkNames.IntegratorIntegrate))
+            missing.push(ChunkNames.IntegratorIntegrate);
+        if (!byName.has(ChunkNames.DisplayDisplay))
+            missing.push(ChunkNames.DisplayDisplay);
+
+        // Advisory (not fatal): geometry chunks are highly recommended
+        if (!byName.has(ChunkNames.GeometryTypes)) {
+            console.warn(`[ShaderAssembler] Missing optional chunk "${ChunkNames.GeometryTypes}".`);
+        }
+        if (!byName.has(ChunkNames.GeometryOps)) {
+            console.warn(`[ShaderAssembler] Missing optional chunk "${ChunkNames.GeometryOps}".`);
+        }
+
+        if (missing.length) {
+            throw new Error(`ShaderAssembler: missing required chunks: ${missing.join(", ")}`);
+        }
+    }
+
+
+
 }

@@ -9,44 +9,40 @@ export default class UniformManager {
     private gl: WebGL2RenderingContext;
     private program: ShaderProgram;
     private prefix: string;
-    private cache = new Map<string, WebGLUniformLocation | null>();    // Change the cache to store nulls as well
+    private cache = new Map<string, WebGLUniformLocation | null>();
+    private logMissing: boolean;
 
-    constructor(gl: WebGL2RenderingContext, program: ShaderProgram, prefix: string = "") {
+    constructor(
+        gl: WebGL2RenderingContext,
+        program: ShaderProgram,
+        prefix: string = "",
+        logMissing: boolean = false  // Set to true during development
+    ) {
         this.gl = gl;
         this.program = program;
         this.prefix = prefix;
+        this.logMissing = logMissing;
     }
 
-    /** Return a new manager sharing gl/program but using a different prefix. */
     withPrefix(prefix: string): UniformManager {
-        return new UniformManager(this.gl, this.program, prefix);
+        return new UniformManager(this.gl, this.program, prefix, this.logMissing);
     }
-
-    // ---- lookups ----
-    private loc(localName: string): WebGLUniformLocation {
-        const gpuName = this.prefix ? `${this.prefix}${localName}` : localName;
-        let loc = this.cache.get(gpuName);
-        if (!loc) {
-            loc = this.program.getUniformLocation(gpuName);
-            this.cache.set(gpuName, loc);
-        }
-        return loc;
-    }
-
-
-
-
-
-
-
 
     private loc(localName: string): WebGLUniformLocation | null {
         const gpuName = this.prefix ? `${this.prefix}${localName}` : localName;
         if (this.cache.has(gpuName)) return this.cache.get(gpuName)!;
-        const loc = this.program.getUniformLocation(gpuName); // now returns WebGLUniformLocation | null
+
+        const loc = this.program.getUniformLocation(gpuName);
         this.cache.set(gpuName, loc);
+
+        // Optional development logging
+        if (!loc && this.logMissing) {
+            console.warn(`UniformManager: uniform "${gpuName}" not found in shader`);
+        }
+
         return loc;
     }
+
 
 // Then guard each setter:
     set1f(name: string, x: number): void {
@@ -77,7 +73,5 @@ export default class UniformManager {
         const L = this.loc(name);
         if (L) this.gl.uniformMatrix4fv(L, false, m as Float32List);
     }
-
-
 
 }

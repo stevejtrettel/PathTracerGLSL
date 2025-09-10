@@ -30,6 +30,9 @@ export default class Tracer {
         this.cache = new ProgramCache(this.gl);
         this.quad = new FullscreenQuad(this.gl);
         this.vertexSrc = opts.vertexSrc;
+
+
+
     }
 
     /** Register/replace the active provider for its role. */
@@ -48,8 +51,9 @@ export default class Tracer {
         const plugins = this.engine.list();
         const { fragment, uniforms } = this.assembler.buildFragment(plugins);
 
-        // Stable cache key: role namespaces (assembler will add shader hashes)
-        const key = "engine:" + plugins.map(p => p.namespace).join("+");
+        // Stable cache key = namespaces + hash of GLSL fragment
+        const shaderHash = this.hash(fragment);
+        const key = "engine:" + plugins.map(p => p.namespace).join("+") + `#${shaderHash}`;
         this.program = this.cache.get(this.vertexSrc, fragment, key);
 
         // Build prefixed views per namespace (from assembler prefixes)
@@ -85,4 +89,15 @@ export default class Tracer {
     /** Optional accessors for advanced usage */
     getEngine(): Engine { return this.engine; }
     getProgram(): ShaderProgram { return this.program; }
+
+
+    /** Simple string hash (djb2) for stable shader cache keys */
+    private hash(src: string): string {
+        let h = 5381;
+        for (let i = 0; i < src.length; i++) {
+            h = ((h << 5) + h) ^ src.charCodeAt(i);
+        }
+        // base36 keeps it short and readable
+        return (h >>> 0).toString(36);
+    }
 }

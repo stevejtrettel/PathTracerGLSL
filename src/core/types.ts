@@ -14,8 +14,10 @@ export interface GLSLChunk {
     /** The actual GLSL source (from a .frag/.glsl file). */
     source: string;
     /** Other chunk names this one needs before it. */
-    deps?: string[];
+    deps: string[];// Always present, [] if none
 }
+
+
 
 /** Well-known roles; exactly one active plugin per role. */
 export type Role = "geometry" | "camera" | "integrator" | "display" | "controls" | "lib";
@@ -67,3 +69,5 @@ export const ChunkNames = {
     IntegratorIntegrate: "integrator.integrate",
     DisplayDisplay: "display.display",
 } as const;
+
+
