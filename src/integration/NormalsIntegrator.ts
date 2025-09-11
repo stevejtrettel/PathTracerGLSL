@@ -1,4 +1,3 @@
-// NormalsIntegrator - updated
 import type { Plugin, GLSLChunk, Role, Stage } from "../core/types";
 import { ChunkNames } from "../core/types";
 
@@ -48,7 +47,7 @@ export default class NormalsIntegrator implements Plugin {
     readonly role: Role = "integrator";
     readonly namespace = "integrator.normals";
 
-    // No uniforms needed - getUniforms() is optional
+    uniforms() { return []; }
 
     chunks(): GLSLChunk[] {
         const stage: Stage = "frag";

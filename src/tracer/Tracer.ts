@@ -1,13 +1,13 @@
-/**
- * Tracer with clean uniform system
- */
 import Engine from "../core/Engine";
-import type { Plugin, Role, PipelineContext, UniformSpec } from "../core/types";
+import type { Plugin, Role } from "../core/types";
 import ShaderAssembler from "../systems/ShaderAssembler";
 import ProgramCache from "../rendering/ProgramCache";
 import ShaderProgram from "../rendering/ShaderProgram";
 import FullscreenQuad from "../rendering/FullscreenQuad";
 import UniformManager from "../systems/UniformManager";
+import type { PipelineContext } from "../core/types";
+
+type NsToUniforms = Map<string, UniformManager>;
 
 export default class Tracer {
     private gl: WebGL2RenderingContext;
@@ -20,8 +20,7 @@ export default class Tracer {
     private quad: FullscreenQuad;
 
     private program!: ShaderProgram;
-    private nsViews: Map<string, UniformManager> = new Map();
-    private ctx: PipelineContext = {};
+    private nsViews: NsToUniforms = new Map();
 
     constructor(opts: { canvas: HTMLCanvasElement; vertexSrc: string }) {
         this.canvas = opts.canvas;
@@ -32,6 +31,9 @@ export default class Tracer {
         this.cache = new ProgramCache(this.gl);
         this.quad = new FullscreenQuad(this.gl);
         this.vertexSrc = opts.vertexSrc;
+
+
+
     }
 
     /** Register/replace the active provider for its role. */
@@ -45,103 +47,78 @@ export default class Tracer {
         this.engine.clear(role);
     }
 
-    /** Set pipeline context */
-    setContext(ctx: PipelineContext): void {
-        this.ctx = ctx;
-    }
-
-    /** Assemble + compile program for the current engine configuration. */
+    /** Assemble + (re)compile program for the current engine configuration. */
     build(): void {
         const plugins = this.engine.list();
         const { fragment, uniforms } = this.assembler.buildFragment(plugins);
 
-        // Stable cache key
+        // Stable cache key = namespaces + hash of GLSL fragment
         const shaderHash = this.hash(fragment);
         const key = "engine:" + plugins.map(p => p.namespace).join("+") + `#${shaderHash}`;
         this.program = this.cache.get(this.vertexSrc, fragment, key);
 
-        // Build prefixed views per namespace
+        // Build prefixed views per namespace (from assembler prefixes)
         this.nsViews.clear();
         for (const [ns, info] of Object.entries(uniforms)) {
             this.nsViews.set(ns, new UniformManager(this.gl, this.program, info.prefix));
         }
     }
 
-    /** Set viewport size in device pixels */
+    /** Set viewport size in device pixels (call after you size the canvas). */
     setSize(width: number, height: number): void {
         this.gl.viewport(0, 0, width, height);
     }
 
-    /** Draw one frame */
+    /** Draw one frame: set engine global(s), let plugins bind uniforms, draw quad. */
     frame(): void {
         const gl = this.gl;
         this.program.use();
 
-        // Engine global
+        // Engine global (minimal by design): u_resolution (no prefix)
         const noPrefix = new UniformManager(gl, this.program, "");
         noPrefix.set2f("u_resolution", this.canvas.width, this.canvas.height);
 
-        // Per-plugin uniforms
+        // Per-plugin uniforms (prefixed views)
         for (const p of this.engine.list()) {
             const view = this.nsViews.get(p.namespace);
-            if (!view) continue;
-
-            if (p.getUniforms) {
-                const specs = p.getUniforms();
-                this.applyUniformSpecs(view, specs);
-            }
+            (p as any).applyUniforms?.(view);
         }
 
         this.quad.draw();
     }
 
-    /** Apply uniform specifications to a manager */
-    private applyUniformSpecs(manager: UniformManager, specs: Record<string, UniformSpec>): void {
-        for (const [name, spec] of Object.entries(specs)) {
-            const value = spec.value;
-
-            if (typeof value === 'number') {
-                // Use type hint to distinguish int vs float
-                if (spec.type === 'int') {
-                    manager.set1i(name, value);
-                } else {
-                    manager.set1f(name, value);
-                }
-            } else if (Array.isArray(value)) {
-                const isInt = spec.type.startsWith('ivec');
-                switch (value.length) {
-                    case 2:
-                        if (isInt) manager.set2i(name, value[0], value[1]);
-                        else manager.set2f(name, value[0], value[1]);
-                        break;
-                    case 3:
-                        if (isInt) manager.set3i(name, value[0], value[1], value[2]);
-                        else manager.set3f(name, value[0], value[1], value[2]);
-                        break;
-                    case 4:
-                        if (isInt) manager.set4i(name, value[0], value[1], value[2], value[3]);
-                        else manager.set4f(name, value[0], value[1], value[2], value[3]);
-                        break;
-                }
-            } else if (value instanceof Float32Array) {
-                if (value.length === 9) {
-                    manager.setMatrix3fv(name, value);
-                } else if (value.length === 16) {
-                    manager.setMatrix4fv(name, value);
-                }
-            }
-        }
-    }
-
-    /** Optional accessors */
+    /** Optional accessors for advanced usage */
     getEngine(): Engine { return this.engine; }
     getProgram(): ShaderProgram { return this.program; }
 
+
+    /** Simple string hash (djb2) for stable shader cache keys */
     private hash(src: string): string {
         let h = 5381;
         for (let i = 0; i < src.length; i++) {
             h = ((h << 5) + h) ^ src.charCodeAt(i);
         }
+        // base36 keeps it short and readable
         return (h >>> 0).toString(36);
     }
+
+    // inside class
+    private ctx: PipelineContext = {};
+    setContext(ctx: PipelineContext) { this.ctx = ctx; }
+
+    frame(): void {
+        const gl = this.gl;
+        this.program.use();
+
+        const noPrefix = new UniformManager(gl, this.program, "");
+        noPrefix.set2f("u_resolution", this.canvas.width, this.canvas.height);
+
+        for (const p of this.engine.list()) {
+            const view = this.nsViews.get(p.namespace);
+            (p as any).applyUniforms?.(view, this.ctx); // pass context (optional)
+        }
+
+        this.quad.draw();
+    }
+
 }
