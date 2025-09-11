@@ -44,6 +44,7 @@ export default class UniformManager {
     }
 
 
+
 // Then guard each setter:
     set1f(name: string, x: number): void {
         const L = this.loc(name);
@@ -57,6 +58,10 @@ export default class UniformManager {
         const L = this.loc(name);
         if (L) this.gl.uniform3f(L, x, y, z);
     }
+    set4f(name: string, x: number, y: number, z: number, w: number): void {
+        const L = this.loc(name);
+        if (L) this.gl.uniform4f(L, x, y, z, w);
+    }
     set2fv(name: string, v: Float32List): void {
         const L = this.loc(name);
         if (L) this.gl.uniform2fv(L, v);
@@ -69,9 +74,17 @@ export default class UniformManager {
         const L = this.loc(name);
         if (L) this.gl.uniform1i(L, x | 0);
     }
+
+    setMatrix3fv(name: string, m: Float32Array | number[]): void {
+        const L = this.loc(name);
+        if (L) this.gl.uniformMatrix3fv(L, false, m as Float32List);
+    }
+
     setMatrix4fv(name: string, m: Float32Array | number[]): void {
         const L = this.loc(name);
         if (L) this.gl.uniformMatrix4fv(L, false, m as Float32List);
     }
+
+
 
 }

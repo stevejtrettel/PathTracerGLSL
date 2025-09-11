@@ -93,22 +93,76 @@ Tangent normalize_g(Tangent a);
 ```
 In **Euclidean**, the metric ignores `Point p`; in curved geometries it won’t.
 
+
+Here's the updated uniform system documentation:
+
 ## Uniforms: lifecycle & rules
-- **Plugins declare uniforms** with local names in TS:
+
+Uniforms follow a streamlined declare-and-provide pattern through a single method:
+
+- **Plugins declare and provide uniforms** via a single `getUniforms()` method that returns type+value pairs:
   ```ts
-  uniforms(): UniformDecl[] { return [{ name: "cam_pos", type: "vec3" }, ...]; }
+  getUniforms(): Record<string, UniformSpec> {
+    return {
+      maxBounces: { type: "int", value: this.maxBounces },
+      lightDir: { type: "vec3", value: [Math.cos(angle), 1, Math.sin(angle)] }
+    };
+  }
   ```
-- **Assembler** prefixes them at link time using the plugin’s `namespace`:
-    - prefix = `u_${namespace.replace(/[^\w]/g, "_")}_`
-    - e.g. camera `cam_pos` → `u_cam_pinhole_cam_pos`
-- **Chunks never declare uniforms.** They only *use* the local names; assembler handles declarations + namespace replacement.
-- **Uniform binding** happens in `Tracer.frame()` by calling optional `applyUniforms(view, ctx)` on each plugin:
-    - `view: UniformManager` is pre-scoped to the plugin’s prefix (so you call `set3f("cam_pos", ...)`).
-    - `ctx: PipelineContext` optionally carries `{ geometry: { runtime, frame } }` so the camera can pull `{p,f,u,r}`.
+- **State lives in plugin properties** for natural updates:
+  ```
+  export default class PathTracer implements Plugin {
+  readonly role: Role = "integrator";
+  readonly namespace = "integrator.pathtracer";
+
+    // Properties for state - natural to update
+    maxBounces = 8;
+    russianRoulette = 0.95;
+    lightAngle = 0;
+    
+    // Single method provides both types and values
+    getUniforms(): Record<string, UniformSpec> {
+        return {
+            maxBounces: { type: "int", value: this.maxBounces },
+            russianRoulette: { type: "float", value: this.russianRoulette },
+            lightDir: { 
+                type: "vec3", 
+                value: [
+                    Math.cos(this.lightAngle), 
+                    1, 
+                    Math.sin(this.lightAngle)
+                ] 
+            }
+        };
+    }
+    
+    chunks(): GLSLChunk[] {
+      ...(glsl stuff)
+    }
+    
+    // Natural update methods
+    setMaxBounces(n: number) { this.maxBounces = n; }
+    animateLight(dt: number) { this.lightAngle += dt; }
+}
+  ```
+- **Assembler extracts declarations** at build time by calling `getUniforms()` once to determine types
+- **Assembler prefixes uniforms** at link time using the plugin's namespace:
+  - prefix = `u_${namespace.replace(/[^\w]/g, "_")}_`
+  - e.g. camera's `cam_pos` → `u_cam_pinhole_cam_pos`
+- **Chunks never declare uniforms.** They only use local names; assembler handles declarations + namespace replacement
+- **Runtime updates** happen each frame: `Tracer.frame()` calls `getUniforms()` to get current values
+- **Separation of concerns**: Plugin state can include internal properties not exposed as uniforms—only what's returned from `getUniforms()` becomes shader uniforms
+
+**Key benefits:**
+- Single method instead of `uniforms()` + `applyUniforms()`
+- Properties update naturally without special setters
+- Computed values (like animated directions) are handled inline
+- Type and value are colocated for clarity
 
 **Engine globals** reserved (declared without prefix):
 - `uniform vec2 u_resolution;`
-- Future globals: `u_time`, `u_frame`, `u_history`, `u_sampleCount` (accumulation).
+- Future globals: `u_time`, `u_frame`, `u_history`, `u_sampleCount` (accumulation)
+
 
 ## Shader assembly (what the assembler guarantees)
 - **Dedup & order.** All chunks are collected, toposorted by `deps`, and **geometry is placed first** (`types`, then `ops`).

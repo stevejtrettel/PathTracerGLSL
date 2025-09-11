@@ -1,29 +1,22 @@
 /**
  * Core contracts for the modular renderer.
- * Keep this tiny and readable; we’ll expand as needed.
+ * Keep this tiny and readable; we'll expand as needed.
  */
 
 export type Stage = "frag" | "vert" | "common";
 
 /** A named GLSL contribution with optional dependencies. */
 export interface GLSLChunk {
-    /** Unique, role-scoped identifier, e.g. "integrator.integrate" */
     name: string;
-    /** Which pipeline stage this targets (mostly "frag" for now). */
     stage: Stage;
-    /** The actual GLSL source (from a .frag/.glsl file). */
     source: string;
-    /** Other chunk names this one needs before it. */
-   // deps: string[];// Always present, [] if none
-    deps?: readonly string[];   // ← accept readonly/literal arrays
+    deps?: readonly string[];
 }
-
-
 
 /** Well-known roles; exactly one active plugin per role. */
 export type Role = "geometry" | "camera" | "integrator" | "display" | "controls" | "lib";
 
-/** Declarative uniform (local name; engine will prefix at link time). */
+/** Declarative uniform types */
 export type UniformType =
     | "float" | "int"
     | "vec2" | "vec3" | "vec4"
@@ -31,53 +24,37 @@ export type UniformType =
     | "mat3" | "mat4"
     | "sampler2D" | "samplerCube";
 
+/** Uniform declaration (used internally by assembler) */
 export interface UniformDecl {
-    name: string;   // local name, e.g. "time", "tint", "accumBuffer"
+    name: string;
     type: UniformType;
 }
 
-/** Base plugin interface (per-role provider of chunks + uniforms). */
-export interface Plugin {
-    /** Namespace used for uniform prefixing & diagnostics, e.g. "integrator", "display.aces". */
-    namespace: string;
-    /** Which role this plugin fulfills. */
-    role: Role;
-    /** GLSL contributions (functions/helpers) this plugin provides. */
-    chunks(): GLSLChunk[];
-    /** Uniforms this plugin needs (local names; engine will prefix). */
-    uniforms(): UniformDecl[];
-    /** Later: parameters(): Parameter[] */
+/** Uniform specification with type and value */
+export interface UniformSpec {
+    type: UniformType;
+    value: number | number[] | Float32Array | WebGLTexture;
 }
 
-/**
- * Recommended contract names (engine will look for exactly one of each at link time):
- * - Camera must provide:   "camera.generateRay"   -> Ray generateRay(vec2 filmUV);
- * - Integrator must provide:"integrator.integrate"-> vec3 integrate(vec2 fragCoord);
- * - Display must provide:  "display.display"      -> vec3 display(vec3 hdr);
- *
- * Common uniforms reserved by the engine (optional per stage):
- *   uniform vec2  u_resolution;
- *   uniform float u_time;
- *   uniform int   u_frame;
- *   // Later (accumulation):
- *   uniform sampler2D u_history;
- *   uniform int       u_sampleCount;
- */
+/** Base plugin interface */
+export interface Plugin {
+    namespace: string;
+    role: Role;
+    chunks(): GLSLChunk[];
+
+    /** Single method provides both types and values */
+    getUniforms?(): Record<string, UniformSpec>;
+}
+
+/** Recommended contract names */
 export const ChunkNames = {
     GeometryTypes: "geometry.types",
     GeometryOps: "geometry.ops",
     CameraGenerateRay: "camera.generateRay",
     IntegratorIntegrate: "integrator.integrate",
     DisplayDisplay: "display.display",
-    SceneSDF: "scene.sdf",           //for now
+    SceneSDF: "scene.sdf",
 } as const;
-
-
-
-
-
-
-
 
 // ---------- Geometry contracts (runtime) ----------
 export type Vec3 = { x: number; y: number; z: number };
@@ -87,24 +64,18 @@ export interface GeoFrame {
     [key: string]: unknown;
 }
 
-/** Minimal runtime hooks every geometry provides (no library types). */
+/** Minimal runtime hooks every geometry provides */
 export interface GeometryRuntime<F extends GeoFrame = GeoFrame> {
     createDefaultFrame(): F;
-
-    /** Move in *local* [right, up, forward]. Units: world-units/sec. */
     moveLocal(frame: F, local: Vec3, speed: number, dt: number): void;
-
-    /** Rotate about *local* axes: pitch (about right), yaw (about up), roll (about forward). */
     rotateLocal(frame: F, angular: Vec3, rotSpeed: number, dt: number): void;
-
-    /** Optional re-orthonormalization / cleanup. */
     stabilize?(frame: F): void;
 }
 
 /** A complete geometry module = shader plugin + runtime. */
 export interface GeometryModule<F extends GeoFrame = GeoFrame> {
-    shader: Plugin;                // contributes geometry.types / geometry.ops
-    runtime: GeometryRuntime<F>;   // owns and updates the frame
+    shader: Plugin;
+    runtime: GeometryRuntime<F>;
 }
 
 /** Optional context passed to plugins during uniform binding. */
