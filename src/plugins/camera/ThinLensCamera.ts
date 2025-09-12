@@ -2,9 +2,9 @@
 import type {
     Plugin, GLSLChunk, Role, Stage, PipelineContext, UniformDecl,
     ParameterDescriptor, ParameterView
-} from "../core/types";
-import { ChunkNames } from "../core/types";
-import UniformManager from "../systems/UniformManager";
+} from "../../core/types";
+import { ChunkNames } from "../../core/types";
+import UniformManager from "../../systems/UniformManager";
 
 const THIN_LENS_CHUNK_SRC = /* glsl */`
 // camera.generateRay — thin lens camera with depth of field

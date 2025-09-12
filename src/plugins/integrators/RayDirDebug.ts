@@ -1,5 +1,5 @@
-import type { Plugin, GLSLChunk, Role, Stage } from "../core/types";
-import { ChunkNames } from "../core/types";
+import type { Plugin, GLSLChunk, Role, Stage } from "../../core/types";
+import { ChunkNames } from "../../core/types";
 
 const SRC = /* glsl */`
 // integrator.integrate — debug: visualize camera ray direction

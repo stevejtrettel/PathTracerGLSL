@@ -6,9 +6,9 @@
 import type {
     Plugin, GLSLChunk, Role, Stage, PipelineContext, UniformDecl,
     ParameterDescriptor, ParameterView  // NEW: Add these types
-} from "../core/types";
-import { ChunkNames } from "../core/types";
-import UniformManager from "../systems/UniformManager";
+} from "../../core/types";
+import { ChunkNames } from "../../core/types";
+import UniformManager from "../../systems/UniformManager";
 
 const CAMERA_CHUNK_SRC = /* glsl */`
 // camera.generateRay — pinhole camera

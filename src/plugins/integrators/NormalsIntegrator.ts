@@ -1,5 +1,5 @@
-import type { Plugin, GLSLChunk, Role, Stage } from "../core/types";
-import { ChunkNames } from "../core/types";
+import type { Plugin, GLSLChunk, Role, Stage } from "../../core/types";
+import { ChunkNames } from "../../core/types";
 
 const INTEGRATOR_SRC = /* glsl */`
 // integrator.integrate — sphere tracing + normal viz

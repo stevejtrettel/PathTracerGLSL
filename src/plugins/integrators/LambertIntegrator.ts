@@ -1,6 +1,6 @@
-import type { Plugin, GLSLChunk, Role, Stage, UniformDecl } from "../core/types";
-import { ChunkNames } from "../core/types";
-import UniformManager from "../systems/UniformManager";
+import type { Plugin, GLSLChunk, Role, Stage, UniformDecl } from "../../core/types";
+import { ChunkNames } from "../../core/types";
+import UniformManager from "../../systems/UniformManager";
 
 const SRC = /* glsl */`
 // integrator.integrate — sphere tracing + Lambert lighting driven by uniform light_dir

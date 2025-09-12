@@ -1,4 +1,4 @@
-import type { Plugin, GLSLChunk, UniformDecl } from "../core/types";
+import type { Plugin, GLSLChunk, UniformDecl } from "../../core/types";
 import testIntegrator from "./test_integrator.glsl";
 
 /**

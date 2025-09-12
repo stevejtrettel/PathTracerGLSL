@@ -52,7 +52,7 @@ import fullscreenVert from "./glsl/fullscreen.vert.glsl";
 // Plugins
 import EuclideanGeometryPlugin from "./geometry/EuclideanGeometryPlugin";
 import PinholeCameraPlugin from "./camera/PinholeCameraPlugin";
-import NormalsIntegrator from "./integration/NormalsIntegrator";
+import NormalsIntegrator from "./integrators/NormalsIntegrator";
 import SRGBDisplayPlugin from "./display/SRGBDisplayPlugin";
 
 // Setup canvas + tracer

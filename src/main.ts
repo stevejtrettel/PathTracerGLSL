@@ -4,12 +4,12 @@ import fullscreenVert from "./glsl/fullscreen.vert.glsl";
 
 import { createEuclideanModule } from "./geometry/Euclidean/EuclideanModule";
 
-import PinholeCamera from "./camera/PinholeCamera";
-import SceneSDFDemoPlugin from "./scene/SceneSDFDemoPlugin";
-import SRGBDisplayPlugin from "./display/SRGBDisplay";
+import PinholeCamera from "./plugins/camera/PinholeCamera";
+import SceneSDFDemoPlugin from "./plugins/scene/SceneSDFDemoPlugin";
+import SRGBDisplayPlugin from "./plugins/display/SRGBDisplay";
 
-import LambertIntegrator from "./integration/LambertIntegrator";
-import NormalsIntegrator from "./integration/NormalsIntegrator";
+import LambertIntegrator from "./plugins/integrators/LambertIntegrator";
+import NormalsIntegrator from "./plugins/integrators/NormalsIntegrator";
 
 // --- Canvas bootstrap ---
 const canvas = document.createElement("canvas");
