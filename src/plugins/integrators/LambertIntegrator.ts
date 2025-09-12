@@ -1,64 +1,61 @@
+// src/plugins/integrators/LambertIntegrator.ts
 import type { Plugin, GLSLChunk, Role, Stage, UniformDecl } from "../../core/types";
 import { ChunkNames } from "../../core/types";
 import UniformManager from "../../systems/UniformManager";
 
 const SRC = /* glsl */`
-// integrator.integrate — sphere tracing + Lambert lighting driven by uniform light_dir
-// NOTE: 'light_dir' is declared by the assembler from uniforms(); do not redeclare here.
+// integrator.integrate — ray/scene intersect + simple Lambert + tiny spec
 
-// finite-difference normal from scene.sdf
-vec3 estimateNormal(Point p){
-  const float e = 1e-3;
-  float dx = map(p + Point(e,0,0)) - map(p - Point(e,0,0));
-  float dy = map(p + Point(0,e,0)) - map(p - Point(0,0,e));
-  float dz = map(p + Point(0,0,e)) - map(p - Point(0,0,e));
-  return normalize(vec3(dx, dy, dz));
-}
-
+// Sky gradient
 vec3 sky(vec3 dir){
   float t = 0.5 * (dir.y + 1.0);
   return mix(vec3(0.7,0.8,1.0), vec3(0.4,0.6,1.0), t);
 }
 
-// DO NOT declare: uniform vec3 light_dir;  // assembler provides it
+// NOTE: 'light_dir' is a uniform provided by uniforms(); do NOT redeclare it here.
 
 vec3 integrate(vec2 fragCoord){
-  vec2 uv  = fragCoord / u_resolution;   // [0,1]^2
-  Ray ray  = generateRay(uv);
+  // film coords → primary ray
+  vec2 uv  = (fragCoord + 0.5) / u_resolution;  // [0,1]^2
+  Ray  ray = generateRay(uv);
 
-  const float EPS  = 1e-3;
+  // intersect scene
   const float TMIN = 1e-3;
   const float TMAX = 100.0;
-  float t = 0.0;
-  bool hit = false;
+  Hit h = scene_intersect(ray, TMIN, TMAX);
+  if (!h.hit) return sky(ray.d);
 
-  // classic sphere tracing
-  for (int i = 0; i < 128; ++i) {
-    Point q = ray.o + ray.d * t;
-    float d = map(q);
-    if (d < EPS) {
-      if (t > TMIN) { hit = true; break; }
-      t += EPS;
-    } else {
-      t += d;
-    }
-    if (t > TMAX) break;
-  }
+  // shading point & data
+  Point    p = ray.o + ray.d * h.t;
+  Dir      n = scene_normal(p, h);
+  Material m = scene_material(h.mat);
 
-  if (!hit) return sky(ray.d);
+  // lighting (single directional)
+  vec3  L = normalize(light_dir);   // provided by TS side
+  vec3  V = normalize(ray.o - p);
+  float NdotL = max(dot(n, L), 0.0);
 
-  Point p = ray.o + ray.d * t;
-  vec3 n = estimateNormal(p);
+  // lambert
+  vec3 diffuse = m.baseColor * NdotL;
 
-  vec3 L = normalize(light_dir);  // <-- just use it
-  float ndotl = max(dot(n, L), 0.0);
+  // tiny Blinn-Phong specular for a highlight; energy-not-physical (demo only)
+  vec3  H     = normalize(L + V);
+  float shin  = mix(8.0, 256.0, 1.0 - m.roughness);
+  float specF0 = mix(0.04, 1.0, m.metalness);   // crude F0 blend
+  float spec  = pow(max(dot(n, H), 0.0), shin);
+  vec3  specCol = mix(vec3(specF0), m.baseColor, m.metalness) * spec;
 
-  vec3 base = vec3(0.8);
-  vec3 ambient = vec3(0.1);
-  return ambient + base * ndotl;
+  // emission from material
+  vec3 emission = m.emission;
+
+  // ambient term (cheap fill)
+  vec3 ambient = 0.1 * m.baseColor;
+
+
+
+  return ambient + diffuse + specCol + emission;
 }
 `;
-
 
 export interface LambertOptions {
     /** Static light direction (world-space). Default: [0.5, 1, 0.3]. */
@@ -100,9 +97,11 @@ export default class LambertIntegrator implements Plugin {
             source: SRC,
             deps: [
                 ChunkNames.GeometryTypes,
-                ChunkNames.GeometryOps,
                 ChunkNames.CameraGenerateRay,
-                ChunkNames.SceneSDF,
+                ChunkNames.SceneTypes,      // ← add this
+                ChunkNames.SceneIntersect,
+                ChunkNames.SceneNormal,
+                ChunkNames.SceneMaterial,
             ],
         }];
     }
@@ -113,7 +112,6 @@ export default class LambertIntegrator implements Plugin {
         if (this.animate) {
             const t = (performance.now() - this.t0) * 0.001; // seconds
             const a = t * this.speed;
-            // rotate around Y; keep a stable elevation
             const r = 1.0;
             lx =  r * Math.cos(a);
             ly =  this.elevationY;
@@ -122,7 +120,6 @@ export default class LambertIntegrator implements Plugin {
             [lx, ly, lz] = this.baseDir;
         }
 
-        // Set as-is; shader normalizes.
         view.set3f("light_dir", lx, ly, lz);
     }
 }

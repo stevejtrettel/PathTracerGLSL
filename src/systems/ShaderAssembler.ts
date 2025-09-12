@@ -7,10 +7,9 @@
  */
 
 import type { GLSLChunk, Plugin } from "../core/types";
-import {ChunkNames} from "../core/types";
+import { ChunkNames } from "../core/types";
 import { topoSortChunks } from "./DependencyResolver";
-
-
+import { SceneTypesChunk } from "../glsl/builtins/sceneTypes";
 
 function assertUniqueNamespaces(plugins: Plugin[]) {
     const seen = new Set<string>();
@@ -24,19 +23,16 @@ function assertUniqueNamespaces(plugins: Plugin[]) {
     }
 }
 
-
-
 export interface AssembledFragment {
     fragment: string;
     /** Map of plugin namespace -> { prefix, uniforms: {local,prefixed,type}[] } */
     uniforms: Record<
-    string,
-    { prefix: string; uniforms: { local: string; prefixed: string; type: string }[] }
-    >;
+        string,
+        { prefix: string; uniforms: { local: string; prefixed: string; type: string }[] }
+        >;
 }
 
 export default class ShaderAssembler {
-
 
     buildFragment(plugins: Plugin[]): AssembledFragment {
         if (!plugins.length) throw new Error("ShaderAssembler: no active plugins.");
@@ -70,20 +66,24 @@ export default class ShaderAssembler {
             // One replacement map per plugin (same for all its chunks)
             const m = new Map<string, string>();
             for (const e of entries) m.set(e.local, e.prefixed);
-            for (const chunk of chunks) {
-                replaceMap.set(chunk, m);
-            }
+            for (const chunk of chunks) replaceMap.set(chunk, m);
         }
 
         // 2) Collect chunks and enforce uniqueness (DO NOT call p.chunks() again)
         const chunks: GLSLChunk[] = Array.from(chunksPerPlugin.values()).flat();
+
+        // 2a) Inject built-in scene types exactly once (Phase 1 permanent)
+        if (!chunks.some(c => c.name === ChunkNames.SceneTypes)) {
+            chunks.push(SceneTypesChunk);
+        }
+
         const byName = new Map<string, GLSLChunk>();
         for (const c of chunks) {
             if (byName.has(c.name)) throw new Error(`ShaderAssembler: duplicate chunk "${c.name}".`);
             byName.set(c.name, c);
         }
 
-        // 2a) Early sanity on declared deps
+        // 2b) Early sanity on declared deps
         for (const c of chunks) {
             for (const d of c.deps ?? []) {
                 if (!byName.has(d)) {
@@ -96,7 +96,7 @@ export default class ShaderAssembler {
         const orderedRaw = topoSortChunks(chunks);
         const ordered = this.geometryFirst(orderedRaw);
 
-        // 4) Ensure required contracts exist
+        // 4) Ensure required contracts exist (integrator + display only for now)
         this.assertRequiredChunks(byName);
 
         // 5) Apply uniform prefixing & concatenate
@@ -104,51 +104,60 @@ export default class ShaderAssembler {
             .map((c) => this.applyUniformPrefixing(c.source, replaceMap.get(c)))
             .join("\n\n");
 
-        // 6) Build final fragment
-        const fragment = this.buildFragmentTemplate({ uniformLines: uniformDeclLines, chunksSource });
+        // 6) Feature defines (harmless for now; useful later)
+        const featureDefines = this.computeFeatureDefines(byName);
+
+        // 7) Build final fragment
+        const fragment = this.buildFragmentTemplate({
+            uniformLines: uniformDeclLines,
+            featureDefines,
+            chunksSource
+        });
 
         return { fragment, uniforms: uniformSpec };
     }
 
-
-
     // ---- internals ----
-
-
 
     private buildFragmentTemplate({
                                       uniformLines,
+                                      featureDefines,
                                       chunksSource,
                                   }: {
         uniformLines: string[];
+        featureDefines: string;
         chunksSource: string;
     }): string {
         const header = `#version 300 es
-        precision highp float;
-        
-        in vec2 v_uv;
-        out vec4 outColor;
-        
-        // --- Engine global (minimal by design) ---
-        uniform vec2 u_resolution;
-        
-        ${uniformLines.join("\n")}
-        `;
-                const main = `
-        void main() {
-          vec3 color = integrate(gl_FragCoord.xy);   // provided by integrator
-          color = display(color);                    // provided by display
-          outColor = vec4(color, 1.0);
-        }
-        `;
+precision highp float;
+
+in vec2 v_uv;
+out vec4 outColor;
+
+// --- Engine global (minimal by design) ---
+uniform vec2 u_resolution;
+
+// --- Feature defines (auto) ---
+${featureDefines}
+
+${uniformLines.join("\n")}
+`;
+        const main = `
+void main() {
+  vec3 color = integrate(gl_FragCoord.xy);   // provided by integrator
+  color = display(color);                    // provided by display
+  outColor = vec4(color, 1.0);
+}
+`;
         return [header.trim(), chunksSource.trim(), main.trim()].join("\n\n");
     }
 
-
-
-
-
-
+    private computeFeatureDefines(byName: Map<string, GLSLChunk>): string {
+        const defs: string[] = [];
+        if (byName.has(ChunkNames.SceneNormal))         defs.push("#define SCENE_HAS_NORMAL 1");
+        if (byName.has(ChunkNames.SceneSignedDistance)) defs.push("#define SCENE_HAS_SIGNED_DISTANCE 1");
+        return defs.join("\n");
+    }
 
     private makePrefix(namespace: string): string {
         const safe = namespace.replace(/[^\w]/g, "_");
@@ -156,28 +165,30 @@ export default class ShaderAssembler {
     }
 
     private applyUniformPrefixing(src: string, map?: Map<string, string>): string {
-    if (!map || map.size === 0) return src;
-    let out = src;
-    for (const [local, prefixed] of map.entries()) {
-    const re = new RegExp(`\\b${this.escapeRegex(local)}\\b`, "g");
-    out = out.replace(re, prefixed);
-}
-return out;
-}
+        if (!map || map.size === 0) return src;
+        let out = src;
+        for (const [local, prefixed] of map.entries()) {
+            const re = new RegExp(`\\b${this.escapeRegex(local)}\\b`, "g");
+            out = out.replace(re, prefixed);
+        }
+        return out;
+    }
 
-private escapeRegex(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+    private escapeRegex(s: string): string {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
 
-private geometryFirst(list: GLSLChunk[]): GLSLChunk[] {
-    const types = list.filter((c) => c.name === ChunkNames.GeometryTypes);
-    const ops   = list.filter((c) => c.name === ChunkNames.GeometryOps);
-    const rest  = list.filter(
-        (c) => c.name !== ChunkNames.GeometryTypes && c.name !== ChunkNames.GeometryOps
-    );
-    return [...types, ...ops, ...rest];
-}
-
+    private geometryFirst(list: GLSLChunk[]): GLSLChunk[] {
+        const types = list.filter((c) => c.name === ChunkNames.GeometryTypes);
+        const ops   = list.filter((c) => c.name === ChunkNames.GeometryOps);
+        const sceneTypes = list.filter(c => c.name === ChunkNames.SceneTypes); // ← stuff for the scene!
+        const rest = list.filter(c =>
+            c.name !== ChunkNames.GeometryTypes &&
+            c.name !== ChunkNames.GeometryOps &&
+            c.name !== ChunkNames.SceneTypes        // ← add
+        );
+        return [...types, ...ops, ...sceneTypes, ...rest];
+    }
 
     private assertRequiredChunks(byName: Map<string, GLSLChunk>) {
         const missing: string[] = [];
@@ -198,7 +209,4 @@ private geometryFirst(list: GLSLChunk[]): GLSLChunk[] {
             throw new Error(`ShaderAssembler: missing required chunks: ${missing.join(", ")}`);
         }
     }
-
-
-
 }

@@ -5,9 +5,13 @@ import fullscreenVert from "./glsl/fullscreen.vert.glsl";
 import { createEuclideanModule } from "./geometry/Euclidean/EuclideanModule";
 
 import PinholeCamera from "./plugins/camera/PinholeCamera";
-import SceneSDFDemoPlugin from "./plugins/scene/SceneSDFDemoPlugin";
 import SRGBDisplayPlugin from "./plugins/display/SRGBDisplay";
 
+// NEW: first-class scene plugins
+import SceneSDFDemo from "./plugins/scene/SceneSDFDemo";
+import SceneThreeSpheres from "./plugins/scene/SceneThreeSpheres";
+
+// Integrators rewritten to call scene_* contract
 import LambertIntegrator from "./plugins/integrators/LambertIntegrator";
 import NormalsIntegrator from "./plugins/integrators/NormalsIntegrator";
 
@@ -24,24 +28,24 @@ const { module: geo, frame } = createEuclideanModule();
 tracer.use(geo.shader); // shader half
 tracer.setContext({ geometry: { runtime: geo.runtime, frame } }); // runtime+frame
 
-// --- Base pipeline (production-ish): Pinhole + Scene + Lambert + sRGB ---
+// --- Plugins (pick base pipeline) ---
+// Base = Pinhole + Demo Scene + Lambert + sRGB
+const camera = new PinholeCamera({ fovYDeg: 60, parameters: ["fov"] });
+const sceneDemo = new SceneSDFDemo();
+const sceneTri  = new SceneThreeSpheres();
+const lambert   = new LambertIntegrator({ animate: true, speed: 0.6, elevationY: 0.7 });
+const normals   = new NormalsIntegrator();
+
 tracer
-    .use(new PinholeCamera({
-        fovYDeg: 60,
-        parameters: ["fov"], // expose FOV as parameter
-    }))
-    .use(new SceneSDFDemoPlugin())              // provides scene.sdf
-    .use(new LambertIntegrator({                // base integrator
-        animate: true,
-        speed: 0.6,
-        elevationY: 0.7,
-    }))
+    .use(camera)
+    .use(sceneDemo)     // <- default scene at startup
+    .use(lambert)       // <- default integrator at startup
     .use(new SRGBDisplayPlugin());
 
-// --- Variant (fast): swap only the integrator to Normals ---
-tracer.addVariant("fast", {
-    integrator: new NormalsIntegrator(),
-});
+// --- Variants: swap integrator and/or scene ---
+tracer.addVariant("fast",           { integrator: normals });
+tracer.addVariant("tri",            { scene: sceneTri });
+tracer.addVariant("tri+fast",       { scene: sceneTri, integrator: normals });
 
 // --- Compile base + variants for hot switching ---
 tracer.buildAll();
@@ -88,13 +92,19 @@ slider.addEventListener("input", () => {
     tracer.setParameter("cam.pinhole", "fov", fov);
 });
 
-// --- Quick keyboard toggle for variants: 1 = base (Lambert), 2 = fast (Normals) ---
+// --- Keyboard hotkeys: 1=base, 2=fast (normals), 3=tri (Lambert), 4=tri+fast ---
 window.addEventListener("keydown", (e) => {
     if (e.key === "1") {
-        tracer.useVariant(null);        // back to base (Lambert)
-        console.log("Variant: base (Lambert)");
+        tracer.useVariant(null);        // base: Demo + Lambert
+        console.log("Variant: base (Demo + Lambert)");
     } else if (e.key === "2") {
-        tracer.useVariant("fast");      // Normals integrator
-        console.log("Variant: fast (Normals)");
+        tracer.useVariant("fast");      // Demo + Normals
+        console.log("Variant: fast (Demo + Normals)");
+    } else if (e.key === "3") {
+        tracer.useVariant("tri");       // ThreeSpheres + Lambert
+        console.log("Variant: tri (ThreeSpheres + Lambert)");
+    } else if (e.key === "4") {
+        tracer.useVariant("tri+fast");  // ThreeSpheres + Normals
+        console.log("Variant: tri+fast (ThreeSpheres + Normals)");
     }
 });

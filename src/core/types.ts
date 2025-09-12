@@ -21,8 +21,18 @@ export interface GLSLChunk {
 
 
 
-/** Well-known roles; exactly one active plugin per role. */
-export type Role = "geometry" | "camera" | "integrator" | "display" | "controls" | "lib";
+// 1) Role: add "scene"
+export type Role =
+    | "geometry"
+    | "camera"
+    | "integrator"
+    | "display"
+    | "scene"        // <— new
+    | "controls"
+    | "lib";
+
+
+
 
 /** Declarative uniform (local name; engine will prefix at link time). */
 export type UniformType =
@@ -50,29 +60,33 @@ export interface Plugin {
     /** Later: parameters(): Parameter[] */
 }
 
+
+
+
 /**
  * Recommended contract names (engine will look for exactly one of each at link time):
  * - Camera must provide:   "camera.generateRay"   -> Ray generateRay(vec2 filmUV);
  * - Integrator must provide:"integrator.integrate"-> vec3 integrate(vec2 fragCoord);
  * - Display must provide:  "display.display"      -> vec3 display(vec3 hdr);
- *
- * Common uniforms reserved by the engine (optional per stage):
- *   uniform vec2  u_resolution;
- *   uniform float u_time;
- *   uniform int   u_frame;
- *   // Later (accumulation):
- *   uniform sampler2D u_history;
- *   uniform int       u_sampleCount;
  */
+// 2) Chunk names: add scene-related constants
 export const ChunkNames = {
-    GeometryTypes: "geometry.types",
-    GeometryOps: "geometry.ops",
-    CameraGenerateRay: "camera.generateRay",
+    // existing …
+    GeometryTypes:       "geometry.types",
+    GeometryOps:         "geometry.ops",
+    CameraGenerateRay:   "camera.generateRay",
     IntegratorIntegrate: "integrator.integrate",
-    DisplayDisplay: "display.display",
-    SceneSDF: "scene.sdf",           //for now
-} as const;
+    DisplayDisplay:      "display.display",
 
+
+    // new (Phase 1 prelude + future scene contract)
+    SceneTypes:          "scene.types",          // <— new (this phase)
+    SceneIntersect:      "scene.intersect",      // future (Phase 3+)
+    SceneMaterial:       "scene.material",       // future (Phase 3+)
+    SceneNormal:         "scene.normal",         // optional
+    // SceneBounds:         "scene.bounds",         // optional
+    // SceneSignedDistance: "scene.signedDistance", // optional/future
+} as const;
 
 
 

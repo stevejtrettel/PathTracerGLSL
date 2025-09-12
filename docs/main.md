@@ -57,6 +57,27 @@ Exactly **one active plugin per role** at build time (except `"lib"`, which is a
 * `"controls"` — optional CPU-side interaction logic (no GLSL contract).
 * `"lib"` — helper code, multiple allowed, provides named GLSL chunks.
 
+
+* `"scene"` — defines the world. Provides chunks under canonical names:
+
+  * `Scene.Intersect` — computes the closest intersection along a ray  
+    (today: sphere tracing over SDFs). Returns a `Hit` struct.
+
+  * `Scene.Normal` — computes the geometric surface normal at a hit  
+    (today: finite-difference gradient of the SDF). Optional, but present in demo scenes.
+
+  * `Scene.Material` — maps a material id to a `Material` record  
+    (`baseColor`, `roughness`, `metalness`, `emission`).
+
+  * `Scene.Types` — shared struct definitions for `Hit` and `Material`.  
+    This chunk is injected once globally, always ordered early alongside  
+    `geometry.types`/`geometry.ops`.
+
+  Integrators declare dependencies on these chunks, so the assembler topo-sorts  
+  them before `integrate()`. Any chunk that mentions `Hit` or `Material` also  
+  declares a dep on `Scene.Types`, ensuring correctness.
+
+
 ### Canonical chunk names
 
 ```ts
@@ -237,7 +258,13 @@ function loop() { tracer.frame(); requestAnimationFrame(loop); }
 * **Parameters**: opt-in; keep metadata accurate; use `resetAccumulation` flag when progressive rendering is added.
 * **Readable GLSL**: short struct fields, clear function names.
 * **Geometry first**: always define `geometry.types` and `geometry.ops` before others.
-
+* **Scenes**:
+  - Always provide `Scene.Intersect` and `Scene.Material`.
+  - Provide `Scene.Normal` if possible (integrators can fallback if absent).
+  - Declare deps correctly: anything that uses `Hit`/`Material` must list `Scene.Types`;  
+    anything that calls a local map function must list `Scene.Intersect`.
+  - `Scene.Types` is also injected globally and explicitly ordered early in `geometryFirst()`,  
+    so types are guaranteed to exist before use.
 ---
 
 ## Next Steps
@@ -246,6 +273,33 @@ function loop() { tracer.frame(); requestAnimationFrame(loop); }
 * **Multipass pipelines**: render-to-texture, MRT, post-processing stages.
 * **Controls unification**: possibly fold controls into `Engine` for consistency.
 * **Developer ergonomics**: shader hot-reload, clearer error reporting, profiling hooks.
+
+
+
+### Future Scene Directions
+
+The scene contract is deliberately minimal (Intersect, Normal, Material, Types), but
+is designed to extend cleanly. Planned additions include:
+
+* **Optional capabilities** signaled by defines:  
+  `SCENE_HAS_NORMAL`, `SCENE_HAS_SIGNED_DISTANCE`, `SCENE_HAS_BOUNDS`.
+
+* **`Scene.SignedDistance`** — raw SDF evaluation. If present, the engine could inject a
+  default marcher when `Scene.Intersect` is missing.
+
+* **`Scene.Bounds`** — returns bounding information (e.g. max t) so integrators don’t guess.
+
+* **`Scene.AnyHit` / `Scene.Occluded`** — fast boolean shadow queries for lighting.
+
+* **Analytic normals** — let primitives supply exact normals; fall back to numeric gradient.
+
+* **Non-SDF scenes** — future support for meshes with BVHs or hybrid scenes mixing tracing and marching.
+
+* **Scene parameters** — expose adjustable properties (e.g. sphere radius, color) via the parameter system.
+
+These extensions can be added without breaking the current contract: integrators only
+ever depend on the canonical `scene_*` functions, and the assembler enforces ordering.
+
 
 ---
 
