@@ -1,8 +1,6 @@
- // src/camera/PinholeCameraPlugin.ts
 
 
-
-// src/camera/PinholeCameraPlugin.ts
+// src/camera/PinholeCamera.ts
 import type {
     Plugin, GLSLChunk, Role, Stage, PipelineContext, UniformDecl,
     ParameterDescriptor, ParameterView  // NEW: Add these types

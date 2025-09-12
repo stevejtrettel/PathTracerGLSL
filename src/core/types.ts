@@ -47,21 +47,6 @@ export interface UniformDecl {
     type: UniformType;
 }
 
-/** Base plugin interface (per-role provider of chunks + uniforms). */
-export interface Plugin {
-    /** Namespace used for uniform prefixing & diagnostics, e.g. "integrator", "display.aces". */
-    namespace: string;
-    /** Which role this plugin fulfills. */
-    role: Role;
-    /** GLSL contributions (functions/helpers) this plugin provides. */
-    chunks(): GLSLChunk[];
-    /** Uniforms this plugin needs (local names; engine will prefix). */
-    uniforms(): UniformDecl[];
-    /** Later: parameters(): Parameter[] */
-}
-
-
-
 
 /**
  * Recommended contract names (engine will look for exactly one of each at link time):

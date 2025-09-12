@@ -153,3 +153,102 @@ awesome — here’s a **thinking map + pick-your-own-adventure roadmap** you ca
 Each of these is self-contained and gives immediate feedback without ripping up today’s work.
 
 If you tell me which thread you want to pull first, I’ll sketch the minimal API/contract additions and test plan for that item so you can implement swiftly.
+
+
+
+
+
+# Next Steps
+
+This system is in a solid place: we can load geometry, compile shaders, attach controls, and render in real-time. The next opportunities fall into two categories: **new features (controllers, input modes)** and **structural refinements (plugin architecture, ergonomics).**
+
+---
+
+## 1. New Control Systems
+
+We currently have **KeyboardControl** and **FPSControls**. Expanding the family will make the system more versatile:
+
+- **OrbitControls**  
+  Orbit the camera around a focus point with mouse drag, zoom, and pan. Useful for object inspection.
+
+- **ArcballControls**  
+  Quaternion-based rotation that mimics a virtual trackball. Popular in CAD/math viewers for clean and intuitive orientation.
+
+- **Gamepad / Joystick Controls**  
+  Bind analog sticks to movement and rotation using the browser `Gamepad` API. Perfect for XR/VR demos or casual navigation.
+
+- **Scripted / Cinematic Paths**  
+  Drive the camera along splines or pre-recorded paths. Great for demos, flythroughs, or benchmark comparisons.
+
+- **Autopilot / AI Wandering**  
+  A “screensaver mode” where the camera drifts via noise-driven motion, keeping a target in view.
+
+Each of these fits naturally as a `controls` plugin with its own parameters and update loop.
+
+---
+
+## 2. Controls Infrastructure
+
+We could improve **how controls integrate**:
+
+- **Unified Attach/Detach API**  
+  Right now, controls manually add/remove event listeners. A higher-level helper could ensure consistent lifecycle management.
+
+- **Multiple Active Controls**  
+  Allow combining plugins (e.g., `KeyboardControl` + `OrbitControls`) and blending their outputs, instead of just one active control at a time.
+
+- **Global Input Abstraction**  
+  Insert a layer between raw events and controls. Controls could then consume high-level actions (“MoveForward”, “YawLeft”), making remapping and multi-device input trivial.
+
+---
+
+## 3. Plugin Architecture Refinements
+
+Currently, all plugins share the same shape, even though **controls** are CPU-only and **geometry/camera/integrator** are CPU+shader. Possible refinements:
+
+- **Split Plugin Interfaces**  
+  Define `ShaderPlugin` (with `chunks`, `uniforms`, etc.) vs. `ControlPlugin` (with `update`, `attach`, `detach`). This makes contracts explicit.
+
+- **Engine Awareness of CPU-only Plugins**  
+  Instead of special-casing controls in `Tracer`, the engine could manage **two plugin collections**: one for shader roles, one for CPU-only roles. This keeps frame orchestration cleaner.
+
+- **Parameter Tiering**  
+  Differentiate *performance-critical* params (like accumulation reset) from *UI-only* params (like control smoothing). This could help with reset logic and auto-benchmarks.
+
+---
+
+## 4. Rendering System Improvements
+
+While not strictly input-related, these tie into a smoother developer workflow:
+
+- **Accumulation / History**  
+  Implement `u_frame` counters and accumulation textures, with automatic reset when controls move the camera.
+
+- **Multipass Rendering**  
+  Add support for render-to-texture and post-process stages (denoisers, tone-mapping, bloom).
+
+- **Diagnostics and Hot Reload**  
+  Better error reporting, shader hot reload, and UI hooks to inspect active variants and controls.
+
+---
+
+## 5. Ergonomics and Future-Proofing
+
+- **Variant Controls**  
+  Variants currently only swap shader plugins; allowing them to swap in alternate controls could be useful for testing.
+
+- **Profiles / Presets**  
+  Group plugins + controls into saved configurations that can be loaded at runtime.
+
+- **Testing and Determinism**  
+  Add deterministic “replay logs” of controls input → makes debugging and performance benchmarking repeatable.
+
+---
+
+### Summary
+
+The next steps branch in two directions:
+1. **Expand the library of control plugins** (keyboard, mouse, orbit, gamepad, scripted paths, autopilot).
+2. **Refine the plugin system** to clearly distinguish shader-based vs CPU-only roles, improving clarity and extensibility.
+
+Both directions strengthen the core philosophy: **modular, geometry-first, readable, testable.**

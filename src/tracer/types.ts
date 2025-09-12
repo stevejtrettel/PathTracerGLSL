@@ -1,23 +1,25 @@
 // src/tracer/types.ts
-import type { Plugin, Role } from "../core/types";
+import type { Plugin } from "../core/types";
 import type ShaderProgram from "../rendering/ShaderProgram";
 import type UniformManager from "../systems/UniformManager";
 
 export type NsToUniforms = Map<string, UniformManager>;
 
-/** Compiled GPU artifact + uniform views for a specific plugin set */
+/** Compiled GPU artifact + uniform views for a specific plugin set (shader participants only) */
 export interface CompiledPipeline {
-    plugins: Plugin[];       // resolved plugin set used to build this program (excludes controls)
+    plugins: Plugin[];       // shader-participating plugins used to build this program
     program: ShaderProgram;
     nsViews: NsToUniforms;   // per-namespace uniform views based on the assembler's prefixes
     key: string;             // cache key (for diagnostics)
     hash: string;            // fragment hash (for diagnostics)
 }
 
-/** Variant definition = named role overrides + its compiled pipeline */
+/** Variant definition = named overrides + its compiled pipeline.
+ *  Note: variants here only affect the shader-participating set.
+ */
 export interface VariantRecord {
     name: string;
-    overrides: Map<Role, Plugin>;  // roles to replace compared to base
+    // We keep this as a Role→Plugin map for now, since your Engine is role-based.
+    overrides: Map<string, Plugin>;
     compiled?: CompiledPipeline;   // filled by buildAll()
-    controls?: Plugin;             // optional controls override
 }

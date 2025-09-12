@@ -1,7 +1,6 @@
 // src/tracer/Tracer.ts
-
 import Engine from "../core/Engine";
-import type { Plugin, Role, PipelineContext } from "../core/types";
+import type { Plugin, PipelineContext } from "../core/types";
 import UniformManager from "../systems/UniformManager";
 import ParameterManager from "../systems/ParameterManager";
 import ShaderProgram from "../rendering/ShaderProgram";
@@ -11,13 +10,30 @@ import ProgramBuilder from "../systems/ProgramBuilder";
 import VariantManager from "./VariantManager";
 import type { CompiledPipeline } from "./types";
 
+/* ---------- Capability Guards ---------- */
+function isUpdatable(p: any): p is { update(ctx: PipelineContext, dt: number): void } {
+    return p && typeof p.update === "function";
+}
+function isAttachable(p: any): p is { attach(el: HTMLElement): void; detach(): void } {
+    return p && typeof p.attach === "function" && typeof p.detach === "function";
+}
+function isShaderParticipant(p: Plugin): boolean {
+    // Participates in GPU pipeline if it provides any GLSL chunks or uniforms
+    const chunks = p.chunks?.() ?? [];
+    const uniforms = p.uniforms?.() ?? [];
+    return (chunks.length > 0) || (uniforms.length > 0);
+}
+/* -------------------------------------- */
+
 export default class Tracer {
     private gl: WebGL2RenderingContext;
     private canvas: HTMLCanvasElement;
 
-    // Base (default) configuration
-    private engine = new Engine();                 // non-controls plugins
-    private baseControls?: Plugin;                 // controls plugin (not in Engine)
+    // Shader participants managed by Engine (camera, integrator, display, scene, libs, geometry shader half)
+    private engine = new Engine();
+
+    // CPU-only / pre-phase modules (e.g., keyboard controls). Multiple allowed.
+    private updatables: Set<Plugin> = new Set();
 
     // Systems
     private builder: ProgramBuilder;
@@ -32,6 +48,9 @@ export default class Tracer {
     private ctx: PipelineContext = {};
     private lastFrameTime = 0;
 
+    // Track attached attachables to manage DOM listeners
+    private attached: Set<Plugin> = new Set();
+
     constructor(opts: { canvas: HTMLCanvasElement; vertexSrc: string }) {
         this.canvas = opts.canvas;
         const gl = this.canvas.getContext("webgl2");
@@ -44,59 +63,81 @@ export default class Tracer {
 
     // --- Public API ----------------------------------------------------------
 
-    /** Register/replace the active provider for its role in the *base* configuration. */
+    /** Register a plugin. Shader-participants go to Engine; updatables run in pre-phase. */
     use(plugin: Plugin): this {
-        if (plugin.role === "controls") {
-            this.baseControls = plugin;
-            this.registerParamsFor(plugin);
-        } else {
+        const shaderish = isShaderParticipant(plugin);
+        const updatable = isUpdatable(plugin);
+
+        if (shaderish) {
             this.engine.use(plugin);
-            this.registerParamsFor(plugin);
         }
+        if (updatable) {
+            this.updatables.add(plugin);
+            // Auto-attach if capable
+            if (isAttachable(plugin)) {
+                try { plugin.attach(this.canvas); this.attached.add(plugin); } catch {}
+            }
+        }
+
+        this.registerParamsFor(plugin);
         return this;
     }
 
-    /** Remove the active provider for a role from the *base* configuration. */
-    clear(role: Role): void {
-        if (role === "controls") {
-            this.baseControls = undefined;
-        } else {
-            this.engine.clear(role);
-        }
+    /** Remove a shader-role plugin (by role). Updatables are not keyed by role; remove manually if needed. */
+    clear(role: string): void {
+        // Shader participants are role-keyed
+        this.engine.clear(role as any);
+
+        // If an updatable happened to share that role name, we do nothing here.
+        // (If you need removal: add a remove(plugin) API or track by namespace.)
     }
 
-    /** Define a named variant by specifying role overrides (any subset of roles). */
-    addVariant(name: string, overrides: { [R in Role]?: Plugin }): this {
-        // Register parameters for override plugins now so UI is ready pre-build
-        for (const role of Object.keys(overrides) as Role[]) {
+    /** Define a named variant by specifying role overrides (shader participants only). */
+    addVariant(name: string, overrides: { [R in string]?: Plugin }): this {
+        // Pre-register parameters so UI is ready pre-build
+        for (const role of Object.keys(overrides)) {
             const p = overrides[role]!;
             this.registerParamsFor(p);
         }
-        this.variants.addVariant(name, overrides);
+        this.variants.addVariant(name, overrides as any);
         return this;
     }
 
-    /** Build the base program only (compatibility). Prefer buildAll() for variants. */
+    /** Build the base program only. */
     build(): void {
-        this.baseCompiled = this.buildForPlugins(this.engine.list());
+        const shaderPlugins = this.engine.list().filter(isShaderParticipant);
+        this.baseCompiled = this.buildForPlugins(shaderPlugins);
+
         // Default active = base
         this.variants.useVariant(null);
+
+        // Ensure any attachables among updatables are attached (if not already)
+        this.syncAttachments();
+
         console.log("[Tracer] Built base program.");
     }
 
     /** Build the base program and all variants (precompile for hot-switching). */
     buildAll(): void {
-        const basePlugins = this.engine.list();
+        const basePlugins = this.engine.list().filter(isShaderParticipant);
         if (basePlugins.length === 0) {
             throw new Error("Tracer.buildAll(): no base plugins registered");
         }
         this.baseCompiled = this.buildForPlugins(basePlugins);
 
-        // Ask VariantManager to compile all variants against the current base
-        this.variants.buildAllVariants(basePlugins, this.buildForPlugins.bind(this));
+        // Compile all variants against current base; filter to shader participants
+        this.variants.buildAllVariants(
+            basePlugins,
+            this.buildForPlugins.bind(this),
+            isShaderParticipant
+        );
 
         // Default active = base
         this.variants.useVariant(null);
+
+        // Attach any attachables among updatables
+        this.syncAttachments();
+
         console.log("[Tracer] buildAll(): base +", this.variants.listVariantNames().length, "variant(s) compiled.");
     }
 
@@ -132,7 +173,7 @@ export default class Tracer {
         this.gl.viewport(0, 0, width, height);
     }
 
-    /** Draw one frame: update controls, apply parameters, set uniforms, draw quad. */
+    /** Draw one frame: PRE (updatables) → SHADER (uniforms & draw). */
     frame(): void {
         const compiled = this.variants.getActiveCompiled(this.baseCompiled);
         if (!compiled) {
@@ -142,39 +183,41 @@ export default class Tracer {
 
         const gl = this.gl;
 
-        // Calculate delta time for controls
+        // Time
         const now = performance.now() / 1000;
         const dt = this.lastFrameTime > 0 ? now - this.lastFrameTime : 0.016;
         this.lastFrameTime = now;
 
-        // Resolve active controls (variant override takes precedence over base)
-        const activeControls = this.variants.getActiveControls(this.baseControls);
-
-        // Step 1: Update controls (may mutate ctx)
-        if (activeControls && "update" in activeControls) {
-            (activeControls as any).update(this.ctx, dt);
+        // -------- PRE PHASE: CPU updatables --------
+        for (const p of this.updatables) {
+            if (p.applyParameters) {
+                const view = this.paramManager.getView(p.namespace);
+                p.applyParameters(view, this.ctx);
+            }
+            if (isUpdatable(p)) {
+                p.update(this.ctx, dt);
+            }
         }
 
-        // Compute the active plugin set that participates in the shader (no controls)
-        const pluginSet = compiled.plugins;
+        // -------- SHADER PHASE --------
+        const pluginSet = compiled.plugins; // shader participants only
 
-        // Step 2: Apply parameters to plugin state (plus controls if present)
-        const toApplyParams: Plugin[] = activeControls ? [...pluginSet, activeControls] : pluginSet;
-        for (const plugin of toApplyParams) {
+        // Apply parameters for shader-participating plugins
+        for (const plugin of pluginSet) {
             if (plugin.applyParameters) {
                 const view = this.paramManager.getView(plugin.namespace);
                 plugin.applyParameters(view, this.ctx);
             }
         }
 
-        // Step 3: Use shader program
+        // Use program
         compiled.program.use();
 
-        // Step 4: Set engine global uniforms (no prefix)
+        // Global uniforms (no prefix)
         const noPrefix = new UniformManager(gl, compiled.program, "");
         noPrefix.set2f("u_resolution", this.canvas.width, this.canvas.height);
 
-        // Step 5: Apply plugin uniforms (prefixed views)
+        // Prefixed plugin uniforms
         for (const p of pluginSet) {
             const view = compiled.nsViews.get(p.namespace);
             if (view && p.applyUniforms) {
@@ -182,7 +225,7 @@ export default class Tracer {
             }
         }
 
-        // Step 6: Draw fullscreen quad
+        // Draw
         this.quad.draw();
     }
 
@@ -206,6 +249,14 @@ export default class Tracer {
         this.variants.disposeAllPrograms();
         this.quad.dispose();
         this.builder.dispose();
+
+        // Detach attachables
+        for (const p of this.attached) {
+            if (isAttachable(p)) {
+                try { p.detach(); } catch {}
+            }
+        }
+        this.attached.clear();
     }
 
     /** Optional accessor */
@@ -217,7 +268,9 @@ export default class Tracer {
 
     /** Build a compiled pipeline for a given plugin list. */
     private buildForPlugins(plugins: Plugin[]): CompiledPipeline {
-        return this.builder.build(plugins);
+        // Ensure we only pass shader participants into the GPU builder
+        const shaderPlugins = plugins.filter(isShaderParticipant);
+        return this.builder.build(shaderPlugins);
     }
 
     /** Register parameter descriptors (and apply initial values) for a plugin if provided. */
@@ -230,6 +283,15 @@ export default class Tracer {
                     const view = this.paramManager.getView(plugin.namespace);
                     plugin.applyParameters(view, this.ctx);
                 }
+            }
+        }
+    }
+
+    /** Ensure attachables among updatables are attached to the canvas. */
+    private syncAttachments(): void {
+        for (const p of this.updatables) {
+            if (isAttachable(p) && !this.attached.has(p)) {
+                try { p.attach(this.canvas); this.attached.add(p); } catch {}
             }
         }
     }

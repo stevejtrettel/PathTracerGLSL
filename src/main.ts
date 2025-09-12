@@ -15,6 +15,11 @@ import SceneThreeSpheres from "./scene/examples/SceneThreeSpheres";
 import LambertIntegrator from "./integrators/examples/LambertIntegrator";
 import NormalsIntegrator from "./integrators/examples/NormalsIntegrator";
 
+// NEW: keyboard controls (CPU-only updatable/attachable)
+import KeyboardControl from "./plugins/controls/KeyboardControl";
+import FPSControls from "./plugins/controls/FPSControls";
+
+
 // --- Canvas bootstrap ---
 const canvas = document.createElement("canvas");
 document.body.style.margin = "0";
@@ -36,11 +41,18 @@ const sceneTri  = new SceneThreeSpheres();
 const lambert   = new LambertIntegrator({ animate: true, speed: 0.6, elevationY: 0.7 });
 const normals   = new NormalsIntegrator();
 
+// NEW: Controls (auto-attaches to canvas via Tracer; preventDefault for arrows)
+const controls = new FPSControls();
+controls.attach(canvas);
+//const controls = new KeyboardControl({ preventDefault: true });
+
 tracer
     .use(camera)
     .use(sceneDemo)     // <- default scene at startup
     .use(lambert)       // <- default integrator at startup
-    .use(new SRGBDisplayPlugin());
+    .use(new SRGBDisplayPlugin())
+    // NEW: register controls (CPU-only, runs pre-phase)
+    .use(controls);
 
 // --- Variants: swap integrator and/or scene ---
 tracer.addVariant("fast",           { integrator: normals });
@@ -91,6 +103,26 @@ slider.addEventListener("input", () => {
     label.textContent = `FOV: ${fov}°`;
     tracer.setParameter("cam.pinhole", "fov", fov);
 });
+
+// // --- NEW: Controls Enabled toggle (nice for long renders) ---
+// const ctrlToggle = document.createElement("label");
+// ctrlToggle.style.position = "fixed";
+// ctrlToggle.style.top = "80px";
+// ctrlToggle.style.left = "20px";
+// ctrlToggle.style.color = "white";
+// ctrlToggle.style.fontFamily = "monospace";
+//
+// const ctrlCheckbox = document.createElement("input");
+// ctrlCheckbox.type = "checkbox";
+// ctrlCheckbox.checked = true;
+// ctrlCheckbox.style.marginRight = "6px";
+// ctrlCheckbox.addEventListener("change", () => {
+//     tracer.setParameter("ctrl.keyboard", "enabled", ctrlCheckbox.checked);
+// });
+//
+// ctrlToggle.appendChild(ctrlCheckbox);
+// ctrlToggle.appendChild(document.createTextNode("Controls Enabled"));
+// document.body.appendChild(ctrlToggle);
 
 // --- Keyboard hotkeys: 1=base, 2=fast (normals), 3=tri (Lambert), 4=tri+fast ---
 window.addEventListener("keydown", (e) => {

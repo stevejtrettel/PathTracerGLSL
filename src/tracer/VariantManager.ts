@@ -9,26 +9,23 @@ export default class VariantManager {
     /** Register or replace a named variant with role overrides (any subset of roles). */
     addVariant(name: string, overrides: { [R in Role]?: Plugin }): void {
         const map = new Map<Role, Plugin>();
-        let controls: Plugin | undefined;
-
         for (const role of Object.keys(overrides) as Role[]) {
-            const p = overrides[role]!;
-            map.set(role, p);
-            if (role === "controls") controls = p;
+            map.set(role, overrides[role]!);
         }
-
-        this.variants.set(name, { name, overrides: map, controls });
+        this.variants.set(name, { name, overrides: map });
     }
 
-    /** Build/compile all variants against the current base plugin set. */
+    /** Build/compile all variants against the current base shader plugin set. */
     buildAllVariants(
         basePlugins: Plugin[],
-        buildForPlugins: (plugins: Plugin[]) => CompiledPipeline
+        buildForPlugins: (plugins: Plugin[]) => CompiledPipeline,
+        filterShaderParticipant?: (p: Plugin) => boolean, // optional capability filter
     ): void {
         for (const [name, v] of this.variants.entries()) {
             const resolved = this.resolveVariantPlugins(v, basePlugins);
-            v.compiled = buildForPlugins(resolved);
-            // Lightweight diagnostics for dev:
+            const filtered = filterShaderParticipant ? resolved.filter(filterShaderParticipant) : resolved;
+            v.compiled = buildForPlugins(filtered);
+
             // eslint-disable-next-line no-console
             console.log(
                 `[VariantManager] Built variant "${name}" with overrides: ${
@@ -44,14 +41,12 @@ export default class VariantManager {
             this.activeVariantName = null;
             return;
         }
-        if (!this.variants.has(name)) {
-            // eslint-disable-next-line no-console
+        const v = this.variants.get(name);
+        if (!v) {
             console.warn(`[VariantManager] Variant "${name}" is not defined.`);
             return;
         }
-        const v = this.variants.get(name)!;
         if (!v.compiled) {
-            // eslint-disable-next-line no-console
             console.warn(`[VariantManager] Variant "${name}" has not been built yet.`);
             return;
         }
@@ -65,31 +60,18 @@ export default class VariantManager {
         return v?.compiled ?? baseCompiled;
     }
 
-    /** Return the active controls plugin (variant override takes precedence over base). */
-    getActiveControls(baseControls?: Plugin): Plugin | undefined {
-        if (this.activeVariantName !== null) {
-            const v = this.variants.get(this.activeVariantName);
-            if (v?.controls) return v.controls;
-        }
-        return baseControls;
-    }
-
     /** For UI or debugging. */
     listVariantNames(): string[] {
         return Array.from(this.variants.keys());
     }
 
-    /** Helper: merge base with overrides (excluding controls for shader compilation). */
+    /** Helper: merge base with overrides (role-based, for shader participants). */
     private resolveVariantPlugins(v: VariantRecord, basePlugins: Plugin[]): Plugin[] {
         const byRole = new Map<Role, Plugin>();
         for (const p of basePlugins) byRole.set(p.role, p);
-        for (const [role, plugin] of v.overrides) {
-            if (role === "controls") continue; // controls are CPU-side; not part of shader program
-            byRole.set(role, plugin);
-        }
+        for (const [role, plugin] of v.overrides) byRole.set(role as Role, plugin);
         return Array.from(byRole.values());
     }
-
 
     /** Dispose all compiled variant programs (does NOT touch the base program). */
     disposeAllPrograms(): void {
