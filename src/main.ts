@@ -5,14 +5,13 @@ import fullscreenVert from "./glsl/fullscreen.vert.glsl";
 import { createEuclideanModule } from "./geometry/Euclidean/EuclideanModule";
 
 import PinholeCamera from "./camera/PinholeCamera";
-import ThinLensCamera from "./camera/ThinLensCamera";
 import SceneSDFDemoPlugin from "./scene/SceneSDFDemoPlugin";
-import NormalsIntegrator from "./integration/NormalsIntegrator";
 import SRGBDisplayPlugin from "./display/SRGBDisplay";
-import RayDirDebug from "./integration/RayDirDebug";
+
 import LambertIntegrator from "./integration/LambertIntegrator";
+import NormalsIntegrator from "./integration/NormalsIntegrator";
 
-
+// --- Canvas bootstrap ---
 const canvas = document.createElement("canvas");
 document.body.style.margin = "0";
 Object.assign(canvas.style, { width: "100vw", height: "100vh", display: "block" });
@@ -25,20 +24,27 @@ const { module: geo, frame } = createEuclideanModule();
 tracer.use(geo.shader); // shader half
 tracer.setContext({ geometry: { runtime: geo.runtime, frame } }); // runtime+frame
 
-// --- Register the rest of the pipeline
+// --- Base pipeline (production-ish): Pinhole + Scene + Lambert + sRGB ---
 tracer
     .use(new PinholeCamera({
         fovYDeg: 60,
-        parameters: ['fov']  // Enable FOV as a parameter
+        parameters: ["fov"], // expose FOV as parameter
     }))
-    //.use(new PinholeCameraPlugin({ fovYDeg: 60 }))
-    .use(new SceneSDFDemoPlugin())     // provides scene.sdf
-    //.use(new NormalIntegrator())      // provides integrator.integrate
-    .use(new LambertIntegrator({ animate: true, speed: 0.6, elevationY: 0.7 }))
-    .use(new SRGBDisplayPlugin())      // display.display
-    .build();// build after all .use()
+    .use(new SceneSDFDemoPlugin())              // provides scene.sdf
+    .use(new LambertIntegrator({                // base integrator
+        animate: true,
+        speed: 0.6,
+        elevationY: 0.7,
+    }))
+    .use(new SRGBDisplayPlugin());
 
+// --- Variant (fast): swap only the integrator to Normals ---
+tracer.addVariant("fast", {
+    integrator: new NormalsIntegrator(),
+});
 
+// --- Compile base + variants for hot switching ---
+tracer.buildAll();
 
 // --- Sizing / loop ---
 function resize() {
@@ -55,31 +61,40 @@ resize();
     requestAnimationFrame(loop);
 })();
 
-
-
-// Create a simple slider
-const slider = document.createElement('input');
-slider.type = 'range';
-slider.min = '10';
-slider.max = '120';
-slider.value = '60';
-slider.style.position = 'fixed';
-slider.style.top = '20px';
-slider.style.left = '20px';
-slider.style.width = '200px';
+// --- Simple FOV slider (parameter persists across variants via namespace) ---
+const slider = document.createElement("input");
+slider.type = "range";
+slider.min = "10";
+slider.max = "120";
+slider.value = "60";
+slider.style.position = "fixed";
+slider.style.top = "20px";
+slider.style.left = "20px";
+slider.style.width = "200px";
 document.body.appendChild(slider);
 
-const label = document.createElement('div');
-label.style.position = 'fixed';
-label.style.top = '50px';
-label.style.left = '20px';
-label.style.color = 'white';
-label.style.fontFamily = 'monospace';
-label.textContent = 'FOV: 60°';
+const label = document.createElement("div");
+label.style.position = "fixed";
+label.style.top = "50px";
+label.style.left = "20px";
+label.style.color = "white";
+label.style.fontFamily = "monospace";
+label.textContent = "FOV: 60°";
 document.body.appendChild(label);
 
-slider.addEventListener('input', () => {
+slider.addEventListener("input", () => {
     const fov = parseFloat(slider.value);
     label.textContent = `FOV: ${fov}°`;
-    tracer.setParameter('cam.pinhole', 'fov', fov);
+    tracer.setParameter("cam.pinhole", "fov", fov);
+});
+
+// --- Quick keyboard toggle for variants: 1 = base (Lambert), 2 = fast (Normals) ---
+window.addEventListener("keydown", (e) => {
+    if (e.key === "1") {
+        tracer.useVariant(null);        // back to base (Lambert)
+        console.log("Variant: base (Lambert)");
+    } else if (e.key === "2") {
+        tracer.useVariant("fast");      // Normals integrator
+        console.log("Variant: fast (Normals)");
+    }
 });

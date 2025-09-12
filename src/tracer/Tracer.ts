@@ -2,35 +2,35 @@
 
 import Engine from "../core/Engine";
 import type { Plugin, Role, PipelineContext } from "../core/types";
-import ShaderAssembler from "../systems/ShaderAssembler";
 import UniformManager from "../systems/UniformManager";
 import ParameterManager from "../systems/ParameterManager";
-import ProgramCache from "../rendering/ProgramCache";
 import ShaderProgram from "../rendering/ShaderProgram";
 import FullscreenQuad from "../rendering/FullscreenQuad";
 
-type NsToUniforms = Map<string, UniformManager>;
+import ProgramBuilder from "../systems/ProgramBuilder";
+import VariantManager from "./VariantManager";
+import type { CompiledPipeline } from "./types";
 
 export default class Tracer {
     private gl: WebGL2RenderingContext;
     private canvas: HTMLCanvasElement;
-    private vertexSrc: string;
 
-    private engine = new Engine();
-    private assembler = new ShaderAssembler();
-    private cache: ProgramCache;
+    // Base (default) configuration
+    private engine = new Engine();                 // non-controls plugins
+    private baseControls?: Plugin;                 // controls plugin (not in Engine)
+
+    // Systems
+    private builder: ProgramBuilder;
     private quad: FullscreenQuad;
     private paramManager = new ParameterManager();
+    private variants = new VariantManager();
 
-    private program!: ShaderProgram;
-    private nsViews: NsToUniforms = new Map();
+    // Compiled pipelines
+    private baseCompiled?: CompiledPipeline;
+
+    // Context & timing
     private ctx: PipelineContext = {};
-
-    // Track controls plugin separately (doesn't participate in shader generation)
-    private controlsPlugin?: Plugin;
-
-    // Timing for controls
-    private lastFrameTime: number = 0;
+    private lastFrameTime = 0;
 
     constructor(opts: { canvas: HTMLCanvasElement; vertexSrc: string }) {
         this.canvas = opts.canvas;
@@ -38,53 +38,76 @@ export default class Tracer {
         if (!gl) throw new Error("WebGL2 not supported");
         this.gl = gl;
 
-        this.cache = new ProgramCache(this.gl);
+        this.builder = new ProgramBuilder(this.gl, opts.vertexSrc);
         this.quad = new FullscreenQuad(this.gl);
-        this.vertexSrc = opts.vertexSrc;
-
-        // // Set up global parameter listener for accumulation reset
-        // this.paramManager.addGlobalListener((namespace, name, value, old) => {
-        //     const descriptors = this.paramManager.getNamespaceParameters(namespace);
-        //     const desc = descriptors.find(d => d.name === name);
-        //     if (desc?.resetAccumulation && this.ctx.accumulation) {
-        //         this.ctx.accumulation.reset();
-        //     }
-        // });
     }
 
-    /** Register/replace the active provider for its role. */
+    // --- Public API ----------------------------------------------------------
+
+    /** Register/replace the active provider for its role in the *base* configuration. */
     use(plugin: Plugin): this {
-        // Special handling for controls (doesn't go into Engine)
         if (plugin.role === "controls") {
-            this.controlsPlugin = plugin;
+            this.baseControls = plugin;
+            this.registerParamsFor(plugin);
         } else {
             this.engine.use(plugin);
+            this.registerParamsFor(plugin);
         }
-
-        // Register parameters if plugin declares them
-        if (plugin.parameters) {
-            const descriptors = plugin.parameters();
-            if (descriptors.length > 0) {
-                this.paramManager.registerParameters(plugin.namespace, descriptors);
-
-                // Apply initial parameter values to plugin state
-                if (plugin.applyParameters) {
-                    const view = this.paramManager.getView(plugin.namespace);
-                    plugin.applyParameters(view, this.ctx);
-                }
-            }
-        }
-
         return this;
     }
 
-    /** Remove the active provider for a role. */
+    /** Remove the active provider for a role from the *base* configuration. */
     clear(role: Role): void {
         if (role === "controls") {
-            this.controlsPlugin = undefined;
+            this.baseControls = undefined;
         } else {
             this.engine.clear(role);
         }
+    }
+
+    /** Define a named variant by specifying role overrides (any subset of roles). */
+    addVariant(name: string, overrides: { [R in Role]?: Plugin }): this {
+        // Register parameters for override plugins now so UI is ready pre-build
+        for (const role of Object.keys(overrides) as Role[]) {
+            const p = overrides[role]!;
+            this.registerParamsFor(p);
+        }
+        this.variants.addVariant(name, overrides);
+        return this;
+    }
+
+    /** Build the base program only (compatibility). Prefer buildAll() for variants. */
+    build(): void {
+        this.baseCompiled = this.buildForPlugins(this.engine.list());
+        // Default active = base
+        this.variants.useVariant(null);
+        console.log("[Tracer] Built base program.");
+    }
+
+    /** Build the base program and all variants (precompile for hot-switching). */
+    buildAll(): void {
+        const basePlugins = this.engine.list();
+        if (basePlugins.length === 0) {
+            throw new Error("Tracer.buildAll(): no base plugins registered");
+        }
+        this.baseCompiled = this.buildForPlugins(basePlugins);
+
+        // Ask VariantManager to compile all variants against the current base
+        this.variants.buildAllVariants(basePlugins, this.buildForPlugins.bind(this));
+
+        // Default active = base
+        this.variants.useVariant(null);
+        console.log("[Tracer] buildAll(): base +", this.variants.listVariantNames().length, "variant(s) compiled.");
+    }
+
+    /** Use a compiled variant by name; pass null to revert to base. */
+    useVariant(name: string | null): void {
+        this.variants.useVariant(name);
+    }
+
+    /** List available variant names. */
+    listVariants(): string[] {
+        return this.variants.listVariantNames();
     }
 
     /** Set pipeline context (e.g., geometry frame). */
@@ -104,40 +127,16 @@ export default class Tracer {
         return this.paramManager;
     }
 
-    /** Assemble + (re)compile program for the current engine configuration. */
-    build(): void {
-        const plugins = this.engine.list();
-        if (plugins.length === 0) {
-            throw new Error("Tracer.build(): no plugins registered");
-        }
-
-        const { fragment, uniforms } = this.assembler.buildFragment(plugins);
-
-        // Stable cache key = namespaces + hash of GLSL fragment
-        const shaderHash = this.hash(fragment);
-        const key = "engine:" + plugins.map(p => p.namespace).join("+") + `#${shaderHash}`;
-        this.program = this.cache.get(this.vertexSrc, fragment, key);
-
-        // Build prefixed views per namespace (from assembler prefixes)
-        this.nsViews.clear();
-        for (const [ns, info] of Object.entries(uniforms)) {
-            this.nsViews.set(ns, new UniformManager(this.gl, this.program, info.prefix));
-        }
-
-        console.log("[Tracer] Built with:", plugins.map(p => `${p.role}:${p.namespace}`).join(", "));
-    }
-
     /** Set viewport size in device pixels (call after you size the canvas). */
     setSize(width: number, height: number): void {
         this.gl.viewport(0, 0, width, height);
-
-        // Future: Reset accumulation buffer when size changes
     }
 
     /** Draw one frame: update controls, apply parameters, set uniforms, draw quad. */
     frame(): void {
-        if (!this.program) {
-            console.warn("[Tracer] Not built yet - call build() first");
+        const compiled = this.variants.getActiveCompiled(this.baseCompiled);
+        if (!compiled) {
+            console.warn("[Tracer] Not built yet - call build() or buildAll() first");
             return;
         }
 
@@ -148,17 +147,20 @@ export default class Tracer {
         const dt = this.lastFrameTime > 0 ? now - this.lastFrameTime : 0.016;
         this.lastFrameTime = now;
 
-        // Step 1: Update controls (modifies context)
-        if (this.controlsPlugin && 'update' in this.controlsPlugin) {
-            (this.controlsPlugin as any).update(this.ctx, dt);
+        // Resolve active controls (variant override takes precedence over base)
+        const activeControls = this.variants.getActiveControls(this.baseControls);
+
+        // Step 1: Update controls (may mutate ctx)
+        if (activeControls && "update" in activeControls) {
+            (activeControls as any).update(this.ctx, dt);
         }
 
-        // Step 2: Apply parameters to plugin state
-        // Include both engine plugins and controls plugin
-        const allPlugins = [...this.engine.list()];
-        if (this.controlsPlugin) allPlugins.push(this.controlsPlugin);
+        // Compute the active plugin set that participates in the shader (no controls)
+        const pluginSet = compiled.plugins;
 
-        for (const plugin of allPlugins) {
+        // Step 2: Apply parameters to plugin state (plus controls if present)
+        const toApplyParams: Plugin[] = activeControls ? [...pluginSet, activeControls] : pluginSet;
+        for (const plugin of toApplyParams) {
             if (plugin.applyParameters) {
                 const view = this.paramManager.getView(plugin.namespace);
                 plugin.applyParameters(view, this.ctx);
@@ -166,16 +168,15 @@ export default class Tracer {
         }
 
         // Step 3: Use shader program
-        this.program.use();
+        compiled.program.use();
 
         // Step 4: Set engine global uniforms (no prefix)
-        const noPrefix = new UniformManager(gl, this.program, "");
+        const noPrefix = new UniformManager(gl, compiled.program, "");
         noPrefix.set2f("u_resolution", this.canvas.width, this.canvas.height);
-        // Future: u_time, u_frame, u_sampleCount, etc.
 
         // Step 5: Apply plugin uniforms (prefixed views)
-        for (const p of this.engine.list()) {
-            const view = this.nsViews.get(p.namespace);
+        for (const p of pluginSet) {
+            const view = compiled.nsViews.get(p.namespace);
             if (view && p.applyUniforms) {
                 p.applyUniforms(view, this.ctx);
             }
@@ -198,24 +199,38 @@ export default class Tracer {
 
     /** Clean up resources. */
     dispose(): void {
-        if (this.program) {
-            this.program.delete();
+        if (this.baseCompiled) {
+            this.baseCompiled.program.delete();
+            this.baseCompiled = undefined;
         }
+        this.variants.disposeAllPrograms();
         this.quad.dispose();
-        this.cache.disposeAll();
+        this.builder.dispose();
     }
 
-    /** Optional accessors for advanced usage */
-    getEngine(): Engine { return this.engine; }
-    getProgram(): ShaderProgram { return this.program; }
+    /** Optional accessor */
+    getProgram(): ShaderProgram | undefined {
+        return this.variants.getActiveCompiled(this.baseCompiled)?.program;
+    }
 
-    /** Simple string hash (djb2) for stable shader cache keys */
-    private hash(src: string): string {
-        let h = 5381;
-        for (let i = 0; i < src.length; i++) {
-            h = ((h << 5) + h) ^ src.charCodeAt(i);
+    // --- Internals -----------------------------------------------------------
+
+    /** Build a compiled pipeline for a given plugin list. */
+    private buildForPlugins(plugins: Plugin[]): CompiledPipeline {
+        return this.builder.build(plugins);
+    }
+
+    /** Register parameter descriptors (and apply initial values) for a plugin if provided. */
+    private registerParamsFor(plugin: Plugin): void {
+        if (plugin.parameters) {
+            const descriptors = plugin.parameters();
+            if (descriptors.length > 0) {
+                this.paramManager.registerParameters(plugin.namespace, descriptors);
+                if (plugin.applyParameters) {
+                    const view = this.paramManager.getView(plugin.namespace);
+                    plugin.applyParameters(view, this.ctx);
+                }
+            }
         }
-        // base36 keeps it short and readable
-        return (h >>> 0).toString(36);
     }
 }
