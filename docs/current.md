@@ -22,6 +22,19 @@
   - `LambertIntegrator` (Lambert shading with **parameterized light direction**; optional animation in TS).
 - **Display**
   - `SRGBDisplay` (simple tonemap + linear→sRGB).
+- **Parameter system**
+  - `ParameterManager` with hierarchical storage (`namespace → name → entry`).
+  - `ParameterDescriptor` type with rich metadata (ranges, units, UI hints).
+  - `ParameterView` for scoped access per plugin.
+  - Parameter → Plugin State → Uniform data flow.
+  - Opt-in via plugin constructor options (`parameters: ['fov']`).
+  - Change notifications and validation.
+  - Persistence via `saveParameters()`/`loadParameters()`.
+- **Parameter integration**
+  - `PinholeCameraPlugin` with adjustable FOV parameter.
+  - `ThinLensCameraPlugin` with aperture/f-stop and focus distance parameters.
+  - Tracer methods: `setParameter()`, `getParameterManager()`.
+  - Parameters applied during `frame()` before uniforms.
 
 **Result:** lit sphere & plane visible, with rotating light when enabled.
 
@@ -38,15 +51,29 @@
 - Camera → Integrator dependency: if an integrator doesn’t call `generateRay`, camera uniforms can be optimized out by the compiler.
 - Add a **`TMIN` self-intersection guard** to marchers to avoid immediate `t=0` hits.
 
+## Parameter System Rules
+- Parameters are **distinct from uniforms** - they carry user-facing metadata that uniforms don't need.
+- Parameters are **opt-in per plugin** - specify via constructor options which values to expose.
+- **Three-phase update**: User Input → Parameters → Plugin State → Uniforms.
+- Parameter names are **local to plugin** - no prefixing needed (handled by namespace).
+- **Validation happens at set-time** - invalid values are rejected, not at apply-time.
+- Controls plugins **modify context, not parameters** - frame vectors flow through context.
+
+
 ## Quick code-quality passes (high priority, small)
 1. **Program cache key hashing.**  
-   Add a stable hash of `(vertexSrc + fragmentSrc)` to the `ProgramCache` key to prevent stale program reuse when source changes but namespaces don’t.
+   Add a stable hash of `(vertexSrc + fragmentSrc)` to the `ProgramCache` key to prevent stale program reuse when source changes but namespaces don't.
 2. **Assembler dev warnings.**  
    Warn if any chunk source contains a `uniform` declaration (catches accidental redeclarations early).
 3. **UniformManager dev mode.**  
    Keep `logMissing` toggleable; default `false`, but easy to enable during bring-up.
 4. **`Stage` usage sanity.**  
    All current chunks are `"frag"`; keep it explicit in each plugin to avoid inference errors.
+5. **Parameter UI generation.**  
+   Build auto-UI from parameter descriptors (sliders, dropdowns based on metadata).
+6. **Parameter persistence.**  
+   Hook up localStorage save/restore for parameter values across sessions.
+
 
 ## Stability tests to run next (no shading complexity yet)
 - **Multiple plugins declare uniforms.** Confirm assembler declares all, and `UniformManager` resolves each, no collisions.  
@@ -74,24 +101,39 @@
 
 ## Concrete next options (pick 1–2; each is self-contained)
 1) **Controls plugin (WASD + mouse)**
-  - Role `"controls"`, no GLSL. Reads/updates `ctx.geometry.frame`.
-  - **Accept:** camera moves smoothly; no shader edits.
-2) **Thin-lens camera**
-  - Uniforms: `cam_aperture`, `cam_focusDist`, `cam_fovY`.
-  - Deterministic sampling first; later tie into accumulation.
-3) **Accumulation scaffold**
-  - Add globals: `u_time`, `u_frame` in header.
-  - Add history texture + sample count, and a running-average path.
-4) **Scene: `albedo(p)` + more primitives**
-  - Keep `map(p)`; add `albedo(p)` and use in Lambert.
-  - Add a uniform color to scene to validate multiple-plugin uniform binding.
-5) **Hyperbolic geometry (shader-only)**
-  - New `HyperbolicGeometryPlugin` defining metric ops; compile and render to see differences immediately.
+- Role `"controls"`, no GLSL. Reads/updates `ctx.geometry.frame`.
+- Can expose its own parameters (move speed, mouse sensitivity).
+- **Accept:** camera moves smoothly; no shader edits.
+2) **Parameter UI system**
+- Auto-generate controls from parameter descriptors.
+- Group parameters by plugin and parameter group.
+- Support sliders, dropdowns, color pickers based on type/hint.
+3) **More parameterized plugins**
+- Add parameters to `LambertIntegrator` (light direction, animation speed).
+- Scene objects with parameterized material properties.
+- Display plugin with exposure/gamma parameters.
+4) **Thin-lens camera** (✓ DONE)
+- ~~Uniforms: `cam_aperture`, `cam_focusDist`, `cam_fovY`.~~
+- ~~Deterministic sampling first; later tie into accumulation.~~
+5) **Accumulation scaffold**
+- Add globals: `u_time`, `u_frame` in header.
+- Add history texture + sample count, and a running-average path.
+- Hook into parameter `resetAccumulation` flag.
+
 
 ## What (if anything) should be reworked
 - **Cache key hashing** (as above) — prevents subtle “stale program” bugs.
 - **Assembler guard** for `uniform` lines in chunks — catches class of errors early.
 - **Optionally**: add a `u_time` global as part of the engine header to avoid per-plugin `performance.now()` usage.
 
+
 ## Summary
-We have a stable core, a clean geometry abstraction, a working camera contract, and a demonstrable rendering path (scene → integrator → display). The next steps focus on **robustness** (cache key, dev guards), **interactivity** (controls), and **extensibility** (extra cameras, accumulation, and additional geometries). This keeps the system steady while opening doors for deeper research work.
+We have a stable core, a clean geometry abstraction, a working camera contract, 
+a demonstrable rendering path (scene → integrator → display), 
+and **a flexible parameter system for runtime control**. 
+The next steps focus on **robustness** (cache key, dev guards), 
+**interactivity** (controls, UI generation), and **extensibility** 
+(extra cameras ✓, accumulation, and additional geometries). 
+The parameter system provides the foundation for user interaction without 
+complicating the core architecture. 
+This keeps the system steady while opening doors for deeper research work.

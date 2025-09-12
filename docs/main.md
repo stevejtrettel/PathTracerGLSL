@@ -9,15 +9,19 @@ This repository is a **research path tracer / ray marcher lab** built to be:
 
 ## Layering (who does what)
 - **`core/`** — Pure TypeScript contracts & light utilities; *no WebGL* and no GLSL strings.  
-  Defines `Plugin`, `GLSLChunk`, `UniformDecl`, roles, `ChunkNames`, geometry contracts, `PipelineContext`.
+    Defines `Plugin`, `GLSLChunk`, `UniformDecl`, roles, `ChunkNames`, geometry contracts, `PipelineContext`, `ParameterDescriptor`, `ParameterView` (parameter system types).
 - **`systems/`** — “Compiler” mechanics: shader assembly, dependency resolution, uniform binding.
     - `ShaderAssembler` (concatenate GLSL chunks, prefix uniforms, enforce contracts)
     - `UniformManager` (lookup + set uniforms with an optional namespace prefix)
     - `DependencyResolver` (toposort chunks by `deps`)
+    - `ParameterManager` (register, validate, and manage user-facing parameters)
+
 - **`rendering/`** — WebGL helpers: `ShaderProgram`, `ProgramCache`, `FullscreenQuad`.
 - **`tracer/`** — Execution façade: `Tracer` wraps the engine + systems into `use → build → frame`.
 - **`plugins/`** — Actual swappable pieces per role (camera, integrator, display, lib, geometry shader).
 - **`geometry/`** — Runtime geometry modules (CPU-side) that pair with a shader plugin.
+
+
 
 ## Roles & contracts
 Exactly **one active plugin per role** (except `"lib"` which is additive). Canonical roles today:
@@ -93,9 +97,61 @@ Tangent normalize_g(Tangent a);
 ```
 In **Euclidean**, the metric ignores `Point p`; in curved geometries it won’t.
 
+
+## Parameter System
+
+The parameter system provides a clean abstraction layer between user-facing controls and shader uniforms. It enables runtime adjustment of values with rich metadata for UI generation, validation, and persistence.
+
+### Key Concepts
+
+Parameters are **not** uniforms. They are higher-level constructs that:
+- Carry metadata (ranges, units, UI hints)
+- Support validation and constraints
+- Enable automatic UI generation
+- Can be persisted across sessions
+- Eventually map to uniforms (but with transformations)
+
+### How It Works
+
+1. **Declaration**: Plugins optionally declare parameters with rich metadata
+2. **Registration**: Tracer registers parameters with the ParameterManager
+3. **Updates**: User changes flow through parameters → plugin state → uniforms
+4. **Persistence**: Parameter values can be saved/restored independently
+
+### Plugin Integration
+
+Plugins opt into the parameter system by:
+
+```
+// Declare which values to expose
+constructor(opts: CameraOptions) {
+    this.fovRadians = opts.fovDegrees * Math.PI / 180;
+    this.exposedParams = new Set(opts.parameters || []);
+}
+
+// Provide metadata for exposed parameters
+parameters(): ParameterDescriptor[] {
+    if (!this.exposedParams.has('fov')) return [];
+    return [{
+        name: 'fov', 
+        type: 'angle',
+        default: 60,
+        min: 10, max: 120,
+        unit: 'degrees'
+    }];
+}
+// Update internal state from parameters
+applyParameters(params: ParameterView): void {
+    if (this.exposedParams.has('fov')) {
+        this.fovRadians = params.get('fov') * Math.PI / 180;
+    }
+}
+````
+
+
 ## Uniforms: lifecycle & rules
 - **Plugins declare uniforms** with local names in TS:
-  ```ts
+  ```
   uniforms(): UniformDecl[] { return [{ name: "cam_pos", type: "vec3" }, ...]; }
   ```
 - **Assembler** prefixes them at link time using the plugin’s `namespace`:
@@ -115,7 +171,7 @@ In **Euclidean**, the metric ignores `Point p`; in curved geometries it won’t.
 - **Contracts.** Fails fast if *exactly one* of `camera.generateRay` / `integrator.integrate` / `display.display` is not present.
 - **Uniform prefixing.** Replacement is applied per-plugin over its chunks (using the *same* `GLSLChunk` objects—important).
 - **Template.** Assembler wraps with a standard header & main:
-  ```glsl
+  ```
   #version 300 es
   precision highp float;
   in vec2 v_uv; out vec4 outColor;
@@ -187,11 +243,17 @@ tracer.use(geo.shader);
 tracer.setContext({ geometry: { runtime: geo.runtime, frame } });
 
 tracer
-  .use(new PinholeCameraPlugin({ fovYDeg: 60 }))
-  .use(new SceneSDFDemoPlugin())
-  .use(new LambertIntegrator({ animate: true })) // or NormalsIntegrator
-  .use(new SRGBDisplayPlugin())
-  .build();
+        .use(new PinholeCameraPlugin({
+          fovYDeg: 60,
+          parameters: ['fov']  // NEW: Expose FOV as adjustable parameter
+        }))
+        .use(new SceneSDFDemoPlugin())
+        .use(new LambertIntegrator({ animate: true }))
+        .use(new SRGBDisplayPlugin())
+        .build();
+
+// NEW: Programmatic parameter control
+tracer.setParameter('cam.pinhole', 'fov', 45);
 
 function resize() { /* set DPR-correct width/height; tracer.setSize() */ }
 requestAnimationFrame(function loop() { tracer.frame(); requestAnimationFrame(loop); });
@@ -203,3 +265,5 @@ requestAnimationFrame(function loop() { tracer.frame(); requestAnimationFrame(lo
 - **One call to `p.chunks()`** per plugin in the assembler (reuse the same objects for replacement).
 - **Short field names in GLSL**, clear function names in APIs (e.g., `Ray{ o,d }`, `Frame{ p,f,u,r }`).
 - **Namespaces matter.** Keep them stable: they determine uniform prefixes and cache keys.
+- **Parameters vs uniforms.** Parameters are user-facing with metadata; uniforms are GPU bindings. Keep them separate.
+- **Opt-in parameters.** Plugins work without parameters. When needed, expose them explicitly via constructor options.

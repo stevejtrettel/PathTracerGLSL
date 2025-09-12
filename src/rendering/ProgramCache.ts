@@ -15,7 +15,7 @@ export default class ProgramCache {
     }
 
     /** Get or create a program. `extraKey` (e.g., "PluginName:prefix") is optional. */
-    get(vertSrc: string, fragSrc: string, extraKey?: string): ShaderProgram {
+     get(vertSrc: string, fragSrc: string, extraKey?: string): ShaderProgram {
         const key = this.makeKey(vertSrc, fragSrc, extraKey);
         const hit = this.cache.get(key);
         if (hit) return hit;

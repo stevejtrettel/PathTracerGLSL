@@ -1,3 +1,4 @@
+
 /**
  * Core contracts for the modular renderer.
  * Keep this tiny and readable; we’ll expand as needed.
@@ -114,3 +115,68 @@ export interface PipelineContext<F extends GeoFrame = GeoFrame> {
         frame: F;
     };
 }
+
+
+
+
+// Rich semantic types for parameters
+export type ParameterType =
+    | 'float'
+    | 'int'
+    | 'angle'      // Shown in degrees in UI, but can be radians internally
+    | 'color'      // vec3 representing RGB
+    | 'vec2'
+    | 'vec3'
+    | 'boolean';
+
+// Describes a user-facing parameter
+export interface ParameterDescriptor {
+    name: string;                    // Local name (e.g., 'fov')
+    displayName?: string;            // UI display name (e.g., 'Field of View')
+    type: ParameterType;
+    default: any;                    // Default value
+
+    // Constraints
+    min?: number;                    // For numeric types
+    max?: number;
+    step?: number;                   // For discrete increments
+    options?: any[];                 // For discrete choices (e.g., f-stops)
+
+    // UI hints
+    unit?: string;                   // Display unit (e.g., 'degrees', 'mm')
+    uiHint?: 'slider' | 'input' | 'dropdown' | 'color-picker' | 'hidden';
+    group?: string;                  // For UI organization (e.g., 'Lens', 'Exposure')
+
+    // Behavior
+    persistent?: boolean;            // Should this be saved/restored?
+    resetAccumulation?: boolean;     // Should changes reset accumulation buffer?
+}
+
+// Read-only view of parameters for a specific namespace
+export interface ParameterView {
+    get(name: string): any;
+    has(name: string): boolean;
+    onChange(name: string, callback: (value: any, old: any) => void): void;
+    offChange(name: string, callback: (value: any, old: any) => void): void;
+}
+
+// Extended Plugin interface
+export interface Plugin {
+    // Existing methods
+    readonly role: Role;
+    readonly namespace: string;
+    uniforms(): UniformDecl[];
+    chunks(): GLSLChunk[];
+
+    //view should be a UniformManager
+    applyUniforms?(view: any, ctx?: PipelineContext): void;
+   // applyUniforms?(view: UniformManager, ctx?: PipelineContext): void;
+
+    // New parameter system methods
+    parameters?(): ParameterDescriptor[];
+    applyParameters?(params: ParameterView, ctx?: PipelineContext): void;
+
+    // For controls plugins
+    update?(ctx: PipelineContext, dt: number): void;
+}
+

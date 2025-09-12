@@ -1,9 +1,14 @@
+ // src/camera/PinholeCameraPlugin.ts
+
+
+
 // src/camera/PinholeCameraPlugin.ts
 import type {
-    Plugin, GLSLChunk, Role, Stage, PipelineContext, UniformDecl
+    Plugin, GLSLChunk, Role, Stage, PipelineContext, UniformDecl,
+    ParameterDescriptor, ParameterView  // NEW: Add these types
 } from "../core/types";
 import { ChunkNames } from "../core/types";
-import UniformManager from "../systems/UniformManager"; // ← singular folder
+import UniformManager from "../systems/UniformManager";
 
 const CAMERA_CHUNK_SRC = /* glsl */`
 // camera.generateRay — pinhole camera
@@ -23,16 +28,59 @@ Ray generateRay(vec2 filmUV) {
 }
 `;
 
-export interface PinholeOptions { fovYDeg?: number; }
+// UPDATED: Add parameters field to options
+export interface PinholeOptions {
+    fovYDeg?: number;
+    parameters?: string[] | boolean;  // NEW: Which parameters to expose
+}
 
-export default class PinholeCameraPlugin implements Plugin {
+export default class PinholeCamera implements Plugin {
     readonly role: Role = "camera";
     readonly namespace = "cam.pinhole";
 
     private fovYRad: number;
+    private exposedParams: Set<string>;  // NEW: Track which params are exposed
+
     constructor(opts: PinholeOptions = {}) {
         const deg = opts.fovYDeg ?? 60;
         this.fovYRad = (deg * Math.PI) / 180;
+
+        // NEW: Parse parameter exposure
+        if (opts.parameters === true) {
+            this.exposedParams = new Set(['fov']);
+        } else if (Array.isArray(opts.parameters)) {
+            this.exposedParams = new Set(opts.parameters);
+        } else {
+            this.exposedParams = new Set();
+        }
+    }
+
+    // NEW: Declare available parameters
+    parameters(): ParameterDescriptor[] {
+        if (!this.exposedParams.has('fov')) return [];
+
+        return [{
+            name: 'fov',
+            displayName: 'Field of View',
+            type: 'angle',
+            default: 60,
+            min: 10,
+            max: 120,
+            step: 1,
+            unit: 'degrees',
+            uiHint: 'slider',
+            group: 'Camera'
+        }];
+    }
+
+    // NEW: Update internal state from parameters
+    applyParameters(params: ParameterView, ctx?: PipelineContext): void {
+        if (this.exposedParams.has('fov')) {
+            const fovDeg = params.get('fov');
+            if (fovDeg !== undefined) {
+                this.fovYRad = (fovDeg * Math.PI) / 180;
+            }
+        }
     }
 
     uniforms(): UniformDecl[] {
@@ -56,12 +104,11 @@ export default class PinholeCameraPlugin implements Plugin {
         }];
     }
 
-    // Optional; Plugin interface doesn’t require it. Tracer passes ctx if available.
     applyUniforms(view: UniformManager, ctx?: PipelineContext) {
+        // Use the potentially updated fovYRad value
         view.set1f("cam_fovY", this.fovYRad);
 
         const f = ctx?.geometry?.frame as any;
-        console.debug("[cam.applyUniforms] frame:", f);
         if (!f) return;
 
         view.set3f("cam_pos", f.p.x, f.p.y, f.p.z);
