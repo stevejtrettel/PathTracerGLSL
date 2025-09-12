@@ -86,7 +86,7 @@ ChunkNames = {
   GeometryOps:         "geometry.ops",
   CameraGenerateRay:   "camera.generateRay",
   IntegratorIntegrate: "integrator.integrate",
-  DisplayDisplay:      "display.display",
+  DisplayDisplay:      "postprocess.postprocess",
   SceneSDF:            "scene.sdf", // convenience name for demo scenes
 } as const;
 ```

@@ -45,6 +45,11 @@ export default class UniformManager {
 
 
 // Then guard each setter:
+    set1i(name: string, x: number): void {
+        const L = this.loc(name);
+        if (L) this.gl.uniform1i(L, x | 0); // force integer for samplers/counters
+    }
+
     set1f(name: string, x: number): void {
         const L = this.loc(name);
         if (L) this.gl.uniform1f(L, x);

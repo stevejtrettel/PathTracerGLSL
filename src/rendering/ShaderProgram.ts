@@ -218,6 +218,12 @@ export default class ShaderProgram {
         this.gl.deleteProgram(this.program);
     }
 
+    set1i(name: string, x: number): void {
+        const L = this.loc(name);
+        if (L) this.gl.uniform1i(L, x | 0); // coerce to int
+    }
+
+
     // --- internals ---
 
     private compile(type: number, source: string): WebGLShader {

@@ -29,7 +29,7 @@ export default class Tracer {
     private gl: WebGL2RenderingContext;
     private canvas: HTMLCanvasElement;
 
-    // Shader participants managed by Engine (camera, integrator, display, scene, libs, geometry shader half)
+    // Shader participants managed by Engine (camera, integrator, postprocess, scene, libs, geometry shader half)
     private engine = new Engine();
 
     // CPU-only / pre-phase modules (e.g., keyboard controls). Multiple allowed.

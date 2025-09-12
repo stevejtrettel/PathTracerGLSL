@@ -26,7 +26,7 @@ export type Role =
     | "geometry"
     | "camera"
     | "integrator"
-    | "display"
+    | "postprocess"
     | "scene"        // <— new
     | "controls"
     | "lib";
@@ -52,7 +52,7 @@ export interface UniformDecl {
  * Recommended contract names (engine will look for exactly one of each at link time):
  * - Camera must provide:   "camera.generateRay"   -> Ray generateRay(vec2 filmUV);
  * - Integrator must provide:"integrator.integrate"-> vec3 integrate(vec2 fragCoord);
- * - Display must provide:  "display.display"      -> vec3 display(vec3 hdr);
+ * - Display must provide:  "postprocess.postprocess"      -> vec3 postprocess(vec3 hdr);
  */
 // 2) Chunk names: add scene-related constants
 export const ChunkNames = {
@@ -61,7 +61,7 @@ export const ChunkNames = {
     GeometryOps:         "geometry.ops",
     CameraGenerateRay:   "camera.generateRay",
     IntegratorIntegrate: "integrator.integrate",
-    DisplayDisplay:      "display.display",
+    PostprocessApply:    "postprocess.apply",    // NEW: postprocess - replaces postprocess
 
 
     // new (Phase 1 prelude + future scene contract)
@@ -131,7 +131,7 @@ export type ParameterType =
 // Describes a user-facing parameter
 export interface ParameterDescriptor {
     name: string;                    // Local name (e.g., 'fov')
-    displayName?: string;            // UI display name (e.g., 'Field of View')
+    displayName?: string;            // UI postprocess name (e.g., 'Field of View')
     type: ParameterType;
     default: any;                    // Default value
 
@@ -179,3 +179,44 @@ export interface Plugin {
     update?(ctx: PipelineContext, dt: number): void;
 }
 
+
+
+
+
+
+
+
+// types for integrators
+
+export type Lifetime = "perFrame" | "history";
+
+export type TargetFormat = "rgba16f" | "rg16f" | "r16f" | "rgba8" | "r32f";
+
+export interface TargetDesc {
+    name: string;                 // logical name, e.g. "albedo", "moments"
+    format: TargetFormat;
+    filtering?: "nearest" | "linear";
+    lifetime: Lifetime;           // cleared per-frame or persisted
+}
+
+export interface IntegratorCaps {
+    progressive?: boolean;        // default: false
+    rng?: "hash" | "sobol" | "pmj" | "blueNoise" | "custom";
+    accumulation?: "none" | "box" | "ema" | "custom";
+    extraTargets?: TargetDesc[];  // optional AOVs (MRT)
+    historyCompatHash?: string;   // bump to reset history on incompatible changes
+    // optional hints (do not force behavior)
+    needsNormals?: "required" | "optional";
+    maxRayT?: number;
+    rngSeedPolicy?: "frameIndex" | "sampleCount" | "explicit";
+}
+
+// Optional compile-time guard rails
+export function validateCaps(c: IntegratorCaps, maxMRT: number): void {
+    if (c.progressive && !c.accumulation && !c.extraTargets?.length) {
+        console.warn("[caps] Progressive set, but no accumulation/targets specified.");
+    }
+    if ((c.extraTargets?.length ?? 0) > Math.max(0, maxMRT - 1)) {
+        throw new Error(`[caps] Too many color attachments requested: ${c.extraTargets?.length}`);
+    }
+}

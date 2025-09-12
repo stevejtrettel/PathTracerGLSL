@@ -5,19 +5,21 @@ import fullscreenVert from "./glsl/fullscreen.vert.glsl";
 import { createEuclideanModule } from "./geometry/Euclidean/EuclideanModule";
 
 import PinholeCamera from "./plugins/camera/PinholeCamera";
-import SRGBDisplayPlugin from "./plugins/display/SRGBDisplay";
+import TonemapSRGB from "./plugins/postprocess/TonemapSRGB"
 
 // NEW: first-class scene plugins
 import SceneSDFDemo from "./scene/examples/SceneSDFDemo";
 import SceneThreeSpheres from "./scene/examples/SceneThreeSpheres";
 
 // Integrators rewritten to call scene_* contract
-import LambertIntegrator from "./integrators/examples/LambertIntegrator";
-import NormalsIntegrator from "./integrators/examples/NormalsIntegrator";
+import NormalsIntegrator from "./integrators/one-shot/NormalsIntegrator";
+import LambertIntegrator from "./integrators/one-shot/LambertIntegrator";
+
 
 // NEW: keyboard controls (CPU-only updatable/attachable)
 import KeyboardControl from "./plugins/controls/KeyboardControl";
 import FPSControls from "./plugins/controls/FPSControls";
+
 
 
 // --- Canvas bootstrap ---
@@ -38,19 +40,19 @@ tracer.setContext({ geometry: { runtime: geo.runtime, frame } }); // runtime+fra
 const camera = new PinholeCamera({ fovYDeg: 60, parameters: ["fov"] });
 const sceneDemo = new SceneSDFDemo();
 const sceneTri  = new SceneThreeSpheres();
-const lambert   = new LambertIntegrator({ animate: true, speed: 0.6, elevationY: 0.7 });
+const lambert   = new LambertIntegrator();
 const normals   = new NormalsIntegrator();
 
 // NEW: Controls (auto-attaches to canvas via Tracer; preventDefault for arrows)
-const controls = new FPSControls();
-controls.attach(canvas);
-//const controls = new KeyboardControl({ preventDefault: true });
+// const controls = new FPSControls();
+// controls.attach(canvas);
+const controls = new KeyboardControl({ preventDefault: true });
 
 tracer
     .use(camera)
     .use(sceneDemo)     // <- default scene at startup
     .use(lambert)       // <- default integrator at startup
-    .use(new SRGBDisplayPlugin())
+    .use(new TonemapSRGB())
     // NEW: register controls (CPU-only, runs pre-phase)
     .use(controls);
 

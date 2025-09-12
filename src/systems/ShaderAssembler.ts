@@ -96,7 +96,7 @@ export default class ShaderAssembler {
         const orderedRaw = topoSortChunks(chunks);
         const ordered = this.geometryFirst(orderedRaw);
 
-        // 4) Ensure required contracts exist (integrator + display only for now)
+        // 4) Ensure required contracts exist (integrator + postprocess only for now)
         this.assertRequiredChunks(byName);
 
         // 5) Apply uniform prefixing & concatenate
@@ -136,7 +136,9 @@ out vec4 outColor;
 
 // --- Engine global (minimal by design) ---
 uniform vec2 u_resolution;
-
+uniform int u_frameIndex;      // starts at 0, increments each frame unless reset
+uniform int u_sampleCount;     // number of samples already accumulated in history
+uniform sampler2D u_historyColor; // previous frame’s accumulated HDR (read-only this frame)
 // --- Feature defines (auto) ---
 ${featureDefines}
 
@@ -145,7 +147,7 @@ ${uniformLines.join("\n")}
         const main = `
 void main() {
   vec3 color = integrate(gl_FragCoord.xy);   // provided by integrator
-  color = display(color);                    // provided by display
+  color = postprocess(color);                    // provided by postprocessor
   outColor = vec4(color, 1.0);
 }
 `;
@@ -155,7 +157,7 @@ void main() {
     private computeFeatureDefines(byName: Map<string, GLSLChunk>): string {
         const defs: string[] = [];
         if (byName.has(ChunkNames.SceneNormal))         defs.push("#define SCENE_HAS_NORMAL 1");
-        if (byName.has(ChunkNames.SceneSignedDistance)) defs.push("#define SCENE_HAS_SIGNED_DISTANCE 1");
+        //if (byName.has(ChunkNames.SceneSignedDistance)) defs.push("#define SCENE_HAS_SIGNED_DISTANCE 1");
         return defs.join("\n");
     }
 
@@ -194,8 +196,8 @@ void main() {
         const missing: string[] = [];
         if (!byName.has(ChunkNames.IntegratorIntegrate))
             missing.push(ChunkNames.IntegratorIntegrate);
-        if (!byName.has(ChunkNames.DisplayDisplay))
-            missing.push(ChunkNames.DisplayDisplay);
+        if (!byName.has(ChunkNames.PostprocessApply))
+            missing.push(ChunkNames.PostprocessApply);
 
         // Advisory (not fatal): geometry chunks are highly recommended
         if (!byName.has(ChunkNames.GeometryTypes)) {

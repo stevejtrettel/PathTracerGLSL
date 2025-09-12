@@ -37,7 +37,7 @@ export type ParameterType =
 // Describes a user-facing parameter
 export interface ParameterDescriptor {
     name: string;                    // Local name (e.g., 'fov')
-    displayName?: string;            // UI display name (e.g., 'Field of View')
+    displayName?: string;            // UI postprocess name (e.g., 'Field of View')
     type: ParameterType;            
     default: any;                    // Default value
     

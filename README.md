@@ -53,7 +53,7 @@ import fullscreenVert from "./glsl/fullscreen.vert.glsl";
 import EuclideanGeometryPlugin from "./geometry/EuclideanGeometryPlugin";
 import PinholeCameraPlugin from "./camera/PinholeCameraPlugin";
 import NormalsIntegrator from "./integrators/NormalsIntegrator";
-import SRGBDisplayPlugin from "./display/SRGBDisplayPlugin";
+import SRGBDisplayPlugin from "./postprocess/SRGBDisplayPlugin";
 
 // Setup canvas + tracer
 const canvas = document.createElement("canvas");
