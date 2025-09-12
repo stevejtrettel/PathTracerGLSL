@@ -1,5 +1,5 @@
-import type { GLSLChunk, Stage } from "../../core/types";
-import { ChunkNames } from "../../core/types";
+import type { GLSLChunk, Stage } from "../core/types";
+import { ChunkNames } from "../core/types";
 
 const stage: Stage = "frag";
 

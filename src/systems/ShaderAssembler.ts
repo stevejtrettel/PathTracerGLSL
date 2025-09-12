@@ -9,7 +9,7 @@
 import type { GLSLChunk, Plugin } from "../core/types";
 import { ChunkNames } from "../core/types";
 import { topoSortChunks } from "./DependencyResolver";
-import { SceneTypesChunk } from "../glsl/builtins/sceneTypes";
+import { SceneTypesChunk } from "../scene/types";
 
 function assertUniqueNamespaces(plugins: Plugin[]) {
     const seen = new Set<string>();

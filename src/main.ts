@@ -8,12 +8,12 @@ import PinholeCamera from "./plugins/camera/PinholeCamera";
 import SRGBDisplayPlugin from "./plugins/display/SRGBDisplay";
 
 // NEW: first-class scene plugins
-import SceneSDFDemo from "./plugins/scene/SceneSDFDemo";
-import SceneThreeSpheres from "./plugins/scene/SceneThreeSpheres";
+import SceneSDFDemo from "./scene/examples/SceneSDFDemo";
+import SceneThreeSpheres from "./scene/examples/SceneThreeSpheres";
 
 // Integrators rewritten to call scene_* contract
-import LambertIntegrator from "./plugins/integrators/LambertIntegrator";
-import NormalsIntegrator from "./plugins/integrators/NormalsIntegrator";
+import LambertIntegrator from "./integrators/examples/LambertIntegrator";
+import NormalsIntegrator from "./integrators/examples/NormalsIntegrator";
 
 // --- Canvas bootstrap ---
 const canvas = document.createElement("canvas");

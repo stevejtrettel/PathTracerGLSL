@@ -143,6 +143,31 @@ In Euclidean, the metric ignores `Point p`; in curved geometries it won’t.
 
 ---
 
+
+## Scene System (current status)
+
+Scenes are now first-class plugins (`role: "scene"`) instead of ad hoc libs.  
+Each scene provides GLSL chunks under canonical names:
+
+- `Scene.Intersect` — computes the closest hit along a ray (today: SDF sphere tracing).
+- `Scene.Normal` — computes a surface normal (today: finite-difference gradient of the SDF).
+- `Scene.Material` — returns a `Material` record given a material id.
+- `Scene.Types` — injected once globally, defines `Hit` and `Material` structs.
+
+Integrators (`Lambert`, `Normals`) declare dependencies on these chunks.  
+The `ShaderAssembler` topo-sorts and concatenates everything so that types and helpers are defined before use.
+
+**Where we injected `scene.types`:**
+- Added as a **built-in chunk** (`SceneTypesChunk`).
+- Always inserted into the fragment if missing.
+- Also explicitly ordered early in `geometryFirst()` (alongside `geometry.types/ops`).
+- Any chunk that mentions `Hit` or `Material` also declares a dependency on it.
+
+This guarantees a stable, extensible foundation: integrators never worry about ordering, and scenes can evolve (e.g. analytic normals, signed distances, BVHs) without breaking the contract.
+
+
+
+
 ## Parameters
 
 The **parameter system** bridges user controls and plugin state.
@@ -300,7 +325,3 @@ is designed to extend cleanly. Planned additions include:
 These extensions can be added without breaking the current contract: integrators only
 ever depend on the canonical `scene_*` functions, and the assembler enforces ordering.
 
-
----
-
-Would you like me to also prepare a **changelog-style summary** (`docs/overview.md`) that highlights *what changed* in this refactor (Tracer slimmed, ProgramBuilder/VariantManager added), alongside this new authoritative `about.md`?
