@@ -2,7 +2,7 @@
 import Tracer from "./tracer/Tracer";
 import fullscreenVert from "./glsl/fullscreen.vert.glsl";
 
-import { createEuclideanModule } from "./geometry/Euclidean/EuclideanModule";
+import { createEuclideanModule } from "./geometry/euclidean/EuclideanModule";
 
 import PinholeCamera from "./plugins/camera/PinholeCamera";
 import TonemapSRGB from "./plugins/postprocess/TonemapSRGB"

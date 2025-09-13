@@ -1,5 +1,5 @@
-import ShaderProgram from "../rendering/ShaderProgram";
-import FullscreenQuad from "../rendering/FullscreenQuad";
+import ShaderProgram from "./ShaderProgram";
+import FullscreenQuad from "./FullscreenQuad";
 import type { Plugin, GLSLChunk } from "../core/types";
 import { ChunkNames } from "../core/types";
 
