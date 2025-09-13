@@ -252,3 +252,384 @@ The next steps branch in two directions:
 2. **Refine the plugin system** to clearly distinguish shader-based vs CPU-only roles, improving clarity and extensibility.
 
 Both directions strengthen the core philosophy: **modular, geometry-first, readable, testable.**
+
+
+
+
+
+
+
+
+
+
+# Output System Design — OutputGraph & Sinks
+
+> A minimal, extensible output pipeline for a geometry‑first path tracer. Integrators emit **linear HDR AOVs**; the Output System turns those into **on‑screen pixels** and **files** (PNG/EXR/Video) via small, composable passes and sinks.
+
+---
+
+## Goals & Non‑Goals
+
+**Goals**
+
+* **Single responsibility**: Integrators only produce HDR buffers (and optional AOVs). Output handles presentation/export.
+* **Composable post**: Support one‑pass tone map today; support multi‑pass bloom/denoise/LUT tomorrow.
+* **Multi‑sink**: Present to screen and export to files in the same frame, without duplicate work.
+* **Simple default**: Reads like a recipe (linear chain + fan‑out). DAG/branching only when needed.
+* **Performance‑aware**: One fullscreen draw for screen; amortized/async readback for files.
+
+**Non‑Goals**
+
+* Full general framegraph with arbitrary resource lifetime tracking. We want a tiny, project‑fit layer.
+
+---
+
+## High‑Level Flow
+
+```
+Integrator (progressive) → BufferManager → OutputGraph
+                               │
+                         [Tonemap/OETF]  →  "ldrColor"
+                               │                 ├── ScreenSink   (present)
+                          [Dither?]                └── FileSink(s) (PNG/EXR/Video)
+                          [Resize?]
+```
+
+* Integrators **never tonemap**. They output linear HDR (e.g., `rgba16f/rgba32f`).
+* Exactly **one tone map** before any LDR sink. HDR sinks (EXR) tap the pre‑tonemap channel.
+* Passes may be internally multipass (e.g., Bloom) while exposing a **single output** channel.
+
+---
+
+## Terminology
+
+* **Channel / AOV**: A named stream (e.g., `hdrColor`, `albedo`, `normal`, `ldrColor`).
+* **Pass**: A shader draw that consumes one channel and produces one channel (internally can have subpasses).
+* **Sink**: A side‑effect consumer of a channel (screen blit, file write, recorder).
+* **OutputGraph**: A tiny linear/DAG pipeline of passes ending in one or more sinks.
+
+---
+
+## Core Contracts (Type Sketches)
+
+```ts
+// Named texture produced by the tracer or by a pass.
+export type Channel = "hdrColor" | "ldrColor" | "albedo" | "normal" | string;
+
+export interface OutputSource {
+  channel: Channel;
+  tex: WebGLTexture;
+  w: number; h: number;
+  format: "rgba8" | "rgba16f" | "rgba32f"; // reflect actual GL texture format
+}
+
+// Shader pass: exactly one input → one output (internal multipass allowed)
+export interface OutputPass {
+  name: string;
+  input: Channel;        // e.g., "hdrColor"
+  output: Channel;       // e.g., "ldrColor"
+  // Use BufferManager for target allocation; use ParameterView for tunables.
+  draw(
+    gl: WebGL2RenderingContext,
+    inputs: Record<Channel, OutputSource>,
+    bm: BufferManager,
+    params: ParameterView
+  ): OutputSource;
+}
+
+// Side-effect endpoint.
+export interface Sink {
+  name: string;
+  input: Channel; // "ldrColor" for PNG/Video, "hdrColor" for EXR
+
+  present?(
+    gl: WebGL2RenderingContext,
+    src: OutputSource
+  ): void; // Screen
+
+  write?(
+    gl: WebGL2RenderingContext,
+    src: OutputSource
+  ): Promise<void>; // Files
+
+  shouldRun?(ctx: OutputContext): boolean; // policy hook
+}
+
+export interface OutputContext {
+  frameIndex: number;
+  sampleCount: number; // progressive samples per pixel
+  time: number;        // seconds
+  events: { snapshot?: boolean; recording?: boolean };
+}
+
+export class OutputManager {
+  setGraph(entry: Channel, nodes: (OutputPass | Sink)[]): void;
+  registerSource(src: OutputSource): void;       // called each frame by Tracer
+  run(ctx: OutputContext): Promise<void>;        // execute passes then sinks
+  dispose(): void;                               // free cached programs/targets
+}
+```
+
+**Notes**
+
+* Passes own their internal complexity (e.g., downsample pyramid) but expose a single outward `output` channel.
+* Sinks never mutate textures; they **consume**.
+* Stable channel names become part of the cache keying and docs (`hdrColor`, `ldrColor`, …).
+
+---
+
+## Default Passes & Sinks
+
+### Passes
+
+1. **TonemapSRGBPass**
+
+  * **Input:** `hdrColor`
+  * **Output:** `ldrColor`
+  * Wraps the active `role: "postprocess"` plugin, reading exposure/curve params via `ParameterManager`.
+
+2. **DitherPass** (optional)
+
+  * **Input/Output:** `ldrColor`
+  * Ordered/blue‑noise dither to mitigate banding after tone map.
+
+3. **ResizePass** (optional)
+
+  * **Input:** `ldrColor` (or `hdrColor` for HDR export)
+  * **Output:** named (e.g., `ldr4k`)
+  * Uses a simple filter (box/bilinear) unless a higher quality resampler is desired.
+
+4. **BloomPass** (optional, internally multipass)
+
+  * **Input:** `hdrColor`
+  * **Output:** `hdrBloomed` or directly `ldrColor` if it includes tone map.
+  * Internal: threshold → downsample chain → blur → upsample/compose.
+
+> Additional passes (Overlay/LUT/Letterbox/Watermark/FXAA/Denoise) follow the same contract.
+
+### Sinks
+
+1. **ScreenSink**
+
+  * **Input:** `ldrColor`
+  * **Action:** Single fullscreen blit to the default framebuffer (no tone map here).
+
+2. **PNGWriter** (snapshots)
+
+  * **Input:** `ldrColor`
+  * **Action:** Readback `rgba8` or copy to an export canvas and `toBlob()`.
+
+3. **EXRWriter** (HDR stills)
+
+  * **Input:** `hdrColor`
+  * **Action:** Readback float (half/float) → encode EXR.
+
+4. **VideoWriter** (LDR)
+
+  * **Input:** `ldrColor`
+  * **Action:** Prefer recording a visible `<canvas>` via `MediaRecorder`. Fallback: readback → software WebM encoder.
+
+---
+
+## Policies (When Sinks Run)
+
+A tiny per‑sink policy layer avoids custom logic in the manager.
+
+```ts
+type CapturePolicy =
+  | { type: "off" }
+  | { type: "snapshot"; hotkey?: string }
+  | { type: "record"; fps?: number; maxFrames?: number }
+  | { type: "onInterval"; everyNFrames: number }
+  | { type: "whenStable"; minSamples: number }; // progressive‑only
+```
+
+Examples:
+
+* `snapshot` — edge‑triggered by UI or hotkey (e.g., "P").
+* `record` — continuous until stopped.
+* `onInterval(60)` — export every 60 frames.
+* `whenStable(128)` — only export when progressive sample count ≥ 128.
+
+Each sink implements `shouldRun(ctx)` using its policy.
+
+---
+
+## Tracer Integration
+
+**Progressive path**
+
+1. Integrator draws to `history.write` (HDR).
+2. Tracer ping‑pongs: `history.read ↔ history.write`.
+3. Tracer registers the source with OutputManager:
+
+   ```ts
+   output.registerSource({ channel: "hdrColor", tex: history.read, w, h, format: "rgba16f" });
+   ```
+4. Tracer calls `await output.run({ frameIndex, sampleCount, time, events })`.
+
+**One‑shot compatibility**
+
+* Preferred: render into a provided HDR target, then reuse the same output path.
+* Transitional: allow integrator‑direct‑to‑screen demos; OutputManager no‑ops.
+
+---
+
+## Execution Model
+
+* **Graph setup**: OutputManager validates the chain, computes topo order (linear in default case).
+* **Allocation**: Passes request targets by name via `BufferManager` (size/format inferred from input unless overridden).
+* **Draw**: Each pass runs a fullscreen draw (or internal multipass). Programs are cached via `ProgramCache`.
+* **Sinks**: After passes, eligible sinks run. Multiple sinks can consume the same output without recompute.
+* **Resize**: On tracer resize, OutputManager drops cached allocations; passes reacquire at next `run()`.
+* **Params**: Passes read values through `ParameterView` and can mark which params require history reset (handled by Tracer upstream).
+
+---
+
+## File/Directory Layout
+
+```
+src/
+  output/
+    OutputManager.ts          // topo compile, run(), simple cache of pass outputs
+    types.ts                  // Channel, OutputSource, OutputPass, Sink, OutputContext
+    passes/
+      TonemapSRGBPass.ts
+      DitherPass.ts
+      ResizePass.ts
+      BloomPass.ts            // internally multipass, outward single output
+      OverlayPass.ts
+    sinks/
+      ScreenSink.ts           // wraps a tiny blit (former ScreenPresenter guts)
+      PNGWriter.ts
+      EXRWriter.ts
+      VideoWriter.ts
+    profiles/
+      interactive.ts          // preset graphs
+      export-4k.ts
+
+  rendering/
+    FullscreenQuad.ts
+    ShaderProgram.ts
+    ProgramCache.ts
+    BufferManager.ts
+    Readback.ts               // helper for double‑buffered readPixels + fences
+```
+
+---
+
+## Example Graphs
+
+**Interactive default**
+
+```ts
+output.setGraph("hdrColor", [
+  new TonemapSRGBPass({ exposureParam: "post.exposure" }),
+  new DitherPass({ enabledParam: "post.dither" }),
+  new ScreenSink(),
+]);
+```
+
+**Export HDR + LDR**
+
+```ts
+output.setGraph("hdrColor", [
+  new BloomPass({ threshold: 1.0, strength: 0.6 }),
+  new TonemapSRGBPass({ exposureParam: "post.exposure" }),  // → ldrColor
+  new ScreenSink(),
+  new EXRWriter({ filePattern: "export/hdr-####.exr",
+                  policy: { type: "whenStable", minSamples: 64 } }), // taps hdrColor
+  new PNGWriter({ filePattern: "export/ldr-####.png",
+                  policy: { type: "snapshot", hotkey: "P" } }),      // taps ldrColor
+]);
+```
+
+**Different look for export**
+
+```ts
+output.setGraph("hdrColor", [
+  new TonemapSRGBPass({ exposureParam: "post.screenExposure" }),    // → ldrColor
+  new ScreenSink(),
+  new TonemapSRGBPass({ input: "hdrColor", output: "ldrExport",
+                        exposureParam: "post.exportExposure", curve: "ACES" }),
+  new ResizePass({ input: "ldrExport", output: "ldr4k", width: 3840, height: 2160 }),
+  new PNGWriter({ input: "ldr4k", filePattern: "4k/frame-####.png",
+                  policy: { type: "snapshot", hotkey: "Shift+P" } }),
+]);
+```
+
+---
+
+## Readback & Performance
+
+* **Screen path**: exactly 1 fullscreen draw.
+* **Readback**: Prefer a dedicated export target sized/typed for the sink; avoid reading back the history texture.
+* **Latency hiding**: Double buffer readback and use fence sync (`EXT_disjoint_timer_query_webgl2` if available) to avoid stalls.
+* **Reuse buffers**: Keep CPU‑side readback arrays persistent to avoid GC churn.
+* **Canvas path for PNG/Video**: If using an export canvas mirroring the LDR texture, use `toBlob()` / `MediaRecorder` to avoid explicit `readPixels`.
+
+---
+
+## Error Handling & Diagnostics
+
+* Graph validation catches missing inputs (e.g., no producer for `ldrColor`).
+* Pass compile/link errors forwarded with source maps from ShaderAssembler.
+* Sinks report I/O failures (e.g., EXR encode) with actionable messages.
+* Optional per‑node timers and a mini HUD overlay (ms/frame per pass, readback time).
+
+---
+
+## Testing Checklist
+
+* **Unit**: Pass parameter mapping; sink `shouldRun` policies; graph validation.
+* **GL**: Correct texture formats; resize handling; ping‑pong correctness.
+* **E2E**: Progressive stability gates; snapshot hotkey; record start/stop; multi‑sink fan‑out.
+* **Visual**: Tone map curve parity (in‑shader vs export); dither toggles; bloom threshold sanity.
+
+---
+
+## Migration Plan
+
+1. Introduce `OutputManager`, `TonemapSRGBPass`, `ScreenSink`. Route progressive presentation through it. (Move tonemap out of ScreenPresenter.)
+2. Add `PNGWriter` with `snapshot` policy and hotkey. Keep integrators unchanged.
+3. Add `EXRWriter` with `whenStable(minSamples)` policy.
+4. Add `ResizePass` and `VideoWriter`.
+5. Deprecate integrator‑inline postprocess in demos; optionally keep an adapter for legacy examples.
+
+---
+
+## Conventions
+
+* Integrators output **linear HDR** only.
+* One tone map per LDR path.
+* Pass names = output channel names in logs.
+* Channels are stable, lowercase, camel for suffixes (`hdrColor`, `ldrColor`, `ldr4k`).
+* Sinks are idempotent per frame (guarded by policy).
+
+---
+
+## Open Questions
+
+* **Denoise location**: Pre‑ or post‑tone map? (Typically pre‑tone map on HDR.)
+* **Color management**: Add profiles beyond sRGB (Display‑P3, PQ/HLG) and HDR display paths.
+* **WebGPU**: Future port—interfaces should map 1:1; add compute‑based passes.
+* **Metadata**: Embed camera/exposure into EXR/PNG text chunks for reproducibility.
+
+---
+
+## Appendix: Minimal Presenter Shader (for ScreenSink)
+
+```glsl
+#version 300 es
+precision highp float;
+
+in vec2 v_uv; out vec4 outColor;
+uniform sampler2D u_src; // bound to the LDR texture
+
+void main() {
+  vec3 ldr = texture(u_src, v_uv).rgb;
+  outColor = vec4(ldr, 1.0);
+}
+```
+
+This document specifies the contracts and expected behavior of the Output System so implementation can proceed incrementally without surprises.
