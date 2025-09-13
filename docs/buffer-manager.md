@@ -1,250 +1,265 @@
-# Buffer Manager
-
-> A small WebGL2 utility that owns named render textures (AOVs, histories), binds them as MRT draw targets, manages **ping-pong pairs**, and clears/resizes them efficiently. It’s designed for our one-pass + blit pipeline and progressive path tracing.
+Here’s a drop-in **`docs/BufferManagement.md`** you can add to the repo.
 
 ---
 
-## What it does
+# Buffer Management
 
-* **Create & alias** named 2D textures (e.g., `hdr`, `albedo`, `normal`, `moments`).
-* **Bind as textures** for sampling and **as draw targets** (MRT) for rendering.
-* **Cache FBOs** per attachment set (no per-frame framebuffer churn).
-* **Fast clears** by lifetime: `"perFrame"` vs `"history"`.
-* **Resize** on canvas/DPR changes (per name or bulk).
-* Built-in **ping-pong pairs** for history (Option C).
-* Guardrails: **MRT count** validation, **EXT\_color\_buffer\_float** check.
-* **State restore**: `unbindDrawTarget()` returns to the previous FBO.
+> How we allocate, reuse, and present GPU buffers for one-shot and progressive rendering.
+
+This document covers the **BufferManager** and how it fits with **ScreenPresenter** and **Tracer** to support:
+
+* one-shot integrators (no history), and
+* progressive integrators (history ping-pong + postprocess).
 
 ---
 
-## Key concepts
+## Goals
 
-* **Named texture**: you interact with buffers by stable string names (e.g., `"historyA"`).
-* **Lifetime**:
-
-    * `"perFrame"`: cleared every frame (transients like G-buffer AOVs).
-    * `"history"`: persists across frames (accumulations, moments).
-* **Ping-pong pair**: a base name (`"history"`) maps to two textures `historyA/historyB` with a flip bit. Each frame you write to one and sample the other, then `swapPair("history")`.
+* **Named resources**: refer to textures/FBOs by stable string names (e.g. `"history.read"`).
+* **Reuse & speed**: cache FBOs and avoid per-frame thrash.
+* **Ping-pong**: ergonomic history swapping (`read ↔ write`) for accumulation.
+* **MRT ready**: bind an ordered set of targets for multi-render-targets.
+* **Clear & resize**: clear by **lifetime** and rebuild on size changes.
+* **Simple present**: one blit step to display, with a postprocess plugin in the path.
 
 ---
 
-## API (TypeScript)
+## Key Concepts
+
+### Named buffers (AOVs)
+
+Every renderable texture has:
+
+* **name** (string): your handle, e.g. `"history.read"`, `"albedo"`.
+* **desc**: `{ format, size, lifetime, filtering, clear }`.
+
+### Lifetimes
+
+* **`"perFrame"`**: cleared each frame (e.g., transient AOVs).
+* **`"history"`**: persists across frames until reset (e.g., accumulation).
+
+### Ping-pong
+
+Two textures for the same logical data:
+
+* `"history.read"`: sampled this frame (previous result).
+* `"history.write"`: written this frame (new result).
+  Swap names when the frame ends.
+
+### MRT binding
+
+Bind **N** named buffers to `COLOR_ATTACHMENT0..N-1` in one call.
+BufferManager validates the count and builds (or reuses) an FBO.
+
+---
+
+## API Overview
+
+### Types
 
 ```ts
-new BufferManager(gl: WebGL2RenderingContext)
+type Lifetime = "perFrame" | "history";
+type TargetFormat = "rgba16f" | "rgba8" | "rg16f" | "r16f" | "r32f";
 
-create(name: string, desc: BufferDesc): WebGLTexture
-alias(name: string, tex: WebGLTexture, desc: BufferDesc): void
-
-resize(name: string, w: number, h: number): void
-resizeAll(w: number, h: number): void
-
-bindAsTexture(name: string, unit: number): void
-
-bindAsDrawTarget(names: string[]): void
-unbindDrawTarget(): void
-
-clearByLifetime(l: "perFrame" | "history"): void
-
-// Ping-pong (built-in)
-createPair(base: string, desc: BufferDesc): [string, string]
-pairRead(base: string): string              // current “previous”
-pairWrite(base: string): string             // current “next”
-swapPair(base: string): void
-bindPairReadAsTexture(base: string, unit: number): void
-bindPairWriteAsDrawTarget(base: string): void
-resizePair(base: string, w: number, h: number): void
-
-// Utilities
-list(): string[]
-getDesc(name: string): BufferDesc | undefined
-getTexture(name: string): WebGLTexture | undefined
-dispose(): void
-```
-
-### `BufferDesc`
-
-```ts
 interface BufferDesc {
-  format: "rgba16f" | "rg16f" | "r16f" | "rgba8" | "r32f"; // r32f sampling-only on WebGL2
+  format: TargetFormat;
   size: { w: number; h: number };
-  lifetime: "perFrame" | "history";
-  filtering?: "nearest" | "linear";  // default: nearest
-  clear?: [number, number, number, number]; // default: [0,0,0,0]
+  lifetime: Lifetime;                  // perFrame | history
+  filtering?: "nearest" | "linear";    // default: nearest
+  clear?: [number, number, number, number]; // RGBA clear (default 0s)
 }
 ```
 
+### Core methods (high-level)
+
+* `ensure(name, desc)`: create if missing or (re)create if size/format changed.
+* `alias(name, texture, desc)`: adopt an external texture under a name.
+* `swap(a, b)`: exchange textures & descs (ping-pong).
+* `bindAsTexture(name, unit)`: bind named texture for sampling.
+* `bindAsDrawTarget(names[])`: bind FBO for MRT; caches per unique `names.join(",")`.
+* `unbindDrawTarget()`: restore previous FBO binding.
+* `clearByLifetime(lifetime)`: clear all buffers with matching lifetime.
+* `resize(name, w, h)` / `resizeAll(w, h)`: resize one/all named buffers.
+* `getTexture(name)`: raw WebGL texture (rarely needed).
+
+> **Performance:** FBOs and a scratch FBO for clears are cached/reused. No per-frame thrashing.
+
 ---
 
-## Usage patterns
+## Typical Patterns
 
-### 1) Create buffers (on build/resize)
+### 1) Progressive accumulation (history ping-pong)
 
-```ts
-const bm = new BufferManager(gl);
-
-// History pair for progressive color accumulation
-bm.createPair("history", {
-  format: "rgba16f",
-  size: { w: canvas.width, h: canvas.height },
-  lifetime: "history",
-  filtering: "nearest",
-  clear: [0,0,0,0]
-});
-
-// Optional per-frame AOVs (albedo/normal, etc.)
-bm.create("albedo", { format: "rgba16f", size, lifetime:"perFrame" });
-bm.create("normal", { format: "rgba16f", size, lifetime:"perFrame" });
-```
-
-### 2) Per-frame loop (integrator pass + present)
+Engine (Tracer) ensures history buffers exist at the current viewport size:
 
 ```ts
-// 1) Bind previous history for reading (TU0)
-bm.bindPairReadAsTexture("history", 0);
-prog.set1i("u_historyColor", 0);
-prog.set1i("u_frameIndex", frameIndex);
-prog.set1i("u_sampleCount", sampleCount);
+bm.ensure("history.read",  { format:"rgba16f", size:{w,h}, lifetime:"history", filtering:"nearest" });
+bm.ensure("history.write", { format:"rgba16f", size:{w,h}, lifetime:"history", filtering:"nearest" });
 
-// 2) Bind write target (MRT if you have more outputs)
-bm.bindPairWriteAsDrawTarget("history");
-// ... gl.viewport, prog.use(), fullscreenQuad.draw()
+const fbo = bm.bindAsDrawTarget(["history.write"]);    // draw HDR into write
+// ... issue draw calls ...
 bm.unbindDrawTarget();
 
-// 3) Present (blit via postprocess shader)
-//   bind freshly written history (pairRead points at it after swap? see below)
-present.use();
-bm.bindAsTexture(bm.pairWrite("history"), 0); // the one we just wrote to
-present.set1i("u_src", 0);
-fullscreenQuad.draw();
-
-// 4) Flip & tick
-bm.swapPair("history");
-sampleCount += 1;
-frameIndex += 1;
+bm.swap("history.read", "history.write");               // next frame will read the new result
 ```
 
-> Tip: Present using the **texture you just rendered into** (pre-swap), then swap. Alternatively, call `bm.swapPair("history")` first and present `bm.pairRead("history")`. Just be consistent.
-
-### 3) Clearing by lifetime
-
-```ts
-// On accumulation reset (resize, variant switch, param marked resetAccumulation)
-sampleCount = 0;
-frameIndex = 0;
-bm.clearByLifetime("history");
-```
-
-### 4) Canvas resize / DPR change
-
-```ts
-bm.resizePair("history", newW, newH);
-bm.resize("albedo", newW, newH);
-bm.resize("normal", newW, newH);
-bm.clearByLifetime("history");
-sampleCount = frameIndex = 0;
-```
-
----
-
-## Display “blitter”
-
-We present by drawing a fullscreen quad that samples the HDR texture and calls the display plugin:
+In the shader, sample the **previous** accumulation and combine:
 
 ```glsl
-// present.frag
-#version 300 es
-precision highp float;
-in vec2 v_uv;
-out vec4 outColor;
+uniform sampler2D u_historyColor;
+uniform int       u_sampleCount; // previous count
 
-uniform sampler2D u_src;
-vec3 display(vec3 hdr); // provided by postprocess plugin
-
-void main(){
-  vec3 hdr = texture(u_src, v_uv).rgb;
-  outColor = vec4(display(hdr), 1.0);
+vec3 accumulate_box(vec3 current, vec3 history, int prevCount) {
+  float n = float(prevCount);
+  return (history * n + current) / (n + 1.0);
 }
 ```
 
-Bind the source with `bm.bindAsTexture(name, unit)` and draw. This keeps integrators pure (return linear HDR).
+### 2) AOVs / MRT
 
----
-
-## Design choices (why it’s like this)
-
-* **FBO cache**: We allocate one FBO per attachment set and **re-attach textures each bind**. This avoids per-frame FBO thrash and naturally tracks resizes/aliases.
-* **Scratch FBO clear**: One reusable FBO for clears; much faster than create/delete per texture.
-* **State restore**: `unbindDrawTarget()` resets the FBO to what the app had bound, avoiding GL state leaks.
-* **Option C ping-pong**: History flip lives here; tracer code stays tiny and focused.
-* **Validation**: We check `MAX_COLOR_ATTACHMENTS` and warn if `EXT_color_buffer_float` is missing (RGBA16F rendering may not be supported on some platforms).
-
----
-
-## Gotchas & tips
-
-* **EXT\_color\_buffer\_float**: Without it, rendering to `rgba16f` may fail. We log a warning in the constructor. Consider falling back to `rgba8` or a different path for those devices.
-* **MRT limits**: Typical WebGL2 limit is 4 color attachments. We validate and throw if exceeded.
-* **Present source**: Present the texture **you just wrote** this frame (before swap), or swap first and present `pairRead`. Don’t double-swap.
-* **Clears**: Only clear `"history"` on resets; clear `"perFrame"` each frame if you rely on implicit zeros.
-* **Formats**:
-
-    * `r32f` is often **not renderable** in WebGL2 (sampling is fine). Prefer `r16f`/`rg16f` for render targets.
-    * Use `nearest` for history to avoid bilinear mixing of samples; switch to `linear` intentionally (e.g., for filtered AOVs).
-* **State order**:
-
-    1. `bindAsDrawTarget` → draw
-    2. `unbindDrawTarget`
-    3. Present (sample as texture)
-    4. `swapPair`
-* **Teardown**: Call `dispose()` on context loss or app shutdown.
-
----
-
-## Minimal progressive tracer loop (reference)
+Attach multiple render targets in order:
 
 ```ts
-// setup (once or on resize)
-bm.createPair("history", { format:"rgba16f", size:{w,h}, lifetime:"history", filtering:"nearest", clear:[0,0,0,0] });
+bm.ensure("albedo", { format:"rgba16f", size:{w,h}, lifetime:"perFrame" });
+bm.ensure("normal", { format:"rgba16f", size:{w,h}, lifetime:"perFrame" });
 
-// per frame
-prog.use();
-prog.set2f("u_resolution", w, h);
-prog.set1i("u_frameIndex", frameIndex);
-prog.set1i("u_sampleCount", sampleCount);
+bm.bindAsDrawTarget(["albedo", "normal"]); // COLOR_ATTACHMENT0,1
+// ... draw (shader writes to layout(location = 0/1)) ...
+bm.unbindDrawTarget();
+```
 
-bm.bindPairReadAsTexture("history", 0);
-prog.set1i("u_historyColor", 0);
+### 3) Clear & reset
 
-bm.bindPairWriteAsDrawTarget("history");
-fullscreenQuad.draw();
+* On **resize** and **variant switch**, Tracer typically resets progressive history:
+
+```ts
+bm.clearByLifetime("history");   // wipes accumulation only
+```
+
+* On **per-frame AOVs**, you can either clear via MRT attach then `gl.clear`, or just overwrite.
+
+---
+
+## Where ScreenPresenter Fits
+
+**ScreenPresenter** is a tiny blit pass used in **progressive** mode:
+
+* Input: HDR texture (usually `"history.read"`) bound to a texture unit.
+* Path: **postprocess** plugin is executed once here (tonemap → sRGB).
+* Output: default framebuffer (the screen).
+
+Usage:
+
+```ts
+// Tracer after ping-pong swap:
+presenter.blitFromTexUnit({ srcUnit: 0 /* bound to history.read */ });
+// presenter uses the active postprocess GLSL and a fullscreen quad under the hood
+```
+
+For **one-shot** integrators, the postprocess usually happens **inside** the main fragment and no separate present step is used.
+
+---
+
+## Formats & “strange” cases
+
+Recommended defaults:
+
+* **Accumulation/History**: `rgba16f` (wide range, widely supported for color render targets).
+* **Per-frame AOVs**: `rgba16f` or `rgba8` (if LDR is fine).
+* **Moments/variance**: `rg16f`, `r16f`.
+
+Notes:
+
+* `r32f` may not be color-renderable on all devices; prefer `rgba16f` unless you truly need 32-bit single-channel.
+* Use **`nearest`** filtering for history (avoids sampling artifacts). AOVs used for postprocessing can use `linear` if desired.
+* WebGL2 float color attachments require appropriate GPU/driver support; BufferManager logs/warns when extensions appear missing.
+
+---
+
+## Integration with Tracer
+
+**One-shot**
+
+* BufferManager is typically idle (no history). The fragment shader does any postprocess itself.
+* Tracer draws once to the default framebuffer.
+
+**Progressive**
+
+* Tracer uses BufferManager to:
+
+  * ensure `history.read/write`,
+  * bind `history.write` as the draw target,
+  * supply engine uniforms (`u_frameIndex`, `u_sampleCount`, `u_historyColor`),
+  * draw the integrator,
+  * `swap("history.read","history.write")`,
+  * present via ScreenPresenter,
+  * update counters.
+* Resets: `clearByLifetime("history")` when canvas resizes, integrator/variant changes, or history-invalidating params change.
+
+---
+
+## Error Handling & Validation
+
+* **MRT limit**: validated against `gl.MAX_COLOR_ATTACHMENTS` in `bindAsDrawTarget`.
+* **Unknown names**: helpful errors for missing textures.
+* **FBO completeness**: checked once when building cached FBOs (meaningful error if incomplete).
+* **State safety**: `unbindDrawTarget()` restores the previous framebuffer binding.
+
+---
+
+## Debugging Tips
+
+* **List buffers**: add a small helper to list names & descs when needed.
+* **Readback** (debug only): bind a single target and `gl.readPixels` into a typed array.
+* **NaNs/Inf**: accumulation going grey/black often means NaNs sneaking in—check the integrator math before blaming BufferManager.
+
+---
+
+## FAQ
+
+**Q: Why name buffers instead of passing raw textures around?**
+A: Names give you a stable contract between CPU orchestration and GLSL. It also makes ping-pong and MRT declarations trivial and readable.
+
+**Q: Do I still need a separate PingPong class?**
+A: No. Ping-pong is a one-liner: `bm.swap("history.read","history.write")`. Keeping it inside BufferManager simplifies ownership and avoids state duplication.
+
+**Q: Where does postprocess happen?**
+A: For **progressive**, in **ScreenPresenter** (once per frame). For **one-shot**, typically inside your integrator shader (call `postprocess()` directly).
+
+**Q: Can I add more histories (e.g., variance, motion vectors)?**
+A: Yes—`ensure()` them with `lifetime: "history"`, bind as MRT, and sample next frame by name.
+
+---
+
+## Minimal Example (progressive)
+
+```ts
+// Resize path
+bm.ensure("history.read",  { format:"rgba16f", size:{w, h}, lifetime:"history", filtering:"nearest" });
+bm.ensure("history.write", { format:"rgba16f", size:{w, h}, lifetime:"history", filtering:"nearest" });
+
+// Frame
+const fbo = bm.bindAsDrawTarget(["history.write"]);
+program.use();
+UM("").set2f("u_resolution", w, h);
+UM("").set1i("u_frameIndex", frameIndex);
+UM("").set1i("u_sampleCount", sampleCount);
+bm.bindAsTexture("history.read", 0);
+UM("").set1i("u_historyColor", 0);
+
+// per-plugin uniforms …
+quad.draw();
 bm.unbindDrawTarget();
 
-// present the just-written texture
-present.use();
-bm.bindAsTexture(bm.pairWrite("history"), 0);
-present.set1i("u_src", 0);
-fullscreenQuad.draw();
+// Swap & present
+bm.swap("history.read","history.write");
+presenter.blitFromTexUnit({ srcUnit: 0 });
 
-// advance
-bm.swapPair("history");
+// Counters
 sampleCount++;
 frameIndex++;
 ```
 
 ---
 
-## FAQ
-
-* **Do I still need a separate PingPong class?**
-  No. Use `createPair/pairRead/pairWrite/swapPair`.
-
-* **Can I use MRT?**
-  Yes—pass multiple names to `bindAsDrawTarget([...])`. Respect `MAX_COLOR_ATTACHMENTS`.
-
-* **Where do integrator “caps” fit?**
-  When you add caps, they should specify **what targets to create** (by name/format/lifetime). You’ll call `create()`/`createPair()` here based on those caps.
-
----
-
-That’s it. With `BufferManager` in place, the progressive path tracer is just: **read history → integrate one sample → box-accumulate → write history → present → swap**.
+That’s the complete picture: **BufferManager** owns textures/FBOs and lifetimes; **ScreenPresenter** turns HDR into pixels on screen; **Tracer** decides when to reset and how to route the frame through these pieces for one-shot vs progressive rendering.

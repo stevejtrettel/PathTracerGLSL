@@ -56,7 +56,7 @@ export default class LambertIntegrator implements Plugin {
 
       vec3 ambient  = 0.1 * m.baseColor;
       vec3 col = ambient + diffuse + specCol + m.emission; // linear HDR
-      return col;
+      return postprocess(col);
     }`;
 
         return [{
@@ -70,6 +70,7 @@ export default class LambertIntegrator implements Plugin {
                 ChunkNames.SceneIntersect,
                 ChunkNames.SceneNormal,
                 ChunkNames.SceneMaterial,
+                ChunkNames.PostprocessApply,//so we can do postprocessing right in the integrator
             ],
         }];
     }

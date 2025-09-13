@@ -14,7 +14,7 @@ import SceneThreeSpheres from "./scene/examples/SceneThreeSpheres";
 // Integrators rewritten to call scene_* contract
 import NormalsIntegrator from "./integrators/one-shot/NormalsIntegrator";
 import LambertIntegrator from "./integrators/one-shot/LambertIntegrator";
-
+import PathTracerMinimal from "./integrators/PathTracerMinimal";
 
 // NEW: keyboard controls (CPU-only updatable/attachable)
 import KeyboardControl from "./plugins/controls/KeyboardControl";
@@ -42,6 +42,7 @@ const sceneDemo = new SceneSDFDemo();
 const sceneTri  = new SceneThreeSpheres();
 const lambert   = new LambertIntegrator();
 const normals   = new NormalsIntegrator();
+const tinypt = new PathTracerMinimal();
 
 // NEW: Controls (auto-attaches to canvas via Tracer; preventDefault for arrows)
 // const controls = new FPSControls();
@@ -51,13 +52,13 @@ const controls = new KeyboardControl({ preventDefault: true });
 tracer
     .use(camera)
     .use(sceneDemo)     // <- default scene at startup
-    .use(lambert)       // <- default integrator at startup
+    .use(tinypt)       // <- default integrator at startup
     .use(new TonemapSRGB())
     // NEW: register controls (CPU-only, runs pre-phase)
     .use(controls);
 
 // --- Variants: swap integrator and/or scene ---
-tracer.addVariant("fast",           { integrator: normals });
+tracer.addVariant("fast",           { integrator: lambert });
 tracer.addVariant("tri",            { scene: sceneTri });
 tracer.addVariant("tri+fast",       { scene: sceneTri, integrator: normals });
 

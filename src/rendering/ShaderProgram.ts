@@ -1,174 +1,13 @@
-// // src/rendering/ShaderProgram.ts
-//
-// export class ShaderProgram {
-//     private program: WebGLProgram;
-//
-//     constructor(private gl: WebGL2RenderingContext, vertexSource: string, fragmentSource: string) {
-//         this.program = this.createProgram(vertexSource, fragmentSource);
-//     }
-//
-//     private createShader(type: number, source: string): WebGLShader {
-//         const shader = this.gl.createShader(type);
-//         if (!shader) {
-//             throw new Error('Failed to create shader');
-//         }
-//
-//         this.gl.shaderSource(shader, source);
-//         this.gl.compileShader(shader);
-//
-//         if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-//             const log = this.gl.getShaderInfoLog(shader);
-//             this.gl.deleteShader(shader);
-//             throw new Error(`Shader compilation failed: ${log}`);
-//         }
-//
-//         return shader;
-//     }
-//
-//     private createProgram(vertSource: string, fragSource: string): WebGLProgram {
-//         const vertShader = this.createShader(this.gl.VERTEX_SHADER, vertSource);
-//         const fragShader = this.createShader(this.gl.FRAGMENT_SHADER, fragSource);
-//
-//         const program = this.gl.createProgram();
-//         if (!program) {
-//             throw new Error('Failed to create program');
-//         }
-//
-//         this.gl.attachShader(program, vertShader);
-//         this.gl.attachShader(program, fragShader);
-//         this.gl.linkProgram(program);
-//
-//         if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
-//             const log = this.gl.getProgramInfoLog(program);
-//             this.gl.deleteProgram(program);
-//             throw new Error(`Program linking failed: ${log}`);
-//         }
-//
-//         // Clean up glsl
-//         this.gl.deleteShader(vertShader);
-//         this.gl.deleteShader(fragShader);
-//
-//         return program;
-//     }
-//
-//     use(): void {
-//         this.gl.useProgram(this.program);
-//     }
-//
-//     // Helper to get uniform locations (we'll need this soon)
-//     getUniformLocation(name: string): WebGLUniformLocation | null {
-//         return this.gl.getUniformLocation(this.program, name);
-//     }
-//
-//     destroy(): void {
-//         this.gl.deleteProgram(this.program);
-//     }
-// }
-
-
-
-
-
-
-//
-// // src/rendering/ShaderProgram.ts
-//
-// export class ShaderProgram {
-//     private program: WebGLProgram;
-//
-//     constructor(private gl: WebGL2RenderingContext, vertexSource: string, fragmentSource: string) {
-//         this.program = this.createProgram(vertexSource, fragmentSource);
-//     }
-//
-//     private createShader(type: number, source: string): WebGLShader {
-//         const shader = this.gl.createShader(type);
-//         if (!shader) {
-//             throw new Error('Failed to create shader');
-//         }
-//
-//         this.gl.shaderSource(shader, source);
-//         this.gl.compileShader(shader);
-//
-//         if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-//             const log = this.gl.getShaderInfoLog(shader);
-//             this.gl.deleteShader(shader);
-//             throw new Error(`Shader compilation failed: ${log}`);
-//         }
-//
-//         return shader;
-//     }
-//
-//     private createProgram(vertSource: string, fragSource: string): WebGLProgram {
-//         const vertShader = this.createShader(this.gl.VERTEX_SHADER, vertSource);
-//         const fragShader = this.createShader(this.gl.FRAGMENT_SHADER, fragSource);
-//
-//         const program = this.gl.createProgram();
-//         if (!program) {
-//             throw new Error('Failed to create program');
-//         }
-//
-//         this.gl.attachShader(program, vertShader);
-//         this.gl.attachShader(program, fragShader);
-//         this.gl.linkProgram(program);
-//
-//         if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
-//             const log = this.gl.getProgramInfoLog(program);
-//             this.gl.deleteProgram(program);
-//             throw new Error(`Program linking failed: ${log}`);
-//         }
-//
-//         // Clean up glsl
-//         this.gl.deleteShader(vertShader);
-//         this.gl.deleteShader(fragShader);
-//
-//         return program;
-//     }
-//
-//     use(): void {
-//         this.gl.useProgram(this.program);
-//     }
-//
-//     // Uniform binding methods
-//     getUniformLocation(name: string): WebGLUniformLocation | null {
-//         return this.gl.getUniformLocation(this.program, name);
-//     }
-//
-//     setFloat(name: string, value: number): void {
-//         const location = this.getUniformLocation(name);
-//         if (location !== null) {
-//             this.gl.uniform1f(location, value);
-//         }
-//     }
-//
-//     setVec2(name: string, x: number, y: number): void {
-//         const location = this.getUniformLocation(name);
-//         if (location !== null) {
-//             this.gl.uniform2f(location, x, y);
-//         }
-//     }
-//
-//     setVec3(name: string, x: number, y: number, z: number): void {
-//         const location = this.getUniformLocation(name);
-//         if (location !== null) {
-//             this.gl.uniform3f(location, x, y, z);
-//         }
-//     }
-//
-//     destroy(): void {
-//         this.gl.deleteProgram(this.program);
-//     }
-// }
-//
-//
-//
-//
-
+// src/rendering/ShaderProgram.ts
 // Minimal OOP wrapper for a WebGL2 program: compile, link, use, and query locations.
 // Kept tiny on purpose; we can grow helpers (setUniform*, etc.) later.
 
 export default class ShaderProgram {
     private gl: WebGL2RenderingContext;
     private program: WebGLProgram;
+
+    // cache uniform locations to avoid repeated GL queries
+    private uniformLocCache = new Map<string, WebGLUniformLocation | null>();
 
     constructor(gl: WebGL2RenderingContext, vertSource: string, fragSource: string) {
         this.gl = gl;
@@ -182,7 +21,7 @@ export default class ShaderProgram {
         gl.attachShader(prog, fs);
         gl.linkProgram(prog);
 
-        // Clean up glsl after linking (they’re attached to the program now).
+        // Clean up shader objects after linking.
         gl.deleteShader(vs);
         gl.deleteShader(fs);
 
@@ -208,14 +47,31 @@ export default class ShaderProgram {
         return loc;
     }
 
-// After (tolerant):
+    // Public, direct lookup (no cache) — fine to keep exposed
     getUniformLocation(name: string): WebGLUniformLocation | null {
         return this.gl.getUniformLocation(this.program, name); // may be null if optimized out
     }
 
+    // Preferred internal lookup with cache
+    private loc(name: string): WebGLUniformLocation | null {
+        if (this.uniformLocCache.has(name)) {
+            return this.uniformLocCache.get(name)!; // may be null if optimized out
+        }
+        const L = this.gl.getUniformLocation(this.program, name);
+        this.uniformLocCache.set(name, L);
+        return L;
+    }
 
-    delete(): void {
-        this.gl.deleteProgram(this.program);
+    // --- small uniform helpers (add more as needed) ---
+
+    set1f(name: string, x: number): void {
+        const L = this.loc(name);
+        if (L) this.gl.uniform1f(L, x);
+    }
+
+    set2f(name: string, x: number, y: number): void {
+        const L = this.loc(name);
+        if (L) this.gl.uniform2f(L, x, y);
     }
 
     set1i(name: string, x: number): void {
@@ -223,6 +79,15 @@ export default class ShaderProgram {
         if (L) this.gl.uniform1i(L, x | 0); // coerce to int
     }
 
+    delete(): void {
+        this.gl.deleteProgram(this.program);
+        this.uniformLocCache.clear();
+    }
+
+    // Alias for convenience if callers expect dispose()
+    dispose(): void {
+        this.delete();
+    }
 
     // --- internals ---
 

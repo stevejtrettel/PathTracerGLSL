@@ -28,7 +28,8 @@ export default class NormalsIntegrator implements Plugin {
 
       Point p = ray.o + ray.d * h.t;
       Dir   n = scene_normal(p, h);                   // assumes scene provides Normal
-      return 0.5 * (n + vec3(1.0));                   // map [-1,1] to [0,1]
+      vec3 normalColor =  0.5 * (n + vec3(1.0));                   // map [-1,1] to [0,1]
+      return postprocess(normalColor);
     }`;
 
         return [{
@@ -41,6 +42,7 @@ export default class NormalsIntegrator implements Plugin {
                 ChunkNames.SceneTypes,
                 ChunkNames.SceneIntersect,
                 ChunkNames.SceneNormal,         // require a normal routine
+                ChunkNames.PostprocessApply,
             ],
         }];
     }

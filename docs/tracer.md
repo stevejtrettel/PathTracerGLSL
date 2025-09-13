@@ -1,98 +1,139 @@
-
-# Tracer System Documentation
+# Tracer System
 
 ## Overview
 
-The **Tracer** is the main orchestrator of the path tracing / ray marching pipeline.  
-It manages everything from plugin registration and shader compilation to per-frame updates, including CPU-side controls.
+`Tracer` is the **orchestration layer** that coordinates plugins, manages builds, and runs the frame loop. It delegates specialized concerns to focused subsystems:
+
+* **FrameRenderer** - Handles all GPU rendering logic (one-shot vs progressive)
+* **ProgressiveRenderer** - Manages accumulation, history buffers, and HDR presentation
+* **VariantManager** - Precompiles and hot-switches alternate configurations
+* **ProgramBuilder** - Assembles and compiles GLSL programs
+
+---
+
+## Architecture
+
+```
+Tracer (orchestration)
+  ├── Engine (shader plugin registry)
+  ├── ParameterManager (parameter state)
+  ├── VariantManager (variant configurations)
+  ├── ProgramBuilder (GLSL compilation)
+  └── FrameRenderer (rendering execution)
+       └── ProgressiveRenderer (accumulation, if needed)
+```
 
 ---
 
 ## Data Flow
 
+### One-shot Integrators
+
+```
+Controls.update → Parameters.apply → Program.use → FrameRenderer.render() → screen
+                                                    └─ integrator.integrate() (with postprocess in-shader)
 ```
 
-Plugin Registration → Shader Assembly → Program Compilation → Frame Rendering
-↓
-Parameter System
-↓
-Controls Update + Uniform Binding
+### Progressive Integrators
 
-````
-
----
-
-## Responsibilities
-
-- Register and manage **plugins** (camera, integrator, display, geometry, scene, lib).
-- Treat **controls** plugins as first-class citizens (CPU-only, not compiled into shaders).
-- Manage **parameters** across all plugins via the `ParameterManager`.
-- Delegate shader building to **ProgramBuilder**.
-- Manage **variants** (alternate plugin combinations) with the `VariantManager`.
-- Drive the **frame loop**:
-  1. Update controls (mutate geometry frame)
-  2. Apply parameters
-  3. Bind uniforms
-  4. Draw
+```
+Controls.update → Parameters.apply → Program.use → FrameRenderer.render()
+                                                    └─ ProgressiveRenderer.render()
+                                                        ├─ bind history.read
+                                                        ├─ draw to history.write (HDR)
+                                                        ├─ present via ScreenPresenter
+                                                        └─ swap buffers, increment counters
+```
 
 ---
 
-## Key Collaborators
+## Core Classes
 
-- **Engine** — Stores active base plugins by role (excluding controls).
-- **ProgramBuilder** — Assembles and compiles the GPU program from plugins.
-- **VariantManager** — Manages named overrides of base configuration and compiles them.
-- **ParameterManager** — Central registry of parameters (metadata, persistence, UI).
-- **UniformManager** — Scoped uniform setter (per-namespace).
-- **FullscreenQuad** — Helper to render a fullscreen quad.
+### Tracer
+
+**Responsibilities:**
+* Plugin registration and management
+* Build coordination (base + variants)
+* Parameter management
+* Frame orchestration
+* Context management
+
+**Does NOT handle:**
+* Rendering logic (delegated to FrameRenderer)
+* Progressive accumulation (delegated to ProgressiveRenderer)
+* Shader compilation (delegated to ProgramBuilder)
+
+### FrameRenderer
+
+**Responsibilities:**
+* Program activation and uniform binding
+* Render path selection (one-shot vs progressive)
+* Viewport management
+* Progressive resource initialization
+
+**Key methods:**
+* `render(compiled, ctx, canvas)` - Execute frame rendering
+* `ensureProgressiveResources(compiled, canvas)` - Initialize progressive renderer if needed
+* `resize(width, height)` - Handle canvas resize
+
+### ProgressiveRenderer
+
+**Responsibilities:**
+* History buffer management (ping-pong)
+* Frame/sample counting
+* HDR accumulation
+* Presentation through postprocess
+
+**Key methods:**
+* `render(quad, uniformManager)` - Execute progressive accumulation
+* `ensureHistory(width, height)` - Allocate history buffers
+* `ensurePresenter(vertexSrc, postprocess)` - Configure presentation pipeline
+* `resetAccumulation()` - Clear history and reset counters
 
 ---
 
 ## Plugin Roles
 
-- **geometry** — Provides GLSL types + operations (required).
-- **camera** — Provides `generateRay()`.
-- **integrator** — Provides `integrate()`.
-- **display** — Provides `display()`.
-- **scene** — Provides scene definition (e.g., SDF).
-- **lib** — Reusable GLSL helpers (multiple allowed).
-- **controls** — CPU-only input/update logic:
-  - `update(ctx, dt)` modifies the geometry frame
-  - Optional: `attach(el)`, `detach()` to manage event listeners
+* **`geometry`** — GLSL types & metric ops (required for compile)
+* **`camera`** — `Ray generateRay(vec2 filmUV)`
+* **`scene`** — `Scene.Intersect`, `Scene.Normal`, `Scene.Material`, `Scene.Types`
+* **`integrator`** — `vec3 integrate(vec2 fragCoord)`
+  * Set `progressive = true` to enable accumulation
+* **`postprocess`** — `vec3 postprocess(vec3 hdr)`
+* **`controls`** — CPU-only: `update(ctx, dt)`
+* **`lib`** — Additive GLSL helpers
 
-All non-control roles are active **exactly once** at build time.  
-Controls can be swapped or disabled dynamically via parameters.
+---
+
+## Progressive Integrator Support
+
+When `integrator.progressive === true`, the system automatically:
+
+1. Creates a ProgressiveRenderer instance
+2. Allocates HDR history buffers (rgba16f)
+3. Provides engine uniforms:
+  * `uniform int u_frameIndex;`
+  * `uniform int u_sampleCount;`
+  * `uniform sampler2D u_historyColor;`
+4. Manages accumulation and presentation
+
+One-shot integrators render directly to the framebuffer and typically call `postprocess()` in-shader.
 
 ---
 
 ## Variants
 
-Variants allow you to pre-compile multiple pipelines (e.g. *production* vs *fast*).
-
-- Define with `tracer.addVariant("name", { role: plugin, ... })`
-- Variants may override **any subset of roles**
-- Parameters persist across variants if namespaces match
-- All variants share the same runtime geometry context
-- Build base + variants with `tracer.buildAll()`
-- Switch at runtime with `tracer.useVariant("name")`, or back to base with `null`
-
-### Example
+Define alternative pipelines, precompile them, and hot-switch at runtime:
 
 ```ts
-tracer
-  .use(new PinholeCamera({ fovYDeg: 60 }))
-  .use(new SceneSDFDemo())
-  .use(new LambertIntegrator())
-  .use(new SRGBDisplayPlugin());
-
-tracer.addVariant("fast", {
-  integrator: new NormalsIntegrator()
-});
-
+tracer.addVariant("fast", { integrator: new NormalsIntegrator() });
 tracer.buildAll();
-
 tracer.useVariant("fast");
-````
+```
+
+* Variants override any subset of roles
+* Parameter values persist across variants (by namespace)
+* Switching variants resets progressive accumulation
 
 ---
 
@@ -100,88 +141,118 @@ tracer.useVariant("fast");
 
 ```ts
 // Construction
-new Tracer({ canvas, vertexSrc })
+new Tracer({ canvas, vertexSrc });
 
-// Plugin management
-tracer.use(plugin)             // add plugin to base config
-tracer.clear(role)             // remove plugin from base config
-tracer.addVariant(name, overrides) // define variant
-
-// Build
-tracer.build()                 // build base only
-tracer.buildAll()              // build base + all variants
+// Plugin registration
+tracer.use(plugin);                     // register plugin for its role
+tracer.clear(role);                     // remove role from base config
 
 // Variants
-tracer.useVariant(name|null)   // switch between base and variants
-tracer.listVariants()          // list defined variants
+tracer.addVariant(name, overrides);     // define alternate role set
+tracer.useVariant(name | null);         // switch active pipeline
+tracer.listVariants();                  // list available variants
 
-// Context
-tracer.setContext(ctx)         // set runtime context (geometry frame)
+// Building
+tracer.build();                         // build base only
+tracer.buildAll();                      // build base + all variants
 
-// Parameters
-tracer.setParameter(ns, name, value)
-tracer.getParameterManager()
-tracer.saveParameters()
-tracer.loadParameters(data)
+// Runtime
+tracer.setContext(ctx);                 // e.g., geometry runtime + frame
+tracer.setParameter(ns, key, value);    // programmatic parameter updates
+tracer.setSize(width, height);          // viewport size
+tracer.frame();                         // render one frame
 
-// Frame/render
-tracer.setSize(width, height)
-tracer.frame()
-tracer.dispose()
+// Persistence
+tracer.saveParameters();                // serialize parameter state
+tracer.loadParameters(data);            // restore parameter state
+
+// Cleanup
+tracer.dispose();                       // free all resources
 ```
 
 ---
 
-## Controls Plugins
-
-Controls are CPU-side plugins with no GLSL.
-They implement `update(ctx, dt)` and may expose parameters.
-
-Examples:
-
-* **KeyboardControl** — keyboard pilot controls (yaw/pitch/roll, translation).
-* **FPSControls** — pointer-lock mouse look + WASD/Space/C for translation.
-* **OrbitControls** — orbit around a target with pan/zoom.
-
-Enable/disable via:
+## Frame Lifecycle
 
 ```ts
-tracer.setParameter("ctrl.keyboard", "enabled", true);
+// Simplified Tracer.frame() implementation:
+frame() {
+    const compiled = variants.getActiveCompiled(baseCompiled);
+    if (!compiled) return;
+    
+    // 1. UPDATE PHASE - CPU controls
+    for (const updatable of updatables) {
+        updatable.applyParameters?.(paramView);
+        updatable.update?.(ctx, dt);
+    }
+    
+    // 2. PARAMETER PHASE - Apply to shader participants
+    for (const plugin of compiled.plugins) {
+        plugin.applyParameters?.(paramView);
+    }
+    
+    // 3. RENDER PHASE - Delegate to FrameRenderer
+    renderer.render(compiled, ctx, canvas);
+}
 ```
+
+The FrameRenderer then:
+1. Activates the compiled program
+2. Sets global uniforms (`u_resolution`)
+3. Applies per-plugin uniforms
+4. Executes appropriate render path (one-shot or progressive)
 
 ---
 
-## VariantManager
+## Reset Policy
 
-Lives alongside `Tracer`.
+Progressive accumulation resets (history cleared, counters zeroed) on:
+* Canvas resize
+* Variant switch
+* Parameter changes flagged as accumulation-invalidating
 
-### Responsibilities
+---
 
-* Store all variant definitions (`name → overrides`)
-* Compile variants against the current base plugins
-* Track active variant name
-* Resolve active compiled pipeline
-* Manage program disposal
-
-### API
+## Build/Execute Example
 
 ```ts
-variants.addVariant(name, { role: plugin, ... })
-variants.buildAllVariants(basePlugins, buildFn)
-variants.useVariant(name|null)
+const tracer = new Tracer({ canvas, vertexSrc });
+const { module: geo, frame } = createEuclideanModule();
 
-variants.getActiveCompiled(baseCompiled?)
-variants.listVariantNames()
-variants.disposeAllPrograms()
+// Register plugins
+tracer.use(geo.shader);
+tracer.setContext({ geometry: { runtime: geo.runtime, frame } });
+
+tracer
+  .use(new PinholeCamera({ fovYDeg: 60 }))
+  .use(new SDFDemo())
+  .use(new PathTracerMinimal())      // progressive integrator
+  .use(new TonemapSRGB());          // postprocess
+
+// Define variant
+tracer.addVariant("fast", { integrator: new NormalsIntegrator() });
+
+// Build and run
+tracer.buildAll();
+tracer.setSize(canvas.width, canvas.height);
+
+function loop() { 
+  tracer.frame(); 
+  requestAnimationFrame(loop); 
+}
+loop();
 ```
 
 ---
 
-## Next Steps
+## Design Benefits
 
-* **Accumulation system**: add history textures, counters (`u_frame`, `u_sampleCount`), reset on resize/variant/param change.
-* **Multipass pipelines**: render-to-texture, MRT, post-processing.
-* **Control ergonomics**: unify attach/detach patterns, maybe add helpers for switching active controls.
-* **Better diagnostics**: shader error reporting, profiling hooks.
+The refactored architecture provides:
 
+* **Clear separation of concerns** - Each class has a single, well-defined responsibility
+* **Minimal coupling** - Tracer knows nothing about rendering details
+* **Easy testing** - Each subsystem can be tested independently
+* **Future flexibility** - New rendering strategies become new FrameRenderer implementations
+* **Readable code** - ~200 lines per class instead of one 400-line monolith
 
+For research code, this means you can focus on algorithms and geometries while the infrastructure remains stable and out of the way.

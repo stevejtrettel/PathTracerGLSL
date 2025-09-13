@@ -3,12 +3,14 @@
 
 ## Purpose & Philosophy
 
-This repository is a **research path tracer / ray marcher lab** designed as a playground for geometry-driven rendering experiments. Its guiding principles are:
+This repository is a **research path tracer / ray marcher lab**: a playground for geometry-driven rendering experiments.
+
+**Guiding principles:**
 
 * **Geometry-first.** Shaders compile *against a geometry platform* (Euclidean now; others later).
-* **Modular.** Cameras, integrators, displays, controls, libraries, and geometry can be swapped independently as **plugins**.
-* **Incremental & testable.** Each component is small, self-contained, and exposes obvious contracts.
-* **Readable.** Names and code mirror the math. Cleverness is avoided if it hides intent.
+* **Modular.** Cameras, integrators, postprocess passes, controls, libraries, and geometry are independent **plugins**.
+* **Incremental & testable.** Small components with clear, explicit contracts.
+* **Readable.** Code mirrors the math; cleverness never hides intent.
 
 ---
 
@@ -19,26 +21,34 @@ This repository is a **research path tracer / ray marcher lab** designed as a pl
 
 * **`systems/`** — Compiler-like mechanics:
 
-  * `ShaderAssembler` — Concatenates GLSL chunks, prefixes uniforms, enforces contracts.
-  * `DependencyResolver` — Orders chunks by dependencies.
-  * `UniformManager` — Scoped lookup and setters for prefixed uniforms.
-  * `ParameterManager` — Central registry of user-facing parameters (metadata, persistence, validation).
-  * `ProgramBuilder` — Assembles GLSL + compiles GPU programs.
+  * `ShaderAssembler` — Concatenates GLSL, prefixes uniforms, enforces contracts.
+  * `DependencyResolver` — Orders chunks by declared deps.
+  * `UniformManager` — Namespaced uniform lookup/setters.
+  * `ParameterManager` — User-facing parameters: metadata, persistence, validation.
+  * `ProgramBuilder` — Builds the final fragment and compiles GPU programs.
 
-* **`rendering/`** — WebGL helpers:
+* **`rendering/`** — WebGL resource helpers:
 
-  * `ShaderProgram` — Compile/link/use shaders.
-  * `ProgramCache` — Cache compiled programs by stable key.
-  * `FullscreenQuad` — Draws a fullscreen quad to run fragment shaders.
+  * `ShaderProgram` — Compile/link/use shaders; small uniform helpers.
+  * `ProgramCache` — Cache programs by stable key.
+  * `FullscreenQuad` — Shared fullscreen geometry for passes.
+  * `BufferManager` — Named textures/AOVs, FBOs, ping-pong, clear/resize, blit.
+  * `ScreenPresenter` — Final pass: apply postprocess to HDR texture, present to screen.
 
 * **`tracer/`** — High-level orchestration:
 
-  * `Tracer` — Execution façade: registers plugins, manages parameters, runs the frame loop.
-  * `VariantManager` — Defines and manages alternate plugin configurations.
+  * `Tracer` — Central façade: registers plugins, manages parameters, handles progressive accumulation, runs the frame loop.
+  * `VariantManager` — Defines and compiles alternate plugin configurations.
 
-* **`geometry/`** — Runtime geometry modules (CPU side) paired with shader plugins.
+* **`geometry/`** — Geometry platforms (runtime + shader halves).
 
-* **`plugins/`** — Swappable per-role providers (camera, integrator, display, scene, libs, etc.).
+* **`integrators/`** — Rendering algorithms (one-shot to progressive).
+
+* **`scenes/`** — Scene definitions (SDF demos today; BVH/mesh later).
+
+* **`plugins/`** — Remaining roles (camera, postprocess, controls, libs).
+
+* **`glsl/`** — Shared GLSL snippets.
 
 ---
 
@@ -46,62 +56,67 @@ This repository is a **research path tracer / ray marcher lab** designed as a pl
 
 Exactly **one active plugin per role** at build time (except `"lib"`, which is additive).
 
-* `"geometry"` — contributes GLSL types and ops the rest of the pipeline compiles against.
-* `"camera"` — must provide `camera.generateRay`:
-  `Ray generateRay(vec2 filmUV /* in [0,1]^2 */);`
-* `"integrator"` — must provide `integrator.integrate`:
-  `vec3 integrate(vec2 fragCoord /* in pixel coords */);`
-* `"display"` — must provide `display.display`:
-  `vec3 display(vec3 hdr);`
-* `"scene"` — defines the world (e.g., SDF).
-* `"controls"` — optional CPU-side interaction logic (no GLSL contract).
-* `"lib"` — helper code, multiple allowed, provides named GLSL chunks.
+* **`"geometry"`** — contributes GLSL types & ops the rest of the pipeline compiles against.
 
+* **`"camera"`** — must provide:
 
-* `"scene"` — defines the world. Provides chunks under canonical names:
+  ```glsl
+  Ray generateRay(vec2 filmUV); // filmUV in [0,1]^2
+  ```
 
-  * `Scene.Intersect` — computes the closest intersection along a ray  
-    (today: sphere tracing over SDFs). Returns a `Hit` struct.
+* **`"integrator"`** — must provide:
 
-  * `Scene.Normal` — computes the geometric surface normal at a hit  
-    (today: finite-difference gradient of the SDF). Optional, but present in demo scenes.
+  ```glsl
+  vec3 integrate(vec2 fragCoord); // fragCoord in pixel coords
+  ```
 
-  * `Scene.Material` — maps a material id to a `Material` record  
-    (`baseColor`, `roughness`, `metalness`, `emission`).
+  * **One-shot** integrators (e.g., Normals, Lambert) compute a full image in a single pass.
+  * **Progressive** integrators (e.g., PathTracerMinimal) emit HDR samples and accumulate over frames. The engine provides counters/history and handles presentation.
 
-  * `Scene.Types` — shared struct definitions for `Hit` and `Material`.  
-    This chunk is injected once globally, always ordered early alongside  
-    `geometry.types`/`geometry.ops`.
+* **`"postprocess"`** — takes HDR to LDR (tone map, color space, denoise, etc.):
 
-  Integrators declare dependencies on these chunks, so the assembler topo-sorts  
-  them before `integrate()`. Any chunk that mentions `Hit` or `Material` also  
-  declares a dep on `Scene.Types`, ensuring correctness.
+  ```glsl
+  vec3 postprocess(vec3 hdr);
+  ```
 
+* **`"scene"`** — world definition; canonical chunks:
+
+  * `Scene.Intersect` — closest hit (e.g., SDF sphere tracing).
+  * `Scene.Normal` — surface normal (analytic or finite difference).
+  * `Scene.Material` — returns `Material` for a material id.
+  * `Scene.Types` — shared `Hit`/`Material` structs (injected early).
+
+* **`"controls"`** — optional CPU-only interaction (no GLSL contract).
+
+* **`"lib"`** — additive GLSL helpers (multiple allowed).
 
 ### Canonical chunk names
 
 ```ts
-ChunkNames = {
+export const ChunkNames = {
   GeometryTypes:       "geometry.types",
   GeometryOps:         "geometry.ops",
   CameraGenerateRay:   "camera.generateRay",
   IntegratorIntegrate: "integrator.integrate",
-  DisplayDisplay:      "postprocess.postprocess",
-  SceneSDF:            "scene.sdf", // convenience name for demo scenes
+  DisplayDisplay:      "postprocess.postprocess", // (role renamed to 'postprocess')
+  SceneSDF:            "scene.sdf",               // convenience for demo scenes
 } as const;
 ```
+
+> **Note:** The role formerly called `"display"` was renamed to `"postprocess"`.
 
 ---
 
 ## Geometry Modules
 
-A **geometry module** is a pair of:
+A **geometry module** pairs a shader plugin and a runtime:
 
-* A **shader plugin** (role `"geometry"`) contributing:
+* **Shader plugin** (`role: "geometry"`) supplies:
 
-  * `geometry.types` — canonical type definitions.
-  * `geometry.ops` — metric-aware operations (`dot_g`, `normalize_g`, etc.).
-* A **runtime object** implementing:
+  * `geometry.types` — canonical types (`Point`, `Dir`, `Ray`, `Frame`, …).
+  * `geometry.ops` — metric-aware ops (`dot_g`, `normalize_g`, …).
+
+* **Runtime object** drives the camera frame on the CPU:
 
   ```ts
   interface GeometryRuntime<F extends GeoFrame> {
@@ -121,134 +136,182 @@ interface GeometryModule<F extends GeoFrame> {
 }
 ```
 
-The first example is **Euclidean v0**.
-
-### GLSL Types & Ops (Euclidean v0)
-
-```glsl
-#define Point vec3
-#define Dir   vec3
-
-struct Tangent { Point p; Dir v; };
-struct Ray     { Point o; Dir d; };
-struct Frame   { Point p; Dir f; Dir u; Dir r; };
-
-Tangent at(Point p, Dir v);
-Ray     makeRay(Point o, Dir d);
-float   dot_g(Point p, Dir a, Dir b);
-Dir     normalize_g(Point p, Dir v);
-```
-
-In Euclidean, the metric ignores `Point p`; in curved geometries it won’t.
+**Euclidean v0** is the first example geometry.
 
 ---
 
+## Scene System
 
-## Scene System (current status)
+Scenes are first-class plugins (`role: "scene"`). Each provides:
 
-Scenes are now first-class plugins (`role: "scene"`) instead of ad hoc libs.  
-Each scene provides GLSL chunks under canonical names:
+* `Scene.Intersect`, `Scene.Normal`, `Scene.Material`, and the shared `Scene.Types`.
+* Integrators list these chunks as deps; the assembler topo-sorts so types/helpers are defined before use.
+* Any chunk mentioning `Hit`/`Material` also declares a dep on `Scene.Types`.
 
-- `Scene.Intersect` — computes the closest hit along a ray (today: SDF sphere tracing).
-- `Scene.Normal` — computes a surface normal (today: finite-difference gradient of the SDF).
-- `Scene.Material` — returns a `Material` record given a material id.
-- `Scene.Types` — injected once globally, defines `Hit` and `Material` structs.
+This gives a stable contract: integrators don’t worry about ordering; scenes can evolve (analytic normals, bounds, BVHs) without breaking integrators.
 
-Integrators (`Lambert`, `Normals`) declare dependencies on these chunks.  
-The `ShaderAssembler` topo-sorts and concatenates everything so that types and helpers are defined before use.
+---
 
-**Where we injected `scene.types`:**
-- Added as a **built-in chunk** (`SceneTypesChunk`).
-- Always inserted into the fragment if missing.
-- Also explicitly ordered early in `geometryFirst()` (alongside `geometry.types/ops`).
-- Any chunk that mentions `Hit` or `Material` also declares a dependency on it.
+## Integrators
 
-This guarantees a stable, extensible foundation: integrators never worry about ordering, and scenes can evolve (e.g. analytic normals, signed distances, BVHs) without breaking the contract.
+Integrators implement the rendering algorithm:
 
+* **One-shot** (e.g., **Normals**, **Lambert**)
 
+  * Single draw; no history.
+  * Typically call `postprocess()` **inside their GLSL**.
+  * Write LDR directly to the default framebuffer.
 
+* **Progressive** (e.g., **PathTracerMinimal**)
+
+  * Emit HDR radiance samples per frame.
+  * Engine provides:
+
+    * `u_frameIndex` — starts at 0, increments each frame.
+    * `u_sampleCount` — number of accumulated samples in history.
+    * `u_historyColor` — previous HDR (read-only) from the history ping-pong.
+  * Engine accumulates into a **history ping-pong** via `BufferManager`, then uses **`ScreenPresenter`** to apply the active postprocess plugin and blit to screen.
+  * Accumulation resets automatically on resize, parameter changes (as flagged), or integrator/variant switch.
+
+> **Design intent:** Keep one-shots as simple as possible while using the **same engine spine** to scale up to complex path tracers (variance buffers, AOVs, reprojection, reservoirs) later.
+
+---
 
 ## Parameters
 
-The **parameter system** bridges user controls and plugin state.
-
-Parameters are **not uniforms**: they include metadata (ranges, units, UI hints), validation, persistence, and mapping logic. Plugins opt-in via:
+The **parameter system** bridges UI controls and plugin state. Parameters are **not uniforms**; they include ranges, units, validation, persistence, and mapping.
 
 ```ts
 parameters(): ParameterDescriptor[] { ... }
 applyParameters(view: ParameterView, ctx?: PipelineContext): void
 ```
 
-`Tracer` automatically registers and applies parameters each frame.
+`Tracer` registers descriptors and applies parameter values each frame.
+Progressive integrators should mark history-invalidating params (e.g., camera pose, roughness) so the engine can reset accumulation.
 
 ---
 
 ## Uniforms
 
-* Plugins declare uniforms in TS via `uniforms()`.
-* At link time, **ShaderAssembler** prefixes names by namespace:
+* Plugins declare uniforms in TS via `uniforms()`; the assembler prefixes names by namespace:
 
-  * camera `cam_pos` → GPU name `u_cam_pinhole_cam_pos`.
-* Plugins never declare GLSL `uniform`s directly.
-* Binding happens in `Tracer.frame()`:
-  `applyUniforms(view, ctx)` called on each plugin.
+  * camera `cam_pos` → `u_cam_pinhole_cam_pos`
+* Plugins do **not** declare GLSL `uniform`s directly.
+* Binding happens in `Tracer.frame()` via `applyUniforms(view, ctx)`.
 
-Reserved globals (no prefix):
-`u_resolution` (present now), later `u_time`, `u_frame`, `u_sampleCount`, `u_history`.
+**Reserved globals (no prefix):**
+
+* `u_resolution`
+* (progressive only) `u_frameIndex`, `u_sampleCount`, `u_historyColor`
 
 ---
 
 ## Shader Assembly & Program Build
 
-* **ShaderAssembler** collects, deduplicates, and topo-sorts chunks.
+* **ShaderAssembler** collects, dedupes, and topo-sorts chunks.
+* Fails if required contracts are missing: `camera.generateRay`, `integrator.integrate` (and normally a `postprocess.postprocess` plugin should be present in the build, even if progressive presents externally).
+* The fragment **epilogue** is minimal by design:
 
-* Geometry types/ops are placed first.
+  ```glsl
+  void main() {
+    vec3 color = integrate(gl_FragCoord.xy); // HDR or LDR depending on integrator
+    outColor = vec4(color, 1.0);             // One-shots usually already postprocess in-shader
+                                             // Progressive is presented via ScreenPresenter
+  }
+  ```
+* **ProgramBuilder** compiles GLSL to a `ShaderProgram`.
+* **ProgramCache** avoids stale reuse across role/source changes.
 
-* Fails if required contracts (`generateRay`, `integrate`, `display`) are missing.
+---
 
-* Assembler produces a full fragment shader with a stable `main()`.
+## Tracer: Frame Lifecycle
 
-* **ProgramBuilder** wraps this: it builds the fragment, hashes sources, caches/reuses `ShaderProgram`, and returns a `CompiledPipeline` with scoped `UniformManager`s.
+1. **Register plugins**: geometry, camera, scene, integrator, postprocess (and any CPU-only controls).
+2. **Build**: assemble + compile base and variant pipelines.
+3. **Per frame**:
+
+  * **CPU pre-phase**: apply parameters; run `controls.update(dt)`.
+  * **GPU phase**:
+
+    * Use compiled program; set `u_resolution`.
+    * If **progressive**:
+
+      * Increment `frameIndex`, `sampleCount`.
+      * Bind `history.read` for sampling; draw to `history.write`.
+      * Swap ping-pong; present HDR via `ScreenPresenter` (postprocess once).
+    * If **one-shot**:
+
+      * Draw directly to the default framebuffer (postprocess is in-shader).
+
+Resets (history clear and counters) happen on **resize**, **integrator/variant switch**, and **parameter changes** flagged as accumulation-invalidating.
 
 ---
 
 ## Variants
 
-* `Tracer.addVariant(name, overrides)` defines an alternate configuration.
-* Variants override any subset of roles.
-* `Tracer.buildAll()` compiles base + all variants.
-* `Tracer.useVariant(name)` switches at runtime.
-* Parameters persist across variants if the same plugin namespace is used.
-* All variants share the same geometry runtime.
-
----
-
-## Program Caching
-
-`ProgramCache` stores `ShaderProgram`s by a composite key:
-
-* active plugin namespaces + hash of GLSL sources.
-  This avoids stale reuse when two different fragments share the same role list.
+* `Tracer.addVariant(name, overrides)` defines alternates (e.g., a fast Normals variant).
+* `Tracer.buildAll()` precompiles base + variants for hot-switching.
+* `Tracer.useVariant(name)` swaps active configuration at runtime.
+* Parameters persist across variants when namespaces match.
 
 ---
 
 ## File & Directory Layout
 
-```
+```txt
 src/
-  core/                 // contracts & types
-  systems/              // ShaderAssembler, DependencyResolver, UniformManager, ParameterManager
-  rendering/            // ShaderProgram, ProgramCache, FullscreenQuad
-  tracer/               // Tracer, ProgramBuilder, VariantManager
-  geometry/             // runtime + shader halves (euclidean/, hyperbolic/, …)
-  plugins/              // swappable role implementations
-  glsl/                 // raw GLSL snippets
-  main.ts               // example entrypoint
+  core/                       // Core contracts, roles, and shared type definitions
+    types.ts                  // Plugin, GLSLChunk, UniformDecl, ChunkNames, ...
+
+  systems/                    // CPU-side orchestration utilities
+    ProgramBuilder.ts         // Assembles GLSL into a ShaderProgram
+    DependencyResolver.ts     // Orders chunks by declared deps
+    UniformManager.ts         // Namespaced uniform setters
+    ParameterManager.ts       // Parameter registry + views
+
+  rendering/                  // Low-level WebGL resources
+    ShaderProgram.ts          // WebGLProgram wrapper (compilation + uniform helpers)
+    ProgramCache.ts           // Cache keyed by sources + config
+    FullscreenQuad.ts         // Fullscreen geometry for passes
+    BufferManager.ts          // Named textures/FBOs, ping-pong, clear/resize, blit
+    ScreenPresenter.ts        // Takes HDR texture + postprocess plugin, blits to screen
+
+  tracer/                     // Engine spine
+    Tracer.ts                 // Plugin orchestration, frame loop, progressive vs one-shot
+    VariantManager.ts         // Prebuilds and hot-switches variants
+    types.ts                  // Internal types for compiled pipelines, etc.
+
+  geometry/                   // Geometry platforms (runtime + shader halves)
+    euclidean/                // Example Euclidean implementation
+    hyperbolic/               // (planned) Hyperbolic geometry
+
+  integrators/                // Rendering algorithms (top-level)
+    NormalsIntegrator.ts      // One-shot: normal visualization
+    LambertIntegrator.ts      // One-shot: Lambert + simple spec
+    PathTracerMinimal.ts      // Progressive: cosine path tracer with accumulation
+
+  scenes/                     // Scene definitions (top-level)
+    SDFDemo.ts                // Demo scene using signed distance fields
+
+  plugins/                    // Remaining role implementations
+    camera/
+      PinholeCamera.ts
+    postprocess/
+      TonemapSRGB.ts          // Reinhard + sRGB
+    controls/
+      KeyboardControls.ts
+      FPSControls.ts
+    lib/                      // Optional GLSL helpers (additive)
+
+  glsl/                       // Shared GLSL snippets
+    fullscreen.vert           // Basic vertex shader for fullscreen passes
+
+  main.ts                     // Example entrypoint wiring camera, scene, integrator, postprocess
 ```
 
 ---
 
-## Build/Execute Lifecycle
+## Build/Execute Example
 
 ```ts
 const tracer = new Tracer({ canvas, vertexSrc });
@@ -258,70 +321,43 @@ tracer.use(geo.shader);
 tracer.setContext({ geometry: { runtime: geo.runtime, frame } });
 
 tracer
-  .use(new PinholeCamera({ fovYDeg: 60, parameters: ["fov"] }))
-  .use(new SceneSDFDemoPlugin())
-  .use(new LambertIntegrator())
-  .use(new SRGBDisplayPlugin());
+  .use(new PinholeCamera({ fovYDeg: 60 }))
+  .use(new SDFDemo())                // from top-level scenes/
+  .use(new PathTracerMinimal())      // progressive integrator (HDR + accumulation)
+  .use(new TonemapSRGB());           // postprocess plugin used by ScreenPresenter
 
-// Define a fast variant
+// “Fast” variant for quick interaction
 tracer.addVariant("fast", { integrator: new NormalsIntegrator() });
 
 tracer.buildAll();
 
 function resize() { tracer.setSize(canvas.width, canvas.height); }
-function loop() { tracer.frame(); requestAnimationFrame(loop); }
+function loop()   { tracer.frame(); requestAnimationFrame(loop); }
+resize();
+loop();
 ```
 
 ---
 
 ## Conventions & Guardrails
 
-* **Uniforms**: declare in TS, never inside GLSL chunks.
-* **Chunk names**: always use `ChunkNames` constants.
-* **Stable chunks**: call `p.chunks()` once per plugin and reuse.
-* **Namespaces**: stable and descriptive — they determine uniform prefixes and cache keys.
-* **Parameters**: opt-in; keep metadata accurate; use `resetAccumulation` flag when progressive rendering is added.
-* **Readable GLSL**: short struct fields, clear function names.
-* **Geometry first**: always define `geometry.types` and `geometry.ops` before others.
-* **Scenes**:
-  - Always provide `Scene.Intersect` and `Scene.Material`.
-  - Provide `Scene.Normal` if possible (integrators can fallback if absent).
-  - Declare deps correctly: anything that uses `Hit`/`Material` must list `Scene.Types`;  
-    anything that calls a local map function must list `Scene.Intersect`.
-  - `Scene.Types` is also injected globally and explicitly ordered early in `geometryFirst()`,  
-    so types are guaranteed to exist before use.
+* **Uniforms**: declare in TS, never inline GLSL. Let the assembler prefix them.
+* **Chunk names**: always use `ChunkNames`.
+* **Namespaces**: stable, descriptive. They define uniform prefixes and cache keys.
+* **Parameters**: keep metadata accurate; flag those that require accumulation reset.
+* **Readable GLSL**: short fields, clear names.
+* **Geometry first**: define `geometry.types` and `geometry.ops` before others.
+* **Scenes**: always provide `Scene.Intersect` and `Scene.Material`; normals are optional but recommended.
+
 ---
 
 ## Next Steps
 
-* **Accumulation system**: add history textures and counters, reset on variant switch/resize/parameter change.
-* **Multipass pipelines**: render-to-texture, MRT, post-processing stages.
-* **Controls unification**: possibly fold controls into `Engine` for consistency.
-* **Developer ergonomics**: shader hot-reload, clearer error reporting, profiling hooks.
+* Progressive extensions: variance/AOVs, reprojection, temporal reservoirs.
+* Compositional submodules: samplers, accumulators, estimators (mix & match).
+* Multi-pass pipelines and MRT when needed.
+* Postprocess growth: ACES/filmic curves, denoise, screenshots/recording.
+* Dev ergonomics: shader hot-reload, profiling hooks.
 
-
-
-### Future Scene Directions
-
-The scene contract is deliberately minimal (Intersect, Normal, Material, Types), but
-is designed to extend cleanly. Planned additions include:
-
-* **Optional capabilities** signaled by defines:  
-  `SCENE_HAS_NORMAL`, `SCENE_HAS_SIGNED_DISTANCE`, `SCENE_HAS_BOUNDS`.
-
-* **`Scene.SignedDistance`** — raw SDF evaluation. If present, the engine could inject a
-  default marcher when `Scene.Intersect` is missing.
-
-* **`Scene.Bounds`** — returns bounding information (e.g. max t) so integrators don’t guess.
-
-* **`Scene.AnyHit` / `Scene.Occluded`** — fast boolean shadow queries for lighting.
-
-* **Analytic normals** — let primitives supply exact normals; fall back to numeric gradient.
-
-* **Non-SDF scenes** — future support for meshes with BVHs or hybrid scenes mixing tracing and marching.
-
-* **Scene parameters** — expose adjustable properties (e.g. sphere radius, color) via the parameter system.
-
-These extensions can be added without breaking the current contract: integrators only
-ever depend on the canonical `scene_*` functions, and the assembler enforces ordering.
+---
 

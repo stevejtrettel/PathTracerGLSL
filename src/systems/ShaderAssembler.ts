@@ -147,7 +147,6 @@ ${uniformLines.join("\n")}
         const main = `
 void main() {
   vec3 color = integrate(gl_FragCoord.xy);   // provided by integrator
-  color = postprocess(color);                    // provided by postprocessor
   outColor = vec4(color, 1.0);
 }
 `;
@@ -196,8 +195,6 @@ void main() {
         const missing: string[] = [];
         if (!byName.has(ChunkNames.IntegratorIntegrate))
             missing.push(ChunkNames.IntegratorIntegrate);
-        if (!byName.has(ChunkNames.PostprocessApply))
-            missing.push(ChunkNames.PostprocessApply);
 
         // Advisory (not fatal): geometry chunks are highly recommended
         if (!byName.has(ChunkNames.GeometryTypes)) {
