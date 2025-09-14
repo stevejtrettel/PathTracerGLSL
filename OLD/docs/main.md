@@ -260,14 +260,16 @@ Resets (history clear and counters) happen on **resize**, **integrator/variant s
 
 ```txt
 src/
-  core/                       // Core contracts, roles, and shared type definitions
+  core/                        // Core contracts, roles, and shared type definitions
     types.ts                  // Plugin, GLSLChunk, UniformDecl, ChunkNames, ...
+    Engine.ts                 //the main engine
 
   systems/                    // CPU-side orchestration utilities
     ProgramBuilder.ts         // Assembles GLSL into a ShaderProgram
     DependencyResolver.ts     // Orders chunks by declared deps
     UniformManager.ts         // Namespaced uniform setters
     ParameterManager.ts       // Parameter registry + views
+    ShaderAssembler.ts        // building shader files from all the components
 
   rendering/                  // Low-level WebGL resources
     ShaderProgram.ts          // WebGLProgram wrapper (compilation + uniform helpers)
@@ -280,6 +282,9 @@ src/
     Tracer.ts                 // Plugin orchestration, frame loop, progressive vs one-shot
     VariantManager.ts         // Prebuilds and hot-switches variants
     types.ts                  // Internal types for compiled pipelines, etc.
+    FrameRenderer.ts          // Rendering a frame to a buffer
+    ProgressiveRenderer.ts    // Managing the details of an accumulation loop
+    
 
   geometry/                   // Geometry platforms (runtime + shader halves)
     euclidean/                // Example Euclidean implementation

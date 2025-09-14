@@ -19,7 +19,7 @@ Core principles:
 - [about.md](docs/about.md) — **Big picture overview**  
   Philosophy, plugin architecture, geometry-first shader model, and the **future file tree** with division of labor.
 
-- [current.md](docs/current.md) — **Current build status**  
+- [current.md](OLD/docs/current.md) — **Current build status**  
   What is already implemented, what is in progress, and the **next concrete steps**.
 
 ---
