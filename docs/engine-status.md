@@ -1,290 +1,411 @@
+# Engine Architecture & Current State (Developer Guide)
 
-# Engine Status (What’s built today)
+This doc is a snapshot of how the rendering engine works **right now**. It’s meant to be a practical guide for contributors—what pieces exist, why they exist, how they fit together, and how you extend them safely.
 
-This is a snapshot of engine-side files with short descriptions.
+---
+
+## High-level pipeline
 
 ```
-
-src/
-└─ engine/
-├─ bindings/
-│  ├─ texture-unit-pool.ts         # Deterministic unit allocator (LRU + pinning + baseUnit)
-│  ├─ resource-binder.ts           # Activates units, binds textures, sets sampler uniforms (via UniformBinder)
-│  └─ uniform-binder.ts            # Binds logical → namespaced uniforms using manifest + gl.uniform\*
-│
-├─ execution/
-│  ├─ render-pipeline.ts           # Fullscreen-quad pipeline; binds engine counters; draws and swaps film
-│  └─ render-engine.ts             # Orchestrator: compile/link/cache programs, bind params/resources, render
-│
-├─ parameters/
-│  ├─ parameter-store.ts           # Typed store, dirty tracking, reset policies, (de)serialize
-│  └─ register-module-params.ts    # Helper: register module schemas into ParameterStore (scoped view)
-│
-├─ resources/
-│  ├─ framebuffer-pool.ts          # Ping-pong framebuffer pair management for GPU Film
-│  └─ resource-directory.ts        # App-filled logical sampler registry; immutable snapshot per frame
-│
-└─ shaders/
-├─ assembly-recipe.ts           # Recipe type (modules + constants + entry)
-├─ dependency-linker.ts         # Resolves requires→provides, orders modules, diagnostics
-├─ namespacing.ts               # Prefix uniforms/private helpers; preserve public symbols
-├─ program-key.ts               # Stable key from linked order + vertex template version
-└─ shader-compiler.ts           # Compiles recipe → vertex/fragment + UniformManifest + diagnostics
-
-````
-
-## What works
-
-- **Deterministic shader assembly** (no feature branching)
-- **Namespacing** that preserves public symbols; duplicates validated
-- **Dependency linker** (topological order, missing/ambiguous checks)
-- **ProgramKey + ProgramCache** (plugged via interfaces in tests)
-- **ParameterStore** with reset policies and uniform binding via **UniformBinder**
-- **ResourceDirectory**, **TextureUnitPool**, **ResourceBinder** (unit tested)
-- **RenderPipeline** for fullscreen draw + film ping-pong
-- **RenderEngine**: dirty-param loop (reset policy + bind), film counters, program hot-swap, optional resource diagnostics
-
-## What’s intentionally minimal
-
-- Sampler binding in the engine is **soft-wired** (diagnostics present, GL-binding assertions relaxed in integration tests).
-- Film features are basic (no special accumulators yet).
-- Single-pass pipeline (multi-pass is planned).
+AssemblyRecipe (modules + constants + entry)
+        │
+        ▼
+ linkRecipe()       ← validates provides/requires; prunes; orders
+        │ LinkReport
+        ▼
+ namespaceModule()  ← prefixes private identifiers per-module
+        │ ModuleNamespaceResults
+        ▼
+ compileRecipe()    ← emits GLSL + manifest (logical→namespaced)
+        │ vertexSrc, fragmentSrc, manifest
+        ▼
+ ProgramCache       ← keyed by computeProgramKey()
+        │ ProgramLike
+        ▼
+ RenderEngine       ← orchestrates uniforms, samplers, film, draw
+        │
+        ├─ UniformBinder    (CPU → non-sampler uniforms)
+        ├─ ResourceBinder   (CPU → samplers via TextureUnitPool)
+        ├─ FramebufferPool  (ping-pong HDR film)
+        └─ RenderPipeline   (VAO, engine uniforms, draw & swap)
+```
 
 ---
 
-# Next Steps (Pasteable plan)
+## Core data model
 
-## A) Finish Sampler Binding Integration (v1.1)
+### `AssemblyRecipe`
 
-**Goal:** When a recipe declares `uniform sampler* logicalName;`, and the app sets a texture for that logical name in `ResourceDirectory`, the engine should bind it *and* set the sampler uniform.
+* **What:** Immutable spec for building one fragment program.
+* **Contents:**
 
-**Tasks**
-1. **Manifest typing**
-   - Ensure `shader-compiler.ts` includes `type: "sampler2D" | "samplerCube" | ...` in `UniformManifestEntry` when emitting sampler uniforms.
-   - Add tests that `sampler2D` is captured.
+    * `modules`: `ShaderModuleDescriptor[]` (id + GLSL fragment sections).
+    * `constants`: `{ [name]: number | boolean | string }`.
+    * `entry`: `{ name: string }` (public symbol to call from `main()`).
+* **Invariants:** All `requires` must be provided by exactly one module; exactly one entry provider must be reachable.
 
-2. **Engine plumbing**
-   - In `render-engine.ts`, after uniform setMany:
-     - Take `const snap = resourceDir?.snapshot()`
-     - Build a candidate list from manifest entries with `type?.startsWith("sampler")`
-     - Call `resourceBinder.bind(snap, { uniforms: candidates })`
-     - Merge result into `diagnostics.resources`:
-       - `boundSamplers`, `skippedSamplers`, `errors`
+### `ShaderFragment` (module fragments)
 
-3. **Diagnostics**
-   - Ensure `RenderOutcome.diagnostics.resources` is always present with arrays.
+* Freeform text sections:
 
-4. **Tests**
-   - Update `render-engine-resources.test.ts` to assert `boundSamplers === 1` for a positive case.
+    * `uniforms`: GLSL `uniform` declarations.
+    * `functions`: GLSL functions, may expose public `provides`.
+    * `mainCode`: optional GLSL appended as a section.
+* Declarative lists:
 
-**Acceptance**
-- Positive case: 1 sampler in manifest + directory → `boundSamplers: 1`, no errors.
-- Unknown sampler in directory → `boundSamplers: 0`, optional presence in `skippedSamplers`, no errors.
+    * `requires`: public symbols this module expects.
+    * `provides`: public symbols this module exports.
 
 ---
 
-## B) Film v1.5 (GPU Accumulation)
+## Linking & namespacing
 
-**Goal:** Add a minimal accumulation API and optional export-to-CPU.
+### `linkRecipe(recipe)`
 
-**Tasks**
-1. **Film interface**
-   - Create `src/engine/execution/film.ts` with:
-     ```ts
-     export interface FilmLike {
-       ensureSize(w: number, h: number): void;
-       pair(): { readTex: WebGLTexture | null; writeFbo: WebGLFramebuffer | null };
-       swap(): void;
-       clear(): void;
-       exportHDR(gl: WebGL2RenderingContext): Float32Array; // RGBA32F, or define format
-     }
-     ```
-   - Adapt `framebuffer-pool.ts` to fully satisfy FilmLike.
+* **Builds a symbol table** from `provides`.
+* **Validates** every `requires` resolves to *exactly one* provider.
+* **Computes reachability** from the entry provider; prunes unused modules.
+* **Topologically sorts** reachable modules (ties: `priority`, `kind`, `name`, `version`, `id-hash`).
+* **Errors** on:
 
-2. **Shader conventions**
-   - Reserve `u_historyColor` + `u_sampleCount` names in the engine prelude.
-   - Pipeline binds them **only if** they appear in the manifest.
+    * Missing symbol, ambiguous providers, entry provider issues, cycles (including self-dependency).
+* **Outputs:**
 
-3. **Export path**
-   - Implement `exportHDR` using `gl.readPixels` from the current accumulation target.
+    * `resolvedOrder[]`, `symbolTable`, `reachableModules[]`, `warnings[]`, `entryProvider`.
 
-4. **Tests**
-   - Mock-based tests for `exportHDR` invocation & size, not pixel accuracy.
+### `namespaceModule(module, {preserve})`
 
-**Acceptance**
-- Accumulating recipes increment `sampleCount`, read previous frame via `u_historyColor`.
-- `exportHDR` returns correctly sized buffer.
+* **Goal:** deterministic collision-free names for *private* identifiers.
+* **Preserves** any names in `preserve` (entry + all `provides`/`requires`).
+* **Prefixes** (with stable, human-readable token) the module’s:
 
----
+    * `uniform` names
+    * private helper function names (function *definitions* not in `preserve`)
+* **Safe textual rewriting**:
 
-## C) Parameter ↔ UI bridge (v1)
+    * Replaces identifier tokens only (skips comments, strings, preprocessor lines).
+    * Leaves built-ins (e.g., `dot`) alone unless you explicitly mapped them (you won’t).
+* **Uniform parsing**:
 
-**Goal:** Ergonomic helpers to drive UI with module schemas.
+    * Handles `uniform float exposure;`, `uniform vec3 a,b;`
+    * Handles samplers and **sampler arrays** (`uniform sampler2D set[4];`)
+    * **Ignores uniform blocks** `uniform Block { ... };` (by design in v1)
+* **Outputs per module:**
 
-**Tasks**
-1. Add `list(scope)` and `getNamespaces()` convenience to `ParameterStore` (already present if you kept earlier APIs).
-2. Add a small `ui-bridge.ts` that:
-   - Enumerates schemas by scope
-   - Emits a flat array of UI descriptors: `[{ scope, logical, kind, min, max, step, resetPolicy }]`
-
-**Acceptance**
-- Example UI can render sliders/toggles that set store values and trigger engine binding/reset logic.
+    * `uniforms`, `functions`, `mainCode` (rewritten text)
+    * `uniformMappings[]` with `{ logicalName, namespacedName, type?, arraySize? }`
+    * `helperMappings` (original→namespaced)
+    * `namespacePrefix` (e.g., `m3af2b1_`)
 
 ---
 
-## D) Multi-pass Foundation (v1.9)
+## Compilation & caching
 
-**Goal:** Represent a small pass DAG (e.g., raymarch → post → tonemap).
+### `compileRecipe(recipe)`
 
-**Tasks**
-1. Extend Recipe to allow `passes: Pass[]` (each with its own module set & entry).
-2. Build a `MultipassPipeline` that:
-   - Creates intermediate color targets (from a FramebufferPool per pass)
-   - Runs passes in order; exposes last color as “film”
+* Runs `linkRecipe` and `namespaceModule` for all reachable modules.
+* Emits:
 
-**Acceptance**
-- Two-pass example compiles and runs with intermediate textures.
+    * **Vertex shader**: a deterministic fullscreen quad.
+    * **Fragment shader**:
 
----
+        * Header + engine prelude (stable engine uniforms)
+        * Inlined recipe constants as `const` declarations
+        * Concatenated `uniforms` / `functions` / `mainCode`
+        * Canonical `main()` that calls the **entry**:
+          `vec3 color = entry(gl_FragCoord.xy); outColor = vec4(color, 1.0);`
+* Builds a **UniformManifest**:
 
-## E) Robustness & Dev UX
+    * `entries[]`: all uniforms (with provenance)
+    * `byLogical{}` and `byNamespaced{}` **for non-samplers**
+    * `samplers[]`: `{ logical, namespaced, type, arraySize? }`
+* **Guarantees**:
 
-**Tasks**
-- Context loss & disposal guards in pipeline
-- Pretty diagnostics (e.g., “missing required symbol” show owner IDs)
-- Optional perf marker hooks
-- Improve error messages for param validation
+    * No `#if/#ifdef` toggles in output—recipe fully determines code shape.
+    * Identical recipes → identical GLSL bytes.
 
----
+### `computeProgramKey(recipe, link, vertexTag)`
 
-## F) Examples & Docs
+* Stable cache key from:
 
-**Tasks**
-- Minimal examples:
-  - “Lambert + Flat tracer + Static albedo texture”
-  - “Path tracer + accumulation”
-- Cookbook for module authors:
-  - How to declare parameters
-  - How to expose samplers
-  - Reset policy best practices
-````
+    * Linked module **ComponentID** hashes **in resolved order**
+    * **Sorted** constants table
+    * Vertex-template version string (e.g., `"v1"`)
+* Digest: FNV-1a (32b) over a stable JSON payload.
 
 ---
 
+## Runtime binding
 
-# Engine Notes & Handoff
+### `ParameterStore` (v1.1)
 
-## Conventions & Contracts
+* **What:** Validates & tracks *non-sampler* parameter values per scope.
+* **Kinds:** `"float" | "int" | "boolean" | "vec2" | "vec3" | "vec4" | "mat3" | "mat4"`.
+* **Reset policies:** `"none" | "accumulation" | "program"`.
+* **API:**
 
-- **Component scope**: `${kind}/${name}@${version}` (e.g., `Material/Lambert@1.0.0`)
-- **Shader**
-  - GLSL ES 300
-  - Canonical `main()` calls the recipe entry: `vec3 color = <entry>(gl_FragCoord.xy);`
-  - Engine prelude sets **only** minimal uniforms (`u_resolution`, `u_frameIndex`), more can be added carefully.
-  - **No preprocessor** feature flags. Feature presence is implied by module inclusion and resolved by linking.
-- **Namespacing**
-  - Uniforms and private helpers are prefixed with a stable module hash.
-  - Public symbols in `provides`/`requires` **must not** be renamed.
-- **Parameters**
-  - Types: `float`, `int`, `bool`, `vec2/3/4`, `mat3/4`
-  - Reset policy:
-    - `none` — safe to update without resets (e.g., exposure)
-    - `accumulation` — clear film on change (e.g., albedo in a path tracer)
-    - `program` — force recompile (e.g., toggling entirely different tracer algorithm)
-- **Resources**
-  - Logical sampler names must match uniforms in module fragments.
-  - The app is responsible for populating `ResourceDirectory` consistently.
+    * `register(scope, descriptors[])` — define parameters for a component scope (`Kind/Name@Version`).
+    * `set(scope, logical, value)` — validates + marks dirty if changed.
+    * `collectDirty()` — returns `{ scope, logical, value, kind, resetPolicy }[]`.
+    * `markClean(scope?, logicals?)`
+    * `serialize()` / `deserialize(data, markDirty?)`
+    * `removeScope(scope)` / `clear()`
+* **Notes:** scalar range checks (`min`/`max`) enforced; matrices accept arrays or `Float32Array`.
 
-## Known Gaps / Intentional Simplifications
+### `UniformBinder`
 
-- Engine integration for sampler binding is intentionally **soft** in the integration tests; ResourceBinder is fully tested in isolation. Finish wiring when ready (see Next Steps).
-- Film is a simple ping-pong; specialized accumulation variants (reprojection, TAA) are out of scope for v1.
-- Single pass only; multi-pass planned.
+* **Binds** non-sampler uniforms to the current GL program:
 
-## Testing Philosophy
+    * Looks up **namespaced** uniform via `manifest.byLogical[logical]`.
+    * Dispatches to correct `gl.uniform*` based on declared or inferred kind.
+    * Robust: skips if uniform pruned or optimized out; never throws during frame (type mistakes become a “skip”).
+* **Batch API:** `setMany([{ logical, value, kind? }]) → { bound, skipped[] }`
 
-- Fast unit tests with tiny **mocks** for GL/program/pipeline.
-- Compiler tests avoid driver variability—assert strings + manifests.
-- ResourceBinder tests assert actual GL call ordering (via mock).
-- Engine integration tests assert **diagnostics** and high-level effects rather than low-level GL calls (to keep the engine decoupled and flexible).
+### `ResourceDirectory`
 
-## Authoring a New Module (Quick Recipe)
+* **App-facing registry** of *logical* samplers:
+  `set(logical, { texture: WebGLTexture|null, target: GLenum, pin?: boolean })`.
+* `snapshot()` returns a fresh POJO the engine can pass to the binder.
+* `texture: null` is allowed (explicit unbind / first frame).
+
+### `TextureUnitPool`
+
+* **Manages** a fixed contiguous range of texture units:
+
+    * Stable mapping per logical name
+    * LRU eviction among *unpinned* mappings
+    * `pin()`/`unpin()` to protect a mapping from eviction
+* **Methods:** `acquire(logical, {pin?})`, `release(logical)`, `unitOf(logical)`, `debugState()`.
+
+### `ResourceBinder`
+
+* **Bridges** logical samplers → GL texture unit bindings:
+
+    * Validates names against `manifest.samplers`.
+    * For each `{logical → {texture,target,pin?}}`:
+
+        * `unit = pool.acquire(logical, {pin})`
+        * `gl.activeTexture(TEXTURE0 + unit)`
+        * `gl.bindTexture(target, texture)` (texture may be `null`)
+        * queues `{ logical, value: unit, kind: "int" }` to `UniformBinder.setMany`
+    * Stats: `{ attempted, bound, skipped[], errors[] }`
+* **Keeps track** of all logicals it touched to support `reset()`.
+
+---
+
+## Drawing
+
+### `FramebufferPool`
+
+* **Ping-pong HDR film** (2 color attachments: READ texture, WRITE FBO).
+* `ensureSize(w,h, {linearFiltering?, forceRGBA8?})`
+
+    * Chooses RGBA16F + `EXT_color_buffer_float` when available, else RGBA8.
+* `pair() → { readTex, writeFbo }`
+* `swap()` — flips roles after render.
+* `clear()` — zeroes both attachments (accumulation reset).
+* **Handles** uninitialized state (`null` attachments) safely.
+
+### `RenderPipeline`
+
+* **Owns** VAO/VBO for fullscreen quad.
+* **Uniforms:**
+
+    * Engine prelude (global): `u_resolution`, `u_frameIndex`
+    * Film-specific (if present in manifest): `historyColor` (sampler2D), `sampleCount` (int)
+* **Render flow:**
+
+    1. `pool.ensureSize(width, height)`
+    2. `{ readTex, writeFbo } = pool.pair()`
+    3. Bind program + VAO; set engine uniforms
+    4. If present:
+
+        * Bind `readTex` to the configured unit (default 0) and set `historyColor`
+        * Set `sampleCount`
+    5. Draw fullscreen strip
+    6. `pool.swap()`
+
+### `RenderEngine`
+
+* **Owner**/orchestrator that connects everything per frame.
+* **On (re)compile**:
+
+    * Runs `linkRecipe` + `compileRecipe`
+    * Computes program key; reuses or re-creates program via cache
+    * Builds `RenderPipeline`, `UniformBinder`, `ResourceBinder`
+    * Registers module parameter schemas (if provided)
+    * **Resets accumulation** on new program shape
+* **Per frame**:
+
+    * Pulls `dirty` params from `ParameterStore`; applies resets:
+
+        * Any `"program"` param forces recompile next frame (you’re using this to gate structural changes).
+        * `"accumulation"` changes trigger film reset (unless a recompile already did).
+    * `UniformBinder.setMany(dirty)`
+    * If app provided a `ResourceDirectory`, `ResourceBinder.bind(snapshot)`
+    * Sets engine counters → `RenderPipeline.render(w,h)`
+    * Increments `frameIndex`/`sampleCount`
+    * Returns diagnostics: linked module order, compiler warnings, sampler bind stats.
+
+---
+
+## Determinism & safety guarantees
+
+* Recipes with identical inputs produce **byte-identical GLSL**.
+* No feature preprocessor branches in emitted GLSL.
+* Linker is strict: **no ambiguity, no missing requirements, no cycles**.
+* Namespacing is identifier-aware (won’t mangle comments/strings/preproc).
+* Bind phases are **idempotent** and **non-throwing** during a frame; bad input yields “skipped” diagnostics instead of crashing.
+
+---
+
+## Extending the engine
+
+### Add a new shader module
+
+1. Create a `ShaderFragment` with `uniforms`, `functions`, optional `mainCode`.
+2. Fill `provides`/`requires` accurately (public symbol names are the linker’s truth).
+3. (Optional) Export a parameter schema (array of descriptors) on the module descriptor so the engine can auto-register UI/state via `registerModuleParams`.
+
+### Add parameters
+
+* Define a `ModuleParamSchema` and attach it to the module descriptor.
+* Values live in `ParameterStore` under scope `Kind/Name@Version`.
+* Use `resetPolicy` to control accumulation vs program reset behavior.
+
+### Bind textures
+
+* Register sampler resources with `ResourceDirectory`:
+
+  ```ts
+  dir.set("albedoMap", { texture: glTex, target: gl.TEXTURE_2D, pin: true });
+  ```
+* The engine discovers which samplers exist through the **manifest**; unknown names are ignored (and reported).
+
+---
+
+## Practical examples
+
+### Compile & render once
 
 ```ts
-// id
-const id = { kind: "Material", name: "Lambert", version: "1.0.0" };
-
-// parameters (optional)
-const parameters = [
-  { name: "albedo", kind: "vec3", default: [1,1,1], resetPolicy: "accumulation" },
-  { name: "exposure", kind: "float", default: 1.0, resetPolicy: "none", min: 0.0, max: 10.0 }
-];
-
-// fragment
-const fragment = {
-  uniforms: `
-    uniform vec3 albedo;
-    uniform float exposure;
-    // optional sampler
-    // uniform sampler2D albedoMap;
-  `,
-  functions: `
-    vec3 shadePixel(vec2 fragCoord) {
-      return albedo * exposure; // trivial example
-    }
-  `,
-  provides: ["shadePixel"],
-  requires: [], // or ["integrateSample"] etc.
-  entrypoints: { fragmentMain: "shadePixel" },
+// Build recipe
+const recipe = {
+  modules: [ lambertModule, filmModule ],
+  constants: { PI: 3.14159265, ENABLE_SOMETHING: true },
+  entry: { name: "shadePixel" }
 };
 
-// descriptor
-const moduleDescriptor = { id, fragment, parameters };
-````
+// Orchestrate
+engine.setResourceDirectory(myResources);
+const result = engine.render(canvas.width, canvas.height, recipe);
 
-## ResourceDirectory Usage (App Side)
-
-```ts
-const dir = new ResourceDirectory();
-dir.set("albedo", { texture: glTex, target: gl.TEXTURE_2D, pin: true });
-engine.setResourceDirectory(dir); // call when textures change (or each frame if dynamic)
+// Diagnostics
+console.table(result.diagnostics.moduleOrder);
+console.log(result.diagnostics.resources);
 ```
 
-## Parameter Flow (App Side)
+### Update a parameter safely
 
 ```ts
-const store = engine.getParameterStore();
-// After compile, module schemas are registered under their scopes
-store.set("Material/Lambert@1.0.0", "albedo", [0.9,0.2,0.2]); // will reset accumulation
-// Engine will bind at next render() call
+// Change exposure and mark accumulation reset automatically (depending on resetPolicy)
+store.set("Material/Lambert@1.0.0", "exposure", 1.2);
+
+// Next engine.render(...) will bind the new value and reset film if needed.
 ```
-
-## Error Messages You May See (and what they mean)
-
-* `dependency-linker: missing provider for symbol X`
-  → A module’s `requires` wasn’t satisfied by any module’s `provides`.
-
-* `namespacing: duplicate uniform "foo"`
-  → A module declared the same uniform twice.
-
-* `TextureUnitPool: no available texture units (all pinned)`
-  → Every unit is pinned; either unpin or increase pool size.
-
-* `UniformBinder: expected vec3 array length 3`
-  → Mismatched parameter kind vs value.
-
-## Performance Tips
-
-* Avoid frequent program-reset parameters; prefer `accumulation` policy when possible.
-* Group uniform updates—use `setMany` instead of per-uniform chattiness.
-* Pin long-lived samplers (env map) so they don’t churn units.
-
-## Housekeeping & Style
-
-* Keep module functions small and side-effect free; prefer passing data explicitly.
-* Use comments in `shader-compiler` output to banner module sections (already implemented).
-* Keep public symbol names stable across versions when feasible; bump version when breaking.
 
 ---
 
+## What’s deliberately **not** in v1
+
+* Uniform Blocks (`uniform Block { ... };`) are stripped during parsing and not mapped into the manifest.
+* Multi-pass / DAG orchestration (single pass only).
+* AST-level GLSL parsing/optimization (textual token-aware rewriting only).
+* Sampler arrays beyond manifest metadata (no runtime iteration helpers yet).
+
+---
+
+# Next Steps (Roadmap)
+
+Here’s a pragmatic path to pushing pixels from a simple “world + photography”:
+
+### 1) Minimal “World” & “Photography” types
+
+* **World**: a list of components (materials, sky, integrator) that each produce a `ShaderModuleDescriptor` + optional param schema.
+* **Photography**: camera intrinsics/extrinsics encoded as uniforms and/or constants (e.g., resolution, focal length, view/proj matrices).
+* **Adapter**: `buildRecipe(world, photography): AssemblyRecipe`
+
+    * Flattens module descriptors
+    * Selects the right entry symbol (e.g., `shadePixel`)
+    * Adds photography constants
+
+**Deliverables**
+
+* `src/app/build-recipe.ts` helper with a tiny, hardcoded world (sky gradient + passthrough film).
+* Unit tests: “changing camera param toggles accumulation reset but not program reset”.
+
+---
+
+### 2) “Film” module family
+
+* Ship **two** tiny film modules:
+
+    1. **Passthrough**: no accumulation (for bring-up)
+    2. **Simple accumulation**: writes weighted sum, consumes `historyColor` and `sampleCount`
+* Provide param schemas and small GLSL for each.
+* This lets you verify `RenderPipeline`’s dynamic uniform discovery.
+
+**Deliverables**
+
+* `Film/Passthrough@1.0.0`
+* `Film/Accumulate@1.0.0`
+* Tests: manifest contains `sampleCount` and (for accumulate) `historyColor` when expected.
+
+---
+
+### 3) Resource loading façade
+
+* Super-thin async loader that returns `WebGLTexture` given a URL (+ sampler state options).
+* Plugs into `ResourceDirectory`.
+* **Mockable** for tests.
+
+**Deliverables**
+
+* `src/engine/resources/texture-loader.ts`
+* Test: loads a 2×2 RGBA, binds as `albedoMap`, frame does not crash, binder stats show 1 bound.
+
+---
+
+### 4) Developer diagnostics overlay (optional but high-ROI)
+
+* Log the **ProgramKey.short**, module order, and a compact manifest table (logical→namespaced).
+* Toggle to dump the exact fragment GLSL (helps confirm namespacing & entry call).
+
+**Deliverables**
+
+* `src/devtools/diagnostics.ts` with pluggable hook (you already have `onRenderStats` in `RenderEngine`).
+
+---
+
+### 5) Stretch: “Integrator” skeleton
+
+* A toy integrator module that samples a sky (no geometry) and returns a color based on `fragCoord` / `uv`.
+* This is your first real “world” picture.
+
+**Deliverables**
+
+* `Integrator/Sky@1.0.0` using a simple gradient or procedural sun.
+* Wire it as the recipe’s entry `shadePixel`.
+
+---
+
+### 6) Hardening & coverage
+
+* Unit tests for:
+
+    * Ambiguous providers / missing requires / cycles in the linker.
+    * Namespacing edge-cases (keywords, preproc lines).
+    * ProgramKey changes on constants & modules; stability when order of input modules changes.
+    * ParameterStore: range enforcement, float vs int, serialize/deserialize across versions.
+* Fuzz-ish tests on `replaceIds` using randomized comments/strings to prevent regressions.
 

@@ -111,3 +111,4 @@ describe("dependency-linker: failures", () => {
         expect(() => linkRecipe(recipe([tracer, bad], "shadePixel"))).toThrow(/self-dependency/);
     });
 });
+

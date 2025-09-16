@@ -1,5 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import ParameterStore, { type ParamDescriptor, type ParamValue } from "../../../../src/engine/parameters/parameter-store";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import ParameterStore, {
+    type ParameterDescriptor,
+    type ParameterValue,
+} from "../../../../src/engine/parameters/parameter-store";
 
 describe("ParameterStore", () => {
     let store: ParameterStore;
@@ -9,15 +12,15 @@ describe("ParameterStore", () => {
         store = new ParameterStore();
     });
 
-    function regs(): ParamDescriptor[] {
+    function regs(): ParameterDescriptor[] {
         return [
-            { logical: "albedo", default: [1, 1, 1], kind: "vec3", resetPolicy: "accumulation" },
-            { logical: "exposure", default: 1.0, kind: "float", resetPolicy: "none", min: 0.0, max: 10.0 },
-            { logical: "bounces", default: 4, kind: "int", resetPolicy: "program" },
-            { logical: "enabled", default: true, kind: "bool" },
-            { logical: "uvScale", default: [1, 1], kind: "vec2" },
-            { logical: "clip", default: [0, 1, 0, 1], kind: "vec4" },
-            { logical: "M4", default: new Float32Array(16), kind: "mat4" },
+            { logical: "albedo",   default: [1, 1, 1],         kind: "vec3",    resetPolicy: "accumulation" },
+            { logical: "exposure", default: 1.0,               kind: "float",   resetPolicy: "none", min: 0.0, max: 10.0 },
+            { logical: "bounces",  default: 4,                 kind: "int",     resetPolicy: "program" },
+            { logical: "enabled",  default: true,              kind: "boolean" },
+            { logical: "uvScale",  default: [1, 1],            kind: "vec2" },
+            { logical: "clip",     default: [0, 1, 0, 1],      kind: "vec4" },
+            { logical: "M4",       default: new Float32Array(16), kind: "mat4" },
         ];
     }
 
@@ -33,7 +36,9 @@ describe("ParameterStore", () => {
         store.set(scope, "albedo", [0.8, 0.2, 0.2]);
         store.set(scope, "enabled", false);
 
-        const dirty = store.collectDirty().sort((a, b) => a.logical.localeCompare(b.logical));
+        const dirty = store
+            .collectDirty()
+            .sort((a, b) => a.logical.localeCompare(b.logical));
         expect(dirty.map((d) => d.logical)).toEqual(["albedo", "enabled"]);
         const alb = dirty.find((d) => d.logical === "albedo")!;
         expect(alb.kind).toBe("vec3");
@@ -48,7 +53,7 @@ describe("ParameterStore", () => {
         store.register(scope, regs());
 
         // wrong type for vec3
-        store.set(scope, "albedo", [1, 2] as unknown as ParamValue);
+        store.set(scope, "albedo", [1, 2] as unknown as ParameterValue);
         expect(store.collectDirty().length).toBe(0);
 
         // out of range exposure
@@ -85,7 +90,7 @@ describe("ParameterStore", () => {
         expect(dirty[0].logical).toBe("exposure");
     });
 
-    it("updating descriptors preserves values", () => {
+    it("updating descriptors preserves values and applies new constraints", () => {
         store.register(scope, [{ logical: "exposure", default: 1.0, kind: "float" }]);
         store.set(scope, "exposure", 3.0);
         store.register(scope, [{ logical: "exposure", default: 0.5, kind: "float", min: 0, max: 5 }]);
@@ -104,5 +109,19 @@ describe("ParameterStore", () => {
 
         const dirty = store.collectDirty().map(d => `${d.scope}:${d.logical}`).sort();
         expect(dirty).toEqual(["Material/A@1.0.0:albedo", "Material/B@1.0.0:albedo"]);
+    });
+
+    it("emits onChange for changed values (once per set)", () => {
+        store.register(scope, regs());
+        const cb = vi.fn();
+        store.onChange(scope, "exposure", cb);
+
+        store.set(scope, "exposure", 2.0);  // change
+        store.set(scope, "exposure", 2.0);  // same value → no emit
+        store.set(scope, "exposure", 3.0);  // change
+
+        expect(cb).toHaveBeenCalledTimes(2);
+        expect(cb).toHaveBeenNthCalledWith(1, 2.0, 1.0);
+        expect(cb).toHaveBeenNthCalledWith(2, 3.0, 2.0);
     });
 });

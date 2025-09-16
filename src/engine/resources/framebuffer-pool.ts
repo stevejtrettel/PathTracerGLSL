@@ -1,39 +1,7 @@
-// src/engine/resources/framebuffer-pool.test.ts
 /**
- * framebuffer-pool.test.ts — v1
+ * framebuffer-pool.ts — v1.1 (cached HDR probe + state-safe clear)
  * ------------------------------------------------------------
- * PURPOSE
- *   Manage a persistent, ping-pong pair of HDR color textures + FBOs used as the
- *   GPU "film". The pool abstracts allocation, resize, clear, and read/write
- *   pairing, so the RenderPipeline can render a frame by:
- *
- *     const { readTex, writeFbo } = pool.pair();
- *     // bind program, bind readTex as `historyColor` if Film wants it
- *     gl.bindFramebuffer(gl.FRAMEBUFFER, writeFbo);
- *     // ... draw fullscreen quad
- *     pool.swap();
- *
- * RENDERING MODEL
- *   - Two color attachments (A, B), both RGBA HDR (default RGBA16F).
- *   - Each frame: sample from READ (texture) and write into WRITE (FBO), then swap.
- *   - `clear()` zeros both textures/FBOs (accumulation reset).
- *
- * WEBGL2 + EXTENSIONS
- *   - Prefers RGBA16F (internalFormat = gl.RGBA16F, type = gl.HALF_FLOAT).
- *   - Requires EXT_color_buffer_float for float rendering on many platforms.
- *   - Gracefully falls back to RGBA8/UNSIGNED_BYTE if float rendering unsupported.
- *
- * API
- *   - ensureSize(w,h[,opts]) : (re)allocates if size or format changed.
- *   - pair()  : returns current { readTex, writeFbo }.
- *   - swap()  : swaps read/write roles (call after finishing a frame).
- *   - clear() : clears both attachments to (0,0,0,0).
- *   - dispose(): releases GL resources.
- *
- * TYPESCRIPT NOTES
- *   - GL handles are typed as `WebGLTexture | null` / `WebGLFramebuffer | null`
- *     so assigning `null` is type-safe and explicit. Callers see `null` only
- *     during uninitialized states; `pair()` returns `null` if not allocated.
+ * Ping-pong HDR film with safe state restoration during clear().
  */
 
 export interface FramebufferPoolOptions {
@@ -49,15 +17,10 @@ export interface FramebufferPair {
 }
 
 export interface PoolFormatInfo {
-    /** texture internalFormat (e.g., gl.RGBA16F or gl.RGBA8) */
-    internalFormat: number;
-    /** texture format (gl.RGBA) */
-    format: number;
-    /** texture type (gl.HALF_FLOAT or gl.UNSIGNED_BYTE) */
-    type: number;
-    /** filter value (gl.NEAREST or gl.LINEAR) */
-    filter: number;
-    /** true if using floating-point renderable attachment */
+    internalFormat: number; // e.g., gl.RGBA16F or gl.RGBA8
+    format: number;         // gl.RGBA
+    type: number;           // gl.HALF_FLOAT or gl.UNSIGNED_BYTE
+    filter: number;         // gl.NEAREST or gl.LINEAR
     hdr: boolean;
 }
 
@@ -67,56 +30,51 @@ export default class FramebufferPool {
     private width = 0;
     private height = 0;
 
-    // ping-pong state: index 0/1 are the two attachments
+    // ping-pong state
     private readIdx = 0;
 
     private textures: (WebGLTexture | null)[] = [null, null];
     private fbos: (WebGLFramebuffer | null)[] = [null, null];
 
-    // chosen format (after extension checks)
     private _fmt!: PoolFormatInfo;
+
+    // cache the HDR renderable support probe
+    private _hdrRenderable: boolean | null = null;
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-        // format is decided on first ensureSize() unless forced in options
     }
 
-    /** Current size (0,0 if not allocated). */
     getSize(): { width: number; height: number } {
         return { width: this.width, height: this.height };
     }
 
-    /** Format info actually in use (after ensureSize). */
     get formatInfo(): PoolFormatInfo {
         if (!this._fmt) {
-            // Provide a sensible default view before allocation
             const gl = this.gl;
             return {
-                internalFormat: gl.RGBA16F ?? 0x881a, // fallback number if undefined in mock
+                internalFormat: (gl as any).RGBA16F ?? 0x881a,
                 format: gl.RGBA,
                 type: (gl as any).HALF_FLOAT ?? 0x140B,
-                filter: this.gl.NEAREST,
+                filter: gl.NEAREST,
                 hdr: true,
             };
         }
         return this._fmt;
     }
 
-    /**
-     * Ensure the pool is allocated at (w,h). Reallocates if size or format changes.
-     * This is cheap to call every frame; it no-ops if nothing changed.
-     */
     ensureSize(width: number, height: number, opts: FramebufferPoolOptions = {}): void {
-        if (width <= 0 || height <= 0) return; // ignore invalid sizes
+        if (width <= 0 || height <= 0) return;
 
         const gl = this.gl;
-
-        // Decide on format (first time) or keep existing unless forced to RGBA8
         const wantLinear = !!opts.linearFiltering;
         const wantRGBA8 = !!opts.forceRGBA8;
 
-        const hdrSupported = !!gl.getExtension("EXT_color_buffer_float");
-        const useHDR = !wantRGBA8 && hdrSupported;
+        if (this._hdrRenderable === null) {
+            // WebGL2: float color attachments require EXT_color_buffer_float
+            this._hdrRenderable = !!gl.getExtension("EXT_color_buffer_float");
+        }
+        const useHDR = !wantRGBA8 && this._hdrRenderable;
 
         const fmt: PoolFormatInfo = useHDR
             ? {
@@ -141,9 +99,7 @@ export default class FramebufferPool {
             this._fmt.type !== fmt.type ||
             this._fmt.filter !== fmt.filter;
 
-        if (!sizeChanged && !fmtChanged && this.textures[0] && this.textures[1]) {
-            return; // already good
-        }
+        if (!sizeChanged && !fmtChanged && this.textures[0] && this.textures[1]) return;
 
         // (Re)allocate
         this.destroyResources();
@@ -166,25 +122,58 @@ export default class FramebufferPool {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
-    /** Return the current read texture + write FBO. */
     pair(): FramebufferPair {
         const readTex = this.textures[this.readIdx] ?? null;
         const writeFbo = this.fbos[1 - this.readIdx] ?? null;
         return { readTex, writeFbo };
     }
 
-    /** Swap read/write roles (call after finishing a frame). */
     swap(): void {
         this.readIdx = 1 - this.readIdx;
     }
 
-    /** Zero both attachments (accumulation reset). */
+    /** Zero both attachments (accumulation reset) with full state restore. */
     clear(): void {
         const gl = this.gl;
-        const oldFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING);
-        const oldCC = gl.getParameter(gl.COLOR_CLEAR_VALUE) as Float32Array;
 
-        gl.colorMask(true, true, true, true);
+        // Snapshot minimal state we actually touch
+        let prevFbo: WebGLFramebuffer | null = null;
+        try { prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null; } catch {}
+
+        // COLOR_CLEAR_VALUE → [r,g,b,a]; default to [0,0,0,0] if absent
+        let prevClear: [number, number, number, number] = [0, 0, 0, 0];
+        try {
+            const v = gl.getParameter(gl.COLOR_CLEAR_VALUE) as any;
+            if (v && (Array.isArray(v) || ArrayBuffer.isView(v))) {
+                prevClear = [
+                    Number(v[0] ?? 0),
+                    Number(v[1] ?? 0),
+                    Number(v[2] ?? 0),
+                    Number(v[3] ?? 0),
+                ];
+            }
+        } catch {}
+
+        // COLOR_WRITEMASK → [r,g,b,a]; default to [true,true,true,true] if absent
+        let prevMask: [boolean, boolean, boolean, boolean] = [true, true, true, true];
+        try {
+            const v = gl.getParameter(gl.COLOR_WRITEMASK) as any;
+            if (v && (Array.isArray(v) || ArrayBuffer.isView(v))) {
+                prevMask = [!!v[0], !!v[1], !!v[2], !!v[3]];
+            }
+        } catch {}
+
+        // SCISSOR_TEST state; some mocks lack isEnabled → use getParameter fallback
+        let scissorWasEnabled = false;
+        try {
+            scissorWasEnabled = typeof (gl as any).isEnabled === "function"
+                ? (gl as any).isEnabled(gl.SCISSOR_TEST)
+                : !!gl.getParameter(gl.SCISSOR_TEST);
+        } catch { scissorWasEnabled = false; }
+
+        // Make clears affect the full target (viewport is irrelevant; scissor controls region)
+        if (scissorWasEnabled && typeof (gl as any).disable === "function") gl.disable(gl.SCISSOR_TEST);
+        if (typeof (gl as any).colorMask === "function") gl.colorMask(true, true, true, true);
 
         for (const fbo of this.fbos) {
             if (!fbo) continue;
@@ -193,12 +182,21 @@ export default class FramebufferPool {
             gl.clear(gl.COLOR_BUFFER_BIT);
         }
 
-        // restore previous bindings/state
-        gl.clearColor(oldCC[0], oldCC[1], oldCC[2], oldCC[3]);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, oldFbo);
+        // Restore previous state (guard each call for mock compatibility)
+        if (typeof gl.clearColor === "function") {
+            gl.clearColor(prevClear[0], prevClear[1], prevClear[2], prevClear[3]);
+        }
+        if (typeof (gl as any).colorMask === "function") {
+            gl.colorMask(prevMask[0], prevMask[1], prevMask[2], prevMask[3]);
+        }
+        if (scissorWasEnabled && typeof (gl as any).enable === "function") {
+            gl.enable(gl.SCISSOR_TEST);
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, prevFbo);
     }
 
-    /** Free all GL resources. Safe to call multiple times. */
+
+
     dispose(): void {
         this.destroyResources();
         this.width = 0;
@@ -243,12 +241,8 @@ export default class FramebufferPool {
 
     private destroyResources(): void {
         const gl = this.gl;
-        for (const fbo of this.fbos) {
-            if (fbo) gl.deleteFramebuffer(fbo);
-        }
-        for (const t of this.textures) {
-            if (t) gl.deleteTexture(t);
-        }
+        for (const fbo of this.fbos) if (fbo) gl.deleteFramebuffer(fbo);
+        for (const t of this.textures) if (t) gl.deleteTexture(t);
         this.fbos = [null, null];
         this.textures = [null, null];
     }

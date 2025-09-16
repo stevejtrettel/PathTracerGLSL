@@ -21,20 +21,20 @@
  */
 
 export interface SamplerResource {
-    texture: WebGLTexture;
-    target: number;   // GL enum for texture target
-    pin?: boolean;    // optional: request unit pinning
+    texture: WebGLTexture | null; // CHANGED (allow explicit unbind)
+    target: number;
+    pin?: boolean;
 }
 
 export type ResourceDirectorySnapshot = Record<
     string,
-    { texture: WebGLTexture; target: number; pin?: boolean }
+    { texture: WebGLTexture | null; target: number; pin?: boolean }
     >;
 
 interface Entry {
-    texture: WebGLTexture;
+    texture: WebGLTexture | null; // CHANGED
     target: number;
-    pin: boolean; // stored as concrete boolean
+    pin: boolean;
 }
 
 export default class ResourceDirectory {
@@ -43,7 +43,7 @@ export default class ResourceDirectory {
     /** Add or replace a logical sampler binding. */
     set(logical: string, res: SamplerResource): void {
         this.table.set(logical, {
-            texture: res.texture,
+            texture: res.texture,        // may be null
             target: res.target | 0,
             pin: !!res.pin,
         });
@@ -68,7 +68,7 @@ export default class ResourceDirectory {
      * Get a *copy* of a binding (so callers can't mutate internal state).
      * Returns undefined if not present.
      */
-    get(logical: string): { texture: WebGLTexture; target: number; pin: boolean } | undefined {
+    get(logical: string): { texture: WebGLTexture | null; target: number; pin: boolean } | undefined {
         const e = this.table.get(logical);
         if (!e) return undefined;
         return { texture: e.texture, target: e.target, pin: e.pin };
@@ -83,7 +83,7 @@ export default class ResourceDirectory {
     snapshot(): ResourceDirectorySnapshot {
         const out: ResourceDirectorySnapshot = Object.create(null);
         for (const [logical, e] of this.table) {
-            const record: { texture: WebGLTexture; target: number; pin?: boolean } = {
+            const record: { texture: WebGLTexture | null; target: number; pin?: boolean } = {
                 texture: e.texture,
                 target: e.target,
             };

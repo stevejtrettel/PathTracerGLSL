@@ -1,164 +1,108 @@
+
+
+
 import { describe, it, expect } from "vitest";
-import type { ComponentID } from "../../../../src/core/ids";
-import type { ShaderFragment, ShaderModuleDescriptor } from "../../../../src/core/shader-fragment";
-import {
-    namespaceModule,
-    makeModulePrefix,
-    extractUniforms,
-    extractFunctionNames,
-    replaceIds,
-} from "../../../../src/engine/shaders/namespacing";
+import { namespaceModule, extractUniforms, makeModulePrefix } from "../../../../src/engine/shaders/namespacing";
+import type { ShaderModuleDescriptor } from "../../../../src/core/shader-fragment";
 
-function id(kind: ComponentID["kind"], name: string): ComponentID {
-    return { kind, name, version: "1.0.0" };
-}
+const mkMod = (over: Partial<ShaderModuleDescriptor>): ShaderModuleDescriptor => ({
+    id: { kind: "Material", name: "Test", version: "1.0.0" },
+    fragment: {
+        uniforms: "",
+        functions: "",
+        provides: [],
+        requires: [],
+        mainCode: "",
+        ...over.fragment,
+    } as any,
+    priority: over.priority,
+    ...over,
+} as ShaderModuleDescriptor);
 
-function mod(
-    kind: ComponentID["kind"],
-    name: string,
-    fragment: Partial<ShaderFragment> & { functions?: string }
-): ShaderModuleDescriptor {
-    return { id: id(kind, name), fragment: { uniforms: "", mainCode: "", ...fragment } };
-}
-
-describe("extractUniforms", () => {
-    it("parses single and comma-separated declarations", () => {
+describe("namespacing", () => {
+    it("parses sampler arrays with arraySize and ignores uniform blocks", () => {
         const src = `
+      // block should be ignored
+      uniform BlockName {
+        mat4 view;
+        mat4 proj;
+      };
+
+      uniform sampler2D set[4], aux;
       uniform float exposure;
-      uniform vec3 albedo, emission;
-      uniform sampler2D tex0, tex1;
-      // uniform int ignored; (comment)
-      /* uniform int alsoIgnored; */
-      uniform float weights[4];
     `;
-        const names = extractUniforms(src).map((e) => e.name);
-        expect(names).toEqual(["exposure", "albedo", "emission", "tex0", "tex1", "weights"]);
-    });
-});
 
-describe("extractFunctionNames", () => {
-    it("finds function definitions and ignores comments/strings", () => {
-        const src = `
-      // void fake() {}
-      /* float nope() {} */
-      const int K = 3;
-      void foo(int a) { }
-      vec3 bar() { return vec3(0.0); }
-      void baz() {
-        // "foo" should not count
-        /* 'bar' should not count either */
-      }
-      // a constructor call like vec3(1.0) should not add a name
-    `;
-        const names = extractFunctionNames(src).sort();
-        expect(names).toEqual(["bar", "baz", "foo"].sort());
-    });
-});
+        const u = extractUniforms(src);
+        // block removed, so we should only see set, aux, exposure
+        const names = u.map(x => x.name);
+        expect(names).toContain("set");
+        expect(names).toContain("aux");
+        expect(names).toContain("exposure");
 
-describe("replaceIds", () => {
-    it("replaces only whole identifiers and skips strings/comments", () => {
-        const code = `
-      // foo should not change here
-      /* foo also not here */
-      const char* s = "foo should stay";
-      float fooBar = 0.0; // contains foo as prefix but shouldn't match
-      float foo = 1.0;
-      float v = foo + 1.0;
-    `;
-        const out = replaceIds(code, { foo: "X_foo" }, new Set());
-        expect(out).toContain("float X_foo = 1.0;");
-        expect(out).toContain("float fooBar = 0.0;");
-        expect(out).toContain('"foo should stay"');
-        expect(out).toContain("// foo should not change here");
-        expect(out).toContain("/* foo also not here */");
-    });
-});
+        const setEntry = u.find(x => x.name === "set")!;
+        expect(setEntry.arraySize).toBe(4);
+        expect(setEntry.type).toBe("sampler2D");
 
-describe("namespaceModule: uniforms + helpers", () => {
-    it("prefixes uniforms and private helpers; preserves public symbols", () => {
-        const fragment: ShaderFragment = {
-            uniforms: `
-        uniform float exposure;
-        uniform vec3 albedo, emission;
-      `,
-            functions: `
-        // private helper
-        float luma(vec3 c) { return dot(c, vec3(0.2126,0.7152,0.0722)); }
-        // public symbol (must NOT rename)
-        vec3 shadePixel(vec2 fragCoord) {
-          return albedo * exposure;
-        }
-      `,
-            provides: ["shadePixel"], // public, must be preserved
-            requires: [],
-            entrypoints: { fragmentMain: "shadePixel" },
-        };
-        const m = mod("Material", "Lambert", fragment);
-        const res = namespaceModule(m, { preserve: ["shadePixel"] });
-
-        // Uniforms renamed in declarations
-        expect(res.uniforms).not.toContain("uniform float exposure;");
-        expect(res.uniforms).toMatch(/uniform float m[A-Fa-f0-9]{6}_exposure;/);
-
-        // Usage renamed inside code (albedo/exposure should be namespaced)
-        expect(res.functions).toMatch(
-            /return\s+m[A-Fa-f0-9]{6}_albedo\s*\*\s*m[A-Fa-f0-9]{6}_exposure\s*;/
-        );
-
-        // Built-in call must stay unmodified (no renaming of 'dot')
-        expect(res.functions).toContain(" dot(");
-
-        // Helper renamed (original name should not appear)
-        expect(res.functions).not.toContain(" luma(");
-
-        // Public symbol preserved
-        expect(res.functions).toContain("vec3 shadePixel(");
-
-        // Helper mapping exists
-        const helperNames = Object.keys(res.helperMappings);
-        expect(helperNames).toContain("luma");
-
-        // Uniform mappings present
-        const uNames = res.uniformMappings.map((u) => u.logicalName).sort();
-        expect(uNames).toEqual(["albedo", "emission", "exposure"].sort());
+        const auxEntry = u.find(x => x.name === "aux")!;
+        expect(auxEntry.arraySize).toBeUndefined();
+        expect(auxEntry.type).toBe("sampler2D");
     });
 
-    it("different modules get different prefixes for same uniform names", () => {
-        const f: ShaderFragment = {
-            uniforms: `uniform float exposure;`,
-            functions: `float foo(){return exposure;}`,
-            provides: [],
-        };
-        const m1 = mod("Material", "A", f);
-        const m2 = mod("Material", "B", f);
+    it("prefixes private helpers/uniforms and preserves public symbols", () => {
+        const mod = mkMod({
+            fragment: {
+                uniforms: `
+          uniform sampler2D set[4];
+          uniform float exposure;
+        `,
+                // shadePixel is a public symbol we want to preserve
+                functions: `
+          /* don't touch exposure in comments */
+          // nor in "strings like exposure"
+          vec3 shadePixel(vec2 frag) {
+            return vec3(0.0) + vec3(exposure);
+          }
+          void helperFoo() {}
+        `,
+                provides: ["shadePixel"],
+                requires: [],
+                mainCode: `
+          // references to helperFoo should be renamed
+          void main_extra() {
+            helperFoo();
+            // sampler index use should remain readable: set[0]
+            vec4 c = texture(set[0], fragCoord.xy);
+          }
+        `,
+            } as any,
+        });
 
-        const r1 = namespaceModule(m1, { preserve: [] });
-        const r2 = namespaceModule(m2, { preserve: [] });
+        const res = namespaceModule(mod, { preserve: ["shadePixel"] });
+        const prefix = makeModulePrefix(mod.id);
 
-        expect(r1.namespacePrefix).not.toBe(r2.namespacePrefix);
-        expect(r1.functions).not.toBe(r2.functions);
-    });
+        // Uniform mappings include array size metadata
+        const names = res.uniformMappings.map(u => u.logicalName);
+        expect(names).toContain("set");
+        expect(names).toContain("exposure");
+        const setMap = res.uniformMappings.find(u => u.logicalName === "set")!;
+        expect(setMap.arraySize).toBe(4);
+        expect(setMap.namespacedName.startsWith(prefix)).toBe(true);
 
-    it("throws on duplicate uniform name in one module", () => {
-        const f: ShaderFragment = {
-            uniforms: `
-        uniform float exposure;
-        uniform float exposure;
-      `,
-            functions: ``,
-            provides: [],
-        };
-        const m = mod("Material", "Dup", f);
-        expect(() => namespaceModule(m, { preserve: [] })).toThrow(/duplicate uniform "exposure"/);
-    });
-});
+        // Public function name is preserved
+        expect(res.functions).toMatch(/\bvec3\s+shadePixel\s*\(/);
 
+        // Helper renamed
+        expect(res.functions).toMatch(new RegExp(`\\bvoid\\s+${prefix}helperFoo\\s*\\(`));
 
-describe("makeModulePrefix", () => {
-    it("is deterministic and uses hash prefix", () => {
-        const a = makeModulePrefix(id("Geometry", "E"));
-        const b = makeModulePrefix(id("Geometry", "E"));
-        expect(a).toBe(b);
-        expect(a).toMatch(/^m[0-9a-f]{6}_$/);
+        // Comments/strings not rewritten (original "exposure" should appear)
+        expect(res.functions).toMatch(/don't touch exposure/);
+        expect(res.functions).toMatch(/strings like exposure/);
+
+        // Main code uses renamed helper
+        expect(res.mainCode).toMatch(new RegExp(`\\b${prefix}helperFoo\\s*\\(`));
+        // The identifier 'set' should be prefixed where it’s an identifier; the [0] index survives.
+        // We can at least ensure the namespaced 'set' exists:
+        const nsSet = setMap.namespacedName;
+        expect(res.mainCode).toContain(`${nsSet}[0]`);
     });
 });

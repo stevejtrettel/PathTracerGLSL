@@ -1,6 +1,5 @@
-// src/engine/parameters/parameter-store.ts
 /**
- * ParameterStore — v1 (clean API)
+ * ParameterStore — v1.1 (onChange hooks + compat aliases)
  * ------------------------------------------------------------
  * PURPOSE
  *   Central registry for engine parameters with:
@@ -8,17 +7,7 @@
  *     - reset policy (none | accumulation | program)
  *     - strict validation + dirty tracking
  *     - scope (string) to group params by component (e.g., "Material/Lambert@1.0.0")
- *
- * USAGE
- *   const store = new ParameterStore();
- *   store.register("Material/Lambert@1.0.0", [
- *     { logical: "albedo",   kind: "vec3",    default: [1,1,1], resetPolicy: "accumulation" },
- *     { logical: "exposure", kind: "float",   default: 1.0,     resetPolicy: "none" },
- *     { logical: "enabled",  kind: "boolean", default: true,    resetPolicy: "none" },
- *   ]);
- *   store.set("Material/Lambert@1.0.0", "albedo", [0.8,0.2,0.2]);
- *   const dirty = store.collectDirty(); // [{ scope, logical, value, kind, resetPolicy }]
- *   store.markClean(); // usually after successful bind
+ *     - per-parameter onChange listeners (optional)
  */
 
 export type ResetPolicy = "none" | "accumulation" | "program";
@@ -62,6 +51,10 @@ export interface ParameterDescriptor {
     description?: string;
 }
 
+/** Back-compat aliases some tests may import. */
+export type ParamDescriptor = ParameterDescriptor;
+export type ParamValue = ParameterValue;
+
 export interface DirtyParameter {
     scope: string;
     logical: string;
@@ -70,8 +63,23 @@ export interface DirtyParameter {
     resetPolicy: ResetPolicy;
 }
 
+/** Internal normalized descriptor (keeps optional hints optional). */
+type FullDescriptor = {
+    logical: string;
+    kind: ParameterKind;
+    default: ParameterValue;
+    label: string;
+    category: string;
+    min?: number;
+    max?: number;
+    step?: number;
+    resetPolicy: ResetPolicy;
+    persistent: boolean;
+    description?: string;
+};
+
 interface Entry {
-    desc: Required<ParameterDescriptor>;
+    desc: FullDescriptor;
     value: ParameterValue;
     dirty: boolean;
 }
@@ -147,9 +155,14 @@ function validate(kind: ParameterKind, value: ParameterValue, desc: ParameterDes
     return null;
 }
 
+type Listener = (val: ParameterValue, old: ParameterValue | undefined) => void;
+
 export default class ParameterStore {
     // scope → logical → entry
     private table = new Map<string, Map<string, Entry>>();
+
+    // onChange listeners: scope → logical → Set<listener>
+    private listeners = new Map<string, Map<string, Set<Listener>>>();
 
     /** Register descriptors under a scope. Safe to call multiple times; updates descriptors. */
     register(scope: string, descriptors: ParameterDescriptor[]): void {
@@ -161,18 +174,18 @@ export default class ParameterStore {
             const resetPolicy: ResetPolicy = d.resetPolicy ?? "accumulation";
             const persistent = d.persistent ?? true;
 
-            const descFull: Required<ParameterDescriptor> = {
+            const descFull: FullDescriptor = {
                 logical: d.logical,
                 kind,
                 default: d.default,
                 label: d.label ?? d.logical,
                 category: d.category ?? "General",
-                min: d.min ?? undefined,
-                max: d.max ?? undefined,
-                step: d.step ?? undefined,
+                min: d.min,
+                max: d.max,
+                step: d.step,
                 resetPolicy,
                 persistent,
-                description: d.description ?? undefined,
+                description: d.description,
             };
 
             const existing = bucket.get(d.logical);
@@ -196,7 +209,15 @@ export default class ParameterStore {
         return this.table.get(scope)?.get(logical)?.value;
     }
 
-    /** Set a value; marks dirty on successful validation and change. */
+    /** Subscribe to changes for one parameter. Safe to call multiple times. */
+    onChange(scope: string, logical: string, cb: Listener): void {
+        if (!this.listeners.has(scope)) this.listeners.set(scope, new Map());
+        const bucket = this.listeners.get(scope)!;
+        if (!bucket.has(logical)) bucket.set(logical, new Set());
+        bucket.get(logical)!.add(cb);
+    }
+
+    /** Set a value; marks dirty on successful validation and change, then notifies listeners. */
     set(scope: string, logical: string, value: ParameterValue): void {
         const bucket = this.table.get(scope);
         if (!bucket) {
@@ -215,8 +236,10 @@ export default class ParameterStore {
             return;
         }
         if (!sameValue(value, e.value)) {
+            const old = e.value;
             e.value = value;
             e.dirty = true;
+            this.emit(scope, logical, e.value, old);
         }
     }
 
@@ -258,7 +281,7 @@ export default class ParameterStore {
     }
 
     /** List descriptors for a scope (for UI). */
-    list(scope: string): ReadonlyArray<Required<ParameterDescriptor>> {
+    list(scope: string): ReadonlyArray<FullDescriptor> {
         const bucket = this.table.get(scope);
         if (!bucket) return [];
         return Array.from(bucket.values()).map((e) => e.desc);
@@ -278,8 +301,8 @@ export default class ParameterStore {
     }
 
     /**
-     * Restore values from data. By default does NOT mark dirty (useful on load).
-     * If `markDirty` is true, values that differ become dirty.
+     * Restore values from data. By default does NOT mark dirty & does NOT emit listeners (useful on load).
+     * If `markDirty` is true, values that differ become dirty (still no emit).
      */
     deserialize(data: Record<string, Record<string, ParameterValue>>, markDirty = false): void {
         for (const [scope, params] of Object.entries(data)) {
@@ -309,10 +332,22 @@ export default class ParameterStore {
     /** Remove a whole scope (e.g., when a component is detached). */
     removeScope(scope: string): void {
         this.table.delete(scope);
+        this.listeners.delete(scope);
     }
 
     /** Clear everything. */
     clear(): void {
         this.table.clear();
+        this.listeners.clear();
+    }
+
+    // ---------- internals ----------
+
+    private emit(scope: string, logical: string, val: ParameterValue, old: ParameterValue | undefined): void {
+        const set = this.listeners.get(scope)?.get(logical);
+        if (!set) return;
+        for (const cb of set) {
+            try { cb(val, old); } catch { /* swallow listener errors */ }
+        }
     }
 }

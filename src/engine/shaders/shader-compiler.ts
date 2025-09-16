@@ -1,51 +1,15 @@
 // src/engine/shaders/shader-compiler.ts
 /**
- * shader-compiler.ts — v1.2
+ * shader-compiler.ts — v1.2.1
  * ------------------------------------------------------------
  * PURPOSE
  *   Take an AssemblyRecipe (modules + constants + entrypoint) and produce
  *   deterministic, branch-free GLSL source code (vertex + fragment),
  *   along with a manifest for uniform binding and diagnostics.
- *
- * CORE RESPONSIBILITIES
- *   1. Collect ShaderFragments from all modules in the recipe.
- *   2. Inline compile-time constants (as `const` declarations).
- *   3. Resolve `requires`/`provides` dependencies (via linkRecipe):
- *        - Build a symbol table from all `provides`.
- *        - Ensure each `requires` resolves to exactly one provider.
- *        - Throw if missing or ambiguous.
- *   4. Namespace module-local identifiers (uniforms, private helpers)
- *      based on ComponentID to avoid collisions, while preserving public
- *      symbols listed in `provides`/`requires` (so linking works).
- *   5. Prune unreachable modules (handled during linking).
- *   6. Emit a canonical `main()` that delegates to the entry symbol.
- *   7. Return:
- *        - vertexSrc: deterministic fullscreen-quad vertex shader
- *        - fragmentSrc: assembled GLSL fragment shader
- *        - manifest: mapping of logical uniform names → namespaced uniforms
- *                    + sampler bindings (separate list)
- *        - diagnostics: warnings, link report summary
- *
- * INVARIANTS
- *   - Output GLSL contains no `#if/#ifdef` conditionals for feature toggles.
- *   - Identical recipes always produce identical GLSL (byte-for-byte).
- *
- * ERROR HANDLING
- *   - Throws on missing symbols, multiple providers, duplicate uniforms in a
- *     module (namespacer check), or multiple/no entry providers.
- *   - Error messages reference ComponentIDs and symbol names for clarity.
- *
- * EVOLUTION NOTES
- *   - v1.3 may introduce optional AST-based optimization passes.
- *   - v2 may add multipass compilation via Recipe DAGs.
  */
 
 import type { AssemblyRecipe } from "./assembly-recipe";
-import type {
-    ShaderModuleDescriptor,
-    NormalizedShaderFragment,
-} from "../../core/shader-fragment";
-import { normalizeShaderFragment } from "../../core/shader-fragment";
+import type { ShaderModuleDescriptor } from "../../core/shader-fragment";
 import { linkRecipe } from "./dependency-linker";
 import {
     namespaceModule,
@@ -62,22 +26,23 @@ export interface UniformManifestEntry {
     owner: { kind: string; name: string; version: string };
 }
 
-/** GLSL sampler types we care about in v1. */
+/** GLSL sampler types supported in v1. */
 export type SamplerType =
-    | "sampler2D"
-    | "samplerCube"
+    | "sampler2D" | "sampler2DArray"
+    | "samplerCube" | "samplerCubeArray"
     | "sampler3D"
-    | "sampler2DShadow"
-    | "samplerCubeShadow";
+    | "sampler2DShadow" | "sampler2DArrayShadow" | "samplerCubeShadow"
+    | "isampler2D" | "usampler2D"
+    | "isampler3D" | "usampler3D"
+    | "isamplerCube" | "usamplerCube"
+    | "isampler2DArray" | "usampler2DArray";
 
 /** One sampler binding discovered during compilation. */
 export interface SamplerBinding {
-    /** Logical name declared in GLSL (pre-namespace). */
     logical: string;
-    /** Namespaced GPU name after module namespacing. */
     namespaced: string;
-    /** GLSL sampler type. */
     type: SamplerType;
+    arraySize?: number;
 }
 
 /** Manifest returned to the engine. */
@@ -153,7 +118,7 @@ export function compileRecipe(recipe: AssemblyRecipe): CompileOutput {
     // 6) Vertex template (kept inline for now to avoid extra file)
     const vertexSrc = VERTEX_TEMPLATE.trim();
 
-    // 7) Build manifest
+    // 7) Build manifest (linear-time, no lookups)
     const manifest = buildManifest(ordered, modResults);
 
     // 8) Diagnostics
@@ -182,8 +147,7 @@ function renderConstants(recipe: AssemblyRecipe): string {
         if (typeof v === "boolean") {
             return `const bool ${k} = ${v ? "true" : "false"};`;
         }
-        // string: emit as a comment + a const with a hashed code, since GLSL lacks strings
-        // we keep it simple here: comment only (useful for diagnostics)
+        // strings are non-native; emit as comment for diagnostics
         return `// const (string) ${k} = "${(v as string).replace(/"/g, '\\"')}"`;
     });
     return lines.join("\n");
@@ -195,7 +159,8 @@ function bannerForModule(m: ShaderModuleDescriptor): string {
 
 function isSamplerType(t?: string): t is SamplerType {
     if (!t) return false;
-    return /^(sampler(?:2D|3D|Cube)(?:Shadow)?)$/i.test(t);
+    // i|u for integer samplers, optional Array and Shadow suffixes
+    return /^(?:[iu]?sampler)(?:2D|3D|Cube)(?:Array)?(?:Shadow)?$/i.test(t);
 }
 
 function buildManifest(
@@ -203,35 +168,33 @@ function buildManifest(
     results: ReadonlyArray<ModuleNamespaceResult>
 ): UniformManifest {
     const entries: UniformManifestEntry[] = [];
-
-    for (let i = 0; i < ordered.length; i++) {
-        const owner = ordered[i]!.id;
-        for (const u of results[i]!.uniformMappings) {
-            entries.push({
-                logicalName: u.logicalName,
-                namespacedName: u.namespacedName,
-                type: u.type,
-                owner: { kind: owner.kind, name: owner.name, version: owner.version },
-            });
-        }
-    }
-
     const byLogical: Record<string, string> = {};
     const byNamespaced: Record<string, string> = {};
     const samplers: SamplerBinding[] = [];
 
-    for (const e of entries) {
-        if (isSamplerType(e.type)) {
-            // Samplers: keep out of the numeric maps; record in sampler list
-            samplers.push({
-                logical: e.logicalName,
-                namespaced: e.namespacedName,
-                type: e.type as SamplerType,
-            });
-        } else {
-            // Non-samplers: visible in the maps (last one wins on collisions)
-            byLogical[e.logicalName] = e.namespacedName;
-            byNamespaced[e.namespacedName] = e.logicalName;
+    for (let i = 0; i < ordered.length; i++) {
+        const owner = ordered[i]!.id;
+        const r = results[i]!;
+        for (const u of r.uniformMappings) {
+            const e: UniformManifestEntry = {
+                logicalName: u.logicalName,
+                namespacedName: u.namespacedName,
+                type: u.type,
+                owner: { kind: owner.kind, name: owner.name, version: owner.version },
+            };
+            entries.push(e);
+
+            if (isSamplerType(u.type)) {
+                samplers.push({
+                    logical: u.logicalName,
+                    namespaced: u.namespacedName,
+                    type: u.type as SamplerType,
+                    arraySize: (u as any).arraySize, // optional metadata from namespacer
+                });
+            } else {
+                byLogical[u.logicalName] = u.namespacedName;
+                byNamespaced[u.namespacedName] = u.logicalName;
+            }
         }
     }
 

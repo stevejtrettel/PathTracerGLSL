@@ -1,40 +1,8 @@
 // src/engine/execution/render-engine.ts
 /**
- * render-engine.ts — v2 (sampler binding + diagnostics)
+ * render-engine.ts — v2.1 (compile-on-change + correct ResourceBinder wiring)
  * ------------------------------------------------------------
- * PURPOSE
- *   Orchestrate one-pass rendering with a GPU Film:
- *     - Build/link/compile a shader from an AssemblyRecipe.
- *     - Compute a deterministic ProgramKey from the link result.
- *     - Cache/reuse the compiled program; hot-swap when the key changes.
- *     - Maintain and apply accumulation counters (frameIndex/sampleCount).
- *     - Delegate drawing to RenderPipeline (which owns VAO + ping-pong use).
- *
- * DESIGN
- *   - Zero feature branching: recipe selection determines shader shape.
- *   - Reset accumulation whenever the ProgramKey changes (code shape change).
- *   - Manual reset available via `resetAccumulation()`.
- *   - Film-specific uniforms are bound by the pipeline only if present in
- *     the manifest (e.g., historyColor, sampleCount), so Films that don't
- *     accumulate remain simple.
- *
- * DEPENDENCIES
- *   - compileRecipe: builds final GLSL + manifest.
- *   - linkRecipe + computeProgramKey: derive ProgramKey from resolved order.
- *   - ProgramCache-like provider to build/reuse GPU programs.
- *   - RenderPipeline-like class for drawing.
- *   - FramebufferPool for GPU film ping-pong.
- *
- * TESTABILITY
- *   - All collaborators are injected via small interfaces (see below).
- *   - No direct DOM or canvas access; width/height provided by caller.
- *   Minimal orchestrator that:
- *     - Computes a ProgramKey for a recipe and compiles/links programs via cache
- *     - Creates a RenderPipeline for the current program
- *     - Auto-registers module parameter schemas on (re)compile
- *     - Collects dirty parameters, applies reset policy, binds via UniformBinder
- *     - Binds sampler resources from a ResourceDirectory via ResourceBinder
- *     - Drives per-frame counters and film accumulation (via FramebufferPool)
+ * Orchestrates single-pass rendering with deterministic shader assembly.
  */
 
 import type { AssemblyRecipe } from "../shaders/assembly-recipe";
@@ -126,6 +94,10 @@ export default class RenderEngine {
     // Persistent sampler unit allocator (stable across frames/programs)
     private texUnits = new TextureUnitPool({ size: 8, baseUnit: 0 });
 
+    // Cached compile products for the active ProgramKey
+    private lastManifest: UniformManifest | null = null;
+    private lastDiagnostics: { warnings: string[]; entrySymbol: string; moduleOrder: string[] } | null = null;
+
     // Optional micro-stats hook (debug)
     public onRenderStats?: (stats: {
         recompiled: boolean;
@@ -169,6 +141,8 @@ export default class RenderEngine {
         this.binder = null;
         this.resBinder = null;
         this.currentKey = null;
+        this.lastManifest = null;
+        this.lastDiagnostics = null;
     }
 
     render(width: number, height: number, recipe: AssemblyRecipe): RenderOutcome {
@@ -184,25 +158,35 @@ export default class RenderEngine {
             this.binder = null;
             this.resBinder = null;
             this.currentKey = null;
+            this.lastManifest = null;
+            this.lastDiagnostics = null;
         }
 
         // B) Link + compute key; compile if needed
         const link = linkRecipe(recipe);
         const progKey = computeProgramKey(recipe, link, this.vertexTemplateVersion);
-        const compiled = compileRecipe(recipe);
 
         let recompiled = false;
+
         if (this.currentKey !== progKey.key) {
+            // Compile this recipe shape (once per key)
+            const compiled = compileRecipe(recipe);
+
             const program = this.cache.getOrCreate(
                 progKey.key,
                 compiled.vertexSrc,
                 compiled.fragmentSrc
             );
 
+            // Rebuild pipeline and binders
             this.pipeline?.dispose();
             this.pipeline = this.makePipeline(this.gl, program, this.pool, compiled.manifest);
             this.binder = new UniformBinder(this.gl, program, compiled.manifest);
-            this.resBinder = new ResourceBinder(this.gl, program, this.texUnits, this.binder);
+            this.resBinder = new ResourceBinder(this.gl, this.texUnits, this.binder, compiled.manifest);
+
+            // Cache manifest/diagnostics for reuse while key is stable
+            this.lastManifest = compiled.manifest;
+            this.lastDiagnostics = compiled.diagnostics;
 
             // Auto-register module parameter schemas for this program shape
             this.registerParamsForRecipe(recipe);
@@ -245,18 +229,13 @@ export default class RenderEngine {
         }
 
         // D) Bind GPU resources (samplers) from the provided directory, if any
-        let resDiag = { boundSamplers: 0, skippedSamplers: [] as string[], errors: [] as string[] };
+        const resDiag = { boundSamplers: 0, skippedSamplers: [] as string[], errors: [] as string[] };
         if (this.resourceDir && this.resBinder) {
             const snapshot = this.resourceDir.snapshot();
-            // ResourceBinder understands the full UniformManifest (filters to sampler* and present logicals)
-            const rb = this.resBinder.bind(snapshot, compiled.manifest) as unknown as {
-                bound: number;
-                skipped: string[];
-                errors: string[];
-            };
-            resDiag.boundSamplers = rb?.bound ?? 0;
-            resDiag.skippedSamplers = rb?.skipped ?? [];
-            resDiag.errors = rb?.errors ?? [];
+            const rb = this.resBinder.bind(snapshot);
+            resDiag.boundSamplers = rb.bound ?? 0;
+            resDiag.skippedSamplers = rb.skipped ?? [];
+            resDiag.errors = rb.errors ?? [];
         }
 
         // E) Apply engine counters and draw
@@ -273,14 +252,16 @@ export default class RenderEngine {
             this.onRenderStats({ recompiled, boundUniforms: boundCount, skippedUniforms: skipped });
         }
 
+        const diag = this.lastDiagnostics ?? { warnings: [], entrySymbol: "", moduleOrder: [] };
+
         return {
-            key: progKey.key,
+            key: this.currentKey ?? progKey.key,
             recompiled,
             frameIndex: this.frameIndex,
             sampleCount: this.sampleCount,
             diagnostics: {
-                moduleOrder: compiled.diagnostics.moduleOrder,
-                warnings: compiled.diagnostics.warnings,
+                moduleOrder: diag.moduleOrder,
+                warnings: diag.warnings,
                 resources: resDiag,
             },
         };
