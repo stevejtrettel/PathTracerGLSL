@@ -54,7 +54,7 @@ describe("UniformBinder", () => {
 
         expect(ub.set("gain", 1.25, "float")).toBe(true);
         expect(ub.set("seed", 7, "int")).toBe(true);
-        expect(ub.set("enabled", true, "bool")).toBe(true);
+        expect(ub.set("enabled", true, "boolean")).toBe(true);
 
         expect(gl.calls.uniform1f[0][1]).toBeCloseTo(1.25);
         expect(gl.calls.uniform1i[0][1]).toBe(7);

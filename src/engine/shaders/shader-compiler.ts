@@ -1,6 +1,6 @@
 // src/engine/shaders/shader-compiler.ts
 /**
- * shader-compiler.ts — v1.1
+ * shader-compiler.ts — v1.2
  * ------------------------------------------------------------
  * PURPOSE
  *   Take an AssemblyRecipe (modules + constants + entrypoint) and produce
@@ -23,6 +23,7 @@
  *        - vertexSrc: deterministic fullscreen-quad vertex shader
  *        - fragmentSrc: assembled GLSL fragment shader
  *        - manifest: mapping of logical uniform names → namespaced uniforms
+ *                    + sampler bindings (separate list)
  *        - diagnostics: warnings, link report summary
  *
  * INVARIANTS
@@ -35,7 +36,7 @@
  *   - Error messages reference ComponentIDs and symbol names for clarity.
  *
  * EVOLUTION NOTES
- *   - v1.2 may introduce optional AST-based optimization passes.
+ *   - v1.3 may introduce optional AST-based optimization passes.
  *   - v2 may add multipass compilation via Recipe DAGs.
  */
 
@@ -53,17 +54,42 @@ import {
 } from "./namespacing";
 import { formatComponentLabel } from "../../core/ids";
 
-/** Minimal manifest for runtime binding. */
+/** Minimal manifest entry for runtime binding (covers all uniforms). */
 export interface UniformManifestEntry {
     logicalName: string;
     namespacedName: string;
     type?: string;
     owner: { kind: string; name: string; version: string };
 }
+
+/** GLSL sampler types we care about in v1. */
+export type SamplerType =
+    | "sampler2D"
+    | "samplerCube"
+    | "sampler3D"
+    | "sampler2DShadow"
+    | "samplerCubeShadow";
+
+/** One sampler binding discovered during compilation. */
+export interface SamplerBinding {
+    /** Logical name declared in GLSL (pre-namespace). */
+    logical: string;
+    /** Namespaced GPU name after module namespacing. */
+    namespaced: string;
+    /** GLSL sampler type. */
+    type: SamplerType;
+}
+
+/** Manifest returned to the engine. */
 export interface UniformManifest {
+    /** All uniforms (sampler + non-sampler) with provenance. */
     entries: ReadonlyArray<UniformManifestEntry>;
+    /** Non-sampler uniforms only: logical → namespaced. */
     byLogical: Readonly<Record<string, string>>;
+    /** Non-sampler uniforms only: namespaced → logical. */
     byNamespaced: Readonly<Record<string, string>>;
+    /** Sampler uniforms only (excluded from the maps above). */
+    samplers: ReadonlyArray<SamplerBinding>;
 }
 
 /** Compiler result. */
@@ -167,11 +193,17 @@ function bannerForModule(m: ShaderModuleDescriptor): string {
     return `${m.id.kind}/${m.id.name}@${m.id.version} [${makeModulePrefix(m.id)}]`;
 }
 
+function isSamplerType(t?: string): t is SamplerType {
+    if (!t) return false;
+    return /^(sampler(?:2D|3D|Cube)(?:Shadow)?)$/i.test(t);
+}
+
 function buildManifest(
     ordered: ReadonlyArray<ShaderModuleDescriptor>,
     results: ReadonlyArray<ModuleNamespaceResult>
 ): UniformManifest {
     const entries: UniformManifestEntry[] = [];
+
     for (let i = 0; i < ordered.length; i++) {
         const owner = ordered[i]!.id;
         for (const u of results[i]!.uniformMappings) {
@@ -183,15 +215,27 @@ function buildManifest(
             });
         }
     }
+
     const byLogical: Record<string, string> = {};
     const byNamespaced: Record<string, string> = {};
+    const samplers: SamplerBinding[] = [];
+
     for (const e of entries) {
-        // If two modules use the same logical name, last-wins in this view;
-        // we still keep all entries to preserve provenance.
-        byLogical[e.logicalName] = e.namespacedName;
-        byNamespaced[e.namespacedName] = e.logicalName;
+        if (isSamplerType(e.type)) {
+            // Samplers: keep out of the numeric maps; record in sampler list
+            samplers.push({
+                logical: e.logicalName,
+                namespaced: e.namespacedName,
+                type: e.type as SamplerType,
+            });
+        } else {
+            // Non-samplers: visible in the maps (last one wins on collisions)
+            byLogical[e.logicalName] = e.namespacedName;
+            byNamespaced[e.namespacedName] = e.logicalName;
+        }
     }
-    return { entries, byLogical, byNamespaced };
+
+    return { entries, byLogical, byNamespaced, samplers };
 }
 
 /* ----------------------------- emitted GLSL ----------------------------- */

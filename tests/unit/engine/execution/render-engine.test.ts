@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+// tests/unit/engine/execution/render-engine.test.ts
+import { describe, it, expect, beforeEach } from "vitest";
 import RenderEngine, {
     ProgramLike,
     ProgramCacheLike,
@@ -10,11 +11,16 @@ import RenderEngine, {
 import type { ComponentID } from "../../../../src/core/ids";
 import type { ShaderFragment, ShaderModuleDescriptor } from "../../../../src/core/shader-fragment";
 import type { AssemblyRecipe } from "../../../../src/engine/shaders/assembly-recipe";
+import { formatComponentScope } from "../../../../src/engine/parameters/register-module-params";
 
 function id(kind: ComponentID["kind"], name: string, version = "1.0.0"): ComponentID {
     return { kind, name, version };
 }
-function mod(kind: ComponentID["kind"], name: string, f: Partial<ShaderFragment> & { functions?: string }): ShaderModuleDescriptor {
+function mod(
+    kind: ComponentID["kind"],
+    name: string,
+    f: Partial<ShaderFragment> & { functions?: string }
+): ShaderModuleDescriptor {
     return {
         id: id(kind, name),
         fragment: {
@@ -34,12 +40,14 @@ function recipe(mods: ShaderModuleDescriptor[], entry: string, constants = {}): 
 // ---- Mocks ----
 
 class MockGL implements Partial<WebGL2RenderingContext> {
-    // No calls needed for this test
+    // No GL calls required for these tests
 }
 
 class MockProgram implements ProgramLike {
     use(): void {}
-    getUniformLocation(_name: string): WebGLUniformLocation | null { return {} as any; }
+    getUniformLocation(_name: string): WebGLUniformLocation | null {
+        return {} as any;
+    }
 }
 
 class MockCache implements ProgramCacheLike {
@@ -54,22 +62,34 @@ class MockPool implements FramebufferPoolLike {
     public ensured: Array<[number, number]> = [];
     public clears = 0;
     public swaps = 0;
-    ensureSize(w: number, h: number): void { this.ensured.push([w, h]); }
-    pair() { return { readTex: ({} as any), writeFbo: ({} as any) }; }
-    swap(): void { this.swaps++; }
-    clear(): void { this.clears++; }
+    ensureSize(w: number, h: number): void {
+        this.ensured.push([w, h]);
+    }
+    pair() {
+        return { readTex: ({} as any), writeFbo: ({} as any) };
+    }
+    swap(): void {
+        this.swaps++;
+    }
+    clear(): void {
+        this.clears++;
+    }
 }
 
 class MockPipeline implements RenderPipelineLike {
     public renders: Array<[number, number]> = [];
     public setFrames: number[] = [];
     public setSamples: number[] = [];
-    constructor(
-        _gl: any, _prog: ProgramLike, _pool: FramebufferPoolLike, _manifest: any
-    ) {}
-    setFrameIndex(i: number): void { this.setFrames.push(i); }
-    setSampleCount(n: number): void { this.setSamples.push(n); }
-    render(w: number, h: number): void { this.renders.push([w, h]); }
+    constructor(_gl: any, _prog: ProgramLike, _pool: FramebufferPoolLike, _manifest: any) {}
+    setFrameIndex(i: number): void {
+        this.setFrames.push(i);
+    }
+    setSampleCount(n: number): void {
+        this.setSamples.push(n);
+    }
+    render(w: number, h: number): void {
+        this.renders.push([w, h]);
+    }
     dispose(): void {}
 }
 
@@ -185,5 +205,55 @@ describe("RenderEngine", () => {
         expect(pool.clears).toBe(2); // first compile + manual reset
         expect(r2.frameIndex).toBe(1);
         expect(r2.sampleCount).toBe(1);
+    });
+
+    it("auto-registers module parameter schemas on first compile", () => {
+        const tracer = mod("Tracer", "Flat", {
+            provides: ["integrateSample"],
+            functions: `vec3 integrateSample(vec2 frag){ return vec3(1.0); }`,
+        });
+
+        // Film module with parameter schema
+        const film = {
+            ...mod("Film", "RA", {
+                provides: ["shadePixel"],
+                requires: ["integrateSample"],
+                entrypoints: { fragmentMain: "shadePixel" },
+                functions: `vec3 shadePixel(vec2 frag){ return integrateSample(frag); }`,
+            }),
+            parameters: [
+                { name: "exposure", kind: "float",   default: 1.25 },           // store default resetPolicy = accumulation
+                { name: "enabled",  kind: "boolean", default: true, resetPolicy: "none" },
+            ],
+        } as ShaderModuleDescriptor;
+
+        const rec = recipe([film, tracer], "shadePixel");
+
+        const { factory } = makeFactory();
+        const engine = new RenderEngine(gl, cache, pool, factory);
+
+        // First render triggers compile + auto-registration
+        engine.render(320, 200, rec);
+
+        const store = engine.getParameterStore();
+        const scope = formatComponentScope(film.id);
+
+        // Descriptors registered with defaults
+        const descs = store.list(scope);
+        const names = descs.map((d) => d.logical).sort();
+        expect(names).toEqual(["enabled", "exposure"].sort());
+
+        const exposure = descs.find((d) => d.logical === "exposure")!;
+        expect(exposure.kind).toBe("float");
+        expect(exposure.resetPolicy).toBe("accumulation"); // store default applied
+        expect(store.get(scope, "exposure")).toBe(1.25);
+
+        const enabled = descs.find((d) => d.logical === "enabled")!;
+        expect(enabled.kind).toBe("boolean");
+        expect(enabled.resetPolicy).toBe("none");
+        expect(store.get(scope, "enabled")).toBe(true);
+
+        // Nothing is dirty right after registration
+        expect(store.collectDirty().length).toBe(0);
     });
 });

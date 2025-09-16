@@ -147,3 +147,54 @@ export function normalizeShaderFragment(f: ShaderFragment): NormalizedShaderFrag
         entrypoints: f.entrypoints,
     };
 }
+
+
+export interface ShaderFragment {
+    uniforms?: string;
+    functions: string;
+    mainCode?: string;
+    provides?: string[];
+    requires?: string[];
+    entrypoints?: { fragmentMain?: string };
+}
+
+/** Lightweight parameter schema carried by modules (engine will consume it). */
+export type ModuleParameterKind =
+    | "float" | "int" | "boolean"
+    | "vec2"  | "vec3" | "vec4"
+    | "mat3"  | "mat4";
+
+export type ModuleParameterValue =
+    | number
+    | boolean
+    | [number, number]
+    | [number, number, number]
+    | [number, number, number, number]
+    | Float32Array
+    | number[];
+
+export type ModuleResetPolicy = "none" | "accumulation" | "program";
+
+export interface ModuleParamSpec {
+    name: string;
+    kind: ModuleParameterKind;
+    default: ModuleParameterValue;
+    resetPolicy?: ModuleResetPolicy;
+    min?: number;
+    max?: number;
+    step?: number;
+    persistent?: boolean;
+    description?: string;
+    label?: string;
+    category?: string;
+}
+
+export type ModuleParamSchema = ModuleParamSpec[];
+
+/** Descriptor a module provides to the engine. */
+export interface ShaderModuleDescriptor {
+    id: ComponentID;            // you already have this in your file
+    fragment: ShaderFragment;   // as before
+    /** Optional parameter schema for auto-registration (engine consumes this). */
+    parameters?: ModuleParamSchema;
+}

@@ -1,55 +1,24 @@
 // src/engine/bindings/uniform-binder.ts
 /**
- * uniform-binder.ts — v1
+ * uniform-binder.ts — v2 (Parameter* types)
  * ------------------------------------------------------------
  * PURPOSE
  *   Bind logical parameter values to GPU uniforms using the compiled
  *   UniformManifest (logical → namespaced). Caches uniform locations and
- *   dispatches to the correct gl.uniform* based on ParamKind.
+ *   dispatches to the correct gl.uniform* based on ParameterKind.
  *
  * SCOPE
  *   - No runtime branching in shaders — this is purely a CPU-side binder.
- *   - No textures/samplers yet (v1.1 can add a simple texture-unit allocator).
- *
- * INPUTS
- *   - WebGL2RenderingContext
- *   - ProgramLike (only needs getUniformLocation(name))
- *   - UniformManifest (from shader-compiler)
- *
- * API
- *   - set(logical, value, kind?): boolean
- *     Bind one logical uniform. Returns true if successfully bound.
- *   - setMany(list): { bound: number; skipped: string[] }
- *     Bind many at once, collecting stats and skipping unknown/pruned ones.
- *
- * TYPE HANDLING
- *   - Prefer explicit `kind` for correctness.
- *   - If `kind` is not provided, infer conservatively from `value`.
- *     number → float, boolean → bool,
- *     array length 2/3/4 → vec2/vec3/vec4,
- *     Float32Array/number[] length 9/16 → mat3/mat4
+ *   - No textures/samplers here (handled by ResourceBinder).
  *
  * SAFETY
  *   - If manifest lacks a logical uniform (e.g., pruned by linker),
- *     the binder silently returns false (or records it in `skipped`).
- *   - If a uniform location is null (optimized out), binding is a no-op false.
+ *     binding is skipped (false, or recorded in `skipped`).
+ *   - If a uniform location is null (optimized out), binding is a no-op (false).
  */
 
 import type { UniformManifest } from "../shaders/shader-compiler";
-
-export type ParamKind =
-    | "float" | "int" | "bool"
-    | "vec2"  | "vec3" | "vec4"
-    | "mat3"  | "mat4";
-
-export type ParamValue =
-    | number
-    | boolean
-    | [number, number]
-    | [number, number, number]
-    | [number, number, number, number]
-    | Float32Array
-    | number[];
+import type { ParameterKind, ParameterValue } from "../parameters/parameter-store";
 
 export interface ProgramLike {
     getUniformLocation(name: string): WebGLUniformLocation | null;
@@ -57,8 +26,8 @@ export interface ProgramLike {
 
 export interface SetManyItem {
     logical: string;
-    value: ParamValue;
-    kind?: ParamKind;
+    value: ParameterValue;
+    kind?: ParameterKind;
 }
 
 export interface SetManyResult {
@@ -79,7 +48,7 @@ export default class UniformBinder {
     }
 
     /** Bind a single logical uniform; returns true if bound. */
-    set(logical: string, value: ParamValue, kind?: ParamKind): boolean {
+    set(logical: string, value: ParameterValue, kind?: ParameterKind): boolean {
         const ns = this.manifest.byLogical[logical];
         if (!ns) return false; // not active / pruned
         const loc = this.loc(ns);
@@ -93,7 +62,7 @@ export default class UniformBinder {
             case "int":
                 this.gl.uniform1i(loc, toInt(value));
                 return true;
-            case "bool":
+            case "boolean":
                 this.gl.uniform1i(loc, toBoolInt(value));
                 return true;
             case "vec2": {
@@ -122,7 +91,6 @@ export default class UniformBinder {
                 return true;
             }
             default:
-                // Unsupported / unknown kind
                 return false;
         }
     }
@@ -138,6 +106,11 @@ export default class UniformBinder {
         return { bound, skipped };
     }
 
+    /** Clear internal location cache (useful if a program is re-linked but binder kept). */
+    clearCache(): void {
+        this.locCache.clear();
+    }
+
     // ---------- internals ----------
 
     private loc(nsName: string): WebGLUniformLocation | null {
@@ -150,14 +123,14 @@ export default class UniformBinder {
 
 // ---------- helpers (type normalization / inference) ----------
 
-function inferKind(v: ParamValue): ParamKind {
-    if (typeof v === "boolean") return "bool";
+function inferKind(v: ParameterValue): ParameterKind {
+    if (typeof v === "boolean") return "boolean";
     if (typeof v === "number")  return "float";
     if (Array.isArray(v)) {
-        if (v.length === 2) return "vec2";
-        if (v.length === 3) return "vec3";
-        if (v.length === 4) return "vec4";
-        if (v.length === 9) return "mat3";
+        if (v.length === 2)  return "vec2";
+        if (v.length === 3)  return "vec3";
+        if (v.length === 4)  return "vec4";
+        if (v.length === 9)  return "mat3";
         if (v.length === 16) return "mat4";
     } else if (v instanceof Float32Array) {
         if (v.length === 9)  return "mat3";
@@ -167,28 +140,31 @@ function inferKind(v: ParamValue): ParamKind {
     return "float";
 }
 
-function toNumber(v: ParamValue): number {
+function toNumber(v: ParameterValue): number {
     if (typeof v === "number") return v;
     throw new Error(`UniformBinder: expected number, got ${typeof v}`);
 }
 
-function toInt(v: ParamValue): number {
+function toInt(v: ParameterValue): number {
     if (typeof v === "number") return v | 0;
     throw new Error(`UniformBinder: expected int/number, got ${typeof v}`);
 }
 
-function toBoolInt(v: ParamValue): number {
+function toBoolInt(v: ParameterValue): number {
     if (typeof v === "boolean") return v ? 1 : 0;
     if (typeof v === "number")  return v ? 1 : 0; // permissive
-    throw new Error(`UniformBinder: expected boolean/number for bool, got ${typeof v}`);
+    throw new Error(`UniformBinder: expected boolean/number for boolean, got ${typeof v}`);
 }
 
-function toArray(v: ParamValue, n: 2 | 3 | 4): [number, number] | [number, number, number] | [number, number, number, number] {
+function toArray(
+    v: ParameterValue,
+    n: 2 | 3 | 4
+): [number, number] | [number, number, number] | [number, number, number, number] {
     if (Array.isArray(v) && v.length === n) return v as any;
     throw new Error(`UniformBinder: expected vec${n} array length ${n}`);
 }
 
-function toMatrix(v: ParamValue, n: 9 | 16): Float32Array {
+function toMatrix(v: ParameterValue, n: 9 | 16): Float32Array {
     if (v instanceof Float32Array && v.length === n) return v;
     if (Array.isArray(v) && v.length === n) return new Float32Array(v);
     throw new Error(`UniformBinder: expected mat${n === 9 ? 3 : 4} array length ${n}`);

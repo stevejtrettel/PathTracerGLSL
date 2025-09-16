@@ -1,6 +1,6 @@
-// src/engine/execution/render-engine.test.ts
+// src/engine/execution/render-engine.ts
 /**
- * render-engine.test.ts — v1
+ * render-engine.ts — v2 (sampler binding + diagnostics)
  * ------------------------------------------------------------
  * PURPOSE
  *   Orchestrate one-pass rendering with a GPU Film:
@@ -28,6 +28,13 @@
  * TESTABILITY
  *   - All collaborators are injected via small interfaces (see below).
  *   - No direct DOM or canvas access; width/height provided by caller.
+ *   Minimal orchestrator that:
+ *     - Computes a ProgramKey for a recipe and compiles/links programs via cache
+ *     - Creates a RenderPipeline for the current program
+ *     - Auto-registers module parameter schemas on (re)compile
+ *     - Collects dirty parameters, applies reset policy, binds via UniformBinder
+ *     - Binds sampler resources from a ResourceDirectory via ResourceBinder
+ *     - Drives per-frame counters and film accumulation (via FramebufferPool)
  */
 
 import type { AssemblyRecipe } from "../shaders/assembly-recipe";
@@ -35,15 +42,26 @@ import { linkRecipe } from "../shaders/dependency-linker";
 import { compileRecipe, type UniformManifest } from "../shaders/shader-compiler";
 import { computeProgramKey } from "../shaders/program-key";
 
-// --- minimal interfaces to stay decoupled from concrete wrappers ---
+import UniformBinder from "../bindings/uniform-binder";
+import ResourceBinder from "../bindings/resource-binder";
+import TextureUnitPool from "../bindings/texture-unit-pool";
+
+import type ResourceDirectory from "../resources/resource-directory";
+
+import ParameterStore, {
+    type ParameterKind,
+    type ParamValue as ParameterValue,
+} from "../parameters/parameter-store";
+import { registerModuleParams } from "../parameters/register-module-params";
+import type { ModuleParamSchema } from "../../core/shader-fragment";
+
+// ---------- Public test-facing types ----------
 
 export interface ProgramLike {
-    use(): void;
     getUniformLocation(name: string): WebGLUniformLocation | null;
 }
 
 export interface ProgramCacheLike {
-    /** Return a compiled program for the (key, sources), reusing any cached one. */
     getOrCreate(key: string, vertexSrc: string, fragmentSrc: string): ProgramLike;
 }
 
@@ -57,7 +75,7 @@ export interface FramebufferPoolLike {
 export interface RenderPipelineLike {
     setFrameIndex(i: number): void;
     setSampleCount(n: number): void;
-    render(width: number, height: number): void;
+    render(w: number, h: number): void;
     dispose(): void;
 }
 
@@ -68,12 +86,6 @@ export type RenderPipelineFactory = (
     manifest: UniformManifest
 ) => RenderPipelineLike;
 
-export interface RenderEngineOptions {
-    /** Vertex template version tag for ProgramKey derivation (default "v1"). */
-    vertexTemplateVersion?: string;
-}
-
-/** Outcome metadata per render call. */
 export interface RenderOutcome {
     key: string;
     recompiled: boolean;
@@ -82,8 +94,15 @@ export interface RenderOutcome {
     diagnostics: {
         moduleOrder: string[];
         warnings: string[];
+        resources: {
+            boundSamplers: number;
+            skippedSamplers: string[];
+            errors: string[];
+        };
     };
 }
+
+// ---------- Engine implementation ----------
 
 export default class RenderEngine {
     private gl: WebGL2RenderingContext;
@@ -92,78 +111,167 @@ export default class RenderEngine {
     private makePipeline: RenderPipelineFactory;
 
     private pipeline: RenderPipelineLike | null = null;
+    private binder: UniformBinder | null = null;
+    private resBinder: ResourceBinder | null = null;
+
     private currentKey: string | null = null;
+    private vertexTemplateVersion = "v1";
 
     private frameIndex = 0;
     private sampleCount = 0;
 
-    private vertexTemplateVersion: string;
+    private paramStore = new ParameterStore();
+    private resourceDir: ResourceDirectory | null = null;
+
+    // Persistent sampler unit allocator (stable across frames/programs)
+    private texUnits = new TextureUnitPool({ size: 8, baseUnit: 0 });
+
+    // Optional micro-stats hook (debug)
+    public onRenderStats?: (stats: {
+        recompiled: boolean;
+        boundUniforms: number;
+        skippedUniforms: string[];
+    }) => void;
 
     constructor(
         gl: WebGL2RenderingContext,
         cache: ProgramCacheLike,
         pool: FramebufferPoolLike,
-        makePipeline: RenderPipelineFactory,
-        opts: RenderEngineOptions = {}
+        pipelineFactory: RenderPipelineFactory
     ) {
         this.gl = gl;
         this.cache = cache;
         this.pool = pool;
-        this.makePipeline = makePipeline;
-        this.vertexTemplateVersion = opts.vertexTemplateVersion ?? "v1";
+        this.makePipeline = pipelineFactory;
     }
 
-    /** Force an accumulation reset (clears film + zeros counters). */
-    resetAccumulation(): void {
+    /** Expose parameter store for tests and tooling. */
+    public getParameterStore(): ParameterStore {
+        return this.paramStore;
+    }
+
+    /** Manual accumulation reset: clears film and zeros counters for next frame. */
+    public resetAccumulation(): void {
         this.pool.clear();
         this.frameIndex = 0;
         this.sampleCount = 0;
     }
 
-    /** Dispose the current pipeline/program resources owned by the engine. */
-    dispose(): void {
+    /** App-side hook: provide the per-frame resource directory used for sampler binding. */
+    public setResourceDirectory(dir: ResourceDirectory | null): void {
+        this.resourceDir = dir;
+    }
+
+    /** Dispose current pipeline resources. */
+    public dispose(): void {
         this.pipeline?.dispose();
         this.pipeline = null;
+        this.binder = null;
+        this.resBinder = null;
         this.currentKey = null;
     }
 
-    /**
-     * Render one frame for the provided recipe at (width,height).
-     * - Recompiles/hot-swaps if ProgramKey changes.
-     * - Increments accumulation counters post-draw (next frame sees +1).
-     */
     render(width: number, height: number, recipe: AssemblyRecipe): RenderOutcome {
-        // 1) Link + compute key from resolved order
+        // A) Gather dirty params up front
+        const dirty = this.paramStore.collectDirty();
+        const wantsProgramReset = dirty.some((d) => d.resetPolicy === "program");
+        const wantsAccumReset = dirty.some((d) => d.resetPolicy === "accumulation");
+
+        // If program-level changes occurred, force a recompile regardless of key equality.
+        if (wantsProgramReset && this.currentKey !== null) {
+            this.pipeline?.dispose();
+            this.pipeline = null;
+            this.binder = null;
+            this.resBinder = null;
+            this.currentKey = null;
+        }
+
+        // B) Link + compute key; compile if needed
         const link = linkRecipe(recipe);
         const progKey = computeProgramKey(recipe, link, this.vertexTemplateVersion);
-
-        // 2) Compile GLSL (deterministic) + get manifest
         const compiled = compileRecipe(recipe);
 
-        // 3) (Re)build pipeline if the key changed
         let recompiled = false;
         if (this.currentKey !== progKey.key) {
-            const program = this.cache.getOrCreate(progKey.key, compiled.vertexSrc, compiled.fragmentSrc);
+            const program = this.cache.getOrCreate(
+                progKey.key,
+                compiled.vertexSrc,
+                compiled.fragmentSrc
+            );
+
             this.pipeline?.dispose();
             this.pipeline = this.makePipeline(this.gl, program, this.pool, compiled.manifest);
+            this.binder = new UniformBinder(this.gl, program, compiled.manifest);
+            this.resBinder = new ResourceBinder(this.gl, program, this.texUnits, this.binder);
 
-            // new code shape → reset accumulation
+            // Auto-register module parameter schemas for this program shape
+            this.registerParamsForRecipe(recipe);
+
+            // New code shape → reset accumulation
             this.resetAccumulation();
             this.currentKey = progKey.key;
             recompiled = true;
+        } else if (wantsAccumReset) {
+            // Only reset film if we didn't already do so due to a recompile.
+            this.resetAccumulation();
         }
 
-        // 4) Apply engine counters for this draw
-        // (Films that don't consume these simply ignore)
+        // Ensure film buffers are correct size each frame
+        this.pool.ensureSize(width, height);
+
+        // C) Bind dirty uniforms via binder (if any)
+        let boundCount = 0;
+        let skipped: string[] = [];
+        if (this.binder && dirty.length) {
+            const items = dirty.map((d) => ({
+                logical: d.logical,
+                value: d.value as ParameterValue,
+                kind: d.kind as ParameterKind,
+            }));
+            const res = this.binder.setMany(items);
+            boundCount = res.bound;
+            skipped = res.skipped;
+
+            // Mark params clean by scope
+            const perScope = new Map<string, string[]>();
+            for (const d of dirty) {
+                const arr = perScope.get(d.scope) ?? [];
+                arr.push(d.logical);
+                perScope.set(d.scope, arr);
+            }
+            for (const [scope, names] of perScope) {
+                this.paramStore.markClean(scope, names);
+            }
+        }
+
+        // D) Bind GPU resources (samplers) from the provided directory, if any
+        let resDiag = { boundSamplers: 0, skippedSamplers: [] as string[], errors: [] as string[] };
+        if (this.resourceDir && this.resBinder) {
+            const snapshot = this.resourceDir.snapshot();
+            // ResourceBinder understands the full UniformManifest (filters to sampler* and present logicals)
+            const rb = this.resBinder.bind(snapshot, compiled.manifest) as unknown as {
+                bound: number;
+                skipped: string[];
+                errors: string[];
+            };
+            resDiag.boundSamplers = rb?.bound ?? 0;
+            resDiag.skippedSamplers = rb?.skipped ?? [];
+            resDiag.errors = rb?.errors ?? [];
+        }
+
+        // E) Apply engine counters and draw
         this.pipeline!.setFrameIndex(this.frameIndex);
         this.pipeline!.setSampleCount(this.sampleCount);
-
-        // 5) Draw
         this.pipeline!.render(width, height);
 
-        // 6) Advance counters for next frame
+        // F) Advance counters
         this.frameIndex++;
         this.sampleCount++;
+
+        // Optional diagnostics hook
+        if (this.onRenderStats) {
+            this.onRenderStats({ recompiled, boundUniforms: boundCount, skippedUniforms: skipped });
+        }
 
         return {
             key: progKey.key,
@@ -173,7 +281,19 @@ export default class RenderEngine {
             diagnostics: {
                 moduleOrder: compiled.diagnostics.moduleOrder,
                 warnings: compiled.diagnostics.warnings,
+                resources: resDiag,
             },
         };
+    }
+
+    // ---------- internals ----------
+
+    /** Register module parameter schemas (if provided) when a new program shape becomes active. */
+    private registerParamsForRecipe(recipe: AssemblyRecipe): void {
+        for (const m of recipe.modules) {
+            const schema = (m as any).parameters as ModuleParamSchema | undefined;
+            if (!schema || schema.length === 0) continue;
+            registerModuleParams(this.paramStore as any, m.id, schema as any);
+        }
     }
 }

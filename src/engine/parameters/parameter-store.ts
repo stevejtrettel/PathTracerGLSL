@@ -1,19 +1,20 @@
 // src/engine/parameters/parameter-store.ts
 /**
- * ParameterStore — v1
+ * ParameterStore — v1 (clean API)
  * ------------------------------------------------------------
  * PURPOSE
  *   Central registry for engine parameters with:
- *     - explicit kinds (float/int/bool/vecN/matN)
- *     - stable reset policy (none | accumulation | program)
+ *     - explicit kinds (float/int/boolean/vecN/matN)
+ *     - reset policy (none | accumulation | program)
  *     - strict validation + dirty tracking
  *     - scope (string) to group params by component (e.g., "Material/Lambert@1.0.0")
  *
  * USAGE
  *   const store = new ParameterStore();
  *   store.register("Material/Lambert@1.0.0", [
- *     { logical: "albedo", kind: "vec3", default: [1,1,1], resetPolicy: "accumulation" },
- *     { logical: "exposure", kind: "float", default: 1.0, resetPolicy: "none" },
+ *     { logical: "albedo",   kind: "vec3",    default: [1,1,1], resetPolicy: "accumulation" },
+ *     { logical: "exposure", kind: "float",   default: 1.0,     resetPolicy: "none" },
+ *     { logical: "enabled",  kind: "boolean", default: true,    resetPolicy: "none" },
  *   ]);
  *   store.set("Material/Lambert@1.0.0", "albedo", [0.8,0.2,0.2]);
  *   const dirty = store.collectDirty(); // [{ scope, logical, value, kind, resetPolicy }]
@@ -22,12 +23,12 @@
 
 export type ResetPolicy = "none" | "accumulation" | "program";
 
-export type ParamKind =
-    | "float" | "int" | "bool"
+export type ParameterKind =
+    | "float" | "int" | "boolean"
     | "vec2"  | "vec3" | "vec4"
     | "mat3"  | "mat4";
 
-export type ParamValue =
+export type ParameterValue =
     | number
     | boolean
     | [number, number]
@@ -36,13 +37,13 @@ export type ParamValue =
     | Float32Array
     | number[];
 
-export interface ParamDescriptor {
+export interface ParameterDescriptor {
     /** Logical uniform/parameter name; should match the shader's logical name. */
     logical: string;
-    /** Explicit GL shape; if omitted, inferred from `default`. */
-    kind?: ParamKind;
+    /** Explicit GL/data shape; if omitted, inferred from `default`. */
+    kind?: ParameterKind;
     /** Initial value. */
-    default: ParamValue;
+    default: ParameterValue;
 
     /** UI / constraints (optional) */
     label?: string;
@@ -56,30 +57,33 @@ export interface ParamDescriptor {
 
     /** Include in serialization (default: true). */
     persistent?: boolean;
+
+    /** Optional help text. */
+    description?: string;
 }
 
-export interface DirtyParam {
+export interface DirtyParameter {
     scope: string;
     logical: string;
-    value: ParamValue;
-    kind: ParamKind;
+    value: ParameterValue;
+    kind: ParameterKind;
     resetPolicy: ResetPolicy;
 }
 
 interface Entry {
-    desc: Required<ParamDescriptor>;
-    value: ParamValue;
+    desc: Required<ParameterDescriptor>;
+    value: ParameterValue;
     dirty: boolean;
 }
 
-function inferKindFromValue(v: ParamValue): ParamKind {
-    if (typeof v === "boolean") return "bool";
+function inferKindFromValue(v: ParameterValue): ParameterKind {
+    if (typeof v === "boolean") return "boolean";
     if (typeof v === "number")  return "float";
     if (Array.isArray(v)) {
-        if (v.length === 2) return "vec2";
-        if (v.length === 3) return "vec3";
-        if (v.length === 4) return "vec4";
-        if (v.length === 9) return "mat3";
+        if (v.length === 2)  return "vec2";
+        if (v.length === 3)  return "vec3";
+        if (v.length === 4)  return "vec4";
+        if (v.length === 9)  return "mat3";
         if (v.length === 16) return "mat4";
     } else if (v instanceof Float32Array) {
         if (v.length === 9)  return "mat3";
@@ -89,7 +93,7 @@ function inferKindFromValue(v: ParamValue): ParamKind {
     return "float";
 }
 
-function sameValue(a: ParamValue, b: ParamValue): boolean {
+function sameValue(a: ParameterValue, b: ParameterValue): boolean {
     if (a === b) return true;
     if (Array.isArray(a) && Array.isArray(b) && a.length === b.length) {
         for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
@@ -102,7 +106,7 @@ function sameValue(a: ParamValue, b: ParamValue): boolean {
     return false;
 }
 
-function validate(kind: ParamKind, value: ParamValue, desc: ParamDescriptor): string | null {
+function validate(kind: ParameterKind, value: ParameterValue, desc: ParameterDescriptor): string | null {
     const fail = (msg: string) => `ParameterStore: ${desc.logical}: ${msg}`;
 
     switch (kind) {
@@ -112,7 +116,7 @@ function validate(kind: ParamKind, value: ParamValue, desc: ParamDescriptor): st
         case "int":
             if (typeof value !== "number" || !Number.isInteger(value)) return fail(`expected int, got ${value}`);
             break;
-        case "bool":
+        case "boolean":
             if (typeof value !== "boolean") return fail(`expected boolean, got ${typeof value}`);
             break;
         case "vec2":
@@ -148,16 +152,16 @@ export default class ParameterStore {
     private table = new Map<string, Map<string, Entry>>();
 
     /** Register descriptors under a scope. Safe to call multiple times; updates descriptors. */
-    register(scope: string, descriptors: ParamDescriptor[]): void {
+    register(scope: string, descriptors: ParameterDescriptor[]): void {
         if (!this.table.has(scope)) this.table.set(scope, new Map());
         const bucket = this.table.get(scope)!;
 
         for (const d of descriptors) {
-            const kind = d.kind ?? inferKindFromValue(d.default);
+            const kind: ParameterKind = d.kind ?? inferKindFromValue(d.default);
             const resetPolicy: ResetPolicy = d.resetPolicy ?? "accumulation";
             const persistent = d.persistent ?? true;
 
-            const descFull: Required<ParamDescriptor> = {
+            const descFull: Required<ParameterDescriptor> = {
                 logical: d.logical,
                 kind,
                 default: d.default,
@@ -168,6 +172,7 @@ export default class ParameterStore {
                 step: d.step ?? undefined,
                 resetPolicy,
                 persistent,
+                description: d.description ?? undefined,
             };
 
             const existing = bucket.get(d.logical);
@@ -187,12 +192,12 @@ export default class ParameterStore {
     }
 
     /** Get a current value (or undefined). */
-    get(scope: string, logical: string): ParamValue | undefined {
+    get(scope: string, logical: string): ParameterValue | undefined {
         return this.table.get(scope)?.get(logical)?.value;
     }
 
     /** Set a value; marks dirty on successful validation and change. */
-    set(scope: string, logical: string, value: ParamValue): void {
+    set(scope: string, logical: string, value: ParameterValue): void {
         const bucket = this.table.get(scope);
         if (!bucket) {
             console.warn(`ParameterStore: unknown scope "${scope}"`);
@@ -235,8 +240,8 @@ export default class ParameterStore {
     }
 
     /** Collect dirty parameters across all scopes; does NOT clear them. */
-    collectDirty(): DirtyParam[] {
-        const out: DirtyParam[] = [];
+    collectDirty(): DirtyParameter[] {
+        const out: DirtyParameter[] = [];
         for (const [scope, bucket] of this.table) {
             for (const [logical, e] of bucket) {
                 if (!e.dirty) continue;
@@ -253,15 +258,15 @@ export default class ParameterStore {
     }
 
     /** List descriptors for a scope (for UI). */
-    list(scope: string): ReadonlyArray<Required<ParamDescriptor>> {
+    list(scope: string): ReadonlyArray<Required<ParameterDescriptor>> {
         const bucket = this.table.get(scope);
         if (!bucket) return [];
         return Array.from(bucket.values()).map((e) => e.desc);
     }
 
     /** Serialize persistent parameters. */
-    serialize(): Record<string, Record<string, ParamValue>> {
-        const result: Record<string, Record<string, ParamValue>> = {};
+    serialize(): Record<string, Record<string, ParameterValue>> {
+        const result: Record<string, Record<string, ParameterValue>> = {};
         for (const [scope, bucket] of this.table) {
             for (const [logical, e] of bucket) {
                 if (!e.desc.persistent) continue;
@@ -276,7 +281,7 @@ export default class ParameterStore {
      * Restore values from data. By default does NOT mark dirty (useful on load).
      * If `markDirty` is true, values that differ become dirty.
      */
-    deserialize(data: Record<string, Record<string, ParamValue>>, markDirty = false): void {
+    deserialize(data: Record<string, Record<string, ParameterValue>>, markDirty = false): void {
         for (const [scope, params] of Object.entries(data)) {
             const bucket = this.table.get(scope);
             if (!bucket) continue;
