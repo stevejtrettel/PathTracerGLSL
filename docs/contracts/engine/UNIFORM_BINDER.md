@@ -1,13 +1,16 @@
 # Uniform Binder Contract
 
-The UniformBinder efficiently maps ParameterStore paths to GPU uniform locations and manages updates.
+The UniformBinder efficiently maps ParameterStore paths to GPU uniform locations using an explicit UniformMap.
 
 ## Core Interface
 
 ```typescript
 interface UniformBinder {
   // Build mappings for a program
-  buildBindings(program: CompiledProgram): UniformBindings;
+  buildBindings(program: CompiledProgram, modules: ModuleDescriptor[]): void;
+  
+  // Get the uniform map for debugging
+  getUniformMap(): UniformMap;
   
   // Update uniforms from parameter changes
   updateUniforms(changes: ParameterChanges): void;
@@ -17,139 +20,231 @@ interface UniformBinder {
   
   // Query bindings
   hasBinding(paramPath: string): boolean;
-  getBinding(paramPath: string): UniformBinding | null;
+  getBinding(paramPath: string): UniformMapping | undefined;
   
   // Performance monitoring
   getUpdateStats(): UpdateStats;
 }
 ```
 
-## Binding Structure
+## The UniformMap - Explicit Parameter Mapping
 
 ```typescript
-interface UniformBindings {
-  programId: string;
-  bindings: Map<string, UniformBinding>;
-  metadata: {
-    totalUniforms: number;
-    boundUniforms: number;           // Successfully mapped
-    unboundUniforms: number;          // No parameter for this uniform
-    textureBindings: Map<string, number>;  // Texture uniforms → units
-  };
+interface UniformMapping {
+  paramPath: string;              // "camera.position"
+  glslName: string;               // "u_camera_pinhole_position"
+  location: WebGLUniformLocation | null;
+  type: "float" | "vec2" | "vec3" | "vec4" | "int" | "mat4";
+  moduleSource: ModuleDescriptor;
 }
 
-interface UniformBinding {
-  paramPath: string;                 // "camera.position"
-  uniformName: string;               // "u_camera_pinhole_position"
-  location: WebGLUniformLocation;
-  type: UniformType;
-  module: string;                    // Which module declared it
-  setter: UniformSetter;             // Function to set value
-}
-
-type UniformType = 
-  | "float" | "vec2" | "vec3" | "vec4" 
-  | "int" | "ivec2" | "ivec3" | "ivec4"
-  | "mat2" | "mat3" | "mat4" 
-  | "sampler2D" | "samplerCube" | "isampler2D";
-
-type UniformSetter = (gl: WebGL2RenderingContext, 
-                     location: WebGLUniformLocation, 
-                     value: any) => void;
-```
-
-## Path Mapping Rules
-
-```typescript
-interface PathMapper {
-  // Convert parameter path to uniform name
-  pathToUniform(path: string, recipe: Recipe): string;
-}
-
-// Mapping patterns (generic paths for persistence):
-// "camera.position"       → "u_camera_[active]_position"
-// "camera.fov"           → "u_camera_[active]_fov"
-// "material.albedo"      → "u_material_albedo"  (single material)
-// "material.0.albedo"    → "u_material_0_albedo" (per-object)
-// "estimator.max_bounces"→ "u_estimator_[active]_max_bounces"
-// "film.alpha"          → "u_film_[active]_alpha"
-// "developer.exposure"   → "u_developer_[active]_exposure"
-
-class PathMapper {
-  constructor(private activeModules: ModuleCollection) {}
+class UniformMap {
+  private mappings = new Map<string, UniformMapping>();
   
-  pathToUniform(path: string): string {
-    const parts = path.split('.');
-    const category = parts[0];
+  static build(modules: ModuleDescriptor[], program: WebGLProgram, gl: WebGL2RenderingContext): UniformMap {
+    const map = new UniformMap();
     
-    switch (category) {
-      case 'camera':
-        // Generic path maps to active camera's uniform
-        const cameraName = this.activeModules.camera.name.toLowerCase();
-        return `u_camera_${cameraName}_${parts.slice(1).join('_')}`;
+    for (const module of modules) {
+      const prefix = getModulePrefix(module);
+      
+      for (const param of module.parameters || []) {
+        // Build parameter path
+        const paramPath = `${module.id.kind.toLowerCase()}.${param.name}`;
         
-      case 'material':
-        // Single material model - simpler mapping
-        const param = parts[1];
-        if (isNumber(param)) {
-          // Per-object: "material.0.albedo"
-          return `u_material_${param}_${parts.slice(2).join('_')}`;
-        } else {
-          // Global material param: "material.roughness"
-          return `u_material_${parts.slice(1).join('_')}`;
-        }
+        // Build GLSL uniform name  
+        const glslName = `u_${prefix}${module.id.name.toLowerCase()}_${param.name}`;
         
-      case 'estimator':
-        const estimatorName = this.activeModules.estimator.name.toLowerCase();
-        return `u_estimator_${estimatorName}_${parts.slice(1).join('_')}`;
+        // Get location from compiled program
+        const location = gl.getUniformLocation(program, glslName);
         
-      case 'film':
-        const filmName = this.activeModules.film.name.toLowerCase();
-        return `u_film_${filmName}_${parts.slice(1).join('_')}`;
-        
-      case 'developer':
-        const developerName = this.activeModules.developer.name.toLowerCase();
-        return `u_developer_${developerName}_${parts.slice(1).join('_')}`;
-        
-      default:
-        // Direct mapping for engine uniforms
-        return `u_${parts.join('_')}`;
+        map.mappings.set(paramPath, {
+          paramPath,
+          glslName,
+          location,
+          type: param.type,
+          moduleSource: module
+        });
+      }
+    }
+    
+    // Add engine uniforms
+    map.addEngineUniforms(program, gl);
+    
+    return map;
+  }
+  
+  private addEngineUniforms(program: WebGLProgram, gl: WebGL2RenderingContext): void {
+    const engineUniforms = [
+      { path: 'resolution', glsl: 'u_resolution', type: 'vec2' },
+      { path: 'frame_index', glsl: 'u_frame_index', type: 'int' },
+      { path: 'sample_count', glsl: 'u_sample_count', type: 'int' },
+      { path: 'time', glsl: 'u_time', type: 'float' }
+    ];
+    
+    for (const uniform of engineUniforms) {
+      this.mappings.set(uniform.path, {
+        paramPath: uniform.path,
+        glslName: uniform.glsl,
+        location: gl.getUniformLocation(program, uniform.glsl),
+        type: uniform.type as any,
+        moduleSource: null as any // Engine uniform
+      });
     }
   }
   
-  // Check if parameter is valid for current modules
-  isValidForActiveModules(path: string): boolean {
-    const uniform = this.pathToUniform(path);
-    return this.activeModules.hasUniform(uniform);
+  // Get uniform location for parameter update
+  getBinding(paramPath: string): UniformMapping | undefined {
+    return this.mappings.get(paramPath);
+  }
+  
+  // Get all mappings (for debugging)
+  getAllMappings(): UniformMapping[] {
+    return Array.from(this.mappings.values());
+  }
+  
+  // Debug helper - shows all mappings
+  debugPrint(): void {
+    console.table(Array.from(this.mappings.values()).map(m => ({
+      param: m.paramPath,
+      glsl: m.glslName,
+      type: m.type,
+      hasLocation: m.location !== null
+    })));
   }
 }
 ```
 
-## Uniform Setters
+## Module Prefix Resolution
 
 ```typescript
-// Type-specific setter functions
-const UNIFORM_SETTERS: Record<UniformType, UniformSetter> = {
-  'float': (gl, loc, val) => gl.uniform1f(loc, val),
-  'vec2': (gl, loc, val) => gl.uniform2fv(loc, val),
-  'vec3': (gl, loc, val) => gl.uniform3fv(loc, val),
-  'vec4': (gl, loc, val) => gl.uniform4fv(loc, val),
-  'int': (gl, loc, val) => gl.uniform1i(loc, val),
-  'ivec2': (gl, loc, val) => gl.uniform2iv(loc, val),
-  'ivec3': (gl, loc, val) => gl.uniform3iv(loc, val),
-  'ivec4': (gl, loc, val) => gl.uniform4iv(loc, val),
-  'mat2': (gl, loc, val) => gl.uniformMatrix2fv(loc, false, val),
-  'mat3': (gl, loc, val) => gl.uniformMatrix3fv(loc, false, val),
-  'mat4': (gl, loc, val) => gl.uniformMatrix4fv(loc, false, val),
-  'sampler2D': (gl, loc, val) => gl.uniform1i(loc, val),
-  'samplerCube': (gl, loc, val) => gl.uniform1i(loc, val),
-  'isampler2D': (gl, loc, val) => gl.uniform1i(loc, val),
-};
+function getModulePrefix(module: ModuleDescriptor): string {
+  const prefixMap: Record<string, string> = {
+    "Geometry": "g_",
+    "Material": "m_",  // Single material now
+    "Scene": "sc_",
+    "Lights": "l_",
+    "Camera": "c_",
+    "Estimator": "e_",
+    "Film": "f_",
+    "Developer": "d_"
+  };
+  
+  return prefixMap[module.id.kind] || "";
+}
+```
+
+## Uniform Updates with Batching
+
+```typescript
+class UniformBinder {
+  private uniformMap: UniformMap;
+  private gl: WebGL2RenderingContext;
+  private pendingChanges = new Map<string, any>();  // Batch updates
+  private stats: UpdateStats;
+  
+  constructor(gl: WebGL2RenderingContext) {
+    this.gl = gl;
+    this.stats = {
+      totalUpdates: 0,
+      uniqueUniforms: 0,
+      skippedUpdates: 0,
+      missingBindings: 0,
+      averageUpdateTime: 0
+    };
+  }
+  
+  buildBindings(program: CompiledProgram, modules: ModuleDescriptor[]): void {
+    this.uniformMap = UniformMap.build(modules, program.program, this.gl);
+    console.log(`Built ${this.uniformMap.getAllMappings().length} uniform bindings`);
+  }
+  
+  // Queue changes for batching (called throughout frame)
+  updateUniforms(changes: ParameterChanges): void {
+    for (const change of changes.changes) {
+      // Just queue the change - don't apply yet
+      this.pendingChanges.set(change.path, change.value);
+    }
+  }
+  
+  // Flush all pending updates at once (called once per frame)
+  frameUpdate(engineState: EngineState): void {
+    const startTime = performance.now();
+    
+    // Update engine uniforms first
+    this.updateEngineUniforms(engineState);
+    
+    // Then flush all pending parameter changes
+    for (const [path, value] of this.pendingChanges) {
+      const binding = this.uniformMap.getBinding(path);
+      
+      if (!binding) {
+        console.warn(`No uniform binding for parameter: ${path}`);
+        this.stats.missingBindings++;
+        continue;
+      }
+      
+      if (!binding.location) {
+        // Uniform not used in this shader variant
+        this.stats.skippedUpdates++;
+        continue;
+      }
+      
+      // Apply update based on type
+      this.applyUniform(binding, value);
+      this.stats.totalUpdates++;
+    }
+    
+    // Clear pending changes for next frame
+    this.pendingChanges.clear();
+    
+    const elapsed = performance.now() - startTime;
+    this.updateStats(elapsed);
+  }
+  
+  private applyUniform(binding: UniformMapping, value: any): void {
+    switch (binding.type) {
+      case 'float':
+        this.gl.uniform1f(binding.location!, value);
+        break;
+      case 'vec2':
+        this.gl.uniform2fv(binding.location!, value);
+        break;
+      case 'vec3':
+        this.gl.uniform3fv(binding.location!, value);
+        break;
+      case 'vec4':
+        this.gl.uniform4fv(binding.location!, value);
+        break;
+      case 'int':
+        this.gl.uniform1i(binding.location!, value);
+        break;
+      case 'mat4':
+        this.gl.uniformMatrix4fv(binding.location!, false, value);
+        break;
+      default:
+        console.warn(`Unknown uniform type: ${binding.type}`);
+    }
+  }
+}
+  
+  // Get the uniform map for debugging
+  getUniformMap(): UniformMap {
+    return this.uniformMap;
+  }
+  
+  // Check if parameter has binding
+  hasBinding(paramPath: string): boolean {
+    return this.uniformMap.getBinding(paramPath) !== undefined;
+  }
+  
+  // Get specific binding
+  getBinding(paramPath: string): UniformMapping | undefined {
+    return this.uniformMap.getBinding(paramPath);
+  }
+}
 ```
 
 ## Engine Uniforms
-
-Standard uniforms provided by the engine:
 
 ```typescript
 interface EngineUniforms {
@@ -163,73 +258,30 @@ interface EngineUniforms {
   'u_film_radiance': number;           // Texture unit
   'u_film_variance': number;           // Texture unit
   'u_film_samples': number;            // Texture unit
-  'u_film_auxiliary': number;          // Texture unit
 }
 
 class UniformBinder {
-  bindEngineUniforms() {
-    // These are always bound regardless of parameters
-    this.gl.uniform2fv(
-      this.locations.get('u_resolution'),
-      [this.resolution.width, this.resolution.height]
-    );
-    
-    this.gl.uniform1i(
-      this.locations.get('u_frame_index'),
-      this.frameIndex
-    );
-    
-    // Film textures
-    this.gl.uniform1i(
-      this.locations.get('u_film_radiance'),
-      ReservedUnits.FILM_RADIANCE
-    );
-    
-    // ... etc
-  }
-}
-```
-
-## Batch Updates
-
-```typescript
-interface BatchUpdate {
-  // Collect all parameter changes
-  changes: Array<{
-    path: string;
-    value: any;
-    resetPolicy: ResetPolicy;
-  }>;
-  
-  // Apply all at once
-  apply(): void;
-}
-
-class UniformBinder {
-  private pendingUpdates: Map<string, any> = new Map();
-  private updateScheduled = false;
-  
-  // Queue update for batching
-  queueUpdate(path: string, value: any) {
-    this.pendingUpdates.set(path, value);
-    
-    if (!this.updateScheduled) {
-      this.updateScheduled = true;
-      requestAnimationFrame(() => this.flushUpdates());
-    }
-  }
-  
-  // Apply all pending updates
-  private flushUpdates() {
-    for (const [path, value] of this.pendingUpdates) {
-      const binding = this.bindings.get(path);
-      if (binding) {
-        binding.setter(this.gl, binding.location, value);
-      }
+  updateEngineUniforms(engineState: EngineState): void {
+    // These are always updated regardless of parameter changes
+    const resolution = this.uniformMap.getBinding('resolution');
+    if (resolution?.location) {
+      this.gl.uniform2fv(resolution.location, [engineState.width, engineState.height]);
     }
     
-    this.pendingUpdates.clear();
-    this.updateScheduled = false;
+    const frameIndex = this.uniformMap.getBinding('frame_index');
+    if (frameIndex?.location) {
+      this.gl.uniform1i(frameIndex.location, engineState.frameIndex);
+    }
+    
+    const sampleCount = this.uniformMap.getBinding('sample_count');
+    if (sampleCount?.location) {
+      this.gl.uniform1i(sampleCount.location, engineState.sampleCount);
+    }
+    
+    const time = this.uniformMap.getBinding('time');
+    if (time?.location) {
+      this.gl.uniform1f(time.location, engineState.time);
+    }
   }
 }
 ```
@@ -237,40 +289,53 @@ class UniformBinder {
 ## Missing Uniform Handling
 
 ```typescript
-interface MissingUniformStrategy {
-  onMissingParameter(uniformName: string): void;
-  onMissingUniform(paramPath: string): void;
-}
-
 class UniformBinder {
-  handleMissingBinding(paramPath: string) {
-    // Some shader variants might not use all parameters
+  handleMissingBinding(paramPath: string): void {
+    // Check if it's expected to be missing
     if (this.isOptionalParameter(paramPath)) {
       // Silently skip - variant doesn't need it
       return;
     }
     
-    // Log warning for debugging
+    // Log warning with helpful context
     console.warn(`No uniform binding for parameter: ${paramPath}`);
     
-    // Check if it's a typo
-    const suggestion = this.findSimilarBinding(paramPath);
-    if (suggestion) {
-      console.warn(`Did you mean: ${suggestion}?`);
+    // Try to help debug
+    const suggestions = this.findSimilarBindings(paramPath);
+    if (suggestions.length > 0) {
+      console.warn(`Did you mean one of: ${suggestions.join(', ')}?`);
+    }
+    
+    // Show what bindings DO exist for this category
+    const category = paramPath.split('.')[0];
+    const categoryBindings = this.uniformMap.getAllMappings()
+      .filter(m => m.paramPath.startsWith(category))
+      .map(m => m.paramPath);
+    
+    if (categoryBindings.length > 0) {
+      console.log(`Available ${category} parameters: ${categoryBindings.join(', ')}`);
     }
   }
   
-  isOptionalParameter(path: string): boolean {
-    // Some parameters are variant-specific
+  private isOptionalParameter(path: string): boolean {
     const optional = [
       'film.variance_threshold',     // Only variance-tracking films
-      'developer.zebra_low',         // Only debug developers
-      'material.*.emission'          // Only emissive materials
+      'developer.debug_mode',         // Only debug developers  
+      'material.emission'             // Only emissive materials
     ];
     
-    return optional.some(pattern => 
-      this.matchesPattern(path, pattern)
-    );
+    return optional.some(pattern => path.includes(pattern));
+  }
+  
+  private findSimilarBindings(paramPath: string): string[] {
+    const allPaths = this.uniformMap.getAllMappings().map(m => m.paramPath);
+    
+    // Simple similarity: shared words
+    const words = paramPath.split(/[._]/);
+    return allPaths.filter(path => {
+      const pathWords = path.split(/[._]/);
+      return words.some(w => pathWords.includes(w));
+    }).slice(0, 3);
   }
 }
 ```
@@ -281,188 +346,103 @@ class UniformBinder {
 interface UpdateStats {
   totalUpdates: number;               // Total uniform updates
   uniqueUniforms: number;             // Unique uniforms updated
-  batchedUpdates: number;             // Updates that were batched
-  skippedUpdates: number;             // No-op updates (same value)
+  skippedUpdates: number;             // No-op updates (not in shader)
+  missingBindings: number;            // Parameters with no binding
   averageUpdateTime: number;          // Milliseconds
-  uniformsPerFrame: number;           // Average uniforms/frame
 }
 
 class UniformBinder {
-  private stats: UpdateStats = {
-    totalUpdates: 0,
-    uniqueUniforms: 0,
-    batchedUpdates: 0,
-    skippedUpdates: 0,
-    averageUpdateTime: 0,
-    uniformsPerFrame: 0
-  };
+  private updateStats(elapsed: number): void {
+    // Update running average
+    const alpha = 0.1; // Exponential moving average factor
+    this.stats.averageUpdateTime = 
+      this.stats.averageUpdateTime * (1 - alpha) + elapsed * alpha;
+  }
   
-  updateUniforms(changes: ParameterChanges) {
-    const start = performance.now();
-    
-    for (const change of changes.changes) {
-      const binding = this.bindings.get(change.path);
-      
-      if (!binding) {
-        this.handleMissingBinding(change.path);
-        continue;
-      }
-      
-      // Skip if value unchanged
-      if (this.valuesEqual(binding.lastValue, change.newValue)) {
-        this.stats.skippedUpdates++;
-        continue;
-      }
-      
-      // Apply update
-      binding.setter(this.gl, binding.location, change.newValue);
-      binding.lastValue = change.newValue;
-      this.stats.totalUpdates++;
-    }
-    
-    const elapsed = performance.now() - start;
-    this.updateStats(elapsed);
+  getUpdateStats(): UpdateStats {
+    return { ...this.stats };
+  }
+  
+  resetStats(): void {
+    this.stats = {
+      totalUpdates: 0,
+      uniqueUniforms: 0,
+      skippedUpdates: 0,
+      missingBindings: 0,
+      averageUpdateTime: 0
+    };
   }
 }
 ```
 
-## Parameter Persistence During Shader Swaps
-
-When switching between shader variants (e.g., different cameras), common parameters persist:
-
-```typescript
-interface ParameterPersistence {
-  // Track parameters across swaps
-  preserveCommonParameters(
-    oldProgram: CompiledProgram,
-    newProgram: CompiledProgram,
-    store: ParameterStore
-  ): void;
-}
-
-class UniformBinder {
-  // Called when switching programs
-  handleProgramSwap(oldProgram: CompiledProgram, newProgram: CompiledProgram) {
-    // Build new bindings
-    this.buildBindings(newProgram);
-    
-    // Restore common parameters
-    const allParams = this.parameterStore.getAll();
-    
-    for (const [path, value] of allParams) {
-      // Try to bind with new program's module names
-      const newUniform = this.pathToUniform(path);
-      
-      if (this.bindings.has(path)) {
-        // This parameter exists in new program
-        const binding = this.bindings.get(path);
-        binding.setter(this.gl, binding.location, value);
-      }
-      // Parameters that don't exist in new program are silently skipped
-    }
-  }
-}
-
-// Example: Switching cameras preserves position/fov
-// User sets: parameterStore.set("camera.position", [0, 5, 10])
-// 
-// With Pinhole camera: maps to u_camera_pinhole_position
-// Switch to ThinLens: maps to u_camera_thinlens_position
-// The value [0, 5, 10] is preserved!
-```
-```
-
-## Integration Example
+## Integration with Engine
 
 ```typescript
 class UniformBinder {
-  constructor(
-    private gl: WebGL2RenderingContext,
-    private program: CompiledProgram
-  ) {
-    this.buildBindings(program);
-  }
-  
-  buildBindings(program: CompiledProgram) {
-    this.bindings = new Map();
-    
-    // Get all active uniforms from GL
-    const numUniforms = this.gl.getProgramParameter(
-      program.program,
-      GL.ACTIVE_UNIFORMS
-    );
-    
-    for (let i = 0; i < numUniforms; i++) {
-      const info = this.gl.getActiveUniform(program.program, i);
-      const location = this.gl.getUniformLocation(
-        program.program,
-        info.name
-      );
-      
-      // Map to parameter path
-      const paramPath = this.uniformToPath(info.name, program.recipe);
-      
-      if (paramPath) {
-        this.bindings.set(paramPath, {
-          paramPath,
-          uniformName: info.name,
-          location,
-          type: this.mapGLType(info.type),
-          module: this.findModule(info.name, program),
-          setter: UNIFORM_SETTERS[this.mapGLType(info.type)]
-        });
-      }
-    }
-  }
-  
   // Called each frame by RenderExecutor
-  frameUpdate(params: ParameterStore) {
-    // Update engine uniforms
-    this.bindEngineUniforms();
+  frameUpdate(engineState: EngineState, parameterChanges?: ParameterChanges): void {
+    // Always update engine uniforms
+    this.updateEngineUniforms(engineState);
     
-    // Update changed parameters
-    const changes = params.getChangedSinceLastFrame();
-    if (changes.length > 0) {
-      this.updateUniforms(changes);
+    // Update changed parameters if any
+    if (parameterChanges && parameterChanges.changes.length > 0) {
+      this.updateUniforms(parameterChanges);
     }
   }
+  
+  // Called when switching programs
+  onProgramSwitch(newProgram: CompiledProgram, modules: ModuleDescriptor[]): void {
+    // Rebuild bindings for new program
+    this.buildBindings(newProgram, modules);
+    
+    // Log the mapping for debugging
+    console.log('New uniform mappings:');
+    this.uniformMap.debugPrint();
+  }
 }
+```
+
+## Usage Example
+
+```typescript
+// In Engine initialization
+const uniformBinder = new UniformBinder(gl);
+
+// After compilation
+uniformBinder.buildBindings(compiledProgram, modules);
+
+// Check what got mapped
+const map = uniformBinder.getUniformMap();
+map.debugPrint(); // Shows all parameter -> uniform mappings
+
+// During render
+const changes = parameterStore.getChanges();
+uniformBinder.updateUniforms(changes);
+
+// Query specific binding
+if (uniformBinder.hasBinding('camera.position')) {
+  const binding = uniformBinder.getBinding('camera.position');
+  console.log(`camera.position maps to ${binding.glslName}`);
+}
+
+// Get performance stats
+const stats = uniformBinder.getUpdateStats();
+console.log(`Average uniform update time: ${stats.averageUpdateTime}ms`);
 ```
 
 ## Validation
 
 The UniformBinder validates:
-1. All required uniforms have parameter bindings
+1. All parameter paths resolve to valid uniforms
 2. Parameter types match uniform types
-3. Texture uniforms bind to valid units
-4. No duplicate bindings
-5. Array uniforms don't exceed limits
+3. No duplicate mappings
+4. Texture uniforms bind to valid units
+5. Required engine uniforms are present
 
-## Error Recovery
+## Benefits of Explicit UniformMap
 
-```typescript
-class UniformBindingError extends Error {
-  constructor(
-    public uniformName: string,
-    public expectedType: UniformType,
-    public actualType?: string,
-    public suggestion?: string
-  ) {
-    super(`Failed to bind uniform ${uniformName}`);
-  }
-}
-
-// Graceful handling:
-try {
-  binder.updateUniforms(changes);
-} catch (e) {
-  if (e instanceof UniformBindingError) {
-    // Log but continue - don't crash the renderer
-    console.error(`Uniform binding error: ${e.message}`);
-    
-    // Use default value
-    const defaultValue = getDefaultForType(e.expectedType);
-    binder.forceUpdate(e.uniformName, defaultValue);
-  }
-}
-```
+1. **Debuggability**: Can inspect exact parameter->uniform mappings
+2. **Performance**: No string manipulation during render
+3. **Validation**: Know immediately if parameters don't map
+4. **Flexibility**: Easy to add new mapping rules
+5. **Testing**: Can unit test mapping logic separately

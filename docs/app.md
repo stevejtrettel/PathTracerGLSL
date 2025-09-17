@@ -15,12 +15,13 @@ class ResearchApp {
   private renderCoordinator: RenderCoordinator;
   
   // Extension system
-  private extensions: Map<string, Extension> = new Map();
+  private extensions = new Map<string, Extension>();
+  private services = new Map<string, any>();  // Services provided by extensions
   private bus: EventEmitter;
   
   // Current state
-  private activeRecipe: RenderRecipe;
-  private compiledPrograms: Map<string, CompiledProgram>;
+  private recipes: Record<string, Recipe>;
+  private activeRecipeName: string;
 }
 ```
 
@@ -31,6 +32,7 @@ class ResearchApp {
 3. **Hybrid Communication**: Direct refs for core flow, events for extensions
 4. **Progressive Complexity**: Simple operations stay simple
 5. **Session-Oriented**: Everything can be saved/restored
+6. **Known Configurations**: Define your 2-3 recipes upfront
 
 ## Core Components
 
@@ -39,9 +41,44 @@ class ResearchApp {
 ```typescript
 class ResearchApp {
   constructor(canvas: HTMLCanvasElement) {
+    // Define your known configurations
+    this.recipes = {
+      pathtracer: {
+        world: { 
+          geometry: 'euclidean', 
+          material: 'disney', 
+          scene: 'sdf', 
+          lights: 'hdri' 
+        },
+        photography: { 
+          camera: 'pinhole', 
+          estimator: 'pathtracer', 
+          film: 'variance', 
+          developer: 'aces' 
+        }
+      },
+      debug: {
+        world: { 
+          geometry: 'euclidean', 
+          material: 'debug', 
+          scene: 'sdf', 
+          lights: 'point' 
+        },
+        photography: { 
+          camera: 'pinhole', 
+          estimator: 'direct', 
+          film: 'simple', 
+          developer: 'linear' 
+        }
+      }
+    };
+    
     this.engine = new Engine(canvas);
+    // Compile all known recipes at startup
+    this.engine.initializeShaders(Object.values(this.recipes));
+    
     this.parameterStore = new ParameterStore();
-    this.sessionManager = new SessionManager();
+    this.sessionManager = new SessionManager(this);
     this.renderCoordinator = new RenderCoordinator(this.engine);
     this.bus = new EventEmitter();
     
@@ -51,24 +88,35 @@ class ResearchApp {
   private setupCoreFlow() {
     // Direct communication for core rendering flow
     this.parameterStore.onChange = (changes) => {
-      // Update engine uniforms
+      // Update engine uniforms (batched)
       this.engine.updateUniforms(changes);
       
-      // Let RenderCoordinator handle reset decisions
-      for (const change of changes.changes) {
-        this.renderCoordinator.handleParameterChange(
-          change.path,
-          change.oldValue,
-          change.newValue
-        );
+      // Check if any change requires reset
+      const needsReset = changes.changes.some(c => 
+        this.renderCoordinator.shouldResetForParameter(c.path)
+      );
+      
+      if (needsReset) {
+        this.renderCoordinator.resetAccumulation();
       }
     };
   }
   
+  // Simple recipe switching (no async needed)
+  switchRecipe(name: string) {
+    if (!this.recipes[name]) {
+      throw new Error(`Unknown recipe: ${name}`);
+    }
+    
+    this.activeRecipeName = name;
+    this.engine.selectRecipe(this.recipes[name]);
+    this.renderCoordinator.resetAccumulation();
+    this.bus.emit('recipe.switched', name);
+  }
+  
   // Simple starting point
-  async quickStart(world: World, photography: Photography) {
-    const recipe = this.createRecipe(world, photography);
-    await this.engine.compile(recipe);
+  quickStart(recipeName: string = 'pathtracer') {
+    this.switchRecipe(recipeName);
     this.renderCoordinator.start();
   }
   
@@ -78,6 +126,15 @@ class ResearchApp {
     this.extensions.set(extension.name, extension);
     return this;
   }
+  
+  // Service registry for extensions (avoids interface pollution)
+  registerService(name: string, service: any) {
+    this.services.set(name, service);
+  }
+  
+  getService(name: string) {
+    return this.services.get(name);
+  }
 }
 ```
 
@@ -85,13 +142,12 @@ class ResearchApp {
 
 ```typescript
 class ParameterStore {
-  private parameters: Map<string, any> = new Map();
-  private metadata: Map<string, ParameterMetadata> = new Map();
+  private parameters = new Map<string, any>();
+  private metadata = new Map<string, ParameterMetadata>();
   onChange: (changes: ParameterChanges) => void;
   
-  // Flexible parameter setting
+  // Single parameter update
   set(path: string, value: any) {
-    // path like "material.glass.ior" or "camera.position"
     const old = this.get(path);
     this.parameters.set(path, value);
     
@@ -108,6 +164,7 @@ class ParameterStore {
   // Batch updates
   batch(updates: Record<string, any>) {
     const changes: ParameterChanges = { changes: [] };
+    
     for (const [path, value] of Object.entries(updates)) {
       const old = this.get(path);
       this.parameters.set(path, value);
@@ -118,7 +175,22 @@ class ParameterStore {
         metadata: this.metadata.get(path)
       });
     }
+    
     this.onChange?.(changes);
+  }
+  
+  get(path: string): any {
+    return this.parameters.get(path);
+  }
+  
+  getAll(): Record<string, any> {
+    return Object.fromEntries(this.parameters);
+  }
+  
+  restore(params: Record<string, any>) {
+    for (const [path, value] of Object.entries(params)) {
+      this.parameters.set(path, value);
+    }
   }
 }
 ```
@@ -129,31 +201,27 @@ class ParameterStore {
 class RenderCoordinator {
   private mode: 'interactive' | 'progressive' | 'production' = 'progressive';
   private accumulator: Accumulator;
-  private tileManager?: TileManager;
+  private animationId?: number;
   
-  // Reset triggers - owns accumulation reset decisions
-  private resetTriggers = new Set(['camera.*', 'material.*', 'scene.*', 'lights.*']);
-  private noResetParameters = new Set(['developer.*', 'ui.*', 'debug.*']);
+  // Reset triggers - using direct prefixes (no wildcards)
+  private resetPrefixes = new Set(['camera.', 'material.', 'scene.', 'lights.']);
+  private noResetPrefixes = new Set(['developer.', 'ui.', 'debug.']);
   
   constructor(private engine: Engine) {
     this.accumulator = new Accumulator();
   }
   
-  handleParameterChange(path: string, oldValue: any, newValue: any) {
-    if (this.shouldResetForParameter(path)) {
-      this.resetAccumulation();
+  shouldResetForParameter(path: string): boolean {
+    // Check no-reset first (higher priority)
+    for (const prefix of this.noResetPrefixes) {
+      if (path.startsWith(prefix)) return false;
     }
-  }
-  
-  private shouldResetForParameter(path: string): boolean {
-    // Check no-reset list first
-    for (const pattern of this.noResetParameters) {
-      if (path.startsWith(pattern.replace('*', ''))) return false;
-    }
+    
     // Check reset triggers
-    for (const pattern of this.resetTriggers) {
-      if (path.startsWith(pattern.replace('*', ''))) return true;
+    for (const prefix of this.resetPrefixes) {
+      if (path.startsWith(prefix)) return true;
     }
+    
     return true; // Default: reset to be safe
   }
   
@@ -171,21 +239,68 @@ class RenderCoordinator {
     }
   }
   
-  private async runProgressive() {
-    while (this.accumulator.isActive) {
-      await this.engine.renderFrame();
+  stop() {
+    this.accumulator.isActive = false;
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = undefined;
+    }
+  }
+  
+  private runProgressive() {
+    this.accumulator.isActive = true;
+    
+    const frame = () => {
+      if (!this.accumulator.isActive) return;
+      
+      this.engine.renderFrame();
       this.accumulator.increment();
       
       // Emit progress events
       if (this.accumulator.count % 10 === 0) {
         this.onProgress?.(this.accumulator.count);
       }
-    }
+      
+      this.animationId = requestAnimationFrame(frame);
+    };
+    
+    this.animationId = requestAnimationFrame(frame);
+  }
+  
+  private runInteractive() {
+    this.accumulator.isActive = false;  // No accumulation
+    
+    const frame = () => {
+      if (this.mode !== 'interactive') return;
+      
+      this.engine.renderFrame();
+      this.animationId = requestAnimationFrame(frame);
+    };
+    
+    this.animationId = requestAnimationFrame(frame);
   }
   
   resetAccumulation() {
     this.accumulator.reset();
     this.engine.clearFilm();
+  }
+  
+  setMode(mode: 'interactive' | 'progressive' | 'production') {
+    this.stop();
+    this.mode = mode;
+  }
+}
+
+class Accumulator {
+  count: number = 0;
+  isActive: boolean = false;
+  
+  increment() {
+    this.count++;
+  }
+  
+  reset() {
+    this.count = 0;
   }
 }
 ```
@@ -194,13 +309,15 @@ class RenderCoordinator {
 
 ```typescript
 class SessionManager {
+  constructor(private app: ResearchApp) {}
+  
   async saveSession(filepath: string): Promise<void> {
     const session = {
       version: "1.0.0",
       timestamp: Date.now(),
-      recipe: this.app.activeRecipe,
+      recipeName: this.app.activeRecipeName,
       parameters: this.app.parameterStore.getAll(),
-      camera: this.app.extensions.get('input')?.getCamera(),
+      camera: this.app.getService('input')?.getCamera(),
       // Everything needed to reproduce exact state
     };
     
@@ -211,9 +328,22 @@ class SessionManager {
     const session = JSON.parse(await this.readFile(filepath));
     
     // Restore everything
-    await this.app.setRecipe(session.recipe);
+    this.app.switchRecipe(session.recipeName);
     this.app.parameterStore.restore(session.parameters);
-    this.app.extensions.get('input')?.setCamera(session.camera);
+    this.app.getService('input')?.setCamera(session.camera);
+  }
+  
+  private async writeFile(path: string, content: string) {
+    // Implementation depends on environment
+    // Browser: Use download
+    // Node: Use fs.writeFile
+  }
+  
+  private async readFile(path: string): Promise<string> {
+    // Implementation depends on environment
+    // Browser: Use file input
+    // Node: Use fs.readFile
+    return "";
   }
 }
 ```
@@ -239,8 +369,13 @@ interface Extension {
 class InputExtension implements Extension {
   name = 'input';
   private mode: 'fly' | 'orbit' | 'locked' = 'fly';
+  private position = [0, 0, 5];
+  private rotation = [0, 0];
   
   install(app: ResearchApp, bus: EventEmitter) {
+    // Register as a service
+    app.registerService('input', this);
+    
     // WASD + mouse for fly mode
     document.addEventListener('keydown', this.handleKey);
     canvas.addEventListener('mousemove', this.handleMouse);
@@ -261,6 +396,23 @@ class InputExtension implements Extension {
     this.mode = mode;
     // Reconfigure handlers
   }
+  
+  getCamera() {
+    return { position: this.position, rotation: this.rotation };
+  }
+  
+  setCamera(camera: any) {
+    this.position = camera.position;
+    this.rotation = camera.rotation;
+  }
+  
+  private handleKey = (e: KeyboardEvent) => {
+    // WASD movement
+  }
+  
+  private handleMouse = (e: MouseEvent) => {
+    // Look around
+  }
 }
 ```
 
@@ -268,9 +420,12 @@ class InputExtension implements Extension {
 ```typescript
 class UIExtension implements Extension {
   name = 'ui';
-  private panels: Map<string, Panel> = new Map();
+  private panels = new Map<string, Panel>();
   
   install(app: ResearchApp, bus: EventEmitter) {
+    // Register as a service
+    app.registerService('ui', this);
+    
     // Create parameter panel
     this.addPanel('parameters', new ParameterPanel(app.parameterStore));
     
@@ -281,10 +436,24 @@ class UIExtension implements Extension {
     
     // Add keyboard shortcuts
     this.registerShortcuts({
-      'Ctrl+S': () => app.saveImage(),
-      'Space': () => app.toggleRendering(),
-      'R': () => app.resetAccumulation()
+      'Ctrl+S': () => this.saveImage(app),
+      'Space': () => app.renderCoordinator.stop(),
+      'R': () => app.renderCoordinator.resetAccumulation()
     });
+  }
+  
+  private saveImage(app: ResearchApp) {
+    // Use app reference to access engine
+    const pixels = app.engine.readPixelsAsync();
+    // ... save logic
+  }
+  
+  private addPanel(name: string, panel: Panel) {
+    this.panels.set(name, panel);
+  }
+  
+  private registerShortcuts(shortcuts: Record<string, () => void>) {
+    // Keyboard handler
   }
 }
 ```
@@ -293,9 +462,16 @@ class UIExtension implements Extension {
 ```typescript
 class PerformanceExtension implements Extension {
   name = 'performance';
-  private stats: Stats = {};
+  private stats = {
+    fps: 0,
+    samplesPerSecond: 0,
+    frameTime: 0
+  };
   
   install(app: ResearchApp, bus: EventEmitter) {
+    // Register as a service
+    app.registerService('performance', this);
+    
     // Track metrics
     bus.on('frame.complete', (timing) => {
       this.stats.fps = 1000 / timing.delta;
@@ -303,9 +479,17 @@ class PerformanceExtension implements Extension {
     });
     
     // Optional overlay
-    if (this.config.overlay) {
+    if (this.config?.overlay) {
       this.createOverlay();
     }
+  }
+  
+  getStats() {
+    return { ...this.stats };
+  }
+  
+  private createOverlay() {
+    // Create DOM overlay with stats
   }
 }
 ```
@@ -316,24 +500,63 @@ class ExperimentExtension implements Extension {
   name = 'experiment';
   
   install(app: ResearchApp, bus: EventEmitter) {
-    // Add experiment methods to app
-    app.sweep = async (config: SweepConfig) => {
-      const results = [];
-      for (const value of config.values) {
-        app.parameterStore.set(config.parameter, value);
-        await app.renderToConvergence(config.samplesPerValue);
-        results.push({
-          value,
-          image: await app.captureImage(),
-          metrics: this.computeMetrics()
-        });
-      }
-      return results;
-    };
+    // Register as a service (NOT polluting app interface)
+    app.registerService('experiment', this);
+  }
+  
+  // Methods on the extension itself
+  async sweep(app: ResearchApp, config: SweepConfig) {
+    const results = [];
     
-    app.compare = async (configs: CompareConfig[]) => {
-      // Side-by-side comparison logic
-    };
+    for (const value of config.values) {
+      app.parameterStore.set(config.parameter, value);
+      await this.renderToConvergence(app, config.samplesPerValue);
+      
+      results.push({
+        value,
+        image: await app.engine.readPixelsAsync(),
+        metrics: this.computeMetrics(app)
+      });
+    }
+    
+    return results;
+  }
+  
+  async compare(app: ResearchApp, configs: CompareConfig[]) {
+    // Side-by-side comparison logic
+    const results = [];
+    
+    for (const config of configs) {
+      app.switchRecipe(config.recipe);
+      app.parameterStore.batch(config.parameters);
+      await this.renderToConvergence(app, config.samples);
+      results.push(await app.engine.readPixelsAsync());
+    }
+    
+    return results;
+  }
+  
+  private async renderToConvergence(app: ResearchApp, samples: number) {
+    return new Promise<void>(resolve => {
+      app.renderCoordinator.resetAccumulation();
+      app.renderCoordinator.start();
+      
+      const checkConvergence = () => {
+        if (app.renderCoordinator.accumulator.count >= samples) {
+          app.renderCoordinator.stop();
+          resolve();
+        } else {
+          setTimeout(checkConvergence, 100);
+        }
+      };
+      
+      checkConvergence();
+    });
+  }
+  
+  private computeMetrics(app: ResearchApp) {
+    const perf = app.getService('performance') as PerformanceExtension;
+    return perf?.getStats() || {};
   }
 }
 ```
@@ -344,13 +567,10 @@ class ExperimentExtension implements Extension {
 ```typescript
 const app = new ResearchApp(canvas);
 
-// Minimal setup
-app.quickStart(
-  new SimpleWorld(),
-  new BasicPhotography()
-);
+// Start with default pathtracer
+app.quickStart();
 
-// Just fly around and render
+// Add camera controls
 app.use(new InputExtension());
 ```
 
@@ -366,29 +586,30 @@ app
   .use(new ExperimentExtension());
 
 // Load previous work
-await app.loadSession('yesterday.json');
+await app.sessionManager.loadSession('yesterday.json');
 
 // Continue research
 app.renderCoordinator.setMode('progressive');
-app.start();
+app.renderCoordinator.start();
 ```
 
 ### 3. Production Render
 ```typescript
 const app = new ResearchApp(canvas);
 
-// Configure for production
-await app.loadSession('final_shot.json');
+// Load saved session
+await app.sessionManager.loadSession('final_shot.json');
 
+// Switch to production mode
 app.renderCoordinator.setMode('production');
-app.renderCoordinator.configureTiles({
+
+// Get production service (if extension loaded)
+const prod = app.getService('production');
+await prod?.renderHighRes({
   resolution: [4096, 4096],
   tileSize: 512,
   samplesPerTile: 1000
 });
-
-// Start overnight render
-await app.renderProduction('output/final.exr');
 ```
 
 ### 4. Parameter Study
@@ -396,15 +617,18 @@ await app.renderProduction('output/final.exr');
 const app = new ResearchApp(canvas);
 app.use(new ExperimentExtension());
 
+// Get experiment service
+const experiment = app.getService('experiment') as ExperimentExtension;
+
 // Sweep roughness values
-const results = await app.sweep({
-  parameter: 'material.marble.roughness',
+const results = await experiment.sweep(app, {
+  parameter: 'material.roughness',
   values: [0.1, 0.2, 0.3, 0.4, 0.5],
   samplesPerValue: 100
 });
 
 // Save comparison grid
-await app.saveComparisonGrid(results, 'roughness_study.png');
+await experiment.saveComparisonGrid(results, 'roughness_study.png');
 ```
 
 ## Communication Patterns
@@ -471,7 +695,7 @@ Start simple, add complexity as needed:
 ### Phase 1: Minimal
 ```typescript
 const app = new ResearchApp(canvas);
-app.quickStart(world, photography);  // That's it!
+app.quickStart();  // That's it!
 ```
 
 ### Phase 2: Interactive
@@ -495,13 +719,13 @@ app.use(new AnimationExtension());   // Sequences
 ## Key Benefits
 
 1. **Clean Core**: Core stays simple and stable
-2. **Flexible Growth**: Add features without modifying core
-3. **Clear Communication**: Direct for core, events for extensions
-4. **Research-Friendly**: Start simple, grow as needed
-5. **Session-Based**: Everything saveable/restorable
-6. **Type-Light**: No fighting with TypeScript
-7. **Extensible**: New workflows via new extensions
+2. **Known Configurations**: 2-3 recipes defined upfront, no dynamic creation
+3. **Service Pattern**: Extensions provide services, don't pollute app interface
+4. **No Unnecessary Async**: Everything synchronous that can be
+5. **Clear Ownership**: Engine owns programs, App owns recipes
+6. **Simple Reset Logic**: Direct prefix checking, no wildcards
+7. **Proper Dependencies**: Components get references they need
 
 ## Summary
 
-This architecture gives you a minimal, stable core that orchestrates your mathematical modules, with all additional features added as extensions. The hybrid communication pattern keeps the core flow simple while allowing extensions to cooperate through events. Start with just `quickStart()` and add extensions as your research needs grow.
+This architecture gives you a minimal, stable core that orchestrates your mathematical modules, with all additional features added as extensions. The service pattern keeps extensions from polluting the app interface, and the known recipe approach eliminates unnecessary dynamic configuration. Start with just `quickStart()` and add extensions as your research needs grow.

@@ -18,8 +18,8 @@ interface RenderExecutor {
   setRenderTarget(target: RenderTarget): void;
   getRenderTarget(): RenderTarget;
   
-  // Pixel readback
-  readPixels(rect?: Rectangle): Promise<Float32Array>;
+  // Pixel readback (both async and sync)
+  readPixelsAsync(rect?: Rectangle): Promise<Float32Array>;
   readPixelsSync(rect?: Rectangle): Float32Array;
   
   // State management
@@ -54,31 +54,30 @@ interface Rectangle {
 }
 ```
 
-## Geometry Setup
+## Geometry Setup - Full-Screen Triangle
 
-The executor uses a simple full-screen quad:
+The executor uses a single full-screen triangle (more efficient than quad):
 
 ```typescript
 class RenderExecutor {
-  private quadVAO: WebGLVertexArrayObject;
+  private triangleVAO: WebGLVertexArrayObject;
   
   setupGeometry() {
     // Create vertex array object
-    this.quadVAO = this.gl.createVertexArray();
-    this.gl.bindVertexArray(this.quadVAO);
+    this.triangleVAO = this.gl.createVertexArray();
+    this.gl.bindVertexArray(this.triangleVAO);
     
-    // Full-screen triangle strip
+    // Full-screen triangle (3 vertices cover screen)
     const vertices = new Float32Array([
       -1, -1,  // Bottom-left
-       1, -1,  // Bottom-right
-      -1,  1,  // Top-left
-       1,  1   // Top-right
+       3, -1,  // Bottom-right (extends beyond viewport)
+      -1,  3   // Top-left (extends beyond viewport)
     ]);
     
     // Create and bind buffer
     const vbo = this.gl.createBuffer();
-    this.gl.bindBuffer(GL.ARRAY_BUFFER, vbo);
-    this.gl.bufferData(GL.ARRAY_BUFFER, vertices, GL.STATIC_DRAW);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vbo);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
     
     // Set up attribute
     const positionLoc = 0;  // Assume location 0
@@ -86,13 +85,27 @@ class RenderExecutor {
     this.gl.vertexAttribPointer(
       positionLoc,
       2,           // 2 components
-      GL.FLOAT,
+      this.gl.FLOAT,
       false,       // No normalization
       0,           // Stride
       0            // Offset
     );
     
     this.gl.bindVertexArray(null);
+  }
+  
+  // Vertex shader handles the triangle
+  getVertexShader(): string {
+    return `
+      attribute vec2 a_position;
+      varying vec2 v_texCoord;
+      
+      void main() {
+        gl_Position = vec4(a_position, 0.0, 1.0);
+        // Convert from clip space to UV coordinates
+        v_texCoord = a_position * 0.5 + 0.5;
+      }
+    `;
   }
 }
 ```
@@ -134,10 +147,10 @@ class RenderExecutor {
       }
       
       // 4. Bind geometry
-      this.gl.bindVertexArray(this.quadVAO);
+      this.gl.bindVertexArray(this.triangleVAO);
       
-      // 5. Draw
-      this.gl.drawArrays(GL.TRIANGLE_STRIP, 0, 4);
+      // 5. Draw triangle (only 3 vertices!)
+      this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
       
       // 6. Unbind
       this.gl.bindVertexArray(null);
@@ -195,9 +208,9 @@ class RenderExecutor {
     let clearMask = 0;
     const buffers = config.buffers || { color: true };
     
-    if (buffers.color) clearMask |= GL.COLOR_BUFFER_BIT;
-    if (buffers.depth) clearMask |= GL.DEPTH_BUFFER_BIT;
-    if (buffers.stencil) clearMask |= GL.STENCIL_BUFFER_BIT;
+    if (buffers.color) clearMask |= this.gl.COLOR_BUFFER_BIT;
+    if (buffers.depth) clearMask |= this.gl.DEPTH_BUFFER_BIT;
+    if (buffers.stencil) clearMask |= this.gl.STENCIL_BUFFER_BIT;
     
     // Clear
     if (clearMask) {
@@ -210,73 +223,30 @@ class RenderExecutor {
 ## Pixel Readback
 
 ```typescript
-interface ReadbackConfig {
-  format?: GLenum;                    // Default: RGBA
-  type?: GLenum;                      // Default: FLOAT
-  buffer?: ArrayBufferView;           // Reuse buffer
-}
-
 class RenderExecutor {
   // Asynchronous readback (non-blocking)
-  async readPixels(rect?: Rectangle, config: ReadbackConfig = {}): Promise<Float32Array> {
+  async readPixelsAsync(rect?: Rectangle): Promise<Float32Array> {
     const r = rect || this.getFullViewport();
+    const pixels = new Float32Array(r.width * r.height * 4);
     
-    // Use pixel buffer object for async
-    const pbo = this.gl.createBuffer();
-    this.gl.bindBuffer(GL.PIXEL_PACK_BUFFER, pbo);
-    
-    const size = r.width * r.height * 4 * 4; // 4 channels, 4 bytes per float
-    this.gl.bufferData(GL.PIXEL_PACK_BUFFER, size, GL.STREAM_READ);
-    
-    // Start async read
+    // Start readback
     this.gl.readPixels(
       r.x, r.y, r.width, r.height,
-      config.format || GL.RGBA,
-      config.type || GL.FLOAT,
-      0  // Offset into PBO
+      this.gl.RGBA, this.gl.FLOAT,
+      pixels
     );
     
-    // Wait for completion
-    await this.waitForSync();
-    
-    // Map buffer and copy
-    const data = new Float32Array(r.width * r.height * 4);
-    this.gl.getBufferSubData(GL.PIXEL_PACK_BUFFER, 0, data);
-    
-    // Cleanup
-    this.gl.bindBuffer(GL.PIXEL_PACK_BUFFER, null);
-    this.gl.deleteBuffer(pbo);
-    
-    return data;
-  }
-  
-  // Synchronous readback (blocks GPU)
-  readPixelsSync(rect?: Rectangle, config: ReadbackConfig = {}): Float32Array {
-    const r = rect || this.getFullViewport();
-    
-    const data = config.buffer || 
-      new Float32Array(r.width * r.height * 4);
-    
-    this.gl.readPixels(
-      r.x, r.y, r.width, r.height,
-      config.format || GL.RGBA,
-      config.type || GL.FLOAT,
-      data
-    );
-    
-    return data;
-  }
-  
-  private async waitForSync() {
-    const sync = this.gl.fenceSync(GL.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    // Insert fence and wait
+    const sync = this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     this.gl.flush();
     
-    return new Promise<void>((resolve) => {
+    // Poll for completion
+    await new Promise<void>((resolve) => {
       const check = () => {
         const status = this.gl.clientWaitSync(sync, 0, 0);
         
-        if (status === GL.ALREADY_SIGNALED || 
-            status === GL.CONDITION_SATISFIED) {
+        if (status === this.gl.ALREADY_SIGNALED || 
+            status === this.gl.CONDITION_SATISFIED) {
           this.gl.deleteSync(sync);
           resolve();
         } else {
@@ -285,68 +255,33 @@ class RenderExecutor {
       };
       check();
     });
-  }
-}
-```
-
-## Tiled Rendering
-
-For high-resolution renders:
-
-```typescript
-interface TileConfig {
-  fullResolution: [number, number];
-  tileSize: number;
-  overlap?: number;                   // For filtering
-  order?: "linear" | "spiral" | "random";
-}
-
-class TiledRenderExecutor {
-  *generateTiles(config: TileConfig): Generator<Tile> {
-    const [width, height] = config.fullResolution;
-    const size = config.tileSize;
-    const overlap = config.overlap || 0;
     
-    const tilesX = Math.ceil(width / size);
-    const tilesY = Math.ceil(height / size);
-    
-    const tiles: Tile[] = [];
-    
-    for (let y = 0; y < tilesY; y++) {
-      for (let x = 0; x < tilesX; x++) {
-        tiles.push({
-          id: y * tilesX + x,
-          x: x * size - overlap,
-          y: y * size - overlap,
-          width: Math.min(size + 2 * overlap, width - x * size),
-          height: Math.min(size + 2 * overlap, height - y * size)
-        });
-      }
-    }
-    
-    // Apply ordering
-    const ordered = this.orderTiles(tiles, config.order);
-    
-    for (const tile of ordered) {
-      yield tile;
-    }
+    return pixels;
   }
   
-  async renderTile(tile: Tile, samplesPerTile: number) {
-    // Set viewport to tile
-    this.setViewport(tile.x, tile.y, tile.width, tile.height);
+  // Synchronous readback (blocks GPU)
+  readPixelsSync(rect?: Rectangle): Float32Array {
+    const r = rect || this.getFullViewport();
     
-    // Clear for first sample
-    this.clearFrame();
+    const data = new Float32Array(r.width * r.height * 4);
     
-    // Render samples
-    for (let s = 0; s < samplesPerTile; s++) {
-      this.uniformBinder.updateUniform('u_frame_index', s);
-      this.renderFrame({ swapBuffers: true });
-    }
+    this.gl.readPixels(
+      r.x, r.y, r.width, r.height,
+      this.gl.RGBA, this.gl.FLOAT,
+      data
+    );
     
-    // Read tile pixels
-    return this.readPixels(tile);
+    return data;
+  }
+  
+  private getFullViewport(): Rectangle {
+    const viewport = this.gl.getParameter(this.gl.VIEWPORT);
+    return {
+      x: viewport[0],
+      y: viewport[1],
+      width: viewport[2],
+      height: viewport[3]
+    };
   }
 }
 ```
@@ -370,13 +305,13 @@ class RenderExecutor {
   saveState(): RenderState {
     return {
       viewport: this.getViewport(),
-      framebuffer: this.gl.getParameter(GL.FRAMEBUFFER_BINDING),
-      program: this.gl.getParameter(GL.CURRENT_PROGRAM),
-      clearColor: this.gl.getParameter(GL.COLOR_CLEAR_VALUE),
+      framebuffer: this.gl.getParameter(this.gl.FRAMEBUFFER_BINDING),
+      program: this.gl.getParameter(this.gl.CURRENT_PROGRAM),
+      clearColor: this.gl.getParameter(this.gl.COLOR_CLEAR_VALUE),
       features: {
-        blend: this.gl.isEnabled(GL.BLEND),
-        depthTest: this.gl.isEnabled(GL.DEPTH_TEST),
-        cullFace: this.gl.isEnabled(GL.CULL_FACE)
+        blend: this.gl.isEnabled(this.gl.BLEND),
+        depthTest: this.gl.isEnabled(this.gl.DEPTH_TEST),
+        cullFace: this.gl.isEnabled(this.gl.CULL_FACE)
       }
     };
   }
@@ -389,14 +324,14 @@ class RenderExecutor {
       state.viewport.height
     );
     
-    this.gl.bindFramebuffer(GL.FRAMEBUFFER, state.framebuffer);
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, state.framebuffer);
     this.gl.useProgram(state.program);
     this.gl.clearColor(...state.clearColor);
     
     // Restore features
-    this.setFeature(GL.BLEND, state.features.blend);
-    this.setFeature(GL.DEPTH_TEST, state.features.depthTest);
-    this.setFeature(GL.CULL_FACE, state.features.cullFace);
+    this.setFeature(this.gl.BLEND, state.features.blend);
+    this.setFeature(this.gl.DEPTH_TEST, state.features.depthTest);
+    this.setFeature(this.gl.CULL_FACE, state.features.cullFace);
   }
   
   private setFeature(feature: GLenum, enabled: boolean) {
@@ -415,7 +350,7 @@ class RenderExecutor {
 interface FrameStats {
   frameTime: number;                  // Milliseconds
   drawCalls: number;                  // Always 1 for us
-  triangles: number;                  // Always 2 for quad
+  triangles: number;                  // 1 for triangle (was 2 for quad)
   frameNumber: number;
   timestamp: number;
   
@@ -431,7 +366,7 @@ class RenderExecutor {
   private stats: FrameStats = {
     frameTime: 0,
     drawCalls: 0,
-    triangles: 2,
+    triangles: 1,  // Just 1 triangle now
     frameNumber: 0,
     timestamp: 0,
     averageFrameTime: 0,
@@ -460,11 +395,6 @@ class RenderExecutor {
                 this.frameHistory.length;
     this.stats.averageFrameTime = avg;
     this.stats.fps = 1000 / avg;
-    
-    // GPU timing if available
-    if (this.timerQuery) {
-      this.updateGPUTime();
-    }
   }
 }
 ```
@@ -475,20 +405,22 @@ class RenderExecutor {
 class RenderExecutor {
   initialize() {
     // Disable unused features
-    this.gl.disable(GL.DEPTH_TEST);
-    this.gl.disable(GL.CULL_FACE);
-    this.gl.disable(GL.BLEND);
+    this.gl.disable(this.gl.DEPTH_TEST);
+    this.gl.disable(this.gl.CULL_FACE);
+    this.gl.disable(this.gl.BLEND);
     
     // Set pixel storage
-    this.gl.pixelStorei(GL.UNPACK_ALIGNMENT, 1);
-    this.gl.pixelStorei(GL.PACK_ALIGNMENT, 1);
+    this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
+    this.gl.pixelStorei(this.gl.PACK_ALIGNMENT, 1);
     
-    // Extensions for float textures
-    this.gl.getExtension('EXT_color_buffer_float');
+    // Check for required extensions
+    const colorBufferFloat = this.gl.getExtension('EXT_color_buffer_float');
+    if (!colorBufferFloat) {
+      console.warn('Float color buffers not available - HDR rendering disabled');
+    }
+    
+    // Optional extensions
     this.gl.getExtension('OES_texture_float_linear');
-    
-    // Timer queries for profiling
-    this.timerExt = this.gl.getExtension('EXT_disjoint_timer_query_webgl2');
   }
 }
 ```
@@ -509,7 +441,7 @@ class RenderError extends Error {
 class RenderExecutor {
   checkGLError(phase: string) {
     const error = this.gl.getError();
-    if (error !== GL.NO_ERROR) {
+    if (error !== this.gl.NO_ERROR) {
       throw new RenderError(
         phase as any,
         error,
@@ -520,11 +452,11 @@ class RenderExecutor {
   
   getErrorString(error: GLenum): string {
     switch (error) {
-      case GL.INVALID_ENUM: return "INVALID_ENUM";
-      case GL.INVALID_VALUE: return "INVALID_VALUE";
-      case GL.INVALID_OPERATION: return "INVALID_OPERATION";
-      case GL.OUT_OF_MEMORY: return "OUT_OF_MEMORY";
-      case GL.INVALID_FRAMEBUFFER_OPERATION: return "INVALID_FRAMEBUFFER_OPERATION";
+      case this.gl.INVALID_ENUM: return "INVALID_ENUM";
+      case this.gl.INVALID_VALUE: return "INVALID_VALUE";
+      case this.gl.INVALID_OPERATION: return "INVALID_OPERATION";
+      case this.gl.OUT_OF_MEMORY: return "OUT_OF_MEMORY";
+      case this.gl.INVALID_FRAMEBUFFER_OPERATION: return "INVALID_FRAMEBUFFER_OPERATION";
       default: return `Unknown error: ${error}`;
     }
   }
@@ -544,13 +476,13 @@ class RenderExecutor {
     this.initialize();
   }
   
-  // Called by RenderCoordinator
+  // Called by Engine each frame
   executeFrame(mode: RenderMode) {
     // Prepare resources
     this.resourceManager.prepareFrame();
     
-    // Update uniforms
-    this.uniformBinder.frameUpdate();
+    // Flush all uniform updates at once
+    this.uniformBinder.frameUpdate(this.getEngineState());
     
     // Render based on mode
     switch (mode) {
@@ -563,12 +495,22 @@ class RenderExecutor {
         break;
         
       case 'production':
-        // Handled by tile executor
+        // Handled separately if needed
         break;
     }
     
     // Finalize
     this.resourceManager.finalizeFrame();
+  }
+  
+  private getEngineState(): EngineState {
+    return {
+      width: this.viewport.width,
+      height: this.viewport.height,
+      frameIndex: this.stats.frameNumber,
+      sampleCount: this.accumulator?.count || 0,
+      time: performance.now() / 1000
+    };
   }
 }
 ```
@@ -581,3 +523,4 @@ The RenderExecutor validates:
 3. Program is bound before draw call
 4. Readback rectangle is within viewport
 5. WebGL context is not lost
+6. Float render targets available for HDR

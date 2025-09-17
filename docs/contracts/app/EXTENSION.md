@@ -1,6 +1,6 @@
 # Extension Contract
 
-Extensions add optional functionality to the App without modifying core orchestration.
+Extensions add optional functionality to the App without modifying core orchestration. They use the service pattern to avoid polluting the app interface.
 
 ## Required Interface
 
@@ -21,7 +21,7 @@ When `app.use(extension)` is called:
 1. Extension dependencies are checked
 2. Extension's `install()` method is invoked with app reference and event bus
 3. Extension is stored in app's extension map by name
-4. Extension may modify app, listen to events, or add UI
+4. Extension registers itself as a service (NOT adding methods to app)
 
 ```typescript
 class ResearchApp {
@@ -43,18 +43,44 @@ class ResearchApp {
 }
 ```
 
+## Service Pattern (NEW)
+
+Extensions should register themselves as services instead of adding methods to the app:
+
+```typescript
+class ExperimentExtension implements Extension {
+  name = 'experiment';
+  
+  install(app: ResearchApp, bus: EventEmitter) {
+    // Register as a service - DON'T pollute app interface
+    app.registerService('experiment', this);
+  }
+  
+  // Methods stay on the extension
+  async sweep(app: ResearchApp, config: SweepConfig) {
+    // Implementation uses app reference
+  }
+}
+
+// Usage - get service first
+const experiment = app.getService('experiment') as ExperimentExtension;
+await experiment.sweep(app, config);
+```
+
 ## What Extensions Can Do
 
-Within `install()`, extensions have full access to:
-- **App instance**: Add methods, access other extensions
+Within `install()`, extensions have access to:
+- **App instance**: Access core components and services
+- **Service registry**: Register themselves as services
 - **Parameter store**: Read/write parameters
 - **Event bus**: Emit and listen to events
 - **DOM**: Create UI elements
 - **Browser APIs**: Storage, files, etc.
 
-## What Extensions Cannot Do
+## What Extensions Should NOT Do
 
 Extensions should not:
+- Add methods directly to app (use services instead)
 - Modify core rendering pipeline (that's Engine's job)
 - Replace core components (ParameterStore, RenderCoordinator)
 - Block the render loop
@@ -73,14 +99,16 @@ install(app: ResearchApp) {
 ```
 
 ### With Other Extensions
-Extensions communicate via events:
+Extensions communicate via events or services:
 ```typescript
 install(app: ResearchApp, bus: EventEmitter) {
-  // Emit events
+  // Via events
   bus.emit('camera.moved', { position, rotation });
-  
-  // Listen to events
   bus.on('render.complete', this.handleComplete);
+  
+  // Via services
+  const ui = app.getService('ui') as UIExtension;
+  ui?.addPanel('my-panel', this.panel);
 }
 ```
 
@@ -89,13 +117,14 @@ install(app: ResearchApp, bus: EventEmitter) {
 ### Installation
 ```typescript
 install(app: ResearchApp, bus: EventEmitter) {
-  // Set up event listeners
-  this.listeners = [
-    ['keydown', this.handleKey],
-    ['render.progress', this.handleProgress]
-  ];
+  // Register as service
+  app.registerService(this.name, this);
   
-  // Add DOM elements
+  // Set up event listeners
+  bus.on('render.progress', this.handleProgress);
+  document.addEventListener('keydown', this.handleKey);
+  
+  // Add DOM elements if needed
   this.createUI();
   
   // Store references
@@ -108,9 +137,8 @@ install(app: ResearchApp, bus: EventEmitter) {
 ```typescript
 uninstall() {
   // Remove event listeners
-  this.listeners.forEach(([event, handler]) => {
-    document.removeEventListener(event, handler);
-  });
+  this.bus.off('render.progress', this.handleProgress);
+  document.removeEventListener('keydown', this.handleKey);
   
   // Clean up DOM
   this.removeUI();
@@ -118,6 +146,8 @@ uninstall() {
   // Clear references
   this.app = null;
   this.bus = null;
+  
+  // Note: App handles removing from service registry
 }
 ```
 
@@ -126,6 +156,7 @@ uninstall() {
 Extensions can listen to/emit these standard events:
 
 ### Core Events
+- `recipe.switched` - Active recipe changed (data: recipe name)
 - `render.start` - Rendering began
 - `render.progress` - Sample completed (data: sample count)
 - `render.complete` - Rendering stopped
@@ -140,18 +171,25 @@ Extensions can listen to/emit these standard events:
 
 ## Extension Categories
 
-While all share the base interface, extensions typically fall into categories:
-
 ### Input Controllers
 Manage camera and user input:
 ```typescript
 class KeyboardExtension implements Extension {
   name = 'keyboard';
-  install(app, bus) {
+  
+  install(app: ResearchApp, bus: EventEmitter) {
+    app.registerService('keyboard', this);
+    
     document.addEventListener('keydown', (e) => {
-      // Update camera based on keys
-      bus.emit('camera.moved', {...});
+      if (e.key === 'w') this.moveForward(app);
+      // etc.
     });
+  }
+  
+  private moveForward(app: ResearchApp) {
+    const pos = app.parameterStore.get('camera.position');
+    pos[2] -= 0.1;
+    app.parameterStore.set('camera.position', pos);
   }
 }
 ```
@@ -161,62 +199,71 @@ Add interface panels:
 ```typescript
 class ParameterPanel implements Extension {
   name = 'parameters';
-  install(app, bus) {
+  private panel: HTMLElement;
+  
+  install(app: ResearchApp, bus: EventEmitter) {
+    app.registerService('parameters', this);
+    
     this.createPanel();
     bus.on('parameter.changed', this.updateUI);
+  }
+  
+  private createPanel() {
+    this.panel = document.createElement('div');
+    // Build UI
+  }
+  
+  private updateUI = (change: any) => {
+    // Update panel display
   }
 }
 ```
 
 ### Workflow Tools
-Add research methods:
+Add research methods (using service pattern):
 ```typescript
 class ExperimentExtension implements Extension {
   name = 'experiments';
-  install(app, bus) {
-    app.sweep = async (config) => {
-      // Implementation
-    };
+  
+  install(app: ResearchApp, bus: EventEmitter) {
+    app.registerService('experiments', this);
   }
-}
-```
-
-### Monitors
-Track performance/progress:
-```typescript
-class StatsExtension implements Extension {
-  name = 'stats';
-  install(app, bus) {
-    bus.on('render.progress', (count) => {
-      this.updateStats(count);
+  
+  // Method on extension, not app
+  async sweep(app: ResearchApp, config: SweepConfig) {
+    const results = [];
+    
+    for (const value of config.values) {
+      app.parameterStore.set(config.parameter, value);
+      await this.renderSamples(app, config.samplesPerValue);
+      
+      results.push({
+        value,
+        image: await app.engine.readPixelsAsync()
+      });
+    }
+    
+    return results;
+  }
+  
+  private renderSamples(app: ResearchApp, samples: number): Promise<void> {
+    return new Promise(resolve => {
+      app.renderCoordinator.resetAccumulation();
+      app.renderCoordinator.start();
+      
+      const check = setInterval(() => {
+        if (app.renderCoordinator.accumulator.count >= samples) {
+          app.renderCoordinator.stop();
+          clearInterval(check);
+          resolve();
+        }
+      }, 100);
     });
   }
 }
 ```
 
-## Best Practices
-
-1. **Namespace added methods**: If adding to app, prefix with extension name
-2. **Clean up properly**: Remove all listeners, DOM elements, timers
-3. **Document dependencies**: If extension needs others, document it
-4. **Handle missing features**: Check if methods exist before calling
-5. **Use events for loose coupling**: Don't assume other extensions' internals
-
-## Example: Minimal Extension
-
-```typescript
-class MinimalExtension implements Extension {
-  name = 'minimal';
-  
-  install(app: ResearchApp, bus: EventEmitter) {
-    console.log('Extension installed');
-    
-    // That's it - minimal valid extension
-  }
-}
-```
-
-## Example: Full Extension
+## Example: Full Extension with Service Pattern
 
 ```typescript
 class ScreenshotExtension implements Extension {
@@ -228,12 +275,12 @@ class ScreenshotExtension implements Extension {
   install(app: ResearchApp, bus: EventEmitter) {
     this.app = app;
     
-    // Can safely access UI extension since dependency is checked
-    const ui = app.extensions.get('ui') as UIExtension;
-    ui.addButton('Screenshot', () => this.takeScreenshot());
+    // Register as service
+    app.registerService('screenshot', this);
     
-    // Add method to app
-    app.screenshot = () => this.takeScreenshot();
+    // Can safely access UI service since dependency is checked
+    const ui = app.getService('ui') as UIExtension;
+    ui?.addButton('Screenshot', () => this.takeScreenshot());
     
     // Listen to keyboard
     this.shortcutHandler = (e) => {
@@ -251,56 +298,63 @@ class ScreenshotExtension implements Extension {
   
   uninstall() {
     document.removeEventListener('keydown', this.shortcutHandler);
-    delete this.app.screenshot;
     this.app = null;
   }
   
-  private async takeScreenshot() {
-    const pixels = await this.app.engine.readPixels();
-    // Save to file...
+  // Public method on the service
+  async takeScreenshot() {
+    const pixels = await this.app.engine.readPixelsAsync();
+    const blob = this.pixelsToBlob(pixels);
+    this.downloadBlob(blob, `screenshot-${Date.now()}.png`);
     this.app.bus.emit('screenshot.taken', { timestamp: Date.now() });
   }
+  
+  private pixelsToBlob(pixels: Float32Array): Blob {
+    // Convert to blob
+    return new Blob([pixels]);
+  }
+  
+  private downloadBlob(blob: Blob, filename: string) {
+    // Trigger download
+  }
 }
+
+// Usage
+app.use(new UIExtension());
+app.use(new ScreenshotExtension());
+
+// Take screenshot via service
+const screenshot = app.getService('screenshot') as ScreenshotExtension;
+await screenshot.takeScreenshot();
 ```
 
-## Extension Dependency Examples
+## Best Practices
+
+1. **Use service pattern**: Register as service, don't add methods to app
+2. **Keep methods on extension**: Public API stays on the extension class
+3. **Pass app reference**: Methods take app as parameter when needed
+4. **Clean up properly**: Remove all listeners, DOM elements, timers
+5. **Document dependencies**: Make requirements explicit
+6. **Handle missing services**: Check if service exists before using
+7. **Use events for loose coupling**: Don't assume other extensions' internals
+
+## Migration from Old Pattern
 
 ```typescript
-// PerformanceExtension requires UI to display stats
-class PerformanceExtension implements Extension {
-  name = 'performance';
-  dependencies = ['ui'];  // Needs UI for overlay
-  
-  install(app: ResearchApp, bus: EventEmitter) {
-    const ui = app.extensions.get('ui') as UIExtension;
-    this.overlay = ui.createPanel({
-      id: 'performance',
-      type: 'stats',
-      position: 'top-right'
-    });
-  }
+// OLD: Adding methods to app
+install(app: ResearchApp) {
+  app.doSomething = () => { /* ... */ };
 }
+// Usage: app.doSomething();
 
-// ExperimentExtension needs both UI and performance monitoring
-class ExperimentExtension implements Extension {
-  name = 'experiments';
-  dependencies = ['ui', 'performance'];
-  
-  install(app: ResearchApp, bus: EventEmitter) {
-    const ui = app.extensions.get('ui') as UIExtension;
-    const perf = app.extensions.get('performance') as PerformanceExtension;
-    
-    // Can safely use both extensions
-    ui.addPanel('experiment-control', this.createControls());
-    perf.trackExperiment(this.experimentId);
-  }
+// NEW: Service pattern
+install(app: ResearchApp) {
+  app.registerService('myService', this);
 }
-
-// Usage - order matters now!
-app.use(new UIExtension());          // Must be first
-app.use(new PerformanceExtension()); // Can be second (needs UI)
-app.use(new ExperimentExtension());  // Must be after both
-
-// This would throw an error:
-// app.use(new ExperimentExtension()); // Error: requires 'ui' to be installed first
+doSomething(app: ResearchApp) { /* ... */ }
+// Usage: 
+const service = app.getService('myService');
+service.doSomething(app);
 ```
+
+This keeps the app interface clean and makes dependencies explicit!

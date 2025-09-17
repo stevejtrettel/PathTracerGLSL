@@ -1,507 +1,268 @@
-# App Architecture: Research Path Tracer
+# Parameter Store Contract
 
-## Overview
+The ParameterStore is the central state management system, tracking all renderer parameters and notifying observers of changes.
 
-The App is your **research command center** - orchestrating the Engine, World, and Photography pillars while managing experiments, interactions, and extensions. It's designed to start minimal and grow through extensions.
-
-## Core Architecture
+## Core Interface
 
 ```typescript
-class ResearchApp {
-  // Core managers (direct references)
-  private engine: Engine;
-  private parameterStore: ParameterStore;
-  private sessionManager: SessionManager;
-  private renderCoordinator: RenderCoordinator;
+interface ParameterStore {
+  // Single value operations
+  set(path: string, value: any): void;
+  get(path: string): any;
   
-  // Extension system
-  private extensions: Map<string, Extension> = new Map();
-  private bus: EventEmitter;
+  // Batch operations
+  batch(updates: Record<string, any>): void;
+  getAll(): Record<string, any>;
   
-  // Current state
-  private activeRecipe: RenderRecipe;
-  private compiledPrograms: Map<string, CompiledProgram>;
-}
-```
-
-## Architectural Principles
-
-1. **Minimal Core**: Only orchestration essentials in core
-2. **Extension-Based Growth**: Features added as plugins
-3. **Hybrid Communication**: Direct refs for core flow, events for extensions
-4. **Progressive Complexity**: Simple operations stay simple
-5. **Session-Oriented**: Everything can be saved/restored
-
-## Core Components
-
-### 1. ResearchApp (Main Orchestrator)
-
-```typescript
-class ResearchApp {
-  constructor(canvas: HTMLCanvasElement) {
-    this.engine = new Engine(canvas);
-    this.parameterStore = new ParameterStore();
-    this.sessionManager = new SessionManager();
-    this.renderCoordinator = new RenderCoordinator(this.engine);
-    this.bus = new EventEmitter();
-    
-    this.setupCoreFlow();
-  }
+  // Metadata
+  registerParameter(path: string, metadata: ParameterMetadata): void;
+  getMetadata(path: string): ParameterMetadata;
   
-  private setupCoreFlow() {
-    // Direct communication for core rendering flow
-    this.parameterStore.onChange = (changes) => {
-      // Update engine uniforms
-      this.engine.updateUniforms(changes);
-      
-      // Let RenderCoordinator handle reset decisions
-      for (const change of changes.changes) {
-        this.renderCoordinator.handleParameterChange(
-          change.path,
-          change.oldValue,
-          change.newValue
-        );
-      }
-    };
-  }
-  
-  // Simple starting point
-  async quickStart(world: World, photography: Photography) {
-    const recipe = this.createRecipe(world, photography);
-    await this.engine.compile(recipe);
-    this.renderCoordinator.start();
-  }
-  
-  // Extension system
-  use(extension: Extension) {
-    extension.install(this, this.bus);
-    this.extensions.set(extension.name, extension);
-    return this;
-  }
-}
-```
-
-### 2. ParameterStore (Central State)
-
-```typescript
-class ParameterStore {
-  private parameters: Map<string, any> = new Map();
-  private metadata: Map<string, ParameterMetadata> = new Map();
+  // Change notification
   onChange: (changes: ParameterChanges) => void;
   
-  // Flexible parameter setting
-  set(path: string, value: any) {
-    // path like "material.glass.ior" or "camera.position"
-    const old = this.get(path);
-    this.parameters.set(path, value);
-    
-    this.onChange?.({
-      changes: [{
-        path,
-        oldValue: old,
-        newValue: value,
-        metadata: this.metadata.get(path)
-      }]
-    });
-  }
-  
-  // Batch updates
-  batch(updates: Record<string, any>) {
-    const changes: ParameterChanges = { changes: [] };
-    for (const [path, value] of Object.entries(updates)) {
-      const old = this.get(path);
-      this.parameters.set(path, value);
-      changes.changes.push({ 
-        path, 
-        oldValue: old, 
-        newValue: value,
-        metadata: this.metadata.get(path)
-      });
-    }
-    this.onChange?.(changes);
-  }
+  // Serialization
+  serialize(): string;
+  restore(data: Record<string, any>): void;
 }
 ```
 
-### 3. RenderCoordinator (Execution Control)
+## Parameter Paths
+
+Parameters use dot-notation paths that match module structure:
 
 ```typescript
-class RenderCoordinator {
-  private mode: 'interactive' | 'progressive' | 'production' = 'progressive';
-  private accumulator: Accumulator;
-  private tileManager?: TileManager;
-  
-  // Reset triggers - owns accumulation reset decisions
-  private resetTriggers = new Set(['camera.*', 'material.*', 'scene.*', 'lights.*']);
-  private noResetParameters = new Set(['developer.*', 'ui.*', 'debug.*']);
-  
-  constructor(private engine: Engine) {
-    this.accumulator = new Accumulator();
-  }
-  
-  handleParameterChange(path: string, oldValue: any, newValue: any) {
-    if (this.shouldResetForParameter(path)) {
-      this.resetAccumulation();
-    }
-  }
-  
-  private shouldResetForParameter(path: string): boolean {
-    // Check no-reset list first
-    for (const pattern of this.noResetParameters) {
-      if (path.startsWith(pattern.replace('*', ''))) return false;
-    }
-    // Check reset triggers
-    for (const pattern of this.resetTriggers) {
-      if (path.startsWith(pattern.replace('*', ''))) return true;
-    }
-    return true; // Default: reset to be safe
-  }
-  
-  start() {
-    switch (this.mode) {
-      case 'interactive':
-        this.runInteractive();  // 60fps, no accumulation
-        break;
-      case 'progressive':
-        this.runProgressive();  // Accumulate until stopped
-        break;
-      case 'production':
-        this.runProduction();   // Tiles, checkpoints
-        break;
-    }
-  }
-  
-  private async runProgressive() {
-    while (this.accumulator.isActive) {
-      await this.engine.renderFrame();
-      this.accumulator.increment();
-      
-      // Emit progress events
-      if (this.accumulator.count % 10 === 0) {
-        this.onProgress?.(this.accumulator.count);
-      }
-    }
-  }
-  
-  resetAccumulation() {
-    this.accumulator.reset();
-    this.engine.clearFilm();
-  }
+"camera.position"           // vec3 camera position
+"camera.fov"               // float field of view
+"material.glass.ior"       // float index of refraction
+"material.marble.albedo"   // vec3 color
+"estimator.max_bounces"    // int path length
+"film.alpha"              // float blend factor
+"developer.exposure"       // float brightness
+```
+
+## Parameter Metadata
+
+Each parameter can have associated metadata:
+
+```typescript
+interface ParameterMetadata {
+  type: 'float' | 'int' | 'vec2' | 'vec3' | 'vec4' | 'bool' | 'enum';
+  min?: number | number[];      // Minimum value(s)
+  max?: number | number[];      // Maximum value(s)
+  default: any;                  // Default value
+  uiHint?: UIHint;              // How to display in UI
+  description?: string;          // Human-readable description
+}
+
+type UIHint = 
+  | 'slider'        // Continuous value
+  | 'color'         // Color picker
+  | 'dropdown'      // Enumeration
+  | 'hidden';       // Not shown in UI
+```
+
+## Change Notification
+
+When parameters change, observers are notified:
+
+```typescript
+interface ParameterChanges {
+  changes: Array<{
+    path: string;
+    oldValue: any;
+    newValue: any;
+    metadata?: ParameterMetadata;  // Optional, may be undefined
+  }>;
 }
 ```
 
-### 4. SessionManager (Save/Load)
+## Usage Examples
 
+### Basic Usage
 ```typescript
-class SessionManager {
-  async saveSession(filepath: string): Promise<void> {
-    const session = {
-      version: "1.0.0",
-      timestamp: Date.now(),
-      recipe: this.app.activeRecipe,
-      parameters: this.app.parameterStore.getAll(),
-      camera: this.app.extensions.get('input')?.getCamera(),
-      // Everything needed to reproduce exact state
-    };
-    
-    await this.writeFile(filepath, JSON.stringify(session, null, 2));
-  }
-  
-  async loadSession(filepath: string): Promise<void> {
-    const session = JSON.parse(await this.readFile(filepath));
-    
-    // Restore everything
-    await this.app.setRecipe(session.recipe);
-    this.app.parameterStore.restore(session.parameters);
-    this.app.extensions.get('input')?.setCamera(session.camera);
-  }
-}
-```
+const store = new ParameterStore();
 
-## Extension System
-
-Extensions add features without cluttering the core:
-
-### Extension Interface
-
-```typescript
-interface Extension {
-  name: string;
-  install(app: ResearchApp, bus: EventEmitter): void;
-  uninstall?(): void;
-}
-```
-
-### Core Extensions
-
-#### Input Extension (Camera Controls)
-```typescript
-class InputExtension implements Extension {
-  name = 'input';
-  private mode: 'fly' | 'orbit' | 'locked' = 'fly';
-  
-  install(app: ResearchApp, bus: EventEmitter) {
-    // WASD + mouse for fly mode
-    document.addEventListener('keydown', this.handleKey);
-    canvas.addEventListener('mousemove', this.handleMouse);
-    
-    // Update parameters directly
-    this.onCameraMove = (delta) => {
-      app.parameterStore.batch({
-        'camera.position': this.position,
-        'camera.rotation': this.rotation
-      });
-    };
-    
-    // Emit events for other extensions
-    bus.emit('camera.updated', this.getCamera());
-  }
-  
-  switchMode(mode: 'fly' | 'orbit' | 'locked') {
-    this.mode = mode;
-    // Reconfigure handlers
-  }
-}
-```
-
-#### UI Extension (Panels and Controls)
-```typescript
-class UIExtension implements Extension {
-  name = 'ui';
-  private panels: Map<string, Panel> = new Map();
-  
-  install(app: ResearchApp, bus: EventEmitter) {
-    // Create parameter panel
-    this.addPanel('parameters', new ParameterPanel(app.parameterStore));
-    
-    // Listen for events
-    bus.on('render.progress', (count) => {
-      this.panels.get('progress')?.update(count);
-    });
-    
-    // Add keyboard shortcuts
-    this.registerShortcuts({
-      'Ctrl+S': () => app.saveImage(),
-      'Space': () => app.toggleRendering(),
-      'R': () => app.resetAccumulation()
-    });
-  }
-}
-```
-
-#### Performance Extension
-```typescript
-class PerformanceExtension implements Extension {
-  name = 'performance';
-  private stats: Stats = {};
-  
-  install(app: ResearchApp, bus: EventEmitter) {
-    // Track metrics
-    bus.on('frame.complete', (timing) => {
-      this.stats.fps = 1000 / timing.delta;
-      this.stats.samplesPerSecond = timing.samples / timing.delta * 1000;
-    });
-    
-    // Optional overlay
-    if (this.config.overlay) {
-      this.createOverlay();
-    }
-  }
-}
-```
-
-#### Experiment Extension
-```typescript
-class ExperimentExtension implements Extension {
-  name = 'experiment';
-  
-  install(app: ResearchApp, bus: EventEmitter) {
-    // Add experiment methods to app
-    app.sweep = async (config: SweepConfig) => {
-      const results = [];
-      for (const value of config.values) {
-        app.parameterStore.set(config.parameter, value);
-        await app.renderToConvergence(config.samplesPerValue);
-        results.push({
-          value,
-          image: await app.captureImage(),
-          metrics: this.computeMetrics()
-        });
-      }
-      return results;
-    };
-    
-    app.compare = async (configs: CompareConfig[]) => {
-      // Side-by-side comparison logic
-    };
-  }
-}
-```
-
-## Workflows
-
-### 1. Simple Exploration
-```typescript
-const app = new ResearchApp(canvas);
-
-// Minimal setup
-app.quickStart(
-  new SimpleWorld(),
-  new BasicPhotography()
-);
-
-// Just fly around and render
-app.use(new InputExtension());
-```
-
-### 2. Research Session
-```typescript
-const app = new ResearchApp(canvas);
-
-// Add all the tools
-app
-  .use(new InputExtension())
-  .use(new UIExtension())
-  .use(new PerformanceExtension())
-  .use(new ExperimentExtension());
-
-// Load previous work
-await app.loadSession('yesterday.json');
-
-// Continue research
-app.renderCoordinator.setMode('progressive');
-app.start();
-```
-
-### 3. Production Render
-```typescript
-const app = new ResearchApp(canvas);
-
-// Configure for production
-await app.loadSession('final_shot.json');
-
-app.renderCoordinator.setMode('production');
-app.renderCoordinator.configureTiles({
-  resolution: [4096, 4096],
-  tileSize: 512,
-  samplesPerTile: 1000
+// Register parameter with metadata
+store.registerParameter('camera.fov', {
+  type: 'float',
+  min: 10,
+  max: 170,
+  default: 60,
+  uiHint: 'slider',
+  description: 'Camera field of view in degrees'
 });
 
-// Start overnight render
-await app.renderProduction('output/final.exr');
+// Set value
+store.set('camera.fov', 45);
+
+// Get value
+const fov = store.get('camera.fov');  // 45
 ```
 
-### 4. Parameter Study
+### Batch Updates
 ```typescript
-const app = new ResearchApp(canvas);
-app.use(new ExperimentExtension());
-
-// Sweep roughness values
-const results = await app.sweep({
-  parameter: 'material.marble.roughness',
-  values: [0.1, 0.2, 0.3, 0.4, 0.5],
-  samplesPerValue: 100
+// Update multiple parameters at once
+store.batch({
+  'camera.position': [0, 5, 10],
+  'camera.target': [0, 0, 0],
+  'material.sphere.albedo': [0.8, 0.2, 0.2]
 });
-
-// Save comparison grid
-await app.saveComparisonGrid(results, 'roughness_study.png');
+// Triggers ONE onChange event with all changes
 ```
 
-## Communication Patterns
-
-### Core Flow (Direct)
-```
-ParameterStore ──onChange──> Engine.updateUniforms()
-                          └─> RenderCoordinator.resetAccumulation()
-
-RenderCoordinator ──render──> Engine.renderFrame()
-                          └─> Accumulator.increment()
-```
-
-### Extension Flow (Events)
-```
-InputExtension ──emit('camera.updated')──> UIExtension
-                                        └─> PerformanceExtension
-
-RenderCoordinator ──emit('frame.complete')──> PerformanceExtension
-                                           └─> UIExtension
-                                           └─> ExperimentExtension
-```
-
-## File Structure
-
-```
-app/
-├── core/
-│   ├── ResearchApp.ts        # Main orchestrator
-│   ├── ParameterStore.ts     # Central state
-│   ├── RenderCoordinator.ts  # Execution control
-│   └── SessionManager.ts     # Save/load
-│
-├── extensions/
-│   ├── core/                 # Always-useful extensions
-│   │   ├── InputExtension.ts
-│   │   ├── UIExtension.ts
-│   │   └── PerformanceExtension.ts
-│   │
-│   ├── research/             # Research-specific
-│   │   ├── ExperimentExtension.ts
-│   │   ├── ComparisonExtension.ts
-│   │   └── ValidationExtension.ts
-│   │
-│   └── production/          # Production tools
-│       ├── TilingExtension.ts
-│       ├── AnimationExtension.ts
-│       └── BatchRenderExtension.ts
-│
-├── types/
-│   ├── Extension.ts         # Extension interface
-│   ├── Recipe.ts           # Render recipe types
-│   └── Parameters.ts       # Parameter types
-│
-└── utils/
-    ├── EventEmitter.ts     # Simple event bus
-    └── FileIO.ts          # Save/load utilities
-```
-
-## Progressive Enhancement
-
-Start simple, add complexity as needed:
-
-### Phase 1: Minimal
+### Change Handling
 ```typescript
-const app = new ResearchApp(canvas);
-app.quickStart(world, photography);  // That's it!
+store.onChange = (changes: ParameterChanges) => {
+  // Update uniforms
+  for (const change of changes.changes) {
+    engine.setUniform(change.path, change.newValue);
+  }
+  
+  // RenderCoordinator decides if reset needed
+  // (ParameterStore doesn't know about accumulation)
+  for (const change of changes.changes) {
+    renderCoordinator.handleParameterChange(
+      change.path, 
+      change.oldValue,
+      change.newValue
+    );
+  }
+};
 ```
 
-### Phase 2: Interactive
+## Auto-Registration
+
+Modules can declare their parameters, which are auto-registered:
+
 ```typescript
-app.use(new InputExtension());  // Add camera controls
-app.use(new UIExtension());     // Add parameter UI
+// From module descriptor
+{
+  parameters: [
+    {
+      name: "roughness",  // Becomes "material.pbr.roughness"
+      type: "float",
+      min: 0,
+      max: 1,
+      default: 0.5,
+      uiHint: "slider",
+      description: "Surface roughness"
+    }
+  ]
+}
 ```
 
-### Phase 3: Research
+## Hierarchical Organization
+
+Parameters form a tree structure:
+
+```
+camera/
+  ├── position: vec3
+  ├── target: vec3
+  ├── fov: float
+  └── aperture: float
+
+material/
+  ├── glass/
+  │   ├── ior: float
+  │   └── absorption: vec3
+  └── marble/
+      ├── albedo: vec3
+      ├── roughness: float
+      └── scale: float
+
+estimator/
+  ├── max_bounces: int
+  └── rr_threshold: float
+```
+
+## Serialization
+
+Save/restore complete parameter state:
+
 ```typescript
-app.use(new ExperimentExtension());  // Parameter sweeps
-app.use(new PerformanceExtension()); // Track metrics
+// Save to JSON
+const json = store.serialize();
+fs.writeFileSync('params.json', json);
+
+// Restore from JSON
+const data = JSON.parse(fs.readFileSync('params.json'));
+store.restore(data);
+
+// Note: restore() does not trigger onChange
+// Call it before starting rendering
 ```
 
-### Phase 4: Production
+## Validation
+
+The store validates values against metadata:
+
 ```typescript
-app.use(new TilingExtension());      // High-res renders
-app.use(new AnimationExtension());   // Sequences
+store.set('camera.fov', 200);  // Throws: exceeds max
+store.set('camera.fov', 'abc'); // Throws: type mismatch
+store.set('unknown.param', 5);  // Warning: unregistered parameter
 ```
 
-## Key Benefits
+## Performance Considerations
 
-1. **Clean Core**: Core stays simple and stable
-2. **Flexible Growth**: Add features without modifying core
-3. **Clear Communication**: Direct for core, events for extensions
-4. **Research-Friendly**: Start simple, grow as needed
-5. **Session-Based**: Everything saveable/restorable
-6. **Type-Light**: No fighting with TypeScript
-7. **Extensible**: New workflows via new extensions
+- Batch updates when possible to reduce onChange calls
+- Use shallow equality for change detection
+- Cache frequently accessed values
+- Debounce rapid changes (e.g., during slider drag)
 
-## Summary
+## Integration Pattern
 
-This architecture gives you a minimal, stable core that orchestrates your mathematical modules, with all additional features added as extensions. The hybrid communication pattern keeps the core flow simple while allowing extensions to cooperate through events. Start with just `quickStart()` and add extensions as your research needs grow.
+The ParameterStore doesn't directly update GPU uniforms or manage accumulation. Instead:
+
+1. **Store** tracks parameter values and metadata
+2. **Store** notifies observers of changes via onChange
+3. **Engine** maps parameters to uniforms and updates GPU
+4. **RenderCoordinator** decides when to reset accumulation
+
+This separation allows:
+- Testing without GPU
+- Multiple observers (UI, Engine, Logger)
+- Undo/redo functionality
+- Parameter animation
+- Clean separation of concerns
+
+## Example: Complete Integration
+
+```typescript
+// Setup
+const store = new ParameterStore();
+const engine = new Engine(canvas);
+const coordinator = new RenderCoordinator(engine);
+
+// Wire up the flow
+store.onChange = (changes) => {
+  // Engine updates uniforms
+  for (const change of changes.changes) {
+    engine.setUniform(change.path, change.newValue);
+  }
+  
+  // Coordinator checks for reset
+  for (const change of changes.changes) {
+    coordinator.handleParameterChange(
+      change.path,
+      change.oldValue, 
+      change.newValue
+    );
+  }
+};
+
+// Usage
+store.set('camera.position', [1, 2, 3]);  // Updates GPU, may reset
+store.set('developer.exposure', 0.5);     // Updates GPU, no reset
+```
+
+## Best Practices
+
+1. **Register all parameters** with metadata for validation
+2. **Use batch updates** for related changes to reduce events
+3. **Keep the store simple** - it only manages state, not rendering logic
+4. **Use hierarchical paths** for clear organization
+5. **Document parameter ranges** in metadata for UI generation
+6. **Validate early** to catch errors before GPU updates
+7. **Let RenderCoordinator decide** about accumulation resets

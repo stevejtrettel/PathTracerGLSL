@@ -194,54 +194,51 @@ The RenderCoordinator owns all decisions about when to reset accumulation:
 
 ```typescript
 class RenderCoordinator {
-  // Parameters that trigger accumulation reset
-  private resetTriggers = new Set([
-    'camera.position',
-    'camera.rotation',
-    'camera.fov',
-    'camera.*',           // Any camera parameter
-    'material.*',         // Any material parameter  
-    'scene.*',           // Any scene change
-    'lights.*',          // Any light change
-    'estimator.*'        // Algorithm parameters
-  ]);
-  
-  // Parameters that DON'T trigger reset
-  private noResetParameters = new Set([
-    'developer.exposure',     // Tonemapping only
-    'developer.gamma',
-    'developer.contrast',
-    'film.display_mode',     // Visualization only
-    'ui.*',                  // UI state
-    'debug.*'               // Debug flags
-  ]);
-  
-  handleParameterChange(path: string, oldValue: any, newValue: any) {
-    // Skip if unchanged
-    if (this.valuesEqual(oldValue, newValue)) return;
-    
-    // Check if reset needed
-    if (this.shouldResetForParameter(path)) {
-      this.resetAccumulation();
+    // Parameters that trigger accumulation reset (prefix-based)
+    private resetPrefixes = new Set([
+        'camera.',         // Any camera parameter
+        'material.',       // Any material parameter  
+        'scene.',          // Any scene change
+        'lights.',         // Any light change
+        'estimator.'       // Algorithm parameters
+    ]);
+
+    // Parameters that DON'T trigger reset (prefix-based)
+    private noResetPrefixes = new Set([
+        'developer.',      // Tonemapping only
+        'film.',           // Visualization only
+        'ui.',             // UI state
+        'debug.'           // Debug flags
+    ]);
+
+    handleParameterChange(path: string, oldValue: any, newValue: any) {
+        // Skip if unchanged
+        if (this.valuesEqual(oldValue, newValue)) return;
+
+        // Check if reset needed
+        if (this.shouldResetForParameter(path)) {
+            this.resetAccumulation();
+        }
     }
-  }
-  
-  private shouldResetForParameter(path: string): boolean {
-    // Check no-reset list first
-    if (this.matchesPattern(path, this.noResetParameters)) {
-      return false;
+
+    private shouldResetForParameter(path: string): boolean {
+        // Check no-reset list first
+        for (const prefix of this.noResetPrefixes) {
+            if (path.startsWith(prefix)) return false;
+        }
+
+        // Check reset triggers
+        for (const prefix of this.resetPrefixes) {
+            if (path.startsWith(prefix)) return true;
+        }
+
+        // Default: reset to be safe
+        console.warn(`Unknown parameter ${path}, resetting accumulation`);
+        return true;
     }
-    
-    // Check reset triggers
-    if (this.matchesPattern(path, this.resetTriggers)) {
-      return true;
-    }
-    
-    // Default: reset to be safe
-    console.warn(`Unknown parameter ${path}, resetting accumulation`);
-    return true;
-  }
 }
+```
+
 
 ## Progress Reporting
 

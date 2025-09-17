@@ -1,22 +1,82 @@
 # Shader Compiler Contract
 
-The ShaderCompiler transforms collections of modules into complete, executable GLSL programs.
+The ShaderCompiler transforms collections of modules into complete, executable GLSL programs using a pipeline architecture with lazy compilation.
 
 ## Core Interface
 
 ```typescript
 interface ShaderCompiler {
-  // Main compilation
-  compile(recipe: Recipe, variant?: string): CompiledProgram;
+    // Compile known recipes at startup
+    initialize(recipes: Recipe[]): void;
+
+    // Get pre-compiled program
+    getProgram(recipe: Recipe): CompiledProgram;
+
+    // Direct compilation (if needed)
+    compile(recipe: Recipe): CompiledProgram;
+
+    // Get compilation pipeline for testing/debugging
+    getPipeline(): CompilationPipeline;
+
+    // Source access for debugging
+    getSource(programId: string): CompilationResult;
+}
+````
+
+## Eager Compilation Implementation
+
+```typescript 
+class ShaderCompiler {
+  private pipeline: CompilationPipeline;
+  private programs = new Map<string, CompiledProgram>();
   
-  // Batch compilation for variants
-  compileAll(recipes: Recipe[]): Map<string, CompiledProgram>;
+  constructor(private gl: WebGL2RenderingContext) {
+    this.pipeline = new CompilationPipeline();
+  }
   
-  // Source access for debugging
-  getSource(programId: string): CompilationResult;
+  // Compile all known variants at startup
+  initialize(recipes: Recipe[]): void {
+    console.log(`Compiling ${recipes.length} shader variants...`);
+    
+    for (const recipe of recipes) {
+      const key = this.getRecipeKey(recipe);
+      try {
+        const program = this.compile(recipe);
+        this.programs.set(key, program);
+        console.log(`✓ Compiled: ${key}`);
+      } catch (error) {
+        console.error(`✗ Failed to compile ${key}:`, error);
+        throw error;
+      }
+    }
+  }
   
-  // Error mapping
-  mapError(error: string, programId: string): CompilationError;
+  // Get pre-compiled program (instant)
+  getProgram(recipe: Recipe): CompiledProgram {
+    const key = this.getRecipeKey(recipe);
+    const program = this.programs.get(key);
+    
+    if (!program) {
+      throw new Error(`Program not pre-compiled: ${key}. Call initialize() with all recipes at startup.`);
+    }
+    
+    return program;
+  }
+  
+  // Direct compilation (used by initialize)
+  compile(recipe: Recipe): CompiledProgram {
+    return this.pipeline.compile(recipe);
+  }
+  
+  private getRecipeKey(recipe: Recipe): string {
+    // Simple key based on module names
+    return [
+      recipe.world.geometry.name,
+      recipe.world.material.name,
+      recipe.photography.camera.name,
+      recipe.photography.estimator.name
+    ].join('_');
+  }
 }
 ```
 
@@ -26,39 +86,148 @@ interface ShaderCompiler {
 interface CompiledProgram {
   id: string;                          // Unique identifier
   program: WebGLProgram;                // GL program object
-  uniforms: Map<string, UniformInfo>;  // All uniforms with locations
-  attributes: Map<string, number>;     // Attribute locations
+  uniformMap: UniformMap;               // Explicit parameter mappings
   recipe: Recipe;                       // Source recipe
   metadata: {
     compiledAt: number;               // Timestamp
     modules: string[];                // Module IDs used
     mainTemplate: string;             // Which main() was used
     lineMap: LineMapping;             // Error line mapping
+    pipeline: string[];               // Stages executed
   };
-}
-
-interface UniformInfo {
-  location: WebGLUniformLocation;
-  type: "float" | "vec2" | "vec3" | "vec4" | "mat3" | "mat4" | "int" | "sampler2D";
-  originalName: string;              // Pre-prefix name
-  prefixedName: string;             // Post-prefix name
-  module: string;                   // Which module declared it
 }
 ```
 
-## Compilation Phases
+## Pipeline Stage Implementations
 
-### Phase 1: Module Collection
+### Stage 1: Module Collection
 ```typescript
+class CollectModulesStage implements CompilationStage<Recipe, ModuleCollection> {
+  transform(recipe: Recipe): ModuleCollection {
+    return {
+      geometry: recipe.world.geometry,
+      material: recipe.world.material,    // SINGLE material
+      scene: recipe.world.scene,
+      lights: recipe.world.lights,
+      camera: recipe.photography.camera,
+      estimator: recipe.photography.estimator,
+      film: recipe.photography.film,
+      developer: recipe.photography.developer
+    };
+  }
+  
+  validate(modules: ModuleCollection): ValidationResult {
+    const errors: string[] = [];
+    
+    if (!modules.geometry) errors.push("Missing Geometry module");
+    if (!modules.material) errors.push("Missing Material module");
+    if (!modules.scene) errors.push("Missing Scene module");
+    if (!modules.lights) errors.push("Missing Lights module");
+    if (!modules.camera) errors.push("Missing Camera module");
+    if (!modules.estimator) errors.push("Missing Estimator module");
+    if (!modules.film) errors.push("Missing Film module");
+    if (!modules.developer) errors.push("Missing Developer module");
+    
+    return { isValid: errors.length === 0, errors };
+  }
+}
+
 interface ModuleCollection {
-  geometry: ProcessedModule;
-  materials: ProcessedModule[];      // Multiple materials
-  scene: ProcessedModule;
-  lights: ProcessedModule;
-  camera: ProcessedModule;
-  estimator: ProcessedModule;
-  film: ProcessedModule;
-  developer: ProcessedModule;
+  geometry: ModuleDescriptor;
+  material: ModuleDescriptor;       // SINGLE, not array
+  scene: ModuleDescriptor;
+  lights: ModuleDescriptor;
+  camera: ModuleDescriptor;
+  estimator: ModuleDescriptor;
+  film: ModuleDescriptor;
+  developer: ModuleDescriptor;
+}
+```
+
+### Stage 2: Dependency Validation
+```typescript
+class ValidateDependenciesStage implements CompilationStage<ModuleCollection, ModuleCollection> {
+  transform(modules: ModuleCollection): ModuleCollection {
+    return modules; // Pass through, validation only
+  }
+  
+  validate(modules: ModuleCollection): ValidationResult {
+    const errors: string[] = [];
+    const allModules = Object.values(modules);
+    
+    // Build provides map
+    const provides = new Map<string, ModuleDescriptor>();
+    for (const module of allModules) {
+      for (const fn of module.fragment.provides || []) {
+        if (provides.has(fn)) {
+          errors.push(`Duplicate function '${fn}' provided by ${provides.get(fn)!.id.name} and ${module.id.name}`);
+        }
+        provides.set(fn, module);
+      }
+    }
+    
+    // Check all requires are satisfied
+    for (const module of allModules) {
+      for (const fn of module.fragment.requires || []) {
+        if (!provides.has(fn)) {
+          errors.push(`Module ${module.id.name} requires '${fn}' but no module provides it`);
+        }
+      }
+    }
+    
+    // Check for cycles
+    const cycles = this.findCycles(allModules);
+    for (const cycle of cycles) {
+      errors.push(`Circular dependency: ${cycle.join(' → ')}`);
+    }
+    
+    return { isValid: errors.length === 0, errors };
+  }
+  
+  private findCycles(modules: ModuleDescriptor[]): string[][] {
+    // Implement cycle detection (Tarjan's algorithm)
+    // Returns array of cycles found
+    return [];
+  }
+}
+```
+
+### Stage 3: Module Sorting
+```typescript
+class SortModulesStage implements CompilationStage<ModuleCollection, ProcessedModule[]> {
+  transform(modules: ModuleCollection): ProcessedModule[] {
+    const allModules = Object.values(modules);
+    
+    // Geometry MUST be first
+    const geometry = modules.geometry;
+    const others = allModules.filter(m => m.id.kind !== 'Geometry');
+    
+    // Topological sort the rest
+    const sorted = this.topologicalSort(others);
+    
+    // Convert to ProcessedModule
+    return [geometry, ...sorted].map(m => ({
+      descriptor: m,
+      prefixedSource: '',  // Will be filled by next stage
+      originalSource: m.fragment.functions,
+      functionMap: new Map()
+    }));
+  }
+  
+  validate(modules: ProcessedModule[]): ValidationResult {
+    if (modules[0].descriptor.id.kind !== 'Geometry') {
+      return { 
+        isValid: false, 
+        errors: ['Geometry must be first module'] 
+      };
+    }
+    return { isValid: true };
+  }
+  
+  private topologicalSort(modules: ModuleDescriptor[]): ModuleDescriptor[] {
+    // Kahn's algorithm implementation
+    return modules; // Simplified
+  }
 }
 
 interface ProcessedModule {
@@ -69,118 +238,147 @@ interface ProcessedModule {
 }
 ```
 
-### Phase 2: Dependency Resolution
+### Stage 4: Prefix Application
 ```typescript
-interface DependencyResolver {
-  sort(modules: ModuleDescriptor[]): ModuleDescriptor[];
-  validate(modules: ModuleDescriptor[]): ValidationResult;
-  findCycles(modules: ModuleDescriptor[]): string[][];
-}
-
-// Rules:
-// 1. Geometry ALWAYS first (defines Point/Direction)
-// 2. Scene before Estimator (provides intersect)
-// 3. Materials before Estimator (provides eval/sample)
-// 4. No circular dependencies
-```
-
-### Phase 3: Prefix Application
-```typescript
-interface PrefixRules {
-  // Standard prefixes
-  Geometry: "g_";
-  Scene: "sc_";
-  Lights: "l_";
-  Camera: "c_";
-  Estimator: "e_";
-  Film: "f_";
-  Developer: "d_";
+class ApplyPrefixesStage implements CompilationStage<ProcessedModule[], ProcessedModule[]> {
+  private prefixMap = {
+    "Geometry": "g_",
+    "Material": "m_",
+    "Scene": "sc_",
+    "Lights": "l_",
+    "Camera": "c_",
+    "Estimator": "e_",
+    "Film": "f_",
+    "Developer": "d_"
+  };
   
-  // Special: Materials include name
-  Material: (name: string) => `m_${name.toLowerCase()}_`;
+  transform(modules: ProcessedModule[]): ProcessedModule[] {
+    for (const module of modules) {
+      const prefix = this.prefixMap[module.descriptor.id.kind];
+      
+      // Apply prefix to functions
+      let source = module.originalSource;
+      for (const fn of module.descriptor.fragment.provides || []) {
+        const prefixed = prefix + fn;
+        source = source.replace(
+          new RegExp(`\\b${fn}\\b`, 'g'),
+          prefixed
+        );
+        module.functionMap.set(fn, prefixed);
+      }
+      
+      // Apply prefix to uniforms
+      for (const param of module.descriptor.parameters || []) {
+        const original = `uniform \\w+ ${param.name}`;
+        const prefixed = `uniform ${param.type} u_${prefix}${module.descriptor.id.name.toLowerCase()}_${param.name}`;
+        source = source.replace(new RegExp(original), prefixed);
+      }
+      
+      module.prefixedSource = source;
+    }
+    
+    return modules;
+  }
+  
+  validate(modules: ProcessedModule[]): ValidationResult {
+    // Check no naming conflicts after prefixing
+    const allNames = new Set<string>();
+    const errors: string[] = [];
+    
+    for (const module of modules) {
+      for (const prefixed of module.functionMap.values()) {
+        if (allNames.has(prefixed)) {
+          errors.push(`Naming conflict: ${prefixed} appears multiple times`);
+        }
+        allNames.add(prefixed);
+      }
+    }
+    
+    return { isValid: errors.length === 0, errors };
+  }
 }
-
-// Examples:
-// "Material:Glass" + "eval" → "m_glass_eval"
-// "Camera:Pinhole" + "generate_ray" → "c_generate_ray"
-// "Geometry:Hyperbolic" + "geodesic" → "g_geodesic"
 ```
 
-### Phase 4: Material Dispatcher
+### Stage 5: Cross-Module Call Resolution
 ```typescript
-interface MaterialDispatcher {
-  generateDispatcher(materials: ProcessedModule[]): string;
+class ResolveCallsStage implements CompilationStage<ProcessedModule[], ProcessedModule[]> {
+  transform(modules: ProcessedModule[]): ProcessedModule[] {
+    // Build provides map
+    const provides = new Map<string, ProcessedModule>();
+    for (const module of modules) {
+      for (const fn of module.descriptor.fragment.provides || []) {
+        provides.set(fn, module);
+      }
+    }
+    
+    // Resolve calls in each module
+    for (const module of modules) {
+      let source = module.prefixedSource;
+      
+      for (const required of module.descriptor.fragment.requires || []) {
+        const provider = provides.get(required);
+        if (provider) {
+          const prefixedName = provider.functionMap.get(required);
+          // Replace calls to required function with prefixed version
+          source = source.replace(
+            new RegExp(`\\b${required}\\(`, 'g'),
+            `${prefixedName}(`
+          );
+        }
+      }
+      
+      module.prefixedSource = source;
+    }
+    
+    return modules;
+  }
+  
+  validate(modules: ProcessedModule[]): ValidationResult {
+    // All requires should now be resolved
+    return { isValid: true };
+  }
 }
+```
 
-// Generated code:
-const MATERIAL_DISPATCHER = `
-// Material dispatcher functions
-vec3 dispatch_material_eval(int id, Direction wi, Direction wo, Hit hit) {
-  switch(id) {
-    case 0: return m_glass_eval(wi, wo, hit);
-    case 1: return m_lambert_eval(wi, wo, hit);
-    case 2: return m_disney_eval(wi, wo, hit);
-    default: return vec3(0);
+### Stage 6: Main Generation
+```typescript
+class GenerateMainStage implements CompilationStage<ProcessedModule[], CompiledSource> {
+  transform(modules: ProcessedModule[]): CompiledSource {
+    const film = modules.find(m => m.descriptor.id.kind === 'Film');
+    const template = this.selectTemplate(film);
+    const main = this.generateMain(template, modules);
+    
+    return {
+      modules,
+      main,
+      vertexShader: VERTEX_SHADER
+    };
+  }
+  
+  validate(output: CompiledSource): ValidationResult {
+    if (!output.main) {
+      return { isValid: false, errors: ['Failed to generate main()'] };
+    }
+    return { isValid: true };
+  }
+  
+  private selectTemplate(film?: ProcessedModule): string {
+    if (film?.descriptor.metadata?.debug) {
+      return DEBUG_MAIN_TEMPLATE;
+    }
+    if (film?.descriptor.metadata?.realtime) {
+      return REALTIME_MAIN_TEMPLATE;
+    }
+    return STANDARD_MAIN_TEMPLATE;
+  }
+  
+  private generateMain(template: string, modules: ProcessedModule[]): string {
+    // Template uses prefixed function names
+    return template;
   }
 }
 
-vec3 dispatch_material_sample(int id, Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf) {
-  switch(id) {
-    case 0: return m_glass_sample(wi, hit, xi, wo, pdf);
-    case 1: return m_lambert_sample(wi, hit, xi, wo, pdf);
-    case 2: return m_disney_sample(wi, hit, xi, wo, pdf);
-    default: wo = wi; pdf = 0.0; return vec3(0);
-  }
-}
-
-float dispatch_material_pdf(int id, Direction wi, Direction wo, Hit hit) {
-  switch(id) {
-    case 0: return m_glass_pdf(wi, wo, hit);
-    case 1: return m_lambert_pdf(wi, wo, hit);
-    case 2: return m_disney_pdf(wi, wo, hit);
-    default: return 0.0;
-  }
-}
-`;
-```
-
-### Phase 5: Cross-Module Resolution
-```typescript
-interface FunctionResolver {
-  resolve(call: string, context: ProcessedModule): string;
-}
-
-// Resolution rules:
-// 1. Check context.requires for function name
-// 2. Find module that provides it
-// 3. Apply that module's prefix
-// 4. Return prefixed name
-
-// Example:
-// Estimator calls "intersect"
-// 1. Estimator.requires = ["intersect"]
-// 2. Scene.provides = ["intersect"]
-// 3. Scene prefix = "sc_"
-// 4. Return "sc_intersect"
-```
-
-### Phase 6: Main Generation
-```typescript
-interface MainGenerator {
-  selectTemplate(modules: ModuleCollection): string;
-  generateMain(template: string, modules: ModuleCollection): string;
-}
-
-// Template selection:
-enum MainTemplate {
-  STANDARD,     // Full pipeline: Camera → Estimator → Film → Developer
-  REALTIME,     // No accumulation: Camera → Estimator → Developer
-  DEBUG,        // Debug output: Camera → Estimator → Output
-  COMPUTE       // Future: Compute shader variant
-}
-
-// Standard template:
-const STANDARD_MAIN = `
+const STANDARD_MAIN_TEMPLATE = `
 void main() {
   vec2 pixel = gl_FragCoord.xy;
   ivec2 pixel_id = ivec2(pixel);
@@ -203,176 +401,224 @@ void main() {
   gl_FragColor = vec4(color, 1.0);
 }
 `;
+
+interface CompiledSource {
+  modules: ProcessedModule[];
+  main: string;
+  vertexShader: string;
+}
 ```
 
-### Phase 7: WebGL Compilation
+### Stage 7: Uniform Extraction
 ```typescript
-interface GLCompiler {
-  compileShader(source: string, type: GLenum): WebGLShader;
-  linkProgram(vertex: WebGLShader, fragment: WebGLShader): WebGLProgram;
-  extractLocations(program: WebGLProgram): LocationMap;
+class ExtractUniformsStage implements CompilationStage<CompiledSource, CompiledWithUniforms> {
+  transform(input: CompiledSource): CompiledWithUniforms {
+    const uniforms: UniformInfo[] = [];
+    
+    for (const module of input.modules) {
+      for (const param of module.descriptor.parameters || []) {
+        const prefix = this.getPrefix(module.descriptor.id.kind);
+        const glslName = `u_${prefix}${module.descriptor.id.name.toLowerCase()}_${param.name}`;
+        const paramPath = `${module.descriptor.id.kind.toLowerCase()}.${param.name}`;
+        
+        uniforms.push({
+          paramPath,
+          glslName,
+          type: param.type,
+          module: module.descriptor.id.name
+        });
+      }
+    }
+    
+    // Add engine uniforms
+    uniforms.push(
+      { paramPath: 'resolution', glslName: 'u_resolution', type: 'vec2', module: 'Engine' },
+      { paramPath: 'frame_index', glslName: 'u_frame_index', type: 'int', module: 'Engine' },
+      { paramPath: 'sample_count', glslName: 'u_sample_count', type: 'int', module: 'Engine' }
+    );
+    
+    return {
+      ...input,
+      uniforms
+    };
+  }
+  
+  validate(output: CompiledWithUniforms): ValidationResult {
+    return { isValid: true };
+  }
 }
 
-// Vertex shader is always the same:
-const VERTEX_SHADER = `
-attribute vec2 a_position;
-void main() {
-  gl_Position = vec4(a_position, 0.0, 1.0);
+interface CompiledWithUniforms extends CompiledSource {
+  uniforms: UniformInfo[];
 }
-`;
+
+interface UniformInfo {
+  paramPath: string;
+  glslName: string;
+  type: string;
+  module: string;
+}
+```
+
+### Stage 8: WebGL Compilation
+```typescript
+class CompileGLSLStage implements CompilationStage<CompiledWithUniforms, CompiledProgram> {
+  constructor(private gl: WebGL2RenderingContext) {}
+  
+  transform(input: CompiledWithUniforms): CompiledProgram {
+    // Assemble final source
+    const fragmentSource = this.assembleSource(input);
+    
+    // Compile shaders
+    const vertexShader = this.compileShader(input.vertexShader, this.gl.VERTEX_SHADER);
+    const fragmentShader = this.compileShader(fragmentSource, this.gl.FRAGMENT_SHADER);
+    
+    // Link program
+    const program = this.linkProgram(vertexShader, fragmentShader);
+    
+    // Build UniformMap
+    const uniformMap = UniformMap.build(input.uniforms, program, this.gl);
+    
+    return {
+      id: generateId(),
+      program,
+      uniformMap,
+      recipe: null, // Would be passed through pipeline
+      metadata: {
+        compiledAt: Date.now(),
+        modules: input.modules.map(m => m.descriptor.id.name),
+        mainTemplate: 'standard',
+        lineMap: this.buildLineMap(input),
+        pipeline: ['collect', 'validate', 'sort', 'prefix', 'resolve', 'main', 'uniforms', 'compile']
+      }
+    };
+  }
+  
+  validate(output: CompiledProgram): ValidationResult {
+    const status = this.gl.getProgramParameter(output.program, this.gl.LINK_STATUS);
+    if (!status) {
+      const error = this.gl.getProgramInfoLog(output.program);
+      return { isValid: false, errors: [error || 'Link failed'] };
+    }
+    return { isValid: true };
+  }
+  
+  private assembleSource(input: CompiledWithUniforms): string {
+    const parts: string[] = [];
+    
+    // Math utilities (always available)
+    parts.push('// Math utilities');
+    parts.push(MATH_UTILITIES);
+    
+    // Module sources in order
+    for (const module of input.modules) {
+      parts.push(`// Module: ${module.descriptor.id.name}`);
+      parts.push(module.prefixedSource);
+    }
+    
+    // Main function
+    parts.push('// Main orchestration');
+    parts.push(input.main);
+    
+    return parts.join('\n\n');
+  }
+  
+  private compileShader(source: string, type: number): WebGLShader {
+    const shader = this.gl.createShader(type);
+    if (!shader) throw new Error('Failed to create shader');
+    
+    this.gl.shaderSource(shader, source);
+    this.gl.compileShader(shader);
+    
+    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+      const error = this.gl.getShaderInfoLog(shader);
+      throw new CompilationError('Shader compilation', { isValid: false, errors: [error || 'Compile failed'] });
+    }
+    
+    return shader;
+  }
+  
+  private linkProgram(vertex: WebGLShader, fragment: WebGLShader): WebGLProgram {
+    const program = this.gl.createProgram();
+    if (!program) throw new Error('Failed to create program');
+    
+    this.gl.attachShader(program, vertex);
+    this.gl.attachShader(program, fragment);
+    this.gl.linkProgram(program);
+    
+    return program;
+  }
+}
 ```
 
 ## Error Handling
 
 ```typescript
-interface CompilationError {
-  phase: CompilationPhase;
-  module?: string;           // Which module caused error
-  line?: number;             // Line in original source
-  column?: number;
-  message: string;
-  originalSource?: string;   // Snippet of problematic code
-  prefixedSource?: string;   // What was sent to GL
-  glError?: string;          // Raw GL error message
-}
-
-enum CompilationPhase {
-  MODULE_COLLECTION = "Module Collection",
-  DEPENDENCY_RESOLUTION = "Dependency Resolution",
-  PREFIX_APPLICATION = "Prefix Application",
-  DISPATCHER_GENERATION = "Material Dispatcher",
-  CROSS_MODULE_RESOLUTION = "Cross-Module Resolution",
-  MAIN_GENERATION = "Main Generation",
-  GL_COMPILATION = "WebGL Compilation",
-  LINKING = "Program Linking"
-}
-
-// Line mapping for errors:
-interface LineMapping {
-  prefixedToOriginal: Map<number, SourceLocation>;
-}
-
-interface SourceLocation {
-  module: string;
-  originalLine: number;
-  originalSource: string;
+class CompilationError extends Error {
+  constructor(
+    public stage: string,
+    public validation: ValidationResult,
+    public sourceContext?: string
+  ) {
+    super(`Compilation failed at stage: ${stage}\n${validation.errors?.join('\n')}`);
+  }
 }
 ```
 
-## Source Management
-
-```typescript
-interface CompilationResult {
-  programId: string;
-  prefixedSource: string;      // Full GLSL sent to GPU
-  modulesSources: Map<string, string>;  // Original modules
-  dispatcher: string;           // Generated dispatcher
-  main: string;                // Generated main
-  uniformMappings: Map<string, string>;  // param path → uniform name
-  
-  // For debugging
-  getLineMapping(glLine: number): SourceLocation;
-  getPrefixMapping(name: string): string;
-}
-```
-
-## Caching
-
-```typescript
-interface CompilerCache {
-  has(recipe: Recipe): boolean;
-  get(recipe: Recipe): CompiledProgram;
-  set(recipe: Recipe, program: CompiledProgram): void;
-  clear(): void;
-}
-
-// Cache key generation:
-function getCacheKey(recipe: Recipe): string {
-  // Hash based on module IDs and versions
-  return hash({
-    geometry: recipe.world.geometry.id,
-    materials: recipe.world.materials.map(m => m.id),
-    scene: recipe.world.scene.id,
-    // ... etc
-  });
-}
-```
-
-## Integration Example
+## Integration with Engine
 
 ```typescript
 class ShaderCompiler {
+  private pipeline: CompilationPipeline;
+  private cache: Map<string, CompiledProgram> = new Map();
+  
+  constructor(private gl: WebGL2RenderingContext) {
+    this.pipeline = new CompilationPipeline();
+  }
+  
   compile(recipe: Recipe): CompiledProgram {
     // Check cache
-    if (this.cache.has(recipe)) {
-      return this.cache.get(recipe);
+    const key = this.getCacheKey(recipe);
+    if (this.cache.has(key)) {
+      return this.cache.get(key)!;
     }
     
-    try {
-      // Phase 1: Collect modules
-      const modules = this.collectModules(recipe);
-      
-      // Phase 2: Sort by dependencies
-      const sorted = this.resolver.sort(modules);
-      
-      // Phase 3: Apply prefixes
-      const prefixed = this.applyPrefixes(sorted);
-      
-      // Phase 4: Generate dispatcher
-      const dispatcher = this.generateDispatcher(prefixed.materials);
-      
-      // Phase 5: Resolve cross-module calls
-      const resolved = this.resolveCalls(prefixed);
-      
-      // Phase 6: Generate main
-      const main = this.generateMain(prefixed);
-      
-      // Phase 7: Compile with WebGL
-      const source = this.assembleSource(resolved, dispatcher, main);
-      const program = this.compileGL(source);
-      
-      // Extract uniform locations
-      const uniforms = this.extractUniforms(program);
-      
-      // Build result
-      const compiled: CompiledProgram = {
-        id: generateId(),
-        program,
-        uniforms,
-        recipe,
-        metadata: {
-          compiledAt: Date.now(),
-          modules: modules.map(m => m.id),
-          mainTemplate: this.selectedTemplate,
-          lineMap: this.lineMapper.build()
-        }
-      };
-      
-      this.cache.set(recipe, compiled);
-      return compiled;
-      
-    } catch (error) {
-      throw this.enhanceError(error, recipe);
-    }
+    // Run pipeline
+    const program = this.pipeline.compile(recipe);
+    
+    // Cache result
+    this.cache.set(key, program);
+    
+    return program;
+  }
+  
+  private getCacheKey(recipe: Recipe): string {
+    // Hash based on module IDs
+    return JSON.stringify({
+      geometry: recipe.world.geometry.id,
+      material: recipe.world.material.id,  // Single material
+      scene: recipe.world.scene.id,
+      // ... etc
+    });
   }
 }
 ```
 
 ## Validation Rules
 
-The compiler validates:
-1. All `requires` are satisfied by some module's `provides`
-2. No duplicate function names after prefixing
-3. Geometry module defines Point and Direction types
-4. Materials provide either `shade` or `interact` interface
-5. No circular dependencies
-6. All uniforms have valid types
-7. Main template matches module capabilities
+The compiler validates at each stage:
+1. All required modules present
+2. All `requires` satisfied by `provides`
+3. No circular dependencies
+4. Geometry is first (defines types)
+5. No naming conflicts after prefixing
+6. Valid GLSL syntax
+7. Successful WebGL compilation and linking
 
 ## Performance Considerations
 
-- Compile all variants at startup (no runtime compilation)
-- Cache compiled programs by recipe hash
+- Compile all programs at startup
+- Cache by recipe hash
 - Keep source mappings for debugging
-- Pre-build material dispatchers
-- Minimize string operations during compilation
+- Minimize string operations
+- Use pipeline for clear error reporting

@@ -1,11 +1,15 @@
 # Resource Manager Contract
 
-The ResourceManager handles all GPU memory allocation including textures, buffers, and framebuffers.
+The ResourceManager handles all GPU memory allocation including textures, buffers, and framebuffers with capability checking and resource reuse.
 
 ## Core Interface
 
 ```typescript
 interface ResourceManager {
+  // Capability checking
+  getCapabilities(): CapabilityReport;
+  validateCapabilities(): ValidationResult;
+  
   // Texture management
   createTexture(spec: TextureSpec): WebGLTexture;
   deleteTexture(id: string): void;
@@ -16,7 +20,7 @@ interface ResourceManager {
   deleteFramebuffer(id: string): void;
   bindFramebuffer(id: string | null): void;  // null = screen
   
-  // Film buffer management
+  // Film buffer management with manifest
   setupFilmBuffers(film: ModuleDescriptor): FilmResources;
   swapFilmBuffers(): void;
   clearFilmBuffers(): void;
@@ -25,6 +29,170 @@ interface ResourceManager {
   getMemoryUsage(): MemoryStats;
   canAllocate(bytes: number): boolean;
   requestFallback(): FallbackOptions;
+}
+```
+
+## Capability Checking
+
+```typescript
+interface CapabilityReport {
+  floatRenderTargets: boolean;
+  floatLinearFiltering: boolean;
+  maxTextureSize: number;
+  maxTextureUnits: number;
+  maxColorAttachments: number;
+  maxViewportDims: [number, number];
+}
+
+class CapabilityChecker {
+  static check(gl: WebGL2RenderingContext): CapabilityReport {
+    return {
+      floatRenderTargets: !!gl.getExtension('EXT_color_buffer_float'),
+      floatLinearFiltering: !!gl.getExtension('OES_texture_float_linear'),
+      maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+      maxTextureUnits: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
+      maxColorAttachments: gl.getParameter(gl.MAX_COLOR_ATTACHMENTS),
+      maxViewportDims: gl.getParameter(gl.MAX_VIEWPORT_DIMS)
+    };
+  }
+  
+  static validate(capabilities: CapabilityReport): ValidationResult {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    
+    // HDR rendering requires float render targets
+    if (!capabilities.floatRenderTargets) {
+      errors.push('Float render targets not supported - HDR rendering unavailable');
+    }
+    
+    // Check minimum requirements
+    if (capabilities.maxTextureUnits < 8) {
+      errors.push(`Only ${capabilities.maxTextureUnits} texture units available (minimum 8 required)`);
+    }
+    
+    if (capabilities.maxColorAttachments < 4) {
+      warnings.push(`Only ${capabilities.maxColorAttachments} color attachments available`);
+    }
+    
+    // Suggest fallbacks
+    const fallbackSuggestion = !capabilities.floatRenderTargets 
+      ? 'Use LDR film module with 8-bit textures' 
+      : undefined;
+    
+    return { 
+      isValid: errors.length === 0, 
+      errors,
+      warnings,
+      fallbackSuggestion
+    };
+  }
+}
+```
+
+## Film Manifest System
+
+```typescript
+// Simple manifest for resource reuse
+interface FilmManifest {
+  textures: Array<{
+    name: string;
+    format: TextureFormat;
+    persistent: boolean;
+  }>;
+}
+
+class ResourceManager {
+  private currentManifest: FilmManifest | null = null;
+  private filmResources: FilmResources | null = null;
+  private capabilities: CapabilityReport;
+  
+  constructor(private gl: WebGL2RenderingContext, private resolution: Resolution) {
+    this.capabilities = CapabilityChecker.check(gl);
+    const validation = CapabilityChecker.validate(this.capabilities);
+    
+    if (!validation.isValid) {
+      console.error('GPU capability issues:', validation.errors);
+      if (validation.fallbackSuggestion) {
+        console.log('Suggestion:', validation.fallbackSuggestion);
+      }
+    }
+  }
+  
+  setupFilmBuffers(film: ModuleDescriptor): FilmResources {
+    const manifest = this.extractManifest(film);
+    
+    // Reuse existing resources if manifest matches
+    if (this.currentManifest && this.manifestsEqual(this.currentManifest, manifest)) {
+      // Just clear buffers, don't reallocate
+      console.log('Reusing existing film buffers');
+      this.clearFilmBuffers();
+      return this.filmResources!;
+    }
+    
+    // Need new resources
+    console.log('Allocating new film buffers');
+    if (this.filmResources) {
+      this.cleanup();
+    }
+    
+    // Check if we can handle the requirements
+    const validation = this.validateManifest(manifest);
+    if (!validation.isValid) {
+      throw new Error(`Cannot create film buffers: ${validation.errors.join(', ')}`);
+    }
+    
+    this.filmResources = this.createFilmResources(manifest);
+    this.currentManifest = manifest;
+    return this.filmResources;
+  }
+  
+  private manifestsEqual(a: FilmManifest, b: FilmManifest): boolean {
+    if (a.textures.length !== b.textures.length) return false;
+    
+    for (let i = 0; i < a.textures.length; i++) {
+      if (a.textures[i].name !== b.textures[i].name ||
+          a.textures[i].format !== b.textures[i].format ||
+          a.textures[i].persistent !== b.textures[i].persistent) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  private extractManifest(film: ModuleDescriptor): FilmManifest {
+    return {
+      textures: film.resources?.textures?.map(t => ({
+        name: t.name,
+        format: this.mapFormat(t.type, t.format),
+        persistent: t.persistent || false
+      })) || []
+    };
+  }
+  
+  private validateManifest(manifest: FilmManifest): ValidationResult {
+    const errors: string[] = [];
+    
+    // Check if we need HDR but don't have it
+    const needsHDR = manifest.textures.some(t => 
+      t.format === TextureFormat.RGBA32F || 
+      t.format === TextureFormat.RGB32F
+    );
+    
+    if (needsHDR && !this.capabilities.floatRenderTargets) {
+      errors.push('Film requires HDR but float render targets not available');
+    }
+    
+    // Check attachment count
+    if (manifest.textures.length > this.capabilities.maxColorAttachments) {
+      errors.push(`Film needs ${manifest.textures.length} attachments but GPU only supports ${this.capabilities.maxColorAttachments}`);
+    }
+    
+    return { isValid: errors.length === 0, errors };
+  }
+  
+  getCapabilities(): CapabilityReport {
+    return this.capabilities;
+  }
 }
 ```
 
@@ -72,38 +240,6 @@ interface Texture {
 
 ## Film Buffer System
 
-Films declare their buffer needs in the ModuleDescriptor:
-
-```typescript
-// In Film's ModuleDescriptor:
-{
-  resources: {
-    textures: [
-      { 
-        name: "radiance",
-        type: "vec4",
-        format: "32bit",
-        persistent: true      // Survives frame-to-frame
-      },
-      { 
-        name: "variance",
-        type: "vec3",
-        format: "32bit",
-        persistent: true
-      },
-      { 
-        name: "samples",
-        type: "int",
-        format: "32bit",
-        persistent: true
-      }
-    ]
-  }
-}
-```
-
-ResourceManager creates matching GPU resources:
-
 ```typescript
 interface FilmResources {
   textures: Map<string, Texture>;
@@ -112,18 +248,20 @@ interface FilmResources {
     previous: Framebuffer;          // Being read from
   };
   uniformBindings: Map<string, number>;  // Texture name → unit
+  manifest: FilmManifest;             // For comparison
 }
 
 class ResourceManager {
-  setupFilmBuffers(film: ModuleDescriptor): FilmResources {
+  private createFilmResources(manifest: FilmManifest): FilmResources {
     const resources: FilmResources = {
       textures: new Map(),
-      framebuffers: { current: null, previous: null },
-      uniformBindings: new Map()
+      framebuffers: { current: null!, previous: null! },
+      uniformBindings: new Map(),
+      manifest
     };
     
-    // Create double-buffered textures for persistence
-    for (const tex of film.resources?.textures || []) {
+    // Create textures based on manifest
+    for (const tex of manifest.textures) {
       if (tex.persistent) {
         // Need two for ping-pong
         resources.textures.set(`${tex.name}_current`, 
@@ -131,8 +269,8 @@ class ResourceManager {
             id: `film_${tex.name}_current`,
             width: this.resolution.width,
             height: this.resolution.height,
-            format: this.mapFormat(tex.type, tex.format),
-            type: this.mapType(tex.format)
+            format: tex.format,
+            type: this.getTypeForFormat(tex.format)
           })
         );
         
@@ -141,14 +279,20 @@ class ResourceManager {
             id: `film_${tex.name}_previous`,
             width: this.resolution.width,
             height: this.resolution.height,
-            format: this.mapFormat(tex.type, tex.format),
-            type: this.mapType(tex.format)
+            format: tex.format,
+            type: this.getTypeForFormat(tex.format)
           })
         );
       } else {
         // Single buffer for temporary
         resources.textures.set(tex.name,
-          this.createTexture({ /* ... */ })
+          this.createTexture({
+            id: `film_${tex.name}`,
+            width: this.resolution.width,
+            height: this.resolution.height,
+            format: tex.format,
+            type: this.getTypeForFormat(tex.format)
+          })
         );
       }
     }
@@ -170,69 +314,53 @@ class ResourceManager {
   }
   
   swapFilmBuffers() {
+    if (!this.filmResources) return;
+    
     // Swap current and previous for next frame
     [this.filmResources.framebuffers.current,
      this.filmResources.framebuffers.previous] = 
     [this.filmResources.framebuffers.previous,
      this.filmResources.framebuffers.current];
   }
-}
-```
-
-## Framebuffer Management
-
-```typescript
-interface FramebufferSpec {
-  id: string;
-  attachments: Array<{
-    texture: WebGLTexture;
-    attachment: AttachmentPoint;
-  }>;
-  depthBuffer?: boolean;             // Add depth attachment
-  stencilBuffer?: boolean;           // Add stencil attachment
-}
-
-enum AttachmentPoint {
-  COLOR0 = WebGL2RenderingContext.COLOR_ATTACHMENT0,
-  COLOR1 = WebGL2RenderingContext.COLOR_ATTACHMENT1,
-  COLOR2 = WebGL2RenderingContext.COLOR_ATTACHMENT2,
-  COLOR3 = WebGL2RenderingContext.COLOR_ATTACHMENT3,
-  DEPTH = WebGL2RenderingContext.DEPTH_ATTACHMENT,
-  STENCIL = WebGL2RenderingContext.STENCIL_ATTACHMENT
-}
-
-interface Framebuffer {
-  id: string;
-  glFramebuffer: WebGLFramebuffer;
-  attachments: Map<AttachmentPoint, WebGLTexture>;
-  width: number;
-  height: number;
-}
-```
-
-## Memory Management
-
-```typescript
-interface MemoryStats {
-  texturesBytes: number;             // Total texture memory
-  buffersBytes: number;              // Vertex/index buffers
-  totalBytes: number;
-  availableBytes?: number;           // If queryable
-  textureCount: number;
-  bufferCount: number;
-}
-
-interface MemoryPressure {
-  level: "low" | "medium" | "high" | "critical";
-  recommendation: MemoryStrategy;
-}
-
-enum MemoryStrategy {
-  CONTINUE,                          // Enough memory
-  REDUCE_PRECISION,                  // Use 16bit instead of 32bit
-  REDUCE_RESOLUTION,                 // Halve resolution
-  TILE_RENDERING,                    // Switch to tiled mode
-  ABORT                             // Cannot continue
+  
+  clearFilmBuffers() {
+    if (!this.filmResources) return;
+    
+    // Clear all persistent textures
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.filmResources.framebuffers.current.glFramebuffer);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.filmResources.framebuffers.previous.glFramebuffer);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+  }
+  
+  private cleanup() {
+    // Delete old textures and framebuffers
+    if (this.filmResources) {
+      for (const texture of this.filmResources.textures.values()) {
+        this.gl.deleteTexture(texture.glTexture);
+      }
+      this.gl.deleteFramebuffer(this.filmResources.framebuffers.current.glFramebuffer);
+      this.gl.deleteFramebuffer(this.filmResources.framebuffers.previous.glFramebuffer);
+    }
+  }
+  
+  private getTypeForFormat(format: TextureFormat): TextureType {
+    switch (format) {
+      case TextureFormat.RGB32F:
+      case TextureFormat.RGBA32F:
+      case TextureFormat.R32F:
+      case TextureFormat.RG32F:
+        return TextureType.FLOAT;
+      case TextureFormat.RGB16F:
+      case TextureFormat.RGBA16F:
+        return TextureType.HALF_FLOAT;
+      case TextureFormat.R32I:
+        return TextureType.INT;
+      default:
+        return TextureType.UNSIGNED_BYTE;
+    }
+  }
 }
 ```
 
@@ -249,17 +377,34 @@ interface FallbackOptions {
     to: [number, number];
   };
   features: {
-    variance?: false;                // Disable variance tracking
+    hdr?: false;                     // Disable HDR
     multipleBuffers?: false;         // Use single accumulation buffer
   };
 }
 
 class ResourceManager {
-  requestFallback(): FallbackOptions {
+  requestFallback(): FallbackOptions | null {
     const isMobile = /Mobile|Android|iOS/.test(navigator.userAgent);
-    const memoryPressure = this.getMemoryPressure();
     
-    if (isMobile || memoryPressure.level === "high") {
+    // If we don't have HDR, suggest LDR fallback
+    if (!this.capabilities.floatRenderTargets) {
+      return {
+        textureFormat: {
+          from: TextureFormat.RGBA32F,
+          to: TextureFormat.RGBA  // 8-bit
+        },
+        resolution: {
+          from: [this.resolution.width, this.resolution.height],
+          to: [this.resolution.width, this.resolution.height]  // Keep same
+        },
+        features: {
+          hdr: false
+        }
+      };
+    }
+    
+    // Mobile optimizations
+    if (isMobile) {
       return {
         textureFormat: {
           from: TextureFormat.RGBA32F,
@@ -267,134 +412,15 @@ class ResourceManager {
         },
         resolution: {
           from: [this.resolution.width, this.resolution.height],
-          to: [this.resolution.width / 2, this.resolution.height / 2]
+          to: [Math.floor(this.resolution.width / 2), Math.floor(this.resolution.height / 2)]
         },
         features: {
-          variance: false               // Simpler film
+          multipleBuffers: false
         }
       };
     }
     
     return null;  // No fallback needed
-  }
-}
-```
-
-## Texture Unit Management
-
-WebGL2 has limited texture units (16-32):
-
-```typescript
-interface TextureUnitManager {
-  units: Array<{
-    index: number;                   // 0-31
-    texture: WebGLTexture | null;
-    lastUsed: number;                // Timestamp for LRU
-  }>;
-  
-  // Reserve units for specific purposes
-  reserveUnit(purpose: string): number;
-  releaseUnit(unit: number): void;
-  
-  // Get available unit (may evict LRU)
-  getAvailableUnit(): number;
-}
-
-// Standard unit reservations:
-enum ReservedUnits {
-  FILM_RADIANCE = 0,
-  FILM_VARIANCE = 1,
-  FILM_SAMPLES = 2,
-  ENVIRONMENT_MAP = 3,
-  MATERIAL_TEXTURES_START = 4,
-  // ... up to MAX_TEXTURE_UNITS - 1
-}
-```
-
-## Resource Lifecycle
-
-```typescript
-interface ResourceLifecycle {
-  // Called when switching recipes
-  onRecipeChange(oldRecipe: Recipe, newRecipe: Recipe): void {
-    // Check if resources are compatible
-    if (this.canReuse(oldRecipe, newRecipe)) {
-      // Keep existing buffers
-      this.clearFilmBuffers();  // Just clear, don't deallocate
-    } else {
-      // Need new buffers
-      this.cleanup();
-      this.allocate(newRecipe);
-    }
-  }
-  
-  // Called on context loss
-  onContextLost(): void {
-    // Mark all resources invalid
-    this.invalidateAll();
-  }
-  
-  // Called on context restored
-  onContextRestored(): void {
-    // Recreate all resources
-    this.recreateAll();
-  }
-}
-```
-
-## Environment Map Management
-
-For HDR environment maps:
-
-```typescript
-interface EnvironmentMapManager {
-  loadHDR(url: string): Promise<HDRTexture>;
-  generateImportanceCDF(hdr: HDRTexture): WebGLTexture;
-  bindEnvironment(unit: number): void;
-}
-
-interface HDRTexture {
-  texture: WebGLTexture;
-  width: number;
-  height: number;
-  importanceMap: WebGLTexture;      // For importance sampling
-}
-```
-
-## Validation
-
-The ResourceManager validates:
-1. Texture formats supported by GPU
-2. Maximum texture size limits
-3. Framebuffer completeness
-4. Texture unit availability
-5. Memory allocation success
-6. Attachment point limits (max color attachments)
-
-## Error Handling
-
-```typescript
-class ResourceAllocationError extends Error {
-  constructor(
-    public resource: string,
-    public requested: number,        // Bytes requested
-    public available?: number,        // Bytes available
-    public fallback?: FallbackOptions
-  ) {
-    super(`Failed to allocate ${resource}: ${requested} bytes`);
-  }
-}
-
-// Usage:
-try {
-  texture = resourceManager.createTexture(spec);
-} catch (e) {
-  if (e instanceof ResourceAllocationError && e.fallback) {
-    // Try with fallback options
-    spec = applyFallback(spec, e.fallback);
-    texture = resourceManager.createTexture(spec);
-  } else {
-    throw e;
   }
 }
 ```
@@ -406,13 +432,39 @@ class ResourceManager {
   constructor(
     private gl: WebGL2RenderingContext,
     private resolution: { width: number, height: number }
-  ) {}
+  ) {
+    // Check capabilities on construction
+    this.capabilities = CapabilityChecker.check(gl);
+    const validation = CapabilityChecker.validate(this.capabilities);
+    
+    if (!validation.isValid) {
+      console.error('GPU limitations:', validation.errors);
+      
+      // Suggest fallbacks
+      const fallback = this.requestFallback();
+      if (fallback) {
+        console.log('Suggested fallback:', fallback);
+      }
+    }
+  }
   
   // Called by ShaderCompiler after compilation
   setupForProgram(program: CompiledProgram) {
     // Extract Film requirements
     const film = program.recipe.photography.film;
-    this.filmResources = this.setupFilmBuffers(film);
+    
+    try {
+      this.filmResources = this.setupFilmBuffers(film);
+    } catch (error) {
+      // Try with fallback
+      const fallback = this.requestFallback();
+      if (fallback) {
+        console.warn('Using fallback configuration:', fallback);
+        // Would need to modify film descriptor here
+        throw new Error('Fallback film modules not yet implemented');
+      }
+      throw error;
+    }
     
     // Bind textures to standard units
     for (const [name, texture] of this.filmResources.textures) {
@@ -423,12 +475,17 @@ class ResourceManager {
   
   // Called by RenderExecutor each frame
   prepareFrame() {
+    if (!this.filmResources) return;
+    
     // Bind previous frame textures for reading
-    this.bindFramebuffer(this.filmResources.framebuffers.previous);
+    this.gl.bindFramebuffer(
+      this.gl.READ_FRAMEBUFFER,
+      this.filmResources.framebuffers.previous.glFramebuffer
+    );
     
     // Set current as render target
     this.gl.bindFramebuffer(
-      GL.FRAMEBUFFER,
+      this.gl.DRAW_FRAMEBUFFER,
       this.filmResources.framebuffers.current.glFramebuffer
     );
   }
@@ -442,9 +499,9 @@ class ResourceManager {
 
 ## Performance Considerations
 
-- Pool texture allocations when possible
-- Use texture arrays for material properties
-- Lazy allocation - only create when needed
-- Monitor memory pressure and suggest fallbacks early
-- Reuse framebuffers when switching between compatible recipes
+- Check capabilities once at startup
+- Reuse film buffers when manifest matches (no reallocation)
 - Clear rather than reallocate when resetting accumulation
+- Pool texture allocations when possible
+- Provide clear fallback paths for limited devices
+- Log manifest comparisons for debugging
