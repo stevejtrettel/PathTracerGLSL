@@ -1,216 +1,511 @@
-# Engine Pillar: Requirements and Questions
+# Engine Architecture: Research Path Tracer
 
-## What We Already Know Engine Must Do
+## Purpose and Philosophy
 
-Based on our Photography and World specifications, the Engine must:
+The Engine is the **boring, deterministic GPU orchestration layer** that transforms mathematical modules into running WebGL programs. It handles all the tedious plumbing: shader compilation, resource management, uniform binding, and render execution. Once built, the Engine should be so stable and predictable that researchers never think about it.
 
-### 1. Shader Compilation and Assembly
-- **Combine modules** into complete GLSL programs
-- **Auto-prefix functions** (e.g., `geodesic` → `g_geodesic`, `interact` → `m_interact`)
-- **Auto-prefix uniforms** (e.g., `albedo` → `u_material_glass_albedo`)
-- **Inject common types** (Ray, Hit, Frame, etc.) available to all modules
-- **Validate contracts** - ensure required functions are provided
-- **Handle defines** from module descriptors (#define POINT_TYPE vec3)
+**Core Principles:**
+- **Invisible Infrastructure**: Researchers write mathematics, not WebGL
+- **Deterministic Execution**: Same inputs always produce same outputs
+- **Zero Cleverness**: Straightforward, debuggable, maintainable code
+- **Set and Forget**: Write once, never modify during research
 
-### 2. Uniform Management
-- **Bind module parameters** to shader uniforms
-- **Track parameter changes** to trigger re-accumulation
-- **Provide system uniforms**:
-    - `u_resolution` (viewport size)
-    - `u_time` (for animation)
-    - `u_frame` (accumulation count)
-    - `u_random_seed` (per-pixel random offset)
-    - Camera matrices and parameters
+## System Architecture
 
-### 3. Resource Management
-- **Texture binding** for environment maps, textures
-- **Buffer management** for BVH data, light CDFs
-- **Film buffers** for accumulation (double-buffered)
-- **Auxiliary buffers** (depth, normals, object IDs)
+```typescript
+class Engine {
+  // Core subsystems - each handles one responsibility
+  private compiler: ShaderCompiler;      // Module assembly → GLSL
+  private resources: ResourceManager;    // GPU buffers and textures
+  private uniforms: UniformBinder;       // Parameter → GPU mapping
+  private executor: RenderExecutor;      // Draw calls and readback
+  private registry: ModuleRegistry;      // Available modules database
+  
+  // Runtime state
+  private programs: Map<string, CompiledProgram>;  // Compiled shaders
+  private activeProgram: CompiledProgram | null;   // Currently bound
+  private gl: WebGL2RenderingContext;              // WebGL context
+}
+```
 
-### 4. Render Loop Execution
-- **Clear accumulation** when scene/parameters change
-- **Dispatch renders** with appropriate viewport coverage
-- **Ping-pong buffers** for accumulation
-- **Handle convergent vs realtime** rendering modes
-- **Output to screen or file**
+## Core Subsystems
 
-### 5. Contract Validation
-- **Check module interfaces** match requirements
-- **Verify function signatures**
-- **Ensure required defines** are present
-- **Report clear errors** when contracts aren't met
+### 1. Shader Compiler
 
-### 6. Module Communication
-- **Wire up cross-module calls** (materials calling geometry functions)
-- **Resolve module dependencies**
-- **Handle optional functions** (check if provided before calling)
+**Responsibility**: Transform modules into complete GLSL programs.
 
----
+**Process**:
+1. **Dependency Resolution**: Topologically sort modules (Geometry first)
+2. **Type Extraction**: Pull Point/Direction definitions from Geometry
+3. **Prefix Application**: Add module-specific prefixes to functions/uniforms
 
-## Questions for Engine Design
+5. **Cross-Module Resolution**: Map `requires` to `provides`
+6. **Main Generation**: Create appropriate orchestration main()
+7. **WebGL Compilation**: Compile and link vertex/fragment shaders
+8. **Location Extraction**: Cache all uniform/attribute locations
 
-### Theme 1: Shader Compilation Strategy
+**Key Decisions**:
+- All shaders compile at startup (no runtime compilation)
+- Keep both prefixed and unprefixed source for debugging
+- Generate line number mappings for error reporting
 
-**1.1 Compilation Approach**
-- Should we compile shaders at startup or on-demand?
-- Pre-compile common configurations or always JIT?
-- Cache compiled programs or rebuild each session?
+### 2. Resource Manager
 
-**1.2 Module Assembly**
-- How do modules specify their GLSL code?
-    - Single string?
-    - Separate files?
-    - Template strings with placeholders?
-- How do we handle GLSL version and extensions?
+**Responsibility**: Manage GPU memory for textures, buffers, and framebuffers.
 
-**1.3 Error Handling**
-- How verbose should shader compilation errors be?
-- Should we add line numbers/module names to errors?
-- Fallback behavior when compilation fails?
+**Film Buffer Management**:
+```typescript
+// Films declare their needs in ModuleDescriptor:
+resources: {
+  textures: [
+    { name: "radiance", type: "vec4", format: "32bit", persistent: true },
+    { name: "variance", type: "vec3", format: "32bit", persistent: true },
+    { name: "samples", type: "int", format: "32bit", persistent: true }
+  ]
+}
 
-### Theme 2: State Management
+// ResourceManager creates matching framebuffers
+class ResourceManager {
+  setupFilmBuffers(film: ModuleDescriptor) {
+    for (const tex of film.resources.textures) {
+      this.createTexture(tex);
+      this.bindToFramebuffer(tex);
+    }
+  }
+}
+```
 
-**2.1 Parameter Updates**
-- How do we detect when parameters change?
-    - Dirty flags?
-    - Comparison?
-    - Version numbers?
-- Which changes trigger re-accumulation vs just uniform updates?
+**Texture Management**:
+- Track texture unit usage (WebGL2 limit: 16-32 units)
+- Pool commonly-used configurations
+- Lazy allocation for memory efficiency
+- Automatic format selection based on platform capabilities
 
-**2.2 Module Lifecycle**
-- Can modules be hot-swapped during rendering?
-- How do we handle module initialization/cleanup?
-- Should modules have setup()/teardown() methods?
+**Memory Strategies**:
+- Monitor GPU memory usage via WebGL extensions
+- Provide fallback formats for mobile devices
+- Report memory pressure to App for tiling decisions
 
-**2.3 Configuration**
-- How do we specify which modules to use?
-    - Recipe objects?
-    - Module arrays?
-    - Builder pattern?
-- How do we validate module compatibility?
+### 3. Uniform Binder
 
-### Theme 3: Performance and Optimization
+**Responsibility**: Efficiently map ParameterStore paths to GPU uniforms.
 
-**3.1 Render Modes**
-- How do we switch between convergent and realtime modes?
-    - Different shader programs?
-    - Uniform flag?
-    - Separate pipelines?
+**Mapping Strategy**:
+```typescript
+// ParameterStore path → GPU uniform location
+"camera.position"        → u_camera_pinhole_position
+"material.glass.ior"     → u_material_glass_ior
+"estimator.max_bounces"  → u_estimator_pathtracer_max_bounces
+```
 
-**3.2 GPU Utilization**
-- Tile-based rendering for large resolutions?
-- Multiple dispatch sizes (full screen, tiles, single pixels)?
-- Async readback for progressive display?
+**Implementation**:
+```typescript
+class UniformBinder {
+  private bindings: Map<string, UniformBinding>;
+  
+  buildBindings(program: CompiledProgram, recipe: Recipe) {
+    // For each parameter in recipe
+    // Find corresponding uniform location
+    // Cache the mapping
+  }
+  
+  updateUniforms(changes: ParameterChanges) {
+    for (const change of changes) {
+      const binding = this.bindings.get(change.path);
+      if (binding) {
+        this.gl.uniform[binding.type](binding.location, change.value);
+      }
+    }
+  }
+}
+```
 
-**3.3 Memory Management**
-- Maximum texture units we can assume?
-- How to handle scenes exceeding GPU memory?
-- Strategy for film buffer allocation?
+**Optimization**:
+- Cache uniform locations per program
+- Batch uniform updates per frame
+- Skip uniforms that haven't changed
+- Handle missing uniforms gracefully (some variants may not use all parameters)
 
-### Theme 4: Film and Accumulation
+### 4. Render Executor
 
-**4.1 Film Architecture**
-- What data does film store beyond color?
-    - Sample count per pixel?
-    - Variance estimates?
-    - Auxiliary passes?
-- Fixed format or configurable?
+**Responsibility**: Execute WebGL draw calls and manage render targets.
 
-**4.2 Accumulation Control**
-- How do we handle different accumulation strategies?
-    - Simple averaging?
-    - Weighted by sample count?
-    - Variance-based?
-- Maximum samples before numerical precision issues?
+**Render Modes**:
+```typescript
+interface RenderMode {
+  target: "screen" | "texture";
+  viewport: { x, y, width, height };
+  clear: boolean;
+  swapBuffers: boolean;
+}
 
-**4.3 Output Pipeline**
-- When does tonemapping happen?
-    - Per sample?
-    - Post accumulation?
-    - Display only?
-- Multiple output formats (screen, file, buffer)?
+class RenderExecutor {
+  renderFrame(mode: RenderMode) {
+    // Set viewport
+    this.gl.viewport(mode.viewport.x, mode.viewport.y, 
+                     mode.viewport.width, mode.viewport.height);
+    
+    // Bind framebuffer (null for screen)
+    this.gl.bindFramebuffer(GL.FRAMEBUFFER, 
+                            mode.target === "screen" ? null : this.fbo);
+    
+    // Clear if requested (first sample)
+    if (mode.clear) {
+      this.gl.clear(GL.COLOR_BUFFER_BIT);
+    }
+    
+    // Draw full-screen quad
+    this.gl.drawArrays(GL.TRIANGLE_STRIP, 0, 4);
+    
+    // Swap if accumulating
+    if (mode.swapBuffers) {
+      this.resources.swapFilmBuffers();
+    }
+  }
+  
+  async readPixels(rect?: Rectangle): Promise<Float32Array> {
+    // Read back from current framebuffer
+    const pixels = new Float32Array(rect.width * rect.height * 4);
+    this.gl.readPixels(rect.x, rect.y, rect.width, rect.height,
+                       GL.RGBA, GL.FLOAT, pixels);
+    return pixels;
+  }
+}
+```
 
-### Theme 5: Debugging and Development
+### 5. Module Registry
 
-**5.1 Debug Features**
-- Should we support shader hot-reload?
-- Debug visualization modes (normals, UVs, materials)?
-- Performance profiling built-in?
+**Responsibility**: Track available modules and their capabilities.
 
-**5.2 Validation Modes**
-- Strict mode that validates every function call?
-- NaN/Inf checking?
-- Energy conservation validation?
+**Module Database**:
+```typescript
+class ModuleRegistry {
+  private modules: Map<string, ModuleDescriptor> = new Map();
+  
+  register(module: ModuleDescriptor) {
+    const key = `${module.id.kind}:${module.id.name}`;
+    this.modules.set(key, module);
+    
+    // Index provides/requires for dependency resolution
+    this.indexCapabilities(module);
+  }
+  
+  resolve(kind: string, name: string): ModuleDescriptor {
+    return this.modules.get(`${kind}:${name}`);
+  }
+  
+  findProvider(functionName: string): ModuleDescriptor {
+    // Find module that provides this function
+    return this.providesIndex.get(functionName);
+  }
+}
+```
 
-**5.3 Developer Experience**
-- Console logging from shaders?
-- Breakpoint/pause functionality?
-- Frame-by-frame stepping?
+## Compilation Pipeline
 
-### Theme 6: Platform and Context
+### Phase 1: Module Collection
+```typescript
+// Gather all modules from Recipe
+const modules = [
+  recipe.world.geometry,
+  ...recipe.world.materials,  // Multiple materials
+  recipe.world.scene,
+  recipe.world.lights,
+  recipe.photography.camera,
+  recipe.photography.estimator,
+  recipe.photography.film,
+  recipe.photography.developer
+];
+```
 
-**6.1 WebGL Constraints**
-- WebGL 2 only or support WebGL 1 fallback?
-- How to handle missing extensions?
-- Mobile GPU considerations?
+### Phase 2: Dependency Sorting
+```typescript
+// Topological sort with Geometry first
+const sorted = topologicalSort(modules, {
+  priority: ["Geometry"],  // Always first
+  edges: extractDependencies(modules)
+});
+```
 
-**6.2 Rendering Context**
-- Single canvas or support multiple viewports?
-- Offscreen rendering support?
-- Integration with other WebGL content?
+### Phase 3: Prefix Application
+```typescript
+// Apply prefixes based on module kind
+const prefixMap = {
+  "Geometry": "g_",
+  "Material": "m_",  
+  "Scene": "sc_",
+  "Light": "l_",
+  "Camera": "c_",
+  "Estimator": "e_",
+  "Film": "f_",
+  "Developer": "d_"
+};
+```
 
-**6.3 Future Compatibility**
-- WebGPU migration path?
-- Compute shader support when available?
-- Progressive enhancement strategy?
 
-### Theme 7: Module Interface Details
 
-**7.1 Module Discovery**
-- How does engine find available modules?
-    - Registration system?
-    - Filesystem scanning?
-    - Explicit imports?
+### Phase 5: Cross-Module Resolution
+```typescript
+// Resolve requires → provides
+function resolveFunction(call: string, context: Module): string {
+  // Example: "intersect" in Estimator
+  // 1. Estimator requires ["intersect"]
+  // 2. Scene provides ["intersect"]
+  // 3. Transform to "sc_intersect"
+  
+  const provider = registry.findProvider(call);
+  const prefix = getPrefixForModule(provider);
+  return prefix + call;
+}
+```
 
-**7.2 Module Metadata**
-- What metadata should modules provide beyond the descriptor?
-    - Human-readable descriptions?
-    - Compatibility information?
-    - Performance hints?
+### Phase 6: Main Generation
+```typescript
+// Select appropriate main() template
+function generateMain(modules: ProcessedModules): string {
+  if (modules.film.isDebug) {
+    return DEBUG_MAIN_TEMPLATE;
+  } else if (modules.film.isPassthrough) {
+    return REALTIME_MAIN_TEMPLATE;
+  } else {
+    return STANDARD_MAIN_TEMPLATE;
+  }
+}
 
-**7.3 Inter-module Communication**
-- How do modules reference each other's functions?
-    - Direct calls with prefixes?
-    - Function pointer tables?
-    - Dynamic dispatch?
+const STANDARD_MAIN_TEMPLATE = `
+void main() {
+  vec2 pixel = gl_FragCoord.xy;
+  
+  // Random offset for antialiasing
+  vec2 xi = sample_2d(ivec2(pixel), u_frame_index, 0);
+  
+  // Camera generates ray
+  Ray ray = c_generate_ray(pixel, xi);
+  
+  // Estimator computes radiance
+  vec3 radiance = e_estimate(ray);
+  
+  // Film accumulates
+  vec3 accumulated = f_accumulate(radiance, pixel);
+  
+  // Developer tonemaps
+  vec3 color = d_develop(accumulated);
+  
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+```
 
-### Theme 8: User Integration
+### Phase 7: WebGL Compilation
+```typescript
+class ShaderCompiler {
+  compile(source: string): WebGLProgram {
+    // Create shaders
+    const vs = this.compileShader(VERTEX_SOURCE, GL.VERTEX_SHADER);
+    const fs = this.compileShader(source, GL.FRAGMENT_SHADER);
+    
+    // Link program
+    const program = this.gl.createProgram();
+    this.gl.attachShader(program, vs);
+    this.gl.attachShader(program, fs);
+    this.gl.linkProgram(program);
+    
+    // Check for errors with line mapping
+    if (!this.gl.getProgramParameter(program, GL.LINK_STATUS)) {
+      const error = this.gl.getProgramInfoLog(program);
+      throw new CompilationError(this.mapErrorToModules(error));
+    }
+    
+    return program;
+  }
+}
+```
 
-**8.1 API Surface**
-- What does the public API look like?
-    - Object-oriented?
-    - Functional?
-    - Event-driven?
+## Data Flow
 
-**8.2 Events and Callbacks**
-- What events does engine emit?
-    - Render complete?
-    - Accumulation milestones?
-    - Errors?
+### Render Frame Flow
+```
+1. App.parameterStore.set("camera.position", [0, 5, 10])
+         ↓
+2. Engine.uniforms.updateUniforms(changes)
+         ↓
+3. Engine.executor.renderFrame({ target: "texture" })
+         ↓
+4. WebGL draws full-screen quad
+         ↓
+5. Shaders execute (Camera → Estimator → Film → Developer)
+         ↓
+6. Result in framebuffer
+         ↓
+7. Engine.resources.swapBuffers() for next frame
+```
 
-**8.3 Control Flow**
-- Who drives the render loop?
-    - Engine with requestAnimationFrame?
-    - User calls render()?
-    - Both options?
+### Module Communication Flow
+```
+Estimator.glsl: intersect(ray, hit)
+         ↓
+Compiler: Resolves to sc_intersect
+         ↓
+Runtime: Calls Scene's intersection function
+         ↓
+Scene.glsl: Returns Hit with material IDs
+         ↓
+Estimator.glsl: dispatch_material_eval(hit.material_id, ...)
+         ↓
+Material dispatcher: Routes to correct material
+```
 
-## Next Steps
+## Memory Management
 
-After you answer these questions, we'll:
-1. Create a detailed Engine design document
-2. Define the Engine contract (what it guarantees to modules)
-3. Design the Module->Engine interface
-4. Plan the implementation phases
+### Texture Allocation
+- Films declare texture requirements upfront
+- ResourceManager allocates on first use
+- Ping-pong buffers for accumulation
+- Reuse buffers when switching recipes (if compatible)
 
-The Engine is the foundational layer that makes everything else work, so getting this right is crucial for the entire system's success.
+### Mobile Fallbacks
+```typescript
+if (isMobile || memoryPressure) {
+  // Use lower precision formats
+  format = "16bit" instead of "32bit"
+  
+  // Reduce resolution
+  resolution = resolution / 2
+  
+  // Simpler Film that needs fewer buffers
+  recipe.photography.film = "MobileFilm"
+}
+```
+
+## Error Handling
+
+### Compilation Errors
+```typescript
+class CompilationError {
+  constructor(
+    public glError: string,
+    public module?: ModuleDescriptor,
+    public line?: number,
+    public sourceSnippet?: string
+  ) {}
+  
+  toString() {
+    return `
+      Shader compilation failed in ${this.module?.id.name}:
+      Line ${this.line}: ${this.glError}
+      
+      ${this.sourceSnippet}
+    `;
+  }
+}
+```
+
+### Runtime Errors
+- Missing uniforms: Warn but continue (variant might not use it)
+- Texture allocation failure: Report to App for fallback
+- Draw call failure: Clear state and retry
+
+## Platform Considerations
+
+### WebGL2 Requirements
+- Floating point textures (OES_texture_float)
+- Multiple render targets (WEBGL_draw_buffers)
+- Texture arrays (for material properties)
+- Instanced rendering (future: for many objects)
+
+### Future WebGPU Migration
+The architecture is designed to allow future WebGPU migration:
+- Resource management abstracted from GL specifics
+- Shader compilation could target WGSL
+- Compute shaders for parallel operations
+- Better memory management APIs
+
+## Interface with App
+
+### Commands from App
+```typescript
+interface EngineCommands {
+  // Compilation
+  compileRecipe(recipe: Recipe): string;  // Returns program ID
+  selectProgram(id: string): void;
+  
+  // Rendering
+  renderFrame(): void;
+  clearAccumulation(): void;
+  setViewport(x, y, width, height): void;
+  
+  // Parameters
+  updateUniforms(changes: ParameterChanges): void;
+  
+  // Output
+  readPixels(rect?: Rectangle): Promise<Float32Array>;
+  getResolution(): { width, height };
+}
+```
+
+### Events to App
+```typescript
+interface EngineEvents {
+  onCompilationComplete: (programId: string) => void;
+  onCompilationError: (error: CompilationError) => void;
+  onRenderComplete: (frameNumber: number) => void;
+  onMemoryPressure: (available: number) => void;
+}
+```
+
+## Key Design Decisions Summary
+
+1. **Startup Compilation**: All variants compile at startup, no runtime compilation
+2. **Material Dispatching**: Engine generates dispatch functions for multiple materials
+3. **Name Prefixing**: Consistent prefixing with special handling for materials (m_NAME_func)
+4. **Film Buffer Declaration**: Films explicitly declare their texture requirements
+5. **Type Ordering**: Geometry always compiles first to define Point/Direction
+6. **Main Templates**: 3-4 template main() functions selected based on mode
+7. **Boring and Explicit**: No clever optimizations, everything explicit and debuggable
+8. **Mobile Fallbacks**: Graceful degradation with lower precision/resolution
+
+## Testing Strategy
+
+The Engine's deterministic nature enables thorough testing:
+- **Module compilation tests**: Each module type compiles correctly
+- **Dependency resolution tests**: Cross-module calls resolve properly
+- **Uniform binding tests**: Parameters map to correct GPU locations
+- **Render output tests**: Pixel-perfect comparison with reference images
+- **Memory stress tests**: Handle allocation failures gracefully
+- **Performance benchmarks**: Track frame time regressions
+
+## Summary
+
+The Engine is intentionally boring infrastructure that never changes once built. It transforms the beautiful mathematical modules from World and Photography into efficient GPU code, handling all the WebGL complexity so researchers can focus on algorithms rather than API calls. Its deterministic, explicit design ensures that debugging is straightforward and behavior is predictable.
+
+```ts
+class Engine {
+// Initialize once
+constructor(gl: WebGL2RenderingContext) {
+this.compiler = new ShaderCompiler(gl);
+this.resources = new ResourceManager(gl);
+this.uniforms = new UniformBinder(gl);
+this.executor = new RenderExecutor(gl);
+this.registry = new ModuleRegistry();
+
+    // Register built-in modules
+    this.registry.registerDefaults();
+}
+
+// Compile recipes at startup
+compileRecipe(recipe: Recipe): string {
+const modules = this.registry.resolveModules(recipe);
+const program = this.compiler.compile(recipe);
+this.resources.setupForProgram(program);
+this.uniforms.buildBindings(program);
+return program.id;
+}
+
+// Render frames (called by App)
+renderFrame() {
+this.uniforms.frameUpdate();
+this.executor.renderFrame();
+this.resources.finalizeFrame();
+}
+}
+````
