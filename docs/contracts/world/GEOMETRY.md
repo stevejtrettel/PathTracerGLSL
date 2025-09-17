@@ -1,371 +1,247 @@
-# Lights Module Contract
+# Geometry Module Contract
 
 ## Purpose
-Lights modules define sources of illumination and provide importance sampling strategies for efficient rendering. They work in any geometry by using geometric operations for solid angle calculations and light transport along geodesics.
+Geometry modules define the differential geometric structure of space. These are typically hand-written as they represent fundamental mathematical operations that don't benefit from build-time optimization.
+
+## Implementation Approach
+**Hand-written GLSL**: These modules are mathematical constants that don't vary with scene content. The implementations are pure mathematics.
 
 ## Module Descriptor
 ```typescript
 {
-  type: 'lights',
-  id: string,                    // e.g., 'hdri_environment', 'area_lights'
-  provides: ['lights'],
-  requires: ['geometry'],         // For geodesic light transport
-  uniforms: [],                   // Light-specific parameters
-  resources: [],                  // Environment maps, IES profiles, etc.
-  defines: {
-    LIGHT_TYPE: 'analytic' | 'environment' | 'area' | 'mixed',
-    NUM_LIGHTS?: number,           // For analytic lights
-    HAS_ENVIRONMENT?: boolean,     // Environment map present
-    SUPPORTS_MIS?: boolean         // Multiple importance sampling
+  id: {
+    kind: 'geometry',
+    name: string,                // e.g., 'euclidean', 'hyperbolic', 'spherical'
+    version: string
+  },
+  provides: ['geometry'],
+  requires: [],                  // Geometry depends on nothing
+  fragment: {
+    functions: string,           // Mathematical operations
+    uniforms: string,           // Usually none or minimal
+    defines: {
+      POINT_TYPE?: 'vec3' | 'vec4',     // Point representation
+      DIRECTION_TYPE?: 'vec3' | 'vec4',  // Direction representation
+      GEOMETRY_TYPE: string              // e.g., 'EUCLIDEAN', 'HYPERBOLIC'
+    }
   }
 }
+```
+
+## Required Type Definitions
+
+All geometry modules must define:
+```glsl
+// The representation of points in this geometry
+typedef vec3 Point;    // or vec4 for projective coordinates
+
+// The representation of directions/vectors
+typedef vec3 Direction;  // or vec4 for some geometries
 ```
 
 ## Required Functions
 
-### sample_light
-Sample a light source with importance sampling.
+### geodesic
+Compute position along a geodesic (straight line in the geometry).
 ```glsl
-LightSample l_sample_light(Point p, vec2 xi)
+Point g_geodesic(Point origin, Direction dir, float t)
 ```
-- **p**: Point being shaded
-- **xi**: Random numbers [0,1)²
-- **returns**: Sampled light direction, radiance, and PDF
-- **Note**: Should importance sample based on estimated contribution
+- **origin**: Starting point
+- **dir**: Direction of travel (unit vector in tangent space)
+- **t**: Parameter along geodesic
+- **returns**: Point at parameter t along geodesic
 
-### eval_light
-Evaluate incoming radiance from a direction.
+### dot
+Inner product using the metric tensor at a point.
 ```glsl
-vec3 l_eval_light(Point p, Direction wi)
+float g_dot(Direction v1, Direction v2, Point p)
 ```
-- **p**: Point being shaded
-- **wi**: Direction toward light
-- **returns**: Incoming radiance from that direction
-- **Note**: Returns vec3(0) if no light from that direction
+- **v1, v2**: Vectors to compute inner product
+- **p**: Point where metric is evaluated
+- **returns**: Inner product value
+- **Note**: In Euclidean space this is standard dot product
 
-### pdf_light
-Probability density for sampling a direction.
+### parallel_transport
+Transport a vector along a geodesic maintaining parallelism.
 ```glsl
-float l_pdf_light(Point p, Direction wi)
+Direction g_parallel_transport(Direction v, Point from, Point to)
 ```
-- **p**: Point being shaded
-- **wi**: Direction toward light
-- **returns**: PDF value for importance sampling
-- **Note**: Must match distribution used in sample_light
+- **v**: Vector to transport
+- **from**: Starting point
+- **to**: Ending point
+- **returns**: Transported vector at ending point
+
+### frame
+Construct orthonormal frame at a point given a normal.
+```glsl
+Frame g_frame(Point p, Direction normal)
+```
+- **p**: Point where frame is constructed
+- **normal**: Normal vector (will be orthonormalized)
+- **returns**: Orthonormal frame with tangent, bitangent, normal
 
 ## Optional Functions
 
-### sample_emission
-Sample an emission point on light sources (for bidirectional).
+### distance
+Compute geodesic distance between points.
 ```glsl
-EmissionSample l_sample_emission(vec2 xi1, vec2 xi2)
+float g_distance(Point p1, Point p2)
 ```
-- **xi1**: Random numbers for position
-- **xi2**: Random numbers for direction
-- **returns**: Point, direction, radiance, and PDFs
 
-### direct_light
-Evaluate direct illumination from a specific light.
+### exp_map
+Exponential map from tangent space to manifold.
 ```glsl
-vec3 l_direct_light(int light_id, Point p)
+Point g_exp_map(Point base, Direction tangent)
 ```
-- **light_id**: Which light to evaluate
-- **p**: Point being shaded
-- **returns**: Unoccluded radiance from light
 
-### light_count
-Get the number of discrete lights.
+### log_map
+Logarithm map from manifold to tangent space.
 ```glsl
-int l_light_count()
+Direction g_log_map(Point from, Point to)
 ```
-- **returns**: Number of analytic/area lights
-- **Note**: Excludes environment map
 
-### light_power
-Get total power of all lights (for Russian roulette).
+### christoffel
+Christoffel symbols of the second kind.
 ```glsl
-float l_light_power()
+mat3[3] g_christoffel(Point p)
 ```
-- **returns**: Total emitted power
-- **Note**: Used for path termination decisions
 
-## Core Types
-
-### Light Sample
+### curvature
+Scalar curvature at a point.
 ```glsl
-struct LightSample {
-  Direction wi;         // Direction toward light
-  float distance;       // Distance to light (inf for directional)
-  vec3 radiance;        // Incoming radiance
-  float pdf;            // Sampling PDF
-  int light_id;         // Which light was sampled
-  bool is_delta;        // True for point/directional lights
+float g_curvature(Point p)
+```
+
+## Frame Structure
+
+```glsl
+struct Frame {
+  Point base;      // Point where frame is valid
+  Direction t;     // Tangent (orthonormal)
+  Direction b;     // Bitangent (orthonormal)
+  Direction n;     // Normal (orthonormal)
 }
-```
-
-### Emission Sample
-```glsl
-struct EmissionSample {
-  Point p;              // Emission point
-  Direction n;          // Surface normal at emission
-  Direction wo;         // Emission direction
-  vec3 radiance;        // Emitted radiance
-  float pdf_pos;        // Position sampling PDF
-  float pdf_dir;        // Direction sampling PDF
-}
-```
-
-### Light Types
-```glsl
-#define LIGHT_POINT 0
-#define LIGHT_DIRECTIONAL 1  
-#define LIGHT_SPOT 2
-#define LIGHT_AREA 3
-#define LIGHT_ENVIRONMENT 4
 ```
 
 ## Implementation Examples
 
-### Point Light
+### Euclidean Geometry
 ```glsl
-#define LIGHT_TYPE analytic
-#define NUM_LIGHTS 1
+// Simple hand-written implementation
+typedef vec3 Point;
+typedef vec3 Direction;
 
-uniform vec3 u_light_position;
-uniform vec3 u_light_color;
-uniform float u_light_intensity;
-
-LightSample l_sample_light(Point p, vec2 xi) {
-  LightSample ls;
-  
-  // Direction from p to light
-  Direction to_light = u_light_position - p;
-  ls.distance = length(to_light);
-  ls.wi = normalize(to_light);
-  
-  // Inverse square falloff
-  float falloff = 1.0 / (ls.distance * ls.distance);
-  ls.radiance = u_light_color * u_light_intensity * falloff;
-  
-  // Delta light - probability is 1 (we always sample it)
-  ls.pdf = 1.0;
-  ls.is_delta = true;
-  ls.light_id = 0;
-  
-  return ls;
+Point g_geodesic(Point origin, Direction dir, float t) {
+  return origin + dir * t;  // Straight lines
 }
 
-vec3 l_eval_light(Point p, Direction wi) {
-  // Delta light - only the exact direction has radiance
-  return vec3(0.0);
+float g_dot(Direction v1, Direction v2, Point p) {
+  return dot(v1, v2);  // Standard dot product everywhere
 }
 
-float l_pdf_light(Point p, Direction wi) {
-  // Delta light - zero probability for any direction
-  return 0.0;
+Direction g_parallel_transport(Direction v, Point from, Point to) {
+  return v;  // No change in flat space
+}
+
+Frame g_frame(Point p, Direction normal) {
+  Direction n = normalize(normal);
+  Direction t = abs(n.x) < 0.9 ? 
+    vec3(1,0,0) : vec3(0,1,0);
+  t = normalize(cross(n, t));
+  Direction b = cross(n, t);
+  
+  return Frame(p, t, b, n);
 }
 ```
 
-### Environment Map
+### Hyperbolic Geometry (Poincaré Ball)
 ```glsl
-#define LIGHT_TYPE environment
-#define HAS_ENVIRONMENT true
+typedef vec3 Point;
+typedef vec3 Direction;
 
-uniform sampler2D u_environment_map;
-uniform sampler2D u_environment_cdf;  // For importance sampling
-uniform float u_environment_intensity;
-
-LightSample l_sample_light(Point p, vec2 xi) {
-  LightSample ls;
+Point g_geodesic(Point origin, Direction dir, float t) {
+  // Geodesics are circular arcs orthogonal to boundary
+  float r2 = dot(origin, origin);
+  float k = sqrt(1.0 - r2);  // Curvature factor
   
-  // Importance sample the environment map
-  vec2 uv = sample_environment_importance(xi);
+  // Parallel transport direction to origin
+  Direction v = dir * k;
   
-  // Convert UV to direction (spherical coordinates)
-  float theta = uv.y * PI;
-  float phi = uv.x * 2.0 * PI;
-  
-  ls.wi = vec3(
-    sin(theta) * cos(phi),
-    cos(theta),
-    sin(theta) * sin(phi)
-  );
-  
-  // Look up environment radiance
-  ls.radiance = texture(u_environment_map, uv).rgb * u_environment_intensity;
-  
-  // PDF includes Jacobian for spherical mapping
-  float sin_theta = max(0.0001, sin(theta));
-  float map_pdf = texture(u_environment_cdf, uv).a;
-  ls.pdf = map_pdf / (2.0 * PI * PI * sin_theta);
-  
-  ls.distance = 1e10;  // Infinite distance
-  ls.is_delta = false;
-  ls.light_id = -1;    // Environment
-  
-  return ls;
+  // Move along geodesic in Poincaré ball
+  Point p = origin + v * tanh(t/2.0);
+  return p / (1.0 + dot(p, p) * 0.5);
 }
 
-vec3 l_eval_light(Point p, Direction wi) {
-  // Convert direction to UV
-  vec2 uv = direction_to_uv(wi);
-  return texture(u_environment_map, uv).rgb * u_environment_intensity;
-}
-
-float l_pdf_light(Point p, Direction wi) {
-  vec2 uv = direction_to_uv(wi);
-  float theta = uv.y * PI;
-  float sin_theta = max(0.0001, sin(theta));
-  float map_pdf = texture(u_environment_cdf, uv).a;
-  return map_pdf / (2.0 * PI * PI * sin_theta);
+float g_dot(Direction v1, Direction v2, Point p) {
+  // Conformal metric
+  float r2 = dot(p, p);
+  float scale = 4.0 / ((1.0 - r2) * (1.0 - r2));
+  return dot(v1, v2) * scale;
 }
 ```
 
-### Area Light
+### Spherical Geometry
 ```glsl
-#define LIGHT_TYPE area
+typedef vec3 Point;  // Points on unit sphere
+typedef vec3 Direction;  // Tangent vectors
 
-struct AreaLight {
-  Point corner;         // Corner of rectangular light
-  Direction edge1;      // First edge vector
-  Direction edge2;      // Second edge vector
-  Direction normal;     // Normal direction
-  vec3 emission;        // Emitted radiance
-};
+Point g_geodesic(Point origin, Direction dir, float t) {
+  // Great circles
+  Direction tangent = normalize(dir - dot(dir, origin) * origin);
+  return cos(t) * origin + sin(t) * tangent;
+}
 
-uniform AreaLight u_area_light;
-
-LightSample l_sample_light(Point p, vec2 xi) {
-  LightSample ls;
-  
-  // Sample point on rectangle
-  Point light_p = u_area_light.corner + 
-                  xi.x * u_area_light.edge1 + 
-                  xi.y * u_area_light.edge2;
-  
-  // Direction from p to sampled point
-  Direction to_light = light_p - p;
-  ls.distance = length(to_light);
-  ls.wi = normalize(to_light);
-  
-  // Check if we're facing the light
-  float cos_light = g_dot(-ls.wi, u_area_light.normal, light_p);
-  if (cos_light <= 0.0) {
-    ls.radiance = vec3(0.0);
-    ls.pdf = 0.0;
-    return ls;
-  }
-  
-  // Area to solid angle conversion
-  float area = length(u_area_light.edge1) * length(u_area_light.edge2);
-  float solid_angle = area * cos_light / (ls.distance * ls.distance);
-  
-  ls.radiance = u_area_light.emission;
-  ls.pdf = 1.0 / solid_angle;
-  ls.is_delta = false;
-  ls.light_id = 0;
-  
-  return ls;
+float g_dot(Direction v1, Direction v2, Point p) {
+  // Project to tangent space then standard dot
+  v1 = v1 - dot(v1, p) * p;
+  v2 = v2 - dot(v2, p) * p;
+  return dot(v1, v2);
 }
 ```
 
-### Multiple Lights with MIS
+## Why Not Generated?
+
+Geometry modules are not generated because:
+
+1. **Mathematical Constants**: The operations are fixed by mathematics
+2. **No Scene Dependency**: Same regardless of what objects exist
+3. **Already Optimal**: Hand-written implementations are already minimal
+4. **Research Focus**: These are often what researchers modify directly
+
+## Special Considerations
+
+### Numerical Stability
 ```glsl
-#define SUPPORTS_MIS true
-
-LightSample l_sample_light(Point p, vec2 xi) {
-  // Choose which light to sample
-  float light_probs[MAX_LIGHTS];
-  compute_light_probabilities(p, light_probs);
+// Handle edge cases in curved geometries
+Point g_geodesic_stable(Point origin, Direction dir, float t) {
+  if (t < EPSILON) return origin;  // Avoid numerical issues
   
-  int light_id = sample_discrete(light_probs, xi.x);
-  float light_prob = light_probs[light_id];
-  
-  // Remap xi.x for reuse
-  xi.x = (xi.x - light_prob) / light_prob;
-  
-  // Sample the chosen light
-  LightSample ls = sample_specific_light(light_id, p, xi);
-  
-  // Adjust PDF for light selection
-  ls.pdf *= light_prob;
-  ls.light_id = light_id;
-  
-  return ls;
-}
-
-// For MIS weight calculation
-float l_pdf_light_mis(Point p, Direction wi, int sampled_light) {
-  float pdf_sum = 0.0;
-  
-  for (int i = 0; i < l_light_count(); i++) {
-    float prob = light_probabilities[i];
-    float pdf = pdf_specific_light(i, p, wi);
-    pdf_sum += prob * pdf;
-  }
-  
-  return pdf_sum;
+  // Clamp to valid domain
+  Point result = g_geodesic(origin, dir, t);
+  return clamp_to_manifold(result);
 }
 ```
 
-## Geometry-Agnostic Implementation
-
-Lights must work in any geometry:
+### Coordinate Charts
+Some geometries may need multiple coordinate charts:
 ```glsl
-// DON'T: Assume Euclidean distance
-float distance = length(light_pos - p);  // WRONG in curved space!
-
-// DO: Use geodesic distance
-float distance = g_distance(p, light_pos);  // Correct
-
-// DON'T: Assume straight-line visibility
-bool visible = dot(to_light, normal) > 0;  // WRONG!
-
-// DO: Consider geodesic bending
-Ray ray;
-ray.origin = p;
-ray.direction = initial_direction_to(light_pos, p);
-bool visible = !sc_intersect_any(ray, distance);
+// For manifolds requiring multiple patches
+int g_chart_id(Point p);
+Point g_change_chart(Point p, int from_chart, int to_chart);
 ```
-
-### Solid Angle in Curved Space
-```glsl
-// Compute solid angle using the metric
-float solid_angle_curved(Point p, AreaLight light) {
-  // Sample several points on light
-  float total = 0.0;
-  const int N = 16;
-  
-  for (int i = 0; i < N; i++) {
-    vec2 uv = hammersley(i, N);
-    Point light_p = sample_light_surface(light, uv);
-    
-    // Direction in curved space
-    Direction wi = initial_direction_to(light_p, p);
-    
-    // Use metric for angle computation
-    float cos_theta = g_dot(wi, light.normal, light_p);
-    float d2 = g_distance(p, light_p);
-    d2 = d2 * d2;
-    
-    total += max(0.0, cos_theta) / d2;
-  }
-  
-  return total * light.area / float(N);
-}
-```
-
-## Validation Requirements
-The engine validates that lights modules:
-1. Return valid (non-negative) radiance values
-2. Return normalized direction vectors
-3. Provide consistent PDFs (integral = 1)
-4. Match sampling distribution with PDF
-5. Handle edge cases (light behind surface)
 
 ## Performance Notes
-- Precompute CDFs for environment importance sampling
-- Use hierarchical sample warping for large area lights
-- Consider light trees for many lights
-- Cache light selection probabilities per region
-- Use LOD for distant environment maps
+
+- Geodesic computation is the hottest path (called per ray march step)
+- Consider caching frame computation when possible
+- In Euclidean space, many operations can be inlined by compiler
+- For complex geometries, consider lookup tables for expensive operations
+
+## Validation Requirements
+
+Geometry modules must:
+1. Maintain unit vectors where expected
+2. Preserve orthonormality in frames
+3. Handle edge cases (points at infinity, singularities)
+4. Provide stable numerical computation
+5. Define consistent Point and Direction types
