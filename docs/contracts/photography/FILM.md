@@ -57,6 +57,9 @@ uniform sampler2D u_film_auxiliary;
 
 // Global sample count (same for all pixels)
 uniform int u_sample_count;
+
+// Reset flag - set by engine when parameters change
+uniform bool u_film_reset;
 ```
 
 ## Common Parameters
@@ -71,6 +74,26 @@ Common film parameters:
 - `alpha` (float): Blend factor for exponential average [0-1]
 - `variance_clamp` (float): Maximum variance threshold
 - `firefly_threshold` (float): Outlier rejection threshold
+
+## Reset Detection
+
+The engine sets `u_film_reset` when accumulation should restart:
+
+```glsl
+vec3 accumulate(vec3 new_sample, vec2 pixel) {
+  // Check for reset condition
+  if (u_film_reset || u_sample_count == 0) {
+    return new_sample;  // Start fresh
+  }
+  
+  // Normal accumulation
+  vec2 uv = pixel / u_resolution;
+  vec3 history = texture(u_film_radiance, uv).rgb;
+  
+  float count = float(u_sample_count);
+  return mix(history, new_sample, 1.0 / (count + 1.0));
+}
+```
 
 ## Implementation Patterns
 
@@ -88,6 +111,11 @@ Standard Monte Carlo accumulation:
 
 ```glsl
 vec3 accumulate(vec3 new_sample, vec2 pixel) {
+  // Handle reset
+  if (u_film_reset || u_sample_count == 0) {
+    return new_sample;
+  }
+  
   vec2 uv = pixel / u_resolution;
   vec3 history = texture(u_film_radiance, uv).rgb;
   
@@ -104,6 +132,13 @@ uniform sampler2D u_film_m2;  // Sum of squared differences
 
 vec3 accumulate(vec3 new_sample, vec2 pixel) {
   vec2 uv = pixel / u_resolution;
+  
+  // Handle reset
+  if (u_film_reset || u_sample_count == 0) {
+    // Store initial values
+    return new_sample;
+  }
+  
   vec3 old_mean = texture(u_film_radiance, uv).rgb;
   vec3 old_m2 = texture(u_film_m2, uv).rgb;
   
@@ -140,15 +175,44 @@ Recent samples weighted more heavily:
 uniform float alpha;
 
 vec3 accumulate(vec3 new_sample, vec2 pixel) {
-  vec2 uv = pixel / u_resolution;
-  vec3 history = texture(u_film_radiance, uv).rgb;
-  
-  // First frame has no history
-  if (u_sample_count == 0) {
+  // Handle reset
+  if (u_film_reset || u_sample_count == 0) {
     return new_sample;
   }
   
+  vec2 uv = pixel / u_resolution;
+  vec3 history = texture(u_film_radiance, uv).rgb;
+  
   return mix(history, new_sample, alpha);
+}
+```
+
+### Firefly Rejection
+Remove outliers that cause bright pixels:
+
+```glsl
+uniform float firefly_threshold;
+
+vec3 accumulate(vec3 new_sample, vec2 pixel) {
+  // Handle reset
+  if (u_film_reset || u_sample_count == 0) {
+    return new_sample;
+  }
+  
+  vec2 uv = pixel / u_resolution;
+  vec3 history = texture(u_film_radiance, uv).rgb;
+  
+  // Reject outliers
+  float luminance = dot(new_sample, vec3(0.2126, 0.7152, 0.0722));
+  float history_lum = dot(history, vec3(0.2126, 0.7152, 0.0722));
+  
+  if (luminance > firefly_threshold * history_lum) {
+    // Clamp outlier
+    new_sample = new_sample * (firefly_threshold * history_lum / luminance);
+  }
+  
+  float count = float(u_sample_count);
+  return mix(history, new_sample, 1.0 / (count + 1.0));
 }
 ```
 
@@ -176,12 +240,13 @@ vec3 accumulate(vec3 new_sample, vec2 pixel) {
 Films have access to:
 - Previous frame buffers via textures
 - Math functions from `math/core.glsl`
-- Engine uniforms: `u_resolution`, `u_sample_count`
+- Engine uniforms: `u_resolution`, `u_sample_count`, `u_film_reset`
 
 ## Implementation Notes
 
 - Pixel coordinates are in screen space [0, resolution]
 - Convert to UV coordinates [0,1] for texture lookups
+- Check `u_film_reset` flag for parameter change detection
 - First frame (u_sample_count == 0) has no history
 - Consider firefly rejection for outliers
 - Variance tracking requires additional buffers

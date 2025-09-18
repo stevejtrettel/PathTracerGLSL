@@ -72,15 +72,25 @@ const module = MaterialCompiler.compile(analysis);
 // Generates:
 ```
 ```glsl
-// Optimized for diffuse-only scene
-const vec3 albedos[2] = vec3[](
-  vec3(0.8, 0.2, 0.2),
-  vec3(0.2, 0.8, 0.2)
+// Optimized for diffuse-only scene with batched properties
+struct MaterialProperties {
+  vec3 albedo;
+  // No roughness, metallic, etc - not used!
+};
+
+const MaterialProperties props[2] = MaterialProperties[](
+  MaterialProperties(vec3(0.8, 0.2, 0.2)),
+  MaterialProperties(vec3(0.2, 0.8, 0.2))
 );
+
+MaterialProperties sc_get_material_properties(int object_id) {
+  return props[object_id];
+}
 
 vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf) {
   // No roughness/metallic code at all - just Lambert
-  Frame frame = g_frame(hit.p, hit.n);
+  // Use precomputed frame - no g_frame call
+  Frame frame = hit.frame;
   
   // Cosine-weighted hemisphere sampling
   float phi = 2.0 * PI * xi.x;
@@ -92,7 +102,10 @@ vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf)
        frame.n * cos_theta;
   
   pdf = cos_theta / PI;
-  return albedos[hit.object_id] / PI;  // Direct array access
+  
+  // Single batched property fetch
+  MaterialProperties props = sc_get_material_properties(hit.object_id);
+  return props.albedo / PI;
 }
 ```
 
@@ -109,14 +122,26 @@ const analysis = {
 // Generates:
 ```
 ```glsl
-uniform float u_roughness[MAX_OBJECTS];  // Runtime controllable
+// Batched properties for used features
+struct MaterialProperties {
+  vec3 albedo;
+  float roughness;
+  // No metallic, clearcoat - not used!
+};
+
+MaterialProperties sc_get_material_properties(int object_id) {
+  MaterialProperties props;
+  props.albedo = albedo_constants[object_id];
+  props.roughness = u_roughness[object_id];  // Runtime controllable
+  return props;
+}
 
 vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf) {
-  float roughness = u_roughness[hit.object_id];
-  float alpha = roughness * roughness;
+  MaterialProperties props = sc_get_material_properties(hit.object_id);
+  float alpha = props.roughness * props.roughness;
   
-  // GGX sampling and evaluation
-  wo = sample_ggx_vndf(wi, hit.n, alpha, xi);
+  // GGX sampling using precomputed frame
+  wo = sample_ggx_vndf_frame(wi, hit.frame, alpha, xi);
   
   // Simplified evaluation - no metallic mixing
   float D = ggx_d(hit.n, wo, alpha);
@@ -124,7 +149,7 @@ vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf)
   float F = 0.04;  // Constant dielectric Fresnel
   
   pdf = D * G / (4.0 * abs(dot(wi, hit.n)));
-  return get_albedo(hit.object_id) * (1.0 - F) / PI + vec3(F * D * G);
+  return props.albedo * (1.0 - F) / PI + vec3(F * D * G);
 }
 
 // Metallic code completely eliminated
@@ -305,7 +330,7 @@ Generated materials achieve:
 
 ## Hit Structure Access
 
-Materials receive complete hit information:
+Materials receive complete hit information with precomputed helpers:
 ```glsl
 struct Hit {
   Point p;              // Hit point
@@ -313,6 +338,11 @@ struct Hit {
   Direction incident;   // Incoming ray direction
   float t;              // Ray parameter
   vec2 uv;              // Texture coordinates
+  
+  // Precomputed helpers
+  Frame frame;          // Orthonormal frame (computed once by scene)
+  
+  // Object identity
   int object_id;        // Which object was hit
   int part_id;          // Which part (for compounds)
   int material_id;      // Material type identifier
@@ -320,27 +350,37 @@ struct Hit {
   // Material interface (populated by scene)
   int material_from;    // Material ray is traveling through
   int material_to;      // Material ray would enter
-  float ior_from;       // IOR of from material
-  float ior_to;         // IOR of to material
-  float ior_ratio;      // ior_from / ior_to (precomputed)
-  
-  // Derived by material if needed:
-  // Frame frame = g_frame(hit.p, hit.n);
-  // float NdotI = -g_dot(hit.incident, hit.n, hit.p);
+  float ior_ratio;      // ior_from / ior_to (precomputed - only value materials need)
 }
 ```
 
 ## Material Property Access
 
-Materials can access per-object properties from the scene:
+Materials access properties through batched fetch:
 ```glsl
-// Inside material functions:
-vec3 albedo = sc_get_vec3_param(hit.object_id, PARAM_ALBEDO);
-float roughness = sc_get_float_param(hit.object_id, PARAM_ROUGHNESS);
+// Batched property access - more efficient
+MaterialProperties props = sc_get_material_properties(hit.object_id);
+vec3 albedo = props.albedo;
+float roughness = props.roughness;
 
-// Or for procedural materials:
+// Or for procedural materials (passed as part of generation)
 vec3 albedo = marble_pattern(hit.p);
 float roughness = wear_map(hit.p, hit.n);
+```
+
+## Random Sampling
+
+Random dimensions are automatically tracked (implementation elsewhere):
+```glsl
+// Old manual tracking - DON'T DO THIS
+int dim = 0;
+vec2 xi1 = sample_2d(pixel_id, sample_id, dim++);
+vec2 xi2 = sample_2d(pixel_id, sample_id, dim++);
+
+// New automatic tracking - DO THIS
+vec2 xi1 = next_2d();  // Automatically increments dimension
+vec2 xi2 = next_2d();  // Next dimension
+vec3 xi3 = next_3d();  // Takes 2 dimensions
 ```
 
 ## Complete Implementation Examples
@@ -363,8 +403,8 @@ vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf)
     return albedo * 0.5;  // Some attenuation
   }
   
-  // Regular diffuse for rest
-  Frame frame = g_frame(hit.p, hit.n);
+  // Regular diffuse for rest - use precomputed frame
+  Frame frame = hit.frame;
   float phi = 2.0 * PI * xi.x;
   float cos_theta = sqrt(xi.y);
   float sin_theta = sqrt(1.0 - xi.y);
@@ -383,11 +423,11 @@ vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf)
 vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf) {
   // Scene has already resolved the interface for us!
   // If we're water hitting glass boundary:
-  // hit.material_from = WATER (ior = 1.33)
-  // hit.material_to = GLASS (ior = 1.5)
-  // hit.ior_ratio = 1.33/1.5 = 0.887
+  // hit.material_from = WATER
+  // hit.material_to = GLASS
+  // hit.ior_ratio = 1.33/1.5 = 0.887 (precomputed!)
   
-  // Just use the precomputed ratio
+  // Just use the ratio directly
   float eta = hit.ior_ratio;
   
   // Standard glass code works for ANY interface
@@ -395,7 +435,7 @@ vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf)
   float F = fresnel_dielectric(cos_theta_i, eta);
   
   if (xi.x < F) {
-    wo = reflect_direction(wi, hit.n, hit.p);
+    wo = reflect_using_frame(wi, hit.frame);
     pdf = F;
     return vec3(1.0);
   } else {
@@ -406,7 +446,7 @@ vec3 m_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf)
 }
 ```
 
-### Volumetric Material
+### Volumetric Material with Auto Sampling
 ```glsl
 #define MATERIAL_TYPE volume
 
@@ -433,6 +473,7 @@ float m_phase_eval(Direction wi, Direction wo, Point p) {
 }
 
 Direction m_phase_sample(Direction wi, Point p, vec2 xi, out float pdf) {
+  // No manual dimension tracking needed!
   float g = m_phase_g(p);
   float cos_theta;
   
@@ -445,11 +486,11 @@ Direction m_phase_sample(Direction wi, Point p, vec2 xi, out float pdf) {
     cos_theta = (1.0 + g*g - s*s) / (2.0 * g);
   }
   
-  // Build direction
+  // Build direction using precomputed frame if available
   float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
   float phi = 2.0 * PI * xi.y;
   
-  Frame frame = g_frame(p, wi);
+  Frame frame = g_frame(p, wi);  // Need fresh frame for arbitrary wi
   Direction wo = frame.t * sin_theta * cos(phi) + 
                  frame.b * sin_theta * sin(phi) + 
                  frame.n * cos_theta;

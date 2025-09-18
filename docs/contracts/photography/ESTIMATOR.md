@@ -47,22 +47,23 @@ Estimators can use these functions from other modules (no prefixes needed - engi
 - `parallel_transport(from, to)` → `g_parallel_transport`
 
 **From World/Scene:**
-- `intersect(ray, hit)` → `sc_intersect`
+- `intersect(ray, hit)` → `sc_intersect` (returns Hit with precomputed frame)
 - `intersect_any(ray, max_t)` → `sc_intersect_any`
 
-**From World/Material:**
-- `eval_bsdf(wi, wo, hit)` → `m_eval_bsdf`
-- `sample_bsdf(wi, hit, xi)` → `m_sample_bsdf`
-- `pdf_bsdf(wi, wo, hit)` → `m_pdf_bsdf`
+**From World/Material (Batched operations):**
+- `interact(wi, hit, xi, wo, pdf)` → `m_interact` (samples and evaluates in one call)
+- `eval(wi, wo, hit)` → `m_eval` (for MIS)
+- `pdf(wi, wo, hit)` → `m_pdf` (for MIS)
 
 **From World/Lights:**
 - `sample_light(point, xi)` → `l_sample_light`
 - `eval_light(point, direction)` → `l_eval_light`
+- `pdf_light(point, direction)` → `l_pdf_light`
 
-**From Infrastructure:**
-- `sample_2d(pixel_id, sample_id, dimension)`
-- `sample_sphere(pixel_id, sample_id, dimension)`
-- `sample_hemisphere(normal, pixel_id, sample_id, dimension)`
+**From Infrastructure (Automatic dimension tracking):**
+- `next_1d()` - Get next random float
+- `next_2d()` - Get next random vec2
+- `next_3d()` - Get next random vec3
 
 ## Common Parameters
 
@@ -78,15 +79,12 @@ Common estimator parameters:
 - `nee_enabled` (bool): Use next event estimation
 - `mis_enabled` (bool): Use multiple importance sampling
 
-## Dimension Tracking
+## Random Sampling
 
-Track dimension locally to avoid correlation:
+Use automatic dimension tracking:
 
 ```glsl
 vec3 estimate(Ray ray) {
-  ivec2 pixel_id = ivec2(gl_FragCoord.xy);
-  int dim = 0;  // Local dimension counter
-  
   vec3 throughput = vec3(1.0);
   vec3 radiance = vec3(0.0);
   
@@ -97,16 +95,56 @@ vec3 estimate(Ray ray) {
       break;
     }
     
-    // Sample BSDF direction
-    vec2 xi = sample_2d(pixel_id, u_frame_index, dim++);
-    Direction wi = sample_bsdf(-ray.d, hit, xi);
+    // Use automatic dimension tracking
+    vec2 xi = next_2d();  // Automatically increments
+    
+    // Use batched BSDF operation
+    Direction wo;
+    float pdf;
+    vec3 contribution = interact(-ray.d, hit, xi, wo, pdf);
     
     // Continue path
-    throughput *= eval_bsdf(-ray.d, wi, hit);
-    ray = Ray(hit.p, wi);
+    throughput *= contribution;  // Already includes BSDF * cos / pdf
+    ray = Ray(hit.p, wo);
   }
   
   return radiance;
+}
+```
+
+## Efficient Material Interaction
+
+Use batched operations when possible:
+
+```glsl
+// EFFICIENT: Single batched call for sampling
+Direction wo;
+float pdf;
+vec3 contribution = interact(wi, hit, next_2d(), wo, pdf);
+throughput *= contribution;  // Includes BSDF * cos(θ) / pdf
+
+// ONLY when needed for MIS: Separate evaluation
+vec3 bsdf_value = eval(wi, wo, hit);
+float bsdf_pdf = pdf(wi, wo, hit);
+```
+
+## Using Precomputed Frame
+
+The Hit structure includes a precomputed frame:
+
+```glsl
+vec3 estimate(Ray ray) {
+  Hit hit;
+  if (!intersect(ray, hit)) {
+    return environment_radiance(ray.d);
+  }
+  
+  // Use precomputed frame - no need to call g_frame()
+  Frame frame = hit.frame;
+  
+  // Local space operations
+  vec3 local_wi = world_to_local(-ray.d, frame);
+  // ...
 }
 ```
 
@@ -116,11 +154,13 @@ vec3 estimate(Ray ray) {
 Debug estimators return scene properties instead of radiance:
 
 ```glsl
-// Normal visualization
+// Normal visualization using precomputed frame
 vec3 estimate(Ray ray) {
   Hit hit;
   if (intersect(ray, hit)) {
-    return hit.n * 0.5 + 0.5;  // Remap [-1,1] to [0,1]
+    // Could also visualize frame axes
+    // return hit.frame.t * 0.5 + 0.5;  // Tangent
+    return hit.n * 0.5 + 0.5;  // Normal
   }
   return vec3(0.0);
 }
@@ -128,6 +168,7 @@ vec3 estimate(Ray ray) {
 
 Common debug modes:
 - **Normals**: Surface normal direction
+- **Frame**: Tangent/bitangent/normal as RGB
 - **Depth**: Distance to first hit
 - **UV**: Texture coordinates
 - **MaterialID**: Different color per material
@@ -136,13 +177,10 @@ Common debug modes:
 ## Implementation Example
 
 ```glsl
-// path_tracer.glsl
+// path_tracer.glsl - Optimized implementation
 uniform int max_bounces;
 
 vec3 estimate(Ray ray) {
-  ivec2 pixel_id = ivec2(gl_FragCoord.xy);
-  int dim = 0;
-  
   vec3 throughput = vec3(1.0);
   vec3 radiance = vec3(0.0);
   
@@ -154,35 +192,36 @@ vec3 estimate(Ray ray) {
       break;
     }
     
-    // Direct lighting (NEE)
-    if (bounce == 0) {
-      vec2 xi_light = sample_2d(pixel_id, u_frame_index, dim++);
-      LightSample ls = sample_light(hit.p, xi_light);
+    // Direct lighting (NEE) - skip for delta materials
+    if (bounce == 0 && !is_delta(hit)) {
+      LightSample ls = sample_light(hit.p, next_2d());
       
       if (!intersect_any(Ray(hit.p, ls.direction), ls.distance)) {
+        // Use separate eval for MIS
+        vec3 bsdf = eval(-ray.d, ls.direction, hit);
         float cos_theta = max(0.0, dot(ls.direction, hit.n, hit.p));
-        radiance += throughput * eval_bsdf(-ray.d, ls.direction, hit) 
-                   * ls.radiance * cos_theta / ls.pdf;
+        radiance += throughput * bsdf * ls.radiance * cos_theta / ls.pdf;
       }
     }
     
-    // Sample next direction
-    vec2 xi = sample_2d(pixel_id, u_frame_index, dim++);
-    Direction wi = sample_bsdf(-ray.d, hit, xi);
+    // Sample next direction - batched operation
+    Direction wo;
+    float pdf;
+    vec3 contribution = interact(-ray.d, hit, next_2d(), wo, pdf);
     
-    // Update throughput
-    float cos_theta = max(0.0, dot(wi, hit.n, hit.p));
-    throughput *= eval_bsdf(-ray.d, wi, hit) * cos_theta 
-                  / pdf_bsdf(-ray.d, wi, hit);
+    if (pdf == 0.0) break;
+    
+    // Update throughput (contribution already includes cos term)
+    throughput *= contribution;
     
     // Russian roulette
     if (bounce > 3) {
       float p = min(1.0, max_component(throughput));
-      if (sample_1d(pixel_id, u_frame_index, dim++) > p) break;
+      if (next_1d() > p) break;
       throughput /= p;
     }
     
-    ray = Ray(hit.p, wi);
+    ray = Ray(hit.p, wo);
   }
   
   return radiance;
@@ -200,3 +239,11 @@ vec3 estimate(Ray ray) {
   }
 }
 ```
+
+## Implementation Notes
+
+- Use `hit.frame` instead of computing `g_frame(hit.p, hit.n)`
+- Use `next_2d()` instead of manual dimension tracking
+- Use `interact()` for batched material sampling when possible
+- Only use separate `eval()` and `pdf()` when needed for MIS
+- Check `is_delta()` before sampling lights (skip NEE for perfect mirrors)

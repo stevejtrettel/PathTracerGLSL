@@ -169,10 +169,21 @@ float sc_get_material_priority(int material_id)
 
 **Material Property Access:**
 ```glsl
-// Generated accessors for material properties
-vec3 sc_get_vec3_param(int object_id, int param_id)
-float sc_get_float_param(int object_id, int param_id)
-int sc_get_int_param(int object_id, int param_id)
+// Batched property access for better cache coherence
+struct MaterialProperties {
+  vec3 albedo;
+  float roughness;
+  float metallic;
+  vec3 emission;
+  // Only properties actually used in scene (determined at compile time)
+};
+
+// Single fetch for all properties
+MaterialProperties sc_get_material_properties(int object_id);
+
+// Legacy individual accessors (still available but discouraged)
+vec3 sc_get_vec3_param(int object_id, int param_id);
+float sc_get_float_param(int object_id, int param_id);
 
 // Standard parameter IDs
 #define PARAM_ALBEDO 0
@@ -192,6 +203,9 @@ struct Hit {
   float t;              // Ray parameter at hit
   vec2 uv;              // Texture coordinates [0,1]²
   
+  // Precomputed helpers
+  Frame frame;          // Orthonormal frame at hit point (computed once by scene)
+  
   // Object information
   int object_id;        // Which object/compound
   int part_id;          // Which part (-1 for simple objects)
@@ -199,9 +213,7 @@ struct Hit {
   // Material interface (ALWAYS populated by scene)
   int material_from;    // Material ray is traveling through
   int material_to;      // Material ray would enter
-  float ior_from;       // IOR of from material
-  float ior_to;         // IOR of to material  
-  float ior_ratio;      // ior_from / ior_to (precomputed)
+  float ior_ratio;      // ior_from / ior_to (precomputed - the only value materials need)
 }
 ```
 
@@ -213,13 +225,37 @@ builder.addBox([2,0,0], [1,1,1]);
 const sceneModule = builder.compile();
 ```
 
-**Generates optimized SDF:**
+**Generates optimized SDF with analytic normals:**
 ```glsl
-// Inlined and optimized
+// Inlined and optimized with analytic normals
 float scene_sdf(Point p) {
   float d = sphere_sdf(p - vec3(0,0,0), 1.0);
   d = min(d, box_sdf(p - vec3(2,0,0), vec3(1)));
   return d;  // Compiler optimizes constant expressions
+}
+
+// Generated normal computation using object knowledge
+Direction compute_normal(Point p, int object_id) {
+  switch(object_id) {
+    case 0: // Sphere at origin - analytic normal
+      return normalize(p);
+    case 1: // Box at (2,0,0) - analytic normal
+      return box_normal_analytic(p - vec3(2,0,0), vec3(1));
+    default: // Fallback to finite differences
+      const float h = 0.001;
+      return normalize(vec3(
+        scene_sdf(p + vec3(h,0,0)) - scene_sdf(p - vec3(h,0,0)),
+        scene_sdf(p + vec3(0,h,0)) - scene_sdf(p - vec3(0,0,h)),
+        scene_sdf(p + vec3(0,0,h)) - scene_sdf(p - vec3(0,0,h))
+      ));
+  }
+}
+
+// Analytic normal for box
+Direction box_normal_analytic(Point p, vec3 size) {
+  vec3 d = abs(p) - size;
+  float m = max(d.x, max(d.y, d.z));
+  return normalize(step(m - 0.001, d) * sign(p));
 }
 ```
 
@@ -227,15 +263,40 @@ float scene_sdf(Point p) {
 
 For **simple objects**, the scene checks ray direction against normal:
 ```glsl
-bool entering = dot(ray.direction, hit.n) < 0;
-if (entering) {
-  hit.material_from = MATERIAL_AIR;
-  hit.material_to = object_materials[hit.object_id];
-} else {
-  hit.material_from = object_materials[hit.object_id];
-  hit.material_to = MATERIAL_AIR;
+bool sc_intersect(Ray ray, out Hit hit) {
+  // ... find intersection point ...
+  
+  // Compute hit properties
+  hit.p = p;
+  hit.t = t;
+  hit.n = compute_normal(p, object_id);  // Uses analytic when possible
+  hit.incident = ray.direction;
+  hit.object_id = object_id;
+  hit.uv = compute_uv(p, object_id);
+  
+  // Precompute frame once
+  hit.frame = g_frame(hit.p, hit.n);
+  
+  // Resolve material interface
+  bool entering = dot(ray.direction, hit.n) < 0;
+  if (entering) {
+    hit.material_from = MATERIAL_AIR;
+    hit.material_to = object_materials[hit.object_id];
+    // Look up IORs and compute ratio
+    float ior_from = 1.0;
+    float ior_to = material_iors[hit.material_to];
+    hit.ior_ratio = ior_from / ior_to;
+  } else {
+    hit.material_from = object_materials[hit.object_id];
+    hit.material_to = MATERIAL_AIR;
+    // Look up IORs and compute ratio
+    float ior_from = material_iors[hit.material_from];
+    float ior_to = 1.0;
+    hit.ior_ratio = ior_from / ior_to;
+  }
+  
+  return true;
 }
-hit.ior_ratio = hit.ior_from / hit.ior_to;
 ```
 
 For **compound objects**, use priority-based resolution:
@@ -248,9 +309,12 @@ void resolve_compound_interface(inout Hit hit) {
   hit.material_from = get_material_at_point(before, hit.object_id);
   hit.material_to = get_material_at_point(after, hit.object_id);
   
-  hit.ior_from = material_iors[hit.material_from];
-  hit.ior_to = material_iors[hit.material_to];
-  hit.ior_ratio = hit.ior_from / hit.ior_to;
+  // Compute only the ratio (materials can look up IORs if needed)
+  float ior_from = material_iors[hit.material_from];
+  float ior_to = material_iors[hit.material_to];
+  hit.ior_ratio = ior_from / ior_to;
+  
+  // Frame already computed by sc_intersect
 }
 ```
 
@@ -365,24 +429,42 @@ Properties are managed through generated accessors optimized at compile time:
 
 ### Generated Accessors
 ```glsl
-// Optimized based on usage patterns
-vec3 get_albedo(int obj_id, Point p) {
+// Batched property fetch - optimized based on usage patterns
+struct MaterialProperties {
+  vec3 albedo;
+  float roughness;
+  float metallic;
+  // Only fields actually used in the scene
+};
+
+// Single optimized fetch
+MaterialProperties get_material_properties(int obj_id) {
+  MaterialProperties props;
+  
+  // Fast path: compile-time constants
   if (obj_id < 47) {
-    // Fast path: compile-time constants
-    const vec3 values[47] = vec3[](...);
-    return values[obj_id];
+    const vec3 albedos[47] = vec3[](...);
+    const float roughness[47] = float[](...);
+    props.albedo = albedos[obj_id];
+    props.roughness = roughness[obj_id];
+    props.metallic = 0.0;  // Never used, compile to constant
+    return props;
   }
+  
   // Procedural materials
   switch(obj_id) {
-    case 47: return marble_pattern(p);
-    case 48: return wood_grain(p);
+    case 47: 
+      props.albedo = marble_pattern(hit.p);
+      props.roughness = 0.5;
+      props.metallic = 0.0;
+      break;
+    case 48: 
+      props.albedo = wood_grain(hit.p);
+      props.roughness = u_roughness[obj_id];  // UI controllable
+      props.metallic = 0.0;
+      break;
   }
-}
-
-// UI-controllable property
-uniform float u_roughness[MAX_OBJECTS];
-float get_roughness(int obj_id) {
-  return u_roughness[obj_id];
+  return props;
 }
 ```
 
@@ -399,6 +481,18 @@ Demonstrates compound object with correct interface resolution:
 // Scene intersection populates interface
 bool sc_intersect(Ray ray, out Hit hit) {
   // Find hit point...
+  
+  // Compute geometric properties
+  hit.p = p;
+  hit.t = t;
+  hit.object_id = COMPOUND_GLASS_WATER;
+  
+  // Use analytic normal for glass sphere
+  hit.n = normalize(hit.p);  // Sphere centered at origin
+  hit.incident = ray.direction;
+  
+  // Precompute frame once
+  hit.frame = g_frame(hit.p, hit.n);
   
   if (hit.object_id == COMPOUND_GLASS_WATER) {
     // Sample before/after points
@@ -420,10 +514,10 @@ bool sc_intersect(Ray ray, out Hit hit) {
     else if (after_glass) hit.material_to = MATERIAL_GLASS;
     else hit.material_to = MATERIAL_AIR;
     
-    // Set IORs
-    hit.ior_from = material_iors[hit.material_from];
-    hit.ior_to = material_iors[hit.material_to];
-    hit.ior_ratio = hit.ior_from / hit.ior_to;
+    // Only compute and store the ratio
+    float ior_from = material_iors[hit.material_from];
+    float ior_to = material_iors[hit.material_to];
+    hit.ior_ratio = ior_from / ior_to;
   }
   
   return true;
@@ -432,13 +526,14 @@ bool sc_intersect(Ray ray, out Hit hit) {
 // Material just uses the interface info
 vec3 glass_interact(Direction wi, Hit hit, vec2 xi, out Direction wo, out float pdf) {
   // No need to figure out entering/exiting!
-  float eta = hit.ior_ratio;  // Already correct
+  float eta = hit.ior_ratio;  // The only value needed
   
   float cos_theta = -g_dot(wi, hit.n, hit.p);
   float F = fresnel(cos_theta, eta);
   
   if (xi.x < F) {
-    wo = reflect(wi, hit.n);
+    // Use precomputed frame for efficient reflection
+    wo = reflect_using_frame(wi, hit.frame);
     pdf = F;
     return vec3(1.0);
   } else {

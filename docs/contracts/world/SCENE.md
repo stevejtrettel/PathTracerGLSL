@@ -66,7 +66,7 @@ bool sc_inside(Point p, int object_id)
 
 ## Generation Examples
 
-### Simple SDF Scene
+### Simple SDF Scene with Analytic Normals
 ```typescript
 const builder = new SceneBuilder();
 builder.addSphere([0,0,0], 1, { albedo: [0.8, 0.2, 0.2] });
@@ -83,11 +83,37 @@ float scene_sdf(Point p) {
   return d;
 }
 
-// Material properties compiled to arrays
-const vec3 object_albedos[2] = vec3[](
-  vec3(0.8, 0.2, 0.2),
-  vec3(0.8, 0.8, 0.8)  // Default for second object
+// Analytic normals for known primitives
+Direction compute_normal(Point p, int object_id) {
+  switch(object_id) {
+    case 0: // Sphere at origin
+      return normalize(p);  // Analytic!
+    case 1: // Box at (2,0,0)
+      return box_normal_analytic(p - vec3(2,0,0), vec3(1));
+    default: // Fallback for complex objects
+      const float h = 0.001;
+      return normalize(vec3(
+        scene_sdf(p + vec3(h,0,0)) - scene_sdf(p - vec3(h,0,0)),
+        scene_sdf(p + vec3(0,h,0)) - scene_sdf(p - vec3(0,0,h)),
+        scene_sdf(p + vec3(0,0,h)) - scene_sdf(p - vec3(0,0,h))
+      ));
+  }
+}
+
+// Batched material properties (compile-time generated)
+struct MaterialProperties {
+  vec3 albedo;
+  float roughness;
+};
+
+const MaterialProperties material_props[2] = MaterialProperties[](
+  MaterialProperties(vec3(0.8, 0.2, 0.2), 1.0),  // Sphere
+  MaterialProperties(vec3(0.8, 0.8, 0.8), 0.5)   // Box
 );
+
+MaterialProperties sc_get_material_properties(int object_id) {
+  return material_props[object_id];
+}
 
 bool sc_intersect(Ray ray, out Hit hit) {
   // Optimized marching implementation
@@ -99,16 +125,37 @@ bool sc_intersect(Ray ray, out Hit hit) {
     if (d < EPSILON) {
       hit.p = p;
       hit.t = t;
-      hit.n = compute_normal(p);
       hit.object_id = identify_object(p);
+      hit.n = compute_normal(p, hit.object_id);  // Uses analytic
+      hit.incident = ray.direction;
+      hit.uv = compute_uv(p, hit.object_id);
       
-      // Material interface resolution (inlined logic)
+      // Precompute frame once
+      hit.frame = g_frame(hit.p, hit.n);
+      
+      // Material interface resolution
       resolve_interface(hit);
       return true;
     }
     t += d * 0.9;
   }
   return false;
+}
+
+// Interface resolution computes only ratio
+void resolve_interface(inout Hit hit) {
+  float cos_theta = dot(ray.direction, hit.n);
+  bool entering = cos_theta < 0;
+  
+  if (entering) {
+    hit.material_from = MATERIAL_AIR;
+    hit.material_to = object_materials[hit.object_id];
+    hit.ior_ratio = 1.0 / material_iors[hit.material_to];
+  } else {
+    hit.material_from = object_materials[hit.object_id];
+    hit.material_to = MATERIAL_AIR;
+    hit.ior_ratio = material_iors[hit.material_from] / 1.0;
+  }
 }
 ```
 

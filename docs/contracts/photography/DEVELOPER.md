@@ -106,7 +106,7 @@ vec3 develop(vec3 radiance) {
 ```
 
 ### Filmic (Uncharted 2)
-Game industry standard:
+Game industry standard with approximated gamma:
 
 ```glsl
 vec3 uncharted2_tonemap(vec3 x) {
@@ -120,12 +120,23 @@ vec3 uncharted2_tonemap(vec3 x) {
   return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
 }
 
+// Fast approximate gamma correction
+float gamma_approx(float x) {
+  return sqrt(x * (2.0 - x));  // Close to pow(x, 1/2.2)
+}
+
 uniform float exposure;
 
 vec3 develop(vec3 radiance) {
   vec3 x = radiance * exposure;
   vec3 color = uncharted2_tonemap(x) / uncharted2_tonemap(vec3(11.2));
-  return pow(color, vec3(1.0/2.2));
+  
+  // Use approximation instead of pow
+  return vec3(
+    gamma_approx(color.r),
+    gamma_approx(color.g),
+    gamma_approx(color.b)
+  );
 }
 ```
 
@@ -151,8 +162,12 @@ vec3 develop(vec3 radiance) {
   float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
   color = mix(vec3(luminance), color, saturation);
   
-  // Gamma
-  return pow(color, vec3(1.0/2.2));
+  // Gamma - use approximation for speed
+  return vec3(
+    gamma_approx(color.r),
+    gamma_approx(color.g),
+    gamma_approx(color.b)
+  );
 }
 ```
 
@@ -166,6 +181,27 @@ vec3 apply_vignette(vec3 color, vec2 pixel) {
   float dist = length(uv);
   float vignette = 1.0 - smoothstep(vignette_radius, 1.0, dist);
   return mix(color * vignette, color, 1.0 - vignette_strength);
+}
+```
+
+## Gamma Correction Optimization
+
+For performance, consider gamma approximations:
+
+```glsl
+// Accurate but slow
+vec3 accurate_gamma(vec3 color) {
+  return pow(color, vec3(1.0/2.2));
+}
+
+// Fast approximation (good enough for most cases)
+float gamma_approx(float x) {
+  return sqrt(x * (2.0 - x));
+}
+
+// Even faster for rough preview
+float gamma_fast(float x) {
+  return sqrt(x);  // gamma = 2.0
 }
 ```
 
@@ -247,6 +283,7 @@ Developers have access to:
 
 - Output must be clamped to [0,1] for display
 - Apply gamma correction as final step (typically 2.2)
+- Consider using gamma approximations for performance
 - Consider preserving hue during tone mapping
 - For HDR output, skip clamping and gamma
 - Analysis modes may intentionally exceed [0,1] range
