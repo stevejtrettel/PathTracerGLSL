@@ -1,306 +1,461 @@
+# Object Module Contract
 
-# Objects System Documentation
+## Purpose
 
-## Overview
+Object modules define geometric entities and their material assignments in the renderer. Each object provides distance estimation for ray marching and material classification logic, but does NOT handle shading or material properties (those belong to the Material module).
 
-The objects system defines all geometric entities that exist in our rendered worlds. Objects are mathematical and procedural definitions written in GLSL that get compiled into shaders. This system is designed for maximum flexibility in a research renderer, allowing different mathematical representations to coexist and be optimized at compile time.
+## Core Architecture
 
-## Core Philosophy
+### Object Definition Structure
 
-Objects aren't inherently "SDF objects" or "analytic objects" - they're geometric objects that can provide various mathematical representations. A sphere might provide both an SDF formulation and an analytic ray intersection. The compiler analyzes what each object provides and how it's used in the scene, then generates the optimal tracing strategy.
-
-## Directory Structure
-
-```
-src/
-└── world/
-    └── objects/
-        ├── sdf/
-        │   ├── tracing.glsl           # Sphere marching implementation
-        │   ├── operations.glsl        # CSG operations
-        │   ├── primitives/            # Basic shapes
-        │   │   ├── sphere.glsl        # Euclidean only (default)
-        │   │   ├── sphere/            # Multi-geometry (when needed)
-        │   │   │   ├── euclidean.glsl
-        │   │   │   └── hyperbolic.glsl
-        │   │   ├── box.glsl
-        │   │   ├── cylinder.glsl
-        │   │   └── torus.glsl
-        │   ├── fractals/              # Mathematical fractals
-        │   │   ├── mandelbulb.glsl
-        │   │   ├── menger.glsl
-        │   │   └── julia.glsl
-        │   └── compound/              # Built via CSG
-        │       ├── teacup.glsl
-        │       └── gear.glsl
-        │
-        ├── isosurface/               # Implicit surfaces
-        │   ├── tracing.glsl         # Gradient/specialized tracing
-        │   ├── metaballs.glsl
-        │   ├── clouds.glsl
-        │   └── harmonic.glsl       # For specialized methods
-        │
-        ├── analytic/                # Direct ray intersection
-        │   ├── sphere.glsl
-        │   ├── plane.glsl
-        │   └── triangle.glsl
-        │
-        └── mesh/                    # Mesh handling code
-            ├── loader.glsl         # BVH traversal
-            └── interpolation.glsl  # Normal/UV interpolation
-
-assets/                             # External data (not in src/)
-├── meshes/
-│   ├── bunny.obj
-│   └── dragon.ply
-└── hdri/
-    └── sunset.hdr
+```typescript
+interface ObjectDefinition {
+  // Geometry specification
+  geometry: {
+    type: 'sdf' | 'isosurface' | 'mesh' | 'multi_region';
+    function: string;           // e.g., "sphere_sdf(p, radius)"
+    bounds?: BoundingVolume;    // For acceleration
+    analyticIntersect?: boolean; // Has closed-form solution
+  };
+  
+  // Material assignment (not properties!)
+  materials: {
+    // Simple: single material
+    default?: MaterialID;
+    
+    // Complex: spatial material distribution
+    regions?: Array<{
+      condition: string;  // e.g., "sdf(p) < -0.1"
+      material: MaterialID;
+      priority?: number;  // For overlapping regions
+    }>;
+  };
+  
+  // Optional optimizations
+  hints?: {
+    hasAnalyticNormal?: boolean;
+    isConvex?: boolean;
+    maxComplexity?: number;
+  };
+}
 ```
 
-## Object Capabilities
+### Object Types
 
-Objects provide mathematical functions based on what makes sense for their representation. The compiler determines which functions to use based on scene context.
+1. **SDF Objects**: Provide true signed distance, enabling exact marching and CSG operations
+2. **Isosurface Objects**: Implicit surfaces where f(p) = 0, using gradient-based distance estimation
+3. **Multi-Region Objects**: Composite objects with multiple materials defined by spatial predicates
+4. **Mesh Objects**: Triangle geometry with BVH traversal (separate system)
 
-### Core Functions
+### Required Functions
+
+Every object must provide:
 
 ```glsl
-// DISTANCE FUNCTIONS (provide at least one)
-float sdf(vec3 p, ...params);           // Signed distance
-float find_t(Ray ray, ...params);       // Analytic ray intersection
-float density(vec3 p, ...params);       // Isosurface value
+// Distance estimation (one of these)
+float [name]_sdf(vec3 p);           // For SDFs
+float [name]_f(vec3 p);              // For isosurfaces
+float [name]_eval(vec3 p, out int region);  // For multi-region
 
-// REQUIRED DERIVED PROPERTIES
-vec3 normal(vec3 p, ...params);         // Surface normal
-bool inside(vec3 p, ...params);         // Interior test
+// Material classification (required)
+// Returns MaterialID (int) NOT material properties
+int classify_[name](vec3 p);
 
-// OPTIONAL PROPERTIES
-vec2 uv(vec3 p, ...params);            // Texture coordinates
-void bounds(out vec3 min, out vec3 max, ...params);  // AABB
-vec3 gradient(vec3 p, ...params);       // For isosurfaces
-vec3 sample_surface(vec2 xi, ...params); // For area lights
-float sample_pdf(...params);            // Sampling probability
+// Surface normal (auto-generated if not provided)
+vec3 normal_[name](vec3 p);
 ```
 
-### Capability Rules
+### File Organization
 
-1. **Every object must enable interior testing** - Either through SDF (sdf < 0) or explicit inside() function
-2. **Every object must provide normals** - Either analytically or via gradient estimation
-3. **Objects provide what's natural** - Spheres can provide both SDF and analytic intersection
-4. **Compiler chooses optimal path** - Based on usage context
+```
+objects/
+├── primitives/              # Basic geometric primitives
+│   ├── sphere/
+│   │   ├── definition.json    # Object definition
+│   │   ├── euc_sdf.glsl      # Euclidean distance function
+│   │   ├── euc_analytic.glsl # Optional: closed-form intersection
+│   │   ├── euc_props.glsl    # Optional: optimized normal
+│   │   └── hyp_sdf.glsl      # Non-Euclidean variant
+│   └── box/
+│       └── ...
+│
+├── isosurfaces/            # Implicit surface objects
+│   └── gyroid/
+│       ├── definition.json
+│       ├── euc_implicit.glsl  # f(p) = 0 function
+│       ├── euc_gradient.glsl  # Optional: analytic gradient
+│       └── euc_distance.glsl  # Optional: custom distance
+│
+├── compounds/              # CSG and complex combinations
+│   ├── operations.glsl      # Union, intersection, difference
+│   └── library/
+│       └── teacup.json      # Pre-defined compound object
+│
+└── procedural/             # Runtime-defined objects
+    └── templates.glsl
+```
 
-## Multi-Representation Objects
+## Implementation Examples
 
-Many objects naturally support multiple representations:
+### Simple SDF with Single Material
+
+```json
+// sphere/definition.json
+{
+  "geometry": {
+    "type": "sdf",
+    "function": "sphere_sdf",
+    "analyticIntersect": true
+  },
+  "materials": {
+    "default": "MATERIAL_GLASS"
+  }
+}
+```
 
 ```glsl
-// primitives/sphere.glsl - Can provide multiple methods
-
-// For CSG operations and general use
-float sdf(vec3 p, vec3 center, float radius) {
+// sphere/euc_sdf.glsl
+float sphere_sdf(vec3 p, vec3 center, float radius) {
     return length(p - center) - radius;
 }
 
-// For fast standalone intersection
-float find_t(Ray ray, vec3 center, float radius) {
-    vec3 oc = ray.origin - center;
-    float b = dot(oc, ray.dir);
-    float c = dot(oc, oc) - radius * radius;
-    float d = b * b - c;
-    if (d < 0.0) return -1.0;
-    return -b - sqrt(d);
+// Generated classifier
+int classify_sphere_0(vec3 p) {
+    return sphere_sdf(p, sphere_0_params.center, sphere_0_params.radius) < 0.0 ? 
+           MATERIAL_GLASS : MATERIAL_AIR;
 }
 
-// Analytic normal (faster than gradient)
-vec3 normal(vec3 p, vec3 center, float radius) {
-    return normalize(p - center);
-}
-
-// Explicit inside test (though sdf < 0 would work too)
-bool inside(vec3 p, vec3 center, float radius) {
-    return length(p - center) < radius;
+// sphere/euc_props.glsl (optional optimization)
+vec3 normal_sphere_0(vec3 p) {
+    return normalize(p - sphere_0_params.center);
 }
 ```
 
-## Compilation Strategy
+### Isosurface Object
 
-The compiler analyzes scene usage and generates optimal code:
-
-### Example Scene
-```typescript
+```json
+// gyroid/definition.json
 {
-    objects: [
-        { name: "hero_sphere", type: "sphere", usage: "standalone" },
-        { name: "csg_sphere1", type: "sphere", usage: "csg_union" },
-        { name: "mandelbulb", type: "fractal" }
-    ]
+  "geometry": {
+    "type": "isosurface",
+    "function": "gyroid_f"
+  },
+  "materials": {
+    "default": "MATERIAL_PORCELAIN"
+  }
 }
 ```
 
-### Generated Code
 ```glsl
-Hit trace_scene(Ray ray) {
-    Hit closest = no_hit();
-    
-    // Standalone sphere: use fast analytic test
-    float t = find_t_sphere(ray, hero_sphere_params);
-    if (t > 0.0 && t < closest.t) {
-        closest = make_sphere_hit(ray, t);
-    }
-    
-    // CSG and fractal: combined SDF marching
-    float scene_sdf(vec3 p) {
-        float d = sdf_sphere(p, csg_sphere1_params);
-        d = op_union(d, sdf_sphere(p, csg_sphere2_params));
-        d = min(d, sdf_mandelbulb(p));
-        return d;
-    }
-    Hit sdf_hit = march(ray, scene_sdf);
-    
-    return closest_hit(closest, sdf_hit);
+// gyroid/euc_implicit.glsl
+float gyroid_f(vec3 p) {
+    return sin(p.x)*cos(p.y) + sin(p.y)*cos(p.z) + sin(p.z)*cos(p.x);
+}
+
+// gyroid/euc_gradient.glsl (optional)
+vec3 gyroid_gradient(vec3 p) {
+    return vec3(
+        cos(p.x)*cos(p.y) - sin(p.z)*sin(p.x),
+        cos(p.y)*cos(p.z) - sin(p.x)*sin(p.y),
+        cos(p.z)*cos(p.x) - sin(p.y)*sin(p.z)
+    );
+}
+
+// Generated distance estimate
+float gyroid_distance(vec3 p) {
+    float f = gyroid_f(p);
+    vec3 grad = gyroid_gradient(p);
+    return abs(f) / max(length(grad), 0.001);
+}
+
+// Generated classifier
+int classify_gyroid_0(vec3 p) {
+    return gyroid_f(p) < 0.0 ? MATERIAL_PORCELAIN : MATERIAL_AIR;
 }
 ```
 
-## Object Types
+### Multi-Region Object
 
-### SDF Objects
-- Provide signed distance function
-- Support CSG operations
-- Enable sphere marching
-- Examples: primitives, fractals, compound objects
-
-### Isosurface Objects
-- Define implicit surface where f(p) = 0
-- May provide gradient for optimization
-- Support specialized tracing methods
-- Examples: metaballs, density fields, harmonic functions
-
-### Analytic Objects
-- Provide closed-form ray intersection
-- Fastest possible intersection
-- Limited to mathematically simple shapes
-- Examples: spheres, planes, triangles
-
-### Mesh Objects
-- Reference external data in assets/
-- Use BVH or other acceleration structures
-- Handle arbitrary complexity
-- Examples: scanned models, artistic creations
-
-## Multi-Geometry Support
-
-Objects can exist in different geometric spaces. The system uses "Euclidean as default":
-
-### Single Geometry (Common Case)
-```
-primitives/
-├── box.glsl          # Euclidean only
-├── torus.glsl        # Euclidean only
-└── teapot.glsl       # Euclidean only
+```json
+// glass_fog/definition.json
+{
+  "geometry": {
+    "type": "multi_region",
+    "function": "mandelbulb_sdf"
+  },
+  "materials": {
+    "regions": [
+      {
+        "condition": "abs(base_sdf) < 0.1",
+        "material": "MATERIAL_GLASS",
+        "priority": 2
+      },
+      {
+        "condition": "base_sdf < -0.1",
+        "material": "MATERIAL_FOG",
+        "priority": 1
+      }
+    ]
+  }
+}
 ```
 
-### Multi-Geometry Objects
-```
-primitives/sphere/
-├── euclidean.glsl    # Standard sphere
-├── hyperbolic.glsl   # Hyperbolic sphere
-└── spherical.glsl    # Spherical geometry sphere
-```
+```glsl
+// Generated multi-region evaluator
+float eval_glass_fog(vec3 p, out int region_id) {
+    float base_sdf = mandelbulb_sdf(p);  // Single evaluation
+    
+    float min_dist = MAX_DIST;
+    region_id = REGION_AIR;
+    
+    // Shell region
+    float d_shell = abs(base_sdf) - 0.1;
+    if(d_shell < min_dist) {
+        min_dist = d_shell;
+        region_id = REGION_GLASS_FOG_SHELL;
+    }
+    
+    // Interior region
+    float d_interior = base_sdf + 0.1;
+    if(d_interior < min_dist) {
+        min_dist = d_interior;
+        region_id = REGION_GLASS_FOG_INTERIOR;
+    }
+    
+    return min_dist;
+}
 
-### Resolution
-The compiler resolves objects based on the scene's geometric space, defaulting to Euclidean and checking for specialized versions when needed.
+// Generated classifier
+int classify_glass_fog(vec3 p) {
+    float base_sdf = mandelbulb_sdf(p);
+    if(abs(base_sdf) < 0.1) return MATERIAL_GLASS;
+    if(base_sdf < -0.1) return MATERIAL_FOG;
+    return MATERIAL_AIR;
+}
+
+// Generated normal (numerical gradient)
+vec3 normal_glass_fog(vec3 p) {
+    const float h = 0.0001;
+    int dummy;
+    return normalize(vec3(
+        eval_glass_fog(p + vec3(h,0,0), dummy) - eval_glass_fog(p - vec3(h,0,0), dummy),
+        eval_glass_fog(p + vec3(0,h,0), dummy) - eval_glass_fog(p - vec3(0,0,h), dummy),
+        eval_glass_fog(p + vec3(0,0,h), dummy) - eval_glass_fog(p - vec3(0,0,h), dummy)
+    ) / (2.0 * h));
+}
+```
 
 ## CSG Operations
 
-Geometry-agnostic operations that work with any SDF:
+CSG operations are primitive operations provided by the Objects module:
 
 ```glsl
-// operations.glsl
-float op_union(float d1, float d2) { 
-    return min(d1, d2); 
+// objects/compounds/operations.glsl
+float op_union(float d1, float d2) {
+    return min(d1, d2);
 }
 
-float op_subtract(float d1, float d2) { 
-    return max(d1, -d2); 
+float op_subtract(float d1, float d2) {
+    return max(d1, -d2);
 }
 
-float op_intersect(float d1, float d2) { 
-    return max(d1, d2); 
+float op_intersect(float d1, float d2) {
+    return max(d1, d2);
 }
 
 float op_smooth_union(float d1, float d2, float k) {
-    float h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
-    return mix(d2, d1, h) - k * h * (1.0 - h);
+    float h = clamp(0.5 + 0.5*(d2-d1)/k, 0.0, 1.0);
+    return mix(d2, d1, h) - k*h*(1.0-h);
 }
 ```
 
-## Compound Objects
+### Compound Object Definition
 
-Built from primitives using CSG:
-
-```glsl
-// compound/teacup.glsl
-float sdf(vec3 p) {
-    // Body
-    float body = sdf_cylinder(p, vec3(0), 0.5, 1.0);
-    
-    // Handle
-    float handle = sdf_torus(p - vec3(0.6, 0.3, 0), 0.2, 0.05);
-    
-    // Combine and hollow out
-    float exterior = op_union(body, handle);
-    float interior = sdf_cylinder(p, vec3(0, 0.1, 0), 0.45, 0.9);
-    
-    return op_subtract(exterior, interior);
+```json
+// teacup/definition.json
+{
+  "geometry": {
+    "type": "compound",
+    "operations": [
+      {
+        "type": "subtract",
+        "a": {
+          "type": "union",
+          "a": { "primitive": "cylinder", "params": {...} },
+          "b": { "primitive": "torus", "params": {...} }
+        },
+        "b": { "primitive": "cylinder", "params": {...} }
+      }
+    ]
+  },
+  "materials": {
+    "default": "MATERIAL_CERAMIC"
+  }
 }
 ```
 
-## Scene Integration
+## Procedural Objects
 
-The scene combines all object types efficiently:
+Runtime-defined objects using templates:
+
+```typescript
+// Input specification
+{
+  type: "procedural_sdf",
+  id: "blob",
+  code: "length(p) - 1.0 + 0.3*sin(10.0*p.x)*sin(10.0*p.y)",
+  material: "MATERIAL_WAX"
+}
+```
 
 ```glsl
-Hit trace_scene(Ray ray) {
-    // 1. Fast analytic tests
-    Hit hit = test_analytic_objects(ray);
+// Generated implementation
+float procedural_blob_sdf(vec3 p) {
+    return length(p) - 1.0 + 0.3*sin(10.0*p.x)*sin(10.0*p.y);
+}
+
+int classify_procedural_blob(vec3 p) {
+    return procedural_blob_sdf(p) < 0.0 ? MATERIAL_WAX : MATERIAL_AIR;
+}
+
+vec3 normal_procedural_blob(vec3 p) {
+    // Auto-generated numerical gradient
+    const float h = 0.0001;
+    return normalize(vec3(
+        procedural_blob_sdf(p + vec3(h,0,0)) - procedural_blob_sdf(p - vec3(h,0,0)),
+        procedural_blob_sdf(p + vec3(0,h,0)) - procedural_blob_sdf(p - vec3(0,0,h)),
+        procedural_blob_sdf(p + vec3(0,0,h)) - procedural_blob_sdf(p - vec3(0,0,h))
+    ) / (2.0 * h));
+}
+```
+
+## Two-Sided Materials
+
+Objects can return different materials based on which side is hit:
+
+```glsl
+int classify_leaf(vec3 p, vec3 ray_dir) {
+    float d = leaf_sdf(p);
+    if (abs(d) > EPSILON) {
+        return d < 0 ? MATERIAL_LEAF_INTERIOR : MATERIAL_AIR;
+    }
     
-    // 2. Combined SDF marching
-    hit = min_hit(hit, march_combined_sdfs(ray));
-    
-    // 3. Specialized isosurface tracing
-    hit = min_hit(hit, trace_isosurfaces(ray));
-    
-    // 4. Mesh BVH traversal
-    hit = min_hit(hit, trace_meshes(ray));
-    
-    return hit;
+    // At surface - check which side
+    vec3 n = normal_leaf(p);
+    bool front_face = dot(ray_dir, n) < 0;
+    return front_face ? MATERIAL_LEAF_FRONT : MATERIAL_LEAF_BACK;
 }
 ```
 
 ## Volume Support
 
-All objects are treated as volumes (supporting interior testing) for simplicity. This enables:
-- Glass and refraction
-- Volumetric effects
-- Subsurface scattering
-- CSG operations
+Objects with volumetric materials work identically:
 
-Objects that lack inside testing will fail gracefully with error materials rather than crashing.
+```glsl
+int classify_fog_sphere(vec3 p) {
+    return sphere_sdf(p) < 0.0 ? MATERIAL_FOG : MATERIAL_AIR;
+}
 
-## Best Practices
+// Material system recognizes MATERIAL_FOG as volume type
+// Scene triggers volumetric transport when entering
+```
 
-1. **Start with SDF** - Get it working first, optimize later
-2. **Add analytic intersection** - For common primitives when used standalone
-3. **Provide analytic normals** - When the math is simple
-4. **Document parameters** - Clear parameter names and ranges
-5. **Credit sources** - For algorithms from papers or other artists
-6. **Use consistent naming** - sdf(), normal(), inside() across all objects
+## Geometry-Agnostic Implementation
 
-## Future Extensions
+Objects must use geometry module functions for all geometric operations:
 
-The system is designed to accommodate:
-- New geometric spaces (projective, conformal)
-- New representations (voxels, point clouds, NURBS)
-- Specialized tracing methods (harmonic functions, neural SDFs)
-- Dynamic objects (animated, procedural)
+```glsl
+// DON'T: Assume Euclidean space
+float NdotL = dot(normal, light_dir);  // WRONG!
 
-Each extension would add new subdirectories under objects/ with their own tracing strategies, maintaining the pattern of objects providing capabilities and the compiler choosing optimal strategies.
+// DO: Use geometry module
+float NdotL = g_dot(normal, light_dir, hit.p);  // Correct
+
+// For reflection/refraction in curved space
+Direction reflect_curved(Direction I, Direction N, Point p) {
+    float NdotI = g_dot(N, I, p);
+    Direction refl_local = I - 2.0 * NdotI * N;
+    return normalize(refl_local);
+}
+```
+
+## Object Compiler
+
+```typescript
+class ObjectCompiler {
+  compile(definition: ObjectDefinition): CompiledObject {
+    const distance = this.generateDistanceFunction(definition);
+    const classifier = this.generateClassifier(definition);
+    const normal = definition.hints?.hasAnalyticNormal ? 
+                   this.loadAnalyticNormal(definition) : 
+                   this.generateNumericalNormal(definition);
+    
+    return {
+      id: definition.id,
+      glsl: {
+        distance,
+        classifier,
+        normal
+      },
+      metadata: {
+        usedMaterials: this.extractMaterialIds(definition),
+        boundingVolume: definition.geometry.bounds,
+        hasAnalyticIntersect: definition.geometry.analyticIntersect
+      }
+    };
+  }
+  
+  generateClassifier(definition: ObjectDefinition): string {
+    if (definition.materials.default) {
+      return `
+int classify_${definition.id}(vec3 p) {
+    return ${definition.geometry.function}(p) < 0.0 ? 
+           ${definition.materials.default} : MATERIAL_AIR;
+}`;
+    }
+    
+    // Multi-region classifier
+    const conditions = definition.materials.regions.map(r => 
+      `if(${r.condition}) return ${r.material};`
+    ).join('\n    ');
+    
+    return `
+int classify_${definition.id}(vec3 p) {
+    float base = ${definition.geometry.function}(p);
+    ${conditions}
+    return MATERIAL_AIR;
+}`;
+  }
+}
+```
+
+## Performance Optimizations
+
+- **Single base evaluation** for multi-region objects
+- **Analytic normals** when available
+- **Bounding volumes** for early rejection
+- **Conservative marching** factor (0.9) for reliability
+- **Precomputed constants** where possible
+- **Unrolled classifiers** for simple objects
+- **Cached evaluations** for expensive SDFs
+
+## Design Principles
+
+1. **Objects own geometry + material assignment** - NOT material properties
+2. **Material IDs are integers** - Lightweight to pass around
+3. **Classification is object-local** - Each object knows its own materials
+4. **CSG is a primitive operation** - Available to all, not special
+5. **Separation of concerns** - Objects don't know about shading or scene arrangement
+6. **Mathematical clarity** - SDFs and isosurfaces remain distinct
+7. **Extensibility** - Easy to add new object types
+
+## Validation Requirements
+
+The compiler ensures generated objects:
+1. Implement all required functions (distance, classify, normal)
+2. Return valid material IDs that exist in the material library
+3. Maintain normals pointing outward
+4. Handle edge cases (grazing rays, surface boundaries)
+5. Produce finite distance values
+6. Classify consistently (same point always returns same material)
+7. Support the geometry module's coordinate system

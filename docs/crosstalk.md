@@ -1,4 +1,4 @@
-# Cosstalk: System Communication Architecture
+# Crosstalk: System Communication Architecture
 
 ## Overview
 
@@ -111,40 +111,157 @@ resourceManager.bindTexture(id, unit)
 executor.renderFrame() // Uses bound resources
 ```
 
-### 4. Module Communication (Through Engine)
+### 4. World Module Internal Communication
 
-Modules don't directly communicate - the Engine mediates:
+The World pillar has complex internal communication between its five module types:
 
-**Cross-Module Function Calls**
+**Objects → Scene**
 ```glsl
-// Estimator writes:
-if (intersect(ray, hit)) { }
+// Objects provide shape and material classification
+float sphere_0_sdf(vec3 p)           // Distance function
+int classify_sphere_0(vec3 p)        // Returns MaterialID
+vec3 normal_sphere_0(vec3 p)         // Surface normal
 
-// Engine resolves to:
-if (sc_intersect(ray, hit)) { }
-```
-
-**Material Dispatching**
-```glsl
-// Scene sets hit.material_id = 2
-// Estimator calls: eval_material(hit.material_id, ...)
-// Engine-generated dispatcher routes:
-switch(id) {
-  case 2: return m_disney_eval(...);
+// Scene uses these through dispatch
+float eval_object_sdf(int obj_id, vec3 p) {
+    switch(obj_id) {
+        case 0: return sphere_0_sdf(p);
+        // ... dispatch to all objects
+    }
 }
 ```
 
-**Type Propagation**
+**Scene → Materials (Interface Resolution)**
 ```glsl
-// Geometry defines:
-typedef vec3 Point;
-typedef vec3 Direction;
+// Scene determines material interface using nearby tracking
+struct NearbyObjects {
+    float dists[3];    // Top 3 closest objects
+    int ids[3];        
+    int count;         // Within boundary threshold
+};
 
-// All other modules use Point/Direction
-// (Geometry compiled first via topological sort)
+// Scene resolves and provides to Hit
+hit.material_from = resolve_material(p - epsilon, nearby);
+hit.material_to = resolve_material(p + epsilon, nearby);
+hit.ior_ratio = ior_table[hit.material_from] / ior_table[hit.material_to];
+```
+
+**Materials ← Material IDs (Not Object IDs)**
+```glsl
+// Materials work with material IDs from Objects
+MaterialProperties get_props(int material_id) {
+    return material_props[material_id];  // Direct indexing by material ID
+}
+
+// Material type flags for dispatch
+const int material_types[NUM_MATERIALS] = int[](
+    MAT_TYPE_OPAQUE,         // MATERIAL_WOOD
+    MAT_TYPE_DIELECTRIC,     // MATERIAL_GLASS
+    MAT_TYPE_PARTICIPATING,  // MATERIAL_FOG
+);
+```
+
+### 5. Photography Module Internal Communication
+
+**Estimator → World Modules**
+```glsl
+// Estimator queries Scene
+bool sc_intersect(Ray ray, out Hit hit)
+bool sc_intersect_any(Ray ray, float max_t)  
+int sc_classify_point(vec3 p, int obj_id)  // For volume boundary checks
+
+// Estimator queries Materials for surface interaction
+vec3 m_interact(wi, hit, xi, wo, pdf)  // Batched BSDF operation
+
+// Estimator queries Materials for volume properties (NOT transport)
+vec3 m_sigma_s(Point p, int mat_id)    // Just scattering coefficient
+vec3 m_sigma_a(Point p, int mat_id)    // Just absorption coefficient
+float m_sigma_max(int mat_id)          // Majorant for delta tracking
+Direction m_sample_phase(wi, p, mat_id, xi, pdf)  // Phase function
+```
+
+**Estimator Transport Ownership**
+```glsl
+// Estimator owns HOW to integrate, Materials provide WHAT
+TransportResult dispatch_transport(Ray ray, Hit hit, TransportState state) {
+    int type = material_types[hit.material_to];
+    
+    if (type & MAT_TYPE_PARTICIPATING) {
+        // Estimator chooses integration strategy at compile time
+        #if VOLUME_STRATEGY == DELTA_TRACKING
+            return delta_track_volume(ray, hit, state);
+        #elif VOLUME_STRATEGY == RAY_MARCHING
+            return raymarch_volume(ray, hit, state);
+        #endif
+    }
+    
+    return transport_surface(ray, hit, state);
+}
+
+// Materials don't implement transport, just provide properties
+// Estimator uses these to implement chosen algorithm
+```
+
+**Camera → Geometry**
+```glsl
+// Camera uses geometry functions for ray generation
+Ray c_generate_ray(vec2 pixel, vec2 xi) {
+    // Uses precomputed u_camera_frame
+    // Calls g_geodesic for non-Euclidean spaces
+}
 ```
 
 ## Data Flow Patterns
+
+### Material Property Flow
+```
+Objects define material assignment
+    ↓
+classify_sphere_0(p) returns MATERIAL_GLASS
+    ↓
+Scene resolves interfaces using nearby tracking
+    ↓
+hit.material_to = MATERIAL_GLASS
+hit.material_from = MATERIAL_AIR
+    ↓
+Materials provide properties by ID
+    ↓
+get_props(MATERIAL_GLASS) returns {ior: 1.5, ...}
+    ↓
+Estimator uses properties for transport
+```
+
+### Volume Transport Flow
+```
+Estimator hits participating medium boundary
+    ↓
+Check material_types[hit.material_to] & MAT_TYPE_PARTICIPATING
+    ↓
+Dispatch to compile-time selected strategy
+    ↓
+Query m_sigma_s(p, mat_id) for properties
+    ↓
+Estimator implements integration (delta tracking, etc.)
+    ↓
+Use sc_classify_point() to check boundaries
+    ↓
+Continue until exit or absorption
+```
+
+### Nearby Object Tracking Flow
+```
+Scene marches ray
+    ↓
+Track top 3 closest objects at each step
+    ↓
+Hit detected
+    ↓
+Use NearbyObjects to resolve material interface
+    ↓
+Only check 2-3 objects, not entire scene
+    ↓
+Efficient boundary resolution
+```
 
 ### Parameter Updates
 ```
@@ -152,142 +269,18 @@ User Input
     ↓
 UI Extension 
     ↓
-ParameterStore.set("camera.position", [0, 5, 10])
+ParameterStore.set("materials[GLASS].ior", 1.5)
     ↓
 onChange callback
     ↓
-Engine.updateUniforms({path: "camera.position", value: [0, 5, 10]})
+Engine.updateUniforms({path: "materials[GLASS].ior", value: 1.5})
     ↓
 UniformBinder.updateUniforms()
     ↓
-GL.uniform3fv(location, [0, 5, 10])
+GL.uniform1f(location, 1.5)
     ↓
-GPU Uniform: u_camera_pinhole_position
+GPU Uniform: u_material_glass_ior
 ```
-
-### Render Frame
-```
-App.renderCoordinator.start()
-    ↓
-RenderCoordinator.runProgressive()
-    ↓
-Engine.renderFrame()
-    ↓
-UniformBinder.frameUpdate()  // Update engine uniforms
-ResourceManager.prepareFrame()  // Bind textures
-RenderExecutor.renderFrame()  // Draw quad
-ResourceManager.finalizeFrame()  // Swap buffers
-    ↓
-Pixels in Framebuffer
-```
-
-### Module Compilation
-```
-App.loadRecipe(recipe)
-    ↓
-Engine.compileRecipe(recipe)
-    ↓
-ModuleRegistry.resolveModules(recipe)
-    ↓
-ShaderCompiler.compile()
-    ├→ Dependency sort (Geometry first)
-    ├→ Apply prefixes
-    ├→ Generate material dispatcher
-    ├→ Resolve cross-module calls
-    ├→ Generate main()
-    └→ WebGL compilation
-    ↓
-CompiledProgram stored in Engine
-```
-
-## Event Communication
-
-### Standard Events (via EventBus)
-
-**Camera Events**
-```typescript
-Source: InputExtension
-Events: 'camera.moved', 'camera.animation_complete'
-Listeners: UIExtension, ExperimentExtension
-```
-
-**Render Events**
-```typescript
-Source: RenderCoordinator
-Events: 'render.start', 'render.progress', 'render.complete'
-Listeners: UIExtension, PerformanceExtension, ExportExtension
-```
-
-**Parameter Events**
-```typescript
-Source: ParameterStore
-Events: 'parameter.changed'
-Listeners: UIExtension (update sliders), Engine (update uniforms)
-```
-
-**Experiment Events**
-```typescript
-Source: ExperimentExtension
-Events: 'experiment.started', 'experiment.progress', 'experiment.complete'
-Listeners: UIExtension (progress bar), ExportExtension (save results)
-```
-
-## Communication Protocols
-
-### Direct Reference Protocol
-Used for: Core App components, Engine subsystems
-```typescript
-class Component {
-  constructor(private dependency: Dependency) {
-    // Direct reference, synchronous calls
-    this.dependency.method();
-  }
-}
-```
-Characteristics:
-- Tight coupling
-- Synchronous
-- Fast
-- Simple debugging
-
-### Callback Protocol
-Used for: ParameterStore → App, Engine → App
-```typescript
-interface Observer {
-  onChange: (changes: Changes) => void;
-}
-```
-Characteristics:
-- Loose coupling
-- Synchronous
-- One-to-one
-- Clear causality
-
-### Event Emitter Protocol
-Used for: Extensions, cross-cutting concerns
-```typescript
-bus.emit('event.name', data);
-bus.on('event.name', handler);
-```
-Characteristics:
-- Very loose coupling
-- Asynchronous possible
-- Many-to-many
-- Harder to trace
-
-### Promise/Async Protocol
-Used for: Pixel readback, file I/O, long operations
-```typescript
-async function operation(): Promise<Result> {
-  // Asynchronous operation
-  return result;
-}
-```
-Characteristics:
-- Non-blocking
-- Error propagation
-- Composition friendly
-- Good for I/O
 
 ## Module String Communication
 
@@ -295,113 +288,152 @@ Modules communicate through GLSL strings that the Engine assembles:
 
 ### Function Name Resolution
 ```
-Module requires: ["intersect"]
-Registry finds: Scene provides ["intersect"]
+Module requires: ["intersect", "classify_point"]
+Registry finds: Scene provides both
 Compiler prefixes: "intersect" → "sc_intersect"
-Final GLSL: if (sc_intersect(ray, hit)) { }
+                  "classify_point" → "sc_classify_point"
+Final GLSL: if (sc_intersect(ray, hit)) { 
+              if (sc_classify_point(p, obj_id) == mat_id) { }
+            }
 ```
 
-### Uniform Mapping
+### Material Dispatch Generation
 ```
-Module declares: uniform vec3 position;
-Engine prefixes: u_camera_pinhole_position
-App parameter: "camera.position"
-Binder maps: "camera.position" → u_camera_pinhole_position
+Objects provide: classify_sphere_0, classify_box_1
+Scene generates: get_object_material(obj_id, p)
+Materials indexed by: material_id (not object_id)
+Estimator uses: material_types[mat_id] for dispatch
 ```
 
-### Type Dependencies
+### Transport Strategy Selection
 ```
-Geometry provides: typedef vec3 Point;
-Camera uses: Ray generate_ray(vec2 pixel)
-Where Ray contains: struct Ray { Point origin; }
-Compiler ensures: Geometry compiled before Camera
+App config: volumeStrategy = "delta_tracking"
+Compiler generates: #define VOLUME_STRATEGY DELTA_TRACKING
+Estimator uses: #if VOLUME_STRATEGY == DELTA_TRACKING
+No runtime branching on strategy
 ```
 
 ## Communication Constraints
 
 ### What CANNOT Communicate Directly
 
-1. **Modules ↔ Modules**: Only through Engine-mediated function calls
-2. **World ↔ Photography**: Only through compiled GLSL
-3. **Engine Subsystems ↔ App Extensions**: Only through App core
-4. **GPU ↔ JavaScript**: Only through readPixels and uniforms
-5. **Different Recipes**: Complete isolation, no shared state
+1. **Objects ↔ Materials**: Objects return IDs, Materials work with IDs, no direct link
+2. **Materials ↔ Transport**: Materials provide properties, Estimator owns algorithms
+3. **Modules ↔ Modules**: Only through Engine-mediated function calls
+4. **World ↔ Photography**: Only through compiled GLSL
+5. **Engine Subsystems ↔ App Extensions**: Only through App core
+6. **GPU ↔ JavaScript**: Only through readPixels and uniforms
 
 ### One-Way Communications
 
-1. **Math → Everyone**: Math utilities available everywhere, but Math never calls others
-2. **Modules → Engine**: Modules provide GLSL strings, never receive anything back
-3. **Recipe → Engine**: Recipe is data, flows one-way into compilation
-4. **GPU → Screen**: Pixels flow out, nothing comes back
+1. **Math → Everyone**: Math utilities available everywhere
+2. **Objects → Scene**: Objects provide functions, Scene dispatches
+3. **Scene → Hit**: Scene populates material interface
+4. **Materials → Properties**: Materials provide properties by ID
+5. **Properties → Estimator**: Estimator queries but doesn't modify
+6. **Recipe → Engine**: Recipe flows one-way into compilation
+
+### Clear Ownership Boundaries
+
+1. **Objects own**: Shape geometry and material ID assignment
+2. **Scene owns**: Object arrangement and material interface resolution
+3. **Materials own**: Properties and local scattering behavior for material IDs
+4. **Estimator owns**: Transport strategy and integration algorithms
+5. **Engine owns**: Compilation and dispatch generation
+
+## Performance-Critical Communications
+
+### High-Frequency (Every Sample)
+- `sc_intersect()` - Ray-scene intersection
+- `m_interact()` - BSDF evaluation
+- `next_2d()` - Random number generation
+- Nearby object distance evaluation
+
+### Medium-Frequency (Every Bounce)
+- `dispatch_transport()` - Transport strategy selection
+- `sc_classify_point()` - Volume boundary checks
+- Material property lookups
+
+### Low-Frequency (Per Frame)
+- Uniform updates
+- Frame buffer swaps
+- Camera matrix computation
+
+### Optimization Strategies
+
+**Batching:**
+- Material properties in single struct
+- BSDF sample+eval in one `m_interact()` call
+- Nearby objects tracked together
+
+**Compile-Time Selection:**
+- Transport strategies (#if VOLUME_STRATEGY)
+- Material features (dead code elimination)
+- Constant folding for fixed properties
+
+**Caching:**
+- Precomputed hit.frame
+- Precomputed ior_ratio
+- Camera matrices per frame
+- Material type flags
 
 ## Communication Debugging
 
-### Tracing Parameter Updates
-```typescript
-// Add logging at each step
-parameterStore.set(path, value)
-  console.log(`1. ParameterStore: ${path} = ${value}`)
-→ onChange(changes)
-  console.log(`2. onChange: ${changes.length} changes`)
-→ engine.updateUniforms(changes)
-  console.log(`3. Engine: updating uniforms`)
-→ gl.uniform3fv(location, value)
-  console.log(`4. GL: uniform ${location} set`)
-```
-
-### Tracing Events
-```typescript
-// Instrument EventBus
-class DebugEventBus extends EventEmitter {
-  emit(event: string, data: any) {
-    console.log(`Event: ${event}`, data);
-    super.emit(event, data);
-  }
-}
-```
-
-### Tracing Module Calls
+### Tracing Material Resolution
 ```glsl
-// Engine can inject debug logging
-bool sc_intersect_debug(Ray ray, out Hit hit) {
-  // _debug_log is a special uniform for debugging
-  if (_debug_log > 0.0) {
-    _debug_counter += 1.0;
-  }
-  return sc_intersect(ray, hit);
+// Scene can inject debug info
+Hit create_hit(...) {
+    #if DEBUG_MATERIALS
+    if (hit.material_from != hit.material_to) {
+        atomicAdd(u_boundary_crossings, 1);
+    }
+    #endif
 }
 ```
 
-## Performance Considerations
+### Tracing Transport Dispatch
+```glsl
+#if DEBUG_TRANSPORT
+vec3 dispatch_transport(...) {
+    if (type & MAT_TYPE_PARTICIPATING) 
+        return vec3(1,0,0);  // Red for volumes
+    if (type & MAT_TYPE_SUBSURFACE)
+        return vec3(0,1,0);  // Green for SSS
+    return vec3(0,0,1);      // Blue for surfaces
+}
+#endif
+```
 
-### High-Frequency Communications
-These happen every frame and must be optimized:
-- UniformBinder.frameUpdate()
-- RenderExecutor.renderFrame()
-- ResourceManager buffer swapping
-
-### Batching Opportunities
-- Parameter updates (collect all, apply once)
-- Uniform updates (batch all uniforms per frame)
-- Event emissions (debounce rapid changes)
-
-### Caching Opportunities
-- Compiled programs (never recompile same recipe)
-- Uniform locations (cache per program)
-- Module resolution (cache dependency graphs)
-- Texture bindings (keep common textures bound)
+### Tracing Nearby Objects
+```glsl
+#if DEBUG_NEARBY
+    // Visualize how many objects are tracked
+    return vec3(float(nearby.count) / 3.0);
+#endif
+```
 
 ## Summary
 
-The system uses a hybrid communication architecture:
-- **Direct references** for core components that need tight coupling
-- **Callbacks** for loose coupling with clear causality
-- **Events** for extensions and cross-cutting concerns
-- **String-based** for module composition
+The system uses a layered communication architecture with clear ownership:
 
-This design ensures:
-- Clean architectural boundaries
-- Predictable data flow
-- Extensibility without core modification
-- Clear debugging paths
-- Performance where needed
+**Ownership Hierarchy:**
+- Objects define shapes and assign material IDs
+- Scene arranges objects and resolves interfaces efficiently
+- Materials provide properties indexed by material ID
+- Estimator owns transport strategy and integration
+
+**Communication Methods:**
+- **Direct references** for core components
+- **Callbacks** for parameter updates
+- **Events** for extensions
+- **String-based** for module composition
+- **Compile-time** for transport strategies
+
+**Key Optimizations:**
+- Nearby object tracking (2-3 objects vs entire scene)
+- Material ID indexing (not object ID)
+- Compile-time transport selection
+- Batched operations (properties, BSDF)
+- Precomputed values (frame, IOR ratio)
+
+This design ensures clean boundaries, predictable data flow, and efficient execution while maintaining flexibility for research.

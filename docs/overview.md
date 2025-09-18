@@ -28,13 +28,14 @@ src/
 │
 ├── world/            # Mathematical scene content
 │   ├── geometries/  # Spaces: Euclidean, hyperbolic, etc.
-│   ├── materials/   # BSDFs: Lambert, GGX, etc. (build-time optimized)
-│   ├── scenes/      # Object compositions (build-time generated)
+│   ├── objects/     # Shapes and material assignments (new separation)
+│   ├── scenes/      # Object arrangement and interface resolution
+│   ├── materials/   # BSDFs and volume properties (by material ID)
 │   └── lights/      # Emitters
 │
 └── photography/      # Observation algorithms
     ├── cameras/     # Ray generation (with precomputed matrices)
-    ├── estimators/  # Light transport
+    ├── estimators/  # Light transport (owns integration strategy)
     ├── films/       # Accumulation
     └── developers/  # Output processing
 ```
@@ -60,15 +61,26 @@ src/
 
 ### 4. World (Content)
 **Purpose**: Define the mathematical space and its contents  
-**Provides**: Geometry, materials, scene structure  
-**Build-time optimization**: Generates specialized GLSL based on scene analysis  
-**This is where differential geometry lives**
+**Now provides five module types**:
+- **Geometry**: Differential geometric structure of space
+- **Objects**: Shape definitions and material ID assignments
+- **Scene**: Object arrangement and material interface resolution
+- **Materials**: Properties and scattering functions (work with material IDs)
+- **Lights**: Emission sources
+
+**Key architectural change**: Clear separation of concerns
+- Objects own geometry + material IDs (not properties)
+- Materials map IDs to properties and local behavior
+- Scene arranges objects and resolves interfaces with nearby tracking
+- Build-time optimization generates specialized GLSL
 
 ### 5. Photography (Algorithms)
 **Purpose**: Define how light is measured and integrated  
 **Provides**: Camera, estimation, accumulation, output  
-**Optimization**: Uses precomputed frames, batched BSDF operations  
-**This is where rendering algorithms live**
+**Key architectural change**: Estimator owns transport strategy
+- Materials provide properties (sigma values, phase functions)
+- Estimator decides integration method (delta tracking, ray marching, etc.)
+- Transport strategies are compile-time selectable for research
 
 ## Data Flow
 
@@ -94,7 +106,7 @@ Every module (from World or Photography) conforms to:
 ```typescript
 interface ModuleDescriptor {
   id: {
-    kind: string;     // "Geometry", "Camera", etc.
+    kind: string;     // "Geometry", "Objects", "Scene", "Material", etc.
     name: string;     // "Euclidean", "Pinhole", etc.
     version: string;  // "1.0.0"
   };
@@ -137,8 +149,9 @@ vec3 c_generate_ray(vec2 pixel) { ... }
 Prefix mapping:
 - Uniforms: `u_${kind}_${name}_${param}`
 - Geometry: `g_`
-- Material: `m_`
+- Objects: no prefix (instance-specific names)
 - Scene: `sc_`
+- Material: `m_`
 - Light: `l_`
 - Camera: `c_`
 - Estimator: `e_`
@@ -193,10 +206,10 @@ struct Hit {
   int object_id;
   int part_id;
   
-  // Material interface
-  int material_from;
-  int material_to;
-  float ior_ratio;     // Only ratio needed (not individual IORs)
+  // Material interface (resolved by Scene using nearby tracking)
+  int material_from;   // Material ID we're traveling through
+  int material_to;     // Material ID we would enter
+  float ior_ratio;     // ior_from / ior_to (precomputed)
 };
 
 struct Frame {
@@ -206,55 +219,105 @@ struct Frame {
   Direction n;
 };
 
-// Batched material properties
-struct MaterialProperties {
-  vec3 albedo;
-  float roughness;
-  float metallic;
-  // Only properties used in scene
+// Nearby object tracking for efficient boundaries
+struct NearbyObjects {
+  float dists[3];      // Distances to closest 3 objects
+  int ids[3];          // Object IDs
+  int count;           // How many within threshold
 };
 ```
 
 ## Module Communication
 
-Modules communicate through:
-1. **Function calls** - Using clean names, auto-resolved by engine
-2. **Shared types** - Ray, Hit, Frame (with precomputed data)
-3. **Engine uniforms** - `u_resolution`, `u_frame_index`, precomputed matrices
-4. **Batched operations** - `m_interact()` for combined BSDF operations
+### World Module Interactions
+
+**Objects → Scene:**
+- Objects provide: `classify_[name](p) → MaterialID`
+- Objects provide: `[name]_sdf(p)` or `[name]_f(p)`
+- Scene uses these to resolve material interfaces
+
+**Scene → Materials:**
+- Scene determines: `material_from`, `material_to`
+- Scene provides: `NearbyObjects` for efficient boundary resolution
+- Materials work with material IDs, not object IDs
+
+**Materials → Estimator:**
+- Surface: `m_interact(wi, hit, xi, wo, pdf)` - batched BSDF
+- Volume properties: `m_sigma_s(p, mat_id)`, `m_sigma_a(p, mat_id)`
+- Phase functions: `m_sample_phase(wi, p, mat_id, xi, pdf)`
+- Type flags: `material_types[mat_id]` for dispatch
+
+### Photography Module Interactions
+
+**Estimator Transport Architecture:**
+```glsl
+// Estimator owns transport strategy
+TransportResult dispatch_transport(Ray ray, Hit hit, TransportState state) {
+    int type_to = material_types[hit.material_to];
+    
+    if (type_to & MAT_TYPE_PARTICIPATING) {
+        // Estimator chooses HOW to integrate
+        #if VOLUME_STRATEGY == DELTA_TRACKING
+            return delta_track_volume(ray, hit, state);
+        #elif VOLUME_STRATEGY == RAY_MARCHING
+            return raymarch_volume(ray, hit, state);
+        #endif
+    }
+    
+    return transport_surface(ray, hit, state);
+}
+```
+
+The key change: Materials provide properties, Estimator implements integration.
 
 ### Optimized Operations
 - **Scene** precomputes `hit.frame` once per intersection
+- **Scene** tracks only 3 nearby objects for boundary resolution
+- **Materials** indexed by material ID for fast lookup
 - **Materials** use batched `m_interact()` for sampling + evaluation
 - **Camera** uses precomputed `u_camera_frame` matrix
-- **Properties** fetched via batched `sc_get_material_properties()`
 
 ## Compilation Process
 
-1. **Scene Analysis**: Determine which features are actually used
-2. **Module Generation**: Build optimized GLSL for materials/scenes
-3. **Module Collection**: Gather all modules from World + Photography
-4. **Dependency Resolution**: Order modules, verify all `requires` satisfied
-5. **Auto-Prefixing**: Transform uniforms and functions
-6. **Dead Code Elimination**: Remove unused features
-7. **Constant Folding**: Compile-time evaluation of fixed values
-8. **Orchestration Generation**: Create main() that calls modules in order
-9. **Type Injection**: Add Point/Direction from Geometry
-10. **Final Assembly**: Complete optimized GLSL program
+1. **Scene Analysis**: Determine which objects and materials are used
+2. **Object Compilation**: Generate classifiers and distance functions
+3. **Material Analysis**: Determine which features are actually used
+4. **Module Generation**: Build optimized GLSL for materials/scenes
+5. **Module Collection**: Gather all modules from World + Photography
+6. **Dependency Resolution**: Order modules, verify all `requires` satisfied
+7. **Auto-Prefixing**: Transform uniforms and functions
+8. **Dead Code Elimination**: Remove unused features
+9. **Constant Folding**: Compile-time evaluation of fixed values
+10. **Orchestration Generation**: Create main() that calls modules in order
+11. **Type Injection**: Add Point/Direction from Geometry
+12. **Final Assembly**: Complete optimized GLSL program
 
 ## Build-Time Optimization
+
+### Object Optimization
+Objects are compiled with:
+- **Efficient classifiers**: Return material IDs directly
+- **Analytic normals**: When available for primitives
+- **CSG operations**: Inlined at compile time
+
+### Scene Optimization
+Scenes are generated with:
+- **Nearby object tracking**: Only check 2-3 objects at boundaries
+- **Dispatch functions**: Direct routing to object-specific code
+- **Efficient interface resolution**: Using nearby objects, not entire scene
 
 ### Material Optimization
 Materials are analyzed and optimized at build time:
 - **Dead code elimination**: Unused features (metallic, clearcoat) removed
+- **Property indexing**: By material ID, not object ID
 - **Constant folding**: Fixed parameters compiled as constants
-- **Batched properties**: Single struct fetch vs multiple calls
+- **Type flags**: Packed into integers for fast dispatch
 
-### Scene Optimization
-Scenes are generated with:
-- **Analytic normals**: For spheres, boxes, other primitives
-- **Inlined SDFs**: Constants folded at compile time
-- **Optimized property access**: Arrays for constants, switches for procedural
+### Estimator Optimization
+Estimators compile with:
+- **Transport strategies**: Selected at compile time (no runtime branching)
+- **Efficient dispatch**: Using material type bit flags
+- **Pluggable strategies**: Different methods for volumes, SSS
 
 ### Camera Optimization
 Cameras receive:
@@ -267,34 +330,61 @@ Cameras receive:
 // Research session
 const app = new ResearchApp(gl);
 
-// Build optimized world (analyzed at compile time)
+// Build world with clear separation
 const world = new WorldBuilder()
   .setGeometry(new EuclideanGeometry())
-  .addObject(sphere([0,0,0], 1))
+  .addObject({
+    shape: sphereSDF([0,0,0], 1),
+    material: MATERIAL_GLASS  // Just ID assignment
+  })
   .compile();  // Generates optimized GLSL
 
-// Set observation algorithm  
-app.setPhotographer(new PathTracer());
-
-// Adjust parameters (batched fetch in shader)
-app.parameters.set("material.albedo", [0.9, 0.2, 0.2]);
-
-// Run experiment (uses all optimizations)
-const results = await app.parameterSweep({
-  parameter: "roughness",
-  values: [0.1, 0.2, 0.3, 0.4, 0.5]
+// Configure estimator with transport strategy
+const estimator = new PathTracer({
+  volumeStrategy: 'delta_tracking',  // Compile-time selection
+  sssModel: 'diffusion'
 });
+
+// Set observation algorithm  
+app.setPhotographer(estimator);
+
+// Materials work with IDs, not objects
+app.parameters.set("material[GLASS].ior", 1.5);
+
+// Run experiment comparing transport strategies
+const results = await app.compareStrategies([
+  { volumeStrategy: 'delta_tracking' },
+  { volumeStrategy: 'ray_marching' },
+  { volumeStrategy: 'analytical' }
+]);
 ```
 
 ## Performance Optimizations Summary
 
-1. **Precomputed Frame**: Hit structure includes frame, computed once
-2. **IOR Ratio Only**: Store only `ior_ratio`, not individual IORs
-3. **Automatic Dimensions**: `next_2d()` instead of manual tracking
-4. **Batched Properties**: Single `MaterialProperties` fetch
-5. **Analytic Normals**: Computed directly for known primitives
-6. **Camera Matrices**: Precomputed per frame, not per ray
-7. **Batched BSDF**: `m_interact()` returns direction + PDF + contribution
-8. **Dead Code Elimination**: Unused material features removed
-9. **Constant Folding**: Fixed values compiled as constants
-10. **Reset Detection**: `u_film_reset` flag for parameter changes
+1. **Nearby Object Tracking**: Only check 2-3 objects at material boundaries
+2. **Material ID Dispatch**: Properties indexed by material ID, not object ID
+3. **Compile-Time Transport**: Volume strategies selected at compilation
+4. **Precomputed Frame**: Hit structure includes frame, computed once
+5. **IOR Ratio Only**: Store only `ior_ratio`, not individual IORs
+6. **Automatic Dimensions**: `next_2d()` instead of manual tracking
+7. **Batched Properties**: Single `MaterialProperties` fetch
+8. **Analytic Normals**: Computed directly for known primitives
+9. **Camera Matrices**: Precomputed per frame, not per ray
+10. **Batched BSDF**: `m_interact()` returns direction + PDF + contribution
+11. **Dead Code Elimination**: Unused material features removed
+12. **Constant Folding**: Fixed values compiled as constants
+13. **Reset Detection**: `u_film_reset` flag for parameter changes
+
+## Key Architectural Decisions
+
+The system now features clear separation of concerns:
+- **Objects**: Own geometry and material ID assignment
+- **Materials**: Map material IDs to properties and local behavior
+- **Scene**: Arranges objects and efficiently resolves interfaces
+- **Estimator**: Owns transport strategy and integration methods
+
+This separation enables:
+- Easy material swapping without changing geometry
+- Multiple transport strategies for research comparison
+- Efficient boundary resolution with nearby tracking
+- Clear ownership of integration algorithms
