@@ -54,7 +54,7 @@ float saturate(float x) {
 
 **Step 3.1: Types**
 ```typescript
-// src/engine/types.ts
+// src/engine/types.md
 export interface ModuleDescriptor {
   id: {
     kind: 'Geometry' | 'Objects' | 'Scene' | 'Material' | 'Camera' | 'Estimator' | 'Film' | 'Developer';

@@ -1,4 +1,4 @@
-// src/tracer/types.ts
+// src/tracer/types.md
 import type { Plugin } from "../core/types";
 import type ShaderProgram from "../rendering/ShaderProgram";
 import type UniformManager from "../systems/UniformManager";

@@ -81,7 +81,7 @@ Build in dependency order:
 
 #### 2.1 Types & Data Structures
 ```typescript
-// engine/types.ts
+// engine/types.md
 interface ModuleDescriptor {
   id: { kind: string; name: string; version: string };
   fragment: { functions: string; uniforms?: string };

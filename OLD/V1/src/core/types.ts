@@ -1,5 +1,5 @@
 /**
- * core/types.ts — v1
+ * core/types.md — v1
  * ------------------------------------------------------------
  * PURPOSE
  *   Canonical contracts for all *public* components that the Engine
