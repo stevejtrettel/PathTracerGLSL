@@ -1,31 +1,22 @@
 /**
- * Integration example: trace-flatcolor
+ * Integration example: trace-sky
  *
  * Purpose
- *   Minimal end-to-end pixel test using the rigorously tested pieces:
- *     - AssemblerLite: builds a concrete fragment (no #ifdefs)
- *     - PinholeCamera: provides generateRay (not actually used by FlatColor, but fine)
- *     - FlatColorTracer: provides tracePixel (returns constant color)
- *     - ShaderProgram + Fullscreen: small GL executor primitives
+ *   End-to-end test of the SkyOnly tracer. Produces a gradient sky with
+ *   an optional sun lobe, driven by camera rays.
  *
  * How to run
- *   1) Ensure this file is included by your dev entry (e.g., import it from main.ts),
- *      or directly point Vite to it as a page entry.
- *   2) npm run dev   → you should see a solid magenta frame.
- *
- * Notes
- *   - This example creates its own canvas and appends to document.body, so no HTML edits.
- *   - Resize is handled; uniforms are re-set each frame as needed.
+ *   npm run dev → see horizon/zenith gradient with sun highlight.
  */
 
 import { assembleTraceFragment } from '../src/engine/shaders/AssemblerLite';
-import { ShaderProgram } from '../src/engine/shaders/ShaderProgram';
-import { Fullscreen } from '../src/engine/execution/Fullscreen';
+import {ShaderProgram} from '../src/engine/shaders/ShaderProgram';
+import {Fullscreen} from '../src/engine/execution/FullScreen';
 
 import PinholeCamera from '../src/photography/camera/PinholeCamera';
-import FlatColorTracer from '../src/photography/tracer/FlatColor';
+import SkyOnlyTracer from '../src/photography/tracer/SkyOnly';
 
-// --- Fullscreen vertex (matches Assembler glue's varyings) ---
+// --- Vertex shader for fullscreen triangle ---
 const VERT_SRC = `#version 300 es
 precision highp float;
 const vec2 POS[3] = vec2[](
@@ -41,10 +32,10 @@ void main(){
 }
 ` as const;
 
-// --- Assemble a concrete fragment (Camera + Tracer) ---
-const FRAG_SRC = assembleTraceFragment(PinholeCamera, FlatColorTracer);
+// --- Assemble Camera + Tracer ---
+const FRAG_SRC = assembleTraceFragment(PinholeCamera, SkyOnlyTracer);
 
-// --- Minimal page setup (no HTML edits needed) ---
+// --- Canvas + GL context ---
 const canvas = document.createElement('canvas');
 canvas.style.width = '100vw';
 canvas.style.height = '100vh';
@@ -52,13 +43,10 @@ canvas.style.display = 'block';
 document.body.style.margin = '0';
 document.body.appendChild(canvas);
 
-// --- WebGL2 context ---
-const gl = canvas.getContext('webgl2', { antialias: false });
-if (!gl) {
-    throw new Error('WebGL2 not available');
-}
+const gl = canvas.getContext('webgl2');
+if (!gl) throw new Error('WebGL2 not available');
 
-// --- Create program & fullscreen helper ---
+// --- Program + fullscreen helper ---
 const program = ShaderProgram.create(gl, { vertex: VERT_SRC, fragment: FRAG_SRC });
 const fullscreen = Fullscreen.create(gl);
 
@@ -66,9 +54,9 @@ const fullscreen = Fullscreen.create(gl);
 let frame = 0;
 const t0 = performance.now();
 
-// --- Utilities ---
-function fitCanvasToCSSPixels(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
-    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1)); // cap for perf
+// --- Utils ---
+function fitCanvasToCSSPixels() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     const w = Math.floor(canvas.clientWidth * dpr);
     const h = Math.floor(canvas.clientHeight * dpr);
     if (canvas.width !== w || canvas.height !== h) {
@@ -85,7 +73,6 @@ function setSystemUniforms() {
 }
 
 function setCameraUniforms() {
-    // camera.pinhole → g_camera_pinhole_*
     gl.uniformMatrix4fv(
         program.uniform('g_camera_pinhole_cameraToWorld')!,
         false,
@@ -101,14 +88,22 @@ function setCameraUniforms() {
 }
 
 function setTracerUniforms() {
-    // tracer.flat_color → g_tracer_flat_color_*
-    gl.uniform3f(program.uniform('g_tracer_flat_color_color')!, 1.0, 0.0, 1.0); // magenta
-    gl.uniform1f(program.uniform('g_tracer_flat_color_exposureEV')!, 0.0);
+    // Horizon color (skyBottom), zenith color (skyTop)
+    gl.uniform3f(program.uniform('g_tracer_sky_only_skyBottom')!, 0.6, 0.7, 0.8);
+    gl.uniform3f(program.uniform('g_tracer_sky_only_skyTop')!,    0.05, 0.1, 0.35);
+
+    // Sun direction & tint
+    gl.uniform3f(program.uniform('g_tracer_sky_only_sunDir')!,    0.6, 0.4, 0.6);
+    gl.uniform3f(program.uniform('g_tracer_sky_only_sunTint')!,   1.8, 1.6, 1.4);
+    gl.uniform1f(program.uniform('g_tracer_sky_only_sunSize')!,   0.03);
+
+    // Exposure
+    gl.uniform1f(program.uniform('g_tracer_sky_only_exposureEV')!, 0.0);
 }
 
 // --- Render loop ---
 function render() {
-    fitCanvasToCSSPixels(canvas, gl);
+    fitCanvasToCSSPixels();
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
 
@@ -125,8 +120,5 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// --- Kickoff ---
 render();
-
-// --- Handle resizes ---
-window.addEventListener('resize', () => fitCanvasToCSSPixels(canvas, gl), { passive: true });
+window.addEventListener('resize', fitCanvasToCSSPixels, { passive: true });

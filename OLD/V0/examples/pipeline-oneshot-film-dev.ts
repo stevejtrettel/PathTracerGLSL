@@ -15,11 +15,11 @@
 
 import { assembleTraceFragment, assembleFragment } from '../src/engine/shaders/AssemblerLite';
 import {ShaderProgram} from '../src/engine/shaders/ShaderProgram';
-import {Fullscreen} from '../src/engine/execution/Fullscreen';
+import {Fullscreen} from '../src/engine/execution/FullScreen';
 
 import PinholeCamera from '../src/photography/camera/PinholeCamera';
 import SDFStubWorld from '../src/world/scene/SDFStub';
-import OneShotTracer from '../src/photography/tracer/OneShot';
+import OneShotTracer from '../src/photography/tracer/Oneshot';
 
 import PassthroughFilm from '../src/photography/film/Passthrough';
 import LinearSRGBDeveloper from '../src/photography/developer/LinearSRGB';
