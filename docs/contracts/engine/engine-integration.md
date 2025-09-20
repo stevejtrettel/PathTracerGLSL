@@ -1,386 +1,634 @@
+# Engine Integration Contract
 
-# Engine Implementation Guide - Integration and Data Flow
+## Purpose
 
-## Overview
+This document specifies how the Engine's five subsystems coordinate to transform recipes into rendered frames. It defines the initialization sequence, frame execution flow, data dependencies, error propagation, and recovery procedures that bind the subsystems into a cohesive whole.
 
-Now that we have all the subsystems, we need to wire them together correctly. This guide covers the actual implementation of how data flows between subsystems during initialization and each frame.
+## Subsystem Dependencies
 
-## The Critical Initialization Order
+```typescript
+// Dependency graph (→ means "depends on")
+ShaderCompiler → ModuleRegistry     // Needs modules to compile
+ResourceManager → (standalone)      // No dependencies
+UniformBinder → (needs program)     // Operates on compiled programs  
+RenderExecutor → ResourceManager    // Needs framebuffers
+Engine → ALL                        // Orchestrates everything
+```
 
-The order matters because of dependencies between subsystems:
+## Initialization Sequence
+
+The Engine MUST initialize subsystems in this exact order:
 
 ```typescript
 class Engine {
-  constructor(private gl: WebGL2RenderingContext) {
-    // Order is CRITICAL - each depends on the previous
+  constructor(gl: WebGL2RenderingContext, config?: EngineConfig) {
+    // PHASE 1: Core Infrastructure
+    this.initializeCore(gl, config);
     
-    // 1. Registry first - it holds module definitions
-    this.registry = new ModuleRegistry();
+    // PHASE 2: Subsystems (order critical)
+    this.initializeSubsystems();
     
-    // 2. Resources second - needs GL context, provides capabilities
-    this.resources = new ResourceManager(gl);
+    // PHASE 3: Validation
+    this.validateInitialization();
     
-    // 3. Executor third - needs resources for framebuffer binding
-    this.executor = new RenderExecutor(gl, this.resources);
-    
-    // 4. Compiler fourth - needs registry for module lookup
-    this.compiler = new ShaderCompiler(gl, this.registry);
-    
-    // 5. UniformBinder last - operates on compiled programs
-    this.uniforms = new UniformBinder(gl);
+    // PHASE 4: State transition
+    this.transitionToReady();
   }
 }
 ```
 
-### Why This Order?
-
-```
-ModuleRegistry (standalone)
-    ↓
-ResourceManager (needs GL context)
-    ↓
-RenderExecutor (needs ResourceManager for framebuffers)
-    ↓
-ShaderCompiler (needs Registry for modules)
-    ↓
-UniformBinder (needs compiled programs)
-```
-
-## Startup Sequence Implementation
+### Phase 1: Core Infrastructure
 
 ```typescript
-initialize(recipes: Recipe[]): void {
-  console.log('Engine initialization starting...');
+private initializeCore(gl: WebGL2RenderingContext, config?: EngineConfig): void {
+  // 1. Store WebGL context
+  this.gl = gl;
   
-  // Phase 1: Register built-in modules
-  console.log('Phase 1: Registering modules');
-  this.registry.registerDefaults();
+  // 2. Check WebGL2 availability
+  if (!gl) {
+    throw new EngineError('WebGL2 not available', 'Engine', false);
+  }
   
-  // Phase 2: Validate GPU capabilities
-  console.log('Phase 2: Checking GPU capabilities');
-  const caps = this.resources.getCapabilities();
+  // 3. Apply configuration
+  this.config = {
+    viewport: { x: 0, y: 0, width: gl.canvas.width, height: gl.canvas.height },
+    clearColor: [0, 0, 0, 0],
+    enableStatistics: true,
+    fallbackBehavior: 'suggest',
+    maxCompileTime: 5000,
+    ...config
+  };
+  
+  // 4. Initialize state
+  this.state = { type: 'uninitialized' };
+  this.compiledPrograms = new Map();
+  this.activeProgram = null;
+  
+  // 5. Set up context loss handling
+  this.gl.canvas.addEventListener('webglcontextlost', this.handleContextLoss);
+  this.gl.canvas.addEventListener('webglcontextrestored', this.handleContextRestore);
+}
+```
+
+### Phase 2: Subsystem Initialization
+
+```typescript
+private initializeSubsystems(): void {
+  try {
+    // 1. ModuleRegistry FIRST - holds module definitions
+    this.registry = new ModuleRegistry();
+    this.registry.registerDefaults();
+    console.log('✓ ModuleRegistry initialized');
+    
+    // 2. ResourceManager SECOND - checks GPU capabilities
+    this.resources = new ResourceManager(this.gl);
+    const capabilities = this.resources.getCapabilities();
+    console.log('✓ ResourceManager initialized');
+    console.log(`  HDR: ${capabilities.floatRenderTargets ? 'Yes' : 'No'}`);
+    console.log(`  Max texture size: ${capabilities.maxTextureSize}`);
+    
+    // 3. RenderExecutor THIRD - needs ResourceManager for framebuffers
+    this.executor = new RenderExecutor(this.gl, this.resources);
+    this.executor.setupGeometry();
+    console.log('✓ RenderExecutor initialized');
+    
+    // 4. ShaderCompiler FOURTH - needs ModuleRegistry for modules
+    this.compiler = new ShaderCompiler(this.gl, this.registry);
+    console.log('✓ ShaderCompiler initialized');
+    
+    // 5. UniformBinder LAST - operates on compiled programs
+    this.uniforms = new UniformBinder(this.gl);
+    console.log('✓ UniformBinder initialized');
+    
+  } catch (error) {
+    // Cleanup any partially initialized subsystems
+    this.cleanupPartialInitialization();
+    throw new EngineError(
+      `Subsystem initialization failed: ${error.message}`,
+      'Engine',
+      false
+    );
+  }
+}
+```
+
+### Phase 3: Validation
+
+```typescript
+private validateInitialization(): void {
+  // Check GPU capabilities
   const validation = this.resources.validateCapabilities();
   
   if (!validation.valid) {
-    // Can't continue without required features
-    this.handleCapabilityFailure(validation);
-    throw new Error('GPU capabilities insufficient');
-  }
-  
-  // Phase 3: Setup rendering geometry
-  console.log('Phase 3: Creating geometry');
-  this.executor.setupGeometry();
-  this.executor.initialize();
-  
-  // Phase 4: Compile all recipe variants
-  console.log('Phase 4: Compiling shaders');
-  const startCompile = performance.now();
-  
-  for (const recipe of recipes) {
-    try {
-      this.compileRecipe(recipe);
-    } catch (error) {
-      console.error(`Failed to compile recipe ${recipe.id}:`, error);
-      // Continue with other recipes
+    switch (this.config.fallbackBehavior) {
+      case 'error':
+        throw new EngineError(
+          `GPU capabilities insufficient: ${validation.errors.join(', ')}`,
+          'Engine',
+          false
+        );
+        
+      case 'suggest':
+        console.error('GPU limitations:', validation.errors);
+        if (validation.suggestions) {
+          console.log('Suggestions:', validation.suggestions);
+        }
+        break;
+        
+      case 'auto':
+        this.applyAutomaticFallbacks(validation);
+        break;
     }
   }
   
-  const compileTime = performance.now() - startCompile;
-  console.log(`Compiled ${recipes.length} recipes in ${compileTime}ms`);
+  // Verify all subsystems ready
+  if (!this.registry || !this.resources || !this.executor || 
+      !this.compiler || !this.uniforms) {
+    throw new EngineError('Not all subsystems initialized', 'Engine', false);
+  }
   
-  // Phase 5: Ready!
-  this.state = 'ready';
+  // Check geometry is set up
+  if (!this.executor.isInitialized()) {
+    throw new EngineError('RenderExecutor geometry not initialized', 'Engine', false);
+  }
+}
+```
+
+### Phase 4: State Transition
+
+```typescript
+private transitionToReady(): void {
+  this.state = { type: 'ready' };
   console.log('Engine initialization complete');
 }
 ```
 
 ## Recipe Compilation Flow
 
-Here's how a recipe becomes a GPU program:
+### Eager Compilation at Startup
 
 ```typescript
-private compileRecipe(recipe: Recipe): void {
-  // Step 1: Check recipe validity
-  const compatibility = this.registry.checkCompatibility(recipe);
-  if (!compatibility.compatible) {
-    throw new Error(`Recipe incompatible: ${compatibility.issues.join(', ')}`);
+initialize(recipes: Recipe[]): void {
+  if (this.state.type !== 'ready') {
+    throw new Error(`Cannot initialize recipes in state: ${this.state.type}`);
   }
   
-  // Step 2: Resolve modules
-  const modules = this.registry.resolveModules(recipe);
-  // This gives us the actual ModuleDescriptor objects
-  
-  // Step 3: Compile to GPU program
-  const program = this.compiler.compile(recipe);
-  // This runs the entire pipeline and creates WebGLProgram
-  
-  // Step 4: Cache the compiled program
+  // For each recipe:
+  for (const recipe of recipes) {
+    this.compileRecipe(recipe);
+  }
+}
+
+private compileRecipe(recipe: Recipe): void {
   const key = this.getRecipeKey(recipe);
-  this.compiledPrograms.set(key, program);
   
-  console.log(`✓ Compiled ${key}`);
+  // 1. Registry: Validate recipe compatibility
+  const compatibility = this.registry.checkCompatibility(recipe);
+  if (!compatibility.compatible) {
+    throw new Error(`Recipe ${key} incompatible: ${compatibility.issues.join(', ')}`);
+  }
+  
+  // 2. Registry: Resolve modules
+  const modules = this.registry.resolveModules(recipe);
+  
+  // 3. Compiler: Run 8-stage pipeline
+  const program = this.compiler.compile(recipe);
+  
+  // 4. Cache compiled program
+  this.compiledPrograms.set(key, program);
 }
 ```
 
-## Recipe Selection Implementation
-
-When the user selects a recipe:
+### Recipe Selection Flow
 
 ```typescript
 selectRecipe(recipeName: string): void {
-  console.log(`Selecting recipe: ${recipeName}`);
-  
-  // Step 1: Get the pre-compiled program
+  // 1. Retrieve pre-compiled program
   const program = this.compiledPrograms.get(recipeName);
   if (!program) {
-    throw new Error(`Recipe not found: ${recipeName}`);
+    throw new Error(`Recipe not pre-compiled: ${recipeName}`);
   }
   
-  // Step 2: Make it active on GPU
+  // 2. Deactivate current if exists
+  if (this.activeProgram) {
+    this.deactivateProgram();
+  }
+  
+  // 3. Activate new program
   this.gl.useProgram(program.program);
   this.activeProgram = program;
   
-  // Step 3: Build uniform bindings for this program
-  this.uniforms.clearBindings();
-  this.uniforms.buildBindings(program, program.modules);
+  // 4. UniformBinder: Build parameter mappings
+  this.uniforms.buildBindings(program);
   
-  // Step 4: Setup film buffers based on film module
-  const filmModule = program.modules.find(m => m.id.kind === 'film');
-  if (!filmModule) {
-    throw new Error('No film module in recipe!');
-  }
-  
+  // 5. ResourceManager: Setup film buffers
+  const filmModule = this.getFilmModule(program);
   const filmResources = this.resources.setupFilmBuffers(filmModule);
   
-  // Step 5: Initialize frame counter
-  this.frameCount = 0;
+  // 6. Bind film textures to standard units
+  this.bindFilmTextures(filmResources);
   
-  // Step 6: Transition to running state
-  this.state = 'running';
-  
-  console.log(`Recipe active: ${recipeName}`);
+  // 7. Transition to running
+  this.state = { 
+    type: 'running', 
+    program, 
+    frame: 0 
+  };
 }
 ```
 
-## Frame Execution Implementation
+## Frame Execution Flow
 
-Here's what happens every frame:
+The frame execution follows a strict sequence:
 
 ```typescript
 renderFrame(): void {
-  if (this.state !== 'running') {
-    throw new Error('Cannot render - engine not running');
+  if (this.state.type !== 'running') {
+    throw new Error(`Cannot render in state: ${this.state.type}`);
   }
   
-  const frameStart = performance.now();
+  // PHASE 1: Resource Preparation
+  this.prepareResources();
   
-  // Step 1: Prepare resources (bind textures, set render target)
+  // PHASE 2: Uniform Updates
+  this.updateUniforms();
+  
+  // PHASE 3: Render Execution
+  this.executeRender();
+  
+  // PHASE 4: Resource Finalization
+  this.finalizeResources();
+  
+  // PHASE 5: State Update
+  this.updateFrameState();
+}
+```
+
+### Phase 1: Resource Preparation
+
+```typescript
+private prepareResources(): void {
+  // ResourceManager: Bind previous frame textures for reading
   this.resources.prepareFrame();
   
-  // Step 2: Flush uniform updates
-  const engineState = this.getEngineState();
-  this.uniforms.frameUpdate(engineState);
-  
-  // Step 3: Execute the draw call
-  this.executor.renderFrame({
-    clear: this.frameCount === 0,  // Clear on first frame
-    swapBuffers: true,              // Use ping-pong buffers
-  });
-  
-  // Step 4: Finalize resources (swap buffers)
-  this.resources.finalizeFrame();
-  
-  // Step 5: Update frame counter
-  this.frameCount++;
-  
-  // Step 6: Track performance
-  const frameTime = performance.now() - frameStart;
-  this.trackFramePerformance(frameTime);
-  
-  // Log every 60 frames
-  if (this.frameCount % 60 === 0) {
-    console.log(`Frame ${this.frameCount}: ${frameTime.toFixed(2)}ms`);
-  }
+  // This binds:
+  // - u_film_radiance_previous → texture unit 0
+  // - u_film_variance_previous → texture unit 1  
+  // - u_film_samples_previous → texture unit 2
 }
+```
 
-private getEngineState(): EngineStateInfo {
-  return {
+### Phase 2: Uniform Updates
+
+```typescript
+private updateUniforms(): void {
+  // Build engine state
+  const engineState: EngineStateInfo = {
     width: this.viewport.width,
     height: this.viewport.height,
-    frameIndex: this.frameCount,
-    sampleCount: this.frameCount,  // Simplified
+    frameIndex: this.state.frame,
+    sampleCount: this.state.frame,  // For now
     time: performance.now() / 1000
   };
+  
+  // UniformBinder: Flush all pending parameter updates
+  this.uniforms.frameUpdate(engineState);
+  
+  // This updates:
+  // 1. Engine uniforms (resolution, frame_index, etc.)
+  // 2. All queued parameter changes
+  // 3. Texture uniforms if needed
 }
+```
+
+### Phase 3: Render Execution
+
+```typescript
+private executeRender(): void {
+  // RenderExecutor: Draw full-screen triangle
+  this.executor.renderFrame({
+    clear: this.state.frame === 0,
+    viewport: this.viewport,
+    swapBuffers: true,
+    target: { type: "screen" }
+  });
+  
+  // This:
+  // 1. Binds the VAO
+  // 2. Issues single drawArrays call
+  // 3. Unbinds the VAO
+}
+```
+
+### Phase 4: Resource Finalization
+
+```typescript
+private finalizeResources(): void {
+  // ResourceManager: Swap film buffers for next frame
+  this.resources.finalizeFrame();
+  
+  // This swaps current/previous framebuffers for accumulation
+}
+```
+
+### Phase 5: State Update
+
+```typescript
+private updateFrameState(): void {
+  this.state = {
+    ...this.state,
+    frame: this.state.frame + 1
+  };
+}
+```
+
+## Data Flow Between Subsystems
+
+### Compilation Data Flow
+
+```
+ModuleRegistry                      ShaderCompiler
+    ↓                                    ↓
+[Modules] ←──── resolveModules() ────→ [Modules]
+                                         ↓
+                                  [8-stage pipeline]
+                                         ↓
+                                  [CompiledProgram]
+```
+
+### Runtime Data Flow
+
+```
+ParameterStore → Engine → UniformBinder
+                            ↓
+                        [Uniform Updates]
+                            ↓
+                          GPU
+
+ResourceManager ←→ RenderExecutor
+      ↓                    ↓
+[Framebuffers]     [Draw Calls]
+      ↓                    ↓
+     GPU ←─────────────────┘
 ```
 
 ## Parameter Update Flow
 
-How parameter changes flow through the system:
+```typescript
+// 1. App updates parameter
+parameterStore.set('camera.position', [0, 5, 10]);
+
+// 2. App gets changes
+const changes = parameterStore.getChanges();
+
+// 3. Engine queues updates
+engine.updateUniforms(changes);
+  ↓
+// 4. UniformBinder queues internally
+uniforms.queueUpdates(changes);
+
+// 5. During renderFrame(), updates flush
+uniforms.frameUpdate(engineState);
+  ↓
+// 6. WebGL uniform calls
+gl.uniform3fv(location, [0, 5, 10]);
+```
+
+## Error Propagation
+
+Errors propagate up from subsystems to Engine:
 
 ```typescript
-updateParameters(changes: ParameterChanges): void {
-  // Step 1: Queue the updates (don't apply yet!)
-  for (const change of changes.changes) {
-    this.uniforms.queueUpdate(change.path, change.newValue);
+class Engine {
+  private handleSubsystemError(error: Error, subsystem: string): void {
+    // Log with subsystem context
+    console.error(`Error in ${subsystem}:`, error);
+    
+    // Determine if recoverable
+    const recoverable = this.isRecoverable(error);
+    
+    // Transition to error state
+    this.state = {
+      type: 'error',
+      error,
+      recoverable
+    };
+    
+    // Emit error event
+    this.emitError(error, subsystem);
+    
+    // Attempt recovery if possible
+    if (recoverable) {
+      this.attemptRecovery(error, subsystem);
+    }
   }
   
-  // Step 2: Check if we need to reset accumulation
-  if (this.requiresReset(changes)) {
-    this.resetAccumulation();
-  }
-  
-  // Note: Actual GPU update happens in frameUpdate()
-}
-
-private requiresReset(changes: ParameterChanges): boolean {
-  // Camera changes always reset
-  if (changes.changes.some(c => c.path.startsWith('camera.'))) {
-    return true;
-  }
-  
-  // Material changes reset
-  if (changes.changes.some(c => c.path.startsWith('material.'))) {
-    return true;
-  }
-  
-  // Developer changes don't reset (just tone mapping)
-  if (changes.changes.every(c => c.path.startsWith('developer.'))) {
+  private isRecoverable(error: Error): boolean {
+    // Context loss is recoverable
+    if (error.message.includes('context lost')) {
+      return true;
+    }
+    
+    // Resource allocation might be recoverable
+    if (error instanceof ResourceAllocationError) {
+      return true;
+    }
+    
+    // Compilation errors are not recoverable
+    if (error instanceof CompilationError) {
+      return false;
+    }
+    
     return false;
   }
-  
-  return true;  // Default to reset
-}
-
-private resetAccumulation(): void {
-  console.log('Resetting accumulation');
-  
-  // Clear film buffers
-  this.resources.clearFilmBuffers();
-  
-  // Reset frame counter
-  this.frameCount = 0;
-  
-  // Tell uniform binder about reset
-  this.uniforms.queueUpdate('engine.film_reset', true);
 }
 ```
 
-## Error Handling Integration
-
-How errors propagate through the system:
+## Context Loss and Recovery
 
 ```typescript
-private handleCompilationError(error: CompilationError): void {
-  console.error('Shader compilation failed:', error);
-  
-  // Try to provide helpful context
-  if (error.sourceContext) {
-    console.error('Source context:', error.sourceContext);
-  }
-  
-  // Use line mapping to find module
-  if (error.compiledLine && this.activeProgram) {
-    const source = this.activeProgram.metadata.lineMap.getSourceLocation(
-      error.compiledLine
-    );
-    if (source) {
-      console.error(`Error in module ${source.module} at line ${source.originalLine}`);
-    }
-  }
+private handleContextLoss = (event: WebGLContextEvent): void => {
+  event.preventDefault();
+  console.warn('WebGL context lost');
   
   // Transition to error state
-  this.state = 'error';
+  this.state = {
+    type: 'error',
+    error: new Error('WebGL context lost'),
+    recoverable: true
+  };
   
-  // Notify app
-  this.onError?.(error);
-}
+  // Notify subsystems
+  this.resources.handleContextLoss();
+  this.executor.handleContextLoss();
+};
 
-private handleContextLoss(): void {
-  console.error('WebGL context lost');
+private handleContextRestore = (): void => {
+  console.log('WebGL context restored, reinitializing...');
   
-  // Stop rendering
-  this.state = 'error';
-  
-  // Mark as recoverable
-  this.contextLost = true;
-  
-  // All GPU resources are now invalid
-  // We'll need to recreate everything when context is restored
-}
-
-private handleContextRestore(): void {
-  console.log('WebGL context restored');
-  
-  // Recreate all GPU resources
-  this.executor.setupGeometry();
-  
-  // Recompile all shaders
-  for (const [key, recipe] of this.cachedRecipes) {
-    try {
-      this.compileRecipe(recipe);
-    } catch (error) {
-      console.error(`Failed to recompile ${key}:`, error);
+  try {
+    // Reinitialize subsystems
+    this.executor.setupGeometry();
+    
+    // Recompile all programs
+    for (const [key, oldProgram] of this.compiledPrograms) {
+      const newProgram = this.compiler.compile(oldProgram.recipe);
+      this.compiledPrograms.set(key, newProgram);
     }
+    
+    // Restore active program if any
+    if (this.activeProgram) {
+      const recipeName = this.getRecipeKey(this.activeProgram.recipe);
+      this.selectRecipe(recipeName);
+    } else {
+      // Return to ready state
+      this.state = { type: 'ready' };
+    }
+    
+    console.log('Context recovery complete');
+    
+  } catch (error) {
+    console.error('Context recovery failed:', error);
+    this.state = {
+      type: 'error',
+      error,
+      recoverable: false
+    };
+  }
+};
+```
+
+## Cleanup Sequence
+
+Cleanup happens in reverse order of initialization:
+
+```typescript
+dispose(): void {
+  // 1. Deactivate running program
+  if (this.activeProgram) {
+    this.deactivateProgram();
   }
   
-  // Reset state
-  this.contextLost = false;
-  this.state = 'ready';
+  // 2. Delete compiled programs
+  for (const program of this.compiledPrograms.values()) {
+    this.gl.deleteProgram(program.program);
+  }
+  this.compiledPrograms.clear();
+  
+  // 3. Dispose subsystems in reverse order
+  this.uniforms.dispose();      // 5th initialized, 1st disposed
+  this.compiler.dispose();      // 4th initialized, 2nd disposed  
+  this.executor.dispose();      // 3rd initialized, 3rd disposed
+  this.resources.dispose();     // 2nd initialized, 4th disposed
+  this.registry.dispose();      // 1st initialized, 5th disposed
+  
+  // 4. Remove event listeners
+  this.gl.canvas.removeEventListener('webglcontextlost', this.handleContextLoss);
+  this.gl.canvas.removeEventListener('webglcontextrestored', this.handleContextRestore);
+  
+  // 5. Clear state
+  this.state = { type: 'uninitialized' };
+  this.activeProgram = null;
+  
+  console.log('Engine disposed');
 }
+```
+
+## State Coordination
+
+The Engine maintains central state that subsystems query:
+
+```typescript
+interface EngineStateCoordination {
+  // Engine owns:
+  state: EngineState;              // Overall engine state
+  viewport: Viewport;              // Current viewport
+  activeProgram: CompiledProgram; // Current program
+  frameNumber: number;             // In state.frame
+  
+  // Subsystems maintain their own state but coordinate through Engine:
+  registry: {
+    modules: Map<string, ModuleDescriptor>;
+  };
+  
+  resources: {
+    filmResources: FilmResources | null;
+    capabilities: CapabilityReport;
+  };
+  
+  executor: {
+    frameStats: FrameStats;
+    renderTarget: RenderTarget;
+  };
+  
+  uniforms: {
+    uniformMap: UniformMap | null;
+    pendingUpdates: Map<string, any>;
+  };
+  
+  compiler: {
+    compiledPrograms: Map<string, CompiledProgram>;
+  };
+}
+```
+
+## Frame Synchronization
+
+All subsystems synchronize through the frame execution:
+
+```typescript
+// Frame N preparation
+resources.prepareFrame();        // Bind frame N-1 textures
+uniforms.frameUpdate(state);     // Update uniforms for frame N
+executor.renderFrame();           // Render frame N
+resources.finalizeFrame();        // Swap for frame N+1
+
+// Critical: No subsystem advances independently
+// All state changes happen in lockstep
 ```
 
 ## Performance Monitoring Integration
 
-Track performance across subsystems:
-
 ```typescript
 getPerformanceReport(): PerformanceReport {
   return {
-    frame: {
-      current: this.frameCount,
-      averageTime: this.executor.getAverageFrameTime(),
-      fps: this.executor.getFrameStats().fps
-    },
+    frame: this.executor.getFrameStats(),
+    memory: this.resources.getMemoryStats(),
+    uniforms: this.uniforms.getUpdateStats(),
+    compilation: this.compiler.getCompilationReport(),
     
-    compilation: {
-      programCount: this.compiler.getProgramCount(),
-      report: this.compiler.getCompilationReport()
-    },
-    
-    uniforms: {
-      stats: this.uniforms.getUpdateStats(),
-      mappingCount: this.uniforms.getUniformMap()?.mappings.size || 0
-    },
-    
-    resources: {
-      memory: this.resources.getMemoryUsage(),
-      textureCount: this.resources.getTextureCount(),
-      framebufferCount: this.resources.getFramebufferCount()
-    },
-    
-    modules: {
-      registered: this.registry.getModuleCount(),
-      byKind: this.registry.getModuleCountByKind()
+    // Overall metrics
+    overall: {
+      state: this.state.type,
+      framesRendered: this.state.type === 'running' ? this.state.frame : 0,
+      programsCompiled: this.compiledPrograms.size,
+      uptime: performance.now() - this.startTime
     }
   };
 }
 ```
 
-## Key Integration Points
+## Integration Invariants
 
-1. **Registry → Compiler**: Modules flow from registry to compiler
-2. **Compiler → UniformBinder**: UniformMap created during compilation
-3. **Resources → Executor**: Framebuffers bound before drawing
-4. **UniformBinder → GPU**: Uniforms flushed before draw call
-5. **All → Engine**: State changes coordinated through main Engine
+1. **Initialization order is strict** - Dependencies must be satisfied
+2. **State transitions are atomic** - No partial state changes
+3. **Frame execution is sequential** - Phases execute in order
+4. **Cleanup is reverse of init** - Proper dependency unwinding
+5. **Errors propagate upward** - Subsystems → Engine → App
+6. **Context loss is handled** - Recovery attempted once
+7. **No orphaned resources** - Everything tracked and cleaned
 
-## Common Integration Issues
+## Integration Requirements
 
-1. **Wrong initialization order** - Subsystems depend on each other
-2. **Missing state transitions** - Must be 'running' to render
-3. **Forgetting to flush uniforms** - Updates queued but not applied
-4. **Resource/program mismatch** - Film buffers don't match shader
-5. **Incomplete error propagation** - Errors lost in subsystem
+The Engine integration MUST:
 
-The key is that each subsystem has a specific responsibility, and the Engine orchestrates them in the right order.
+1. Initialize subsystems in dependency order
+2. Validate capabilities before operations
+3. Compile all recipes before any can run
+4. Execute frames in strict phase order
+5. Propagate errors with context
+6. Handle context loss gracefully
+7. Clean up in reverse order
+8. Maintain state consistency
+9. Provide performance visibility
+10. Coordinate subsystem interactions

@@ -1,437 +1,739 @@
-# Render Executor Contract
+                                         # Render Executor Contract
 
 ## Purpose
 
-The RenderExecutor manages WebGL draw calls, viewport configuration, render target management, and pixel readback. It executes the actual GPU rendering using a full-screen triangle and manages all WebGL state required for rendering.
+The RenderExecutor handles WebGL draw calls, viewport configuration, and pixel readback. It manages the full-screen triangle geometry, coordinates render state, and provides both synchronous and asynchronous pixel reading capabilities.
 
 ## Required Interface
 
 ```typescript
 interface RenderExecutor {
   // Initialization
+  constructor(gl: WebGL2RenderingContext, resources: ResourceManager);
   setupGeometry(): void;
-  initialize(): void;
   isInitialized(): boolean;
   
   // Frame rendering
   renderFrame(config?: FrameConfig): void;
-  clearFrame(config?: ClearConfig): void;
+  clear(config?: ClearConfig): void;
   
   // Viewport management
   setViewport(x: number, y: number, width: number, height: number): void;
   getViewport(): Viewport;
-  resetViewport(): void;
+  pushViewport(viewport: Viewport): void;
+  popViewport(): void;
   
   // Render target control
   setRenderTarget(target: RenderTarget): void;
   getRenderTarget(): RenderTarget;
-  bindFramebuffer(framebufferId: string | null): void;
   
   // Pixel readback
   readPixelsAsync(rect?: Rectangle): Promise<Float32Array>;
   readPixelsSync(rect?: Rectangle): Float32Array;
   canReadPixels(): boolean;
   
-  // WebGL state management
+  // State management
   saveState(): RenderState;
   restoreState(state: RenderState): void;
-  getCurrentState(): RenderState;
   resetState(): void;
   
-  // Performance monitoring
-  getFrameStats(): FrameStats;
-  resetFrameStats(): void;
-  getAverageFrameTime(): number;
-  getFrameCount(): number;
-  
-  // WebGL context
-  checkContextLost(): boolean;
-  handleContextLost(): void;
-  handleContextRestored(): void;
-  getGLError(): string | null;
-}
-```
-
-## Frame Configuration
-
-### Frame Config Structure
-
-```typescript
-interface FrameConfig {
-  // Clearing
-  clear?: boolean;                    // Clear before drawing
-  clearColor?: [number, number, number, number];
-  clearDepth?: number;
-  clearStencil?: number;
-  
-  // Viewport
-  viewport?: Viewport;                // Override current viewport
-  scissorTest?: boolean;              // Enable scissor test
-  scissorRect?: Rectangle;            // Scissor rectangle
-  
-  // Target
-  target?: RenderTarget;              // Where to render
-  drawBuffers?: number[];             // MRT color attachments
-  
-  // Buffer management
-  swapBuffers?: boolean;              // Swap film buffers after
-  preserveDrawingBuffer?: boolean;    // Keep for readback
-}
-
-interface ClearConfig {
-  color?: boolean;                    // Clear color buffer
-  depth?: boolean;                    // Clear depth buffer
-  stencil?: boolean;                  // Clear stencil buffer
-  clearColor?: [number, number, number, number];
-  clearDepth?: number;
-  clearStencil?: number;
-}
-```
-
-### Render Targets
-
-```typescript
-type RenderTarget = 
-  | { type: "screen" }                           // Default framebuffer
-  | { type: "framebuffer"; id: string }          // Single framebuffer
-  | { type: "mrt"; framebufferId: string;        // Multiple render targets
-      attachments: number[] };
-
-interface Viewport {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface Rectangle {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-```
-
-## Geometry Setup
-
-### Full-Screen Triangle
-
-The executor MUST use a full-screen triangle (3 vertices) for efficiency:
-
-```
-Vertex positions:
-  v0: (-1, -1)  // Bottom-left
-  v1: ( 3, -1)  // Bottom-right (extends beyond viewport)
-  v2: (-1,  3)  // Top-left (extends beyond viewport)
-```
-
-### Vertex Array Requirements
-
-The executor MUST:
-- Create a VAO for the triangle
-- Bind vertex positions to attribute location 0
-- Use STATIC_DRAW for vertex buffer
-- Keep VAO bound only during draw calls
-
-## Rendering Process
-
-### Frame Execution Steps
-
-`renderFrame(config)` MUST execute in this order:
-
-1. **Save state** (if config specifies viewport/target changes)
-2. **Set render target** (framebuffer or screen)
-3. **Configure viewport** (and scissor if enabled)
-4. **Clear buffers** (if requested)
-5. **Bind VAO** (full-screen triangle)
-6. **Draw triangle** (3 vertices, TRIANGLES mode)
-7. **Unbind VAO**
-8. **Swap buffers** (if film uses ping-pong)
-9. **Update statistics**
-10. **Restore state** (if saved)
-
-### Draw Call
-
-The single draw call MUST:
-- Use `gl.drawArrays(gl.TRIANGLES, 0, 3)`
-- Draw exactly 3 vertices
-- Use TRIANGLES primitive mode
-- Not use index buffer
-
-## Pixel Readback
-
-### Asynchronous Readback
-
-`readPixelsAsync()` MUST:
-
-1. Start pixel read with `gl.readPixels()`
-2. Insert fence sync with `gl.fenceSync()`
-3. Flush with `gl.flush()`
-4. Poll fence status without blocking
-5. Return Promise that resolves when complete
-6. Delete sync object after completion
-
-### Synchronous Readback
-
-`readPixelsSync()` MUST:
-1. Call `gl.readPixels()` directly
-2. Block until transfer complete
-3. Return pixel data immediately
-4. Handle format conversion if needed
-
-### Readback Formats
-
-The executor MUST support reading:
-
-| Format | Type | Use Case |
-|--------|------|----------|
-| RGBA | FLOAT | HDR rendering output |
-| RGBA | UNSIGNED_BYTE | LDR/screenshot |
-| RGB | FLOAT | HDR without alpha |
-| RGB | UNSIGNED_BYTE | Standard screenshots |
-
-### Readback Validation
-
-The executor MUST:
-- Clamp rectangle to viewport bounds
-- Use full viewport if no rectangle specified
-- Check framebuffer is complete before reading
-- Handle coordinate system (flip Y if needed)
-
-## WebGL State Management
-
-### Render State Structure
-
-```typescript
-interface RenderState {
-  // Bindings
-  viewport: Viewport;
-  framebuffer: WebGLFramebuffer | null;
-  program: WebGLProgram | null;
-  vao: WebGLVertexArrayObject | null;
-  
-  // Clear values
-  clearColor: [number, number, number, number];
-  clearDepth: number;
-  clearStencil: number;
-  
-  // Feature flags
-  features: {
-    blend: boolean;
-    cullFace: boolean;
-    depthTest: boolean;
-    scissorTest: boolean;
-    stencilTest: boolean;
-  };
-  
-  // Blend state
-  blendFunc?: {
-    srcRGB: number;
-    dstRGB: number;
-    srcAlpha: number;
-    dstAlpha: number;
-  };
-}
-```
-
-### State Operations
-
-The executor MUST:
-- Save complete WebGL state on request
-- Restore state exactly as saved
-- Track current state for queries
-- Reset to default state when needed
-
-### Default State
-
-The default/reset state MUST be:
-- Viewport: full canvas
-- Framebuffer: null (screen)
-- Features: all disabled except COLOR_BUFFER_BIT
-- Clear color: (0, 0, 0, 0)
-- Clear depth: 1.0
-- Clear stencil: 0
-
-## Performance Monitoring
-
-### Frame Statistics
-
-```typescript
-interface FrameStats {
-  // Timing
-  frameTime: number;                  // Last frame milliseconds
-  averageFrameTime: number;           // Moving average
-  minFrameTime: number;               // Best frame
-  maxFrameTime: number;               // Worst frame
-  
-  // Counts
-  frameNumber: number;                // Total frames rendered
-  drawCalls: number;                  // Always 1 for us
-  triangles: number;                  // Always 1 for us
+  // WebGL state control
+  setFeature(feature: GLenum, enabled: boolean): void;
+  isFeatureEnabled(feature: GLenum): boolean;
   
   // Performance
-  fps: number;                        // Current FPS
-  averageFps: number;                 // Average FPS
+  getFrameStats(): FrameStats;
+  resetFrameStats(): void;
+  getLastFrameTime(): number;
   
-  // Timestamps
-  lastFrameTimestamp: number;         // When last frame completed
-  startTimestamp: number;             // When rendering started
+  // Cleanup
+  dispose(): void;
 }
 ```
 
-### Statistics Tracking
-
-The executor MUST:
-- Update stats after each frame
-- Maintain moving average over last 60 frames
-- Track min/max for performance bounds
-- Calculate FPS from frame times
-- Reset statistics on request
-
-## Context Loss Handling
-
-### Detection
-
-The executor MUST:
-- Check context before each frame
-- Detect `webglcontextlost` event
-- Set internal flag when lost
-
-### Response to Context Loss
-
-When context is lost, the executor MUST:
-- Stop all rendering operations
-- Clear all WebGL resources
-- Notify Engine of context loss
-- Wait for restoration
-
-### Context Restoration
-
-When context is restored, the executor MUST:
-- Re-create VAO and geometry
-- Signal Engine to recompile shaders
-- Reset all statistics
-- Resume rendering
-
-## WebGL Configuration
-
-### Initial Setup
-
-`initialize()` MUST:
-
-1. **Disable unused features**:
-    - Depth test (not needed for full-screen)
-    - Face culling (single triangle)
-    - Blending (handled in shader)
-    - Stencil test (not used)
-
-2. **Configure pixel storage**:
-    - UNPACK_ALIGNMENT: 1
-    - PACK_ALIGNMENT: 1
-    - UNPACK_FLIP_Y_WEBGL: false
-    - UNPACK_PREMULTIPLY_ALPHA_WEBGL: false
-
-3. **Check extensions**:
-    - EXT_color_buffer_float (required for HDR)
-    - OES_texture_float_linear (optional)
-    - WEBGL_lose_context (for testing)
-
-### Error Checking
-
-The executor MUST:
-- Check `gl.getError()` after major operations in development
-- Clear error state before checking
-- Map error codes to readable strings
-- Not check errors in production (performance)
-
-## Integration Requirements
-
-### With ResourceManager
-
-The executor MUST:
-- Get framebuffer IDs for render targets
-- Trigger buffer swaps after rendering
-- Respect viewport constraints from capabilities
-
-### With UniformBinder
-
-The executor MUST:
-- Ensure uniforms are bound before drawing
-- Not interfere with uniform state
-
-### With Engine
-
-The executor MUST:
-- Provide frame statistics
-- Handle render configuration
-- Report context loss
-- Execute pixel readback
-
-## Error Handling
-
-### Rendering Errors
-
-The executor MUST handle:
-- Invalid viewport dimensions → Clamp to canvas
-- Incomplete framebuffer → Fall back to screen
-- Context lost → Stop rendering
-- WebGL errors → Log and continue
-
-### Readback Errors
-
-The executor MUST handle:
-- Out of bounds rectangle → Clamp to viewport
-- Invalid format → Use RGBA/UNSIGNED_BYTE
-- Incomplete framebuffer → Return black
-- Out of memory → Return null
-
-## Performance Requirements
-
-- Frame rendering: < 0.5ms overhead (beyond shader execution)
-- State save/restore: < 0.1ms
-- Async readback: Non-blocking with < 1ms setup
-- Sync readback: Proportional to pixel count
-- Statistics update: < 0.05ms
-
-## Usage Example
+## Architecture
 
 ```typescript
-const executor = new RenderExecutor(gl, resourceManager, uniformBinder);
+class RenderExecutor {
+  private gl: WebGL2RenderingContext;
+  private resources: ResourceManager;
+  
+  // Geometry
+  private triangleVAO: WebGLVertexArrayObject | null = null;
+  private vertexBuffer: WebGLBuffer | null = null;
+  private initialized: boolean = false;
+  
+  // State
+  private viewport: Viewport;
+  private viewportStack: Viewport[] = [];
+  private currentTarget: RenderTarget = { type: "screen" };
+  
+  // Performance
+  private frameStats: FrameStats;
+  private frameHistory: number[] = [];
+  private startTime: number;
+  
+  // Constants
+  private readonly VERTEX_SHADER: string;
+  private readonly TRIANGLE_VERTICES: Float32Array;
+}
+```
 
-// One-time setup
+## Geometry Setup Contract
+
+The executor MUST use a full-screen triangle (not quad) for efficiency:
+
+```typescript
+setupGeometry(): void {
+  if (this.initialized) {
+    console.warn('Geometry already initialized');
+    return;
+  }
+  
+  // Create VAO
+  this.triangleVAO = this.gl.createVertexArray();
+  if (!this.triangleVAO) {
+    throw new Error('Failed to create vertex array');
+  }
+  
+  this.gl.bindVertexArray(this.triangleVAO);
+  
+  // Triangle vertices that cover entire screen
+  // Using 3 vertices instead of 4 (quad) avoids diagonal seam
+  this.TRIANGLE_VERTICES = new Float32Array([
+    -1, -1,  // Bottom-left
+     3, -1,  // Bottom-right (extends beyond viewport)
+    -1,  3   // Top-left (extends beyond viewport)
+  ]);
+  
+  // Create vertex buffer
+  this.vertexBuffer = this.gl.createBuffer();
+  if (!this.vertexBuffer) {
+    throw new Error('Failed to create vertex buffer');
+  }
+  
+  this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
+  this.gl.bufferData(
+    this.gl.ARRAY_BUFFER,
+    this.TRIANGLE_VERTICES,
+    this.gl.STATIC_DRAW
+  );
+  
+  // Setup position attribute (location 0)
+  const positionLoc = 0;
+  this.gl.enableVertexAttribArray(positionLoc);
+  this.gl.vertexAttribPointer(
+    positionLoc,
+    2,              // 2 components (x, y)
+    this.gl.FLOAT,  // Type
+    false,          // Normalized
+    0,              // Stride
+    0               // Offset
+  );
+  
+  // Unbind
+  this.gl.bindVertexArray(null);
+  this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+  
+  this.initialized = true;
+  
+  // Initialize WebGL state
+  this.initializeState();
+}
+
+private initializeState(): void {
+  // Disable unused features for performance
+  this.gl.disable(this.gl.DEPTH_TEST);
+  this.gl.disable(this.gl.CULL_FACE);
+  this.gl.disable(this.gl.BLEND);
+  this.gl.disable(this.gl.SCISSOR_TEST);
+  this.gl.disable(this.gl.STENCIL_TEST);
+  
+  // Set pixel pack/unpack alignment
+  this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
+  this.gl.pixelStorei(this.gl.PACK_ALIGNMENT, 1);
+  
+  // Set default clear values
+  this.gl.clearColor(0, 0, 0, 0);
+  this.gl.clearDepth(1.0);
+  this.gl.clearStencil(0);
+  
+  // Initialize viewport
+  const canvas = this.gl.canvas as HTMLCanvasElement;
+  this.viewport = {
+    x: 0,
+    y: 0,
+    width: canvas.width,
+    height: canvas.height
+  };
+  this.gl.viewport(0, 0, canvas.width, canvas.height);
+}
+```
+
+## Frame Rendering Contract
+
+```typescript
+renderFrame(config?: FrameConfig): void {
+  if (!this.initialized) {
+    throw new Error('Executor not initialized - call setupGeometry() first');
+  }
+  
+  const startTime = performance.now();
+  
+  // Apply configuration
+  const frameConfig: FrameConfig = {
+    clear: false,
+    swapBuffers: true,
+    preserveDrawingBuffer: false,
+    ...config
+  };
+  
+  // 1. Set render target
+  if (frameConfig.target) {
+    this.setRenderTarget(frameConfig.target);
+  }
+  
+  // 2. Set viewport
+  if (frameConfig.viewport) {
+    this.pushViewport(this.viewport);
+    this.setViewport(
+      frameConfig.viewport.x,
+      frameConfig.viewport.y,
+      frameConfig.viewport.width,
+      frameConfig.viewport.height
+    );
+  }
+  
+  // 3. Clear if requested
+  if (frameConfig.clear) {
+    this.clear({
+      color: frameConfig.clearColor,
+      buffers: { color: true }
+    });
+  }
+  
+  // 4. Bind geometry
+  this.gl.bindVertexArray(this.triangleVAO);
+  
+  // 5. Draw the triangle (just 3 vertices!)
+  this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+  
+  // 6. Unbind
+  this.gl.bindVertexArray(null);
+  
+  // 7. Handle buffer swapping
+  if (frameConfig.swapBuffers) {
+    this.resources.swapFilmBuffers();
+  }
+  
+  // 8. Restore viewport if pushed
+  if (frameConfig.viewport) {
+    this.popViewport();
+  }
+  
+  // 9. Check for errors in development
+  if (process.env.NODE_ENV === 'development') {
+    this.checkGLError('renderFrame');
+  }
+  
+  // Update statistics
+  const elapsed = performance.now() - startTime;
+  this.updateFrameStats(elapsed);
+}
+
+clear(config?: ClearConfig): void {
+  const clearConfig: ClearConfig = {
+    color: [0, 0, 0, 0],
+    depth: 1.0,
+    stencil: 0,
+    buffers: { color: true },
+    ...config
+  };
+  
+  // Set clear values
+  if (clearConfig.color) {
+    this.gl.clearColor(...clearConfig.color);
+  }
+  if (clearConfig.depth !== undefined) {
+    this.gl.clearDepth(clearConfig.depth);
+  }
+  if (clearConfig.stencil !== undefined) {
+    this.gl.clearStencil(clearConfig.stencil);
+  }
+  
+  // Build clear mask
+  let mask = 0;
+  if (clearConfig.buffers?.color) mask |= this.gl.COLOR_BUFFER_BIT;
+  if (clearConfig.buffers?.depth) mask |= this.gl.DEPTH_BUFFER_BIT;
+  if (clearConfig.buffers?.stencil) mask |= this.gl.STENCIL_BUFFER_BIT;
+  
+  // Execute clear
+  if (mask !== 0) {
+    this.gl.clear(mask);
+  }
+}
+```
+
+## Viewport Management Contract
+
+```typescript
+setViewport(x: number, y: number, width: number, height: number): void {
+  // Validate
+  if (width <= 0 || height <= 0) {
+    throw new Error(`Invalid viewport dimensions: ${width}x${height}`);
+  }
+  
+  // Update internal state
+  this.viewport = { x, y, width, height };
+  
+  // Apply to WebGL
+  this.gl.viewport(x, y, width, height);
+}
+
+getViewport(): Viewport {
+  return { ...this.viewport };
+}
+
+pushViewport(viewport: Viewport): void {
+  this.viewportStack.push({ ...viewport });
+}
+
+popViewport(): void {
+  const viewport = this.viewportStack.pop();
+  if (!viewport) {
+    console.warn('No viewport to pop');
+    return;
+  }
+  
+  this.setViewport(viewport.x, viewport.y, viewport.width, viewport.height);
+}
+```
+
+## Render Target Contract
+
+```typescript
+setRenderTarget(target: RenderTarget): void {
+  switch (target.type) {
+    case 'screen':
+      // Render to default framebuffer (screen)
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+      break;
+      
+    case 'framebuffer':
+      // Render to specific framebuffer
+      if ('buffer' in target) {
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, target.buffer);
+      } else if ('id' in target) {
+        const fb = this.resources.getFramebuffer(target.id);
+        if (!fb) {
+          throw new Error(`Framebuffer not found: ${target.id}`);
+        }
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb.glFramebuffer);
+      }
+      
+      // Check framebuffer completeness
+      const status = this.gl.checkFramebufferStatus(this.gl.FRAMEBUFFER);
+      if (status !== this.gl.FRAMEBUFFER_COMPLETE) {
+        throw new Error(`Framebuffer incomplete: ${this.getFramebufferStatusString(status)}`);
+      }
+      break;
+  }
+  
+  this.currentTarget = target;
+}
+
+getRenderTarget(): RenderTarget {
+  return this.currentTarget;
+}
+
+private getFramebufferStatusString(status: GLenum): string {
+  switch (status) {
+    case this.gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+      return 'FRAMEBUFFER_INCOMPLETE_ATTACHMENT';
+    case this.gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+      return 'FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT';
+    case this.gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
+      return 'FRAMEBUFFER_INCOMPLETE_DIMENSIONS';
+    case this.gl.FRAMEBUFFER_UNSUPPORTED:
+      return 'FRAMEBUFFER_UNSUPPORTED';
+    case this.gl.FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
+      return 'FRAMEBUFFER_INCOMPLETE_MULTISAMPLE';
+    default:
+      return `Unknown status: 0x${status.toString(16)}`;
+  }
+}
+```
+
+## Pixel Readback Contract
+
+```typescript
+async readPixelsAsync(rect?: Rectangle): Promise<Float32Array> {
+  const r = rect || this.getFullViewport();
+  
+  // Validate rectangle
+  if (r.x < 0 || r.y < 0 || r.width <= 0 || r.height <= 0) {
+    throw new Error(`Invalid readback rectangle: ${JSON.stringify(r)}`);
+  }
+  
+  // Check if we can read float pixels
+  if (!this.resources.getCapabilities().floatRenderTargets) {
+    console.warn('Float render targets not available - readback may be degraded');
+  }
+  
+  // Allocate buffer
+  const pixels = new Float32Array(r.width * r.height * 4);
+  
+  // Start readback
+  this.gl.readPixels(
+    r.x, r.y,
+    r.width, r.height,
+    this.gl.RGBA,
+    this.gl.FLOAT,
+    pixels
+  );
+  
+  // Insert fence for async completion
+  const sync = this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (!sync) {
+    throw new Error('Failed to create fence sync');
+  }
+  
+  // Flush to ensure commands are submitted
+  this.gl.flush();
+  
+  // Wait for completion (non-blocking)
+  return new Promise<Float32Array>((resolve, reject) => {
+    const checkComplete = () => {
+      const status = this.gl.clientWaitSync(sync, 0, 0);
+      
+      switch (status) {
+        case this.gl.ALREADY_SIGNALED:
+        case this.gl.CONDITION_SATISFIED:
+          // Complete - clean up and resolve
+          this.gl.deleteSync(sync);
+          resolve(pixels);
+          break;
+          
+        case this.gl.TIMEOUT_EXPIRED:
+          // Still waiting - check again next frame
+          requestAnimationFrame(checkComplete);
+          break;
+          
+        case this.gl.WAIT_FAILED:
+          // Error
+          this.gl.deleteSync(sync);
+          reject(new Error('Sync wait failed'));
+          break;
+      }
+    };
+    
+    // Start checking
+    checkComplete();
+  });
+}
+
+readPixelsSync(rect?: Rectangle): Float32Array {
+  const r = rect || this.getFullViewport();
+  
+  // Validate
+  if (r.x < 0 || r.y < 0 || r.width <= 0 || r.height <= 0) {
+    throw new Error(`Invalid readback rectangle: ${JSON.stringify(r)}`);
+  }
+  
+  // Allocate and read (blocking)
+  const pixels = new Float32Array(r.width * r.height * 4);
+  
+  this.gl.readPixels(
+    r.x, r.y,
+    r.width, r.height,
+    this.gl.RGBA,
+    this.gl.FLOAT,
+    pixels
+  );
+  
+  return pixels;
+}
+
+private getFullViewport(): Rectangle {
+  return {
+    x: this.viewport.x,
+    y: this.viewport.y,
+    width: this.viewport.width,
+    height: this.viewport.height
+  };
+}
+
+canReadPixels(): boolean {
+  // Check if we're in a state where pixels can be read
+  return this.initialized && !this.gl.isContextLost();
+}
+```
+
+## State Management Contract
+
+```typescript
+saveState(): RenderState {
+  return {
+    viewport: { ...this.viewport },
+    framebuffer: this.gl.getParameter(this.gl.FRAMEBUFFER_BINDING),
+    program: this.gl.getParameter(this.gl.CURRENT_PROGRAM),
+    vao: this.triangleVAO,
+    
+    clearColor: this.gl.getParameter(this.gl.COLOR_CLEAR_VALUE),
+    clearDepth: this.gl.getParameter(this.gl.DEPTH_CLEAR_VALUE),
+    clearStencil: this.gl.getParameter(this.gl.STENCIL_CLEAR_VALUE),
+    
+    features: {
+      blend: this.gl.isEnabled(this.gl.BLEND),
+      cullFace: this.gl.isEnabled(this.gl.CULL_FACE),
+      depthTest: this.gl.isEnabled(this.gl.DEPTH_TEST),
+      scissorTest: this.gl.isEnabled(this.gl.SCISSOR_TEST),
+      stencilTest: this.gl.isEnabled(this.gl.STENCIL_TEST)
+    }
+  };
+}
+
+restoreState(state: RenderState): void {
+  // Restore viewport
+  this.setViewport(
+    state.viewport.x,
+    state.viewport.y,
+    state.viewport.width,
+    state.viewport.height
+  );
+  
+  // Restore bindings
+  this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, state.framebuffer);
+  this.gl.useProgram(state.program);
+  
+  // Restore clear values
+  this.gl.clearColor(...state.clearColor);
+  this.gl.clearDepth(state.clearDepth);
+  this.gl.clearStencil(state.clearStencil);
+  
+  // Restore features
+  this.setFeature(this.gl.BLEND, state.features.blend);
+  this.setFeature(this.gl.CULL_FACE, state.features.cullFace);
+  this.setFeature(this.gl.DEPTH_TEST, state.features.depthTest);
+  this.setFeature(this.gl.SCISSOR_TEST, state.features.scissorTest);
+  this.setFeature(this.gl.STENCIL_TEST, state.features.stencilTest);
+}
+
+setFeature(feature: GLenum, enabled: boolean): void {
+  if (enabled) {
+    this.gl.enable(feature);
+  } else {
+    this.gl.disable(feature);
+  }
+}
+
+isFeatureEnabled(feature: GLenum): boolean {
+  return this.gl.isEnabled(feature);
+}
+```
+
+## Performance Tracking Contract
+
+```typescript
+private updateFrameStats(frameTime: number): void {
+  // Update immediate stats
+  this.frameStats.frameTime = frameTime;
+  this.frameStats.frameNumber++;
+  this.frameStats.drawCalls = 1;  // Always 1 for us
+  this.frameStats.triangles = 1;   // Single triangle
+  
+  const now = performance.now();
+  this.frameStats.timestamp = now;
+  
+  // Update history
+  this.frameHistory.push(frameTime);
+  if (this.frameHistory.length > 60) {
+    this.frameHistory.shift();
+  }
+  
+  // Calculate moving averages
+  if (this.frameHistory.length > 0) {
+    const sum = this.frameHistory.reduce((a, b) => a + b, 0);
+    this.frameStats.averageFrameTime = sum / this.frameHistory.length;
+    this.frameStats.fps = 1000 / this.frameStats.averageFrameTime;
+    this.frameStats.averageFps = this.frameStats.fps;
+    
+    // Track min/max
+    this.frameStats.minFrameTime = Math.min(...this.frameHistory);
+    this.frameStats.maxFrameTime = Math.max(...this.frameHistory);
+  }
+}
+
+getFrameStats(): FrameStats {
+  return { ...this.frameStats };
+}
+
+resetFrameStats(): void {
+  this.frameStats = {
+    frameTime: 0,
+    averageFrameTime: 0,
+    minFrameTime: Infinity,
+    maxFrameTime: 0,
+    frameNumber: 0,
+    drawCalls: 0,
+    triangles: 0,
+    timestamp: performance.now(),
+    fps: 0,
+    averageFps: 0,
+    startTimestamp: performance.now()
+  };
+  this.frameHistory = [];
+}
+```
+
+## Error Handling Contract
+
+```typescript
+private checkGLError(phase: string): void {
+  const error = this.gl.getError();
+  if (error !== this.gl.NO_ERROR) {
+    const errorString = this.getGLErrorString(error);
+    console.error(`WebGL error in ${phase}: ${errorString}`);
+  }
+}
+
+private getGLErrorString(error: GLenum): string {
+  switch (error) {
+    case this.gl.INVALID_ENUM:
+      return 'INVALID_ENUM';
+    case this.gl.INVALID_VALUE:
+      return 'INVALID_VALUE';
+    case this.gl.INVALID_OPERATION:
+      return 'INVALID_OPERATION';
+    case this.gl.OUT_OF_MEMORY:
+      return 'OUT_OF_MEMORY';
+    case this.gl.INVALID_FRAMEBUFFER_OPERATION:
+      return 'INVALID_FRAMEBUFFER_OPERATION';
+    case this.gl.CONTEXT_LOST_WEBGL:
+      return 'CONTEXT_LOST_WEBGL';
+    default:
+      return `Unknown error: 0x${error.toString(16)}`;
+  }
+}
+```
+
+## Cleanup Contract
+
+```typescript
+dispose(): void {
+  // Delete geometry
+  if (this.triangleVAO) {
+    this.gl.deleteVertexArray(this.triangleVAO);
+    this.triangleVAO = null;
+  }
+  
+  if (this.vertexBuffer) {
+    this.gl.deleteBuffer(this.vertexBuffer);
+    this.vertexBuffer = null;
+  }
+  
+  // Reset state
+  this.initialized = false;
+  this.viewportStack = [];
+  this.currentTarget = { type: "screen" };
+  
+  // Reset stats
+  this.resetFrameStats();
+}
+```
+
+## Minimal Working Example
+
+```typescript
+// Create executor
+const gl = canvas.getContext('webgl2')!;
+const resources = new ResourceManager(gl);
+const executor = new RenderExecutor(gl, resources);
+
+// Initialize geometry (once)
 executor.setupGeometry();
-executor.initialize();
+
+// Set viewport
+executor.setViewport(0, 0, 1920, 1080);
 
 // Each frame
-executor.renderFrame({
-  clear: frameNumber === 0,
-  swapBuffers: true,
-  viewport: { x: 0, y: 0, width: 1920, height: 1080 }
-});
+function renderFrame() {
+  // Prepare resources
+  resources.prepareFrame();
+  
+  // Render with configuration
+  executor.renderFrame({
+    clear: frameNumber === 0,
+    clearColor: [0, 0, 0, 0],
+    swapBuffers: true,
+    target: { type: "screen" }
+  });
+  
+  // Finalize resources
+  resources.finalizeFrame();
+  
+  // Check performance
+  const stats = executor.getFrameStats();
+  if (frameNumber % 60 === 0) {
+    console.log(`FPS: ${stats.fps.toFixed(1)}`);
+  }
+}
 
 // Read pixels asynchronously
-const pixels = await executor.readPixelsAsync({
-  x: 100, y: 100, width: 200, height: 200
+document.getElementById('save-btn').onclick = async () => {
+  const pixels = await executor.readPixelsAsync();
+  console.log('Captured pixels:', pixels.length / 4, 'pixels');
+  saveToFile(pixels);
+};
+
+// Read specific rectangle synchronously
+const thumbnail = executor.readPixelsSync({
+  x: 0, y: 0,
+  width: 256, height: 256
 });
 
-// Check performance
-const stats = executor.getFrameStats();
-console.log(`FPS: ${stats.fps.toFixed(1)}`);
+// Save/restore state for multiple passes
+const savedState = executor.saveState();
 
-// Handle context loss
-if (executor.checkContextLost()) {
-  console.error('WebGL context lost');
-  executor.handleContextLost();
-}
+executor.setViewport(0, 0, 512, 512);
+executor.setRenderTarget({ type: "framebuffer", id: "shadow_map" });
+executor.renderFrame();
+
+executor.restoreState(savedState);
+
+// Cleanup
+executor.dispose();
 ```
 
 ## Invariants
 
-1. Exactly one draw call per frame (3 vertices)
-2. VAO is only bound during drawing
-3. Viewport is always valid (positive dimensions)
-4. Statistics are updated every frame
-5. Context state is checked before rendering
-6. Pixel readback rectangles are clamped to viewport
-7. Frame config overrides are temporary (restored after)
-8. Clear operations happen before drawing
+1. **Geometry initialized** before any rendering
+2. **VAO bound** only during draw call
+3. **Single triangle** covers full viewport
+4. **Viewport validated** for positive dimensions
+5. **Framebuffer complete** before rendering
+6. **Fence sync deleted** after readback
+7. **State stack balanced** (push/pop pairs)
+
+## Error Handling
+
+The RenderExecutor MUST handle these error conditions:
+
+| Error | Response |
+|-------|----------|
+| Not initialized | Throw on render operations |
+| Invalid viewport | Throw with dimensions |
+| Framebuffer incomplete | Throw with status |
+| Context lost | Return false from canReadPixels |
+| Sync creation failed | Throw in async readback |
+| Invalid readback rect | Throw with rectangle |
+| WebGL errors | Log in development mode |
+
+## Performance Requirements
+
+- Geometry setup: Once at initialization
+- Draw call: Single `drawArrays` per frame
+- State save/restore: < 1ms
+- Async readback: Non-blocking with fence
+- Sync readback: Blocks until complete
+- Frame stats: O(1) update per frame

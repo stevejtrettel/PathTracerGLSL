@@ -1,38 +1,36 @@
-
 # Uniform Binder Contract
 
 ## Purpose
 
-The UniformBinder maps parameter paths from the ParameterStore to GPU uniform locations. It builds an explicit UniformMap for debugging visibility, batches uniform updates for efficiency, and tracks uniform usage statistics.
+The UniformBinder creates and manages the explicit mapping between ParameterStore paths and GPU uniform locations. It builds UniformMaps from compiled programs, batches parameter updates for efficiency, and provides complete visibility into parameter-to-uniform bindings for debugging.
 
 ## Required Interface
 
 ```typescript
 interface UniformBinder {
-  // Binding management
-  buildBindings(program: CompiledProgram, modules: ModuleDescriptor[]): void;
+  // Binding creation
+  buildBindings(program: CompiledProgram): void;
   clearBindings(): void;
   hasBindings(): boolean;
   
-  // Uniform mapping
-  getUniformMap(): UniformMap;
-  hasBinding(paramPath: string): boolean;
-  getBinding(paramPath: string): UniformMapping | undefined;
-  getAllBindings(): UniformMapping[];
+  // Uniform map access
+  getUniformMap(): UniformMap | null;
+  getMapping(paramPath: string): UniformMapping | undefined;
+  hasMapping(paramPath: string): boolean;
+  getAllMappings(): UniformMapping[];
   
-  // Parameter updates (batched)
+  // Parameter updates
   queueUpdate(paramPath: string, value: any): void;
   queueUpdates(changes: ParameterChanges): void;
-  clearQueue(): void;
-  getQueueSize(): number;
+  getPendingCount(): number;
+  clearPendingUpdates(): void;
   
-  // Frame execution (flushes queue)
-  frameUpdate(engineState: EngineState): void;
-  forceFlush(): void;
+  // Frame execution
+  frameUpdate(engineState: EngineStateInfo): void;
+  forceUpdate(paramPath: string, value: any): void;
   
   // Texture binding
-  bindTexture(samplerPath: string, textureUnit: number): void;
-  unbindTexture(samplerPath: string): void;
+  bindTextureUniform(uniformName: string, unit: number): void;
   getTextureBindings(): Map<string, number>;
   
   // Performance monitoring
@@ -42,328 +40,611 @@ interface UniformBinder {
   
   // Debugging
   debugPrint(): void;
-  getMissingBindings(): string[];
-  getSuggestedBindings(paramPath: string): string[];
+  getMissingParameters(): string[];
+  getUnusedUniforms(): string[];
+  
+  // Cleanup
+  dispose(): void;
 }
 ```
 
-## The UniformMap
-
-### Structure
+## Architecture
 
 ```typescript
-interface UniformMap {
-  // Core operations
-  addMapping(mapping: UniformMapping): void;
-  getMapping(paramPath: string): UniformMapping | undefined;
-  hasMapping(paramPath: string): boolean;
-  getAllMappings(): UniformMapping[];
+class UniformBinder {
+  private gl: WebGL2RenderingContext;
+  private uniformMap: UniformMap | null = null;
+  private activeProgram: WebGLProgram | null = null;
+  
+  // Update batching
+  private pendingUpdates: Map<string, any>;
+  private frameUpdateRequired: boolean = false;
+  
+  // Texture unit tracking
+  private textureBindings: Map<string, number>;
+  
+  // Performance tracking
+  private stats: UpdateStats;
+  private updateHistory: number[] = [];
   
   // Debugging
-  getProgramId(): string;
-  getMappingCount(): number;
-  getUnusedMappings(): UniformMapping[];
-  debugPrint(): void;
-}
-
-interface UniformMapping {
-  paramPath: string;              // "camera.position"
-  glslName: string;               // "u_camera_pinhole_position"
-  location: WebGLUniformLocation | null;
-  type: UniformType;
-  arrayLength?: number;           // For array uniforms
-  
-  // Metadata
-  moduleSource: string;           // Which module defined this
-  used: boolean;                  // Has been set at least once
-  lastValue?: any;                // For change detection
-  updateCount: number;            // Times updated
-}
-
-type UniformType = 
-  | 'float' | 'vec2' | 'vec3' | 'vec4'
-  | 'int' | 'ivec2' | 'ivec3' | 'ivec4'
-  | 'bool' | 'bvec2' | 'bvec3' | 'bvec4'
-  | 'mat2' | 'mat3' | 'mat4'
-  | 'sampler2D' | 'samplerCube' | 'sampler3D';
-```
-
-### Mapping Construction
-
-The UniformMap MUST be built from:
-1. Module parameters → uniforms
-2. Engine uniforms → fixed mappings
-3. Film textures → sampler uniforms
-
-## Parameter Path Mapping
-
-### Module Parameter Mapping
-
-Parameters map to uniforms with this pattern:
-
-```
-Parameter Path: [kind].[parameter_name]
-GLSL Uniform:   u_[prefix][module_name]_[parameter_name]
-```
-
-Examples:
-- `camera.position` → `u_camera_pinhole_position`
-- `material.roughness` → `u_material_disney_roughness`
-- `developer.exposure` → `u_developer_aces_exposure`
-
-### Prefix Resolution
-
-| Module Kind | Prefix |
-|------------|--------|
-| geometry | `g_` |
-| material | `m_` |
-| scene | `sc_` |
-| lights | `l_` |
-| camera | `camera_` |
-| estimator | `estimator_` |
-| film | `film_` |
-| developer | `developer_` |
-
-### Engine Uniforms
-
-These uniforms MUST always be available:
-
-| Parameter Path | GLSL Name | Type | Purpose |
-|---------------|-----------|------|---------|
-| `engine.resolution` | `u_resolution` | vec2 | Viewport size |
-| `engine.frame_index` | `u_frame_index` | int | Frame number |
-| `engine.sample_count` | `u_sample_count` | int | Accumulation count |
-| `engine.film_reset` | `u_film_reset` | bool | Clear flag |
-| `engine.time` | `u_time` | float | Seconds elapsed |
-
-### Film Texture Uniforms
-
-Film textures map to samplers:
-
-| Texture Name | GLSL Name | Type |
-|-------------|-----------|------|
-| radiance | `u_film_radiance` | sampler2D |
-| variance | `u_film_variance` | sampler2D |
-| auxiliary | `u_film_auxiliary` | sampler2D |
-
-## Update Batching
-
-### Queue Management
-
-The UniformBinder MUST:
-1. Queue parameter updates during frame (not apply immediately)
-2. Detect redundant updates (same value)
-3. Coalesce multiple updates to same parameter
-4. Track queue size for monitoring
-
-### Frame Update Process
-
-`frameUpdate(engineState)` MUST execute in this order:
-
-1. **Update engine uniforms** (always)
-    - Resolution, frame index, sample count, time
-
-2. **Update camera matrices** (if changed)
-    - View matrix, projection matrix, derived values
-
-3. **Flush parameter queue** (batched)
-    - Apply all queued parameter changes
-    - Skip if location is null (uniform optimized out)
-    - Track statistics
-
-4. **Clear queue** for next frame
-
-### Type-Specific Updates
-
-The binder MUST correctly handle each uniform type:
-
-| Type | WebGL Call | Value Format |
-|------|------------|--------------|
-| float | `uniform1f` | number |
-| vec2 | `uniform2fv` | [x, y] |
-| vec3 | `uniform3fv` | [x, y, z] |
-| vec4 | `uniform4fv` | [x, y, z, w] |
-| int | `uniform1i` | number |
-| bool | `uniform1i` | 0 or 1 |
-| mat3 | `uniformMatrix3fv` | 9 elements |
-| mat4 | `uniformMatrix4fv` | 16 elements |
-| sampler2D | `uniform1i` | texture unit |
-
-## Performance Tracking
-
-### Update Statistics
-
-```typescript
-interface UpdateStats {
-  // Counts
-  totalUpdates: number;               // Lifetime updates
-  frameUpdates: number;               // Updates this frame
-  uniqueUniforms: number;             // Distinct uniforms updated
-  skippedUpdates: number;             // No location (optimized out)
-  redundantUpdates: number;           // Same value
-  missingBindings: number;            // No mapping found
-  
-  // Timing
-  lastUpdateTime: number;             // Milliseconds for last flush
-  averageUpdateTime: number;          // Running average
-  maxUpdateTime: number;              // Worst case
-  
-  // Queue
-  maxQueueSize: number;               // Largest queue seen
-  averageQueueSize: number;           // Typical queue size
+  private unusedUniforms: Set<string>;
+  private missingParameters: Set<string>;
 }
 ```
 
-### Performance Requirements
-
-- Queue operation: O(1) insertion
-- Flush operation: O(n) where n = queue size
-- Typical frame: < 1ms for 50 uniform updates
-- Redundancy detection: O(1) with last value cache
-
-## Error Handling
-
-### Missing Bindings
-
-When a parameter has no uniform binding:
-
-1. **Check if optional** - Some parameters only apply to certain variants
-2. **Increment counter** - Track missing binding statistics
-3. **Log warning** (development) or skip silently (production)
-4. **Provide suggestions** - Find similar parameter names
-
-### Optional Parameters
-
-These parameters MAY not have bindings:
-
-- Material emission (only emissive materials)
-- Film variance threshold (only variance films)
-- Developer debug settings (only debug developer)
-- Estimator volume settings (only volumetric estimator)
-
-### Suggestions System
-
-For missing bindings, suggest alternatives:
-1. Find parameters with similar names (edit distance)
-2. List all parameters in same category
-3. Check for common typos
-
-## Texture Binding
-
-### Sampler Management
-
-The UniformBinder MUST:
-- Track which texture unit each sampler uses
-- Bind texture samplers to correct units
-- Reserve units 0-7 for film textures
-- Reserve units 8-15 for material textures
-- Update sampler uniforms with unit numbers
-
-### Texture Unit Allocation
-
-| Units | Reserved For |
-|-------|-------------|
-| 0-3 | Film textures (radiance, variance, etc.) |
-| 4-7 | Additional film buffers |
-| 8-11 | Material textures (albedo, normal, etc.) |
-| 12-15 | Environment/light textures |
-| 16-31 | General purpose (if available) |
-
-## Integration Requirements
-
-### With ShaderCompiler
-
-The binder MUST:
-- Build UniformMap from CompiledProgram
-- Extract uniform locations from WebGLProgram
-- Map parameter paths using module metadata
-
-### With ResourceManager
-
-The binder MUST:
-- Get texture unit assignments for film textures
-- Bind samplers to correct texture units
-- Respect texture unit reservations
-
-### With Engine
-
-The binder MUST:
-- Accept parameter updates from ParameterStore
-- Flush all updates once per frame
-- Provide statistics for monitoring
-- Clear bindings when switching programs
-
-## Debugging Features
-
-### Debug Output
-
-`debugPrint()` MUST show:
-- Total mappings
-- Mappings with/without locations
-- Update statistics
-- Queue size
-- Missing bindings
-
-Example output:
-```
-=== Uniform Bindings ===
-Total mappings: 47
-With location: 32
-Without location: 15 (optimized out)
-Updates this frame: 12
-Queue size: 3
-Missing bindings: 1 (camera.aperature)
-```
-
-### Missing Binding Helpers
+## UniformMap Building Contract
 
 ```typescript
-getMissingBindings(): string[]
-// Returns all parameters that were set but had no binding
+buildBindings(program: CompiledProgram): void {
+  // Clear previous bindings
+  this.clearBindings();
+  
+  // Store active program
+  this.activeProgram = program.program;
+  
+  // Build the uniform map
+  this.uniformMap = this.createUniformMap(program);
+  
+  // Log mapping summary
+  const mappingCount = this.uniformMap.getAllMappings().length;
+  const activeCount = this.uniformMap.getAllMappings()
+    .filter(m => m.location !== null).length;
+  
+  console.log(
+    `Built ${mappingCount} uniform mappings ` +
+    `(${activeCount} active in shader)`
+  );
+  
+  // Reset tracking
+  this.unusedUniforms = new Set(
+    this.uniformMap.getAllMappings()
+      .filter(m => m.location !== null)
+      .map(m => m.paramPath)
+  );
+  this.missingParameters.clear();
+  
+  // Initialize engine uniforms
+  this.initializeEngineUniforms();
+}
 
-getSuggestedBindings(paramPath: string): string[]
-// Returns similar parameter names that DO have bindings
+private createUniformMap(program: CompiledProgram): UniformMap {
+  const mappings = new Map<string, UniformMapping>();
+  
+  // Process each module's parameters
+  for (const module of program.modules) {
+    const prefix = MODULE_PREFIX_MAP[module.id.kind];
+    const moduleName = module.id.name.toLowerCase();
+    
+    for (const param of module.parameters || []) {
+      // Build parameter path: kind.paramName
+      const paramPath = `${module.id.kind}.${param.name}`;
+      
+      // Build GLSL uniform name with prefix
+      const glslName = `u_${prefix}${moduleName}_${param.name}`;
+      
+      // Get location from compiled program
+      const location = this.gl.getUniformLocation(program.program, glslName);
+      
+      // Create mapping
+      const mapping: UniformMapping = {
+        paramPath,
+        glslName,
+        location,
+        type: param.type as GLSLType,
+        moduleSource: module.id.name,
+        used: false,
+        updateCount: 0
+      };
+      
+      mappings.set(paramPath, mapping);
+      
+      // Log if uniform was optimized out
+      if (!location) {
+        console.debug(`Uniform optimized out: ${glslName} (${paramPath})`);
+      }
+    }
+  }
+  
+  // Add engine uniforms
+  this.addEngineUniformMappings(mappings, program.program);
+  
+  // Create UniformMap implementation
+  return {
+    programId: program.id,
+    mappings,
+    
+    getMapping: (path: string) => mappings.get(path),
+    getAllMappings: () => Array.from(mappings.values()),
+    getUnusedMappings: () => Array.from(mappings.values()).filter(m => !m.used),
+    getMissingParameters: () => Array.from(this.missingParameters),
+    
+    debugPrint: () => {
+      console.table(
+        Array.from(mappings.values()).map(m => ({
+          param: m.paramPath,
+          glsl: m.glslName,
+          type: m.type,
+          hasLocation: m.location !== null,
+          used: m.used,
+          updates: m.updateCount
+        }))
+      );
+    }
+  };
+}
+
+private addEngineUniformMappings(
+  mappings: Map<string, UniformMapping>,
+  program: WebGLProgram
+): void {
+  const engineUniforms = [
+    { path: 'engine.resolution', glsl: 'u_resolution', type: 'vec2' },
+    { path: 'engine.frame_index', glsl: 'u_frame_index', type: 'int' },
+    { path: 'engine.sample_count', glsl: 'u_sample_count', type: 'int' },
+    { path: 'engine.time', glsl: 'u_time', type: 'float' },
+    { path: 'engine.film_reset', glsl: 'u_film_reset', type: 'bool' }
+  ];
+  
+  for (const uniform of engineUniforms) {
+    const location = this.gl.getUniformLocation(program, uniform.glsl);
+    
+    mappings.set(uniform.path, {
+      paramPath: uniform.path,
+      glslName: uniform.glsl,
+      location,
+      type: uniform.type as GLSLType,
+      moduleSource: 'Engine',
+      used: true,  // Engine uniforms always marked as used
+      updateCount: 0
+    });
+  }
+}
 ```
 
-## Usage Example
+## Update Batching Contract
 
 ```typescript
+queueUpdate(paramPath: string, value: any): void {
+  // Queue for batch update
+  this.pendingUpdates.set(paramPath, value);
+  this.frameUpdateRequired = true;
+}
+
+queueUpdates(changes: ParameterChanges): void {
+  for (const change of changes.changes) {
+    this.queueUpdate(change.path, change.newValue);
+  }
+  
+  // Check if film reset needed
+  if (changes.triggersReset) {
+    this.queueUpdate('engine.film_reset', true);
+  }
+}
+
+getPendingCount(): number {
+  return this.pendingUpdates.size;
+}
+
+clearPendingUpdates(): void {
+  this.pendingUpdates.clear();
+  this.frameUpdateRequired = false;
+}
+```
+
+## Frame Update Contract
+
+```typescript
+frameUpdate(engineState: EngineStateInfo): void {
+  if (!this.uniformMap || !this.activeProgram) {
+    throw new Error('No uniform bindings - call buildBindings() first');
+  }
+  
+  const startTime = performance.now();
+  let updatedCount = 0;
+  let skippedCount = 0;
+  let missingCount = 0;
+  
+  // 1. Always update engine uniforms
+  this.updateEngineUniforms(engineState);
+  
+  // 2. Process pending parameter updates
+  for (const [path, value] of this.pendingUpdates) {
+    const mapping = this.uniformMap.getMapping(path);
+    
+    if (!mapping) {
+      // Track missing parameter
+      this.missingParameters.add(path);
+      missingCount++;
+      
+      // Only warn once per parameter
+      if (!this.stats.missingBindings) {
+        console.warn(`No uniform mapping for parameter: ${path}`);
+      }
+      continue;
+    }
+    
+    if (!mapping.location) {
+      // Uniform was optimized out
+      skippedCount++;
+      continue;
+    }
+    
+    // Apply the uniform update
+    this.applyUniform(mapping, value);
+    
+    // Update tracking
+    mapping.used = true;
+    mapping.lastValue = value;
+    mapping.updateCount++;
+    this.unusedUniforms.delete(path);
+    updatedCount++;
+  }
+  
+  // 3. Clear pending updates
+  this.pendingUpdates.clear();
+  this.frameUpdateRequired = false;
+  
+  // 4. Update statistics
+  const elapsed = performance.now() - startTime;
+  this.updateStats(elapsed, updatedCount, skippedCount, missingCount);
+}
+
+private updateEngineUniforms(state: EngineStateInfo): void {
+  // Resolution
+  const resolutionMapping = this.uniformMap!.getMapping('engine.resolution');
+  if (resolutionMapping?.location) {
+    this.gl.uniform2f(resolutionMapping.location, state.width, state.height);
+  }
+  
+  // Frame index
+  const frameMapping = this.uniformMap!.getMapping('engine.frame_index');
+  if (frameMapping?.location) {
+    this.gl.uniform1i(frameMapping.location, state.frameIndex);
+  }
+  
+  // Sample count
+  const sampleMapping = this.uniformMap!.getMapping('engine.sample_count');
+  if (sampleMapping?.location) {
+    this.gl.uniform1i(sampleMapping.location, state.sampleCount);
+  }
+  
+  // Time
+  const timeMapping = this.uniformMap!.getMapping('engine.time');
+  if (timeMapping?.location) {
+    this.gl.uniform1f(timeMapping.location, state.time);
+  }
+  
+  // Film reset flag (cleared each frame)
+  const resetMapping = this.uniformMap!.getMapping('engine.film_reset');
+  if (resetMapping?.location) {
+    this.gl.uniform1i(resetMapping.location, 0);
+  }
+}
+
+private applyUniform(mapping: UniformMapping, value: any): void {
+  const location = mapping.location!;
+  
+  switch (mapping.type) {
+    case 'float':
+      this.gl.uniform1f(location, value);
+      break;
+      
+    case 'vec2':
+      if (Array.isArray(value) && value.length === 2) {
+        this.gl.uniform2f(location, value[0], value[1]);
+      } else {
+        this.gl.uniform2fv(location, value);
+      }
+      break;
+      
+    case 'vec3':
+      if (Array.isArray(value) && value.length === 3) {
+        this.gl.uniform3f(location, value[0], value[1], value[2]);
+      } else {
+        this.gl.uniform3fv(location, value);
+      }
+      break;
+      
+    case 'vec4':
+      if (Array.isArray(value) && value.length === 4) {
+        this.gl.uniform4f(location, value[0], value[1], value[2], value[3]);
+      } else {
+        this.gl.uniform4fv(location, value);
+      }
+      break;
+      
+    case 'int':
+      this.gl.uniform1i(location, value);
+      break;
+      
+    case 'bool':
+      this.gl.uniform1i(location, value ? 1 : 0);
+      break;
+      
+    case 'mat3':
+      this.gl.uniformMatrix3fv(location, false, value);
+      break;
+      
+    case 'mat4':
+      this.gl.uniformMatrix4fv(location, false, value);
+      break;
+      
+    case 'sampler2D':
+    case 'samplerCube':
+      // Texture uniforms just need the texture unit number
+      this.gl.uniform1i(location, value);
+      break;
+      
+    default:
+      console.warn(`Unknown uniform type: ${mapping.type} for ${mapping.paramPath}`);
+  }
+}
+```
+
+## Forced Update Contract
+
+```typescript
+forceUpdate(paramPath: string, value: any): void {
+  if (!this.uniformMap) {
+    throw new Error('No uniform bindings');
+  }
+  
+  const mapping = this.uniformMap.getMapping(paramPath);
+  if (!mapping) {
+    throw new Error(`No mapping for parameter: ${paramPath}`);
+  }
+  
+  if (!mapping.location) {
+    // Silently skip if optimized out
+    return;
+  }
+  
+  // Apply immediately
+  this.applyUniform(mapping, value);
+  
+  // Update tracking
+  mapping.used = true;
+  mapping.lastValue = value;
+  mapping.updateCount++;
+  this.unusedUniforms.delete(paramPath);
+  this.stats.totalUpdates++;
+}
+```
+
+## Texture Binding Contract
+
+```typescript
+bindTextureUniform(uniformName: string, unit: number): void {
+  if (!this.activeProgram) {
+    throw new Error('No active program');
+  }
+  
+  const location = this.gl.getUniformLocation(this.activeProgram, uniformName);
+  if (!location) {
+    // Texture uniform optimized out
+    return;
+  }
+  
+  this.gl.uniform1i(location, unit);
+  this.textureBindings.set(uniformName, unit);
+}
+
+getTextureBindings(): Map<string, number> {
+  return new Map(this.textureBindings);
+}
+```
+
+## Performance Tracking Contract
+
+```typescript
+private updateStats(elapsed: number, updated: number, skipped: number, missing: number): void {
+  // Update counts
+  this.stats.frameUpdates = updated;
+  this.stats.totalUpdates += updated;
+  this.stats.skippedUpdates += skipped;
+  this.stats.missingBindings += missing;
+  
+  // Track unique uniforms
+  this.stats.uniqueUniforms = this.uniformMap!.getAllMappings()
+    .filter(m => m.used).length;
+  
+  // Update timing
+  this.stats.lastUpdateTime = elapsed;
+  
+  // Moving average (exponential)
+  const alpha = 0.1;
+  this.stats.averageUpdateTime = 
+    this.stats.averageUpdateTime * (1 - alpha) + elapsed * alpha;
+  
+  // Track max queue size
+  const queueSize = this.pendingUpdates.size;
+  if (queueSize > this.stats.maxQueueSize) {
+    this.stats.maxQueueSize = queueSize;
+  }
+  
+  // Keep history for debugging
+  this.updateHistory.push(elapsed);
+  if (this.updateHistory.length > 60) {
+    this.updateHistory.shift();
+  }
+}
+
+getUpdateStats(): UpdateStats {
+  // Check for redundant updates
+  let redundantCount = 0;
+  if (this.uniformMap) {
+    for (const mapping of this.uniformMap.getAllMappings()) {
+      if (mapping.updateCount > this.stats.frameUpdates * 2) {
+        redundantCount++;
+      }
+    }
+  }
+  
+  return {
+    ...this.stats,
+    redundantUpdates: redundantCount
+  };
+}
+
+resetStats(): void {
+  this.stats = {
+    totalUpdates: 0,
+    frameUpdates: 0,
+    uniqueUniforms: 0,
+    skippedUpdates: 0,
+    redundantUpdates: 0,
+    missingBindings: 0,
+    lastUpdateTime: 0,
+    averageUpdateTime: 0,
+    maxQueueSize: 0
+  };
+  this.updateHistory = [];
+}
+```
+
+## Debugging Contract
+
+```typescript
+debugPrint(): void {
+  if (!this.uniformMap) {
+    console.log('No uniform bindings');
+    return;
+  }
+  
+  console.log('=== Uniform Bindings ===');
+  this.uniformMap.debugPrint();
+  
+  console.log('\n=== Texture Bindings ===');
+  console.table(
+    Array.from(this.textureBindings.entries()).map(([name, unit]) => ({
+      uniform: name,
+      unit
+    }))
+  );
+  
+  console.log('\n=== Update Statistics ===');
+  console.table(this.getUpdateStats());
+  
+  if (this.unusedUniforms.size > 0) {
+    console.log('\n=== Unused Uniforms ===');
+    console.log(Array.from(this.unusedUniforms));
+  }
+  
+  if (this.missingParameters.size > 0) {
+    console.log('\n=== Missing Parameters ===');
+    console.log(Array.from(this.missingParameters));
+  }
+}
+
+getMissingParameters(): string[] {
+  return Array.from(this.missingParameters);
+}
+
+getUnusedUniforms(): string[] {
+  return Array.from(this.unusedUniforms);
+}
+```
+
+## Minimal Working Example
+
+```typescript
+// Create uniform binder
+const gl = canvas.getContext('webgl2')!;
 const binder = new UniformBinder(gl);
 
-// Build mappings for a program
-binder.buildBindings(compiledProgram, modules);
+// After compilation, build bindings
+const compiledProgram = compiler.getProgram('pathtracer');
+gl.useProgram(compiledProgram.program);
+binder.buildBindings(compiledProgram);
+
+// Inspect mappings
+const map = binder.getUniformMap();
+map?.debugPrint();
 
 // Queue parameter updates
 binder.queueUpdate('camera.position', [0, 5, 10]);
+binder.queueUpdate('camera.fov', 60);
 binder.queueUpdate('material.roughness', 0.5);
+binder.queueUpdate('material.albedo', [0.8, 0.2, 0.2]);
 
-// Once per frame
-const engineState = {
+// Or queue from ParameterChanges
+const changes: ParameterChanges = {
+  changes: [
+    { path: 'lights.intensity', oldValue: 1, newValue: 2, timestamp: Date.now() }
+  ],
+  source: 'user',
+  triggersReset: true
+};
+binder.queueUpdates(changes);
+
+// Each frame: flush all updates at once
+const engineState: EngineStateInfo = {
   width: 1920,
   height: 1080,
   frameIndex: 42,
-  sampleCount: 100,
-  time: 1.234
+  sampleCount: 42,
+  time: performance.now() / 1000
 };
-binder.frameUpdate(engineState);  // Flushes all updates
+binder.frameUpdate(engineState);
 
-// Debug missing binding
-if (!binder.hasBinding('camera.aperature')) {
-  const suggestions = binder.getSuggestedBindings('camera.aperature');
-  console.log('Did you mean:', suggestions);  // ['camera.aperture']
+// Check what got updated
+const stats = binder.getUpdateStats();
+console.log(`Updated ${stats.frameUpdates} uniforms in ${stats.lastUpdateTime.toFixed(2)}ms`);
+
+// Force immediate update (bypasses queue)
+binder.forceUpdate('developer.exposure', 1.5);
+
+// Bind texture uniforms
+binder.bindTextureUniform('u_film_radiance_previous', 0);
+binder.bindTextureUniform('u_environment_map', 8);
+
+// Debug everything
+binder.debugPrint();
+
+// Check for issues
+const missing = binder.getMissingParameters();
+if (missing.length > 0) {
+  console.warn('Parameters with no uniforms:', missing);
 }
 
-// Check performance
-const stats = binder.getUpdateStats();
-console.log(`Uniform updates: ${stats.frameUpdates} in ${stats.lastUpdateTime}ms`);
+const unused = binder.getUnusedUniforms();
+if (unused.length > 0) {
+  console.log('Uniforms never set:', unused);
+}
+
+// Cleanup
+binder.dispose();
 ```
 
 ## Invariants
 
-1. UniformMap is immutable after `buildBindings()`
-2. Queue is always empty after `frameUpdate()`
-3. Engine uniforms are updated every frame
-4. Texture units 0-7 are reserved for film
-5. Statistics accurately reflect update counts
-6. Missing bindings are tracked but don't cause errors
-7. Redundant updates (same value) are skipped
+1. **Bindings match program** - UniformMap always corresponds to active program
+2. **Updates batched** - All queued updates flushed in single frameUpdate()
+3. **Engine uniforms first** - Always updated before parameter uniforms
+4. **Locations cached** - WebGLUniformLocation retrieved once at binding
+5. **Missing tracked** - Parameters with no mapping recorded
+6. **Usage tracked** - Know which uniforms are actually used
+7. **Statistics accurate** - Performance metrics updated each frame
+
+## Error Handling
+
+The UniformBinder MUST handle these error conditions:
+
+| Error | Response |
+|-------|----------|
+| No bindings | Throw when frameUpdate() called |
+| No active program | Throw when building bindings |
+| Invalid uniform type | Warn and skip update |
+| Missing parameter mapping | Track and warn once |
+| Optimized out uniform | Skip silently |
+| Invalid value type | Warn with details |
+| Texture uniform missing | Skip silently |
+
+## Performance Requirements
+
+- Binding creation: < 10ms for typical program
+- Batch update: < 1ms for 50 uniforms
+- Forced update: < 0.1ms per uniform
+- Memory overhead: ~200 bytes per mapping
+- Queue capacity: Unlimited (uses Map)

@@ -2,115 +2,38 @@
 
 ## Purpose
 
-This document defines all shared types used across Engine subsystems. These types form the contracts between subsystems and with the App layer.
+This document defines all shared types used across Engine subsystems. These types form the contracts between subsystems and provide the vocabulary for Engine operations.
 
-## Module Types
+## Core Engine Types
 
-### Module Identification
+### Engine State
 
-    ```typescript
-interface ModuleId {
-  kind: ModuleKind;
-  name: string;
-  version: string;
-}
+```typescript
+type EngineState = 
+  | { type: "uninitialized" }
+  | { type: "ready" }
+  | { type: "running"; program: CompiledProgram; frame: number }
+  | { type: "error"; error: Error; recoverable: boolean };
 
-type ModuleKind = 
-  | 'geometry'
-  | 'material' 
-  | 'scene'
-  | 'lights'
-  | 'camera'
-  | 'estimator'
-  | 'film'
-  | 'developer';
-```
-
-### Module Descriptor
-
-    ```typescript
-interface ModuleDescriptor {
-  id: ModuleId;
-  
-  // Functions
-  provides?: string[];                // Functions this module exports
-  requires?: string[];                // Functions this module needs
-  
-  // GLSL source
-  fragment: {
-    functions: string;                // GLSL function implementations
-    uniforms?: string;                // Uniform declarations
-    constants?: string;               // #define statements
-  };
-  
-  // Parameters
-  parameters?: ParameterDescriptor[];
-  
-  // Resources
-  resources?: {
-    textures?: TextureResourceSpec[];
-    buffers?: BufferResourceSpec[];
-  };
-  
-  // Metadata
-  metadata?: {
-    author?: string;
-    description?: string;
-    tags?: string[];
-    debug?: boolean;                  // Debug variant
-    realtime?: boolean;               // Real-time variant
-  };
-}
-
-interface ParameterDescriptor {
-  name: string;
-  type: ParameterType;
-  default: any;
-  
-  // Validation
-  min?: number;
-  max?: number;
-  step?: number;
-  options?: any[];                    // Enum values
-  
-  // UI hints
-  group?: string;
-  label?: string;
-  help?: string;
-  hidden?: boolean;
-}
-
-type ParameterType = 
-  | 'float' | 'vec2' | 'vec3' | 'vec4'
-  | 'int' | 'ivec2' | 'ivec3' | 'ivec4'
-  | 'bool' | 'color' | 'texture';
-```
-
-### Module Collection
-
-    ```typescript
-interface ModuleCollection {
-  geometry: ModuleDescriptor;
-  material: ModuleDescriptor;         // SINGLE material module
-  scene: ModuleDescriptor;
-  lights: ModuleDescriptor;
-  camera: ModuleDescriptor;
-  estimator: ModuleDescriptor;
-  film: ModuleDescriptor;
-  developer: ModuleDescriptor;
+interface EngineStateInfo {
+  width: number;                      // Viewport width
+  height: number;                     // Viewport height
+  frameIndex: number;                 // Current frame number
+  sampleCount: number;                // Accumulation sample count
+  time: number;                       // Seconds since start
 }
 ```
 
-## Recipe Types
+### Recipe and Module References
 
-    ```typescript
+```typescript
 interface Recipe {
-  id: string;
-  name: string;
+  id: string;                         // Unique recipe identifier
+  name: string;                       // Human-readable name
   
   world: {
     geometry: ModuleReference;
-    material: ModuleReference;        // SINGLE material
+    material: ModuleReference;        // SINGLE material module
     scene: ModuleReference;
     lights: ModuleReference;
   };
@@ -122,7 +45,7 @@ interface Recipe {
     developer: ModuleReference;
   };
   
-  parameters?: ParameterOverrides;
+  parameters?: ParameterOverrides;   // Initial parameter values
 }
 
 interface ModuleReference {
@@ -130,38 +53,116 @@ interface ModuleReference {
   name: string;
 }
 
+type ModuleKind = 
+  | 'geometry'
+  | 'material' 
+  | 'scene'
+  | 'lights'
+  | 'camera'
+  | 'estimator'
+  | 'film'
+  | 'developer';
+
 interface ParameterOverrides {
-  [path: string]: any;                // e.g., "camera.position": [0, 5, 10]
+  [path: string]: any;               // e.g., "camera.position": [0, 5, 10]
+}
+```
+
+## Module Types
+
+### Module Descriptor
+
+```typescript
+interface ModuleDescriptor {
+  id: {
+    kind: ModuleKind;
+    name: string;
+    version: string;
+  };
+  
+  fragment: {
+    functions: string;               // GLSL function implementations
+    uniforms?: string;              // Uniform declarations
+    constants?: string;             // #define statements
+    provides?: string[];            // Functions this module exports
+    requires?: string[];            // Functions this module needs
+  };
+  
+  parameters?: ParameterDescriptor[];
+  
+  resources?: {
+    textures?: TextureResourceSpec[];
+  };
+  
+  metadata?: {
+    author?: string;
+    description?: string;
+    tags?: string[];
+  };
+}
+
+interface ParameterDescriptor {
+  name: string;
+  type: GLSLType;
+  default: any;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+type GLSLType = 
+  | 'float' | 'vec2' | 'vec3' | 'vec4'
+  | 'int' | 'ivec2' | 'ivec3' | 'ivec4'
+  | 'bool' | 'mat3' | 'mat4'
+  | 'sampler2D' | 'samplerCube';
+```
+
+### Module Collection
+
+```typescript
+interface ModuleCollection {
+  geometry: ModuleDescriptor;
+  material: ModuleDescriptor;        // SINGLE material
+  scene: ModuleDescriptor;
+  lights: ModuleDescriptor;
+  camera: ModuleDescriptor;
+  estimator: ModuleDescriptor;
+  film: ModuleDescriptor;
+  developer: ModuleDescriptor;
+}
+
+interface ModuleQuery {
+  kind?: ModuleKind;
+  name?: string;                    // Partial match
+  provides?: string[];              // Must provide all
+  requires?: string[];              // Must require all
+  tags?: string[];
 }
 ```
 
 ## Compilation Types
 
-    ```typescript
+### Compiled Program
+
+```typescript
 interface CompiledProgram {
-  id: string;                         // Unique identifier
-  program: WebGLProgram;               // GPU program
-  uniformMap: UniformMap;              // Parameter mappings
-  recipe: Recipe;                      // Source recipe
-  modules: ModuleDescriptor[];        // Modules used
+  id: string;                        // Unique program identifier
+  program: WebGLProgram;             // GPU program object
+  uniformMap: UniformMap;            // Parameter â†' uniform mappings
+  recipe: Recipe;                    // Source recipe
+  modules: ModuleDescriptor[];      // Modules used
   
   metadata: {
-    compiledAt: number;               // Timestamp
-    vertexSource: string;             // For debugging
-    fragmentSource: string;           // For debugging
-    lineMap: LineMapping;             // Error mapping
-    compileTime: number;              // Milliseconds
+    compiledAt: number;             // Timestamp
+    compileTime: number;            // Milliseconds to compile
+    vertexSource: string;           // For debugging
+    fragmentSource: string;         // For debugging
+    lineMap: LineMapping;           // Error line mapping
+    pipelineStages: string[];       // Stages executed
   };
 }
 
 interface LineMapping {
-  lines: Array<{
-    compiledLine: number;             // Line in compiled shader
-    sourceLine: number;               // Line in original module
-    module: string;                   // Module name
-    function?: string;                // Function name if applicable
-  }>;
-  
   getSourceLocation(compiledLine: number): {
     module: string;
     originalLine: number;
@@ -171,9 +172,12 @@ interface LineMapping {
 
 interface CompilationReport {
   recipesCompiled: number;
+  recipesSucceeded: number;
+  recipesFailed: number;
   totalTime: number;
+  averageTime: number;
   programs: Array<{
-    recipe: string;
+    recipeId: string;
     success: boolean;
     time: number;
     error?: string;
@@ -181,247 +185,87 @@ interface CompilationReport {
 }
 ```
 
-## Engine State Types
+### Pipeline Types
 
-    ```typescript
-type EngineState = 
-  | { type: 'uninitialized' }
-  | { type: 'ready' }
-  | { type: 'compiling'; recipe: Recipe }
-  | { type: 'running'; program: CompiledProgram; frame: number }
-  | { type: 'error'; error: Error; recoverable: boolean };
-
-interface EngineStateInfo {
-  width: number;                      // Viewport width
-  height: number;                     // Viewport height
-  frameIndex: number;                 // Current frame
-  sampleCount: number;                // Accumulation count
-  time: number;                       // Seconds elapsed
+```typescript
+interface ProcessedModule {
+  descriptor: ModuleDescriptor;
+  originalSource: string;
+  prefixedSource: string;
+  functionMap: Map<string, string>;  // original â†' prefixed
+  prefix: string;                    // Module's prefix (g_, m_, etc.)
 }
-```
 
-## Parameter Types
-
-    ```typescript
-interface ParameterChanges {
-  changes: Array<{
-    path: string;                     // "camera.position"
-    oldValue: any;
-    newValue: any;
-    timestamp: number;
-  }>;
-  
-  // Metadata
-  source: 'user' | 'animation' | 'reset';
-  triggersReset: boolean;             // Requires accumulation clear
+interface PipelineContext {
+  recipe: Recipe;
+  modules: ProcessedModule[];
+  errors: string[];
+  warnings: string[];
+  metadata: Record<string, any>;
 }
 ```
 
 ## Uniform Types
 
-    ```typescript
+### Uniform Mapping
+
+```typescript
 interface UniformMap {
   programId: string;
   mappings: Map<string, UniformMapping>;
   
-  // Operations
   getMapping(paramPath: string): UniformMapping | undefined;
   getAllMappings(): UniformMapping[];
   getUnusedMappings(): UniformMapping[];
+  getMissingParameters(): string[];
+  debugPrint(): void;
 }
 
 interface UniformMapping {
-  paramPath: string;                  // "camera.position"
-  glslName: string;                   // "u_camera_pinhole_position"
+  paramPath: string;                 // "camera.position"
+  glslName: string;                  // "u_camera_pinhole_position"
   location: WebGLUniformLocation | null;
-  type: UniformType;
-  arrayLength?: number;               // For arrays
+  type: GLSLType;
   
   // Metadata
-  moduleSource: string;               // Which module
-  used: boolean;                      // Ever set
-  lastValue?: any;                    // For change detection
-  updateCount: number;                // Times updated
+  moduleSource: string;              // Which module defined this
+  used: boolean;                     // Ever set during rendering
+  lastValue?: any;                   // For change detection
+  updateCount: number;               // Times updated
+}
+```
+
+### Parameter Changes
+
+```typescript
+interface ParameterChanges {
+  changes: Array<{
+    path: string;                    // "camera.position"
+    oldValue: any;
+    newValue: any;
+    timestamp: number;
+  }>;
+  
+  source: 'user' | 'animation' | 'reset' | 'initialization';
+  triggersReset: boolean;            // Requires film buffer clear
 }
 
-type UniformType = 
-  | 'float' | 'vec2' | 'vec3' | 'vec4'
-  | 'int' | 'ivec2' | 'ivec3' | 'ivec4'
-  | 'bool' | 'bvec2' | 'bvec3' | 'bvec4'
-  | 'mat2' | 'mat3' | 'mat4'
-  | 'sampler2D' | 'samplerCube' | 'sampler3D'
-  | 'isampler2D' | 'usampler2D';
-
-interface UpdateStats {
-  totalUpdates: number;
-  frameUpdates: number;
-  uniqueUniforms: number;
-  skippedUpdates: number;
-  redundantUpdates: number;
-  missingBindings: number;
-  lastUpdateTime: number;
-  averageUpdateTime: number;
-  maxQueueSize: number;
+interface UniformUpdateQueue {
+  pending: Map<string, any>;         // Queued updates
+  processed: number;                 // Updates processed this frame
+  skipped: number;                   // Updates skipped (no location)
+  missing: number;                   // Updates with no mapping
 }
 ```
 
 ## Resource Types
 
-### Texture Types
-
-    ```typescript
-interface TextureSpec {
-  id: string;
-  width: number;
-  height: number;
-  format: TextureFormat;
-  type: DataType;
-  
-  // Optional
-  data?: ArrayBufferView | null;
-  filter?: FilterMode;
-  wrap?: WrapMode;
-  generateMipmap?: boolean;
-  flipY?: boolean;
-  premultiplyAlpha?: boolean;
-  
-  // Usage
-  usage: 'film' | 'asset' | 'temporary';
-  persistent?: boolean;
-}
-
-interface Texture {
-  id: string;
-  glTexture: WebGLTexture;
-  spec: TextureSpec;
-  boundUnit?: number;
-  memoryBytes: number;
-  lastUsedFrame?: number;
-}
-
-enum TextureFormat {
-  // 8-bit formats
-  RGB = 0x1907,
-  RGBA = 0x1908,
-  LUMINANCE = 0x1909,
-  
-  // 16-bit float formats
-  RGB16F = 0x881B,
-  RGBA16F = 0x881A,
-  R16F = 0x822D,
-  RG16F = 0x822F,
-  
-  // 32-bit float formats
-  RGB32F = 0x8815,
-  RGBA32F = 0x8814,
-  R32F = 0x822E,
-  RG32F = 0x8230,
-  
-  // Integer formats
-  R32I = 0x8235,
-  R32UI = 0x8236,
-}
-
-enum DataType {
-  UNSIGNED_BYTE = 0x1401,
-  UNSIGNED_SHORT = 0x1403,
-  UNSIGNED_INT = 0x1405,
-  FLOAT = 0x1406,
-  HALF_FLOAT = 0x140B,
-  BYTE = 0x1400,
-  SHORT = 0x1402,
-  INT = 0x1404,
-}
-
-enum FilterMode {
-  NEAREST = 0x2600,
-  LINEAR = 0x2601,
-  NEAREST_MIPMAP_NEAREST = 0x2700,
-  LINEAR_MIPMAP_NEAREST = 0x2701,
-  NEAREST_MIPMAP_LINEAR = 0x2702,
-  LINEAR_MIPMAP_LINEAR = 0x2703,
-}
-
-enum WrapMode {
-  REPEAT = 0x2901,
-  CLAMP_TO_EDGE = 0x812F,
-  MIRRORED_REPEAT = 0x8370,
-}
-```
-
-### Framebuffer Types
-
-    ```typescript
-interface FramebufferSpec {
-  id: string;
-  attachments: FramebufferAttachment[];
-  width: number;
-  height: number;
-}
-
-interface FramebufferAttachment {
-  type: AttachmentType;
-  attachment: number;                 // Color attachment index
-  texture?: Texture;
-  renderbuffer?: WebGLRenderbuffer;
-}
-
-type AttachmentType = 
-  | 'color' 
-  | 'depth' 
-  | 'stencil' 
-  | 'depth_stencil';
-
-interface Framebuffer {
-  id: string;
-  glFramebuffer: WebGLFramebuffer;
-  spec: FramebufferSpec;
-  complete: boolean;
-}
-```
-
-### Film Types
-
-    ```typescript
-interface FilmManifest {
-  textures: Array<{
-    name: string;                     // 'radiance', 'variance'
-    format: TextureFormat;
-    persistent: boolean;              // Needs ping-pong
-  }>;
-  resolution: Resolution;
-  clearColor: [number, number, number, number];
-}
-
-interface FilmResources {
-  textures: Map<string, Texture>;
-  framebuffers: {
-    current: Framebuffer;
-    previous: Framebuffer;
-  };
-  manifest: FilmManifest;
-  needsSwap: boolean;
-}
-
-interface TextureResourceSpec {
-  name: string;
-  type: 'texture2D' | 'textureCube' | 'texture3D';
-  format: string;                     // 'rgba32f', 'rgba16f', etc.
-  persistent?: boolean;
-}
-
-interface BufferResourceSpec {
-  name: string;
-  size: number;
-  usage: 'static' | 'dynamic' | 'stream';
-}
-```
-
 ### Capability Types
 
-    ```typescript
+```typescript
 interface CapabilityReport {
-  // Critical
+  // Critical capabilities
+  webgl2: boolean;
   floatRenderTargets: boolean;
   floatLinearFiltering: boolean;
   
@@ -432,8 +276,7 @@ interface CapabilityReport {
   maxViewportDims: [number, number];
   maxRenderBufferSize: number;
   maxVertexAttributes: number;
-  maxUniformVectors: number;
-  maxFragmentUniformVectors: number;
+  maxFragmentUniforms: number;
   
   // Optional features
   depthTexture: boolean;
@@ -450,20 +293,133 @@ interface CapabilityReport {
   shadingLanguageVersion: string;
 }
 
-interface FallbackOption {
+interface FallbackSuggestion {
   capability: string;
   issue: string;
   suggestion: string;
-  alternativeModule?: ModuleDescriptor;
+  alternativeModule?: ModuleReference;
   reducedFeatures?: string[];
+}
+```
+
+### Texture and Framebuffer Types
+
+```typescript
+interface TextureSpec {
+  id: string;
+  width: number;
+  height: number;
+  format: TextureFormat;
+  type: DataType;
+  
+  filter?: FilterMode;
+  wrap?: WrapMode;
+  data?: ArrayBufferView | null;
+  
+  usage: 'film' | 'asset' | 'temporary';
+  persistent?: boolean;              // Needs double-buffering
+}
+
+enum TextureFormat {
+  RGB = 0x1907,
+  RGBA = 0x1908,
+  RGB32F = 0x8815,
+  RGBA32F = 0x8814,
+  RGB16F = 0x881B,
+  RGBA16F = 0x881A,
+  R32F = 0x822E,
+  RG32F = 0x8230,
+  R32I = 0x8235,
+}
+
+enum DataType {
+  UNSIGNED_BYTE = 0x1401,
+  FLOAT = 0x1406,
+  HALF_FLOAT = 0x140B,
+  INT = 0x1404,
+}
+
+enum FilterMode {
+  NEAREST = 0x2600,
+  LINEAR = 0x2601,
+}
+
+enum WrapMode {
+  REPEAT = 0x2901,
+  CLAMP_TO_EDGE = 0x812F,
+  MIRRORED_REPEAT = 0x8370,
+}
+
+interface Texture {
+  id: string;
+  glTexture: WebGLTexture;
+  spec: TextureSpec;
+  boundUnit?: number;
+  memoryBytes: number;
+  lastUsedFrame?: number;
+}
+```
+
+### Film Resource Types
+
+```typescript
+interface FilmManifest {
+  textures: Array<{
+    name: string;                    // 'radiance', 'variance'
+    format: TextureFormat;
+    persistent: boolean;             // Needs ping-pong
+  }>;
+  clearColor: [number, number, number, number];
+}
+
+interface FilmResources {
+  textures: Map<string, Texture>;
+  framebuffers: {
+    current: WebGLFramebuffer;       // Being written to
+    previous: WebGLFramebuffer;      // Being read from
+  };
+  manifest: FilmManifest;
+  needsSwap: boolean;
+}
+
+interface TextureResourceSpec {
+  name: string;
+  type: 'texture2D' | 'textureCube';
+  format: string;                    // 'rgba32f', 'rgba16f', etc.
+  persistent?: boolean;
 }
 ```
 
 ## Rendering Types
 
-### Viewport and Geometry
+### Frame Configuration
 
-    ```typescript
+```typescript
+interface FrameConfig {
+  // Clear options
+  clear?: boolean;
+  clearColor?: [number, number, number, number];
+  clearDepth?: number;
+  clearStencil?: number;
+  
+  // Viewport
+  viewport?: Viewport;
+  scissorTest?: boolean;
+  scissorRect?: Rectangle;
+  
+  // Target
+  target?: RenderTarget;
+  
+  // Buffer management
+  swapBuffers?: boolean;              // Swap film buffers after
+  preserveDrawingBuffer?: boolean;    // Keep for readback
+}
+
+type RenderTarget = 
+  | { type: "screen" }
+  | { type: "framebuffer"; id: string }
+  | { type: "framebuffer"; buffer: WebGLFramebuffer };
+
 interface Viewport {
   x: number;
   y: number;
@@ -477,42 +433,11 @@ interface Rectangle {
   width: number;
   height: number;
 }
-
-interface Resolution {
-  width: number;
-  height: number;
-}
 ```
 
-### Render Configuration
+### Render State
 
-    ```typescript
-type RenderTarget = 
-  | { type: 'screen' }
-  | { type: 'framebuffer'; id: string }
-  | { type: 'mrt'; framebufferId: string; attachments: number[] };
-
-interface FrameConfig {
-  // Clearing
-  clear?: boolean;
-  clearColor?: [number, number, number, number];
-  clearDepth?: number;
-  clearStencil?: number;
-  
-  // Viewport
-  viewport?: Viewport;
-  scissorTest?: boolean;
-  scissorRect?: Rectangle;
-  
-  // Target
-  target?: RenderTarget;
-  drawBuffers?: number[];
-  
-  // Buffer management
-  swapBuffers?: boolean;
-  preserveDrawingBuffer?: boolean;
-}
-
+```typescript
 interface RenderState {
   // Bindings
   viewport: Viewport;
@@ -536,20 +461,20 @@ interface RenderState {
 }
 ```
 
-### Performance Types
+## Performance Types
 
-    ```typescript
+```typescript
 interface FrameStats {
   // Timing
-  frameTime: number;
-  averageFrameTime: number;
+  frameTime: number;                  // Last frame milliseconds
+  averageFrameTime: number;           // Moving average
   minFrameTime: number;
   maxFrameTime: number;
   
   // Counts
   frameNumber: number;
-  drawCalls: number;
-  triangles: number;
+  drawCalls: number;                  // Always 1 for us
+  triangles: number;                  // Always 1 for us
   
   // Performance
   fps: number;
@@ -561,49 +486,67 @@ interface FrameStats {
 }
 
 interface MemoryStats {
-  textureMemory: number;
-  framebufferMemory: number;
-  totalMemory: number;
+  textureMemory: number;              // Bytes
+  framebufferMemory: number;          // Bytes
+  totalMemory: number;                // Total GPU memory
   textureCount: number;
   framebufferCount: number;
-  largestTexture: string;
-  lastCleanup: number;
+  largestTexture: string;             // ID of largest
+  lastCleanup: number;                // Timestamp
+}
+
+interface UpdateStats {
+  totalUpdates: number;               // Lifetime uniform updates
+  frameUpdates: number;               // Updates this frame
+  uniqueUniforms: number;             // Distinct uniforms updated
+  skippedUpdates: number;             // No location (optimized out)
+  redundantUpdates: number;           // Same value
+  missingBindings: number;            // No mapping found
+  
+  lastUpdateTime: number;             // Milliseconds
+  averageUpdateTime: number;          // Running average
+  maxQueueSize: number;               // Largest queue seen
+}
+
+interface PerformanceReport {
+  frame: FrameStats;
+  memory: MemoryStats;
+  uniforms: UpdateStats;
+  compilation: CompilationReport;
 }
 ```
 
 ## Validation Types
 
-    ```typescript
+```typescript
 interface ValidationResult {
   valid: boolean;
-  isValid?: boolean;                  // Alias for compatibility
   errors: string[];
   warnings?: string[];
   suggestions?: string[];
-  context?: string;                    // Additional context
-  fallbackSuggestion?: string;        // Suggested fallback
+  context?: string;                   // Additional debug info
 }
 
-interface CompatibilityResult {
-  compatible: boolean;
+interface DependencyValidation {
+  satisfied: boolean;
   missing: Array<{
-    kind: string;
-    name: string;
+    module: string;
+    requires: string;
+    reason: string;
   }>;
-  issues: string[];
-  suggestions: ModuleSuggestion[];
-}
-
-interface ModuleSuggestion {
-  missing: { kind: string; name: string };
-  alternatives: ModuleDescriptor[];
-  reason: string;
+  duplicates: Array<{
+    function: string;
+    providers: string[];
+  }>;
+  cycles: Array<{
+    path: string[];
+  }>;
 }
 ```
 
 ## Error Types
 
-    ```typescript
+```typescript
 class EngineError extends Error {
   constructor(
     message: string,
@@ -615,60 +558,53 @@ class EngineError extends Error {
   }
 }
 
-class CompilationError extends Error {
+class CompilationError extends EngineError {
   constructor(
     public stage: string,
     public validation: ValidationResult,
-    public module?: ModuleDescriptor,
-    public sourceContext?: string
+    public module?: string,
+    public line?: number
   ) {
-    super(`Compilation failed at stage: ${stage}`);
-    this.name = 'CompilationError';
+    super(
+      `Compilation failed at stage: ${stage}`,
+      'ShaderCompiler',
+      false
+    );
   }
 }
 
-class RegistrationError extends Error {
-  constructor(
-    public module: ModuleDescriptor,
-    public validationErrors: string[]
-  ) {
-    super(`Failed to register module ${module.id.name}`);
-    this.name = 'RegistrationError';
-  }
-}
-
-class ModuleNotFoundError extends Error {
-  constructor(
-    public kind: string,
-    public name: string
-  ) {
-    super(`Module ${kind}:${name} not found`);
-    this.name = 'ModuleNotFoundError';
-  }
-}
-
-class ResourceAllocationError extends Error {
+class ResourceAllocationError extends EngineError {
   constructor(
     public resourceType: string,
     public requested: number,
     public available?: number
   ) {
-    super(`Failed to allocate ${resourceType}`);
-    this.name = 'ResourceAllocationError';
+    super(
+      `Failed to allocate ${resourceType}`,
+      'ResourceManager',
+      true
+    );
   }
 }
 
-class ContextLostError extends Error {
-  constructor() {
-    super('WebGL context lost');
-    this.name = 'ContextLostError';
+class ModuleNotFoundError extends EngineError {
+  constructor(
+    public kind: ModuleKind,
+    public name: string,
+    public alternatives?: string[]
+  ) {
+    super(
+      `Module ${kind}:${name} not found`,
+      'ModuleRegistry',
+      true
+    );
   }
 }
 ```
 
 ## Constants
 
-    ```typescript
+```typescript
 // Module prefixes
 const MODULE_PREFIX_MAP: Record<ModuleKind, string> = {
   'geometry': 'g_',
@@ -682,7 +618,7 @@ const MODULE_PREFIX_MAP: Record<ModuleKind, string> = {
 };
 
 // Texture unit reservations
-const TEXTURE_UNIT_ALLOCATION = {
+const TEXTURE_UNITS = {
   FILM_START: 0,
   FILM_END: 7,
   MATERIAL_START: 8,
@@ -691,19 +627,19 @@ const TEXTURE_UNIT_ALLOCATION = {
   GENERAL_END: 31,
 };
 
+// Engine limits
+const LIMITS = {
+  MAX_RECIPES: 10,                    // Reasonable limit for eager compilation
+  COMPILE_TIMEOUT: 5000,              // ms
+  MAX_UNIFORM_UPDATES_PER_FRAME: 1000,
+  MAX_TEXTURE_SIZE_DEFAULT: 4096,
+};
+
 // Default values
 const DEFAULTS = {
   VIEWPORT: { x: 0, y: 0, width: 1920, height: 1080 },
   CLEAR_COLOR: [0, 0, 0, 0] as [number, number, number, number],
   CLEAR_DEPTH: 1.0,
   CLEAR_STENCIL: 0,
-};
-
-// Performance thresholds
-const PERFORMANCE = {
-  TARGET_FPS: 60,
-  MAX_FRAME_TIME: 16.67,              // ms for 60 FPS
-  FRAME_HISTORY_SIZE: 60,             // Moving average window
-  COMPILE_TIME_WARNING: 1000,         // ms
 };
 ```
