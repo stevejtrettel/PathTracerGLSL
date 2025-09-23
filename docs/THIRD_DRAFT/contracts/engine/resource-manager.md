@@ -5,46 +5,53 @@
 The ResourceManager handles all GPU memory allocation including textures, buffers, and framebuffers. It validates GPU capabilities at startup and manages per-recipe film buffers to preserve accumulation when switching between recipes.
 
 ## Required Interface
-
 ```typescript
 interface ResourceManager {
-  // Capability checking
-  getCapabilities(): CapabilityReport;
-  validateCapabilities(): ValidationResult;
-  hasCapability(capability: string): boolean;
-  suggestFallback(capability: string): FallbackSuggestion | null;
-  
-  // Texture management
-  createTexture(spec: TextureSpec): Texture;
-  deleteTexture(textureId: string): void;
-  getTexture(textureId: string): Texture | null;
-  bindTexture(textureId: string, unit: number): void;
-  unbindTexture(unit: number): void;
-  
-  // Framebuffer management
-  createFramebuffer(spec: FramebufferSpec): Framebuffer;
-  deleteFramebuffer(framebufferId: string): void;
-  getFramebuffer(framebufferId: string): Framebuffer | null;
-  bindFramebuffer(framebufferId: string | null): void;  // null = screen
-  
-  // Per-recipe film buffer management
-  setupFilmBuffers(recipeId: string, film: ModuleDescriptor): FilmResources;
-  getFilmResources(recipeId: string): FilmResources | null;
-  setActiveRecipe(recipeId: string): void;
-  clearFilmBuffers(recipeId?: string): void;  // Current recipe if not specified
-  
-  // Frame lifecycle
-  prepareFrame(): void;
-  finalizeFrame(): void;
-  swapFilmBuffers(): void;
-  
-  // Memory monitoring
-  getMemoryStats(): MemoryStats;
-  canAllocate(bytes: number): boolean;
-  
-  // Cleanup
-  cleanup(): void;
-  dispose(): void;
+    // Capability checking
+    getCapabilities(): CapabilityReport;
+    validateCapabilities(): ValidationResult;
+    hasCapability(capability: string): boolean;
+    suggestFallback(capability: string): FallbackSuggestion | null;
+
+    // Texture management
+    createTexture(spec: TextureSpec): Texture;
+    deleteTexture(textureId: string): void;
+    getTexture(textureId: string): Texture | null;
+    bindTexture(textureId: string, unit: number): void;
+    unbindTexture(unit: number): void;
+
+    // Framebuffer management
+    createFramebuffer(spec: FramebufferSpec): Framebuffer;
+    deleteFramebuffer(framebufferId: string): void;
+    getFramebuffer(framebufferId: string): Framebuffer | null;
+    bindFramebuffer(framebufferId: string | null): void;  // null = screen
+
+    // Per-recipe film buffer management
+    setupFilmBuffers(recipeId: string, film: ModuleDescriptor): FilmResources;
+    getFilmResources(recipeId: string): FilmResources | null;
+    setActiveRecipe(recipeId: string): void;
+    clearFilmBuffers(recipeId?: string): void;  // Current recipe if not specified
+
+    // Snapshot management (for accumulating recipes only)
+    captureSnapshot(recipeId: string, pixels: Float32Array, frame: number): void;
+    getSnapshot(recipeId: string): { pixels: Float32Array; frame: number; timestamp: number } | null;
+    hasSnapshot(recipeId: string): boolean;
+
+    // Frame lifecycle
+    prepareFrame(): void;
+    finalizeFrame(): void;
+    swapFilmBuffers(): void;
+
+    // Memory monitoring
+    getMemoryStats(): MemoryStats;
+    canAllocate(bytes: number): boolean;
+
+    //resize
+    resizeFilmBuffers(recipeId: string, width: number, height: number): void;
+
+    // Cleanup
+    cleanup(): void;
+    dispose(): void;
 }
 ```
 
@@ -52,27 +59,105 @@ interface ResourceManager {
 
 ```typescript
 class ResourceManager {
-  private gl: WebGL2RenderingContext;
-  private capabilities: CapabilityReport;
-  
-  // General resources
-  private textures: Map<string, Texture>;
-  private framebuffers: Map<string, Framebuffer>;
-  
-  // Per-recipe film resources
-  private filmResourcesMap: Map<string, FilmResources>;
-  private activeRecipeId: string | null = null;
-  
-  constructor(gl: WebGL2RenderingContext) {
-    this.gl = gl;
-    this.textures = new Map();
-    this.framebuffers = new Map();
-    this.filmResourcesMap = new Map();
-    
-    // Check capabilities immediately
-    this.capabilities = this.detectCapabilities();
-    this.logCapabilities();
+    private gl: WebGL2RenderingContext;
+    private capabilities: CapabilityReport;
+
+    // General resources
+    private textures: Map<string, Texture>;
+    private framebuffers: Map<string, Framebuffer>;
+
+    // Per-recipe film resources
+    private filmResourcesMap: Map<string, FilmResources>;
+    private activeRecipeId: string | null = null;
+
+    // Snapshots for recovery (accumulating recipes only)
+    private snapshots: Map<string, {
+        pixels: Float32Array;
+        frame: number;
+        timestamp: number;
+    }> = new Map();
+
+    constructor(gl: WebGL2RenderingContext) {
+        this.gl = gl;
+        this.textures = new Map();
+        this.framebuffers = new Map();
+        this.filmResourcesMap = new Map();
+        this.snapshots = new Map();
+
+        // Check capabilities immediately
+        this.capabilities = this.detectCapabilities();
+        this.logCapabilities();
+    }
+}
+```
+
+
+## Snapshot Management
+
+```typescript
+// Helper to detect accumulating recipes
+private isAccumulatingRecipe(recipeId: string): boolean {
+const resources = this.filmResourcesMap.get(recipeId);
+if (!resources) return false;
+
+// Accumulating films have persistent textures that need swapping
+return resources.manifest.textures.some(t => t.persistent);
+}
+
+// Capture snapshot for accumulating recipes only
+captureSnapshot(recipeId: string, pixels: Float32Array, frame: number): void {
+// Only capture for accumulating recipes
+if (!this.isAccumulatingRecipe(recipeId)) {
+return; // Silent skip for non-accumulating recipes
+}
+
+// Replace any existing snapshot for this recipe (only keep most recent)
+const oldSnapshot = this.snapshots.get(recipeId);
+if (oldSnapshot) {
+console.log(`Replacing snapshot from frame ${oldSnapshot.frame} with frame ${frame}`);
+}
+
+this.snapshots.set(recipeId, {
+pixels: new Float32Array(pixels), // Copy to avoid reference issues
+frame,
+timestamp: Date.now()
+});
+
+const sizeMB = (pixels.length * 4) / (1024 * 1024);
+console.log(`Snapshot for accumulating recipe '${recipeId}': ${sizeMB.toFixed(1)}MB at frame ${frame}`);
+}
+
+getSnapshot(recipeId: string): { pixels: Float32Array; frame: number; timestamp: number } | null {
+return this.snapshots.get(recipeId) || null;
+}
+
+hasSnapshot(recipeId: string): boolean {
+return this.snapshots.has(recipeId);
+}
+
+private clearSnapshots(): void {
+this.snapshots.clear();
+}
+```
+
+## Resizing
+
+```typescript
+resizeFilmBuffers(recipeId: string, width: number, height: number): void {
+  const resources = this.filmResourcesMap.get(recipeId);
+  if (!resources) {
+    throw new Error(`No film resources for recipe: ${recipeId}`);
   }
+  
+  // Delete old textures and framebuffers
+  this.cleanupRecipeResources(recipeId);
+  
+  // Recreate at new size
+  const filmModule = /* need to store or pass this */;
+  const newResources = this.createFilmResources(recipeId, resources.manifest, filmModule);
+  this.filmResourcesMap.set(recipeId, newResources);
+  
+  console.log(`Resized film buffers for ${recipeId} to ${width}x${height}`);
 }
 ```
 
@@ -537,22 +622,32 @@ private estimateTextureMemory(spec: TextureSpec): number {
 
 ```typescript
 // Called from Engine when WebGL context is lost
+// Called from Engine when WebGL context is lost
 handleContextLoss(): void {
-  console.warn('WebGL context lost - all GPU resources invalidated');
-  
-  // Clear references but don't try to delete WebGL resources
-  // (they're already gone)
-  this.textures.clear();
-  this.framebuffers.clear();
-  
-  // Note: Film resources will need to be recreated when context is restored
-  // IMPORTANT: All accumulation will be lost!
-  for (const recipeId of this.filmResourcesMap.keys()) {
+    console.warn('WebGL context lost - all GPU resources invalidated');
+
+    // Clear references but don't try to delete WebGL resources
+    // (they're already gone)
+    this.textures.clear();
+    this.framebuffers.clear();
+
+    // Note: Film resources will need to be recreated when context is restored
+    // IMPORTANT: All accumulation will be lost!
+    for (const recipeId of this.filmResourcesMap.keys()) {
     console.warn(`Recipe '${recipeId}' accumulation will be lost on context restore`);
-  }
-  
-  this.filmResourcesMap.clear();
-  this.activeRecipeId = null;
+}
+
+// Snapshots remain in system memory and could be shown as reference
+if (this.snapshots.size > 0) {
+    console.log(`${this.snapshots.size} snapshot(s) available as reference after context loss:`);
+    for (const [recipeId, snapshot] of this.snapshots) {
+        const age = Date.now() - snapshot.timestamp;
+        console.log(`  - ${recipeId}: frame ${snapshot.frame} (${Math.floor(age / 1000)}s ago)`);
+    }
+}
+
+this.filmResourcesMap.clear();
+this.activeRecipeId = null;
 }
 
 // Called from Engine after context is restored
@@ -588,26 +683,27 @@ private cleanupRecipeResources(recipeId: string): void {
 }
 
 dispose(): void {
-  // Clean up all film resources
-  for (const recipeId of this.filmResourcesMap.keys()) {
+    // Clean up all film resources
+    for (const recipeId of this.filmResourcesMap.keys()) {
     this.cleanupRecipeResources(recipeId);
-  }
-  
-  // Clean up remaining textures
-  for (const texture of this.textures.values()) {
+}
+
+// Clean up remaining textures
+for (const texture of this.textures.values()) {
     this.gl.deleteTexture(texture.glTexture);
-  }
-  
-  // Clean up framebuffers
-  for (const fb of this.framebuffers.values()) {
+}
+
+// Clean up framebuffers
+for (const fb of this.framebuffers.values()) {
     this.gl.deleteFramebuffer(fb.glFramebuffer);
-  }
-  
-  // Clear all maps
-  this.textures.clear();
-  this.framebuffers.clear();
-  this.filmResourcesMap.clear();
-  this.activeRecipeId = null;
+}
+
+// Clear all maps including snapshots
+this.textures.clear();
+this.framebuffers.clear();
+this.filmResourcesMap.clear();
+this.snapshots.clear();
+this.activeRecipeId = null;
 }
 ```
 

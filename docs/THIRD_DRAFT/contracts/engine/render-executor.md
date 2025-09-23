@@ -77,17 +77,19 @@ class RenderExecutor {
   private startTime: number;
   
   // Constants
-  private readonly TRIANGLE_VERTICES = new Float32Array([
-    -1, -1,  // Bottom-left
-     3, -1,  // Bottom-right (extends beyond viewport)  
-    -1,  3   // Top-left (extends beyond viewport)
-  ]);
-}
+    private readonly QUAD_VERTICES = new Float32Array([
+        -1, -1,  // Bottom-left
+        1, -1,  // Bottom-right  
+        -1,  1,  // Top-left
+        1, -1,  // Bottom-right (repeated)
+        1,  1,  // Top-right
+        -1,  1   // Top-left (repeated)
+    ]);
 ```
 
 ## Geometry Setup Contract
 
-The executor MUST use a full-screen triangle (not quad) for efficiency:
+The executor MUST use a full-screen quad:
 
 ```typescript
 setupGeometry(): void {
@@ -97,12 +99,12 @@ setupGeometry(): void {
   }
   
   // Create VAO
-  this.triangleVAO = this.gl.createVertexArray();
-  if (!this.triangleVAO) {
+  this.quadVAO = this.gl.createVertexArray();
+  if (!this.quadVAO) {
     throw new Error('Failed to create vertex array');
   }
   
-  this.gl.bindVertexArray(this.triangleVAO);
+  this.gl.bindVertexArray(this.quadVAO);
   
   // Create vertex buffer  
   this.vertexBuffer = this.gl.createBuffer();
@@ -111,11 +113,11 @@ setupGeometry(): void {
   }
   
   this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-  this.gl.bufferData(
+this.gl.bufferData(
     this.gl.ARRAY_BUFFER,
-    this.TRIANGLE_VERTICES,
+    this.QUAD_VERTICES,
     this.gl.STATIC_DRAW
-  );
+);
   
   // Setup position attribute (location 0)
   const positionLoc = 0;
@@ -210,10 +212,10 @@ renderFrame(config?: FrameConfig): void {
   }
   
   // 4. Bind geometry
-  this.gl.bindVertexArray(this.triangleVAO);
-  
-  // 5. Draw the triangle (just 3 vertices!)
-  this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+  this.gl.bindVertexArray(this.quadVAO);
+
+    // 5. Draw the quad (6 vertices, 2 triangles)
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
   
   // 6. Unbind
   this.gl.bindVertexArray(null);
@@ -474,7 +476,7 @@ saveState(): RenderState {
     viewport: { ...this.viewport },
     framebuffer: this.gl.getParameter(this.gl.FRAMEBUFFER_BINDING),
     program: this.gl.getParameter(this.gl.CURRENT_PROGRAM),
-    vao: this.triangleVAO,
+    vao: this.quadVAO,
     
     clearColor: this.gl.getParameter(this.gl.COLOR_CLEAR_VALUE),
     clearDepth: this.gl.getParameter(this.gl.DEPTH_CLEAR_VALUE),
@@ -542,7 +544,7 @@ private updateFrameStats(frameTime: number): void {
   this.frameStats.frameTime = frameTime;
   this.frameStats.frameNumber++;
   this.frameStats.drawCalls = 1;  // Always 1 for us
-  this.frameStats.triangles = 1;   // Single triangle
+  this.frameStats.triangles = 2;   // Two triangles forming quad
   
   const now = performance.now();
   this.frameStats.timestamp = now;

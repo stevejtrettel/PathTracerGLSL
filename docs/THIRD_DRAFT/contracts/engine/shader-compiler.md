@@ -196,7 +196,7 @@ compile(recipe: Recipe): CompiledProgram {
   const uniformMap = this.buildUniformMap(glProgram, modules);
   
   // 6. Create program ID
-  const programId = `prog_${recipe.id}_${Date.now()}`;
+  const programId = `prog_${recipe.id}`;
   
   // Build compiled program
   const program: CompiledProgram = {

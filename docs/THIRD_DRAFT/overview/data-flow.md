@@ -1,6 +1,4 @@
-# Data Flow & Dependencies
-
-A precise trace of how data flows through the path tracer from pixel to final color.
+# Data Flow & Dependencies (Revised)
 
 ## Execution Timeline
 
@@ -9,14 +7,14 @@ A precise trace of how data flows through the path tracer from pixel to final co
 ```
 1. App creates recipes with module selections
 2. Engine compiles each recipe:
-   - Loads module descriptors (with manually prefixed functions)
-   - Validates manual prefixing
+   - Loads module descriptors with manual prefixing
+   - Validates prefixing (geometry_*, scene_*, material_*, etc.)
    - Concatenates modules in fixed order
    - Compiles GLSL program
 3. Engine allocates per-recipe resources:
    - Film buffers (radiance, variance) for each recipe
    - Light textures (environment maps, CDFs)
-   - Uniform buffer objects
+   - Material property arrays
 4. App binds initial parameters to uniforms
 ```
 
@@ -39,34 +37,44 @@ A precise trace of how data flows through the path tracer from pixel to final co
    - Set active framebuffer for output
 ```
 
-### Phase 3: Pixel Rendering (Per pixel)
+### Phase 3: Pixel Rendering (Per pixel - Updated Flow)
 
 ```
 main() {
     vec2 pixel = gl_FragCoord.xy;
     
-    // 1. Camera: pixel → ray (actual module names)
+    // 1. Camera: pixel → ray
     vec2 xi = next_2d();  // Dims 0-1
-    Ray ray = pinhole_generateRay(pixel, xi);  // Module named "pinhole"
+    Ray ray = camera_generateRay(pixel, xi);
     
-    // 2. Estimator: ray → spectrum
-    Spectrum radiance = pathtracer_estimate(ray);  // Module named "pathtracer"
+    // 2. Transport: ray → spectrum (drives integration)
+    Spectrum radiance = transport_trace(ray);
         └─> For each bounce:
-            a. sdf_intersect(ray, hit)  // Module named "sdf"
-                └─> euclidean_geodesic() for marching
-                └─> euclidean_frame() for hit frame
-                └─> Material resolution
-            b. hdri_sample_light() for NEE  // Module named "hdri"
-            c. disney_sample() for next direction  // Module named "disney"
-            d. disney_evaluate() for BSDF
+            a. scene_intersect(ray, hit)
+                └─> geometry_geodesic() for marching
+                └─> geometry_frame() for hit frame
+                └─> Material ID resolution
+            
+            b. material_get_properties(hit.material_to, hit.p)
+                └─> Returns MaterialProperties struct
+            
+            c. light_sample() for NEE
+            
+            d. interaction_surface_scatter() for next direction
+                └─> Uses material properties
+                └─> Implements importance sampling
+            
+            e. interaction_surface_shade() for BRDF
+                └─> Uses material properties
+                └─> Evaluates Disney/Lambert/etc.
     
     // 3. Film: spectrum → accumulated radiance
-    Radiance accumulated = variance_accumulate(radiance, pixel);  // Module named "variance"
+    Radiance accumulated = film_accumulate(radiance, pixel);
         └─> texture(u_film_radiance_previous, uv) for history
         └─> Incremental averaging or variance tracking
     
     // 4. Developer: radiance → RGB
-    RGB color = aces_develop(accumulated);  // Module named "aces"
+    RGB color = developer_develop(accumulated);
         └─> Tone mapping
         └─> Gamma correction
     
@@ -83,490 +91,381 @@ main() {
 4. Display or save output
 ```
 
-## Module Dependencies
+## Module Dependencies (Updated)
 
 ### Compile-Time Dependencies (Fixed Order)
 
 ```
-Modules are concatenated in this fixed order:
-1. Geometry
-2. Material
-3. Lights
-4. Scene
-5. Camera
-6. Estimator
-7. Film
-8. Developer
+Modules concatenated in fixed order:
+1. Common types and utilities
+2. Geometry (defines coordinate system)
+3. Scene (includes compiled objects)
+4. Materials (property provider)
+5. Lights (emission sources)
+6. Camera (ray generation)
+7. Interaction (light-matter physics)
+8. Transport (integration algorithms)
+9. Film (accumulation)
+10. Developer (tone mapping)
 
-No dependency resolution needed - order is constant.
+No dependency resolution - order is constant.
 ```
 
-### Runtime Call Graph (With Manual Prefixes)
+### Runtime Call Graph (With Correct Prefixes)
 
 ```
 main()
-├── pinhole_generateRay(pixel, xi)
+├── camera_generateRay(pixel, xi)
 │   └── uses: u_camera_frame, u_camera_position
 │
-├── pathtracer_estimate(ray)
-│   ├── sdf_intersect(ray, hit) [multiple times]
-│   │   ├── euclidean_geodesic(origin, dir, t)
-│   │   ├── eval_object_sdf(obj_id, p)
-│   │   │   └── sphere_sdf(p), box_sdf(p), etc.
-│   │   ├── get_object_material(obj_id, p)
-│   │   │   └── classify_sphere(p), etc.
-│   │   └── euclidean_frame(p, normal)
+├── transport_trace(ray)
+│   ├── scene_intersect(ray, hit) [multiple times]
+│   │   ├── geometry_geodesic(origin, dir, t)
+│   │   ├── scene_eval_object_distance(obj_id, p)
+│   │   │   └── sphere_sphere_0_distance(p), box_box_1_distance(p)
+│   │   ├── scene_get_object_material(obj_id, p)
+│   │   │   └── sphere_sphere_0_material(p), box_box_1_material(p)
+│   │   └── geometry_frame(p, normal)
 │   │
-│   ├── hdri_sample_light(p, xi)
-│   │   └── uses: u_light_position, u_environment_map
+│   ├── material_get_properties(mat_id, p)
+│   │   └── Returns: albedo, roughness, ior, etc. (DATA ONLY)
 │   │
-│   ├── disney_sample(wi, hit, xi, pdf)
-│   │   └── uses: material_params[hit.material_to]
+│   ├── light_sample(p, xi)
+│   │   └── uses: u_light_positions, u_environment_map
 │   │
-│   └── disney_evaluate(wi, wo, hit)
-│       └── uses: material_params[hit.material_to]
+│   ├── interaction_surface_scatter(wi, hit, xi, pdf)
+│   │   └── Queries material_get_properties()
+│   │   └── Implements importance sampling
+│   │
+│   └── interaction_surface_shade(wi, wo, hit)
+│       └── Queries material_get_properties()
+│       └── Implements BRDF evaluation
 │
-├── variance_accumulate(radiance, pixel)
+├── film_accumulate(radiance, pixel)
 │   └── texture(u_film_radiance_previous, uv)
 │
-└── aces_develop(accumulated)
+└── developer_develop(accumulated)
     └── uses: u_developer_exposure, etc.
 ```
 
-## Uniform Data Flow
+## Data vs Behavior Flow
 
-### Engine-Provided Uniforms
+### The Critical Separation
 
-These are computed and set by the engine before each frame:
-
-```glsl
-// Global uniforms (available to all modules)
-uniform vec2 u_resolution;          // Screen dimensions
-uniform int u_frame_index;          // Frame counter
-uniform float u_time;               // Wall clock time
-uniform int u_sample_count;         // Samples accumulated
-uniform bool u_film_reset;          // Clear accumulation
-
-// Camera uniforms (computed from parameters)
-uniform mat3 u_camera_frame;        // [right, up, forward]
-uniform vec3 u_camera_position;     // World position
-uniform float u_camera_tan_fov;     // tan(fov/2)
+```
+DATA PROVIDERS (World):
+┌─────────────────────────────────┐
+│ Materials Module                 │
+│ - material_get_properties()      │
+│ - Returns: MaterialProperties    │
+│   {albedo, roughness, ior, ...}  │
+└─────────────────────────────────┘
+           ↓ Properties
+           
+PHYSICS (Photography - Interaction):
+┌─────────────────────────────────┐
+│ Interaction Module               │
+│ - interaction_surface_shade()    │
+│ - interaction_surface_scatter()  │
+│ - Implements Disney/Lambert/etc  │
+│ - Uses properties for physics    │
+└─────────────────────────────────┘
+           ↓ BRDFs
+           
+ALGORITHMS (Photography - Transport):
+┌─────────────────────────────────┐
+│ Transport Module                 │
+│ - transport_trace()              │
+│ - Owns integration strategy      │
+│ - Calls Interaction for physics  │
+└─────────────────────────────────┘
 ```
 
-### Module-Specific Uniforms
+## Uniform Data Flow (Updated)
 
-Each module declares its uniforms:
+### Module-Specific Uniforms with Correct Prefixes
 
 ```glsl
-// Module parameters map directly to uniforms:
 // Pattern: u_[module_kind]_[param_name]
 
-uniform vec3 u_camera_target;
+// Camera uniforms
+uniform mat3 u_camera_frame;
+uniform vec3 u_camera_position;
+uniform float u_camera_tan_fov;
 uniform float u_camera_aperture;
-uniform vec3 u_material_albedo;
-uniform float u_material_roughness;
+
+// Material uniforms (property arrays, not BRDFs!)
+uniform vec4 u_material_albedo_roughness[NUM_MATERIALS];
+uniform vec4 u_material_metallic_ior[NUM_MATERIALS];
+uniform int u_material_flags[NUM_MATERIALS];
+
+// Scene uniforms
+uniform mat4 u_scene_object_transforms[NUM_OBJECTS];
+
+// Transport uniforms
+uniform int u_transport_max_bounces;
+uniform float u_transport_rr_threshold;
+
+// Interaction uniforms (if parameterized)
+uniform float u_interaction_brdf_mode;
 ```
 
-### Parameter Update Flow
+### Property Query Flow (New)
 
-```typescript
-// 1. User changes parameter
-app.setParameter('camera.fov', 60);
-
-// 2. ParameterStore validates and notifies
-paramStore.set('camera.fov', 60);
-  └─> Emits change event
-
-// 3. RenderCoordinator checks impact
-if (triggers_reset.includes('camera.fov')) {
-  engine.clearAccumulation();  // Clears current recipe's buffers
+```glsl
+// Materials provides data
+MaterialProperties material_get_properties(int mat_id, vec3 p) {
+  MaterialProperties props;
+  
+  // Unpack from optimized arrays
+  vec4 ar = u_material_albedo_roughness[mat_id];
+  props.albedo = ar.rgb;
+  props.roughness = ar.a;
+  
+  vec4 mi = u_material_metallic_ior[mat_id];
+  props.metallic = mi.x;
+  props.ior = mi.y;
+  
+  props.flags = u_material_flags[mat_id];
+  
+  return props;
 }
 
-// 4. Engine computes derived values
-const tan_fov = Math.tan(fov * 0.5 * Math.PI / 180);
-engine.updateUniforms({ 'u_camera_tan_fov': tan_fov });
-
-// 5. Next frame uses updated values
-```
-
-## Memory Layout & Access Patterns
-
-### Per-Recipe Film Buffers
-
-```typescript
-// Each recipe maintains separate accumulation buffers
-ResourceManager {
-  filmResourcesMap: Map<recipeId, FilmResources>
-    │
-    ├─ 'pathtracer' → {
-    │     textures: [radiance_current, radiance_previous, variance],
-    │     framebuffers: { current, previous }
-    │   }
-    │
-    └─ 'debug' → {
-          textures: [color],
-          framebuffers: { current }
-        }
+// Interaction uses data for physics
+Spectrum interaction_surface_shade(vec3 wi, vec3 wo, Hit hit) {
+  // Get properties once
+  MaterialProperties props = material_get_properties(hit.material_to, hit.p);
+  
+  // Implement BRDF using properties
+  if (props.flags & MATERIAL_FLAG_DIELECTRIC) {
+    return compute_glass_brdf(wi, wo, hit, props.ior);
+  } else {
+    return compute_disney_brdf(wi, wo, hit, props.albedo, 
+                              props.roughness, props.metallic);
+  }
 }
 ```
 
-### Texture Memory
+## Memory Layout (Updated for Property Architecture)
+
+### Material Property Storage
 
 ```glsl
-// Film buffers (2D textures, float32) - per recipe
-sampler2D u_film_radiance_previous;  // RGB accumulation
-sampler2D u_film_variance_previous;  // RGB M2 for variance
-isampler2D u_film_samples_previous;  // Sample count per pixel
+// Packed for GPU efficiency
+layout(std140) uniform MaterialData {
+  vec4 albedo_roughness[NUM_MATERIALS];    // rgb + roughness
+  vec4 metallic_ior_flags[NUM_MATERIALS];  // metallic + ior + 2 flags
+  vec4 emission_intensity[NUM_MATERIALS];  // rgb + intensity
+  vec4 scatter_absorb[NUM_MATERIALS];      // volume properties
+} u_materials;
 
-// Environment maps
-sampler2D u_environment_map;         // HDR radiance
-sampler2D u_environment_cdf;         // Importance sampling CDF
+// NO BRDF function pointers or evaluation code here!
 ```
 
-### Uniform Buffer Layout
+### Object Building Blocks in Scene
 
 ```glsl
-// Materials use array uniforms
-struct MaterialParams {
-  vec4 albedo_metallic;      // RGB + metallic packed
-  vec4 roughness_ior_flags;  // Properties packed
-};
-uniform MaterialParams u_material_params[NUM_MATERIALS];
-
-// Access pattern (memory coherent)
-MaterialParams mp = u_material_params[hit.material_to];
-```
-
-### Constants (Compile-Time)
-
-```glsl
-// Generated at build time, baked into shader
-const int NUM_MATERIALS = 5;
-const int NUM_OBJECTS = 3;
-const float material_iors[NUM_MATERIALS] = float[](
-  1.0,   // Air
-  1.5,   // Glass
-  1.33,  // Water
-  // ...
-);
-```
-
-## Manual Prefixing Convention
-
-### No Transformation - Direct Usage
-
-Module authors write manually prefixed functions that are used directly:
-
-```glsl
-// Module author writes (in material module named "disney"):
-Spectrum disney_evaluate(Direction wi, Direction wo, Hit hit) {
-  return albedo / PI;
+// Objects compiled into Scene's dispatch functions
+float scene_eval_object_distance(int obj_id, vec3 p) {
+  switch(obj_id) {
+    case 0: return sphere_glass_sphere_distance(p);
+    case 1: return box_metal_box_distance(p);
+    case 2: return torus_plastic_torus_distance(p);
+  }
+  return MAX_DIST;
 }
 
-// Used directly in other modules - no transformation:
-Spectrum f = disney_evaluate(wi, wo, hit);
+int scene_get_object_material(int obj_id, vec3 p) {
+  switch(obj_id) {
+    case 0: return sphere_glass_sphere_material(p);
+    case 1: return box_metal_box_material(p);
+    case 2: return torus_plastic_torus_material(p);
+  }
+  return MATERIAL_AIR;
+}
 ```
 
-### Prefix Mapping (Manual Convention)
+## The Transport-Interaction-Materials Triangle
 
-| Module Kind | Example Name | Functions Written By Author |
-|------------|--------------|------------------------------|
-| geometry | euclidean | `euclidean_geodesic`, `euclidean_dot`, `euclidean_frame` |
-| material | disney | `disney_evaluate`, `disney_sample`, `disney_pdf` |
-| scene | sdf | `sdf_intersect`, `sdf_classify_point` |
-| lights | hdri | `hdri_sample_light`, `hdri_eval_light` |
-| camera | pinhole | `pinhole_generateRay` |
-| estimator | pathtracer | `pathtracer_estimate` |
-| film | variance | `variance_accumulate` |
-| developer | aces | `aces_develop` |
-
-### Cross-Module Calls
-
-Modules call manually prefixed functions from other modules:
+### Complete Integration Example
 
 ```glsl
-// In pathtracer estimator module:
-Spectrum pathtracer_estimate(Ray ray) {
+// Transport drives the algorithm
+Spectrum transport_trace(Ray ray) {
   Hit hit;
-  if (!sdf_intersect(ray, hit)) {  // Calls scene module named "sdf"
-    return hdri_eval_light(ray.origin, ray.direction);  // Calls lights module named "hdri"
+  
+  // 1. Find intersection (geometry + material IDs)
+  if (!scene_intersect(ray, hit)) {
+    return light_environment(ray.direction);
   }
   
-  Direction wo = disney_sample(-ray.direction, hit, xi, pdf);  // Calls material module named "disney"
-  // ...
-}
-```
-
-## Random Dimension Management
-
-### Automatic Tracking
-
-```glsl
-// Global state (hidden from user)
-int g_dimension_counter = 0;
-int g_pixel_id;
-int g_sample_id;
-
-// User-visible functions
-float next_1d() {
-  float value = sample_1d(g_pixel_id, g_sample_id, g_dimension_counter);
-  g_dimension_counter += 1;
-  return value;
-}
-
-vec2 next_2d() {
-  vec2 value = sample_2d(g_pixel_id, g_sample_id, g_dimension_counter);
-  g_dimension_counter += 2;
-  return value;
-}
-```
-
-### Dimension Allocation
-
-| Module | Purpose | Dimensions Used |
-|--------|---------|----------------|
-| Camera | Antialiasing | 0-1 |
-| Camera | Depth of field | 2-3 |
-| Estimator | Light selection | 4-5 |
-| Estimator | Light sampling | 6-7 |
-| Estimator | BSDF sampling (bounce 0) | 8-9 |
-| Estimator | Russian roulette (bounce 0) | 10 |
-| Estimator | BSDF sampling (bounce 1) | 11-12 |
-| ... | ... | ... |
-
-### Reset Between Pixels
-
-```glsl
-// In main(), before generateRay
-g_pixel_id = int(pixel.x) + int(pixel.y) * int(u_resolution.x);
-g_sample_id = u_sample_count;
-g_dimension_counter = 0;  // Reset for new pixel
-```
-
-## Resource Lifetime
-
-### Persistent Resources (Recipe to Recipe)
-
-- Compiled shader programs for each recipe
-- Per-recipe film accumulation buffers
-- Environment map textures
-- Material parameter arrays
-
-### Per-Frame Resources
-
-- Camera matrices (recomputed if camera moves)
-- Random seeds (different per frame)
-- Time uniforms
-
-### Per-Pixel State
-
-- Ray origin and direction
-- Random dimension counter
-- Local RNG state
-
-### Per-Sample Temporaries
-
-- Hit structures
-- BSDF samples
-- Light samples
-- Transport state
-
-## Simplified Compilation Pipeline
-
-### Direct Module Assembly
-
-```typescript
-// 1. Gather modules
-const modules = {
-  geometry: registry.get('geometry', 'euclidean'),
-  material: registry.get('material', 'disney'),
-  lights: registry.get('lights', 'hdri'),
-  scene: registry.get('scene', 'sdf'),
-  camera: registry.get('camera', 'pinhole'),
-  estimator: registry.get('estimator', 'pathtracer'),
-  film: registry.get('film', 'variance'),
-  developer: registry.get('developer', 'aces')
-};
-
-// 2. Validate manual prefixing
-modules.forEach(module => {
-  validatePrefixing(module);  // Ensures functions are properly prefixed
-});
-
-// 3. Generate main function using actual module names
-const main = generateMainFunction(modules);
-
-// 4. Concatenate in fixed order - NO TRANSFORMATION
-const finalShader = [
-  commonDefines,
-  modules.geometry.fragment.functions,
-  modules.material.fragment.functions,
-  modules.lights.fragment.functions,
-  modules.scene.fragment.functions,
-  modules.camera.fragment.functions,
-  modules.estimator.fragment.functions,
-  modules.film.fragment.functions,
-  modules.developer.fragment.functions,
-  main
-].join('\n');
-
-// 5. Compile
-const program = gl.createProgram();
-gl.shaderSource(vertexShader, FULLSCREEN_TRIANGLE_VS);
-gl.shaderSource(fragmentShader, finalShader);
-gl.linkProgram(program);
-```
-
-### Recipe Switching with Preserved Accumulation
-
-```typescript
-// Recipes are compiled once at startup
-const programCache = new Map<recipeId, WebGLProgram>();
-
-// Each recipe has its own film buffers
-const filmBuffers = new Map<recipeId, FilmResources>();
-
-// Switching preserves accumulation
-function switchRecipe(recipeId: string) {
-  const program = programCache.get(recipeId);
-  gl.useProgram(program);
+  // 2. Get material properties (data only)
+  MaterialProperties props = material_get_properties(hit.material_to, hit.p);
   
-  // Activate this recipe's film buffers (accumulation intact!)
-  resourceManager.setActiveRecipe(recipeId);
+  // 3. Check emission
+  Spectrum Le = props.emission * props.emission_intensity;
+  
+  // 4. Sample next direction (Interaction does physics)
+  float pdf;
+  vec3 wo = interaction_surface_scatter(-ray.direction, hit, next_2d(), pdf);
+  
+  // 5. Evaluate BRDF (Interaction does physics)
+  Spectrum f = interaction_surface_shade(-ray.direction, wo, hit);
+  
+  // 6. Continue path (Transport owns recursion strategy)
+  if (transport_should_continue(depth, throughput)) {
+    Ray next_ray = Ray(hit.p, wo, EPSILON, MAX_DIST);
+    Spectrum Li = transport_trace(next_ray);  // Recursive
+    return Le + f * Li * abs(dot(wo, hit.n)) / pdf;
+  }
+  
+  return Le;
 }
 ```
 
-## Performance Critical Paths
-
-### Hot Path 1: Ray Marching
+### Volume Integration Example
 
 ```glsl
-// Called 100-300 times per ray
-Point p = euclidean_geodesic(ray.origin, ray.direction, t);
-float d = eval_object_sdf(0, p);
-t += d * 0.9;
+// Transport owns integration strategy
+Spectrum transport_integrate_volume(Ray ray, Hit entry, int mat_id) {
+  // Get volume properties from Materials
+  MaterialProperties props = material_get_properties(mat_id, ray.origin);
+  
+  #if VOLUME_STRATEGY == DELTA_TRACKING
+    // Transport: Sample free path
+    float sigma_t = length(props.sigma_scatter + props.sigma_absorb);
+    float t = -log(next_1d()) / sigma_t;
+    
+    vec3 p = geometry_geodesic(ray.origin, ray.direction, t);
+    
+    // Interaction: Compute scattering
+    float phase_pdf;
+    vec3 wo = interaction_volume_scatter(ray.direction, p, mat_id, next_2d(), phase_pdf);
+    Spectrum phase = interaction_volume_shade(ray.direction, wo, p, mat_id);
+    
+    // Transport: Continue
+    return phase * transport_trace(Ray(p, wo, 0, MAX_DIST));
+    
+  #elif VOLUME_STRATEGY == RAY_MARCHING
+    // Different integration strategy, same property/physics separation
+  #endif
+}
 ```
 
-Optimization: Precomputed ray.direction, conservative factor
+## Manual Prefixing Reference
 
-### Hot Path 2: BSDF Evaluation
+### Module Prefixes (by Kind)
+
+| Module Kind | Prefix | Example Functions |
+|-------------|--------|-------------------|
+| **Geometry** | `geometry_` | `geometry_geodesic()`, `geometry_frame()` |
+| **Scene** | `scene_` | `scene_intersect()`, `scene_get_material()` |
+| **Materials** | `material_` | `material_get_properties()` (DATA ONLY!) |
+| **Lights** | `light_` | `light_sample()`, `light_evaluate()` |
+| **Camera** | `camera_` | `camera_generateRay()` |
+| **Transport** | `transport_` | `transport_trace()`, `transport_integrate()` |
+| **Interaction** | `interaction_` | `interaction_surface_shade()`, `interaction_surface_scatter()` |
+| **Film** | `film_` | `film_accumulate()` |
+| **Developer** | `developer_` | `developer_develop()` |
+
+### Object Naming (Type-Based)
+
+Objects use their type and instance name:
+- `sphere_glass_sphere_distance()`
+- `box_metal_box_material()`
+- `torus_plastic_torus_normal()`
+
+## Performance Critical Paths (Updated)
+
+### Hot Path 1: Material Properties
 
 ```glsl
-// Called 2-10 times per pixel (using manual prefixes)
-Spectrum f = disney_evaluate(wi, wo, hit);
-float cos_theta = euclidean_dot(wo, hit.n, hit.p);
-contribution = f * cos_theta / pdf;
+// Called 2-10 times per ray - MUST be efficient
+MaterialProperties props = material_get_properties(mat_id, p);
+
+// Single query gets everything (cache-friendly)
+// Compile-time optimization for constant properties
 ```
 
-Optimization: Three-way interface, precomputed hit.frame
-
-### Hot Path 3: Film Accumulation
+### Hot Path 2: BRDF Evaluation
 
 ```glsl
-// Called once per pixel
-vec2 uv = pixel / u_resolution;
-Radiance history = texture(u_film_radiance_previous, uv).rgb;
-return mix(history, new_sample, 1.0 / n);
+// Interaction module - optimized per model
+Spectrum f = interaction_surface_shade(wi, wo, hit);
+
+// No virtual dispatch, compiled for specific BRDF
+// Uses cached properties from material_get_properties()
 ```
 
-Optimization: Incremental mean, single texture fetch
-
-## Debug Data Flow
-
-### Debug Overrides
+### Hot Path 3: Transport Decisions
 
 ```glsl
-#ifdef DEBUG_NORMALS
-  // In estimator, after intersection
-  return Spectrum(hit.n * 0.5 + 0.5);
-#endif
+// Transport owns strategy - compiled for specific algorithm
+if (transport_should_use_nee(state)) {
+  // Next event estimation path
+}
 
-#ifdef DEBUG_MATERIALS
-  return hash_color(hit.material_to);
-#endif
+// No runtime branching between algorithms
 ```
 
-### Performance Counters
-
-```glsl
-// Instrumentation points
-uniform int u_debug_ray_count;
-uniform int u_debug_bounce_count;
-uniform int u_debug_shadow_rays;
-
-// In estimator
-atomicAdd(u_debug_ray_count, 1);
-```
-
-## Complete Frame Trace Example
+## Complete Frame Trace (Updated)
 
 ```
-Frame 100, Pixel (400, 300), Recipe: 'pathtracer'
+Frame 100, Pixel (400, 300), Recipe: 'production'
 
 1. main() entry
    - gl_FragCoord = (400.5, 300.5)
-   - g_dimension_counter = 0
 
-2. pinhole_generateRay(pixel=(400.5, 300.5), xi=(0.234, 0.567))
-   - Uses u_camera_frame, u_camera_position
-   - Returns Ray(origin=(0,0,-5), direction=(0.1, -0.05, 0.994))
-   - g_dimension_counter = 2
+2. camera_generateRay(pixel, xi)
+   - Returns Ray
 
-3. pathtracer_estimate(ray)
-   - sdf_intersect(ray) → hit at t=4.95
-     - Marched 47 steps using euclidean_geodesic
-     - Hit object_id=0 (sphere)
-     - material_from=MATERIAL_AIR, material_to=0
+3. transport_trace(ray)
    
-   - hdri_sample_light(hit.p, xi=(0.123, 0.456))
-     - Samples sky at direction=(0.3, 0.8, 0.52)
-     - g_dimension_counter = 4
+   a. scene_intersect(ray) → hit
+      - Uses scene_eval_object_distance()
+      - Calls sphere_glass_sphere_distance()
+      - Returns material IDs: from=AIR, to=GLASS
    
-   - Shadow ray: blocked
+   b. material_get_properties(GLASS, hit.p)
+      - Returns: {albedo=(0.95,0.95,0.95), ior=1.5, ...}
    
-   - disney_sample(wi, hit, xi=(0.789, 0.012))
-     - Samples direction=(0.2, 0.3, 0.93)
-     - pdf = 0.296
-     - g_dimension_counter = 6
+   c. interaction_surface_scatter(wi, hit, xi)
+      - Uses glass properties
+      - Samples refraction direction
    
-   - Continue to bounce 2...
+   d. interaction_surface_shade(wi, wo, hit)
+      - Implements Fresnel equations
+      - Returns transmission coefficient
    
-   Final: radiance = (0.234, 0.189, 0.156)
+   e. transport continues recursion...
 
-4. variance_accumulate(radiance, pixel)
-   - Previous = (0.232, 0.191, 0.154) from recipe's film buffer
-   - n = 100
-   - Result = (0.23202, 0.19098, 0.15402)
+4. film_accumulate(radiance, pixel)
+   - Updates accumulation buffer
 
-5. aces_develop(accumulated)
-   - Reinhard tone map
-   - Gamma correction
-   - Result = (0.496, 0.456, 0.437)
+5. developer_develop(accumulated)
+   - Tone maps to display range
 
-6. gl_FragColor = (0.496, 0.456, 0.437, 1.0)
-
-Note: If we switch to 'debug' recipe, pathtracer's 100 samples remain preserved
+6. gl_FragColor = final color
 ```
 
-## Context Loss Handling
+## Key Architectural Changes in Data Flow
 
-```
-WebGL Context Lost:
-1. All GPU resources invalidated
-2. Per-recipe accumulation buffers lost (cannot be recovered)
-3. Engine attempts recovery:
-   - Recompiles shaders from cached recipes
-   - Recreates film buffers (empty)
-   - Resumes from frame 0
-```
+| Aspect | Old Architecture | New Architecture |
+|--------|------------------|------------------|
+| **Material Role** | Provided evaluate/sample/pdf | Only provides properties |
+| **BRDF Location** | In Materials module | In Interaction module |
+| **Integration** | In Estimator | Split: Transport (algorithm) + Interaction (physics) |
+| **Property Access** | Multiple queries | Single batched query |
+| **Module Count** | 8 in Photography | 5 in Photography |
+| **Prefixing** | By module name | By module kind |
+| **Objects** | Modules | Building blocks in Scene |
 
-## Key Simplifications
+## Benefits of New Data Flow
 
-| Aspect | Old System | New Simplified System |
-|--------|------------|------------------------|
-| **Function Prefixing** | Automatic transformation | Manual by authors |
-| **Compilation** | Complex 8-stage pipeline | Direct concatenation |
-| **Module Order** | Dependency resolution | Fixed order |
-| **Recipe Keys** | Complex hashing | Simple recipe.id |
-| **Film Buffers** | Single global | Per-recipe (preserved) |
-| **Function Calls** | Generated prefixes | Actual module names |
+1. **Clear Separation**: Properties (Materials) vs Physics (Interaction) vs Algorithms (Transport)
+2. **Research Flexibility**: Swap interaction models without changing material data
+3. **Performance**: Single property query, aggressive compile-time optimization
+4. **Debugging**: Can visualize properties directly without BRDF evaluation
+5. **Extensibility**: Easy to add new properties or interaction models
+
+The data now flows cleanly from geometric queries (Scene) through property lookup (Materials) to physics evaluation (Interaction), all orchestrated by algorithmic decisions (Transport).

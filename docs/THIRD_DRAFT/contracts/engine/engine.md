@@ -46,6 +46,9 @@ interface Engine {
   getPerformanceReport(): PerformanceReport;
   resetStatistics(): void;
   
+  //resizing
+  resize(width: number, height: number): void;
+  
   // Cleanup
   dispose(): void;
 }
@@ -60,6 +63,8 @@ interface EngineConfig {
   enableStatistics?: boolean;
   fallbackBehavior?: 'error' | 'suggest' | 'auto';
   maxCompileTime?: number;
+  enableSnapshots?: boolean;      // Enable periodic snapshots for accumulating recipes
+  snapshotInterval?: number;       // Frames between snapshots (default 600 ~= 10s at 60fps)
 }
 ```
 
@@ -115,6 +120,8 @@ constructor(gl: WebGL2RenderingContext, config?: EngineConfig) {
     enableStatistics: true,
     fallbackBehavior: 'suggest',
     maxCompileTime: 2000,
+    enableSnapshots: true,        // Default to enabled
+    snapshotInterval: 600,        // Default ~10 seconds at 60fps
     ...config
   };
   this.viewport = this.config.viewport!;
@@ -161,6 +168,31 @@ private setupContextHandling(): void {
     console.log('WebGL context restored');
     this.handleContextRestore();
   });
+}
+```
+
+
+Resizing things:
+
+```typescript
+resize(width: number, height: number): void {
+if (width <= 0 || height <= 0) {
+throw new Error(`Invalid dimensions: ${width}x${height}`);
+}
+
+// Update viewport
+this.viewport = { x: 0, y: 0, width, height };
+this.executor.setViewport(0, 0, width, height);
+
+// Resize film buffers if we have an active recipe
+if (this.activeRecipeId) {
+this.resources.resizeFilmBuffers(this.activeRecipeId, width, height);
+
+    // Clear accumulation since dimensions changed
+    this.clearAccumulation();
+    
+    console.log(`Resized to ${width}x${height}, accumulation reset`);
+}
 }
 ```
 
@@ -293,6 +325,22 @@ renderFrame(): void {
     ...this.state,
     frame: this.state.frame + 1
   };
+  
+  // 6. Periodic snapshot for accumulating recipes
+  if (this.config.enableSnapshots && 
+      this.state.frame % this.config.snapshotInterval === 0 && 
+      this.state.frame > 0) {
+    try {
+      // ResourceManager will check if this recipe actually accumulates
+      const pixels = this.executor.readPixelsSync();
+      this.resources.captureSnapshot(this.state.recipeId, pixels, this.state.frame);
+    } catch (e) {
+      // Silent fail - snapshots are nice-to-have, not critical
+      if (this.config.enableStatistics) {
+        console.debug('Failed to capture snapshot:', e);
+      }
+    }
+  }
   
   this.frameCount++;
 }
@@ -490,7 +538,7 @@ private handleContextLoss(): void {
 
     // Notify all subsystems about context loss
     this.executor.handleContextLoss();
-    this.resources.handleContextLoss();
+    this.resources.handleContextLoss();  // This will report available snapshots
     // Note: Compiler and Registry don't need notification (no GPU resources)
 
     // Clear references to GPU resources (don't try to delete - they're gone)
@@ -501,6 +549,11 @@ private handleContextLoss(): void {
     console.warn('WebGL context lost - all GPU resources invalidated');
     console.warn('IMPORTANT: All accumulated samples for all recipes will be lost');
     console.warn('Context can be restored, but accumulation must restart from frame 0');
+    
+    // Check if we have snapshots as reference
+    if (this.config.enableSnapshots) {
+        console.log('Note: Snapshots may be available as reference images');
+    }
 }
 
 
@@ -568,14 +621,16 @@ dispose(): void {
 ## Minimal Working Example
 
 ```typescript
-// Create engine
+// Create engine with snapshot configuration
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const gl = canvas.getContext('webgl2');
 if (!gl) throw new Error('WebGL2 not supported');
 
 const engine = new Engine(gl, {
   viewport: { x: 0, y: 0, width: 1920, height: 1080 },
-  enableStatistics: true
+  enableStatistics: true,
+  enableSnapshots: true,      // Enable automatic snapshots
+  snapshotInterval: 600       // Every ~10 seconds at 60fps
 });
 
 // Define recipes
@@ -592,14 +647,14 @@ const recipes: Recipe[] = [
     photography: {
       camera: { kind: 'camera', name: 'pinhole' },
       estimator: { kind: 'estimator', name: 'pathtracer' },
-      film: { kind: 'film', name: 'variance' },
+      film: { kind: 'film', name: 'variance' },  // Accumulating film
       developer: { kind: 'developer', name: 'aces' }
     }
   },
   {
     id: 'debug',
     name: 'Debug View',
-    // ... debug configuration
+    // ... debug configuration with non-accumulating film
   }
 ];
 
