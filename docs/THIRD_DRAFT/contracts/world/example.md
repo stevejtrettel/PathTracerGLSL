@@ -1,24 +1,26 @@
-Looking at what we have, I think we need one more critical document: a **complete example** that shows the entire flow from input to rendering. This would tie everything together and reveal any gaps.
 
-# Example: One Sphere, One Light
+# Examples: Cross-Reference System in Action
 
-## Input Descriptions
+## Example 1: Simple Scene (No Emissives)
+
+This example shows the baseline - no cross-referencing needed.
+
+### Input
 
 ```typescript
-// User writes:
 const sceneDescription = {
   objects: [
     {
       id: 'sphere_0',
       geometry: { type: 'sphere', radius: 1.0 },
-      material: 'red_plastic',
+      material: 'matte_white',
       transform: { position: [0, 0, 0] }
     }
   ],
   materials: new Map([
-    ['red_plastic', {
-      albedo: [0.8, 0.2, 0.2],
-      roughness: 0.3,
+    ['matte_white', {
+      albedo: [0.8, 0.8, 0.8],
+      roughness: 1.0,
       metallic: 0.0,
       ior: 1.5,
       emission: [0, 0, 0]  // Not emissive
@@ -29,184 +31,450 @@ const sceneDescription = {
 const lightDescription = {
   lights: [
     {
-      id: 'sun',
-      type: 'directional',
-      direction: [0, -1, -1],
-      intensity: [5, 5, 5],
-      visible: false  // No geometry
+      id: 'key_light',
+      type: 'point',
+      position: [5, 5, 5],
+      intensity: [100, 100, 100],
+      visible: false
     }
-  ],
-  environment: {
-    type: 'constant',
-    value: [0.1, 0.1, 0.2],  // Dim blue sky
-    intensity: 1.0
-  }
+  ]
 };
 ```
 
-## Augmentation (Internal to WorldCompiler)
+### After Augmentation
 
 ```typescript
-// WorldCompiler.augment() produces:
+crossRef = {
+  objectToLight: Map {},  // Empty - no emissives
+  lightToObject: Map {},  // Empty - no visible lights
+  samplableLights: Set { 'key_light' },
+  stats: {
+    totalLights: 1,
+    samplableLights: 1,
+    pathOnlyEmissives: 0
+  }
+}
+```
 
-sceneInput = {
+### Generated GLSL (Key Parts)
+
+```glsl
+// In Scene Module
+bool scene_intersect(Ray ray, out Hit hit) {
+  // ... marching
+  hit.object_id = 0;  // Only one object
+  hit.material_to = 1;  // matte_white
+  // ...
+}
+
+// In Lighting Module  
+const int OBJECT_TO_LIGHT[1] = int[](-1);  // No emissives
+const bool LIGHT_CAN_SAMPLE[1] = bool[](true);  // Point light samplable
+
+// In Transport Module
+if (hit.emission > 0) {  // Never true
+  // This branch never taken
+}
+```
+
+---
+
+## Example 2: Emissive Sphere (Samplable)
+
+This shows an emissive object that becomes a samplable light.
+
+### Input
+
+```typescript
+const sceneDescription = {
   objects: [
     {
-      id: 'sphere_0',
-      sdf: 'return length(p) - 1.0;',
-      materialId: 1,  // Assigned ID
-      transform: mat4([...])
+      id: 'glowing_sphere',
+      geometry: { type: 'sphere', radius: 0.5 },
+      material: 'hot_metal',
+      transform: { position: [0, 3, 0] }
+    },
+    {
+      id: 'floor',
+      geometry: { type: 'plane', normal: [0, 1, 0] },
+      material: 'concrete'
     }
-    // No light objects (sun is invisible)
   ],
-  materials: [
-    { id: 0, /* AIR */ },
-    { id: 1, albedo: [0.8,0.2,0.2], roughness: 0.3, ... }
-  ]
+  materials: new Map([
+    ['hot_metal', {
+      albedo: [0.9, 0.4, 0.1],
+      roughness: 0.2,
+      metallic: 1.0,
+      ior: 2.5,
+      emission: [50, 20, 5]  // EMISSIVE!
+    }],
+    ['concrete', {
+      albedo: [0.5, 0.5, 0.5],
+      roughness: 0.8,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0, 0, 0]
+    }]
+  ])
 };
 
-lightingInput = {
+const lightDescription = {
+  lights: []  // No explicit lights
+};
+```
+
+### After Augmentation
+
+```typescript
+// WorldCompiler detects emissive sphere
+crossRef = {
+  objectToLight: Map {
+    'glowing_sphere' -> 'emissive_glowing_sphere'
+  },
+  lightToObject: Map {
+    'emissive_glowing_sphere' -> 'glowing_sphere'  
+  },
+  samplableLights: Set { 'emissive_glowing_sphere' },
+  stats: {
+    totalLights: 1,
+    samplableLights: 1,
+    pathOnlyEmissives: 0
+  }
+}
+
+// Sphere added to lights
+lightingInput.lights = [
+  {
+    id: 'emissive_glowing_sphere',
+    canSample: true,
+    intensity: [50, 20, 5],
+    sourceObjectId: 'glowing_sphere',
+    sampling: {
+      type: 'sphere',
+      position: [0, 3, 0],
+      radius: 0.5
+    }
+  }
+]
+```
+
+### Generated GLSL (Key Parts)
+
+```glsl
+// In Scene Module
+bool scene_intersect(Ray ray, out Hit hit) {
+  // ... marching finds sphere
+  hit.object_id = 0;  // glowing_sphere
+  hit.material_to = 1;  // hot_metal
+  // ...
+}
+
+// In Lighting Module
+const int OBJECT_TO_LIGHT[2] = int[](0, -1);  // Object 0 maps to light 0
+const bool LIGHT_CAN_SAMPLE[1] = bool[](true);  // Can sample sphere
+
+LightSample sample_sphere_0(Point p, vec2 xi) {
+  // Proper sphere sampling
+  vec3 center = vec3(0, 3, 0);
+  float radius = 0.5;
+  // ... sampling code
+}
+
+// In Transport Module - THE KEY MIS MOMENT
+if (length(props.emission) > 0) {
+  // We hit the emissive sphere!
+  int light_id = lighting_get_light_for_object(0);  // Returns 0
+  
+  if (light_id >= 0 && lighting_can_sample_light(0)) {  // true
+    // MIS required - could sample this sphere directly
+    float bsdf_pdf = last_bounce_pdf;
+    float light_pdf = lighting_pdf(prev_point, ray.direction);
+    float mis_weight = power_heuristic(bsdf_pdf, light_pdf);
+    radiance += throughput * props.emission * mis_weight;
+  }
+}
+```
+
+---
+
+## Example 3: Complex Emissive SDF (Non-Samplable)
+
+This shows an emissive that's too complex to sample.
+
+### Input
+
+```typescript
+const sceneDescription = {
+  objects: [
+    {
+      id: 'fractal_emitter',
+      geometry: {
+        type: 'sdf',
+        code: `
+          // Mandelbulb fractal
+          vec3 z = p;
+          float dr = 1.0;
+          float r = 0.0;
+          for (int i = 0; i < 4; i++) {
+            r = length(z);
+            if (r > 2.0) break;
+            
+            float theta = acos(z.z/r);
+            float phi = atan(z.y, z.x);
+            dr = pow(r, 7.0) * 8.0 * dr + 1.0;
+            
+            float zr = pow(r, 8.0);
+            theta *= 8.0;
+            phi *= 8.0;
+            
+            z = zr * vec3(sin(theta)*cos(phi), 
+                         sin(phi)*sin(theta), 
+                         cos(theta));
+            z += p;
+          }
+          return 0.25 * log(r) * r / dr;
+        `
+      },
+      material: 'plasma',
+      transform: { position: [0, 0, 0] }
+    }
+  ],
+  materials: new Map([
+    ['plasma', {
+      albedo: [0.1, 0.1, 0.1],
+      roughness: 0.0,
+      metallic: 0.0,
+      ior: 1.0,
+      emission: [100, 50, 200]  // Very emissive!
+    }]
+  ])
+};
+```
+
+### After Augmentation
+
+```typescript
+// WorldCompiler analyzes complexity
+// Finds: fractal, multiple operations -> TOO COMPLEX
+
+crossRef = {
+  objectToLight: Map {
+    'fractal_emitter' -> 'emissive_fractal_emitter'
+  },
+  lightToObject: Map {},  // Empty - can't sample it
+  samplableLights: Set {},  // Empty - nothing samplable
+  stats: {
+    totalLights: 1,
+    samplableLights: 0,
+    pathOnlyEmissives: 1
+  }
+}
+
+// Non-samplable light created
+lightingInput.lights = [
+  {
+    id: 'emissive_fractal_emitter',
+    canSample: false,  // KEY: Cannot sample
+    intensity: [100, 50, 200],
+    sourceObjectId: 'fractal_emitter'
+  }
+]
+```
+
+### Generated GLSL (Key Parts)
+
+```glsl
+// In Lighting Module
+const int OBJECT_TO_LIGHT[1] = int[](0);  // Maps to light 0
+const bool LIGHT_CAN_SAMPLE[1] = bool[](false);  // CANNOT sample
+
+// No sampling function generated for fractal!
+
+LightSample lighting_sample(Point p, vec2 xi) {
+  // No samplable lights
+  LightSample ls;
+  ls.pdf = 0.0;  // Invalid sample
+  return ls;
+}
+
+// In Transport Module
+if (length(props.emission) > 0) {
+  // We hit the fractal emitter!
+  int light_id = lighting_get_light_for_object(0);  // Returns 0
+  
+  if (light_id >= 0 && lighting_can_sample_light(0)) {  // FALSE!
+    // This branch NOT taken
+  } else {
+    // Path-only emissive - full contribution
+    radiance += throughput * props.emission;  // No MIS weight!
+  }
+}
+```
+
+---
+
+## Example 4: Mixed Scene (Complete MIS)
+
+This shows everything working together.
+
+### Input
+
+```typescript
+const sceneDescription = {
+  objects: [
+    {
+      id: 'simple_emitter',
+      geometry: { type: 'sphere', radius: 0.2 },
+      material: 'light_bulb',
+      transform: { position: [-2, 2, 0] }
+    },
+    {
+      id: 'complex_emitter',  
+      geometry: {
+        type: 'sdf',
+        code: 'return length(p) - 1.0 + 0.1 * sin(20.0 * p.x) * sin(20.0 * p.y);'
+      },
+      material: 'weird_glow',
+      transform: { position: [2, 2, 0] }
+    }
+  ],
+  materials: new Map([
+    ['light_bulb', {
+      emission: [100, 100, 80]  // Samplable emissive
+    }],
+    ['weird_glow', {
+      emission: [50, 100, 50]  // Non-samplable emissive
+    }]
+  ])
+};
+
+const lightDescription = {
   lights: [
     {
       id: 'sun',
       type: 'directional',
-      direction: [0, -1, -1],
-      intensity: [5, 5, 5]
+      direction: [0, -1, 0],
+      intensity: [5, 5, 5],
+      visible: true  // Will create geometry!
     }
-    // No emissive objects
-  ],
-  environment: { type: 'constant', value: [0.1,0.1,0.2] }
+  ]
 };
 ```
 
-## Generated Scene Module
+### After Augmentation
 
-```glsl
-// From SceneCompiler
-#define NUM_MATERIALS 2
-#define NUM_OBJECTS 1
-
-// Material properties
-uniform vec4 u_material_albedo_metallic[2];
-uniform vec4 u_material_ior_flags[2];
-uniform vec3 u_material_emission[2];
-
-// Object SDF
-float object_sphere_0_sdf(Point p) {
-  return length(p) - 1.0;
-}
-
-// Single object - no dispatch needed
-bool scene_intersect(Ray ray, out Hit hit) {
-  float t = 0.0;
-  
-  for (int i = 0; i < 100; i++) {
-    Point p = geometry_geodesic(ray.origin, ray.direction, t);
-    float d = object_sphere_0_sdf(p);
-    
-    if (d < 0.001) {
-      hit.t = t;
-      hit.p = p;
-      hit.n = normalize(p);  // Sphere normal
-      hit.frame = geometry_frame(p, hit.n);
-      hit.material_from = MATERIAL_AIR;
-      hit.material_to = 1;  // red_plastic
-      return true;
-    }
-    
-    t += d * 0.9;
-    if (t > ray.max_t) break;
+```typescript
+crossRef = {
+  objectToLight: Map {
+    'simple_emitter' -> 'emissive_simple_emitter',
+    'complex_emitter' -> 'emissive_complex_emitter'
+  },
+  lightToObject: Map {
+    'emissive_simple_emitter' -> 'simple_emitter',
+    'sun' -> 'light_sun'  // Visible light gets object
+  },
+  samplableLights: Set { 
+    'sun', 
+    'emissive_simple_emitter'
+    // Note: complex_emitter NOT here
+  },
+  stats: {
+    totalLights: 3,
+    samplableLights: 2,
+    pathOnlyEmissives: 1
   }
-  return false;
-}
-
-MaterialProperties scene_material_properties(int id, Point p) {
-  MaterialProperties props;
-  vec4 am = u_material_albedo_metallic[id];
-  props.albedo = am.rgb;
-  props.metallic = am.a;
-  props.roughness = 0.3;  // Could be constant
-  props.ior = u_material_ior_flags[id].x;
-  props.emission = u_material_emission[id];
-  return props;
 }
 ```
 
-## Generated Lighting Module
+### Transport Execution Flow
 
 ```glsl
-// From LightingCompiler
-#define NUM_LIGHTS 1
-#define HAS_ENVIRONMENT 1
-
-uniform vec3 u_light_intensities[1];
-
-LightSample lighting_sample(Point p, vec2 xi) {
-  // Only one light - always sample it
-  LightSample ls;
-  ls.wi = normalize(vec3(0, -1, -1));
-  ls.distance = MAX_DIST;
-  ls.radiance = u_light_intensities[0];
-  ls.pdf = 1.0;
-  ls.light_id = 0;
-  return ls;
+// Case 1: Ray hits simple_emitter (samplable)
+hit.object_id = 0;  // simple_emitter
+int light_id = OBJECT_TO_LIGHT[0];  // Returns 1
+if (LIGHT_CAN_SAMPLE[1]) {  // true
+  // Use MIS - this could have been sampled
+  float mis_weight = compute_mis_weight(bsdf_pdf, light_pdf);
+  radiance += throughput * emission * mis_weight;
 }
 
-float lighting_pdf(Point p, Direction wi) {
-  // Directional light is delta - 0 for arbitrary directions
-  return 0.0;
+// Case 2: Ray hits complex_emitter (non-samplable)  
+hit.object_id = 1;  // complex_emitter
+int light_id = OBJECT_TO_LIGHT[1];  // Returns 2
+if (LIGHT_CAN_SAMPLE[2]) {  // false
+  // No MIS - could only find by path tracing
+  radiance += throughput * emission;  // Full weight
 }
 
-Spectrum lighting_environment(Direction dir) {
-  return vec3(0.1, 0.1, 0.2);  // Constant environment
-}
+// Case 3: Explicit light sampling
+LightSample ls = lighting_sample(p, xi);
+// Might sample sun or simple_emitter, never complex_emitter
 ```
 
-## Frame Execution
+---
 
-```glsl
-// In Transport module
-Spectrum transport_trace(Ray ray) {
-  Hit hit;
-  if (!scene_intersect(ray, hit)) {
-    return lighting_environment(ray.direction);
+## Example 5: Configuration-Driven Behavior
+
+Same scene, different configurations:
+
+### Config: Sample Everything
+
+```typescript
+const config = {
+  emissiveStrategy: {
+    mode: 'all',
+    bboxSampleAttempts: 64
   }
-  
-  // Direct lighting
-  LightSample ls = lighting_sample(hit.p, next_2d());
-  Ray shadow = Ray(hit.p, ls.wi, EPSILON, ls.distance);
-  
-  Spectrum L = vec3(0);
-  if (!scene_intersect_any(shadow, ls.distance)) {
-    // Get material properties
-    MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
-    
-    // Evaluate BRDF (in Interaction module)
-    Spectrum f = interaction_surface_shade(-ray.direction, ls.wi, hit);
-    
-    L = ls.radiance * f * max(0, dot(ls.wi, hit.n));
-  }
-  
-  // Add emission (none in this case)
-  L += props.emission;
-  
-  return L;
-}
+};
+
+// Result: complex_emitter gets bbox sampler
+// More sampling attempts, potentially better convergence
+// But slower per sample
 ```
 
-## What This Example Reveals
+### Config: Simple Only
 
-1. **Simple scenes optimize well** - Single object removes dispatch entirely
-2. **Delta lights are simple** - No complex PDF evaluation needed
-3. **Material properties flow cleanly** - Scene → Transport → Interaction
-4. **Cross-referencing is transparent** - User never sees augmentation
+```typescript
+const config = {
+  emissiveStrategy: {
+    mode: 'simple'
+  }
+};
 
-This completes our documentation. We have:
-- Architecture overview
-- Module contracts
-- Data types
-- Compiler specifications
-- Integration rules
-- Concrete example
+// Result: Only sphere sampled, complex SDF is path-only
+// Faster but may miss some lighting
+```
 
-Ready to start implementation!
+### Config: Analyzed
+
+```typescript
+const config = {
+  emissiveStrategy: {
+    mode: 'analyzed',
+    complexityThreshold: 10
+  }
+};
+
+// Result: Automatic decision based on complexity score
+// Good balance of performance and quality
+```
+
+## Key Takeaways
+
+1. **Simple emissives** → Exact sampling + MIS
+2. **Complex emissives** → Path-only, no MIS needed
+3. **Visible lights** → Become objects automatically
+4. **Cross-reference** → Enables correct MIS decisions
+5. **Configuration** → User controls the tradeoffs
+
+The system handles all combinations correctly and efficiently!
+
+
+This comprehensive example document shows:
+1. The progression from simple to complex
+2. How the cross-reference system works in practice
+3. The MIS decision points
+4. Different configuration options
+5. The actual GLSL code that gets generated
+
+It should make the entire system crystal clear for implementation.
