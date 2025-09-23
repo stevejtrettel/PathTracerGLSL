@@ -1,288 +1,301 @@
-# World Pillar Overview
+# World Pillar: Complete System Overview
 
-## Purpose
+## Executive Summary
 
-The World pillar defines the **mathematical and physical reality** that exists independent of observation. It encompasses geometry, objects, their arrangement, material properties, and light sources - everything that exists before we choose how to look at it.
+The World pillar defines mathematical and physical reality independent of observation. It provides three modules to the rendering engine:
 
-## Core Philosophy
+1. **Geometry Module** (hand-written): Mathematical structure of space
+2. **Scene Module** (compiled): Objects, material properties, intersection
+3. **Lighting Module** (compiled): Light sampling strategies
 
-World modules describe **what exists**, not how we see it or how light behaves. This separation is fundamental: a glass sphere in hyperbolic space exists as a mathematical entity with specific properties (refractive index, surface roughness). How light refracts through it, whether we use Fresnel equations or approximations, how we importance sample the BRDF - these are Photography's concerns, not World's.
+The key innovation is that Scene and Lighting modules are compiled from high-level descriptions, with a cross-referencing step that ensures emissive objects become lights and visible lights become geometry.
 
-## The Five Components
+## System Architecture
 
-### 1. Geometry: The Mathematical Foundation
-
-Geometry defines the differential geometric structure of space itself. This is pure mathematics:
-
-- **Geodesics**: Straight lines in the space (which may be curved!)
-- **Metric tensor**: How to measure angles and distances
-- **Parallel transport**: How vectors change when moved through curved space
-- **Frame construction**: Local coordinate systems
-
-Geometry is **always hand-written** because it represents fundamental mathematical truths that don't change with scene content.
-
-### 2. Objects: Building Blocks for Scene
-
-Objects are **not modules** but building blocks that get compiled into the Scene module. 
-They define shapes and material ID assignment using type-based naming conventions:
-```glsl
-// Objects use type-based naming, not module prefixes
-float sphere_glass_sphere_distance(vec3 p)
-int sphere_glass_sphere_material(vec3 p)
-vec3 sphere_glass_sphere_normal(vec3 p)
+```
+Scene Description + Light Description
+              ↓
+         WorldCompiler
+              ↓
+    ┌─────────┬─────────┐
+    │         │         │
+Geometry   Scene    Lighting
+Module    Module    Module
 ```
 
+The WorldCompiler orchestrates the entire pipeline, transforming user-friendly descriptions into optimized GLSL modules.
 
-### 3. Scene: Spatial Organization and Interface Resolution
+## The Three Modules
 
-The Scene module arranges objects in space and **resolves material interfaces**. This is where the critical architectural innovation of **nearby object tracking** happens.
+### 1. Geometry Module
 
-#### The Nearby Object System
-
-Instead of checking all objects to resolve material boundaries, Scene tracks only the 3 nearest objects:
+Hand-written mathematical foundations that define the structure of space itself:
 
 ```glsl
-struct NearbyObjects {
-  float dists[3];  // Distances to 3 closest
-  int ids[3];      // Their IDs
-  int count;       // How many within threshold
-};
+// Differential geometry operations
+Point geometry_geodesic(Point origin, Direction dir, float t)
+float geometry_distance(Point a, Point b)
+Frame geometry_frame(Point p, Normal n)
+float geometry_dot(Direction u, Direction v, Point p)
 ```
 
-Scene generates **dispatch functions** that route to object-specific code:
+These represent mathematical invariants - they don't change with scene content. We maintain a library: `euclidean.glsl`, `hyperbolic.glsl`, `spherical.glsl`.
+
+### 2. Scene Module
+
+Compiled from object and material descriptions, provides:
+
 ```glsl
-float eval_object_sdf(int obj_id, vec3 p) {
-  switch(obj_id) {
-    case 0: return sphere_0_sdf(p);
-    case 1: return box_1_sdf(p);
-  }
+// Intersection queries
+bool scene_intersect(Ray ray, out Hit hit)
+bool scene_intersect_any(Ray ray, float max_t)
+
+// Material data (properties only, no BSDFs!)
+MaterialProperties scene_material_properties(int mat_id, Point p)
+int scene_material_at(Point p)
+
+// Scene information
+float scene_bounding_radius()
+```
+
+The Scene module knows about geometry and material properties, but not how light behaves - that's Photography's domain.
+
+### 3. Lighting Module
+
+Compiled from light descriptions and emissive objects, provides:
+
+```glsl
+// Sampling
+LightSample lighting_sample(Point p, vec2 xi)
+float lighting_pdf(Point p, Direction wi)
+
+// Light information
+int lighting_count()
+bool lighting_has_environment()
+Spectrum lighting_environment(Direction dir)
+```
+
+## Material System
+
+Materials are **purely data containers** with no behavior:
+
+```glsl
+struct MaterialProperties {
+  vec3 albedo;
+  float roughness;
+  float metallic;
+  float ior;
+  vec3 emission;        // Can be non-zero for emissive objects
+  float emission_strength;
+  int flags;            // DIELECTRIC | PARTICIPATING | etc.
 }
 ```
 
-### 4. Materials: Physical Properties Only
+Key principle: Materials provide properties, Photography implements physics. The Scene module never evaluates BRDFs, never samples directions, never computes Fresnel. It only returns data.
 
-Materials is now **purely a data provider** with zero knowledge of light physics:
+## The Compilation Pipeline
 
-**Materials DOES provide:**
-- Property queries via `material_get_properties()`
-- Fast accessors like `material_get_ior()`
-- Type flags (DIELECTRIC, PARTICIPATING, EMISSIVE)
+### Phase 1: Input Parsing
 
-**Materials NEVER provides:**
-- BRDF evaluation functions ❌
-- Sampling strategies ❌
-- PDF calculations ❌
-- Fresnel equations ❌
-- Phase functions ❌
-- ANY light interaction logic ❌
+Users write two descriptions:
 
-This is a hard boundary - all physics lives in Photography's Interaction module.
-
-
-#### Properties as Data
-
-Materials provide a query interface for properties:
-
-```glsl
-// The key function that Photography calls
-MaterialProperties material_get_properties(int mat_id, vec3 p) {
-  MaterialProperties props;
-  
-  // Surface properties (may be constant or varying)
-  props.albedo = get_albedo(mat_id, p);
-  props.roughness = get_roughness(mat_id, p);
-  props.metallic = get_metallic(mat_id, p);
-  props.ior = material_iors[mat_id];  // Often constant
-  
-  // Emission
-  props.emission = get_emission(mat_id, p);
-  props.emission_intensity = get_emission_intensity(mat_id, p);
-  
-  // Volume properties (if applicable)
-  props.sigma_scatter = get_sigma_scatter(mat_id, p);
-  props.sigma_absorb = get_sigma_absorb(mat_id, p);
-  props.phase_g = phase_asymmetry[mat_id];
-  
-  return props;
-}
-```
-
-#### Constant vs Spatially-Varying
-
-Properties can be:
-- **Constants**: Simple values in arrays
-- **Textures**: UV-mapped from surface coordinates
-- **Procedural**: Functions of position (noise, patterns)
-
-```glsl
-// Compile-time selection based on scene analysis
-vec3 get_albedo(int mat_id, vec3 p) {
-  #if ALBEDO_VARYING
-    // Procedural or texture lookup
-    return texture_lookup(mat_id, p);
-  #else
-    // Simple array lookup
-    return material_albedo[mat_id];
-  #endif
-}
-```
-
-Materials do NOT provide:
-- BRDF evaluation functions
-- Sampling strategies
-- Phase functions
-- Any light interaction logic
-
-All interaction physics moved to Photography's Interaction module.
-
-### 5. Lights: Illumination Sources
-
-Lights define where photons originate. They provide:
-- **Sampling strategies** for importance sampling
-- **Evaluation** of radiance from directions
-- **PDFs** for multiple importance sampling
-
-## Build-Time Optimization Strategy
-
-World modules are **generated and optimized at scene load time**:
-
-### 1. Analysis Phase
 ```typescript
-const analysis = {
-  materialProperties: {
-    hasVaryingAlbedo: true,
-    hasVaryingRoughness: false,
-    hasVolumes: false,
-    hasEmission: true
-  },
-  propertyRanges: {
-    roughness: [0.1, 0.1],  // All same - make constant
-    ior: [1.0, 1.5, 1.33]   // Varying - need array
-  }
+// Scene: objects and their materials
+const sceneDescription = {
+  objects: [
+    { geometry: 'sphere', material: 'glass', transform: {...} }
+  ],
+  materials: new Map([
+    ['glass', { albedo: [0.95, 0.95, 0.95], ior: 1.5, emission: [0,0,0] }]
+  ])
+};
+
+// Lights: illumination sources
+const lightDescription = {
+  lights: [
+    { type: 'point', position: [0,5,0], intensity: [100,100,100], visible: false }
+  ],
+  environment: { type: 'hdri', path: 'sky.exr' }
 };
 ```
 
-### 2. Generation Phase
-Generate optimized property accessors:
-- **Constant folding**: If all materials have roughness = 0.5, compile as constant
-- **Dead code elimination**: No volume queries if no volumes
-- **Texture atlasing**: Pack all textures efficiently
-- **Procedural inlining**: Inline simple noise functions
+### Phase 2: Cross-Referencing
 
-## The Property Query Architecture
+The WorldCompiler performs critical cross-referencing:
 
-The `material_get_properties()` function is the key interface between World and Photography:
+1. **Emissive objects → Lighting module**: Any object with non-zero emission becomes a light source
+2. **Visible lights → Scene module**: Lights marked `visible: true` become geometric objects
+3. **Material ID assignment**: Sequential IDs starting from 1 (0 reserved for air)
 
-### Compile-Time Optimization
-Based on scene analysis, the compiler generates specialized versions:
+This happens internally in the WorldCompiler:
 
-```glsl
-// Scene with only constant properties (fast path)
-MaterialProperties material_get_properties(int mat_id, vec3 p) {
-  return constant_properties[mat_id];
-}
-
-// Scene with some varying properties
-MaterialProperties material_get_properties(int mat_id, vec3 p) {
-  MaterialProperties props = constant_properties[mat_id];
-  #if HAS_VARYING_ALBEDO
-    props.albedo = sample_albedo_texture(mat_id, p);
-  #endif
-  return props;
+```typescript
+private augment(scene: SceneDescription, lights: LightDescription) {
+  // Find emissive objects
+  const emissiveLights = scene.objects
+    .filter(o => o.material.emission > 0)
+    .map(o => this.objectToLight(o));
+  
+  // Find visible lights
+  const lightObjects = lights.lights
+    .filter(l => l.visible)
+    .map(l => this.lightToObject(l));
+  
+  return {
+    sceneInput: {
+      objects: [...scene.objects, ...lightObjects],
+      materials: [...scene.materials, ...lightMaterials]
+    },
+    lightingInput: {
+      lights: [...lights.lights, ...emissiveLights],
+      environment: lights.environment
+    }
+  };
 }
 ```
 
-### Batched Access
-Photography gets all properties in one call, avoiding multiple queries:
-- More efficient memory access
-- Better GPU utilization
-- Clearer interface
+### Phase 3: Module Compilation
 
-## Material Interface Resolution
+Two specialized compilers generate optimized GLSL:
 
-The complete flow for determining material at boundaries:
+#### SceneCompiler
 
-1. **Objects** define shape and assign MaterialIDs
-2. **Scene** tracks nearby objects during marching
-3. **At intersection**, Scene resolves interface:
-    - Determines material_from and material_to
-4. **Materials** provide properties for those IDs via `material_get_properties()`
-5. **Photography** uses properties to compute light interaction
+Takes objects and materials, generates:
+- Object SDF functions
+- Dispatch mechanisms
+- Ray marching loops
+- Material property lookups
 
-## Key Design Principles
+Optimizations:
+- Unroll loops for <5 objects
+- Fold constants when properties uniform
+- Eliminate unused material properties
+- Skip transforms for objects at origin
 
-### 1. Separation of Data and Behavior
+#### LightingCompiler
 
-- **World owns data**: Properties, positions, shapes
-- **Photography owns behavior**: How light interacts with that data
+Takes lights (including emissive objects), generates:
+- Specific samplers per light type
+- Importance sampling strategies
+- PDF evaluation functions
+- Environment map sampling
 
-### 2. Single Query Interface
+Optimizations:
+- Direct sampling for single light
+- Power-based selection for multiple lights
+- Analytic samplers for simple shapes
+- Bbox fallback for complex emitters
 
-Materials expose one key function that returns all properties:
-- Simple, clear contract
-- Efficient batching
-- Easy to optimize
+### Phase 4: Module Assembly
 
-### 3. Build-Time Specialization
+The WorldCompiler returns three modules:
 
-Property accessors are specialized based on actual usage:
-- Constant properties become literals
-- Unused properties are eliminated
-- Texture accesses are optimized
+```typescript
+interface CompiledWorld {
+  geometry: ModuleDescriptor;   // Hand-written
+  scene: ModuleDescriptor;      // From SceneCompiler
+  lighting: ModuleDescriptor;   // From LightingCompiler
+  metadata: {
+    materialCount: number;
+    lightCount: number;
+    hasEmissive: boolean;
+  };
+}
+```
 
+## Example Flow
 
-## Function Naming Conventions
+### Simple Scene
+```typescript
+// User: sphere with point light
+scene.objects = [{ geometry: 'sphere', material: 'red' }];
+lights.lights = [{ type: 'point', position: [0,5,0] }];
+```
 
-World uses **manual function prefixing** for clarity and to avoid naming conflicts:
+### After Cross-Reference
+```typescript
+// SceneCompiler receives:
+objects: [sphere]  // Just the sphere
+materials: [red]   // Non-emissive
 
-- **Geometry**: `geometry_*` (geometry_geodesic, geometry_frame)
-- **Scene**: `scene_*` (scene_intersect, scene_get_material)
-- **Materials**: `material_*` (material_get_properties, material_get_ior)
-- **Lights**: `light_*` (light_sample, light_evaluate)
-- **Objects**: Type-based naming (sphere_*, box_*, torus_*)
+// LightingCompiler receives:
+lights: [point]    // Just the point light
+```
 
-This explicit prefixing makes the code self-documenting and enables fixed concatenation order without complex dependency resolution.
+### Complex Scene
+```typescript
+// User: glowing sphere + visible area light
+scene.objects = [{ 
+  geometry: 'sphere', 
+  material: 'hot_metal',  // emission: [10, 5, 2]
+}];
+lights.lights = [{ 
+  type: 'quad',
+  vertices: [...],
+  visible: true  // Will appear in scene
+}];
+```
 
-## Why This Architecture?
+### After Cross-Reference
+```typescript
+// SceneCompiler receives:
+objects: [sphere, quad]     // Quad added as geometry
+materials: [hot_metal, light_material]  // Light gets material
 
-### Clarity
+// LightingCompiler receives:
+lights: [quad, sphere_emitter]  // Sphere added as light
+```
 
-- Materials are just data providers
-- No confusion about where physics lives
-- Clear one-way dependency
+## Key Design Decisions
 
-### Performance
+### Why Separate Scene and Lighting?
 
-- Batched property access
-- Compile-time optimization
-- No virtual dispatch for properties
+1. **Different concerns**: Geometry vs. sampling strategies
+2. **Flexibility**: Swap lighting without recompiling geometry
+3. **Optimization**: Each compiler optimizes for its domain
+4. **Clarity**: Clean separation of responsibilities
 
-### Flexibility
+### Why Compile Instead of Hand-Write?
 
-- Easy to add new properties
-- Photography modules can interpret properties differently
-- Same material data works with different interaction models
+1. **Optimization**: Scene-specific code with no waste
+2. **Correctness**: No manual synchronization errors
+3. **Productivity**: High-level descriptions vs. GLSL
+4. **Consistency**: Material IDs managed automatically
 
-## Implementation Flow
+### Why Materials Don't Include BSDFs?
 
-1. **Define geometry space** (hand-written)
-2. **Create objects** with material IDs (hand-written or procedural)
-3. **Arrange in scene** (build-time generation)
-4. **Analyze material properties** (automatic)
-5. **Generate property accessors** (build-time)
-6. **Setup lights** (hand-written or generated)
+1. **Separation**: Data (World) vs. behavior (Photography)
+2. **Research flexibility**: Same properties, different BRDFs
+3. **Clean dependencies**: World never depends on Photography
+4. **Performance**: Compile-time optimization of property access
+
+## Integration with Engine
+
+The Engine concatenates modules in order:
+
+```glsl
+[Common Types]
+[Geometry Module]      // Mathematical foundation
+[Scene Module]         // Objects and materials
+[Lighting Module]      // Sampling strategies
+[Camera Module]        // From Photography
+[Transport Module]     // From Photography
+[Interaction Module]   // BRDFs (uses material properties)
+[Film Module]          // From Photography
+[Developer Module]     // From Photography
+[Main Function]
+```
+
+Transport queries Scene for intersections and materials, queries Lighting for samples, and Interaction queries Scene for material properties to evaluate BRDFs.
+
+## Benefits
+
+1. **Automatic cross-referencing**: Emissive objects become lights automatically
+2. **Optimization**: Each scene gets specifically optimized code
+3. **Consistency**: Material IDs managed by compiler
+4. **Modularity**: Clean interfaces between components
+5. **Debugging**: Generated code is readable and inspectable
 
 ## Summary
 
-The World pillar defines reality through five components, with Materials now simplified to pure property providers. The key architectural change is that **Materials no longer implement light interaction** - they only provide the data (albedo, roughness, scattering coefficients) that Photography's Interaction module will use to compute how light behaves.
-
-The `material_get_properties()` function serves as the clean interface between World's data and Photography's algorithms, returning all material properties in a single, efficient query that can be optimized at compile time based on scene analysis.
-
----
-
-Regarding your question about where `material_get_properties()` lives: it should be **part of the Materials module**. The Materials module is generated at build time and includes:
-1. The property data (arrays, texture references)
-2. The accessor functions (get_albedo, get_roughness, etc.)
-3. The main `material_get_properties()` function that packages everything
-
-This keeps all material data access in one place and allows for compile-time optimization based on what properties are actually varying in the scene.
+The World pillar combines hand-written mathematical truth (Geometry) with compiled physical reality (Scene and Lighting). The WorldCompiler orchestrates the transformation from user-friendly descriptions to optimized GLSL, handling all cross-referencing between emissive objects and lights. Materials are pure data containers, with all light physics delegated to Photography's Interaction module. This architecture enables aggressive optimization while maintaining clean separation between what exists (World) and how we observe it (Photography).
