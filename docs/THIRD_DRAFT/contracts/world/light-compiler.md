@@ -1,18 +1,7 @@
-
 # LightingCompiler
 
 ## Purpose
-Takes a list of lights and produces a GLSL module with light sampling and PDF evaluation functions. The key challenge is handling both explicitly-defined lights and emissive objects that have been promoted to lights, while maintaining correct PDF calculations for MIS.
-
-## The Compilation Challenge
-
-The LightingCompiler must handle several types of lights:
-1. **Traditional lights** (point, directional, spot) - always samplable
-2. **Area lights** (quads, spheres) - always samplable  
-3. **Emissive objects promoted to lights** - may or may not be samplable
-4. **Environment maps** - sampled separately from other lights
-
-The compiler must generate efficient sampling code while tracking which lights can actually be sampled for MIS calculations.
+Takes a list of lights and produces a GLSL module with light sampling and PDF evaluation functions. The compiler handles both explicitly-defined lights and lights created from emissive materials, maintaining correct PDF calculations for MIS.
 
 ## Input Structure
 
@@ -20,14 +9,17 @@ The compiler must generate efficient sampling code while tracking which lights c
 interface LightingCompilerInput {
   lights: CompilerLight[];
   environment?: EnvironmentMap;
-  crossRef: CrossReferenceData;  // Critical for MIS
+}
+
+interface CompilerLight {
+  id: string;
+  radiance: vec3;
+  sampling: LightSampling | null;  // null = path-only
+  source: 'explicit_light' | 'emissive_material' | 'visible_light';
 }
 ```
 
-The `crossRef` data tells us:
-- Which lights came from emissive objects
-- Which lights can actually be sampled
-- Mappings between object IDs and light IDs
+The key distinction: lights either can be sampled (`sampling !== null`) or can't (`sampling === null`).
 
 ## Output Structure
 
@@ -37,76 +29,81 @@ The compiler generates a GLSL module with these required functions:
 // Core sampling interface
 LightSample lighting_sample(Point p, vec2 xi)
 float lighting_pdf(Point p, Direction wi)
+
+// Light information
+LightData lighting_get_light(int light_id)
+bool lighting_can_sample(int light_id)
 int lighting_count()
 
 // Environment queries
 Spectrum lighting_environment(Direction dir)
 bool lighting_has_environment()
-
-// MIS helpers (NEW)
-int lighting_get_light_for_object(int obj_id)
-bool lighting_can_sample_light(int light_id)
 ```
 
 ## Compilation Strategy
 
-### Step 1: Separate Samplable from Non-Samplable
-
-The first critical step is to separate lights we can actually sample from those we can't:
+### Step 1: Separate Samplable from Path-Only
 
 ```typescript
 compile(input: LightingCompilerInput): ModuleDescriptor {
-  const samplableLights = input.lights.filter(l => l.canSample);
-  const nonSamplableLights = input.lights.filter(l => !l.canSample);
+  const samplableLights = input.lights.filter(l => l.sampling !== null);
+  const samplableIndices = samplableLights.map(l => input.lights.indexOf(l));
   
-  // Only samplable lights get sampling functions
+  // Generate samplers only for lights we can sample
   const samplers = samplableLights.map(l => this.generateSampler(l));
+  
+  return this.buildModule(input.lights, samplers, samplableIndices);
+}
 ```
 
-Why? Non-samplable lights (complex emissive SDFs) still need to be tracked for MIS, but we don't want to waste time trying to sample them.
+### Step 2: Generate Light Data Array
 
-### Step 2: Generate Individual Light Samplers
-
-Each light type needs a specific sampling strategy. Here's why each is different:
-
-#### Point Lights
-Delta distribution - infinitely small, so PDF is technically infinite but we use 1.0:
+All lights (samplable or not) get entries in the uniform array:
 
 ```glsl
-LightSample sample_point_${id}(Point p, vec2 xi) {
+// Generated uniform array
+uniform LightData u_lights[NUM_LIGHTS] = LightData[](
+  LightData(vec3(100, 100, 100), SAMPLING_POINT, vec4(5, 5, 5, 0), vec4(0)),
+  LightData(vec3(50, 20, 5), SAMPLING_NONE, vec4(0), vec4(0)),  // Path-only emissive
+  LightData(vec3(10, 10, 10), SAMPLING_SPHERE, vec4(0, 3, 0, 0.5), vec4(0))
+);
+```
+
+### Step 3: Generate Individual Samplers
+
+Each samplable light type gets a specific sampling function:
+
+#### Point Light
+```glsl
+LightSample sample_point_${index}(Point p, vec2 xi) {
+  vec3 light_pos = u_lights[${index}].param0.xyz;
+  
   LightSample ls;
-  vec3 light_pos = vec3(${position});
+  ls.point = light_pos;
   ls.wi = normalize(light_pos - p);
   ls.distance = length(light_pos - p);
-  ls.point = light_pos;
-  
-  // Inverse square law built into radiance
-  ls.radiance = vec3(${intensity}) / (ls.distance * ls.distance);
+  ls.radiance = u_lights[${index}].radiance / (ls.distance * ls.distance);
   ls.pdf = 1.0;  // Delta distribution
   
   return ls;
 }
 ```
 
-#### Sphere Area Lights
-We sample the visible hemisphere for better efficiency:
-
+#### Sphere Light
 ```glsl
-LightSample sample_sphere_${id}(Point p, vec2 xi) {
-  vec3 center = vec3(${position});
-  float radius = ${radius};
+LightSample sample_sphere_${index}(Point p, vec2 xi) {
+  vec3 center = u_lights[${index}].param0.xyz;
+  float radius = u_lights[${index}].param0.w;
   
-  // Build coordinate frame aligned with vector to sphere
+  // Sample visible hemisphere
   vec3 w = normalize(center - p);
   vec3 u, v;
   make_basis(w, u, v);
   
-  // Sample hemisphere facing the point
-  float z = 1.0 - 2.0 * xi.x;  // cos(theta)
-  float r = sqrt(max(0.0, 1.0 - z*z));  // sin(theta)
+  float z = 1.0 - 2.0 * xi.x;
+  float r = sqrt(max(0.0, 1.0 - z*z));
   float phi = 2.0 * PI * xi.y;
   
-  // Convert to world space
   vec3 local = vec3(r * cos(phi), r * sin(phi), z);
   vec3 point_on_sphere = center + radius * (u * local.x + v * local.y + w * local.z);
   
@@ -114,7 +111,7 @@ LightSample sample_sphere_${id}(Point p, vec2 xi) {
   ls.point = point_on_sphere;
   ls.wi = normalize(point_on_sphere - p);
   ls.distance = length(point_on_sphere - p);
-  ls.radiance = vec3(${intensity});
+  ls.radiance = u_lights[${index}].radiance;
   
   // PDF in solid angle measure
   float cos_theta_max = sqrt(1.0 - (radius * radius) / dot(center - p, center - p));
@@ -124,68 +121,20 @@ LightSample sample_sphere_${id}(Point p, vec2 xi) {
 }
 ```
 
-#### Bounding Box Sampling (Approximate)
-For complex emissive objects, we use rejection sampling:
+### Step 4: Light Selection
 
-```glsl
-LightSample sample_bbox_${id}(Point p, vec2 xi) {
-  vec3 bbox_min = vec3(${bounds.min});
-  vec3 bbox_max = vec3(${bounds.max});
-  
-  // Rejection sampling with limited attempts
-  const int MAX_ATTEMPTS = ${config.bboxSampleAttempts ?? 32};
-  
-  for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    // Random point in bounding box
-    vec3 candidate = mix(bbox_min, bbox_max, vec3(xi, random()));
-    
-    // Check if actually on the emissive surface
-    float sdf_value = object_${sourceObjectId}_sdf(candidate);
-    
-    if (abs(sdf_value) < 0.01) {  // On surface
-      LightSample ls;
-      ls.point = candidate;
-      ls.wi = normalize(candidate - p);
-      ls.distance = length(candidate - p);
-      ls.radiance = vec3(${intensity});
-      
-      // Approximate PDF based on solid angle
-      vec3 size = bbox_max - bbox_min;
-      float approx_area = 2.0 * (size.x*size.y + size.y*size.z + size.z*size.x);
-      
-      // Convert from area to solid angle measure
-      vec3 normal = normalize(object_${sourceObjectId}_normal(candidate));
-      float cos_theta = abs(dot(normal, -ls.wi));
-      ls.pdf = (ls.distance * ls.distance) / (approx_area * cos_theta);
-      
-      return ls;
-    }
-    
-    // Generate new random numbers for next attempt
-    xi = vec2(random(), random());
-  }
-  
-  // Failed to find point on surface
-  LightSample ls;
-  ls.pdf = 0.0;  // Invalid sample
-  return ls;
-}
-```
+For multiple lights, implement importance sampling:
 
-### Step 3: Light Selection Strategy
-
-How do we choose which light to sample? Two main strategies:
-
-#### Power-Based Selection (Better for Varied Intensities)
 ```glsl
 // Precomputed at compile time
+const int samplable_indices[NUM_SAMPLABLE] = int[](${samplableIndices.join(', ')});
 const float light_powers[NUM_SAMPLABLE] = float[](
-  ${samplableLights.map(l => luminance(l.intensity)).join(', ')}
+  ${samplableLights.map(l => luminance(l.radiance)).join(', ')}
 );
-const float total_power = ${sum(light_powers)};
+const float total_power = ${totalPower};
 
-int select_light(vec2 xi) {
-  float r = xi.x * total_power;
+int select_light(float xi) {
+  float r = xi * total_power;
   float cumulative = 0.0;
   
   for (int i = 0; i < NUM_SAMPLABLE; i++) {
@@ -195,30 +144,12 @@ int select_light(vec2 xi) {
   
   return NUM_SAMPLABLE - 1;
 }
-
-float light_selection_pdf(int light_id) {
-  return light_powers[light_id] / total_power;
-}
 ```
 
-#### Uniform Selection (Simpler, Good for Similar Powers)
-```glsl
-int select_light(vec2 xi) {
-  return min(int(xi.x * float(NUM_SAMPLABLE)), NUM_SAMPLABLE - 1);
-}
-
-float light_selection_pdf(int light_id) {
-  return 1.0 / float(NUM_SAMPLABLE);
-}
-```
-
-### Step 4: Main Sampling Function
-
-This ties everything together:
+### Step 5: Main Sampling Function
 
 ```glsl
 LightSample lighting_sample(Point p, vec2 xi) {
-  // No lights to sample?
   if (NUM_SAMPLABLE == 0) {
     LightSample ls;
     ls.pdf = 0.0;
@@ -226,188 +157,150 @@ LightSample lighting_sample(Point p, vec2 xi) {
   }
   
   // Select which light to sample
-  int light_index = select_light(xi);
+  int samplable_idx = select_light(xi.x);
+  int light_id = samplable_indices[samplable_idx];
   
   // Dispatch to specific sampler
   LightSample ls;
-  switch(light_index) {
-    case 0: ls = sample_${light0.type}_0(p, xi); break;
-    case 1: ls = sample_${light1.type}_1(p, xi); break;
-    // ... generated for each light
+  switch(light_id) {
+    ${this.generateSamplerDispatch(samplableLights)}
   }
   
-  // Account for light selection probability
-  ls.pdf *= light_selection_pdf(light_index);
-  ls.light_id = light_index;
+  // Account for selection probability
+  ls.pdf *= light_powers[samplable_idx] / total_power;
   
   return ls;
 }
 ```
 
-### Step 5: PDF Evaluation for MIS
+### Step 6: Light Information Functions
 
-This is crucial for MIS - given a direction, what's the probability we would have sampled it?
+Simple, direct access to light data:
 
 ```glsl
-float lighting_pdf(Point p, Direction wi) {
-  float total_pdf = 0.0;
-  
-  // Check each samplable light
-  for (int i = 0; i < NUM_SAMPLABLE; i++) {
-    float light_pdf = 0.0;
-    
-    // Would this direction hit this light?
-    if (light_intersects(i, p, wi)) {
-      // Compute PDF for this specific light
-      light_pdf = compute_light_pdf(i, p, wi);
-    }
-    
-    // Weight by selection probability
-    total_pdf += light_pdf * light_selection_pdf(i);
+LightData lighting_get_light(int light_id) {
+  if (light_id < 0 || light_id >= NUM_LIGHTS) {
+    return LightData(vec3(0), SAMPLING_NONE, vec4(0), vec4(0));
   }
-  
-  return total_pdf;
-}
-```
-
-### Step 6: Cross-Reference Table Generation
-
-This is the key innovation for handling emissive objects correctly:
-
-```glsl
-// Generated from crossRef data
-const int OBJECT_TO_LIGHT[${numObjects}] = int[](
-  ${generateObjectToLightTable()}
-);
-
-const bool LIGHT_CAN_SAMPLE[${numLights}] = bool[](
-  ${lights.map(l => l.canSample).join(', ')}
-);
-
-// MIS helper: "I hit object X, what light is it?"
-int lighting_get_light_for_object(int obj_id) {
-  if (obj_id < 0 || obj_id >= ${numObjects}) return -1;
-  return OBJECT_TO_LIGHT[obj_id];
+  return u_lights[light_id];
 }
 
-// MIS helper: "Can I sample light Y?"
-bool lighting_can_sample_light(int light_id) {
-  if (light_id < 0 || light_id >= ${numLights}) return false;
-  return LIGHT_CAN_SAMPLE[light_id];
+bool lighting_can_sample(int light_id) {
+  if (light_id < 0 || light_id >= NUM_LIGHTS) return false;
+  return u_lights[light_id].sampling_type != SAMPLING_NONE;
+}
+
+int lighting_count() {
+  return NUM_LIGHTS;
 }
 ```
 
 ## Optimization Strategies
 
 ### Single Light Optimization
-When there's only one light, skip selection entirely:
+When there's only one samplable light:
 
 ```glsl
-// Generated when NUM_SAMPLABLE == 1
 LightSample lighting_sample(Point p, vec2 xi) {
-  return sample_${light.type}_0(p, xi);  // Direct call, no selection
+  return sample_${lightType}_0(p, xi);  // Direct call, no selection
 }
 ```
 
-### No Area Lights Optimization
-If only point/directional lights exist, simplify PDF calculation:
+### No Samplable Lights
+When only path-tracing finds lights:
 
 ```glsl
-// Delta lights never contribute to direction PDF
-float lighting_pdf(Point p, Direction wi) {
-  return 0.0;  // Can't hit delta lights randomly
-}
-```
-
-### Environment Map Integration
-
-Environment sampling is separate from light sampling for efficiency:
-
-```glsl
-LightSample lighting_sample_environment(Point p, vec2 xi) {
-  // Importance sample the environment map
-  vec2 uv = sample_environment_map(xi);
-  Direction wi = uv_to_direction(uv);
-  
+LightSample lighting_sample(Point p, vec2 xi) {
   LightSample ls;
-  ls.wi = wi;
-  ls.distance = MAX_DIST;
-  ls.radiance = texture(u_environment_map, uv).rgb * u_env_intensity;
-  ls.pdf = environment_pdf(wi);
-  
+  ls.pdf = 0.0;  // No sampling possible
   return ls;
 }
+
+float lighting_pdf(Point p, Direction wi) {
+  return 0.0;  // Can't sample any lights
+}
+```
+
+### Compile-Time Constants
+When all lights share properties:
+
+```glsl
+#if ALL_LIGHTS_SAME_COLOR
+  #define LIGHT_COLOR vec3(${sharedColor})
+#endif
 ```
 
 ## Complete Example Output
 
-For a scene with 1 point light, 1 sphere area light, and 1 non-samplable emissive:
+For a scene with 1 point light and 1 non-samplable emissive:
 
 ```glsl
 // ============================================
 // Generated by LightingCompiler
-// 2 samplable lights, 1 non-samplable tracked
+// 2 lights total, 1 samplable
 // ============================================
 
-#define NUM_LIGHTS 3
-#define NUM_SAMPLABLE 2
+#define NUM_LIGHTS 2
+#define NUM_SAMPLABLE 1
 
-// Individual samplers (only for samplable)
+// Light data array
+uniform LightData u_lights[2] = LightData[](
+  LightData(vec3(100, 100, 100), SAMPLING_POINT, vec4(5, 5, 5, 0), vec4(0)),
+  LightData(vec3(50, 20, 5), SAMPLING_NONE, vec4(0), vec4(0))
+);
+
+// Samplable light indices
+const int samplable_indices[1] = int[](0);
+const float light_powers[1] = float[](100.0);
+const float total_power = 100.0;
+
+// Point light sampler
 LightSample sample_point_0(Point p, vec2 xi) {
-  // ... point sampling code
-}
-
-LightSample sample_sphere_1(Point p, vec2 xi) {
-  // ... sphere sampling code
-}
-
-// Light selection (power-based)
-const float light_powers[2] = float[](100.0, 50.0);
-const float total_power = 150.0;
-
-// Cross-reference tables for MIS
-const int OBJECT_TO_LIGHT[5] = int[](-1, -1, 2, -1, -1);  // Object 2 is emissive
-const bool LIGHT_CAN_SAMPLE[3] = bool[](true, true, false);  // Light 2 can't be sampled
-
-// Main sampling function
-LightSample lighting_sample(Point p, vec2 xi) {
-  float r = xi.x * total_power;
+  vec3 light_pos = u_lights[0].param0.xyz;
   
   LightSample ls;
-  if (r < 100.0) {
-    ls = sample_point_0(p, xi);
-    ls.pdf *= 100.0 / 150.0;
-    ls.light_id = 0;
-  } else {
-    ls = sample_sphere_1(p, xi);
-    ls.pdf *= 50.0 / 150.0;
-    ls.light_id = 1;
-  }
+  ls.point = light_pos;
+  ls.wi = normalize(light_pos - p);
+  ls.distance = length(light_pos - p);
+  ls.radiance = u_lights[0].radiance / (ls.distance * ls.distance);
+  ls.pdf = 1.0;
   
   return ls;
 }
 
-// MIS helpers
-int lighting_get_light_for_object(int obj_id) {
-  if (obj_id < 0 || obj_id >= 5) return -1;
-  return OBJECT_TO_LIGHT[obj_id];
+// Main sampling function (single light optimization)
+LightSample lighting_sample(Point p, vec2 xi) {
+  return sample_point_0(p, xi);
 }
 
-bool lighting_can_sample_light(int light_id) {
-  if (light_id < 0 || light_id >= 3) return false;
-  return LIGHT_CAN_SAMPLE[light_id];
+// PDF evaluation
+float lighting_pdf(Point p, Direction wi) {
+  return 0.0;  // Point light is delta, can't be hit randomly
 }
 
-// Required exports
-int lighting_count() { return 3; }
+// Light information
+LightData lighting_get_light(int light_id) {
+  if (light_id < 0 || light_id >= 2) {
+    return LightData(vec3(0), SAMPLING_NONE, vec4(0), vec4(0));
+  }
+  return u_lights[light_id];
+}
+
+bool lighting_can_sample(int light_id) {
+  if (light_id < 0 || light_id >= 2) return false;
+  return u_lights[light_id].sampling_type != SAMPLING_NONE;
+}
+
+int lighting_count() { return 2; }
 bool lighting_has_environment() { return false; }
 ```
 
 ## Why This Design?
 
-1. **Separation of samplable/non-samplable**: Don't waste cycles on lights we can't sample
-2. **Cross-reference tables**: Enable correct MIS weights in the Transport module
-3. **Flexible sampling strategies**: Support exact, approximate, and no sampling
-4. **Optimization opportunities**: Single light, no area lights, etc.
-5. **Clean interface**: Transport doesn't need to know about light implementation details
+1. **Direct access**: Light data accessed by simple array lookup
+2. **Clean separation**: Samplable vs non-samplable handled elegantly
+3. **No indirection**: No object mapping or cross-reference needed
+4. **Optimization-friendly**: Single light, no lights, etc. handled efficiently
+5. **MIS-ready**: Path-only lights tracked for correct MIS weights
 
+The compiler focuses solely on lights and their sampling strategies, without concern for where they came from or which objects they correspond to.

@@ -1,276 +1,347 @@
-
 # WorldCompiler
 
 ## Purpose
-Orchestrates compilation of World modules from scene and light descriptions. The key challenge this solves is the dual nature of emissive objects (they're both geometry and light sources) and the need to handle them correctly for Multiple Importance Sampling (MIS).
+Orchestrates compilation of World modules from scene and light descriptions. The key task is unifying lights from two sources (explicit lights and emissive materials) into a single light array that materials can reference directly.
 
 ## Core Architecture
 
-The WorldCompiler is the orchestrator that transforms user-friendly descriptions into optimized GLSL modules. Its main job is to handle the complex relationships between objects and lights.
+The WorldCompiler transforms user-friendly descriptions into optimized GLSL modules with a straightforward pipeline:
 
 ```typescript
 class WorldCompiler {
   private sceneCompiler = new SceneCompiler();
   private lightingCompiler = new LightingCompiler();
-  private crossRef: CrossReferenceData;
+  private lightRegistry: LightRegistry;
   
-  constructor(private config: SamplingStrategyConfig) {}
+  constructor(private config: WorldCompilerConfig) {}
+}
 ```
 
 ## The Compilation Pipeline
 
-### Step 1: Cross-Reference Initialization
+### Step 1: Collect All Lights
 
-Before we process anything, we need a data structure to track relationships. This is crucial for MIS - when we hit an emissive object, we need to know if we could have sampled it directly.
+The first step is gathering lights from both sources:
 
 ```typescript
-private initializeCrossReference(): CrossReferenceData {
+private collectLights(
+  scene: SceneDescription, 
+  lights: LightDescription
+): CompilerLight[] {
+  const allLights: CompilerLight[] = [];
+  
+  // Add explicit lights
+  for (const light of lights.lights) {
+    allLights.push({
+      id: light.id,
+      radiance: light.intensity,
+      sampling: this.createSamplingStrategy(light),
+      source: light.visible ? 'visible_light' : 'explicit_light'
+    });
+  }
+  
+  // Find and add emissive materials as lights
+  for (const [matName, mat] of scene.materials) {
+    if (this.isEmissive(mat)) {
+      const light = this.createLightFromMaterial(matName, mat);
+      if (light) allLights.push(light);
+    }
+  }
+  
+  return allLights;
+}
+```
+
+### Step 2: Determine Sampling Strategies
+
+For each light, decide if and how it can be sampled:
+
+```typescript
+private createSamplingStrategy(light: UserLight): LightSampling | null {
+  switch (light.type) {
+    case 'point':
+      return {
+        type: 'point',
+        position: light.position
+      };
+      
+    case 'sphere':
+      return {
+        type: 'sphere',
+        position: light.position,
+        radius: light.radius
+      };
+      
+    case 'quad':
+      return {
+        type: 'quad',
+        vertices: light.vertices
+      };
+      
+    // ... other light types
+  }
+}
+
+private createLightFromMaterial(
+  name: string, 
+  mat: MaterialDescription
+): CompilerLight | null {
+  // Simple heuristic: only create lights for significant emission
+  const intensity = luminance(mat.emission);
+  if (intensity < this.config.lightStrategy.minIntensity) {
+    return null;  // Too dim to bother
+  }
+  
+  // For now, emissive materials are path-only
+  // Future: analyze geometry for sampling capability
   return {
-    objectToLight: new Map(),     // "I hit object X, is it also light Y?"
-    lightToObject: new Map(),     // "I sampled light Y, what object is it?"
-    samplableLights: new Set(),   // "Which lights can I actually sample?"
+    id: `emissive_${name}`,
+    radiance: mat.emission,
+    sampling: null,  // Path-only
+    source: 'emissive_material'
+  };
+}
+```
+
+### Step 3: Assign Light IDs to Materials
+
+Materials need to know their light ID for emission:
+
+```typescript
+private assignLightIds(
+  materials: Map<string, MaterialDescription>,
+  lights: CompilerLight[]
+): CompilerMaterial[] {
+  const compiled: CompilerMaterial[] = [];
+  let materialId = 0;
+  
+  for (const [name, mat] of materials) {
+    let lightId = -1;
+    
+    // Find corresponding light if emissive
+    if (this.isEmissive(mat)) {
+      const light = lights.find(l => 
+        l.source === 'emissive_material' && 
+        l.id === `emissive_${name}`
+      );
+      if (light) {
+        lightId = lights.indexOf(light);
+      }
+    }
+    
+    compiled.push({
+      id: materialId++,
+      albedo: mat.albedo,
+      roughness: mat.roughness,
+      metallic: mat.metallic,
+      ior: mat.ior,
+      emission: mat.emission,
+      light_id: lightId,  // Direct reference!
+      flags: this.computeFlags(mat)
+    });
+  }
+  
+  return compiled;
+}
+```
+
+### Step 4: Build Light Registry
+
+Create the registry with sampling information:
+
+```typescript
+private buildRegistry(lights: CompilerLight[]): LightRegistry {
+  const samplableIndices: number[] = [];
+  
+  lights.forEach((light, index) => {
+    if (light.sampling !== null) {
+      samplableIndices.push(index);
+    }
+  });
+  
+  return {
+    lights,
+    samplableIndices,
     stats: {
-      totalLights: 0,
-      samplableLights: 0,
-      pathOnlyEmissives: 0
+      total: lights.length,
+      samplable: samplableIndices.length,
+      pathOnly: lights.length - samplableIndices.length,
+      fromExplicitLights: lights.filter(l => 
+        l.source === 'explicit_light' || l.source === 'visible_light'
+      ).length,
+      fromEmissiveMaterials: lights.filter(l => 
+        l.source === 'emissive_material'
+      ).length
     }
   };
 }
 ```
 
-### Step 2: Processing and Augmentation
+### Step 5: Handle Visible Lights
 
-This is where the magic happens. We take the user's separate lists of objects and lights and merge them intelligently. The key insight: some objects become lights (if emissive) and some lights become objects (if visible).
+Lights marked `visible: true` need to be added as objects:
 
 ```typescript
-private processAndAugment(
+private augmentSceneWithVisibleLights(
+  objects: UserObject[],
+  lights: UserLight[]
+): UserObject[] {
+  const augmented = [...objects];
+  
+  for (const light of lights.filter(l => l.visible)) {
+    augmented.push({
+      id: `light_geom_${light.id}`,
+      geometry: this.createGeometryForLight(light),
+      material: `_light_material_${light.id}`,  // Special material
+      transform: { position: light.position }
+    });
+  }
+  
+  return augmented;
+}
+```
+
+### Step 6: Compile Modules
+
+With everything prepared, compile the final modules:
+
+```typescript
+compile(
   scene: SceneDescription,
-  lights: LightDescription
-): { sceneInput: SceneCompilerInput, lightingInput: LightingCompilerInput } {
-```
-
-#### Material ID Assignment
-First, we need consistent material IDs across both modules. Material 0 is always air/vacuum, then we number sequentially.
-
-```typescript
-  const materials = this.buildMaterialList(scene, lights);
-  const materialIdMap = this.assignMaterialIds(materials);
-```
-
-#### Processing Original Lights
-User-defined lights are straightforward - they're always samplable (that's their purpose).
-
-```typescript
-  const processedLights: CompilerLight[] = lights.lights.map(light => 
-    this.processUserLight(light)
+  lights: LightDescription,
+  geometryModule: string
+): CompiledWorld {
+  // 1. Collect all lights
+  const allLights = this.collectLights(scene, lights);
+  
+  // 2. Build registry
+  const registry = this.buildRegistry(allLights);
+  
+  // 3. Prepare materials with light IDs
+  const materials = this.assignLightIds(scene.materials, allLights);
+  
+  // 4. Augment scene with visible lights
+  const objects = this.augmentSceneWithVisibleLights(
+    scene.objects, 
+    lights.lights
   );
-```
-
-#### Creating Objects from Visible Lights
-If a light has `visible: true`, it needs geometry so rays can hit it:
-
-```typescript
-  const lightObjects = lights.lights
-    .filter(l => l.visible)
-    .map(l => this.createObjectFromLight(l, materialIdMap));
-```
-
-#### The Critical Part: Emissive Objects as Lights
-This is where we make the key decision - can we sample this emissive object directly, or must it only be found via path tracing?
-
-```typescript
-  const emissiveLights = scene.objects
-    .filter(obj => this.isEmissive(obj))
-    .map(obj => this.createLightFromObject(obj));
-```
-
-### Step 3: Sampling Strategy Decision
-
-Not all emissive objects can be efficiently sampled. This method decides what to do with each one:
-
-```typescript
-private createLightFromObject(obj: UserObject): CompilerLight | null {
-  const strategy = this.determineSamplingStrategy(obj);
-  const lightId = `emissive_${obj.id}`;
-```
-
-#### Always Track the Relationship
-Even if we can't sample it, we need to know it exists for MIS:
-
-```typescript
-  // This mapping is ALWAYS created
-  this.crossRef.objectToLight.set(obj.id, lightId);
-```
-
-#### Three Possible Outcomes
-
-**Outcome 1: Non-Samplable Light**
-Complex SDFs, volumetrics, or fractals - we can't sample them efficiently:
-
-```typescript
-  if (strategy === 'none') {
-    // This light exists but can only be found by hitting it
-    return {
-      id: lightId,
-      canSample: false,
-      intensity: obj.material.emission,
-      sourceObjectId: obj.id
-    } as NonSamplableLight;
-  }
-```
-
-**Outcome 2: Exact Sampling**
-Simple shapes like spheres or quads - we know the math:
-
-```typescript
-  if (strategy === 'exact') {
-    this.crossRef.samplableLights.add(lightId);
-    this.crossRef.lightToObject.set(lightId, obj.id);
-    
-    return {
-      id: lightId,
-      canSample: true,
-      intensity: obj.material.emission,
-      sourceObjectId: obj.id,
-      sampling: {
-        type: 'sphere',
-        position: obj.transform?.position,
-        radius: obj.geometry.radius
-      }
-    } as SamplableLight;
-  }
-```
-
-**Outcome 3: Approximate Sampling**
-Medium complexity - we'll try bounding box rejection sampling:
-
-```typescript
-  if (strategy === 'approximate') {
-    // Similar to exact, but with bbox sampling strategy
-    return {
-      sampling: {
-        type: 'bbox',
-        bounds: this.computeBounds(obj)
-      }
-      // ... rest of light data
-    };
-  }
-```
-
-### Step 4: Complexity Analysis
-
-How do we decide if an emissive can be sampled? We analyze its complexity:
-
-```typescript
-private analyzeGeometryComplexity(geometry: Geometry): { 
-  isSimple: boolean; 
-  score: number;
-} {
-```
-
-#### Simple Shapes
-These have known sampling strategies:
-```typescript
-  if (geometry.type === 'sphere' || 
-      geometry.type === 'quad' || 
-      geometry.type === 'triangle') {
-    return { isSimple: true, score: 0 };
-  }
-```
-
-#### SDF Analysis
-For procedural SDFs, we look at their code:
-```typescript
-  if (geometry.type === 'sdf') {
-    const ops = this.countSDFOperations(geometry.code);
-    const hasNoise = geometry.code.includes('noise');
-    const hasFractal = geometry.code.includes('fractal');
-    
-    // Noise and fractals are effectively impossible to sample
-    return {
-      isSimple: ops < 3 && !hasNoise && !hasFractal,
-      score: ops + (hasNoise ? 10 : 0) + (hasFractal ? 20 : 0)
-    };
-  }
-```
-
-### Step 5: Configuration-Driven Behavior
-
-The user can control the strategy via configuration:
-
-```typescript
-private determineSamplingStrategy(obj: UserObject): 'exact' | 'approximate' | 'none' {
-  // User wants no emissive sampling at all
-  if (this.config.emissiveStrategy.mode === 'none') {
-    return 'none';
-  }
   
-  // User wants to try sampling everything possible
-  if (this.config.emissiveStrategy.mode === 'all') {
-    return this.canCreateExactSampler(obj) ? 'exact' : 'approximate';
-  }
+  // 5. Compile modules
+  const sceneModule = this.sceneCompiler.compile({
+    objects: this.compileObjects(objects),
+    materials
+  });
   
-  // User wants only simple shapes sampled
-  if (this.config.emissiveStrategy.mode === 'simple') {
-    return complexity.isSimple ? 'exact' : 'none';
-  }
+  const lightingModule = this.lightingCompiler.compile({
+    lights: allLights,
+    environment: lights.environment
+  });
   
-  // Analyzed mode: use thresholds
-  const threshold = this.config.emissiveStrategy.complexityThreshold ?? 5;
-  if (complexity.score < threshold) {
-    return complexity.isSimple ? 'exact' : 'approximate';
-  }
+  // 6. Generate metadata
+  const metadata = this.generateMetadata(objects, materials, registry);
   
-  return 'none';
+  return {
+    modules: {
+      geometry: { source: geometryModule, /* ... */ },
+      scene: sceneModule,
+      lighting: lightingModule
+    },
+    registry,
+    metadata
+  };
+}
+```
+
+## Configuration-Driven Behavior
+
+The compiler behavior is controlled by configuration:
+
+```typescript
+interface WorldCompilerConfig {
+  lightStrategy: {
+    mode: 'all' | 'simple' | 'none';
+    minIntensity?: number;  // Default: 0.01
+    bboxAttempts?: number;   // Future feature
+  };
+}
+```
+
+### Strategy Modes
+
+**`'none'`**: No emissive materials become lights
+```typescript
+// Only explicit lights are compiled
+// Materials still have emission for direct viewing
+// No MIS needed for emissives
+```
+
+**`'simple'`**: Only simple emissives become lights
+```typescript
+// Future: detect spheres, quads, etc.
+// Currently same as 'none'
+```
+
+**`'all'`**: All emissives become lights
+```typescript
+// Every emissive material gets a light entry
+// Most will be path-only (sampling = null)
+// Enables correct MIS for all emissives
+```
+
+## Optimization Opportunities
+
+### Single Light Optimization
+```typescript
+if (registry.samplableIndices.length === 1) {
+  // Skip light selection in shader
+  // Direct sampling without random selection
+}
+```
+
+### No Emission Optimization
+```typescript
+if (!metadata.features.hasEmission) {
+  // Simpler material structure
+  // No light_id checks in transport
+}
+```
+
+### Few Materials Optimization
+```typescript
+if (materials.length < config.optimization.inlineMaterials) {
+  // Inline material properties as constants
+  // Avoid uniform array lookups
 }
 ```
 
 ## Debug Features
 
-For development and verification:
-
 ```typescript
-private logSamplingDecisions() {
-  if (!this.config.verification.logSamplingDecisions) return;
+private logCompilationSummary() {
+  if (!this.config.debug.logLightAssignment) return;
   
-  console.log("=== Sampling Strategy Report ===");
-  console.log(`Total lights: ${this.crossRef.stats.totalLights}`);
-  console.log(`Samplable: ${this.crossRef.stats.samplableLights}`);
-  console.log(`Path-only emissives: ${this.crossRef.stats.pathOnlyEmissives}`);
+  console.log("=== Light Compilation Summary ===");
+  console.log(`Total lights: ${this.registry.stats.total}`);
+  console.log(`  Samplable: ${this.registry.stats.samplable}`);
+  console.log(`  Path-only: ${this.registry.stats.pathOnly}`);
+  console.log(`  From explicit lights: ${this.registry.stats.fromExplicitLights}`);
+  console.log(`  From materials: ${this.registry.stats.fromEmissiveMaterials}`);
   
-  // List which emissives we decided not to sample and why
-  for (const [objId, lightId] of this.crossRef.objectToLight) {
-    if (!this.crossRef.samplableLights.has(lightId)) {
-      console.log(`  Object ${objId}: Too complex for sampling`);
+  // Show which materials got lights
+  for (const mat of this.materials) {
+    if (mat.light_id >= 0) {
+      console.log(`  Material ${mat.id} → Light ${mat.light_id}`);
     }
   }
 }
 ```
 
-## The Final Output
-
-The compiler produces everything needed for rendering:
-
-```typescript
-return {
-  modules: {
-    geometry: geometryModule,     // Hand-written math
-    scene: sceneModule,           // Compiled SDFs and materials
-    lighting: lightingModule      // Compiled sampling strategies
-  },
-  crossRef: this.crossRef,        // For MIS calculations
-  metadata: {
-    // Statistics for optimization decisions
-    counts: { materials, objects, lights, samplableLights },
-    features: { hasEmissive, hasPathOnlyEmissive, hasEnvironment }
-  }
-};
-```
-
 ## Why This Design?
 
-1. **MIS Correctness**: By tracking all emissives (even non-samplable ones), we can compute correct MIS weights
-2. **Performance**: Complex emissives don't waste time on failed sampling attempts
-3. **Flexibility**: Users can choose their preferred strategy via configuration
-4. **Debugging**: Clear separation makes it easy to see why decisions were made
-```
+1. **Simplicity**: One-way flow from sources to lights to materials
+2. **Efficiency**: Direct light_id lookup, no indirection
+3. **Flexibility**: Easy to add new light sources or sampling strategies
+4. **Correctness**: All emissives tracked for proper MIS
+5. **Clarity**: No complex bidirectional mappings to maintain
+
+The compiler's job is straightforward: collect lights, assign IDs, compile modules. The complexity of cross-referencing is eliminated by having materials directly reference their lights.

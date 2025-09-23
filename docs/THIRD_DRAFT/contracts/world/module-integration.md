@@ -2,16 +2,7 @@
 # Module Integration
 
 ## Purpose
-Defines how World modules integrate with the Engine and Photography modules to form a complete shader, with special focus on how cross-reference data enables proper MIS calculations.
-
-## The Integration Challenge
-
-The key challenge is that Multiple Importance Sampling requires knowledge that spans modules:
-- **Scene** knows which object was hit
-- **Lighting** knows which objects correspond to samplable lights  
-- **Transport** needs to combine this information for MIS weights
-
-The cross-reference system bridges this gap.
+Defines how World modules integrate with the Engine and Photography modules to form a complete shader, with focus on how materials directly reference lights for proper MIS calculations.
 
 ## Module Loading Order
 
@@ -24,7 +15,7 @@ const shaderSource = [
   recipe.world.scene,            // Objects and materials  
   recipe.world.lighting,         // Light sampling
   recipe.photography.camera,     // Ray generation
-  recipe.photography.transport,  // Integration algorithms (USES MIS)
+  recipe.photography.transport,  // Integration algorithms
   recipe.photography.interaction,// BRDFs
   recipe.photography.film,       // Accumulation
   recipe.photography.developer,  // Tone mapping
@@ -32,13 +23,33 @@ const shaderSource = [
 ].join('\n');
 ```
 
-Order matters! Transport depends on both Scene and Lighting being already defined.
+Order matters: Transport depends on both Scene and Lighting being already defined.
 
 ## Critical Data Flow for MIS
 
+### The Simplified Flow
+
+The new system eliminates indirection through direct material→light references:
+
+```glsl
+// OLD FLOW (complex):
+Hit hit;  // Contains object_id
+scene_intersect(ray, hit);
+int light_id = lighting_get_light_for_object(hit.object_id);
+bool can_sample = lighting_can_sample_light(light_id);
+
+// NEW FLOW (direct):
+Hit hit;  // No object_id needed!
+scene_intersect(ray, hit);
+MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+if (props.light_id >= 0) {
+  bool can_sample = lighting_can_sample(props.light_id);
+}
+```
+
 ### The MIS Decision Point
 
-When Transport hits an emissive object, it needs to make a critical decision:
+When Transport hits an emissive surface:
 
 ```glsl
 // In Transport module
@@ -46,34 +57,25 @@ Hit hit;
 if (scene_intersect(ray, hit)) {
   MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
   
-  if (length(props.emission) > 0.0) {
-    // This is emissive! But how do we handle it?
+  if (props.light_id >= 0) {
+    // This material emits light!
+    LightData light = lighting_get_light(props.light_id);
     
-    // NEW: Check if this object could have been sampled directly
-    int light_id = lighting_get_light_for_object(hit.object_id);
-    
-    if (light_id >= 0 && lighting_can_sample_light(light_id)) {
-      // This emissive CAN be sampled - need MIS
+    if (lighting_can_sample(props.light_id)) {
+      // This light CAN be sampled - need MIS
       float bsdf_pdf = last_bounce_pdf;
       float light_pdf = lighting_pdf(previous_point, ray.direction);
       float mis_weight = power_heuristic(bsdf_pdf, light_pdf);
       
-      radiance += throughput * props.emission * mis_weight;
+      radiance += throughput * light.radiance * mis_weight;
     } else {
-      // This emissive can ONLY be found by path tracing
+      // This light can ONLY be found by path tracing
       // Full weight - no MIS needed
-      radiance += throughput * props.emission;
+      radiance += throughput * light.radiance;
     }
   }
 }
 ```
-
-### Why This Works
-
-1. **Scene** provides `hit.object_id` - which object we hit
-2. **Lighting** provides mapping - is this object also a light?
-3. **Lighting** tells us if it's samplable - can we sample it directly?
-4. **Transport** uses this info for correct MIS weights
 
 ## Function Dependencies
 
@@ -85,23 +87,21 @@ Transport calls Scene for geometric queries:
 // Primary intersection
 Hit hit;
 if (scene_intersect(ray, hit)) {
-  // hit.object_id tells us WHICH object (NEW)
-  // hit.material_to tells us material
-  
+  // hit.material_to tells us the material
   MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
-  // props.emission tells us if it's emissive
+  // props.light_id tells us if it's emissive (-1 if not)
 }
 
-// Shadow rays (unchanged)
+// Shadow rays
 bool occluded = scene_intersect_any(shadow_ray, light_distance);
 
-// Volume tracking (unchanged)
+// Volume tracking
 int material = scene_material_at(point);
 ```
 
 ### Transport → Lighting
 
-Transport calls Lighting for sampling and MIS:
+Transport calls Lighting for sampling and light information:
 
 ```glsl
 // Sample a light
@@ -120,22 +120,10 @@ if (ls.pdf > 0.0) {
   }
 }
 
-// NEW: MIS helpers
-int light_id = lighting_get_light_for_object(hit.object_id);
-bool can_sample = lighting_can_sample_light(light_id);
-```
-
-### Lighting → Scene (NEW)
-
-Lighting may need to call Scene for bbox rejection sampling:
-
-```glsl
-// In bbox light sampler (inside Lighting module)
-float sdf = scene_evaluate_object_sdf(source_object_id, candidate_point);
-if (abs(sdf) < 0.01) {
-  // Point is on surface - valid sample
-  vec3 normal = scene_compute_object_normal(source_object_id, candidate_point);
-  // Use normal for PDF calculation
+// Direct light access (NEW - much simpler!)
+if (props.light_id >= 0) {
+  LightData light = lighting_get_light(props.light_id);
+  bool can_sample = lighting_can_sample(props.light_id);
 }
 ```
 
@@ -148,32 +136,32 @@ Spectrum interaction_evaluate(Direction wi, Direction wo, Hit hit) {
   // Get material properties
   MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
   
-  // Use properties for BRDF (unchanged)
+  // Use properties for BRDF
   float alpha = props.roughness * props.roughness;
   vec3 F = fresnel(props.ior, dot(wi, hit.n));
   // ...
 }
 ```
 
-## Uniform Management with Cross-Reference
+## Uniform Management
 
 ### World Uniforms
 
-The WorldCompiler generates metadata about the cross-reference:
+The WorldCompiler generates simpler metadata:
 
 ```typescript
 interface WorldUniforms {
   // Scene uniforms
   'u_material_albedo_metallic': Float32Array,
   'u_material_emission_strength': Float32Array,
-  'u_material_ior_roughness': Float32Array,
+  'u_material_ior_roughness_light': Float32Array,  // .z = light_id
   
   // Lighting uniforms  
-  'u_light_intensities': Float32Array,
+  'u_lights': LightData[],
   'u_environment_map'?: Texture2D,
   
-  // NEW: Cross-reference metadata
-  'u_num_objects': number,
+  // Simple counts
+  'u_num_materials': number,
   'u_num_lights': number,
   'u_num_samplable': number,
 }
@@ -185,55 +173,55 @@ interface WorldUniforms {
 // Engine receives compiled world
 const world = worldCompiler.compile(scene, lights, geometry);
 
-// Engine extracts metadata for uniform binding
-engine.setUniform('u_num_objects', world.metadata.counts.objects);
-engine.setUniform('u_num_samplable', world.crossRef.stats.samplableLights);
+// Engine binds uniforms
+engine.setUniform('u_num_materials', world.metadata.counts.materials);
+engine.setUniform('u_num_lights', world.metadata.counts.lights);
+engine.setUniform('u_num_samplable', world.registry.samplableIndices.length);
 
-// Cross-reference tables are baked into GLSL, not uniforms
+// Light data as uniform array
+engine.setUniform('u_lights', world.registry.lights);
 ```
 
 ## Constants Coordination
 
-Modules share compile-time constants that must agree:
+Modules share compile-time constants:
 
 ```glsl
 // Generated by WorldCompiler, used by all modules
 #define NUM_MATERIALS 5
-#define NUM_OBJECTS 10      // NEW: Total objects
 #define NUM_LIGHTS 3        // Total lights (including non-samplable)
-#define NUM_SAMPLABLE 2     // NEW: Lights we can actually sample
+#define NUM_SAMPLABLE 2     // Lights we can actually sample
 #define HAS_ENVIRONMENT 1
 #define MATERIAL_AIR 0
 ```
 
-These constants ensure array sizes match across modules.
-
 ## Error States and Validation
 
-The Engine must validate the integration:
+The Engine validates the integration:
 
 ```typescript
 class ShaderIntegrationValidator {
   validate(world: CompiledWorld): ValidationResult {
     const errors = [];
     
-    // Check object ID consistency
-    const maxObjectId = Math.max(...world.crossRef.objectToLight.keys());
-    if (maxObjectId >= world.metadata.counts.objects) {
-      errors.push(`Object ID ${maxObjectId} exceeds object count`);
-    }
-    
-    // Check light samplability consistency
-    const samplableCount = world.crossRef.samplableLights.size;
-    if (samplableCount !== world.metadata.counts.samplableLights) {
-      errors.push(`Samplable light count mismatch`);
-    }
-    
-    // Verify all emissive objects are tracked
+    // Check light ID consistency
     for (const mat of world.materials) {
-      if (mat.emission.some(e => e > 0)) {
-        // Should have corresponding entry in cross-reference
-        // ... validation logic
+      if (mat.light_id >= world.registry.lights.length) {
+        errors.push(`Material references invalid light ${mat.light_id}`);
+      }
+    }
+    
+    // Check samplable indices
+    for (const idx of world.registry.samplableIndices) {
+      if (idx >= world.registry.lights.length) {
+        errors.push(`Samplable index ${idx} out of range`);
+      }
+    }
+    
+    // Verify all emissive materials have lights
+    for (const mat of world.materials) {
+      if (mat.emission.some(e => e > 0) && mat.light_id < 0) {
+        errors.push(`Emissive material missing light assignment`);
       }
     }
     
@@ -247,7 +235,6 @@ class ShaderIntegrationValidator {
 For debugging MIS weights:
 
 ```glsl
-// Debug mode: visualize MIS weights
 #ifdef DEBUG_MIS
 vec3 debug_mis_weight_color(float weight) {
   // Red = BSDF only (weight = 1)
@@ -266,69 +253,69 @@ if (debug_mode == DEBUG_MIS_WEIGHTS) {
 
 ## Performance Considerations
 
-### Cross-Reference Lookup Cost
+### Direct Light Lookup
 
-The object→light lookup is a single array access:
+Light access is now a single array lookup:
 ```glsl
-// Constant time lookup
-int light_id = OBJECT_TO_LIGHT[hit.object_id];  // O(1)
+// Direct access - no indirection
+LightData light = u_lights[props.light_id];  // O(1)
 ```
+
+### Reduced Register Pressure
+
+Hit structure is smaller without object_id:
+- Saves register space
+- Better GPU occupancy
+- Simpler ray tracing loops
 
 ### Branch Prediction
 
-Modern GPUs handle this pattern well:
+Simpler branching pattern:
 ```glsl
-if (light_id >= 0 && LIGHT_CAN_SAMPLE[light_id]) {
-  // MIS path - less common
+if (props.light_id >= 0 && lighting_can_sample(props.light_id)) {
+  // MIS path
 } else {
-  // Direct path - more common
+  // Direct contribution or non-emissive
 }
 ```
-
-### Register Pressure
-
-The Hit structure is larger with object_id, but it's worth it:
-- Without: incorrect MIS weights, energy loss/gain
-- With: correct unbiased rendering
 
 ## Complete Example: MIS for Emissive Sphere
 
 ```glsl
-// Scene: sphere is object 2, material 3 (emissive)
-// Lighting: sphere became light 4, samplable
+// Scene: sphere has material 2 (emissive)
+// Material 2 has light_id = 1
 
 // In Transport, we hit the sphere:
 Hit hit;
 scene_intersect(ray, hit);
-// hit.object_id = 2
-// hit.material_to = 3
+// hit.material_to = 2
 
-// Check emission
-MaterialProperties props = scene_material_properties(3, hit.p);
+// Get material properties
+MaterialProperties props = scene_material_properties(2, hit.p);
 // props.emission = vec3(10, 5, 2)
+// props.light_id = 1
 
-// Check if samplable
-int light_id = lighting_get_light_for_object(2);  // Returns 4
-bool can_sample = lighting_can_sample_light(4);   // Returns true
+// Get light information
+LightData light = lighting_get_light(1);
+bool can_sample = lighting_can_sample(1);  // true for sphere
 
 // Compute MIS weight
-float bsdf_pdf = last_bounce_pdf;  // How we found it
-float light_pdf = lighting_pdf(prev_point, ray.direction);  // Could we sample it?
-float mis_weight = power_heuristic(bsdf_pdf, light_pdf);
-
-// Apply with MIS weight
-radiance += throughput * props.emission * mis_weight;
+if (can_sample) {
+  float bsdf_pdf = last_bounce_pdf;
+  float light_pdf = lighting_pdf(prev_point, ray.direction);
+  float mis_weight = power_heuristic(bsdf_pdf, light_pdf);
+  radiance += throughput * light.radiance * mis_weight;
+} else {
+  radiance += throughput * light.radiance;
+}
 ```
 
 ## Why This Architecture?
 
-1. **Correctness**: Proper MIS weights prevent energy loss/gain
-2. **Flexibility**: Can mark any emissive as samplable or not
-3. **Performance**: Cross-reference is compile-time, lookups are O(1)
-4. **Debugging**: Can visualize MIS decisions and weights
-5. **Modularity**: Each module maintains its own concerns
+1. **Simplicity**: Direct material→light reference, no complex mappings
+2. **Performance**: Smaller Hit structure, fewer indirections
+3. **Correctness**: MIS weights computed correctly
+4. **Maintainability**: Clear data flow, easy to debug
+5. **Flexibility**: Easy to add new light types or sampling strategies
 
-The cross-reference system is the bridge that makes MIS work correctly across module boundaries.
-
-
-This shows how the cross-reference data flows through the system and enables correct MIS calculations, while maintaining clean module separation.
+The integration is cleaner because each module maintains focused responsibilities with minimal cross-dependencies.

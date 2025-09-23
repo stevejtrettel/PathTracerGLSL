@@ -1,14 +1,12 @@
 # World Pillar: Complete System Overview
 
-## Executive Summary
+## Purpose
 
-The World pillar defines mathematical and physical reality independent of observation. It provides three modules to the rendering engine:
+The World pillar defines the **mathematical and physical reality** that exists independent of observation. It encompasses geometry, objects, their arrangement, material properties, and light sources - everything that exists before we choose how to look at it.
 
-1. **Geometry Module** (hand-written): Mathematical structure of space
-2. **Scene Module** (compiled): Objects, material properties, intersection
-3. **Lighting Module** (compiled): Light sampling strategies
+## Core Philosophy
 
-The key innovation is that Scene and Lighting modules are compiled from high-level descriptions, with a cross-referencing step that ensures emissive objects become lights and visible lights become geometry.
+World modules describe **what exists**, not how we see it. This separation is fundamental: a glass sphere in hyperbolic space exists as a mathematical entity with specific properties. How light travels through it, whether we use delta tracking or ray marching, whether we visualize it as a normal map or a rendered image - these are Photography's concerns, not World's.
 
 ## System Architecture
 
@@ -23,61 +21,86 @@ Geometry   Scene    Lighting
 Module    Module    Module
 ```
 
-The WorldCompiler orchestrates the entire pipeline, transforming user-friendly descriptions into optimized GLSL modules.
+The WorldCompiler orchestrates the transformation from user-friendly descriptions to optimized GLSL, automatically handling the relationship between emissive materials and lights.
 
-## The Three Modules
+## The Three Core Modules
 
-### 1. Geometry Module
+### 1. Geometry Module: The Mathematical Foundation
 
-Hand-written mathematical foundations that define the structure of space itself:
+Geometry defines the differential geometric structure of space itself. This is pure mathematics:
 
 ```glsl
-// Differential geometry operations
+// Geodesics: How light travels in straight lines (which may be curved!)
 Point geometry_geodesic(Point origin, Direction dir, float t)
+
+// Metric tensor: How to measure angles and distances
 float geometry_distance(Point a, Point b)
-Frame geometry_frame(Point p, Normal n)
 float geometry_dot(Direction u, Direction v, Point p)
+
+// Parallel transport: How vectors change when moved through curved space
+Direction geometry_parallel_transport(Direction v, Point from, Point to)
+
+// Frame construction: Local coordinate systems
+Frame geometry_frame(Point p, Normal n)
 ```
 
-These represent mathematical invariants - they don't change with scene content. We maintain a library: `euclidean.glsl`, `hyperbolic.glsl`, `spherical.glsl`.
+Geometry is **always hand-written** because it represents fundamental mathematical truths that don't change with scene content. A hyperbolic space is hyperbolic regardless of what objects inhabit it.
 
-### 2. Scene Module
+#### Example: Euclidean Geometry
+```glsl
+Point geometry_geodesic(Point origin, Direction dir, float t) {
+  return origin + dir * t;  // Simple linear interpolation
+}
 
-Compiled from object and material descriptions, provides:
+float geometry_distance(Point a, Point b) {
+  return length(a - b);  // Standard Euclidean distance
+}
+```
+
+#### Example: Hyperbolic Geometry
+```glsl
+Point geometry_geodesic(Point origin, Direction dir, float t) {
+  // Geodesics in Poincaré ball model
+  float r = length(origin);
+  float k = (1.0 - r*r) / 2.0;
+  return (origin + k*t*dir) / (1.0 + k*t*dot(dir, origin));
+}
+```
+
+We maintain a library: `euclidean.glsl`, `hyperbolic.glsl`, `spherical.glsl`.
+
+### 2. Scene Module: Objects and Materials
+
+The Scene module provides geometric queries and material properties for all objects in the scene. It tracks materials and their associated lights through a direct ID system.
+
+#### Core Responsibilities
+
+1. **Object Arrangement**: Spatial organization via SDFs
+2. **Material Interface Resolution**: Determining material boundaries
+3. **Light Association**: Materials know their light IDs directly
+
+#### The Hit Structure (Simplified)
 
 ```glsl
-// Intersection queries
-bool scene_intersect(Ray ray, out Hit hit)
-bool scene_intersect_any(Ray ray, float max_t)
-
-// Material data (properties only, no BSDFs!)
-MaterialProperties scene_material_properties(int mat_id, Point p)
-int scene_material_at(Point p)
-
-// Scene information
-float scene_bounding_radius()
+struct Hit {
+  // Geometric data
+  Point p;
+  Normal n;
+  vec2 uv;
+  float t;
+  
+  // Material interface (no object_id needed!)
+  int material_from;    // Material we're leaving
+  int material_to;      // Material we're entering
+  
+  // Frame
+  Frame frame;
+}
 ```
 
-The Scene module knows about geometry and material properties, but not how light behaves - that's Photography's domain.
+Note the absence of `object_id` - we don't need it because materials directly reference their lights.
 
-### 3. Lighting Module
-
-Compiled from light descriptions and emissive objects, provides:
-
-```glsl
-// Sampling
-LightSample lighting_sample(Point p, vec2 xi)
-float lighting_pdf(Point p, Direction wi)
-
-// Light information
-int lighting_count()
-bool lighting_has_environment()
-Spectrum lighting_environment(Direction dir)
-```
-
-## Material System
-
-Materials are **purely data containers** with no behavior:
+#### Material Properties with Light References
 
 ```glsl
 struct MaterialProperties {
@@ -85,217 +108,318 @@ struct MaterialProperties {
   float roughness;
   float metallic;
   float ior;
-  vec3 emission;        // Can be non-zero for emissive objects
+  vec3 emission;
   float emission_strength;
-  int flags;            // DIELECTRIC | PARTICIPATING | etc.
+  int light_id;  // KEY: Direct reference to light array (-1 if non-emissive)
+  int flags;
 }
 ```
 
-Key principle: Materials provide properties, Photography implements physics. The Scene module never evaluates BRDFs, never samples directions, never computes Fresnel. It only returns data.
+#### Efficient Material Interface Resolution
+
+The Scene module uses **nearby object tracking** to efficiently resolve material boundaries:
+
+```glsl
+struct NearbyObjects {
+  float dists[3];  // Distances to 3 closest
+  int material_ids[3];  // Their material IDs
+  int count;       // How many within threshold
+};
+
+// During ray marching
+void march_ray(Ray ray, out Hit hit) {
+  NearbyObjects nearby;
+  
+  for (int step = 0; step < MAX_STEPS; step++) {
+    Point p = geometry_geodesic(ray.origin, ray.direction, t);
+    
+    // Track only nearby objects
+    update_nearby_objects(p, nearby);
+    
+    if (nearby.dists[0] < EPSILON) {
+      // Resolve material interface using only 2-3 objects
+      resolve_materials(p, nearby, hit);
+      return;
+    }
+  }
+}
+```
+
+This elegantly solves the material interface problem:
+- **90%+ of rays**: Only one object nearby, trivial resolution
+- **Boundaries**: 2-3 objects nearby, quick resolution
+- **Never**: Need to check all objects in scene
+
+### 3. Lighting Module: Unified Light Management
+
+The Lighting module manages all light sources uniformly, whether they originated as explicit lights or emissive materials.
+
+#### Light Data Structure
+
+```glsl
+struct LightData {
+  vec3 radiance;
+  int sampling_type;  // SAMPLING_NONE, SAMPLING_POINT, SAMPLING_SPHERE, etc.
+  vec4 param0;  // Position or other primary parameters
+  vec4 param1;  // Additional parameters
+}
+
+// All lights in one array
+uniform LightData u_lights[NUM_LIGHTS];
+```
+
+#### Sampling Capability
+
+Lights fall into two categories:
+
+1. **Samplable** (`sampling_type != SAMPLING_NONE`)
+    - Can be explicitly sampled for next event estimation
+    - Need MIS when hit via path tracing
+
+2. **Path-only** (`sampling_type == SAMPLING_NONE`)
+    - Too complex to sample (fractals, complex SDFs)
+    - Only found by path tracing
+    - No MIS needed (single strategy)
+
+#### Direct Access Functions
+
+```glsl
+// Get light information by ID
+LightData lighting_get_light(int light_id) {
+  return u_lights[light_id];
+}
+
+// Check if light can be sampled
+bool lighting_can_sample(int light_id) {
+  return u_lights[light_id].sampling_type != SAMPLING_NONE;
+}
+```
 
 ## The Compilation Pipeline
 
-### Phase 1: Input Parsing
-
-Users write two descriptions:
+### Phase 1: Light Collection and Unification
 
 ```typescript
-// Scene: objects and their materials
-const sceneDescription = {
-  objects: [
-    { geometry: 'sphere', material: 'glass', transform: {...} }
-  ],
-  materials: new Map([
-    ['glass', { albedo: [0.95, 0.95, 0.95], ior: 1.5, emission: [0,0,0] }]
-  ])
-};
-
-// Lights: illumination sources
-const lightDescription = {
-  lights: [
-    { type: 'point', position: [0,5,0], intensity: [100,100,100], visible: false }
-  ],
-  environment: { type: 'hdri', path: 'sky.exr' }
-};
-```
-
-### Phase 2: Cross-Referencing
-
-The WorldCompiler performs critical cross-referencing:
-
-1. **Emissive objects → Lighting module**: Any object with non-zero emission becomes a light source
-2. **Visible lights → Scene module**: Lights marked `visible: true` become geometric objects
-3. **Material ID assignment**: Sequential IDs starting from 1 (0 reserved for air)
-
-This happens internally in the WorldCompiler:
-
-```typescript
-private augment(scene: SceneDescription, lights: LightDescription) {
-  // Find emissive objects
-  const emissiveLights = scene.objects
-    .filter(o => o.material.emission > 0)
-    .map(o => this.objectToLight(o));
+private collectLights(scene: SceneDescription, lights: LightDescription): CompilerLight[] {
+  const allLights: CompilerLight[] = [];
   
-  // Find visible lights
-  const lightObjects = lights.lights
-    .filter(l => l.visible)
-    .map(l => this.lightToObject(l));
+  // Explicit lights
+  lights.lights.forEach(light => {
+    allLights.push({
+      id: light.id,
+      radiance: light.intensity,
+      sampling: determineSamplingStrategy(light),
+      source: 'explicit_light'
+    });
+  });
   
-  return {
-    sceneInput: {
-      objects: [...scene.objects, ...lightObjects],
-      materials: [...scene.materials, ...lightMaterials]
-    },
-    lightingInput: {
-      lights: [...lights.lights, ...emissiveLights],
-      environment: lights.environment
+  // Emissive materials become lights
+  scene.materials.forEach((mat, name) => {
+    if (isEmissive(mat)) {
+      allLights.push({
+        id: `emissive_${name}`,
+        radiance: mat.emission,
+        sampling: null,  // Usually path-only
+        source: 'emissive_material'
+      });
     }
-  };
+  });
+  
+  return allLights;
 }
 ```
 
-### Phase 3: Module Compilation
-
-Two specialized compilers generate optimized GLSL:
-
-#### SceneCompiler
-
-Takes objects and materials, generates:
-- Object SDF functions
-- Dispatch mechanisms
-- Ray marching loops
-- Material property lookups
-
-Optimizations:
-- Unroll loops for <5 objects
-- Fold constants when properties uniform
-- Eliminate unused material properties
-- Skip transforms for objects at origin
-
-#### LightingCompiler
-
-Takes lights (including emissive objects), generates:
-- Specific samplers per light type
-- Importance sampling strategies
-- PDF evaluation functions
-- Environment map sampling
-
-Optimizations:
-- Direct sampling for single light
-- Power-based selection for multiple lights
-- Analytic samplers for simple shapes
-- Bbox fallback for complex emitters
-
-### Phase 4: Module Assembly
-
-The WorldCompiler returns three modules:
+### Phase 2: Material-Light Assignment
 
 ```typescript
-interface CompiledWorld {
-  geometry: ModuleDescriptor;   // Hand-written
-  scene: ModuleDescriptor;      // From SceneCompiler
-  lighting: ModuleDescriptor;   // From LightingCompiler
-  metadata: {
-    materialCount: number;
-    lightCount: number;
-    hasEmissive: boolean;
-  };
+private assignLightIds(materials: Map<string, MaterialDescription>, lights: CompilerLight[]): CompilerMaterial[] {
+  return materials.map((mat, name) => {
+    let light_id = -1;
+    
+    if (isEmissive(mat)) {
+      const lightIndex = lights.findIndex(l => l.id === `emissive_${name}`);
+      light_id = lightIndex;
+    }
+    
+    return {
+      ...mat,
+      light_id  // Materials now know their light
+    };
+  });
 }
 ```
 
-## Example Flow
+### Phase 3: Module Generation with Optimization
 
-### Simple Scene
+#### Build-Time Analysis
 ```typescript
-// User: sphere with point light
-scene.objects = [{ geometry: 'sphere', material: 'red' }];
-lights.lights = [{ type: 'point', position: [0,5,0] }];
+const analysis = {
+  usedMaterialIds: [0, 1, 2],
+  hasRoughMaterials: true,
+  hasVolumes: false,
+  lightCount: allLights.length,
+  samplableLightCount: allLights.filter(l => l.sampling !== null).length
+};
 ```
 
-### After Cross-Reference
-```typescript
-// SceneCompiler receives:
-objects: [sphere]  // Just the sphere
-materials: [red]   // Non-emissive
+#### Optimization Strategies
 
-// LightingCompiler receives:
-lights: [point]    // Just the point light
+**Dead Code Elimination**
+```glsl
+// If no volumes in scene
+#if !HAS_VOLUMES
+  // Volume code completely removed
+#endif
 ```
 
-### Complex Scene
-```typescript
-// User: glowing sphere + visible area light
-scene.objects = [{ 
-  geometry: 'sphere', 
-  material: 'hot_metal',  // emission: [10, 5, 2]
-}];
-lights.lights = [{ 
-  type: 'quad',
-  vertices: [...],
-  visible: true  // Will appear in scene
-}];
+**Constant Folding**
+```glsl
+// If all materials have same roughness
+#define CONST_ROUGHNESS 0.5
 ```
 
-### After Cross-Reference
-```typescript
-// SceneCompiler receives:
-objects: [sphere, quad]     // Quad added as geometry
-materials: [hot_metal, light_material]  // Light gets material
-
-// LightingCompiler receives:
-lights: [quad, sphere_emitter]  // Sphere added as light
+**Loop Unrolling**
+```glsl
+// For < 5 objects
+float dispatch_sdf(Point p) {
+  float d0 = object_0_sdf(p);
+  float d1 = object_1_sdf(p);
+  float d2 = object_2_sdf(p);
+  return min(min(d0, d1), d2);
+}
 ```
 
-## Key Design Decisions
+**Direct Light Access**
+```glsl
+// Single light optimization
+#if NUM_SAMPLABLE == 1
+  LightSample lighting_sample(Point p, vec2 xi) {
+    return sample_light_0(p, xi);  // Skip selection
+  }
+#endif
+```
 
-### Why Separate Scene and Lighting?
+## MIS Integration Flow
 
-1. **Different concerns**: Geometry vs. sampling strategies
-2. **Flexibility**: Swap lighting without recompiling geometry
-3. **Optimization**: Each compiler optimizes for its domain
-4. **Clarity**: Clean separation of responsibilities
-
-### Why Compile Instead of Hand-Write?
-
-1. **Optimization**: Scene-specific code with no waste
-2. **Correctness**: No manual synchronization errors
-3. **Productivity**: High-level descriptions vs. GLSL
-4. **Consistency**: Material IDs managed automatically
-
-### Why Materials Don't Include BSDFs?
-
-1. **Separation**: Data (World) vs. behavior (Photography)
-2. **Research flexibility**: Same properties, different BRDFs
-3. **Clean dependencies**: World never depends on Photography
-4. **Performance**: Compile-time optimization of property access
-
-## Integration with Engine
-
-The Engine concatenates modules in order:
+The key to correct MIS is the direct material→light reference:
 
 ```glsl
-[Common Types]
-[Geometry Module]      // Mathematical foundation
-[Scene Module]         // Objects and materials
-[Lighting Module]      // Sampling strategies
-[Camera Module]        // From Photography
-[Transport Module]     // From Photography
-[Interaction Module]   // BRDFs (uses material properties)
-[Film Module]          // From Photography
-[Developer Module]     // From Photography
-[Main Function]
+// In Transport module
+Hit hit;
+if (scene_intersect(ray, hit)) {
+  // Get material properties including light_id
+  MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+  
+  if (props.light_id >= 0) {
+    // This material emits light!
+    LightData light = lighting_get_light(props.light_id);
+    
+    if (lighting_can_sample(props.light_id)) {
+      // Can be sampled - need MIS
+      float bsdf_pdf = last_bounce_pdf;
+      float light_pdf = lighting_pdf(previous_point, ray.direction);
+      float mis_weight = power_heuristic(bsdf_pdf, light_pdf);
+      radiance += throughput * light.radiance * mis_weight;
+    } else {
+      // Path-only light - no MIS
+      radiance += throughput * light.radiance;
+    }
+  }
+}
 ```
 
-Transport queries Scene for intersections and materials, queries Lighting for samples, and Interaction queries Scene for material properties to evaluate BRDFs.
+## Complete Example: Scene with Mixed Lights
 
-## Benefits
+### User Input
+```typescript
+// Scene
+objects = [
+  { geometry: 'sphere', material: 'emissive_orb' },
+  { geometry: 'plane', material: 'concrete' }
+];
 
-1. **Automatic cross-referencing**: Emissive objects become lights automatically
-2. **Optimization**: Each scene gets specifically optimized code
-3. **Consistency**: Material IDs managed by compiler
-4. **Modularity**: Clean interfaces between components
-5. **Debugging**: Generated code is readable and inspectable
+materials = {
+  emissive_orb: { 
+    emission: [50, 20, 5],
+    albedo: [0.8, 0.4, 0.1],
+    roughness: 0.2
+  },
+  concrete: {
+    emission: [0, 0, 0],
+    albedo: [0.5, 0.5, 0.5],
+    roughness: 0.8
+  }
+};
+
+// Lights
+lights = [
+  { type: 'point', position: [5, 5, 5], intensity: [100, 100, 100] }
+];
+```
+
+### After Compilation
+
+```glsl
+// Materials with light IDs
+MaterialProperties[2] = {
+  { // emissive_orb
+    albedo: vec3(0.8, 0.4, 0.1),
+    roughness: 0.2,
+    light_id: 1  // Points to sphere light
+  },
+  { // concrete
+    albedo: vec3(0.5, 0.5, 0.5),
+    roughness: 0.8,
+    light_id: -1  // Non-emissive
+  }
+};
+
+// Unified light array
+LightData[2] = {
+  { // Point light
+    radiance: vec3(100, 100, 100),
+    sampling_type: SAMPLING_POINT,
+    param0: vec4(5, 5, 5, 0)
+  },
+  { // Sphere emitter
+    radiance: vec3(50, 20, 5),
+    sampling_type: SAMPLING_SPHERE,
+    param0: vec4(0, 0, 0, 1)  // center + radius
+  }
+};
+```
+
+## Key Design Principles
+
+### 1. Direct References
+- Materials reference lights directly via `light_id`
+- No complex object→light mappings
+- Single source of truth
+
+### 2. Compile-Time Optimization
+- Feature detection and dead code elimination
+- Constant folding for shared properties
+- Specialized dispatch for small scenes
+
+### 3. Efficient Boundary Resolution
+- Nearby object tracking avoids full scene queries
+- Material interfaces resolved with 2-3 objects
+- O(1) light lookups via direct IDs
+
+### 4. Separation of Concerns
+- **Geometry**: Mathematical space structure
+- **Scene**: Object arrangement and materials
+- **Lighting**: Sampling strategies and radiance
+- **Materials**: Properties including light references
+
+## Performance Benefits
+
+1. **Smaller Hit Structure**: No object_id saves registers
+2. **Direct Lookups**: Material→Light is single array access
+3. **Optimized Shaders**: Only code for used features
+4. **Efficient Marching**: Nearby tracking reduces computations
+5. **Simple MIS**: Direct light_id eliminates indirection
 
 ## Summary
 
-The World pillar combines hand-written mathematical truth (Geometry) with compiled physical reality (Scene and Lighting). The WorldCompiler orchestrates the transformation from user-friendly descriptions to optimized GLSL, handling all cross-referencing between emissive objects and lights. Materials are pure data containers, with all light physics delegated to Photography's Interaction module. This architecture enables aggressive optimization while maintaining clean separation between what exists (World) and how we observe it (Photography).
+The World pillar provides a clean, efficient system for managing geometry, materials, and lights. The key architectural insight is that **materials directly reference their associated lights**, eliminating complex cross-referencing while maintaining correct MIS. Combined with build-time optimization and efficient boundary resolution, this creates a system that is both powerful for research and performant for production.
