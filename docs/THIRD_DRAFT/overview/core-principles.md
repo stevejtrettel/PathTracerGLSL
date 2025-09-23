@@ -1,4 +1,4 @@
-# Core Principles & Shared Concepts (Revised)
+# Core Principles & Shared Concepts
 
 ## Architectural Principles
 
@@ -10,39 +10,48 @@ Each pillar has exclusive responsibilities:
 - **App**: Orchestrates *experiments* (no GPU calls)
 - **Math**: Provides *utilities* (no state or contracts)
 
-### 2. Determinism & Reproducibility
+### 2. Compilation vs Hand-Writing
+Modules fall into two categories:
+- **Compiled**: Scene, Lighting (from descriptions, optimized at build-time)
+- **Hand-written**: Geometry, Camera, Transport, Interaction, Film, Developer
+
+Compilation enables aggressive optimization and automatic cross-referencing.
+
+### 3. Determinism & Reproducibility
 Given fixed inputs (recipe, seed, environment), output is identical:
 - Random sampling explicitly seeded and dimensioned
 - All floating point operations IEEE-compliant
 - Parameter changes tracked and logged
 - No undefined behavior or race conditions
 
-### 3. Ownership Rules (Updated)
+### 4. Ownership Rules
 Clear ownership prevents architectural confusion:
+- **WorldCompiler owns cross-referencing**: Emissive objects → lights, visible lights → geometry
+- **SceneCompiler owns geometry**: Object SDFs, intersection, material properties
+- **LightingCompiler owns sampling**: Light sampling strategies, PDFs
 - **Transport owns integration**: Path tracing, delta tracking strategies
 - **Interaction owns physics**: BRDF evaluation, phase functions, Fresnel
-- **Materials owns properties**: Provides data via `material_get_properties()`
-- **Objects own shapes**: Geometry + material ID assignment only
-- **Scene owns interfaces**: Material boundary resolution, nearby tracking
 - **Engine owns GPU state**: All WebGL operations
 - **App owns orchestration**: Recipe and parameter management
 
-### 4. The Critical Separation
+### 5. The Critical Separation
 **Data vs Behavior** is the core architectural principle:
-- **World = Data**: Shapes, material IDs, properties (albedo, roughness, IOR)
+- **World = Data**: Shapes, material properties, light parameters
 - **Photography = Behavior**: How light interacts with that data
-- Materials NEVER implements physics (no evaluate/sample/pdf)
-- Interaction NEVER stores properties (queries Materials)
+- Scene NEVER implements physics (no BRDFs)
+- Lighting NEVER implements materials (only sampling)
+- Interaction NEVER stores properties (queries Scene)
 
-### 5. Error & Fallback Policy
+### 6. Error & Fallback Policy
 - **Fatal errors**: Shader compilation, out-of-memory → stop
 - **Recoverable errors**: Missing parameters → use defaults with warning
 - **Research errors**: NaN/Inf samples → clamp to black, count, continue
 - **Capability fallbacks**: Missing HDR → suggest LDR alternatives
 - **Context loss**: Warn about accumulation loss, attempt recovery
 
-### 6. Performance Philosophy
+### 7. Performance Philosophy
 Optimize at compile-time, not runtime:
+- Scene-specific code generation
 - Dead code elimination for unused properties
 - Constant folding when all materials share a value
 - Strategy selection at compilation (#if DELTA_TRACKING)
@@ -55,93 +64,69 @@ Optimize at compile-time, not runtime:
 ```typescript
 interface ModuleDescriptor {
   id: {
-    kind: string;     // "geometry", "scene", "materials", etc.
-    name: string;     // "euclidean", "generated", "optimized", etc.
+    kind: string;     // "geometry", "scene", "lighting", etc.
+    name: string;     // "euclidean", "compiled_12345", etc.
     version: string;  // "1.0.0"
   };
   
   fragment: {
     uniforms?: string;    // Parameter declarations
-    functions: string;    // GLSL implementation with manual prefixes
+    functions: string;    // GLSL implementation
     constants?: string;   // #define statements
   };
   
   metadata?: {
-    // Module-specific metadata
+    materialCount?: number;
+    lightCount?: number;
+    hasEmissive?: boolean;
   };
 }
 ```
 
-### Manual Prefixing Convention (Updated)
+### Function Prefixing Convention
 
-All modules use explicit prefixes based on their **kind**, not their name:
+All modules use explicit prefixes based on their **kind**:
 
 | Module Kind | Prefix | Example Functions |
 |------------|---------|-------------------|
 | Geometry | `geometry_` | `geometry_geodesic()`, `geometry_frame()` |
-| Scene | `scene_` | `scene_intersect()`, `scene_get_material()` |
-| Materials | `material_` | `material_get_properties()`, `material_get_ior()` |
-| Lights | `light_` | `light_sample()`, `light_evaluate()` |
+| Scene | `scene_` | `scene_intersect()`, `scene_material_properties()` |
+| Lighting | `lighting_` | `lighting_sample()`, `lighting_pdf()` |
 | Camera | `camera_` | `camera_generateRay()` |
-| Transport | `transport_` | `transport_trace()`, `transport_integrate()` |
-| Interaction | `interaction_` | `interaction_surface_shade()`, `interaction_surface_scatter()` |
+| Transport | `transport_` | `transport_trace()` |
+| Interaction | `interaction_` | `interaction_surface_shade()` |
 | Film | `film_` | `film_accumulate()` |
 | Developer | `developer_` | `developer_develop()` |
 
-Objects (building blocks) use type-based naming:
-- `sphere_[instance]_distance()`
-- `box_[instance]_material()`
-- `torus_[instance]_normal()`
-
-### Cross-Module Communication (Updated)
-Modules call each other using manual prefixes:
+### Cross-Module Communication
+Modules call each other using prefixes:
 
 ```glsl
-// In Transport calling other modules
+// Transport orchestrates the pipeline
 Spectrum transport_trace(Ray ray) {
   Hit hit;
   
   // Call Scene for intersection
   if (scene_intersect(ray, hit)) {
-    // Get material properties from Materials
-    MaterialProperties props = material_get_properties(hit.material_to, hit.p);
+    // Get material properties from Scene
+    MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+    
+    // Call Lighting for direct illumination
+    LightSample ls = lighting_sample(hit.p, xi);
     
     // Call Interaction for physics
-    vec3 wo = interaction_surface_scatter(-ray.direction, hit, xi, pdf);
-    Spectrum f = interaction_surface_shade(-ray.direction, wo, hit);
-    
-    // Call Lights for direct illumination
-    LightSample ls = light_sample(hit.p, xi);
-    // ...
+    Spectrum f = interaction_surface_shade(-ray.direction, ls.wi, hit);
   }
 }
 ```
 
-## Material Architecture (Completely Revised)
+## Material Architecture
 
-### The Three-Layer Separation
+### Pure Data Model
 
-**Materials Module (Data Layer)**
-- Provides properties via `material_get_properties(int mat_id, vec3 p)`
-- Returns: albedo, roughness, metallic, IOR, emission, volume coefficients
-- NO evaluation, sampling, or PDF functions
-- Just a property database
-
-**Interaction Module (Physics Layer)**
-- Implements light-matter physics using properties from Materials
-- Surface interactions: BRDF/BSDF evaluation, importance sampling
-- Volume interactions: Phase functions, scattering
-- Uses but doesn't own material properties
-
-**Transport Module (Algorithm Layer)**
-- Owns integration strategies (path tracing, bidirectional, etc.)
-- Decides WHEN to sample, HOW to terminate paths
-- Calls Interaction for physics, never accesses Materials directly
-
-### Property Query Architecture
+Materials in the Scene module are **pure property containers**:
 
 ```glsl
-// The ONLY interface from Materials
 struct MaterialProperties {
   // Surface properties
   vec3 albedo;
@@ -149,7 +134,7 @@ struct MaterialProperties {
   float metallic;
   float ior;
   
-  // Emission
+  // Emission (can be non-zero)
   vec3 emission;
   float emission_intensity;
   
@@ -162,223 +147,179 @@ struct MaterialProperties {
   int flags;  // DIELECTRIC | PARTICIPATING | EMISSIVE
 }
 
-MaterialProperties material_get_properties(int mat_id, vec3 p);
+// Scene provides properties only
+MaterialProperties scene_material_properties(int mat_id, Point p);
 ```
 
-### Physics Implementation (in Interaction)
+### Physics in Interaction
+
+All light-matter physics lives in Photography's Interaction module:
 
 ```glsl
-// Surface interactions (using properties)
-Spectrum interaction_surface_shade(vec3 wi, vec3 wo, Hit hit) {
-  MaterialProperties props = material_get_properties(hit.material_to, hit.p);
+// Interaction implements physics using Scene's data
+Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit) {
+  // Query properties from Scene
+  MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
   
-  // Implement Disney BRDF using properties
+  // Implement BRDF using properties
   float alpha = props.roughness * props.roughness;
-  vec3 h = normalize(wi + wo);
-  float D = ggx_d(hit.n, h, alpha);
-  // ... rest of BRDF calculation
-}
-
-vec3 interaction_surface_scatter(vec3 wi, Hit hit, vec2 xi, out float pdf) {
-  MaterialProperties props = material_get_properties(hit.material_to, hit.p);
-  // Importance sample based on properties
-}
-
-// Volume interactions (parallel structure)
-Spectrum interaction_volume_shade(vec3 wi, vec3 wo, vec3 p, int mat_id) {
-  MaterialProperties props = material_get_properties(mat_id, p);
-  // Implement phase function using props.phase_g
+  // ... Disney/Lambert/etc calculation
 }
 ```
 
-### Nearby Object Tracking
-For efficient boundary resolution, Scene tracks only closest 3 objects:
-```glsl
-struct NearbyObjects {
-  float dists[3];      // Distances to closest 3
-  int ids[3];          // Object IDs
-  int count;           // Within threshold
-};
+## Compilation Architecture
 
-// Scene uses this for material ID resolution
-int scene_resolve_material(vec3 p, NearbyObjects nearby) {
-  // Fast path: one object (90% of cases)
-  if (nearby.count <= 1) {
-    return scene_get_object_material(nearby.ids[0], p);
-  }
-  // Boundary: check 2-3 objects
-}
+### WorldCompiler Pipeline
+
 ```
+Scene Description + Light Description
+              ↓
+    WorldCompiler.augment()
+              ↓
+  Cross-referenced inputs
+              ↓
+    SceneCompiler + LightingCompiler
+              ↓
+    Three modules: Geometry, Scene, Lighting
+```
+
+### Cross-Referencing Rules
+
+The WorldCompiler automatically:
+1. **Emissive → Lights**: Objects with `emission > 0` become light sources
+2. **Visible Lights → Geometry**: Lights with `visible: true` become objects
+3. **Material IDs**: Sequential assignment starting from 1 (0 = air)
+
+### Compilation Optimizations
+
+SceneCompiler optimizations:
+- Unroll loops for <5 objects
+- Fold constants for uniform properties
+- Eliminate unused material fields
+- Inline simple SDFs
+
+LightingCompiler optimizations:
+- Direct call for single light
+- Power-based importance sampling
+- Analytic samplers for simple shapes
+- Bbox fallback for complex emitters
 
 ## Shared Types
 
-### Spectral Types
+### Core Types
 ```glsl
 typedef vec3 Spectrum;   // Wavelength-dependent radiance
 typedef vec3 Radiance;   // What films accumulate  
 typedef vec3 RGB;        // Display output
+typedef vec3 Point;      // Position in space
+typedef vec3 Direction;  // Unit vector
+typedef vec3 Normal;     // Surface normal
 ```
 
-### Hit Structure (Updated)
+### Hit Structure
 ```glsl
 struct Hit {
   // Geometry
-  vec3 p;               // Hit point
-  vec3 n;               // Normal
-  vec3 incident;        // Incoming direction
+  Point p;              // Hit point
+  Normal n;             // Normal
   float t;              // Ray parameter
   vec2 uv;              // Texture coordinates
   
   // Frame
   Frame frame;          // Orthonormal basis
   
-  // Material interface (IDs only!)
+  // Material interface
   int material_from;    // Material we're leaving
   int material_to;      // Material we're entering
   
   // Object identity
   int object_id;
-  
-  // NO precomputed material properties!
-  // NO ior_ratio - Interaction computes when needed
+}
+```
+
+### LightSample Structure
+```glsl
+struct LightSample {
+  Point point;          // Point on light
+  Direction wi;         // Direction to light
+  Spectrum radiance;    // Emitted radiance
+  float pdf;           // Sampling PDF
+  float distance;      // Distance to light
+  int light_id;        // Which light
 }
 ```
 
 ## Technical Patterns
 
-### Property Batching
-Get all properties in one call:
+### Property Access Pattern
+Always batch property queries:
 ```glsl
 // Good - single query
-MaterialProperties props = material_get_properties(mat_id, p);
-use(props.albedo);
-use(props.roughness);
+MaterialProperties props = scene_material_properties(mat_id, p);
 
-// Bad - multiple queries (never do this)
-vec3 albedo = material_get_albedo(mat_id, p);
-float roughness = material_get_roughness(mat_id, p);
+// Bad - would require multiple functions (don't do)
+vec3 albedo = scene_get_albedo(mat_id, p);  // NO!
 ```
 
-### Compile-Time Property Optimization
+### Compile-Time Specialization
+Generated code adapts to scene:
 ```glsl
-// Generated based on scene analysis
-#define HAS_VARYING_ROUGHNESS 0
+// If all materials have roughness = 0.5
 #define CONST_ROUGHNESS 0.5
 
-MaterialProperties material_get_properties(int mat_id, vec3 p) {
-  MaterialProperties props;
-  
-  #if HAS_VARYING_ROUGHNESS
-    props.roughness = texture_lookup_roughness(mat_id, p);
-  #else
-    props.roughness = CONST_ROUGHNESS;  // Compile-time constant
-  #endif
-  
-  // ... other properties
-  return props;
-}
+// If scene has no volumes
+// All volume code eliminated
 ```
 
-### Transport-Interaction Cooperation
+### Multiple Importance Sampling
+Transport combines sampling strategies:
 ```glsl
-// Transport decides strategy
-Spectrum transport_integrate_volume(Ray ray, Hit entry) {
-  #if VOLUME_STRATEGY == DELTA_TRACKING
-    return transport_delta_track(ray, entry);
-  #elif VOLUME_STRATEGY == RAY_MARCHING
-    return transport_raymarch(ray, entry);
-  #endif
-}
+// Sample lights (Lighting module)
+LightSample ls = lighting_sample(p, xi);
 
-// Inside delta tracking, Transport calls Interaction for physics
-Spectrum transport_delta_track(Ray ray, Hit entry) {
-  // Transport: Sample free path
-  float t = -log(random()) / sigma_max;
-  
-  // Interaction: Compute scattering
-  vec3 wo = interaction_volume_scatter(wi, p, mat_id, xi, pdf);
-  Spectrum phase = interaction_volume_shade(wi, wo, p, mat_id);
-  
-  // Transport: Update path state
-  throughput *= phase;
-}
+// Sample BRDF (Interaction module)
+Direction wo = interaction_surface_scatter(wi, hit, xi, pdf);
+
+// Combine with MIS weights
+weight = balance_heuristic(light_pdf, brdf_pdf);
 ```
 
-## Performance Optimizations
+## Performance Characteristics
 
-### Material System (New)
-- Single property query returns everything (cache-friendly)
-- Compile-time constant folding for uniform properties
-- Dead code elimination for unused properties
-- No virtual dispatch or function pointers
-- Properties packed efficiently in memory
+### Compile-Time Costs
+- Scene analysis: O(objects + materials)
+- Code generation: O(objects)
+- Optimization passes: O(code size)
+- Total: <100ms for typical scenes
 
-### Photography Pipeline
-- Transport algorithms compiled for specific strategies
-- Interaction physics optimized per BRDF model
-- No runtime branching between material types
-- Precomputed frames and geometric quantities
+### Runtime Benefits
+- No dynamic dispatch
+- Minimal branching
+- Optimized memory layout
+- Cache-friendly access patterns
+- Zero overhead abstractions
 
-### Scene Traversal
-- Nearby object tracking (max 3 objects)
-- Conservative marching factor (0.9)
-- Early termination for shadow rays
-- Dispatch functions for object routing
+## Debug Support
 
-## Debug & Analysis
-
-### Property Visualization
-New debug modes for the separated architecture:
-- `DEBUG_PROPERTIES`: Visualize material properties directly
-- `DEBUG_INTERACTION`: Show interaction type (diffuse/specular/volume)
-- `DEBUG_TRANSPORT`: Color by transport decision
-- `DEBUG_NEARBY`: Show nearby object count
-
-## Implementation Flow Example
-
-Complete flow showing the separation:
-
-```glsl
-// 1. Camera generates ray
-Ray ray = camera_generateRay(pixel);
-
-// 2. Transport drives the algorithm
-Spectrum transport_trace(Ray ray) {
-  Hit hit;
-  
-  // 3. Scene finds intersection (geometry + material IDs)
-  if (!scene_intersect(ray, hit)) return scene_env_radiance(ray.direction);
-  
-  // 4. Materials provides properties
-  MaterialProperties props = material_get_properties(hit.material_to, hit.p);
-  
-  // 5. Check for emission
-  Spectrum Le = props.emission * props.emission_intensity;
-  
-  // 6. Interaction computes scattering
-  vec3 wo;
-  float pdf;
-  wo = interaction_surface_scatter(-ray.direction, hit, next_2d(), pdf);
-  
-  // 7. Interaction evaluates BRDF
-  Spectrum f = interaction_surface_shade(-ray.direction, wo, hit);
-  
-  // 8. Transport continues recursion
-  Ray next_ray = Ray(hit.p, wo, EPSILON, MAX_DIST);
-  return Le + f * transport_trace(next_ray) * abs(dot(wo, hit.n)) / pdf;
-}
-```
+### Debug Visualization Modes
+- `DEBUG_NORMALS`: Surface normals
+- `DEBUG_MATERIALS`: Material IDs as colors
+- `DEBUG_PROPERTIES`: Specific properties (roughness, metallic)
+- `DEBUG_LIGHTS`: Light sampling density
+- `DEBUG_INTERSECTION`: Ray march step count
 
 ## Key Architecture Benefits
 
-1. **Clear Separation**: Data (Materials) vs Physics (Interaction) vs Algorithms (Transport)
-2. **Research Flexibility**: Swap interaction models without changing properties
-3. **Optimization**: Aggressive compile-time specialization based on property usage
-4. **Debugging**: Each layer can be tested independently
-5. **Performance**: Property batching, no virtual dispatch
-6. **Extensibility**: Easy to add new properties or interaction models
+1. **Automatic Cross-referencing**: Emissive objects and visible lights handled automatically
+2. **Compile-Time Optimization**: Scene-specific code generation
+3. **Clear Separation**: Data (World) vs Physics (Photography)
+4. **Research Flexibility**: Swap algorithms independently
+5. **Zero Boilerplate**: Descriptions compile to optimized GLSL
+6. **Type Safety**: MaterialIDs managed by compiler
+7. **Performance**: No runtime overhead from abstraction
 
-This architecture enables mixing and matching:
-- Same properties, different interaction models (Disney vs Lambert)
-- Same interaction physics, different transport (unidirectional vs bidirectional)
-- Same transport, different property distributions
+This architecture enables:
+- Writing scene descriptions instead of GLSL
+- Automatic optimization based on actual scene content
+- Clean separation between what exists and how light behaves
+- Research into new algorithms without touching scene representation

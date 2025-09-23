@@ -21,19 +21,20 @@ A research-grade GPU path tracer where **mathematics drives implementation**. Th
 
 ### 2. World (Content)
 **Purpose**: Define the mathematical space and its contents  
-**What it provides**: Data only - shapes, material IDs, properties  
+**What it provides**: Data only - shapes, material properties, light sources  
 **What it doesn't do**: Physics, light behavior, BRDFs
 
-**Modules** (4 modules + building blocks):
-- **Geometry**: Differential geometric structure (`geometry_*`)
-- **Scene**: Object arrangement and material ID resolution (`scene_*`)
-- **Materials**: Physical properties ONLY via `material_get_properties()` (`material_*`)
-- **Lights**: Emission sources (`light_*`)
+**Three Modules**:
+- **Geometry** (hand-written): Differential geometric structure (`geometry_*`)
+- **Scene** (compiled): Objects, materials, intersection (`scene_*`)
+- **Lighting** (compiled): Light sampling strategies (`lighting_*`)
 
-**Building Blocks** (compiled into Scene):
-- **Objects**: Shape definitions with type-based naming (`sphere_*`, `box_*`)
+**Key Innovation**: Scene and Lighting modules are compiled from high-level descriptions with automatic cross-referencing:
+- Emissive objects → become lights in Lighting module
+- Visible lights → become geometry in Scene module
+- Material IDs managed automatically
 
-**Key Insight**: Materials is now a pure property database - no evaluation/sampling/pdf functions, just data.
+**Critical Insight**: Materials are pure property data within Scene - no BRDFs, no sampling, just data accessed via `scene_material_properties()`.
 
 ### 3. Photography (Observation)
 **Purpose**: Define how light is observed and measured  
@@ -46,13 +47,13 @@ A research-grade GPU path tracer where **mathematics drives implementation**. Th
 4. **Film**: Temporal accumulation (`film_*`)
 5. **Developer**: Tone mapping (`developer_*`)
 
-**Revolutionary Split**: Transport owns integration strategy (path tracing, delta tracking), Interaction owns physics (BRDF evaluation, phase functions). Materials just provides the raw data.
+**Revolutionary Split**: Transport owns integration strategy (path tracing, delta tracking), Interaction owns physics (BRDF evaluation, phase functions). Scene just provides the raw material data.
 
 ### 4. Engine (Infrastructure)
 **Purpose**: Compile shaders, manage GPU, execute renders  
 **Principle**: Boring, deterministic, invisible  
 **Components** (4 subsystems):
-- Module Registry: Validates modules with manual prefixing
+- Module Registry: Validates and loads modules
 - Simple Compiler: Direct concatenation → GLSL
 - Resource Manager: Per-recipe GPU buffers
 - Render Executor: WebGL draw calls
@@ -65,12 +66,33 @@ A research-grade GPU path tracer where **mathematics drives implementation**. Th
 - Render Coordinator: Execution modes
 - Extension System: Services without core modification
 
+## World Compilation Pipeline
+
+The World system features a sophisticated compilation pipeline:
+
+```
+Scene Description + Light Description
+              ↓
+         WorldCompiler
+              ↓
+    ┌─────────┬─────────┐
+    │         │         │
+Geometry   Scene    Lighting
+(hand)   (compiled) (compiled)
+```
+
+**Cross-referencing**: The compiler automatically:
+- Adds emissive objects as light sources
+- Adds visible lights as geometric objects
+- Assigns material IDs consistently
+
 ## Key Architectural Separation
 
 ### Data vs Behavior
 **World (Data)**:
-- What exists: shapes, material IDs, properties
-- `material_get_properties()` returns albedo, roughness, IOR, etc.
+- What exists: shapes, material properties, light positions
+- `scene_material_properties()` returns albedo, roughness, IOR, etc.
+- `lighting_sample()` returns light samples
 - No knowledge of BRDFs, Fresnel, or light physics
 
 **Photography (Behavior)**:
@@ -80,66 +102,30 @@ A research-grade GPU path tracer where **mathematics drives implementation**. Th
 
 This is a hard boundary - no physics in World, no data ownership in Photography.
 
-## Manual Function Prefixing
+## Module Function Prefixing
 
-All modules use explicit prefixes - no transformation by Engine:
+All modules use explicit prefixes:
 
 ```glsl
-// Geometry module
-vec3 geometry_geodesic(vec3 origin, vec3 dir, float t)
-Frame geometry_frame(vec3 p, vec3 n)
+// Geometry module (hand-written)
+Point geometry_geodesic(Point origin, Direction dir, float t)
+Frame geometry_frame(Point p, Normal n)
 
-// Scene module  
+// Scene module (compiled)
 bool scene_intersect(Ray ray, out Hit hit)
-int scene_get_material(vec3 p)
+MaterialProperties scene_material_properties(int mat_id, Point p)
+int scene_material_at(Point p)
 
-// Materials module (data only!)
-MaterialProperties material_get_properties(int mat_id, vec3 p)
-float material_get_ior(int mat_id)
+// Lighting module (compiled)
+LightSample lighting_sample(Point p, vec2 xi)
+float lighting_pdf(Point p, Direction wi)
 
-// Photography modules
+// Photography modules (hand-written)
 Ray camera_generateRay(vec2 pixel)
 Spectrum transport_trace(Ray ray)
-Spectrum interaction_surface_shade(vec3 wi, vec3 wo, Hit hit)
+Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit)
 Radiance film_accumulate(Spectrum s, vec2 pixel)
 RGB developer_develop(Radiance r)
-
-// Objects (type-based, not module prefixes)
-float sphere_glass_sphere_distance(vec3 p)
-int box_metal_box_material(vec3 p)
-```
-
-## The Transport-Interaction Separation
-
-This architecture makes a critical distinction in Photography:
-
-### Transport (Algorithms)
-Owns HOW to integrate light:
-- Path construction strategies
-- Russian roulette decisions
-- Next event estimation
-- Delta tracking vs ray marching for volumes
-
-### Interaction (Physics)
-Owns WHAT happens when light meets matter:
-- BRDF/BSDF evaluation using material properties
-- Importance sampling of scattering directions
-- Fresnel equations and energy conservation
-- Phase functions for volumes
-
-### Materials (Data)
-Just provides properties:
-```glsl
-struct MaterialProperties {
-  vec3 albedo;
-  float roughness;
-  float metallic;
-  float ior;
-  vec3 sigma_scatter;
-  vec3 sigma_absorb;
-  float phase_g;
-  // ... just data, no functions
-}
 ```
 
 ## Data Flow Example
@@ -154,17 +140,20 @@ struct MaterialProperties {
 3. Scene finds intersection
    scene_intersect(ray, hit) → geometric data + material IDs
 
-4. Materials provides properties
-   material_get_properties(hit.material_to, hit.p) → MaterialProperties
+4. Scene provides material properties
+   scene_material_properties(hit.material_to, hit.p) → MaterialProperties
 
-5. Interaction computes physics
-   interaction_surface_shade(wi, wo, hit, props) → Spectrum
-   interaction_surface_scatter(wi, hit, props) → Direction
+5. Lighting provides light samples
+   lighting_sample(hit.p, xi) → LightSample
 
-6. Film accumulates
+6. Interaction computes physics
+   interaction_surface_shade(wi, wo, hit) → Spectrum
+   (queries scene_material_properties internally)
+
+7. Film accumulates
    film_accumulate(spectrum, pixel) → updated buffer
 
-7. Developer maps to display
+8. Developer maps to display
    developer_develop(radiance) → RGB
 ```
 
@@ -172,76 +161,70 @@ struct MaterialProperties {
 
 A typical production recipe:
 
-| Module | Implementation | Purpose |
-|--------|----------------|---------|
-| Geometry | euclidean | Standard 3D space |
-| Scene | generated | Compiled from object definitions |
-| Materials | optimized | Property arrays with compile-time optimization |
-| Lights | area_lights | Emissive geometry |
-| Camera | thin_lens | DOF effects |
-| Transport | pathtracer | Unidirectional path tracing |
-| Interaction | disney | Disney principled BRDF |
-| Film | variance | Accumulation with variance tracking |
-| Developer | aces | Film-like tone mapping |
+| Module | Type | Purpose |
+|--------|------|---------|
+| Geometry | euclidean (hand) | Standard 3D space |
+| Scene | compiled | Objects, materials, intersection |
+| Lighting | compiled | Light sampling strategies |
+| Camera | thin_lens (hand) | DOF effects |
+| Transport | pathtracer (hand) | Unidirectional path tracing |
+| Interaction | disney (hand) | Disney principled BRDF |
+| Film | variance (hand) | Accumulation with variance tracking |
+| Developer | aces (hand) | Film-like tone mapping |
 
-## Build-Time Optimization
+## Compilation and Optimization
 
-The system analyzes the scene and generates optimized code:
+The WorldCompiler analyzes descriptions and generates optimized code:
 
 ```typescript
 // Analysis determines what varies
-propertyAnalysis = {
-  constant: { roughness: 0.5 },     // Same for all materials
-  varying: ['albedo', 'ior'],       // Differ between materials  
-  spatial: ['albedo'],              // Textures/procedural
-  unused: ['subsurface']            // Never referenced
+analysis = {
+  objects: 2,
+  materials: 3,
+  lights: 1,
+  constantProperties: { roughness: 0.5 },
+  varyingProperties: ['albedo', 'ior'],
+  hasEmissive: true
 }
 
-// Generated code eliminates dead paths
-MaterialProperties material_get_properties(int id, vec3 p) {
-  props.roughness = 0.5;  // Constant folded
-  props.albedo = texture_lookup(id, p);  // Spatial variation
-  props.ior = ior_array[id];  // Per-material
-  // subsurface eliminated entirely
-}
+// Generated Scene module optimizations:
+- Unrolled marching for 2 objects
+- Constant-folded roughness
+- Efficient material property packing
+
+// Generated Lighting module optimizations:
+- Direct sampling for single light
+- Analytic sampler for sphere lights
+- Bbox fallback for complex emitters
 ```
 
 ## Performance Architecture
 
-### Nearby Object Tracking
-Scene tracks only 3 closest objects:
-- 90% of rays: Single object
-- 10% boundaries: 2-3 objects
-- Never: Full traversal
-
 ### Compile-Time Specialization
-- No runtime material type branching
-- Unused properties eliminated
-- Constants folded
-- Fixed concatenation order
+- Scene-specific code generation
+- Dead code elimination
+- Constant folding
+- Optimal data layout
 
-### Per-Recipe Resources
-Each recipe maintains separate buffers:
-- Switch recipes without losing samples
-- No reallocation thrashing
-- Instant comparison
+### Runtime Efficiency
+- No dynamic dispatch
+- Minimal branching
+- Packed material properties
+- Per-recipe accumulation buffers
 
 ## Research Workflows
 
-### Interactive Exploration
-- Real-time preview
-- Debug visualizations (normals, materials, properties)
-- **Hot-swap Interaction models**: Compare Disney vs Lambert instantly
+### Interactive Development
+- Write scene/light descriptions
+- Automatic compilation to GLSL
+- Hot-reload on changes
+- Debug visualizations
 
-### Progressive Refinement
-- Continuous accumulation
-- **Recipe switching preserves samples**
-- Variance-based convergence
-
-### Algorithm Research
+### Algorithm Comparison
 - **Swap Transport strategies**: Path tracing vs bidirectional
-- **Swap Interaction physics**: Different BRDF models, same properties
-- **A/B testing**: Side-by-side with preserved accumulation
+- **Swap Interaction models**: Disney vs Lambert
+- **Swap Lighting setups**: Without recompiling scene
+- **A/B testing**: Side-by-side comparison
 
 ## File Organization
 
@@ -251,24 +234,25 @@ src/
 ├── engine/            # Infrastructure
 ├── app/              # Orchestration
 ├── world/            
-│   ├── geometry/     # Modules
-│   ├── scene/        # Modules  
-│   ├── materials/    # Modules (properties only!)
-│   ├── lights/       # Modules
-│   └── objects/      # Building blocks (not modules)
+│   ├── geometry/     # Hand-written modules
+│   ├── compiler/     # WorldCompiler system
+│   │   ├── WorldCompiler.ts
+│   │   ├── SceneCompiler.ts
+│   │   └── LightingCompiler.ts
+│   └── descriptions/ # Scene/light descriptions
 └── photography/      
-    ├── cameras/      # Modules
-    ├── transport/    # Modules (algorithms)
-    ├── interaction/  # Modules (physics)
-    ├── films/        # Modules
-    └── developers/   # Modules
+    ├── cameras/      # Hand-written modules
+    ├── transport/    # Hand-written modules
+    ├── interaction/  # Hand-written modules
+    ├── films/        # Hand-written modules
+    └── developers/   # Hand-written modules
 ```
 
-## Key Benefits of New Architecture
+## Key Benefits
 
-1. **Clear Separation**: Data (World) vs Behavior (Photography)
-2. **Research Flexibility**: Swap algorithms without changing data
-3. **Optimization**: Aggressive compile-time specialization
-4. **Debugging**: Manual prefixes make code self-documenting
-5. **Performance**: Property batching, no virtual dispatch
-6. **Experimentation**: Mix and match Transport/Interaction independently
+1. **Automatic Cross-referencing**: Emissive objects become lights, visible lights become geometry
+2. **Compile-Time Optimization**: Scene-specific code with zero overhead
+3. **Clear Separation**: Data (World) vs Behavior (Photography)
+4. **Research Flexibility**: Mix and match algorithms independently
+5. **No Boilerplate**: Write descriptions, not GLSL
+6. **Debugging**: Generated code is readable and inspectable
