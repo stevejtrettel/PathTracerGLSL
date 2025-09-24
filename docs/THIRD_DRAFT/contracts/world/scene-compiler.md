@@ -1,17 +1,16 @@
+Looking at the scene-compiler.md document, it needs a significant rewrite. It's still based on the old object-tracking system for MIS, but in our new architecture:
+
+1. **No object_id needed** - Materials directly reference lights via `light_id`
+2. **No special SDF exports** - We removed `scene_evaluate_object_sdf` and `scene_compute_object_normal`
+3. **Simpler Hit structure** - No object tracking
+4. **Materials have light_id** - Direct reference, no cross-referencing
+
+Here's the updated version:
 
 # SceneCompiler
 
 ## Purpose
-Takes a list of objects and materials and produces a GLSL module with intersection and material property functions. The key change from before: we now need to track object IDs so the Transport module can determine if an emissive object could have been sampled directly (for MIS).
-
-## The ID Tracking Challenge
-
-When a ray hits an emissive object, we need to know:
-1. Which object we hit (object ID)
-2. What material it has (material ID)
-3. Whether this object corresponds to a samplable light (via cross-reference)
-
-This means our Hit structure must now include the object ID, not just material IDs.
+Takes a list of objects and materials and produces a GLSL module with intersection and material property functions. Materials directly reference their associated lights through `light_id`, eliminating the need for object tracking.
 
 ## Input Structure
 
@@ -20,9 +19,25 @@ interface SceneCompilerInput {
   objects: CompilerObject[];
   materials: CompilerMaterial[];
 }
-```
 
-No changes to input - the SceneCompiler remains agnostic about where objects came from.
+interface CompilerObject {
+  id: string;
+  sdf: string;            // GLSL function for SDF
+  materialId: number;     // Which material it uses
+  transform: mat4;
+}
+
+interface CompilerMaterial {
+  id: number;
+  albedo: vec3;
+  roughness: number;
+  metallic: number;
+  ior: number;
+  emission: vec3;
+  light_id: number;      // -1 if non-emissive, else index into light array
+  flags: number;
+}
+```
 
 ## Output Requirements
 
@@ -39,15 +54,11 @@ int scene_material_at(Point p)
 
 // Scene information
 float scene_bounding_radius()
-
-// NEW: For bbox light sampling
-float scene_evaluate_object_sdf(int obj_id, Point p)
-vec3 scene_compute_object_normal(int obj_id, Point p)
 ```
 
-## Updated Hit Structure
+## Hit Structure
 
-The critical change - we now track which object was hit:
+Clean and simple - no object tracking needed:
 
 ```glsl
 struct Hit {
@@ -61,9 +72,6 @@ struct Hit {
   int material_from;
   int material_to;
   
-  // NEW: Object tracking for MIS
-  int object_id;  // Which object did we hit?
-  
   // Frame
   Frame frame;
 }
@@ -71,9 +79,9 @@ struct Hit {
 
 ## Compilation Strategy
 
-### Step 1: Generate Object SDFs with IDs
+### Step 1: Generate Object SDFs
 
-Each object needs a unique, stable ID that matches what the WorldCompiler assigned:
+Each object gets an SDF function:
 
 ```typescript
 private generateObjectSDFs(objects: CompilerObject[]): string {
@@ -96,71 +104,54 @@ private generateObjectSDFs(objects: CompilerObject[]): string {
 
 ### Step 2: The Dispatch Function
 
-For ray marching, we need the minimum distance to any object, but we also need to track which object gives that minimum:
+For ray marching, we need the minimum distance to any object:
 
-#### Few Objects (<5): Unrolled with Tracking
+#### Few Objects (<5): Unrolled
 ```glsl
-void dispatch_sdf(Point p, out float dist, out int closest_object) {
+float dispatch_sdf(Point p) {
   float d0 = object_0_sdf(p);
   float d1 = object_1_sdf(p);
   float d2 = object_2_sdf(p);
   
-  dist = d0;
-  closest_object = 0;
-  
-  if (d1 < dist) {
-    dist = d1;
-    closest_object = 1;
-  }
-  
-  if (d2 < dist) {
-    dist = d2;
-    closest_object = 2;
-  }
+  return min(min(d0, d1), d2);
 }
 ```
 
-#### Many Objects: Loop with Tracking
+#### Many Objects: Loop
 ```glsl
-void dispatch_sdf(Point p, out float dist, out int closest_object) {
-  dist = MAX_DIST;
-  closest_object = -1;
+float dispatch_sdf(Point p) {
+  float dist = MAX_DIST;
   
   for (int i = 0; i < NUM_OBJECTS; i++) {
     float d = evaluate_object_sdf(i, p);
-    if (d < dist) {
-      dist = d;
-      closest_object = i;
-    }
+    dist = min(dist, d);
   }
+  
+  return dist;
 }
 ```
 
-### Step 3: Ray Marching with Object Tracking
+### Step 3: Ray Marching
 
-The ray marcher now tracks which object we hit:
+Simple marching without object tracking:
 
 ```glsl
 bool scene_intersect(Ray ray, out Hit hit) {
   float t = 0.0;
-  int closest_object = -1;
   
   for (int step = 0; step < MAX_STEPS; step++) {
     Point p = geometry_geodesic(ray.origin, ray.direction, t);
     
-    float d;
-    dispatch_sdf(p, d, closest_object);
+    float d = dispatch_sdf(p);
     
     if (d < EPSILON) {
-      // We hit object 'closest_object'
       hit.t = t;
       hit.p = p;
-      hit.object_id = closest_object;  // NEW: Store object ID
       hit.n = compute_normal(p);
       hit.frame = geometry_frame(p, hit.n);
       
       // Resolve materials at the interface
-      resolve_materials(ray, p, closest_object, hit);
+      resolve_materials(ray, p, hit);
       
       return true;
     }
@@ -175,20 +166,17 @@ bool scene_intersect(Ray ray, out Hit hit) {
 
 ### Step 4: Material Interface Resolution
 
-When we hit a surface, we need to determine materials on both sides. This is trickier with multiple objects:
+Determine materials on both sides of the surface:
 
 ```glsl
-void resolve_materials(Ray ray, Point p, int hit_object, out Hit hit) {
-  // The object we hit determines one material
-  int hit_material = object_material(hit_object);
-  
+void resolve_materials(Ray ray, Point p, out Hit hit) {
   // Sample just inside and outside the surface
   Point p_outside = p + hit.n * EPSILON;
   Point p_inside = p - hit.n * EPSILON;
   
   // What materials are at these points?
-  int material_outside = material_at_point(p_outside);
-  int material_inside = material_at_point(p_inside);
+  int material_outside = scene_material_at(p_outside);
+  int material_inside = scene_material_at(p_inside);
   
   // Determine which is which based on ray direction
   if (dot(ray.direction, hit.n) < 0) {
@@ -196,13 +184,13 @@ void resolve_materials(Ray ray, Point p, int hit_object, out Hit hit) {
     hit.material_from = material_outside;
     hit.material_to = material_inside;
   } else {
-    // Ray hitting from inside (or grazing)
+    // Ray hitting from inside
     hit.material_from = material_inside;
     hit.material_to = material_outside;
   }
 }
 
-int material_at_point(Point p) {
+int scene_material_at(Point p) {
   // Check all objects to see which ones contain this point
   // Return material of the "deepest" one
   int material = MATERIAL_AIR;
@@ -215,7 +203,7 @@ int material_at_point(Point p) {
       float depth = -d;
       if (depth > deepest_inside) {
         deepest_inside = depth;
-        material = object_material(i);
+        material = object_${i}_material();
       }
     }
   }
@@ -224,44 +212,15 @@ int material_at_point(Point p) {
 }
 ```
 
-### Step 5: Export Functions for Light Sampling
+### Step 5: Material Properties with Light References
 
-The bbox light sampler needs to evaluate SDFs and normals for specific objects:
-
-```glsl
-// Called by lighting module for bbox rejection sampling
-float scene_evaluate_object_sdf(int obj_id, Point p) {
-  switch(obj_id) {
-    case 0: return object_0_sdf(p);
-    case 1: return object_1_sdf(p);
-    // ... generated for each object
-  }
-  return MAX_DIST;
-}
-
-// Compute normal for a specific object
-vec3 scene_compute_object_normal(int obj_id, Point p) {
-  const float eps = 0.001;
-  
-  float d = scene_evaluate_object_sdf(obj_id, p);
-  
-  float dx = scene_evaluate_object_sdf(obj_id, p + vec3(eps, 0, 0)) - d;
-  float dy = scene_evaluate_object_sdf(obj_id, p + vec3(0, eps, 0)) - d;
-  float dz = scene_evaluate_object_sdf(obj_id, p + vec3(0, 0, eps)) - d;
-  
-  return normalize(vec3(dx, dy, dz));
-}
-```
-
-### Step 6: Material Properties with Emission
-
-Material properties must include emission for emissive objects:
+Material properties include direct light references:
 
 ```glsl
 // Pack materials efficiently
 uniform vec4 u_material_albedo_metallic[NUM_MATERIALS];
 uniform vec4 u_material_emission_strength[NUM_MATERIALS];
-uniform vec4 u_material_ior_roughness[NUM_MATERIALS];
+uniform vec4 u_material_ior_roughness_light[NUM_MATERIALS];
 
 MaterialProperties scene_material_properties(int id, Point p) {
   MaterialProperties props;
@@ -274,10 +233,11 @@ MaterialProperties scene_material_properties(int id, Point p) {
   props.emission = es.rgb;
   props.emission_strength = es.a;
   
-  vec4 ir = u_material_ior_roughness[id];
-  props.ior = ir.x;
-  props.roughness = ir.y;
-  props.flags = int(ir.z);
+  vec4 irl = u_material_ior_roughness_light[id];
+  props.ior = irl.x;
+  props.roughness = irl.y;
+  props.light_id = int(irl.z);  // Direct light reference
+  props.flags = int(irl.w);
   
   return props;
 }
@@ -286,11 +246,10 @@ MaterialProperties scene_material_properties(int id, Point p) {
 ## Optimization Strategies
 
 ### Object Batching by Material
-If multiple objects share the same material, we can optimize:
+If multiple objects share the same material:
 
 ```glsl
 // Objects 0,2,5 use material 1
-// Objects 1,3,4 use material 2
 float dispatch_material_1(Point p) {
   return min(min(object_0_sdf(p), object_2_sdf(p)), object_5_sdf(p));
 }
@@ -312,7 +271,7 @@ float object_${index}_sdf(Point p) {
 ```
 
 ### Constant Material Properties
-If all materials share a property, make it a constant:
+If all materials share a property:
 
 ```glsl
 #if ALL_MATERIALS_HAVE_SAME_ROUGHNESS
@@ -345,38 +304,29 @@ float object_1_sdf(Point p) {
   return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 }
 
-// Dispatch with object tracking
-void dispatch_sdf(Point p, out float dist, out int closest_object) {
+// Simple dispatch - no object tracking
+float dispatch_sdf(Point p) {
   float d0 = object_0_sdf(p);
   float d1 = object_1_sdf(p);
-  
-  if (d0 < d1) {
-    dist = d0;
-    closest_object = 0;
-  } else {
-    dist = d1;
-    closest_object = 1;
-  }
+  return min(d0, d1);
 }
 
-// Main intersection with object ID tracking
+// Main intersection - no object_id needed
 bool scene_intersect(Ray ray, out Hit hit) {
   float t = 0.0;
-  int closest_object = -1;
   
   for (int step = 0; step < MAX_STEPS; step++) {
     Point p = ray.origin + ray.direction * t;
     
-    float d;
-    dispatch_sdf(p, d, closest_object);
+    float d = dispatch_sdf(p);
     
     if (d < EPSILON) {
       hit.t = t;
       hit.p = p;
-      hit.object_id = closest_object;  // Store which object
       hit.n = compute_normal(p);
       
-      // Material resolution...
+      // Material resolution
+      resolve_materials(ray, p, hit);
       
       return true;
     }
@@ -388,16 +338,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
   return false;
 }
 
-// Export for light sampling
-float scene_evaluate_object_sdf(int obj_id, Point p) {
-  switch(obj_id) {
-    case 0: return object_0_sdf(p);
-    case 1: return object_1_sdf(p);
-    default: return MAX_DIST;
-  }
-}
-
-// Material properties including emission
+// Material properties with light_id
 MaterialProperties scene_material_properties(int id, Point p) {
   MaterialProperties props;
   
@@ -405,9 +346,11 @@ MaterialProperties scene_material_properties(int id, Point p) {
   if (id == 1) {
     props.emission = vec3(10.0, 5.0, 2.0);
     props.emission_strength = 1.0;
+    props.light_id = 0;  // Direct reference to light array
   } else {
     props.emission = vec3(0.0);
     props.emission_strength = 0.0;
+    props.light_id = -1;  // Non-emissive
   }
   
   // ... rest of properties
@@ -416,12 +359,12 @@ MaterialProperties scene_material_properties(int id, Point p) {
 }
 ```
 
-## Why These Changes?
+## Key Simplifications
 
-1. **Object ID tracking**: Essential for MIS - we need to know which object we hit
-2. **Export SDF evaluation**: Allows bbox light sampling to test if points are on surfaces
-3. **Material interface resolution**: Correctly handles overlapping objects
-4. **Normal computation per object**: Needed for proper PDF calculation in lighting
-5. **Emission in materials**: Emissive objects need their emission values accessible
+1. **No object tracking**: Hit structure is simpler
+2. **Direct light references**: Materials know their light_id
+3. **No special exports**: No need for object-specific SDF evaluation
+4. **Cleaner interface**: Scene only deals with geometry and materials
+5. **Simpler MIS**: Transport just checks material.light_id
 
-The SceneCompiler remains agnostic about the source of objects while providing the necessary infrastructure for MIS and cross-referenced lighting.
+The SceneCompiler focuses on its core job: compiling SDFs and material lookups, without complex cross-referencing infrastructure.
