@@ -9,10 +9,10 @@
 2. WorldCompiler processes descriptions:
    - Assigns material IDs sequentially
    - Cross-references:
-     * Emissive objects → added to lighting
+     * Emissive geometries → added to lighting
      * Visible lights → added to scene
 3. SceneCompiler generates Scene module:
-   - Object SDFs
+   - Geometry SDFs
    - Material properties
    - Intersection functions
 4. LightingCompiler generates Lighting module:
@@ -26,11 +26,11 @@
 
 ```
 1. App creates recipe with module selections:
-   - World: {geometry: 'euclidean', scene: compiled, lighting: compiled}
-   - Photography: {camera, transport, interaction, film, developer}
+   - Objects: {ambient: 'euclidean', scene: compiled, lighting: compiled}
+   - Optics: {camera, transport, interaction, film, developer}
 2. Engine concatenates modules in fixed order:
    - Common types
-   - Geometry (hand-written)
+   - AmbientSpace (hand-written)
    - Scene (compiled)
    - Lighting (compiled)
    - Camera through Developer (hand-written)
@@ -74,8 +74,8 @@ main() {
     Spectrum radiance = transport_trace(ray);
         └─> For each bounce:
             a. scene_intersect(ray, hit)
-                └─> geometry_geodesic() for marching
-                └─> Dispatch to object SDFs
+                └─> ambient_geodesic() for marching
+                └─> Dispatch to geometry SDFs
                 └─> Material interface resolution
             
             b. scene_material_properties(hit.material_to, hit.p)
@@ -109,7 +109,7 @@ main() {
 
 ```
 1. Common types and utilities
-2. Geometry (hand-written)
+2. AmbientSpace (hand-written)
 3. Scene (compiled)
 4. Lighting (compiled)
 5. Camera (hand-written)
@@ -129,8 +129,8 @@ main()
 │
 ├── transport_trace(ray)
 │   ├── scene_intersect(ray, hit)
-│   │   ├── geometry_geodesic(origin, dir, t)
-│   │   └── Internal dispatch to object SDFs
+│   │   ├── ambient_geodesic(origin, dir, t)
+│   │   └── Internal dispatch to geometry SDFs
 │   │
 │   ├── scene_material_properties(mat_id, p)
 │   │   └── Returns: MaterialProperties struct
@@ -160,7 +160,7 @@ main()
 ```
 Scene Description           Light Description
        ↓                           ↓
-    Objects                     Lights
+    Geometries                  Lights
     Materials                Environment
        ↓                           ↓
        └─────────┬─────────────────┘
@@ -170,7 +170,7 @@ Scene Description           Light Description
     ┌────────────┴────────────┐
     ↓                         ↓
 Find emissive            Find visible
-  objects                   lights
+  geometries                lights
     ↓                         ↓
 Add to lights            Add to scene
     ↓                         ↓
@@ -185,7 +185,7 @@ Scene Module     Lighting Module
 
 ## Data vs Behavior Separation
 
-### Data Flow (World Modules)
+### Data Flow (Objects Modules)
 
 ```
 SCENE MODULE (Compiled):
@@ -208,7 +208,7 @@ LIGHTING MODULE (Compiled):
            ↓ Samples
 ```
 
-### Behavior Flow (Photography Modules)
+### Behavior Flow (Optics Modules)
 
 ```
 TRANSPORT (Algorithm):
@@ -239,8 +239,8 @@ uniform vec4 u_material_albedo_metallic[NUM_MATERIALS];
 uniform vec4 u_material_roughness_ior[NUM_MATERIALS];
 uniform vec3 u_material_emission[NUM_MATERIALS];
 
-// Object transforms (if not baked)
-uniform mat4 u_object_transforms[NUM_OBJECTS];
+// Geometry transforms (if not baked)
+uniform mat4 u_geometry_transforms[NUM_GEOMETRIES];
 ```
 
 ### Lighting Module Uniforms (Generated)
@@ -254,7 +254,7 @@ uniform sampler2D u_environment_map;
 uniform float u_environment_intensity;
 ```
 
-### Photography Uniforms (Hand-written)
+### Optics Uniforms (Hand-written)
 
 ```glsl
 // Camera
@@ -316,7 +316,7 @@ if (!scene_intersect_any(shadow, ls.distance)) {
   Spectrum f = interaction_surface_shade(-ray.direction, ls.wi, hit);
   
   // MIS weight
-  float brdf_pdf = interaction_pdf(-ray.direction, ls.wi, hit);
+  float brdf_pdf = interaction_surface_pdf(-ray.direction, ls.wi, hit);
   float weight = balance_heuristic(ls.pdf, brdf_pdf);
   
   // Contribution
@@ -328,7 +328,7 @@ if (!scene_intersect_any(shadow, ls.distance)) {
 
 | Module | Prefix | Example Functions |
 |--------|--------|-------------------|
-| **Geometry** | `geometry_` | `geometry_geodesic()`, `geometry_frame()` |
+| **AmbientSpace** | `ambient_` | `ambient_geodesic()`, `ambient_frame()` |
 | **Scene** | `scene_` | `scene_intersect()`, `scene_material_properties()` |
 | **Lighting** | `lighting_` | `lighting_sample()`, `lighting_pdf()` |
 | **Camera** | `camera_` | `camera_generateRay()` |
@@ -343,8 +343,8 @@ if (!scene_intersect_any(shadow, ls.distance)) {
 ```glsl
 // Inner loop of scene_intersect (compiled, optimized)
 for (int i = 0; i < MAX_STEPS; i++) {
-  Point p = geometry_geodesic(ray.origin, ray.direction, t);
-  float d = dispatch_sdf(p);  // Unrolled for few objects
+  Point p = ambient_geodesic(ray.origin, ray.direction, t);
+  float d = dispatch_sdf(p);  // Unrolled for few geometries
   if (d < EPSILON) { /* hit */ }
   t += d * 0.9;
 }
@@ -383,7 +383,7 @@ Frame 100, Pixel (400, 300)
 3. transport_trace(ray)
    
    a. scene_intersect(ray) → hit
-      - Marches using geometry_geodesic()
+      - Marches using ambient_geodesic()
       - Returns hit with material IDs
    
    b. scene_material_properties(hit.material_to, hit.p)
@@ -410,13 +410,13 @@ Frame 100, Pixel (400, 300)
 6. Output color
 ```
 
-## Key Benefits of New Data Flow
+## Key Benefits of Architecture
 
 1. **Compilation Pipeline**: Scene-specific optimization at build time
-2. **Automatic Cross-referencing**: Emissive objects and visible lights handled transparently
+2. **Automatic Cross-referencing**: Emissive geometries and visible lights handled transparently
 3. **Clean Separation**: Scene provides data, Interaction provides physics
 4. **Efficient Batching**: Single property query per shading point
 5. **Optimized Sampling**: Light sampling compiled for specific configuration
 6. **Research Flexibility**: Swap Transport/Interaction independently
 
-The data flow is now cleaner with compiled Scene and Lighting modules providing optimized, scene-specific code while maintaining complete separation between data and behavior.
+The data flow is cleaner with compiled Scene and Lighting modules providing optimized, scene-specific code while maintaining complete separation between data (Objects) and behavior (Optics).

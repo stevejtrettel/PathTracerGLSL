@@ -1,21 +1,27 @@
-# Photography Pillar Overview
+# Optics Pillar Overview
 
 ## Purpose
 
-Photography defines **how we observe and measure light** in the mathematical world. It transforms abstract geometry and materials into images through a carefully orchestrated pipeline of measurement, interaction, integration, accumulation, and presentation.
+Optics defines **how we observe and measure light** in the mathematical world. It transforms abstract geometry and materials into scientific measurements through a carefully orchestrated pipeline of ray generation, integration, interaction, accumulation, and visualization. Like a scientific instrument, it provides both raw measurements for analysis and processed views for human observation.
 
 ## Core Philosophy
 
-Photography is about **observation**, not creation. While the World pillar defines what exists (geometry, materials, lights), Photography defines how we see it. This separation enables us to study the same scene through different observational lenses - from physically accurate path tracing to specialized visualization modes that reveal normally invisible properties.
+Optics is about **measurement and observation**, not creation. While the Objects pillar defines what exists (geometry, materials, lights), Optics defines how we measure and visualize it. This separation enables us to study the same scene through different observational lenses - from physically accurate path tracing to specialized visualization modes that reveal normally invisible properties.
 
-## The Photography Pipeline
+Critically, Optics functions as a **scientific camera** that outputs multiple representations of the same measurement:
+- **Raw data** (radiance) for analysis and archival
+- **Viewable images** (RGB) for human observation
+- **Statistical information** (variance) for convergence analysis
+- Future: Additional channels (depth, normals, albedo) for reconstruction
+
+## The Optics Pipeline
 
 The pillar implements a five-stage pipeline, each with distinct responsibilities:
 
 ```
 Pixel → [Camera] → Ray → [Transport] → Spectrum → [Film] → Radiance → [Developer] → RGB
-                            ↓
-                      [Interaction]
+                            ↓                                    ↓
+                      [Interaction]                        (Raw Output)
                             ↓
                       [Material Properties]
 ```
@@ -45,7 +51,7 @@ Transport is purely algorithmic - it knows HOW to integrate but delegates the ph
 
 ### 3. Interaction: Light-Matter Physics
 
-Interaction modules implement **what happens when light meets matter**. They bridge between material properties (from World) and transport algorithms, computing:
+Interaction modules implement **what happens when light meets matter**. They bridge between material properties (from Objects) and transport algorithms, computing:
 
 - **Surface interactions**: BRDF/BSDF evaluation, importance sampling, Fresnel equations
 - **Volume interactions**: Phase functions, extinction via Beer's law, emission integration
@@ -53,7 +59,7 @@ Interaction modules implement **what happens when light meets matter**. They bri
 
 The interaction module queries material properties (albedo, roughness, scattering coefficients) and implements the physics equations that determine light behavior. Different interaction modules can interpret the same material properties differently - a Lambert interaction sees only albedo, while Disney uses all parameters.
 
-### 4. Film: Temporal Integration
+### 4. Film: Temporal Integration and Recording
 
 Films accumulate samples over time, implementing the temporal aspect of Monte Carlo integration. They manage:
 
@@ -62,17 +68,44 @@ Films accumulate samples over time, implementing the temporal aspect of Monte Ca
 - **Firefly rejection**: Outlier detection and clamping
 - **Adaptive sampling**: Tracking per-pixel variance for early termination
 
-Films also handle **reset detection** - when parameters change, accumulation must restart to avoid ghosting artifacts. Importantly, each recipe maintains its own film buffers, preserving accumulation when switching between recipes.
+Films **record the raw measurement** - the accumulated radiance values that represent the actual physics computation. This raw data is the primary scientific output of the system.
 
-### 5. Developer: Preparing for Display
+### 5. Developer: Making Physics Visible
 
-Developers transform high dynamic range radiance into displayable images. This involves:
+Developers transform high dynamic range radiance into displayable images. Rather than "post-processing," think of this as **making physics visible to humans**:
 
-- **Tone mapping**: Compressing infinite range to [0,1]
-- **Color grading**: Artistic adjustments
-- **Analysis modes**: False color, exposure warnings
+- **Tone mapping**: Compressing infinite range to monitor gamut
+- **Exposure control**: Like adjusting camera settings
+- **Color science**: Converting from physics units to perceptual space
 
-Different developers represent different "development processes" - ACES for film-like response, Reinhard for simple efficiency, or specialized visualizations for debugging.
+The developer runs **in parallel** with raw output - it doesn't modify the radiance data, but provides a human-viewable interpretation alongside it.
+
+## Output Interface
+
+Optics provides multiple simultaneous outputs, like a scientific camera with both raw and processed modes:
+
+```typescript
+interface OpticsOutput {
+  // Primary measurements
+  radiance: Texture;      // Raw HDR radiance (W/sr/m²) - for EXR export, analysis
+  rgb: Texture;           // Tone-mapped RGB - for display
+  
+  // Statistical data
+  variance: Texture;      // Per-pixel variance - for adaptive sampling
+  sampleCount: number;    // Accumulated samples - for convergence tracking
+  
+  // Future expansion
+  // depth?: Texture;     // Geometric depth - for defocus, fog
+  // normal?: Texture;    // Surface normals - for denoising
+  // albedo?: Texture;    // Material albedo - for relighting
+}
+```
+
+This multi-output design reflects that Optics is a **measurement instrument**, not just a renderer. Different consumers need different views:
+- **Scientists** need raw radiance for analysis
+- **Artists** need tone-mapped RGB for viewing
+- **Denoisers** need auxiliary buffers for reconstruction
+- **Researchers** need variance for convergence studies
 
 ## The Transport-Interaction Separation
 
@@ -82,7 +115,7 @@ This architecture makes a critical distinction between **integration algorithms*
 
 Consider rendering a cloud:
 
-**Material Properties** (from World):
+**Material Properties** (from Objects):
 - Scattering coefficient: 0.5 /m
 - Absorption coefficient: 0.01 /m
 - Phase asymmetry: 0.8 (forward scattering)
@@ -102,29 +135,6 @@ This separation allows:
 - Different physics with the same algorithm (Lambert vs. Disney in a pathtracer)
 - Research into new algorithms without changing material models
 - Optimization of physics models without affecting integration
-
-### Example: Volume Rendering
-
-```glsl
-// TRANSPORT decides the algorithm
-TransportState delta_track_volume(Ray ray, Hit entry, TransportState state) {
-  while (true) {
-    // Transport: Sample free path length (algorithmic choice)
-    float t = -log(next_1d()) / sigma_max;
-    
-    // Transport: Check for real vs null collision (algorithmic)
-    if (next_1d() < p_real) {
-      
-      // Interaction: Compute scattering (physics)
-      vec3 wo = interaction_volume_scatter(wi, p, mat_id, xi, pdf);
-      Spectrum phase = interaction_volume_shade(wi, wo, p, mat_id, distance);
-      
-      // Transport: Update path state (algorithmic)
-      state.throughput *= phase;
-    }
-  }
-}
-```
 
 ## Type Hierarchy for Spectral Rendering
 
@@ -154,43 +164,39 @@ The five-module design enables rich composition possibilities:
 
 Transport owns HOW to integrate, Interaction owns WHAT happens at each interaction. This separation is fundamental to the architecture's flexibility.
 
-### 2. Compile-Time Configuration
+### 2. Multi-Output Architecture
+
+Optics provides both raw measurements and human-viewable interpretations simultaneously, like a scientific instrument with multiple readouts.
+
+### 3. Compile-Time Configuration
 
 Different strategies compile to different shaders. No runtime branching for:
 - Volume integration method
 - NEE strategies
 - BRDF models
 
-### 3. Manual Prefixing
+### 4. KIND-Based Prefixing
 
-All functions use explicit module prefixes:
+All functions use explicit module KIND prefixes:
 - `camera_generateRay()`
 - `transport_trace()`
 - `interaction_surface_shade()`
 - `film_accumulate()`
 - `developer_develop()`
 
-### 4. Property Batching
-
-Materials provide all properties in one query for efficiency:
-```glsl
-MaterialProperties mp = material_get_properties(mat_id, p);
-```
-
 ### 5. Per-Recipe Resources
 
 Each recipe maintains separate film buffers, allowing instant switching without losing accumulation progress.
 
-## Interaction with World
+## Interaction with Objects
 
-Photography depends on World but doesn't modify it:
+Optics depends on Objects but doesn't modify it:
 
-- **From Geometry**: Geodesic paths, metric-aware dot products, frame construction
-- **From Scene**: Ray intersection, material interface resolution
-- **From Materials**: Property queries (albedo, roughness, coefficients)
-- **From Lights**: Emission sampling and evaluation
+- **From Ambient**: Geodesic paths, metric-aware dot products, frame construction
+- **From Scene**: Ray intersection, material interface resolution, property queries
+- **From Lighting**: Emission sampling and evaluation
 
-The dependency is one-way - World knows nothing about how it's being observed.
+The dependency is one-way - Objects knows nothing about how it's being observed.
 
 ## Research Flexibility
 
@@ -211,9 +217,14 @@ The five-module architecture specifically supports research:
 - Optimize interaction models independently
 - Measure convergence per configuration
 
+### Data Export
+- Save raw radiance to EXR for ground truth
+- Export auxiliary buffers for denoising research
+- Capture variance maps for adaptive sampling studies
+
 ## Implementation Strategy
 
-Photography modules are primarily hand-written because they embody algorithmic and physical choices:
+Optics modules are primarily hand-written because they embody algorithmic and physical choices:
 
 - **Cameras**: Mathematical transformations
 - **Transport**: Integration algorithms
@@ -221,8 +232,8 @@ Photography modules are primarily hand-written because they embody algorithmic a
 - **Films**: Accumulation strategies
 - **Developers**: Tone mapping operators
 
-Unlike World modules which can be generated from scene data, Photography modules represent deliberate algorithmic and physical decisions that benefit from manual implementation.
+Unlike Objects modules which can be generated from scene data, Optics modules represent deliberate algorithmic and physical decisions that benefit from manual implementation.
 
 ## Summary
 
-Photography transforms the mathematical World into images through a five-stage pipeline. By separating transport algorithms from light-matter physics, cameras from integration, and accumulation from display, the architecture enables unprecedented flexibility. Researchers can swap algorithms without changing physics, compare physics models with the same algorithm, and compose specialized pipelines for any rendering task. The key insight is the clean separation between integration strategies (Transport), physics equations (Interaction), and the other stages of image formation, allowing independent evolution and optimization of each component.
+Optics transforms the mathematical Objects into scientific measurements through a five-stage pipeline. By functioning as a measurement instrument that provides both raw data and human-viewable output, it serves both analysis and visualization needs. The separation between transport algorithms and light-matter physics, combined with the multi-output architecture, enables unprecedented flexibility. Researchers can swap algorithms without changing physics, save raw measurements while viewing tone-mapped results, and compose specialized pipelines for any measurement task. The key insight is that Optics is not just a renderer but a **scientific camera** - it measures light and provides multiple representations of those measurements for different purposes.

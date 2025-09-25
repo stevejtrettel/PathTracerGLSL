@@ -19,26 +19,27 @@ A research-grade GPU path tracer where **mathematics drives implementation**. Th
 - Spectrum operations: add, scale, multiply
 - Random sampling infrastructure
 
-### 2. World (Content)
+### 2. Objects (Content)
 **Purpose**: Define the mathematical space and its contents  
 **What it provides**: Data only - shapes, material properties, light sources  
 **What it doesn't do**: Physics, light behavior, BRDFs
 
 **Three Modules**:
-- **Geometry** (hand-written): Differential geometric structure (`geometry_*`)
-- **Scene** (compiled): Objects, materials, intersection (`scene_*`)
+- **AmbientSpace** (hand-written): Differential geometric structure (`ambient_*`)
+- **Scene** (compiled): Geometries, materials, intersection (`scene_*`)
 - **Lighting** (compiled): Light sampling strategies (`lighting_*`)
 
 **Key Innovation**: Scene and Lighting modules are compiled from high-level descriptions with automatic cross-referencing:
-- Emissive objects → become lights in Lighting module
-- Visible lights → become geometry in Scene module
+- Emissive geometries → become lights in Lighting module
+- Visible lights → become geometries in Scene module
 - Material IDs managed automatically
 
 **Critical Insight**: Materials are pure property data within Scene - no BRDFs, no sampling, just data accessed via `scene_material_properties()`.
 
-### 3. Photography (Observation)
+### 3. Optics (Observation)
 **Purpose**: Define how light is observed and measured  
-**What it provides**: All physics and integration algorithms
+**What it provides**: All physics and integration algorithms  
+**What it outputs**: Both raw measurements (radiance) and viewable images (RGB)
 
 **5-Module Pipeline**:
 1. **Camera**: Ray generation (`camera_*`)
@@ -66,9 +67,9 @@ A research-grade GPU path tracer where **mathematics drives implementation**. Th
 - Render Coordinator: Execution modes
 - Extension System: Services without core modification
 
-## World Compilation Pipeline
+## Objects Compilation Pipeline
 
-The World system features a sophisticated compilation pipeline:
+The Objects system features a sophisticated compilation pipeline:
 
 ```
 Scene Description + Light Description
@@ -77,39 +78,39 @@ Scene Description + Light Description
               ↓
     ┌─────────┬─────────┐
     │         │         │
-Geometry   Scene    Lighting
-(hand)   (compiled) (compiled)
+AmbientSpace Scene    Lighting
+  (hand)   (compiled) (compiled)
 ```
 
 **Cross-referencing**: The compiler automatically:
-- Adds emissive objects as light sources
-- Adds visible lights as geometric objects
+- Adds emissive geometries as light sources
+- Adds visible lights as geometric entities
 - Assigns material IDs consistently
 
 ## Key Architectural Separation
 
 ### Data vs Behavior
-**World (Data)**:
+**Objects (Data)**:
 - What exists: shapes, material properties, light positions
 - `scene_material_properties()` returns albedo, roughness, IOR, etc.
 - `lighting_sample()` returns light samples
 - No knowledge of BRDFs, Fresnel, or light physics
 
-**Photography (Behavior)**:
+**Optics (Behavior)**:
 - How light behaves with that data
 - `interaction_surface_shade()` implements Disney/Lambert/etc using properties
 - `transport_trace()` implements path tracing strategies
 
-This is a hard boundary - no physics in World, no data ownership in Photography.
+This is a hard boundary - no physics in Objects, no data ownership in Optics.
 
 ## Module Function Prefixing
 
-All modules use explicit prefixes:
+All modules use KIND-based prefixes:
 
 ```glsl
-// Geometry module (hand-written)
-Point geometry_geodesic(Point origin, Direction dir, float t)
-Frame geometry_frame(Point p, Normal n)
+// AmbientSpace module (hand-written)
+Point ambient_geodesic(Point origin, Direction dir, float t)
+Frame ambient_frame(Point p, Normal n)
 
 // Scene module (compiled)
 bool scene_intersect(Ray ray, out Hit hit)
@@ -120,8 +121,8 @@ int scene_material_at(Point p)
 LightSample lighting_sample(Point p, vec2 xi)
 float lighting_pdf(Point p, Direction wi)
 
-// Photography modules (hand-written)
-Ray camera_generateRay(vec2 pixel)
+// Optics modules (hand-written)
+Ray camera_generateRay(vec2 pixel, vec2 xi)
 Spectrum transport_trace(Ray ray)
 Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit)
 Radiance film_accumulate(Spectrum s, vec2 pixel)
@@ -163,8 +164,8 @@ A typical production recipe:
 
 | Module | Type | Purpose |
 |--------|------|---------|
-| Geometry | euclidean (hand) | Standard 3D space |
-| Scene | compiled | Objects, materials, intersection |
+| AmbientSpace | euclidean (hand) | Standard 3D space |
+| Scene | compiled | Geometries, materials, intersection |
 | Lighting | compiled | Light sampling strategies |
 | Camera | thin_lens (hand) | DOF effects |
 | Transport | pathtracer (hand) | Unidirectional path tracing |
@@ -179,7 +180,7 @@ The WorldCompiler analyzes descriptions and generates optimized code:
 ```typescript
 // Analysis determines what varies
 analysis = {
-  objects: 2,
+  geometries: 2,
   materials: 3,
   lights: 1,
   constantProperties: { roughness: 0.5 },
@@ -188,7 +189,7 @@ analysis = {
 }
 
 // Generated Scene module optimizations:
-- Unrolled marching for 2 objects
+- Unrolled marching for 2 geometries
 - Constant-folded roughness
 - Efficient material property packing
 
@@ -233,14 +234,14 @@ src/
 ├── math/              # Utilities
 ├── engine/            # Infrastructure
 ├── app/              # Orchestration
-├── world/            
-│   ├── geometry/     # Hand-written modules
+├── objects/            
+│   ├── ambient/      # Hand-written ambient space modules
 │   ├── compiler/     # WorldCompiler system
 │   │   ├── WorldCompiler.ts
 │   │   ├── SceneCompiler.ts
 │   │   └── LightingCompiler.ts
 │   └── descriptions/ # Scene/light descriptions
-└── photography/      
+└── optics/      
     ├── cameras/      # Hand-written modules
     ├── transport/    # Hand-written modules
     ├── interaction/  # Hand-written modules
@@ -250,9 +251,19 @@ src/
 
 ## Key Benefits
 
-1. **Automatic Cross-referencing**: Emissive objects become lights, visible lights become geometry
+1. **Automatic Cross-referencing**: Emissive geometries become lights, visible lights become geometries
 2. **Compile-Time Optimization**: Scene-specific code with zero overhead
-3. **Clear Separation**: Data (World) vs Behavior (Photography)
+3. **Clear Separation**: Data (Objects) vs Behavior (Optics)
 4. **Research Flexibility**: Mix and match algorithms independently
 5. **No Boilerplate**: Write descriptions, not GLSL
 6. **Debugging**: Generated code is readable and inspectable
+
+## Optics as Scientific Instrument
+
+Optics functions as a **measurement device** providing multiple outputs:
+- **Raw radiance** for scientific analysis and EXR export
+- **Tone-mapped RGB** for human viewing
+- **Variance data** for convergence analysis
+- **Future**: Additional channels (depth, normals) for reconstruction
+
+This dual-output design reflects that rendering is fundamentally about measurement, not just pretty pictures.

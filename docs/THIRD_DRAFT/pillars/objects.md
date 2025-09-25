@@ -1,12 +1,12 @@
-# World Pillar: Complete System Overview
+# Objects Pillar: Complete System Overview
 
 ## Purpose
 
-The World pillar defines the **mathematical and physical reality** that exists independent of observation. It encompasses geometry, objects, their arrangement, material properties, and light sources - everything that exists before we choose how to look at it.
+The Objects pillar defines the **mathematical and physical reality** that exists independent of observation. It encompasses the ambient space, geometries, their arrangement, material properties, and light sources - everything that exists before we choose how to look at it.
 
 ## Core Philosophy
 
-World modules describe **what exists**, not how we see it. This separation is fundamental: a glass sphere in hyperbolic space exists as a mathematical entity with specific properties. How light travels through it, whether we use delta tracking or ray marching, whether we visualize it as a normal map or a rendered image - these are Photography's concerns, not World's.
+Objects modules describe **what exists**, not how we see it. This separation is fundamental: a glass sphere in hyperbolic space exists as a mathematical entity with specific properties. How light travels through it, whether we use delta tracking or ray marching, whether we visualize it as a normal map or a rendered image - these are Optics' concerns, not Objects'.
 
 ## System Architecture
 
@@ -17,49 +17,49 @@ Scene Description + Light Description
               ↓
     ┌─────────┬─────────┐
     │         │         │
-Geometry   Scene    Lighting
-Module    Module    Module
+AmbientSpace  Scene    Lighting
+   Module    Module    Module
 ```
 
 The WorldCompiler orchestrates the transformation from user-friendly descriptions to optimized GLSL, automatically handling the relationship between emissive materials and lights.
 
 ## The Three Core Modules
 
-### 1. Geometry Module: The Mathematical Foundation
+### 1. AmbientSpace Module: The Mathematical Foundation
 
-Geometry defines the differential geometric structure of space itself. This is pure mathematics:
+AmbientSpace defines the differential geometric structure of space itself. This is pure mathematics:
 
 ```glsl
 // Geodesics: How light travels in straight lines (which may be curved!)
-Point geometry_geodesic(Point origin, Direction dir, float t)
+Point ambient_geodesic(Point origin, Direction dir, float t)
 
 // Metric tensor: How to measure angles and distances
-float geometry_distance(Point a, Point b)
-float geometry_dot(Direction u, Direction v, Point p)
+float ambient_distance(Point a, Point b)
+float ambient_dot(Direction u, Direction v, Point p)
 
 // Parallel transport: How vectors change when moved through curved space
-Direction geometry_parallel_transport(Direction v, Point from, Point to)
+Direction ambient_parallel_transport(Direction v, Point from, Point to)
 
 // Frame construction: Local coordinate systems
-Frame geometry_frame(Point p, Normal n)
+Frame ambient_frame(Point p, Normal n)
 ```
 
-Geometry is **always hand-written** because it represents fundamental mathematical truths that don't change with scene content. A hyperbolic space is hyperbolic regardless of what objects inhabit it.
+AmbientSpace is **always hand-written** because it represents fundamental mathematical truths that don't change with scene content. A hyperbolic space is hyperbolic regardless of what geometries inhabit it.
 
-#### Example: Euclidean Geometry
+#### Example: Euclidean Ambient Space
 ```glsl
-Point geometry_geodesic(Point origin, Direction dir, float t) {
+Point ambient_geodesic(Point origin, Direction dir, float t) {
   return origin + dir * t;  // Simple linear interpolation
 }
 
-float geometry_distance(Point a, Point b) {
+float ambient_distance(Point a, Point b) {
   return length(a - b);  // Standard Euclidean distance
 }
 ```
 
-#### Example: Hyperbolic Geometry
+#### Example: Hyperbolic Ambient Space
 ```glsl
-Point geometry_geodesic(Point origin, Direction dir, float t) {
+Point ambient_geodesic(Point origin, Direction dir, float t) {
   // Geodesics in Poincaré ball model
   float r = length(origin);
   float k = (1.0 - r*r) / 2.0;
@@ -69,13 +69,13 @@ Point geometry_geodesic(Point origin, Direction dir, float t) {
 
 We maintain a library: `euclidean.glsl`, `hyperbolic.glsl`, `spherical.glsl`.
 
-### 2. Scene Module: Objects and Materials
+### 2. Scene Module: Geometries and Materials
 
-The Scene module provides geometric queries and material properties for all objects in the scene. It tracks materials and their associated lights through a direct ID system.
+The Scene module provides geometric queries and material properties for all geometries in the scene. It tracks materials and their associated lights through a direct ID system.
 
 #### Core Responsibilities
 
-1. **Object Arrangement**: Spatial organization via SDFs
+1. **Geometry Arrangement**: Spatial organization via SDFs
 2. **Material Interface Resolution**: Determining material boundaries
 3. **Light Association**: Materials know their light IDs directly
 
@@ -89,7 +89,7 @@ struct Hit {
   vec2 uv;
   float t;
   
-  // Material interface (no object_id needed!)
+  // Material interface (no geometry_id needed!)
   int material_from;    // Material we're leaving
   int material_to;      // Material we're entering
   
@@ -98,7 +98,7 @@ struct Hit {
 }
 ```
 
-Note the absence of `object_id` - we don't need it because materials directly reference their lights.
+Note the absence of `geometry_id` - we don't need it because materials directly reference their lights.
 
 #### Material Properties with Light References
 
@@ -117,27 +117,27 @@ struct MaterialProperties {
 
 #### Efficient Material Interface Resolution
 
-The Scene module uses **nearby object tracking** to efficiently resolve material boundaries:
+The Scene module uses **nearby geometry tracking** to efficiently resolve material boundaries:
 
 ```glsl
-struct NearbyObjects {
-  float dists[3];  // Distances to 3 closest
+struct NearbyGeometries {
+  float dists[3];      // Distances to 3 closest
   int material_ids[3];  // Their material IDs
-  int count;       // How many within threshold
+  int count;           // How many within threshold
 };
 
 // During ray marching
 void march_ray(Ray ray, out Hit hit) {
-  NearbyObjects nearby;
+  NearbyGeometries nearby;
   
   for (int step = 0; step < MAX_STEPS; step++) {
-    Point p = geometry_geodesic(ray.origin, ray.direction, t);
+    Point p = ambient_geodesic(ray.origin, ray.direction, t);
     
-    // Track only nearby objects
-    update_nearby_objects(p, nearby);
+    // Track only nearby geometries
+    update_nearby_geometries(p, nearby);
     
     if (nearby.dists[0] < EPSILON) {
-      // Resolve material interface using only 2-3 objects
+      // Resolve material interface using only 2-3 geometries
       resolve_materials(p, nearby, hit);
       return;
     }
@@ -146,9 +146,9 @@ void march_ray(Ray ray, out Hit hit) {
 ```
 
 This elegantly solves the material interface problem:
-- **90%+ of rays**: Only one object nearby, trivial resolution
-- **Boundaries**: 2-3 objects nearby, quick resolution
-- **Never**: Need to check all objects in scene
+- **90%+ of rays**: Only one geometry nearby, trivial resolution
+- **Boundaries**: 2-3 geometries nearby, quick resolution
+- **Never**: Need to check all geometries in scene
 
 ### 3. Lighting Module: Unified Light Management
 
@@ -173,13 +173,13 @@ uniform LightData u_lights[NUM_LIGHTS];
 Lights fall into two categories:
 
 1. **Samplable** (`sampling_type != SAMPLING_NONE`)
-    - Can be explicitly sampled for next event estimation
-    - Need MIS when hit via path tracing
+   - Can be explicitly sampled for next event estimation
+   - Need MIS when hit via path tracing
 
 2. **Path-only** (`sampling_type == SAMPLING_NONE`)
-    - Too complex to sample (fractals, complex SDFs)
-    - Only found by path tracing
-    - No MIS needed (single strategy)
+   - Too complex to sample (fractals, complex SDFs)
+   - Only found by path tracing
+   - No MIS needed (single strategy)
 
 #### Direct Access Functions
 
@@ -280,11 +280,11 @@ const analysis = {
 
 **Loop Unrolling**
 ```glsl
-// For < 5 objects
+// For < 5 geometries
 float dispatch_sdf(Point p) {
-  float d0 = object_0_sdf(p);
-  float d1 = object_1_sdf(p);
-  float d2 = object_2_sdf(p);
+  float d0 = geometry_0_sdf(p);
+  float d1 = geometry_1_sdf(p);
+  float d2 = geometry_2_sdf(p);
   return min(min(d0, d1), d2);
 }
 ```
@@ -333,9 +333,9 @@ if (scene_intersect(ray, hit)) {
 ### User Input
 ```typescript
 // Scene
-objects = [
-  { geometry: 'sphere', material: 'emissive_orb' },
-  { geometry: 'plane', material: 'concrete' }
+geometries = [
+  { shape: 'sphere', material: 'emissive_orb' },
+  { shape: 'plane', material: 'concrete' }
 ];
 
 materials = {
@@ -393,7 +393,7 @@ LightData[2] = {
 
 ### 1. Direct References
 - Materials reference lights directly via `light_id`
-- No complex object→light mappings
+- No complex geometry→light mappings
 - Single source of truth
 
 ### 2. Compile-Time Optimization
@@ -402,19 +402,19 @@ LightData[2] = {
 - Specialized dispatch for small scenes
 
 ### 3. Efficient Boundary Resolution
-- Nearby object tracking avoids full scene queries
-- Material interfaces resolved with 2-3 objects
+- Nearby geometry tracking avoids full scene queries
+- Material interfaces resolved with 2-3 geometries
 - O(1) light lookups via direct IDs
 
 ### 4. Separation of Concerns
-- **Geometry**: Mathematical space structure
-- **Scene**: Object arrangement and materials
+- **AmbientSpace**: Mathematical space structure
+- **Scene**: Geometry arrangement and materials
 - **Lighting**: Sampling strategies and radiance
 - **Materials**: Properties including light references
 
 ## Performance Benefits
 
-1. **Smaller Hit Structure**: No object_id saves registers
+1. **Smaller Hit Structure**: No geometry_id saves registers
 2. **Direct Lookups**: Material→Light is single array access
 3. **Optimized Shaders**: Only code for used features
 4. **Efficient Marching**: Nearby tracking reduces computations
@@ -422,4 +422,4 @@ LightData[2] = {
 
 ## Summary
 
-The World pillar provides a clean, efficient system for managing geometry, materials, and lights. The key architectural insight is that **materials directly reference their associated lights**, eliminating complex cross-referencing while maintaining correct MIS. Combined with build-time optimization and efficient boundary resolution, this creates a system that is both powerful for research and performant for production.
+The Objects pillar provides a clean, efficient system for managing the ambient space, materials, and lights. The key architectural insight is that **materials directly reference their associated lights**, eliminating complex cross-referencing while maintaining correct MIS. Combined with build-time optimization and efficient boundary resolution, this creates a system that is both powerful for research and performant for production.

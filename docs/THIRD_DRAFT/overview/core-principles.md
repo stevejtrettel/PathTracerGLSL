@@ -4,8 +4,8 @@
 
 ### 1. Separation of Concerns
 Each pillar has exclusive responsibilities:
-- **World**: Defines *what exists* - data only (no physics, no behavior)
-- **Photography**: Defines *how we observe* - all physics and algorithms
+- **Objects**: Defines *what exists* - data only (no physics, no behavior)
+- **Optics**: Defines *how we observe* - all physics and algorithms
 - **Engine**: Provides *infrastructure* (no research logic)
 - **App**: Orchestrates *experiments* (no GPU calls)
 - **Math**: Provides *utilities* (no state or contracts)
@@ -13,7 +13,7 @@ Each pillar has exclusive responsibilities:
 ### 2. Compilation vs Hand-Writing
 Modules fall into two categories:
 - **Compiled**: Scene, Lighting (from descriptions, optimized at build-time)
-- **Hand-written**: Geometry, Camera, Transport, Interaction, Film, Developer
+- **Hand-written**: AmbientSpace, Camera, Transport, Interaction, Film, Developer
 
 Compilation enables aggressive optimization and automatic cross-referencing.
 
@@ -26,8 +26,8 @@ Given fixed inputs (recipe, seed, environment), output is identical:
 
 ### 4. Ownership Rules
 Clear ownership prevents architectural confusion:
-- **WorldCompiler owns cross-referencing**: Emissive objects → lights, visible lights → geometry
-- **SceneCompiler owns geometry**: Object SDFs, intersection, material properties
+- **WorldCompiler owns cross-referencing**: Emissive geometries → lights, visible lights → geometries
+- **SceneCompiler owns geometries**: SDF dispatch, intersection, material properties
 - **LightingCompiler owns sampling**: Light sampling strategies, PDFs
 - **Transport owns integration**: Path tracing, delta tracking strategies
 - **Interaction owns physics**: BRDF evaluation, phase functions, Fresnel
@@ -36,8 +36,8 @@ Clear ownership prevents architectural confusion:
 
 ### 5. The Critical Separation
 **Data vs Behavior** is the core architectural principle:
-- **World = Data**: Shapes, material properties, light parameters
-- **Photography = Behavior**: How light interacts with that data
+- **Objects = Data**: Shapes, material properties, light parameters
+- **Optics = Behavior**: How light interacts with that data
 - Scene NEVER implements physics (no BRDFs)
 - Lighting NEVER implements materials (only sampling)
 - Interaction NEVER stores properties (queries Scene)
@@ -64,7 +64,7 @@ Optimize at compile-time, not runtime:
 ```typescript
 interface ModuleDescriptor {
   id: {
-    kind: string;     // "geometry", "scene", "lighting", etc.
+    kind: string;     // "ambient", "scene", "lighting", etc.
     name: string;     // "euclidean", "compiled_12345", etc.
     version: string;  // "1.0.0"
   };
@@ -89,7 +89,7 @@ All modules use explicit prefixes based on their **kind**:
 
 | Module Kind | Prefix | Example Functions |
 |------------|---------|-------------------|
-| Geometry | `geometry_` | `geometry_geodesic()`, `geometry_frame()` |
+| AmbientSpace | `ambient_` | `ambient_geodesic()`, `ambient_frame()` |
 | Scene | `scene_` | `scene_intersect()`, `scene_material_properties()` |
 | Lighting | `lighting_` | `lighting_sample()`, `lighting_pdf()` |
 | Camera | `camera_` | `camera_generateRay()` |
@@ -153,7 +153,7 @@ MaterialProperties scene_material_properties(int mat_id, Point p);
 
 ### Physics in Interaction
 
-All light-matter physics lives in Photography's Interaction module:
+All light-matter physics lives in Optics' Interaction module:
 
 ```glsl
 // Interaction implements physics using Scene's data
@@ -180,20 +180,20 @@ Scene Description + Light Description
               ↓
     SceneCompiler + LightingCompiler
               ↓
-    Three modules: Geometry, Scene, Lighting
+    Three modules: AmbientSpace, Scene, Lighting
 ```
 
 ### Cross-Referencing Rules
 
 The WorldCompiler automatically:
-1. **Emissive → Lights**: Objects with `emission > 0` become light sources
-2. **Visible Lights → Geometry**: Lights with `visible: true` become objects
+1. **Emissive → Lights**: Geometries with `emission > 0` become light sources
+2. **Visible Lights → Geometries**: Lights with `visible: true` become geometries
 3. **Material IDs**: Sequential assignment starting from 1 (0 = air)
 
 ### Compilation Optimizations
 
 SceneCompiler optimizations:
-- Unroll loops for <5 objects
+- Unroll loops for <5 geometries
 - Fold constants for uniform properties
 - Eliminate unused material fields
 - Inline simple SDFs
@@ -231,9 +231,6 @@ struct Hit {
   // Material interface
   int material_from;    // Material we're leaving
   int material_to;      // Material we're entering
-  
-  // Object identity
-  int object_id;
 }
 ```
 
@@ -287,8 +284,8 @@ weight = balance_heuristic(light_pdf, brdf_pdf);
 ## Performance Characteristics
 
 ### Compile-Time Costs
-- Scene analysis: O(objects + materials)
-- Code generation: O(objects)
+- Scene analysis: O(geometries + materials)
+- Code generation: O(geometries)
 - Optimization passes: O(code size)
 - Total: <100ms for typical scenes
 
@@ -310,9 +307,9 @@ weight = balance_heuristic(light_pdf, brdf_pdf);
 
 ## Key Architecture Benefits
 
-1. **Automatic Cross-referencing**: Emissive objects and visible lights handled automatically
+1. **Automatic Cross-referencing**: Emissive geometries and visible lights handled automatically
 2. **Compile-Time Optimization**: Scene-specific code generation
-3. **Clear Separation**: Data (World) vs Physics (Photography)
+3. **Clear Separation**: Data (Objects) vs Physics (Optics)
 4. **Research Flexibility**: Swap algorithms independently
 5. **Zero Boilerplate**: Descriptions compile to optimized GLSL
 6. **Type Safety**: MaterialIDs managed by compiler

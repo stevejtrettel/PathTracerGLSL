@@ -2,11 +2,11 @@
 
 ## Purpose
 
-The App is the **research orchestration layer** that transforms a GPU path tracer into a complete experimental apparatus. It provides the minimal scaffolding needed to coordinate Engine, World, and Photography into working experiments, while enabling unlimited growth through extensions. The App makes path tracing research feel like using a scientific instrument, not programming a renderer.
+The App is the **research orchestration layer** that transforms a GPU path tracer into a complete experimental apparatus. It provides the minimal scaffolding needed to coordinate Engine, Objects, and Optics into working experiments, while enabling unlimited growth through extensions. The App makes path tracing research feel like using a scientific instrument, not programming a renderer.
 
 ## Core Philosophy
 
-The App embodies **orchestration without opinion**. While the Engine hides GPU complexity and Photography defines observation algorithms, the App purely coordinates - it has no rendering opinions, no built-in UI, no mandatory workflows. Every research feature is an extension. The core remains minimal, stable, and focused solely on orchestration.
+The App embodies **orchestration without opinion**. While the Engine hides GPU complexity and Optics defines observation algorithms, the App purely coordinates - it has no rendering opinions, no built-in UI, no mandatory workflows. Every research feature is an extension. The core remains minimal, stable, and focused solely on orchestration.
 
 This minimalism is deliberate. Research needs vary wildly - some need parameter sweeps, others need animation, many just need to render one beautiful image. By keeping the core minimal and making everything else an extension, the App adapts to any research style without imposing workflow assumptions.
 
@@ -34,9 +34,9 @@ Each component has a single, focused responsibility that cannot be delegated to 
 
 **ParameterStore** is the single source of truth for all renderer state. Every parameter - from camera position to material roughness - flows through this central store. It validates values against metadata, batches updates for efficiency, and notifies observers of changes. This isn't just a key-value store - it understands parameter types, ranges, and relationships. When you change `camera.fov`, the store knows this is a float between 10 and 170 degrees. Critically, the store knows nothing about rendering - it just manages state and emits change events.
 
-**ResearchApp** is the orchestration hub that wires everything together. At initialization, it defines your 2-3 research recipes (complete configurations of all 8 modules), asks the Engine to eagerly compile them, creates the core components, and establishes the data flow between them. During runtime, it provides the minimal API needed for research: switch recipes, start/stop rendering, save/load sessions. Everything else - camera controls, UI, experiments - comes from extensions. The app keeps no rendering state, makes no rendering decisions, and provides no features beyond pure orchestration.
+**ResearchApp** is the orchestration hub that wires everything together. At initialization, it defines your 2-3 research recipes (complete configurations of all 8 modules), asks the Engine to eagerly compile them, creates the core components, and establishes the data flow between them. During runtime, it provides the minimal API needed for research: switch recipes, start/stop rendering, save/load sessions, and choose which output to display or export (radiance for analysis, RGB for viewing). Everything else - camera controls, UI, experiments - comes from extensions. The app keeps no rendering state, makes no rendering decisions, and provides no features beyond pure orchestration.
 
-**RenderCoordinator** manages the execution of rendering across three modes: interactive (real-time preview), progressive (accumulation), and production (tiled high-res). It owns the critical decision of when to reset accumulation - a camera move requires reset, a tonemapping change doesn't. It tracks sample counts, manages frame timing, and reports progress. But it doesn't touch WebGL or shaders - it just tells the Engine when to render frames and tracks the results.
+**RenderCoordinator** manages the execution of rendering across three modes: interactive (real-time preview), progressive (accumulation), and production (tiled high-res). It owns the critical decision of when to reset accumulation - a camera move requires reset, a tonemapping change doesn't. It tracks sample counts, manages frame timing, and reports progress. Importantly, it understands that Optics provides multiple outputs - radiance for scientific analysis and RGB for display - and coordinates which output different extensions should receive. But it doesn't touch WebGL or shaders - it just tells the Engine when to render frames and tracks the results.
 
 **SessionManager** enables reproducible research by saving and restoring complete system state. A session includes the active recipe, all parameter values, camera position, and any extension-specific state. This isn't just for convenience - reproducibility is fundamental to research. Every beautiful image, every parameter study, every debugging session can be perfectly recreated from a session file.
 
@@ -54,15 +54,15 @@ The App requires you to define your 2-3 research recipes upfront:
 const app = new ResearchApp(canvas, {
   recipes: {
     pathtracer: {
-      world: { 
-        geometry: 'euclidean', 
-        material: 'disney',
-        scene: 'sdf',
-        lights: 'hdri'
+      objects: { 
+        ambient: 'euclidean', 
+        scene: 'compiled_scene',
+        lighting: 'compiled_lighting'
       },
-      photography: {
+      optics: {
         camera: 'pinhole',
-        estimator: 'pathtracer', 
+        transport: 'pathtracer',
+        interaction: 'disney',
         film: 'variance',
         developer: 'aces'
       }
@@ -94,7 +94,9 @@ install(app) {
   app.registerService('screenshot', this);
 }
 takeScreenshot() {
-  const pixels = this.app.engine.readPixels();
+  const outputs = this.app.engine.getOutputs();
+  // Can capture RGB for display or radiance for analysis
+  const pixels = this.captureRGB ? outputs.rgb : outputs.radiance;
   // ...
 }
 
@@ -105,7 +107,39 @@ await screenshot.takeScreenshot();
 
 This keeps the App interface minimal and makes dependencies explicit. You can see exactly which extensions you're using.
 
-### 3. Direct Core Flow, Events for Extensions
+### 3. Multiple Output Handling
+
+The App coordinates Optics' dual output nature - raw radiance for analysis and tone-mapped RGB for display:
+
+```typescript
+class RenderCoordinator {
+  getOutputs(): OpticsOutput {
+    return {
+      radiance: this.engine.getRadianceOutput(),  // For EXR export, analysis
+      rgb: this.engine.getRGBOutput(),            // For display
+      variance: this.engine.getVarianceOutput(),  // For convergence analysis
+      sampleCount: this.sampleCount
+    };
+  }
+}
+
+// Extensions choose what they need
+class DisplayExtension {
+  update() {
+    const { rgb } = this.app.renderCoordinator.getOutputs();
+    this.displayTexture(rgb);
+  }
+}
+
+class AnalysisExtension {
+  analyze() {
+    const { radiance, variance } = this.app.renderCoordinator.getOutputs();
+    this.computeStatistics(radiance, variance);
+  }
+}
+```
+
+### 4. Direct Core Flow, Events for Extensions
 
 The critical rendering path uses direct references for zero overhead:
 
@@ -123,7 +157,7 @@ InputExtension →emit('camera.moved')→ UIExtension
 
 This hybrid approach gives performance where it matters and flexibility where it's useful.
 
-### 4. Reset Logic Ownership
+### 5. Reset Logic Ownership
 
 The RenderCoordinator, not the ParameterStore, decides when to reset accumulation:
 
@@ -150,7 +184,7 @@ class RenderCoordinator {
 
 This separation keeps the ParameterStore pure (just state management) while giving the coordinator the context it needs to make intelligent reset decisions.
 
-### 5. Everything Synchronous That Can Be
+### 6. Everything Synchronous That Can Be
 
 Unlike many web renderers, the App avoids unnecessary async operations:
 
@@ -192,8 +226,10 @@ app.renderCoordinator.start();
 app.parameterStore.set('material.roughness', 0.3);
 // Accumulation automatically resets!
 
-// 5. Save interesting results
-await app.sessionManager.save('good_result.json');
+// 5. Save interesting results (both outputs available)
+const exporter = app.getService('exporter');
+await exporter.saveEXR('result.exr');  // Raw radiance
+await exporter.savePNG('result.png');  // Tone-mapped RGB
 ```
 
 ### Progressive Enhancement
@@ -220,8 +256,9 @@ await exp.sweep(app, {
   samplesPerValue: 100
 });
 
-// Day 30: Production rendering
+// Day 30: Production rendering with analysis
 app.use(new TilingExtension());
+app.use(new ConvergenceAnalyzer());  // Uses radiance output
 ```
 
 Each extension adds capabilities without modifying the core. Your Day 1 code still works on Day 30.
@@ -234,9 +271,10 @@ The App orchestrates but doesn't intrude:
 - Tells Engine which recipe to use (Engine compiles)
 - Passes parameter updates (Engine maps to uniforms)
 - Requests frames (Engine executes WebGL)
+- Retrieves multiple outputs (radiance and RGB textures)
 - Never touches GPU directly
 
-### With World and Photography
+### With Objects and Optics
 - Specifies module names in recipes
 - Never knows about module internals
 - Parameters flow through store to Engine to GPU
@@ -251,7 +289,9 @@ Engine (maps to uniforms)
     ↓
 GPU (executes shaders)
     ↓
-Pixels
+Optics Output
+    ├── Radiance Texture → Analysis/Export
+    └── RGB Texture → Display
 ```
 
 The App coordinates this flow but doesn't participate in it.
@@ -278,12 +318,12 @@ Add visual interfaces:
 Enable research methods:
 - `ExperimentExtension` - Parameter sweeps
 - `ComparisonExtension` - A/B testing
-- `ConvergenceAnalyzer` - Statistical analysis
+- `ConvergenceAnalyzer` - Statistical analysis (uses radiance)
 - `BatchRenderer` - Queue multiple renders
 
 ### Import/Export
 Handle data and assets:
-- `ImageExporter` - PNG, EXR, JPEG
+- `ImageExporter` - PNG (RGB), EXR (radiance), JPEG
 - `VideoExporter` - Animation sequences
 - `SceneImporter` - Load geometry
 - `HDRILoader` - Environment maps
@@ -356,11 +396,13 @@ The App stays out of the hot path:
 - Parameter updates (direct flow)
 - Frame rendering (minimal orchestration overhead)
 - Event dispatch (efficient emitter)
+- Output selection (direct texture references)
 
 ### What's Deliberately Slower
 - Extension loading (startup only)
 - Session save/load (file I/O)
 - Service lookup (explicit indirection)
+- Radiance readback (only when needed for export)
 
 The App optimizes for research iteration speed, not framework overhead.
 
@@ -378,14 +420,18 @@ The App embodies a specific philosophy about research tools:
 
 **Fast Iteration**: Change parameters, see results immediately. No compilation waits during research.
 
+**Scientific Output**: Access both raw measurements (radiance) and human-viewable results (RGB).
+
 The App doesn't impose a workflow - it enables yours.
 
 ## Summary
 
-The App transforms the mathematical machinery of World and Photography pillars, orchestrated by the Engine, into a complete research environment. Through its minimal core of just four components - ParameterStore for state, ResearchApp for orchestration, RenderCoordinator for execution control, and SessionManager for persistence - it provides exactly what's needed for research and nothing more.
+The App transforms the mathematical machinery of Objects and Optics pillars, orchestrated by the Engine, into a complete research environment. Through its minimal core of just four components - ParameterStore for state, ResearchApp for orchestration, RenderCoordinator for execution control, and SessionManager for persistence - it provides exactly what's needed for research and nothing more.
 
 The extension system isn't an afterthought but the primary growth mechanism. Every UI panel, every control scheme, every analysis tool lives as an extension, keeping the core clean and stable. The service pattern prevents interface pollution while enabling sophisticated multi-extension workflows.
 
 By requiring recipes to be defined upfront and compiled eagerly, the App eliminates runtime compilation stutters. By keeping parameter updates synchronous and using direct references for the core rendering path, it maintains predictable, debuggable behavior. By owning reset logic in the coordinator rather than the store, it separates concerns cleanly.
+
+Critically, the App understands that Optics functions as a scientific instrument providing multiple outputs - raw radiance for analysis and tone-mapped RGB for viewing. Extensions can choose the appropriate output for their purpose, whether that's displaying images, analyzing convergence, or exporting data.
 
 The result is an orchestration layer that gets out of your way during research. Write mathematics in your modules, define your apparatus in recipes, then iterate rapidly on parameters to explore the space of light transport. The App makes GPU path tracing feel like using a microscope - you focus on what you're studying, not how the instrument works.

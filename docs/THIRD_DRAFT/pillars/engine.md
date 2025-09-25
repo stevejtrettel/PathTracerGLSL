@@ -28,20 +28,20 @@ RenderExecutor (executes frames)
 
 Each subsystem owns a specific piece of the infrastructure puzzle, designed to be as independent as possible while maintaining clear interfaces with its neighbors.
 
-**ModuleRegistry** acts as the central library of all available modules. Before any compilation can happen, modules must be registered, validated, and indexed. The registry ensures that every module fulfills its contract with properly prefixed functions - a Geometry module must provide `geometry_geodesic`, `geometry_dot`, `geometry_parallel_transport`, and `geometry_frame` functions; an Interaction module must provide `interaction_surface_shade`, `interaction_surface_scatter`, and `interaction_surface_pdf`. The prefixing convention uses the module KIND, not the specific module name, so a "disney" interaction module still uses `interaction_` prefix, not `disney_`. Think of it as a strict librarian who ensures every module follows the universal naming rules.
+**ModuleRegistry** acts as the central library of all available modules. Before any compilation can happen, modules must be registered, validated, and indexed. The registry ensures that every module fulfills its contract with properly prefixed functions - an AmbientSpace module must provide `ambient_geodesic`, `ambient_dot`, `ambient_parallel_transport`, and `ambient_frame` functions; an Interaction module must provide `interaction_surface_shade`, `interaction_surface_scatter`, and `interaction_surface_pdf`. The prefixing convention uses the module KIND, not the specific module name, so a "disney" interaction module still uses `interaction_` prefix, not `disney_`. Think of it as a strict librarian who ensures every module follows the universal naming rules.
 
-**SimpleCompiler** transforms collections of modules into complete GPU programs through direct concatenation. It takes a recipe - which includes both hand-written modules and compiled modules from WorldCompiler - and produces a complete WebGL program ready to run on the GPU. The compiler concatenates modules in a fixed order (geometry, scene, lighting, camera, transport, interaction, film, developer) without any code transformation. It also manages uniform mapping, building an explicit map from parameter paths to GPU locations. Importantly, with eager compilation, this entire process happens once at startup for all known recipes, eliminating any compilation during research interaction.
+**SimpleCompiler** transforms collections of modules into complete GPU programs through direct concatenation. It takes a recipe - which includes both hand-written modules and compiled modules from WorldCompiler - and produces a complete WebGL program ready to run on the GPU. The compiler concatenates modules in a fixed order (ambient, scene, lighting, camera, transport, interaction, film, developer) without any code transformation. It also manages uniform mapping, building an explicit map from parameter paths to GPU locations. Importantly, with eager compilation, this entire process happens once at startup for all known recipes, eliminating any compilation during research interaction.
 
-**ResourceManager** owns all GPU memory allocation and capability detection. At initialization, it interrogates the GPU to understand its limits - can it handle HDR rendering? How many texture units are available? How large can textures be? Based on these capabilities, it manages per-recipe film buffers, ensuring each recipe has its own accumulation buffers that persist when switching between recipes. This is key for preserving accumulated samples when quickly checking debug views. If the GPU can't handle certain requirements, the ResourceManager provides specific, actionable fallback suggestions.
+**ResourceManager** owns all GPU memory allocation and capability detection. At initialization, it interrogates the GPU to understand its limits - can it handle HDR rendering? How many texture units are available? How large can textures be? Based on these capabilities, it manages per-recipe film buffers, ensuring each recipe has its own accumulation buffers that persist when switching between recipes. Critically, it maintains **both radiance and RGB buffers** for each recipe - the radiance buffer holds Film's raw accumulated values (for analysis and EXR export), while the RGB buffer holds Developer's tone-mapped output (for display). This dual-buffer approach enables instant access to both scientific measurements and viewable images. If the GPU can't handle certain requirements, the ResourceManager provides specific, actionable fallback suggestions.
 
-**RenderExecutor** handles the actual WebGL draw calls and frame execution. It manages the full-screen quad geometry (6 vertices forming 2 triangles that cover the viewport), coordinates render target binding, viewport configuration, and the actual draw call that triggers shader execution. It also handles pixel readback for output, using fence synchronization for non-blocking reads. Despite being called the "executor," it's remarkably simple - its job is to reliably trigger the GPU work that everything else has prepared.
+**RenderExecutor** handles the actual WebGL draw calls and frame execution. It manages the full-screen quad geometry (6 vertices forming 2 triangles that cover the viewport), coordinates render target binding, viewport configuration, and the actual draw call that triggers shader execution. It also handles pixel readback for output, using fence synchronization for non-blocking reads. The executor maintains references to both the radiance and RGB textures, making either available for readback depending on what the App needs - raw data for analysis or tone-mapped images for display.
 
 ## The Simplified Compilation Process
 
 The Engine's compilation is remarkably simple - just direct concatenation:
 
 ```
-Recipe (from App with compiled World modules)
+Recipe (from App with compiled Objects modules)
     ↓
 1. ValidateModules    → Check all modules exist and have proper functions
     ↓
@@ -63,8 +63,8 @@ No transformation, no dependency resolution, no automatic prefixing - modules ar
 The Engine enforces a universal prefixing convention based on module KIND, not specific module names:
 
 ```glsl
-// Hand-written geometry module (whether euclidean, hyperbolic, or spherical):
-Point geometry_geodesic(Point origin, Direction dir, float t) { 
+// Hand-written ambient space module (whether euclidean, hyperbolic, or spherical):
+Point ambient_geodesic(Point origin, Direction dir, float t) { 
     return origin + t * dir;  // Euclidean implementation
 }
 
@@ -107,7 +107,26 @@ engine.selectRecipe('pathtracer');  // Still has 100 samples!
 
 This enables rapid iteration without losing accumulated samples.
 
-### 3. Eager Compilation - Zero Runtime Latency
+### 3. Dual Output Architecture
+
+The Engine maintains both radiance and RGB outputs simultaneously:
+
+```typescript
+// Both outputs are always available
+const radiance = engine.getRadianceOutput();  // Raw HDR from Film
+const rgb = engine.getRGBOutput();             // Tone-mapped from Developer
+
+// App chooses based on need
+if (exportingEXR) {
+  readPixels(radiance);  // Scientific data
+} else {
+  displayTexture(rgb);   // Human-viewable
+}
+```
+
+This parallel output design reflects Optics' nature as a scientific instrument that provides both raw measurements and processed views.
+
+### 4. Eager Compilation - Zero Runtime Latency
 
 With only 2-3 recipes in a research system, the Engine compiles everything at startup:
 
@@ -124,7 +143,7 @@ engine.selectRecipe('pathtracer');  // No compilation!
 engine.selectRecipe('debug');       // Instant switch!
 ```
 
-### 4. Explicit UniformMap - Debugging Made Easy
+### 5. Explicit UniformMap - Debugging Made Easy
 
 Every parameter-to-GPU mapping is explicit and queryable:
 
@@ -141,14 +160,14 @@ console.log(`Maps to uniform: ${mapping.glslName}`);
 program.uniformMap.debugPrint();
 ```
 
-### 5. Module Order for Dependencies
+### 6. Module Order for Dependencies
 
 Modules are concatenated in a specific order to satisfy dependencies:
 
 ```typescript
 const moduleOrder = [
-    'geometry',      // Mathematical foundation (hand-written)
-    'scene',         // Objects and materials (compiled)
+    'ambient',       // Mathematical foundation (hand-written)
+    'scene',         // Geometries and materials (compiled)
     'lighting',      // Light sources (compiled)
     'camera',        // Ray generation (hand-written)
     'transport',     // Integration strategy (hand-written)
@@ -160,7 +179,7 @@ const moduleOrder = [
 
 This ensures each module can call functions from modules loaded before it.
 
-### 6. State Machine - Always Know Where You Are
+### 7. State Machine - Always Know Where You Are
 
 The Engine maintains explicit state with validated transitions:
 
@@ -177,7 +196,7 @@ if (!engine.isRunning()) {
 }
 ```
 
-### 7. Full-Screen Quad - Simple and Clear
+### 8. Full-Screen Quad - Simple and Clear
 
 The Engine uses a traditional quad (6 vertices, 2 triangles) to cover the viewport:
 
@@ -211,22 +230,23 @@ vertices = [
 
 ### ResourceManager: The Memory Guardian
 - Checks GPU capabilities at startup
-- Manages per-recipe film buffers
+- Manages per-recipe film buffers (both radiance and RGB)
 - Preserves accumulation when switching
 - Provides fallbacks for limited devices
 - Warns about accumulation loss on context loss
+- Maintains dual textures for scientific and display outputs
 
 ### RenderExecutor: The Draw Master
 - Manages the full-screen quad
 - Executes WebGL draw calls
-- Handles pixel readback
+- Handles pixel readback from either radiance or RGB texture
 - Tracks frame statistics
 
 ## Module Function Convention
 
 All modules use their KIND as prefix, regardless of specific implementation:
 
-### Hand-Written Modules (Photography)
+### Hand-Written Modules (Optics)
 
 ```glsl
 // Module kind: camera (implementation: pinhole, perspective, fisheye, etc.)
@@ -255,14 +275,14 @@ void film_clear() { ... }
 RGB developer_develop(Radiance accumulated) { ... }
 ```
 
-### Compiled Modules (World)
+### Compiled Modules (Objects)
 
 ```glsl
-// Module kind: geometry (implementation: euclidean, hyperbolic, spherical)
-Point geometry_geodesic(Point origin, Direction dir, float t) { ... }
-float geometry_distance(Point a, Point b) { ... }
-float geometry_dot(Direction u, Direction v, Point p) { ... }
-Frame geometry_frame(Point p, Normal n) { ... }
+// Module kind: ambient (implementation: euclidean, hyperbolic, spherical)
+Point ambient_geodesic(Point origin, Direction dir, float t) { ... }
+float ambient_distance(Point a, Point b) { ... }
+float ambient_dot(Direction u, Direction v, Point p) { ... }
+Frame ambient_frame(Point p, Normal n) { ... }
 
 // Module kind: scene (always compiled by WorldCompiler)
 bool scene_intersect(Ray ray, out Hit hit) { ... }
@@ -296,6 +316,8 @@ void main() {
   Radiance accumulated = film_accumulate(radiance, pixel);
   RGB color = developer_develop(accumulated);
   
+  // Note: Both accumulated (radiance) and color (RGB) exist in the pipeline
+  // The Engine captures both to separate textures for different uses
   fragColor = vec4(color, 1.0);
 }
 ```
@@ -313,14 +335,14 @@ lighting_sample(p, xi)                         // From Lighting
 lighting_get_light(light_id)                  // From Lighting
 interaction_surface_shade(wi, wo, hit)        // From Interaction
 interaction_surface_scatter(wi, hit, xi, pdf) // From Interaction
-geometry_geodesic(origin, dir, t)             // From Geometry
+ambient_geodesic(origin, dir, t)              // From AmbientSpace
 ```
 
 ### Interaction Dependencies
 ```glsl
 // Interaction can call earlier modules:
 scene_material_properties(mat_id, p)          // Get material data
-geometry_dot(u, v, p)                          // For geometric calculations
+ambient_dot(u, v, p)                           // For geometric calculations
 // Materials are pure data - no functions to call
 ```
 
@@ -341,29 +363,36 @@ if (!capabilities.floatRenderTargets) {
 }
 
 // App adjusts recipe
-recipe.photography.film = { kind: 'film', name: 'simple_ldr' };
+recipe.optics.film = { kind: 'film', name: 'simple_ldr' };
 ```
 
 ## Integration with Other Pillars
 
 The Engine is purely infrastructural:
 
-### From World Modules
+### From Objects Modules
 - Receives compiled Scene and Lighting modules from WorldCompiler
-- Hand-written Geometry module
+- Hand-written AmbientSpace module
 - Uses them exactly as provided with their KIND prefixes
 
-### From Photography Modules
+### From Optics Modules
 - Receives hand-written modules for camera, transport, interaction, film, developer
 - Each uses its KIND as prefix
+- Film produces radiance, Developer produces RGB
 
 ### To GPU
 - All WebGL operations flow through Engine
 - Modules never touch WebGL directly
 - Engine handles all GPU state
+- Maintains both radiance and RGB textures
 
 ### With App
 - Provides simple, high-level interface
+- Exposes dual outputs for different purposes:
+  ```typescript
+  getRadianceOutput(): WebGLTexture  // Raw HDR from Film (for EXR, analysis)
+  getRGBOutput(): WebGLTexture       // Tone-mapped from Developer (for display)
+  ```
 - Hides all GPU complexity
 - Makes state and mappings queryable
 
@@ -405,6 +434,7 @@ A 'disney' interaction module still uses 'interaction_' prefix.
 - **Batched uniforms**: All parameter updates flushed once per frame
 - **Single draw call**: One quad, no state changes
 - **Async readback**: Non-blocking pixel reads with fence sync
+- **Dual texture management**: Both outputs maintained without extra draw calls
 
 ## Context Loss Reality
 
@@ -423,16 +453,16 @@ The Engine handles this gracefully but cannot recover accumulated samples.
 
 ## Recipe Structure
 
-A complete recipe combining World and Photography:
+A complete recipe combining Objects and Optics:
 
 ```typescript
 interface Recipe {
-  world: {
-    geometry: { kind: 'geometry', name: string };        // Hand-written module
+  objects: {
+    ambient: { kind: 'ambient', name: string };          // Hand-written module
     scene: { kind: 'scene', name: string };              // Compiled by WorldCompiler
     lighting: { kind: 'lighting', name: string };        // Compiled by WorldCompiler
   };
-  photography: {
+  optics: {
     camera: { kind: 'camera', name: string };            // Hand-written module
     transport: { kind: 'transport', name: string };      // Path tracing strategy
     interaction: { kind: 'interaction', name: string };  // BRDF/BSDF physics
@@ -443,12 +473,12 @@ interface Recipe {
 
 // Example recipe
 const pathTracerRecipe: Recipe = {
-  world: {
-    geometry: { kind: 'geometry', name: 'euclidean' },
+  objects: {
+    ambient: { kind: 'ambient', name: 'euclidean' },
     scene: { kind: 'scene', name: 'compiled_12345' },     // From WorldCompiler
     lighting: { kind: 'lighting', name: 'compiled_12345' } // From WorldCompiler
   },
-  photography: {
+  optics: {
     camera: { kind: 'camera', name: 'pinhole' },
     transport: { kind: 'transport', name: 'pathtracer' },
     interaction: { kind: 'interaction', name: 'disney' },
@@ -490,6 +520,8 @@ The universal KIND-based prefixing means you can swap implementations freely - c
 
 The Engine transforms modular mathematics into GPU execution through direct concatenation of both hand-written and compiled modules. Its KIND-based prefixing convention creates a universal interface - every camera module provides `camera_generateRay`, every transport provides `transport_trace`, every interaction provides `interaction_surface_shade`. This makes modules truly swappable without code changes.
 
-It handles the integration between WorldCompiler's output (compiled Scene and Lighting modules) and hand-written Photography modules. Materials are pure data accessed through the Scene module, while all light-matter physics lives in the Interaction module using the universal `interaction_` prefix. The Transport module orchestrates the rendering algorithm, calling into Scene for geometry, Lighting for illumination, and Interaction for BRDFs - all using consistent KIND prefixes.
+Critically, the Engine maintains **dual outputs** - both the raw radiance from Film and the tone-mapped RGB from Developer. This parallel output architecture enables the App to choose the appropriate representation: radiance for scientific analysis and EXR export, RGB for human viewing and display. The Engine manages both textures efficiently without requiring additional render passes.
 
-Every design decision prioritizes simplicity, predictability, and visibility over cleverness. The Engine is the foundational layer that makes the entire path tracer possible, yet researchers never need to think about it. It's infrastructure that achieves invisibility through absolute reliability. Write mathematics with universal prefixes, get GPU execution, never touch WebGL - that's the Engine's promise.
+It handles the integration between WorldCompiler's output (compiled Scene and Lighting modules) and hand-written Optics modules. Materials are pure data accessed through the Scene module, while all light-matter physics lives in the Interaction module using the universal `interaction_` prefix. The Transport module orchestrates the rendering algorithm, calling into Scene for geometries, Lighting for illumination, and Interaction for BRDFs - all using consistent KIND prefixes.
+
+Every design decision prioritizes simplicity, predictability, and visibility over cleverness. The Engine is the foundational layer that makes the entire path tracer possible, yet researchers never need to think about it. It's infrastructure that achieves invisibility through absolute reliability. Write mathematics with universal prefixes, get GPU execution with both scientific and display outputs, never touch WebGL - that's the Engine's promise.
