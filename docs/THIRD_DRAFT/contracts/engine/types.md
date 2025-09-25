@@ -1,22 +1,3 @@
-# Engine Types (Simplified)
-
-## Purpose
-
-This document defines all shared types used across the simplified Engine subsystems. These types form the contracts between subsystems and provide the vocabulary for Engine operations.
-
-## Manual Prefixing Convention
-
-**CRITICAL**: All modules MUST manually prefix their public functions with their module name followed by underscore. This is NOT automatic - module authors are responsible for proper namespacing.
-
-```glsl
-// Example: In a camera module named "pinhole"
-Ray pinhole_generateRay(vec2 pixel) { ... }  // CORRECT
-Ray generateRay(vec2 pixel) { ... }          // WRONG - missing prefix
-
-// Example: In an estimator module named "pathtracer"  
-Spectrum pathtracer_estimate(Ray ray) { ... }  // CORRECT
-Spectrum estimate(Ray ray) { ... }             // WRONG - missing prefix
-```
 
 ## Core Engine Types
 
@@ -46,17 +27,17 @@ interface Recipe {
   name: string;                       // Human-readable name
   
   world: {
-    geometry: ModuleReference;
-    material: ModuleReference;        // SINGLE material module
-    scene: ModuleReference;
-    lights: ModuleReference;
+    geometry: ModuleReference;       // Mathematical space (euclidean, hyperbolic, etc.)
+    scene: ModuleReference;           // Objects, materials, intersection (compiled)
+    lighting: ModuleReference;        // Light sources and sampling (compiled)
   };
   
   photography: {
-    camera: ModuleReference;
-    estimator: ModuleReference;
-    film: ModuleReference;
-    developer: ModuleReference;
+    camera: ModuleReference;          // Ray generation
+    transport: ModuleReference;       // Integration algorithms
+    interaction: ModuleReference;     // Light-matter physics
+    film: ModuleReference;            // Accumulation
+    developer: ModuleReference;       // Tone mapping
   };
   
   parameters?: ParameterOverrides;   // Initial parameter values
@@ -64,18 +45,18 @@ interface Recipe {
 
 interface ModuleReference {
   kind: ModuleKind;
-  name: string;                       // MUST match prefix used in functions
+  name: string;                       // Specific implementation (e.g., "disney", "pathtracer")
 }
 
 type ModuleKind = 
-  | 'geometry'
-  | 'material' 
-  | 'scene'
-  | 'lights'
-  | 'camera'
-  | 'estimator'
-  | 'film'
-  | 'developer';
+  | 'geometry'      // World: mathematical structure
+  | 'scene'         // World: objects and materials (compiled)
+  | 'lighting'      // World: light sources (compiled)
+  | 'camera'        // Photography: ray generation
+  | 'transport'     // Photography: integration algorithms  
+  | 'interaction'   // Photography: light-matter physics
+  | 'film'          // Photography: accumulation
+  | 'developer';    // Photography: tone mapping
 
 interface ParameterOverrides {
   [path: string]: any;               // e.g., "camera.position": [0, 5, 10]
@@ -90,12 +71,12 @@ interface ParameterOverrides {
 interface ModuleDescriptor {
   id: {
     kind: ModuleKind;
-    name: string;                    // MUST match function prefixes
+    name: string;                    // Specific implementation name
     version: string;
   };
   
   fragment: {
-    functions: string;               // GLSL with manually prefixed functions
+    functions: string;               // GLSL with KIND-prefixed functions
     uniforms?: string;              // Uniform declarations  
     constants?: string;             // #define statements
   };
@@ -133,14 +114,14 @@ type GLSLType =
 
 ```typescript
 interface ModuleCollection {
-  geometry: ModuleDescriptor;
-  material: ModuleDescriptor;        // SINGLE material
-  scene: ModuleDescriptor;
-  lights: ModuleDescriptor;
-  camera: ModuleDescriptor;
-  estimator: ModuleDescriptor;
-  film: ModuleDescriptor;
-  developer: ModuleDescriptor;
+  geometry: ModuleDescriptor;        // Mathematical foundation
+  scene: ModuleDescriptor;           // Objects and material properties
+  lighting: ModuleDescriptor;        // Light sampling strategies
+  camera: ModuleDescriptor;          // Ray generation
+  transport: ModuleDescriptor;       // Integration algorithms
+  interaction: ModuleDescriptor;     // BRDFs and phase functions
+  film: ModuleDescriptor;            // Accumulation
+  developer: ModuleDescriptor;       // Tone mapping
 }
 
 interface ModuleQuery {
@@ -585,32 +566,16 @@ class ModuleNotFoundError extends EngineError {
 ## Constants
 
 ```typescript
-// Required function prefixes - modules MUST manually prefix their functions
-const REQUIRED_PREFIXES: Record<ModuleKind, string> = {
-  'geometry': 'geometry_',
-  'material': 'material_',
-  'scene': 'scene_',
-  'lights': 'lights_',
-  'camera': 'camera_',
-  'estimator': 'estimator_',
-  'film': 'film_',
-  'developer': 'developer_'
-};
-
-// Note: The actual prefix is the module NAME, not the kind
-// Example: A camera module named "pinhole" uses "pinhole_" prefix
-// Example: A material module named "disney" uses "disney_" prefix
-
 // Fixed module concatenation order
 const MODULE_ORDER: ModuleKind[] = [
-  'geometry',    // Defines types
-  'material',    // Material functions
-  'lights',      // Light functions
-  'scene',       // Uses above three
-  'camera',      // Ray generation
-  'estimator',   // Orchestrates everything
-  'film',        // Accumulation
-  'developer'    // Tone mapping
+  'geometry',      // Mathematical foundation
+  'scene',         // Objects and material data (compiled)
+  'lighting',      // Light sources (compiled)
+  'camera',        // Ray generation
+  'transport',     // Integration algorithms
+  'interaction',   // Light-matter physics
+  'film',          // Accumulation
+  'developer'      // Tone mapping
 ];
 
 // Texture unit reservations
@@ -639,55 +604,89 @@ const DEFAULTS = {
 
 ## Module Writing Convention
 
-Modules MUST follow this pattern for their public functions:
+Modules MUST use their KIND as prefix for all public functions:
 
 ```glsl
-// ============ Example: Camera Module Named "pinhole" ============
+// ============ Example: Camera Module (any implementation) ============
 uniform vec3 u_camera_position;
 uniform vec3 u_camera_target;
 
-// CORRECT - prefixed with module name
-Ray pinhole_generateRay(vec2 pixel) {
+// CORRECT - prefixed with module KIND
+Ray camera_generateRay(vec2 pixel) {
   // Implementation
 }
 
-// WRONG - missing prefix
-Ray generateRay(vec2 pixel) {
+// WRONG - using specific module name
+Ray pinhole_generateRay(vec2 pixel) {
   // This will fail validation
 }
 
-// ============ Example: Material Module Named "disney" ============
+// ============ Example: Interaction Module (any implementation) ============
 uniform vec3 u_material_albedo;
 
-// CORRECT - all required functions prefixed
-vec3 disney_evaluate(vec3 wi, vec3 wo, Hit hit) { ... }
-vec3 disney_sample(vec3 wi, Hit hit, vec2 xi, out float pdf) { ... }
-float disney_pdf(vec3 wi, vec3 wo, Hit hit) { ... }
+// CORRECT - all required functions use KIND prefix
+Spectrum interaction_surface_shade(vec3 wi, vec3 wo, Hit hit) { 
+  MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+  // Disney BRDF implementation
+}
 
-// WRONG - inconsistent prefixing
-vec3 evaluate(vec3 wi, vec3 wo, Hit hit) { ... }  // Missing prefix!
+vec3 interaction_surface_scatter(vec3 wi, Hit hit, vec2 xi, out float pdf) { ... }
+float interaction_surface_pdf(vec3 wi, vec3 wo, Hit hit) { ... }
+
+// WRONG - using module name instead of KIND
+Spectrum disney_shade(vec3 wi, vec3 wo, Hit hit) { ... }  // Incorrect!
 ```
 
 ## Cross-Module Calling Convention
 
-When modules call functions from other modules, they use the target module's prefix:
+When modules call functions from other modules, they use the target module's KIND prefix:
 
 ```glsl
-// In estimator module calling other modules:
-Spectrum pathtracer_estimate(Ray ray) {
+// In transport module calling other modules:
+Spectrum transport_trace(Ray ray) {
   Hit hit;
   
-  // Call scene module (assumed to be named "sdf")
-  if (!sdf_intersect(ray, hit)) {
-    return sky_color(ray.direction);
+  // Call scene module (always uses scene_ prefix)
+  if (!scene_intersect(ray, hit)) {
+    return lighting_environment(ray.direction);
   }
   
-  // Call material module (assumed to be named "disney")
-  vec3 wo = disney_sample(ray.direction, hit, xi, pdf);
-  vec3 brdf = disney_evaluate(ray.direction, wo, hit);
+  // Get material properties from scene
+  MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+  
+  // Call interaction module for physics
+  vec3 wo = interaction_surface_scatter(-ray.direction, hit, next_2d(), pdf);
+  Spectrum f = interaction_surface_shade(-ray.direction, wo, hit);
+  
+  // Call lighting module for sampling
+  LightSample ls = lighting_sample(hit.p, next_2d());
   
   // Continue...
 }
 ```
 
-Note: The main() function orchestrator must know the actual module names to call the correct prefixed functions.
+## Material Property Access
+
+Materials are pure data within the Scene module:
+
+```glsl
+// Scene provides material properties (data only)
+struct MaterialProperties {
+  vec3 albedo;
+  float roughness;
+  float metallic;
+  float ior;
+  vec3 emission;
+  float emission_strength;
+  int light_id;        // Direct reference to light array
+  int flags;
+};
+
+MaterialProperties scene_material_properties(int mat_id, Point p);
+
+// Interaction uses properties for physics
+Spectrum interaction_surface_shade(vec3 wi, vec3 wo, Hit hit) {
+  MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+  // Implement Disney BRDF using properties
+}
+```

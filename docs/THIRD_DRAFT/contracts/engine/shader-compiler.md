@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The SimpleCompiler transforms collections of modules into complete, executable GLSL programs through direct concatenation. Modules provide manually prefixed functions that are used as-written. It handles eager compilation at startup, uniform mapping, and provides instant recipe switching through pre-compiled program caching.
+The SimpleCompiler transforms collections of modules into complete, executable GLSL programs through direct concatenation. Modules provide KIND-prefixed functions that are used as-written. It handles eager compilation at startup, uniform mapping, and provides instant recipe switching through pre-compiled program caching.
 
 ## Required Interface
 
@@ -71,14 +71,14 @@ void main() {
 }`;
 
   private readonly MODULE_ORDER: ModuleKind[] = [
-    'geometry',
-    'material', 
-    'lights',
-    'scene',
-    'camera',
-    'estimator',
-    'film',
-    'developer'
+    'geometry',      // Mathematical foundation
+    'scene',         // Objects and materials (compiled)
+    'lighting',      // Light sources (compiled)
+    'camera',        // Ray generation
+    'transport',     // Integration algorithms
+    'interaction',   // Light-matter physics
+    'film',          // Accumulation
+    'developer'      // Tone mapping
   ];
 }
 ```
@@ -161,7 +161,7 @@ initialize(recipes: Recipe[]): void {
   this.compilationReport = report;
   
   console.log(`Compilation complete: ${report.totalTime.toFixed(1)}ms total`);
-  console.log(`All modules use manual prefixing (moduleName_functionName)`);
+  console.log(`All modules use KIND prefixing (camera_, transport_, interaction_, etc.)`);
 }
 ```
 
@@ -182,7 +182,7 @@ compile(recipe: Recipe): CompiledProgram {
     );
   }
   
-  // 2. Collect modules
+  // 2. Collect modules (including compiled World modules)
   const modules = this.collectModules(recipe);
   
   // 3. Assemble shader source (direct concatenation, no transformation)
@@ -221,7 +221,8 @@ compile(recipe: Recipe): CompiledProgram {
 }
 
 private collectModules(recipe: Recipe): ModuleCollection {
-  // Simple collection from registry - modules already have prefixed functions
+  // Simple collection from registry - modules use KIND prefixes
+  // Note: Scene and Lighting modules may be compiled from WorldCompiler
   return this.registry.resolveModules(recipe);
 }
 ```
@@ -238,20 +239,22 @@ private assembleFragmentShader(modules: ModuleCollection): string {
   parts.push('precision highp int;');
   parts.push('');
   
-  // Common type definitions (from geometry module typically)
+  // Common type definitions
   parts.push('// ============ Common Types ============');
   parts.push(this.getCommonTypes());
   parts.push('');
   
-  // Cross-module calling documentation
-  parts.push('// ============ Manual Prefixing Convention ============');
-  parts.push('// All public functions are manually prefixed with module name:');
-  parts.push(`// Camera (${modules.camera.id.name}): ${modules.camera.id.name}_generateRay`);
-  parts.push(`// Material (${modules.material.id.name}): ${modules.material.id.name}_evaluate, ${modules.material.id.name}_sample, ${modules.material.id.name}_pdf`);
-  parts.push(`// Scene (${modules.scene.id.name}): ${modules.scene.id.name}_intersect`);
-  parts.push(`// Estimator (${modules.estimator.id.name}): ${modules.estimator.id.name}_estimate`);
-  parts.push(`// Film (${modules.film.id.name}): ${modules.film.id.name}_accumulate`);
-  parts.push(`// Developer (${modules.developer.id.name}): ${modules.developer.id.name}_develop`);
+  // Document the prefixing convention
+  parts.push('// ============ KIND Prefixing Convention ============');
+  parts.push('// All public functions use module KIND as prefix:');
+  parts.push('// Geometry: geometry_geodesic(), geometry_frame()');
+  parts.push('// Scene: scene_intersect(), scene_material_properties()');
+  parts.push('// Lighting: lighting_sample(), lighting_get_light()');
+  parts.push('// Camera: camera_generateRay()');
+  parts.push('// Transport: transport_trace()');
+  parts.push('// Interaction: interaction_surface_shade(), interaction_surface_scatter()');
+  parts.push('// Film: film_accumulate()');
+  parts.push('// Developer: developer_develop()');
   parts.push('');
   
   // Concatenate modules in fixed order - NO TRANSFORMATION
@@ -273,7 +276,7 @@ private assembleFragmentShader(modules: ModuleCollection): string {
       parts.push(module.fragment.constants);
     }
     
-    // Add module functions AS-IS (already prefixed)
+    // Add module functions AS-IS (already KIND-prefixed)
     parts.push(module.fragment.functions);
     parts.push('');
   }
@@ -283,7 +286,7 @@ private assembleFragmentShader(modules: ModuleCollection): string {
   parts.push(this.getEngineUniforms());
   parts.push('');
   
-  // Main function - uses actual module names for prefixes
+  // Main function - uses KIND prefixes
   parts.push('// ============ Main Orchestration ============');
   parts.push(this.generateMainFunction(modules));
   
@@ -293,7 +296,7 @@ private assembleFragmentShader(modules: ModuleCollection): string {
 private getCommonTypes(): string {
   // Basic types that all modules need
   return `
-// Spectrum types for future spectral rendering
+// Spectral types for future spectral rendering
 typedef vec3 Spectrum;
 typedef vec3 Radiance;
 typedef vec3 RGB;
@@ -301,6 +304,7 @@ typedef vec3 RGB;
 // Geometric types (may be overridden by geometry module)
 typedef vec3 Point;
 typedef vec3 Direction;
+typedef vec3 Normal;
 
 // Core structures
 struct Ray {
@@ -311,22 +315,40 @@ struct Ray {
 
 struct Hit {
   Point p;
-  Direction n;
-  Direction incident;
+  Normal n;
   float t;
   vec2 uv;
   
   int material_from;
   int material_to;
-  float ior_ratio;
   
-  int object_id;
-  int part_id;
+  Frame frame;
 };
 
 struct Frame {
   Point base;
   Direction t, b, n;
+};
+
+// Material properties (data only)
+struct MaterialProperties {
+  vec3 albedo;
+  float roughness;
+  float metallic;
+  float ior;
+  vec3 emission;
+  float emission_strength;
+  int light_id;  // Direct reference to light array
+  int flags;
+};
+
+// Light sampling
+struct LightSample {
+  Point point;
+  Direction wi;
+  Spectrum radiance;
+  float pdf;
+  float distance;
 };`;
 }
 
@@ -348,31 +370,27 @@ out vec4 fragColor;`;
 }
 
 private generateMainFunction(modules: ModuleCollection): string {
-  // Generate main using ACTUAL module names for prefixes
-  const camera = modules.camera.id.name;
-  const estimator = modules.estimator.id.name;
-  const film = modules.film.id.name;
-  const developer = modules.developer.id.name;
-  
+  // Generate main using KIND prefixes (not module names!)
   return `
 void main() {
   vec2 pixel = gl_FragCoord.xy;
   ivec2 pixel_id = ivec2(pixel);
   
-  // Random dimension tracking would be initialized here
-  // (provided by math pillar, not engine)
+  // Random dimension tracking initialized here
+  // (provided by math infrastructure)
   
-  // Generate camera ray - using module's actual prefix
-  Ray ray = ${camera}_generateRay(pixel);
+  // Generate camera ray - using KIND prefix
+  vec2 xi = next_2d();
+  Ray ray = camera_generateRay(pixel, xi);
   
-  // Estimate radiance - using module's actual prefix
-  Spectrum radiance = ${estimator}_estimate(ray);
+  // Compute radiance - using KIND prefix
+  Spectrum radiance = transport_trace(ray);
   
-  // Accumulate in film - using module's actual prefix
-  Radiance accumulated = ${film}_accumulate(radiance, pixel);
+  // Accumulate in film - using KIND prefix
+  Radiance accumulated = film_accumulate(radiance, pixel);
   
-  // Develop to display color - using module's actual prefix
-  RGB color = ${developer}_develop(accumulated);
+  // Develop to display color - using KIND prefix
+  RGB color = developer_develop(accumulated);
   
   fragColor = vec4(color, 1.0);
 }`;
@@ -726,22 +744,22 @@ registry.registerDefaults();
 
 const compiler = new SimpleCompiler(gl, registry);
 
-// Define recipes - module names determine function prefixes
+// Define recipes - modules use KIND prefixes
 const recipes: Recipe[] = [
   {
     id: 'pathtracer',
     name: 'Path Tracer',
     world: {
-      geometry: { kind: 'geometry', name: 'euclidean' },     // Functions: euclidean_*
-      material: { kind: 'material', name: 'disney' },        // Functions: disney_*
-      scene: { kind: 'scene', name: 'sdf' },                 // Functions: sdf_*
-      lights: { kind: 'lights', name: 'hdri' }               // Functions: hdri_*
+      geometry: { kind: 'geometry', name: 'euclidean' },      
+      scene: { kind: 'scene', name: 'compiled_12345' },     // From WorldCompiler
+      lighting: { kind: 'lighting', name: 'compiled_12345' } // From WorldCompiler
     },
     photography: {
-      camera: { kind: 'camera', name: 'pinhole' },           // Functions: pinhole_*
-      estimator: { kind: 'estimator', name: 'pathtracer' },  // Functions: pathtracer_*
-      film: { kind: 'film', name: 'variance' },              // Functions: variance_*
-      developer: { kind: 'developer', name: 'aces' }         // Functions: aces_*
+      camera: { kind: 'camera', name: 'pinhole' },           
+      transport: { kind: 'transport', name: 'pathtracer' },  
+      interaction: { kind: 'interaction', name: 'disney' },  
+      film: { kind: 'film', name: 'variance' },              
+      developer: { kind: 'developer', name: 'aces' }         
     }
   }
 ];
@@ -752,13 +770,13 @@ compiler.initialize(recipes);
 // Compiling 1 shader programs...
 //   ✓ pathtracer (142.3ms)
 // Compilation complete: 142.3ms total
-// All modules use manual prefixing (moduleName_functionName)
+// All modules use KIND prefixing (camera_, transport_, interaction_, etc.)
 
 // The generated main() will call:
-// - pinhole_generateRay()
-// - pathtracer_estimate()
-// - variance_accumulate()
-// - aces_develop()
+// - camera_generateRay()
+// - transport_trace()
+// - film_accumulate()
+// - developer_develop()
 
 // Retrieve pre-compiled program instantly
 const program = compiler.getProgram('pathtracer');
@@ -794,7 +812,7 @@ console.log(`Compiled in ${report.averageTime.toFixed(1)}ms average`);
 
 // Get source for debugging (shows actual concatenated GLSL)
 const source = compiler.getSource(program.id);
-console.log('Fragment shader includes prefixed functions:');
+console.log('Fragment shader includes KIND-prefixed functions:');
 console.log(source?.fragment.substring(0, 1000));
 
 // Cleanup
@@ -816,7 +834,7 @@ try {
   // Context around line 234:
   //      231: uniform vec3 u_camera_position;
   //      232: 
-  //      233: Ray pinhole_generateRay(vec2 pixel) {
+  //      233: Ray camera_generateRay(vec2 pixel) {
   //  >>> 234:   return Ray(camera_positio, normalize(dir));
   //      235:   //         ^^^^^^^^^^^^^^ typo here!
   //      236: }
@@ -827,20 +845,20 @@ try {
 
 | Aspect | Old System | Simplified System |
 |--------|------------|-------------------|
-| **Prefixing** | Automatic transformation | Manual by module authors |
-| **Function calls** | Generated prefixes | Use actual module names |
-| **Compilation** | 8-stage pipeline | Direct concatenation |
-| **main() generation** | Fixed prefixes | Dynamic based on module names |
+| **Prefixing** | Module name prefixes | KIND prefixes |
+| **Function calls** | Variable prefixes | Fixed KIND prefixes |
 | **Module processing** | Transform code | Use as-written |
-| **Error context** | Not provided | Shows surrounding lines |
+| **Material module** | Separate module | Part of Scene |
+| **Interaction module** | Missing | Handles all BRDFs |
+| **main() generation** | Complex | Simple KIND calls |
 
 ## Invariants
 
 1. **All recipes compiled at startup** - No runtime compilation
-2. **Recipe IDs are cache keys** - Direct lookup, no concatenation
-3. **Modules used as-written** - No code transformation, manual prefixes
-4. **Fixed module order** - Same concatenation order for all recipes
-5. **main() uses actual module names** - Calls pinhole_generateRay, not camera_generateRay
+2. **Recipe IDs are cache keys** - Direct lookup
+3. **Modules used as-written** - No code transformation
+4. **Fixed module order** - Same concatenation for all recipes
+5. **main() uses KIND prefixes** - Calls camera_generateRay, not pinhole_generateRay
 6. **Uniforms mapped once** - At compilation time
 7. **Shaders deleted after linking** - Memory cleanup
 8. **Error context provided** - Shows lines around compilation errors
@@ -860,7 +878,7 @@ try {
 
 ## Performance Requirements
 
-- Recipe compilation: < 200ms typical (simpler than old system)
+- Recipe compilation: < 200ms typical
 - Total initialization: < 1000ms for 3 recipes
 - Program retrieval: O(1) from cache
 - Uniform update: < 0.1ms per uniform

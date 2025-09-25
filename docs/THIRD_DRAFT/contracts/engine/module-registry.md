@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The ModuleRegistry stores all available modules, validates they implement required functions with correct manual prefixing, and provides modules to the SimpleCompiler. It acts as the module database and enforces the manual prefixing convention.
+The ModuleRegistry stores all available modules, validates they implement required functions with correct KIND prefixing, and provides modules to the SimpleCompiler. It acts as the module database and enforces the KIND prefixing convention.
 
 ## Required Interface
 
@@ -59,7 +59,7 @@ class ModuleRegistry {
 
 ## Module Validation Contract
 
-Each module MUST provide specific functions with manual prefixing based on module NAME:
+Each module MUST provide specific functions with KIND-based prefixing:
 
 ```typescript
 validateModule(module: ModuleDescriptor): ValidationResult {
@@ -74,22 +74,22 @@ validateModule(module: ModuleDescriptor): ValidationResult {
   
   // 2. Valid kind
   const validKinds: ModuleKind[] = [
-    'geometry', 'material', 'scene', 'lights',
-    'camera', 'estimator', 'film', 'developer'
+    'geometry', 'scene', 'lighting',
+    'camera', 'transport', 'interaction', 'film', 'developer'
   ];
   if (!validKinds.includes(module.id.kind)) {
     errors.push(`Invalid kind: ${module.id.kind}`);
   }
   
-  // 3. Required functions with MANUAL PREFIXING
+  // 3. Required functions with KIND PREFIXING
   const requiredFunctions = this.getRequiredFunctions(module.id.kind);
   if (requiredFunctions.length > 0) {
     const source = module.fragment.functions;
-    const modulePrefix = `${module.id.name}_`;  // PREFIX IS MODULE NAME
+    const kindPrefix = `${module.id.kind}_`;  // PREFIX IS MODULE KIND
     
     for (const funcName of requiredFunctions) {
-      // Enforce exact pattern: moduleName_functionName
-      const expectedFunction = `${modulePrefix}${funcName}`;
+      // Enforce exact pattern: kind_functionName
+      const expectedFunction = `${kindPrefix}${funcName}`;
       const pattern = new RegExp(`\\b${expectedFunction}\\s*\\(`);
       
       if (!pattern.test(source)) {
@@ -97,29 +97,38 @@ validateModule(module: ModuleDescriptor): ValidationResult {
           `Module '${module.id.name}' (${module.id.kind}) missing required function: ${expectedFunction}()`
         );
         
-        // Try to find unprefixed version for helpful error
+        // Try to find incorrectly prefixed version for helpful error
+        const wrongPattern = new RegExp(`\\b${module.id.name}_${funcName}\\s*\\(`);
+        if (wrongPattern.test(source)) {
+          context.push(
+            `Found '${module.id.name}_${funcName}' with wrong prefix. ` +
+            `All functions must use KIND prefix: ${expectedFunction}`
+          );
+        }
+        
+        // Check for unprefixed version
         const unprefixedPattern = new RegExp(`\\b${funcName}\\s*\\(`);
         if (unprefixedPattern.test(source)) {
           context.push(
             `Found '${funcName}' without prefix. ` +
-            `All functions must be manually prefixed: ${expectedFunction}`
+            `All functions must be KIND-prefixed: ${expectedFunction}`
           );
         }
       }
     }
   }
   
-  // 4. Check for unprefixed versions of required functions (warning)
+  // 4. Check for module-name prefixed versions (warning)
   const requiredFuncs = this.getRequiredFunctions(module.id.kind);
   for (const func of requiredFuncs) {
-    const unprefixedPattern = new RegExp(`\\b${func}\\s*\\(`);
-    const prefixedPattern = new RegExp(`\\b${module.id.name}_${func}\\s*\\(`);
+    const wrongPrefix = new RegExp(`\\b${module.id.name}_${func}\\s*\\(`);
+    const correctPrefix = new RegExp(`\\b${module.id.kind}_${func}\\s*\\(`);
     
-    if (unprefixedPattern.test(module.fragment.functions) && 
-        prefixedPattern.test(module.fragment.functions)) {
-      warnings.push(
-        `Found both '${func}' and '${module.id.name}_${func}'. ` +
-        `Consider removing unprefixed version.`
+    if (wrongPrefix.test(module.fragment.functions) && 
+        !correctPrefix.test(module.fragment.functions)) {
+      errors.push(
+        `Found '${module.id.name}_${func}' but need '${module.id.kind}_${func}'. ` +
+        `Use KIND prefix, not module name.`
       );
     }
   }
@@ -155,37 +164,37 @@ validateModule(module: ModuleDescriptor): ValidationResult {
 
 ## Required Functions by Module Kind
 
-These are the BASE function names that MUST be prefixed with the module name:
+These are the BASE function names that MUST be prefixed with the module KIND:
 
 ```typescript
 private getRequiredFunctions(kind: ModuleKind): string[] {
-  // Returns base function names that must exist with module prefix
-  // Example: 'generateRay' must become 'moduleName_generateRay'
+  // Returns base function names that must exist with KIND prefix
+  // Example: 'generateRay' must become 'camera_generateRay'
   
   switch (kind) {
     case 'geometry':
       return ['geodesic', 'dot', 'parallel_transport', 'frame'];
       
-    case 'material':
-      return ['evaluate', 'sample', 'pdf'];
-      
     case 'scene':
-      return ['intersect', 'intersect_any', 'classify_point'];
+      return ['intersect', 'intersect_any', 'material_properties', 'material_at'];
       
-    case 'lights':
-      return ['sample_light', 'eval_light', 'pdf_light'];
+    case 'lighting':
+      return ['sample', 'pdf', 'get_light', 'can_sample'];
       
     case 'camera':
-      return ['generateRay'];  // Must be prefixed: pinhole_generateRay
+      return ['generateRay'];  // Must be prefixed: camera_generateRay
       
-    case 'estimator':
-      return ['estimate'];     // Must be prefixed: pathtracer_estimate
+    case 'transport':
+      return ['trace'];        // Must be prefixed: transport_trace
+      
+    case 'interaction':
+      return ['surface_shade', 'surface_scatter', 'surface_pdf'];
       
     case 'film':
-      return ['accumulate'];   // Must be prefixed: variance_accumulate
+      return ['accumulate'];   // Must be prefixed: film_accumulate
       
     case 'developer':
-      return ['develop'];      // Must be prefixed: aces_develop
+      return ['develop'];      // Must be prefixed: developer_develop
       
     default:
       return [];
@@ -197,7 +206,7 @@ private getRequiredFunctions(kind: ModuleKind): string[] {
 
 ```typescript
 register(module: ModuleDescriptor): void {
-  // 1. Validate with prefixing enforcement
+  // 1. Validate with KIND prefixing enforcement
   const validation = this.validateModule(module);
   if (!validation.valid) {
     const errorMsg = validation.errors.join('\n');
@@ -232,7 +241,7 @@ register(module: ModuleDescriptor): void {
   }
   this.byKind.get(module.id.kind)!.add(module);
   
-  console.log(`Registered module: ${key} (functions prefixed with '${module.id.name}_')`);
+  console.log(`Registered module: ${key} (functions use '${module.id.kind}_' prefix)`);
 }
 
 registerBatch(modules: ModuleDescriptor[]): void {
@@ -277,11 +286,11 @@ checkCompatibility(recipe: Recipe): CompatibilityResult {
   // Check all 8 modules exist
   const moduleRefs = [
     recipe.world.geometry,
-    recipe.world.material,
     recipe.world.scene,
-    recipe.world.lights,
+    recipe.world.lighting,
     recipe.photography.camera,
-    recipe.photography.estimator,
+    recipe.photography.transport,
+    recipe.photography.interaction,
     recipe.photography.film,
     recipe.photography.developer
   ];
@@ -303,11 +312,11 @@ checkCompatibility(recipe: Recipe): CompatibilityResult {
     }
   }
   
-  // Note about prefixing
+  // Note about KIND prefixing
   if (result.compatible) {
     console.log('Recipe compatible. Module function prefixes:');
     for (const ref of moduleRefs) {
-      console.log(`  ${ref.kind}: ${ref.name}_*`);
+      console.log(`  ${ref.kind}: ${ref.kind}_*`);
     }
   }
   
@@ -329,19 +338,19 @@ resolveModules(recipe: Recipe): ModuleCollection {
   
   const collection = {
     geometry: get(recipe.world.geometry),
-    material: get(recipe.world.material),
     scene: get(recipe.world.scene),
-    lights: get(recipe.world.lights),
+    lighting: get(recipe.world.lighting),
     camera: get(recipe.photography.camera),
-    estimator: get(recipe.photography.estimator),
+    transport: get(recipe.photography.transport),
+    interaction: get(recipe.photography.interaction),
     film: get(recipe.photography.film),
     developer: get(recipe.photography.developer)
   };
   
   // Log the expected function prefixes for debugging
-  console.log('Module collection resolved with prefixes:');
+  console.log('Module collection resolved with KIND prefixes:');
   for (const [kind, module] of Object.entries(collection)) {
-    console.log(`  ${kind}: ${module.id.name}_*`);
+    console.log(`  ${kind}: ${kind}_* (implementation: ${module.id.name})`);
   }
   
   return collection;
@@ -417,24 +426,24 @@ registerDefaults(): void {
     { kind: 'geometry', name: 'euclidean' },
     { kind: 'geometry', name: 'spherical' },
     
-    // Materials  
-    { kind: 'material', name: 'lambert' },
-    { kind: 'material', name: 'disney' },
-    
-    // Scenes
+    // Scene (compiled by WorldCompiler usually)
     { kind: 'scene', name: 'sdf' },
     
-    // Lights
-    { kind: 'lights', name: 'point' },
-    { kind: 'lights', name: 'hdri' },
+    // Lighting (compiled by WorldCompiler usually)
+    { kind: 'lighting', name: 'point' },
+    { kind: 'lighting', name: 'hdri' },
     
     // Cameras
     { kind: 'camera', name: 'pinhole' },
     { kind: 'camera', name: 'thin_lens' },
     
-    // Estimators
-    { kind: 'estimator', name: 'pathtracer' },
-    { kind: 'estimator', name: 'debug' },
+    // Transport
+    { kind: 'transport', name: 'pathtracer' },
+    { kind: 'transport', name: 'debug' },
+    
+    // Interaction
+    { kind: 'interaction', name: 'lambert' },
+    { kind: 'interaction', name: 'disney' },
     
     // Films
     { kind: 'film', name: 'simple' },
@@ -451,15 +460,15 @@ registerDefaults(): void {
     this.builtInModules.add(this.getKey(spec.kind as ModuleKind, spec.name));
   }
   
-  console.log(`Registered ${builtIns.length} built-in modules with manual prefixing`);
+  console.log(`Registered ${builtIns.length} built-in modules with KIND prefixing`);
 }
 
 private createBuiltInModule(spec: any): ModuleDescriptor {
-  // Create stub module with PROPERLY PREFIXED functions
-  const prefix = `${spec.name}_`;  // Module name is the prefix
+  // Create stub module with PROPERLY KIND-PREFIXED functions
+  const kindPrefix = `${spec.kind}_`;  // KIND is the prefix
   const functions = this.getRequiredFunctions(spec.kind).map(fn => {
-    // Generate properly prefixed function
-    return `vec3 ${prefix}${fn}() { return vec3(0.0); }`;
+    // Generate properly KIND-prefixed function
+    return `vec3 ${kindPrefix}${fn}() { return vec3(0.0); }`;
   }).join('\n');
   
   return {
@@ -501,33 +510,34 @@ dispose(): void {
 // Create registry
 const registry = new ModuleRegistry();
 
-// Register built-in modules (all with proper prefixing)
+// Register built-in modules (all with KIND prefixing)
 registry.registerDefaults();
 
-// Register custom module WITH MANUAL PREFIXING
-const customMaterial: ModuleDescriptor = {
+// Register custom module WITH KIND PREFIXING
+const customInteraction: ModuleDescriptor = {
   id: { 
-    kind: 'material', 
-    name: 'custom_brdf',  // This is the prefix for all functions
+    kind: 'interaction', 
+    name: 'custom_brdf',  // This is the implementation name
     version: '1.0.0' 
   },
   fragment: {
     functions: `
-      uniform vec3 u_material_albedo;
-      uniform float u_material_roughness;
+      uniform vec3 u_interaction_albedo;
+      uniform float u_interaction_roughness;
       
-      // CORRECT: All functions manually prefixed with module name
-      vec3 custom_brdf_evaluate(vec3 wi, vec3 wo, Hit hit) {
-        return u_material_albedo / PI;
+      // CORRECT: All functions use KIND prefix
+      Spectrum interaction_surface_shade(vec3 wi, vec3 wo, Hit hit) {
+        MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+        return Spectrum(props.albedo / PI);
       }
       
-      vec3 custom_brdf_sample(vec3 wi, Hit hit, vec2 xi, out float pdf) {
+      vec3 interaction_surface_scatter(vec3 wi, Hit hit, vec2 xi, out float pdf) {
         vec3 wo = sample_hemisphere(xi, hit.n);
         pdf = 1.0 / (2.0 * PI);
         return wo;
       }
       
-      float custom_brdf_pdf(vec3 wi, vec3 wo, Hit hit) {
+      float interaction_surface_pdf(vec3 wi, vec3 wo, Hit hit) {
         return 1.0 / (2.0 * PI);
       }
       
@@ -555,10 +565,10 @@ const customMaterial: ModuleDescriptor = {
   ]
 };
 
-// Register validates prefixing
+// Register validates KIND prefixing
 try {
-  registry.register(customMaterial);
-  console.log('Module registered with functions: custom_brdf_*');
+  registry.register(customInteraction);
+  console.log('Module registered with functions: interaction_*');
 } catch (e) {
   console.error('Validation failed - check function prefixing');
 }
@@ -568,16 +578,16 @@ const recipe: Recipe = {
   id: 'test',
   name: 'Test Recipe',
   world: {
-    geometry: { kind: 'geometry', name: 'euclidean' },     // Expects: euclidean_*
-    material: { kind: 'material', name: 'custom_brdf' },   // Expects: custom_brdf_*
-    scene: { kind: 'scene', name: 'sdf' },                 // Expects: sdf_*
-    lights: { kind: 'lights', name: 'point' }              // Expects: point_*
+    geometry: { kind: 'geometry', name: 'euclidean' },     
+    scene: { kind: 'scene', name: 'sdf' },                 
+    lighting: { kind: 'lighting', name: 'point' }         
   },
   photography: {
-    camera: { kind: 'camera', name: 'pinhole' },           // Expects: pinhole_*
-    estimator: { kind: 'estimator', name: 'pathtracer' },  // Expects: pathtracer_*
-    film: { kind: 'film', name: 'simple' },                // Expects: simple_*
-    developer: { kind: 'developer', name: 'reinhard' }     // Expects: reinhard_*
+    camera: { kind: 'camera', name: 'pinhole' },           
+    transport: { kind: 'transport', name: 'pathtracer' },  
+    interaction: { kind: 'interaction', name: 'custom_brdf' }, 
+    film: { kind: 'film', name: 'simple' },                
+    developer: { kind: 'developer', name: 'reinhard' }     
   }
 };
 
@@ -587,10 +597,11 @@ if (!compatibility.compatible) {
   console.log('Suggestions:', compatibility.suggestions);
 } else {
   console.log('Recipe compatible!');
-  console.log('Functions will be called with these prefixes:');
-  console.log('  Camera: pinhole_generateRay()');
-  console.log('  Material: custom_brdf_evaluate(), custom_brdf_sample(), custom_brdf_pdf()');
-  console.log('  Scene: sdf_intersect()');
+  console.log('Functions will be called with KIND prefixes:');
+  console.log('  Camera: camera_generateRay()');
+  console.log('  Transport: transport_trace()');
+  console.log('  Interaction: interaction_surface_shade(), interaction_surface_scatter()');
+  console.log('  Scene: scene_intersect(), scene_material_properties()');
   // etc.
 }
 
@@ -598,15 +609,14 @@ if (!compatibility.compatible) {
 const modules = registry.resolveModules(recipe);
 
 // Search for specific modules
-const hdriLights = registry.search({
-  kind: 'lights',
-  name: 'hdri'
+const interactions = registry.search({
+  kind: 'interaction'
 });
 
-// Get all materials
-const materials = registry.listByKind('material');
-console.log(`Available materials: ${materials.map(m => m.id.name).join(', ')}`);
-console.log('Each uses prefix: <name>_* for functions');
+// Get all transport modules
+const transports = registry.listByKind('transport');
+console.log(`Available transport modules: ${transports.map(m => m.id.name).join(', ')}`);
+console.log('All use prefix: transport_* for functions');
 
 // Cleanup
 registry.dispose();
@@ -616,60 +626,62 @@ registry.dispose();
 
 ```typescript
 // This module will FAIL validation
-const badMaterial: ModuleDescriptor = {
+const badInteraction: ModuleDescriptor = {
   id: { 
-    kind: 'material', 
-    name: 'bad_material',
+    kind: 'interaction', 
+    name: 'bad_brdf',
     version: '1.0.0' 
   },
   fragment: {
     functions: `
-      // WRONG: Functions not prefixed
-      vec3 evaluate(vec3 wi, vec3 wo, Hit hit) {
+      // WRONG: Functions using module name instead of KIND
+      vec3 bad_brdf_surface_shade(vec3 wi, vec3 wo, Hit hit) {
         return vec3(1.0);
       }
       
-      // WRONG: Inconsistent prefixing
-      vec3 bad_material_sample(vec3 wi, Hit hit, vec2 xi, out float pdf) {
+      // WRONG: Unprefixed function
+      vec3 surface_scatter(vec3 wi, Hit hit, vec2 xi, out float pdf) {
         pdf = 1.0;
         return vec3(0.0);
       }
       
-      // MISSING: No pdf function at all
+      // MISSING: No surface_pdf function at all
     `
   }
 };
 
 try {
-  registry.register(badMaterial);
+  registry.register(badInteraction);
 } catch (e) {
   console.error(e);
   // Error output:
   // Module validation failed:
-  // Module 'bad_material' (material) missing required function: bad_material_evaluate()
-  // Module 'bad_material' (material) missing required function: bad_material_pdf()
-  // Found 'evaluate' without prefix. All functions must be manually prefixed: bad_material_evaluate
+  // Module 'bad_brdf' (interaction) missing required function: interaction_surface_shade()
+  // Module 'bad_brdf' (interaction) missing required function: interaction_surface_scatter()
+  // Module 'bad_brdf' (interaction) missing required function: interaction_surface_pdf()
+  // Found 'bad_brdf_surface_shade' with wrong prefix. All functions must use KIND prefix: interaction_surface_shade
+  // Found 'surface_scatter' without prefix. All functions must be KIND-prefixed: interaction_surface_scatter
 }
 ```
 
 ## Invariants
 
 1. **No duplicate modules** - same kind:name pair cannot be registered twice
-2. **Required functions validated WITH PREFIX** - each module must provide prefixed functions
-3. **Prefix is module NAME** - not kind, always moduleName_functionName
+2. **Required functions validated WITH KIND PREFIX** - each module must provide KIND-prefixed functions
+3. **Prefix is module KIND** - not module name, always kind_functionName
 4. **Parameter validation** - min < max, default in range
-5. **Built-ins use prefixing** - even built-in modules follow the convention
-6. **Manual prefixing only** - no automatic transformation
+5. **Built-ins use KIND prefixing** - even built-in modules follow the convention
+6. **No automatic transformation** - modules must be correctly prefixed
 
 ## Error Handling
 
 | Error | Response |
 |-------|----------|
 | Invalid module structure | Throw with validation errors |
-| Missing function prefix | Include in validation errors with context |
+| Wrong function prefix | Include in validation errors with context |
 | Duplicate registration | Throw with module info |
 | Module not found | Throw ModuleNotFoundError |
-| Unprefixed functions found | Provide helpful context about manual prefixing |
+| Unprefixed functions found | Provide helpful context about KIND prefixing |
 | Invalid parameter ranges | Include in validation warnings |
 
 ## Performance Requirements

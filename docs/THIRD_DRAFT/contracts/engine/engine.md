@@ -46,7 +46,7 @@ interface Engine {
   getPerformanceReport(): PerformanceReport;
   resetStatistics(): void;
   
-  //resizing
+  // Resizing
   resize(width: number, height: number): void;
   
   // Cleanup
@@ -171,28 +171,27 @@ private setupContextHandling(): void {
 }
 ```
 
-
-Resizing things:
+## Resizing
 
 ```typescript
 resize(width: number, height: number): void {
-if (width <= 0 || height <= 0) {
-throw new Error(`Invalid dimensions: ${width}x${height}`);
-}
-
-// Update viewport
-this.viewport = { x: 0, y: 0, width, height };
-this.executor.setViewport(0, 0, width, height);
-
-// Resize film buffers if we have an active recipe
-if (this.activeRecipeId) {
-this.resources.resizeFilmBuffers(this.activeRecipeId, width, height);
-
+  if (width <= 0 || height <= 0) {
+    throw new Error(`Invalid dimensions: ${width}x${height}`);
+  }
+  
+  // Update viewport
+  this.viewport = { x: 0, y: 0, width, height };
+  this.executor.setViewport(0, 0, width, height);
+  
+  // Resize film buffers if we have an active recipe
+  if (this.activeRecipeId) {
+    this.resources.resizeFilmBuffers(this.activeRecipeId, width, height);
+    
     // Clear accumulation since dimensions changed
     this.clearAccumulation();
     
     console.log(`Resized to ${width}x${height}, accumulation reset`);
-}
+  }
 }
 ```
 
@@ -369,7 +368,7 @@ private shouldResetAccumulation(changes: ParameterChanges): boolean {
   if (changes.triggersReset) return true;
   
   // Parameters that require reset
-  const resetTriggers = ['camera.', 'material.', 'lights.', 'scene.'];
+  const resetTriggers = ['camera.', 'scene.', 'lighting.', 'transport.', 'interaction.'];
   
   // Parameters that don't reset
   const noReset = ['developer.', 'film.alpha'];
@@ -529,33 +528,32 @@ resetStatistics(): void {
 
 ```typescript
 private handleContextLoss(): void {
-    // Transition to error state
-    this.state = {
-        type: 'error',
-        error: new Error('WebGL context lost'),
-        recoverable: true
-    };
-
-    // Notify all subsystems about context loss
-    this.executor.handleContextLoss();
-    this.resources.handleContextLoss();  // This will report available snapshots
-    // Note: Compiler and Registry don't need notification (no GPU resources)
-
-    // Clear references to GPU resources (don't try to delete - they're gone)
-    this.activeProgram = null;
-    this.activeRecipeId = null;
-
-    // Log clear warning about data loss
-    console.warn('WebGL context lost - all GPU resources invalidated');
-    console.warn('IMPORTANT: All accumulated samples for all recipes will be lost');
-    console.warn('Context can be restored, but accumulation must restart from frame 0');
-    
-    // Check if we have snapshots as reference
-    if (this.config.enableSnapshots) {
-        console.log('Note: Snapshots may be available as reference images');
-    }
+  // Transition to error state
+  this.state = {
+    type: 'error',
+    error: new Error('WebGL context lost'),
+    recoverable: true
+  };
+  
+  // Notify all subsystems about context loss
+  this.executor.handleContextLoss();
+  this.resources.handleContextLoss();  // This will report available snapshots
+  // Note: Compiler and Registry don't need notification (no GPU resources)
+  
+  // Clear references to GPU resources (don't try to delete - they're gone)
+  this.activeProgram = null;
+  this.activeRecipeId = null;
+  
+  // Log clear warning about data loss
+  console.warn('WebGL context lost - all GPU resources invalidated');
+  console.warn('IMPORTANT: All accumulated samples for all recipes will be lost');
+  console.warn('Context can be restored, but accumulation must restart from frame 0');
+  
+  // Check if we have snapshots as reference
+  if (this.config.enableSnapshots) {
+    console.log('Note: Snapshots may be available as reference images');
+  }
 }
-
 
 private handleContextRestore(): void {
   console.log('Attempting to restore after context loss...');
@@ -633,20 +631,20 @@ const engine = new Engine(gl, {
   snapshotInterval: 600       // Every ~10 seconds at 60fps
 });
 
-// Define recipes
+// Define recipes using KIND prefixes
 const recipes: Recipe[] = [
   {
     id: 'pathtracer',
     name: 'Path Tracer',
     world: {
       geometry: { kind: 'geometry', name: 'euclidean' },
-      material: { kind: 'material', name: 'disney' },
-      scene: { kind: 'scene', name: 'sdf' },
-      lights: { kind: 'lights', name: 'hdri' }
+      scene: { kind: 'scene', name: 'sdf' },           // Compiled by WorldCompiler
+      lighting: { kind: 'lighting', name: 'hdri' }     // Compiled by WorldCompiler
     },
     photography: {
       camera: { kind: 'camera', name: 'pinhole' },
-      estimator: { kind: 'estimator', name: 'pathtracer' },
+      transport: { kind: 'transport', name: 'pathtracer' },
+      interaction: { kind: 'interaction', name: 'disney' },
       film: { kind: 'film', name: 'variance' },  // Accumulating film
       developer: { kind: 'developer', name: 'aces' }
     }
@@ -654,7 +652,18 @@ const recipes: Recipe[] = [
   {
     id: 'debug',
     name: 'Debug View',
-    // ... debug configuration with non-accumulating film
+    world: {
+      geometry: { kind: 'geometry', name: 'euclidean' },
+      scene: { kind: 'scene', name: 'sdf' },
+      lighting: { kind: 'lighting', name: 'point' }
+    },
+    photography: {
+      camera: { kind: 'camera', name: 'pinhole' },
+      transport: { kind: 'transport', name: 'debug' },
+      interaction: { kind: 'interaction', name: 'debug_normal' },
+      film: { kind: 'film', name: 'simple' },  // Non-accumulating
+      developer: { kind: 'developer', name: 'reinhard' }
+    }
   }
 ];
 

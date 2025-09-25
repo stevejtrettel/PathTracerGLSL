@@ -722,15 +722,14 @@ if (!validation.valid) {
 
 // Define film modules for different recipes
 const pathTracerFilm: ModuleDescriptor = {
-  id: { kind: 'film', name: 'variance', version: '1.0.0' },
-  fragment: { 
-    // Functions with manual prefixing
-    functions: `
-      Radiance variance_accumulate(Spectrum radiance, vec2 pixel) {
-        // Implementation
+    id: { kind: 'film', name: 'variance', version: '1.0.0' },
+    fragment: {
+        functions: `
+      Radiance film_accumulate(Spectrum radiance, vec2 pixel) {
+        // Implementation - uses KIND prefix
       }
-    ` 
-  },
+    `
+    },
   resources: {
     textures: [
       { name: 'radiance', format: 'rgba32f', persistent: true },

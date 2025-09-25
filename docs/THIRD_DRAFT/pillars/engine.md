@@ -34,7 +34,7 @@ Each subsystem owns a specific piece of the infrastructure puzzle, designed to b
 
 **ResourceManager** owns all GPU memory allocation and capability detection. At initialization, it interrogates the GPU to understand its limits - can it handle HDR rendering? How many texture units are available? How large can textures be? Based on these capabilities, it manages per-recipe film buffers, ensuring each recipe has its own accumulation buffers that persist when switching between recipes. This is key for preserving accumulated samples when quickly checking debug views. If the GPU can't handle certain requirements, the ResourceManager provides specific, actionable fallback suggestions.
 
-**RenderExecutor** handles the actual WebGL draw calls and frame execution. It manages the full-screen triangle geometry (just 3 vertices that cover the viewport), coordinates render target binding, viewport configuration, and the actual draw call that triggers shader execution. It also handles pixel readback for output, using fence synchronization for non-blocking reads. Despite being called the "executor," it's remarkably simple - its job is to reliably trigger the GPU work that everything else has prepared.
+**RenderExecutor** handles the actual WebGL draw calls and frame execution. It manages the full-screen quad geometry (6 vertices forming 2 triangles that cover the viewport), coordinates render target binding, viewport configuration, and the actual draw call that triggers shader execution. It also handles pixel readback for output, using fence synchronization for non-blocking reads. Despite being called the "executor," it's remarkably simple - its job is to reliably trigger the GPU work that everything else has prepared.
 
 ## The Simplified Compilation Process
 
@@ -177,16 +177,19 @@ if (!engine.isRunning()) {
 }
 ```
 
-### 7. Full-Screen Triangle - Subtle Optimization
+### 7. Full-Screen Quad - Simple and Clear
 
-Instead of the traditional quad (6 vertices), the Engine uses a single triangle (3 vertices):
+The Engine uses a traditional quad (6 vertices, 2 triangles) to cover the viewport:
 
 ```glsl
-// Three vertices that cover the entire screen
+// Six vertices forming two triangles that cover the screen
 vertices = [
     -1, -1,  // Bottom-left
-     3, -1,  // Bottom-right (extends beyond)
-    -1,  3   // Top-left (extends beyond)
+     1, -1,  // Bottom-right
+    -1,  1,  // Top-left
+     1, -1,  // Bottom-right (repeated)
+     1,  1,  // Top-right
+    -1,  1   // Top-left (repeated)
 ];
 ```
 
@@ -214,7 +217,7 @@ vertices = [
 - Warns about accumulation loss on context loss
 
 ### RenderExecutor: The Draw Master
-- Manages the full-screen triangle
+- Manages the full-screen quad
 - Executes WebGL draw calls
 - Handles pixel readback
 - Tracks frame statistics
@@ -227,7 +230,7 @@ All modules use their KIND as prefix, regardless of specific implementation:
 
 ```glsl
 // Module kind: camera (implementation: pinhole, perspective, fisheye, etc.)
-Ray camera_generateRay(vec2 pixel) { ... }
+Ray camera_generateRay(vec2 pixel, vec2 xi) { ... }
 mat4 camera_getProjectionMatrix() { ... }
 
 // Module kind: transport (implementation: pathtracer, volumetric, debug, etc.)
@@ -285,9 +288,10 @@ The main() orchestrator uses module KIND prefixes consistently:
 ```glsl
 void main() {
   vec2 pixel = gl_FragCoord.xy;
+  vec2 xi = next_2d();
   
   // All calls use module KIND as prefix
-  Ray ray = camera_generateRay(pixel);
+  Ray ray = camera_generateRay(pixel, xi);
   Spectrum radiance = transport_trace(ray);
   Radiance accumulated = film_accumulate(radiance, pixel);
   RGB color = developer_develop(accumulated);
@@ -347,7 +351,7 @@ The Engine is purely infrastructural:
 ### From World Modules
 - Receives compiled Scene and Lighting modules from WorldCompiler
 - Hand-written Geometry module
-- Uses them exactly as provided with their prefixes
+- Uses them exactly as provided with their KIND prefixes
 
 ### From Photography Modules
 - Receives hand-written modules for camera, transport, interaction, film, developer
@@ -399,7 +403,7 @@ A 'disney' interaction module still uses 'interaction_' prefix.
 ### Runtime Performance
 - **Per-recipe resources**: No reallocation when switching
 - **Batched uniforms**: All parameter updates flushed once per frame
-- **Single draw call**: One triangle, no state changes
+- **Single draw call**: One quad, no state changes
 - **Async readback**: Non-blocking pixel reads with fence sync
 
 ## Context Loss Reality
@@ -424,32 +428,32 @@ A complete recipe combining World and Photography:
 ```typescript
 interface Recipe {
   world: {
-    geometry: string;           // Hand-written module name
-    scene: ModuleDescriptor;    // Compiled by WorldCompiler
-    lighting: ModuleDescriptor; // Compiled by WorldCompiler
+    geometry: { kind: 'geometry', name: string };        // Hand-written module
+    scene: { kind: 'scene', name: string };              // Compiled by WorldCompiler
+    lighting: { kind: 'lighting', name: string };        // Compiled by WorldCompiler
   };
   photography: {
-    camera: string;             // Hand-written module name
-    transport: string;          // Path tracing strategy
-    interaction: string;        // BRDF/BSDF physics
-    film: string;               // Accumulation strategy
-    developer: string;          // Tone mapping
+    camera: { kind: 'camera', name: string };            // Hand-written module
+    transport: { kind: 'transport', name: string };      // Path tracing strategy
+    interaction: { kind: 'interaction', name: string };  // BRDF/BSDF physics
+    film: { kind: 'film', name: string };                // Accumulation strategy
+    developer: { kind: 'developer', name: string };      // Tone mapping
   };
 }
 
 // Example recipe
-const pathTracerRecipe = {
+const pathTracerRecipe: Recipe = {
   world: {
-    geometry: 'euclidean',
-    scene: compiledSceneModule,    // From WorldCompiler
-    lighting: compiledLightingModule // From WorldCompiler
+    geometry: { kind: 'geometry', name: 'euclidean' },
+    scene: { kind: 'scene', name: 'compiled_12345' },     // From WorldCompiler
+    lighting: { kind: 'lighting', name: 'compiled_12345' } // From WorldCompiler
   },
   photography: {
-    camera: 'pinhole',
-    transport: 'pathtracer',
-    interaction: 'disney',
-    film: 'variance',
-    developer: 'aces'
+    camera: { kind: 'camera', name: 'pinhole' },
+    transport: { kind: 'transport', name: 'pathtracer' },
+    interaction: { kind: 'interaction', name: 'disney' },
+    film: { kind: 'film', name: 'variance' },
+    developer: { kind: 'developer', name: 'aces' }
   }
 };
 ```

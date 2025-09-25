@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The RenderExecutor handles WebGL draw calls, viewport configuration, and pixel readback. It manages the full-screen triangle geometry, coordinates render state, and provides both synchronous and asynchronous pixel reading capabilities.
+The RenderExecutor handles WebGL draw calls, viewport configuration, and pixel readback. It manages the full-screen quad geometry, coordinates render state, and provides both synchronous and asynchronous pixel reading capabilities.
 
 ## Required Interface
 
@@ -62,7 +62,7 @@ class RenderExecutor {
   private resources: ResourceManager;
   
   // Geometry
-  private triangleVAO: WebGLVertexArrayObject | null = null;
+  private quadVAO: WebGLVertexArrayObject | null = null;
   private vertexBuffer: WebGLBuffer | null = null;
   private initialized: boolean = false;
   
@@ -77,19 +77,20 @@ class RenderExecutor {
   private startTime: number;
   
   // Constants
-    private readonly QUAD_VERTICES = new Float32Array([
-        -1, -1,  // Bottom-left
-        1, -1,  // Bottom-right  
-        -1,  1,  // Top-left
-        1, -1,  // Bottom-right (repeated)
-        1,  1,  // Top-right
-        -1,  1   // Top-left (repeated)
-    ]);
+  private readonly QUAD_VERTICES = new Float32Array([
+    -1, -1,  // Bottom-left
+     1, -1,  // Bottom-right  
+    -1,  1,  // Top-left
+     1, -1,  // Bottom-right (repeated)
+     1,  1,  // Top-right
+    -1,  1   // Top-left (repeated)
+  ]);
+}
 ```
 
 ## Geometry Setup Contract
 
-The executor MUST use a full-screen quad:
+The executor uses a full-screen quad (two triangles, 6 vertices):
 
 ```typescript
 setupGeometry(): void {
@@ -113,11 +114,11 @@ setupGeometry(): void {
   }
   
   this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-this.gl.bufferData(
+  this.gl.bufferData(
     this.gl.ARRAY_BUFFER,
     this.QUAD_VERTICES,
     this.gl.STATIC_DRAW
-);
+  );
   
   // Setup position attribute (location 0)
   const positionLoc = 0;
@@ -213,9 +214,9 @@ renderFrame(config?: FrameConfig): void {
   
   // 4. Bind geometry
   this.gl.bindVertexArray(this.quadVAO);
-
-    // 5. Draw the quad (6 vertices, 2 triangles)
-    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+  
+  // 5. Draw the quad (6 vertices, 2 triangles)
+  this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
   
   // 6. Unbind
   this.gl.bindVertexArray(null);
@@ -629,7 +630,7 @@ handleContextLoss(): void {
   
   // Clear internal state
   this.initialized = false;
-  this.triangleVAO = null;
+  this.quadVAO = null;
   this.vertexBuffer = null;
   
   // Don't try to delete WebGL resources - they're already gone
@@ -643,8 +644,8 @@ handleContextLoss(): void {
 dispose(): void {
   // Delete geometry (only if context is still valid)
   if (!this.gl.isContextLost()) {
-    if (this.triangleVAO) {
-      this.gl.deleteVertexArray(this.triangleVAO);
+    if (this.quadVAO) {
+      this.gl.deleteVertexArray(this.quadVAO);
     }
     
     if (this.vertexBuffer) {
@@ -653,7 +654,7 @@ dispose(): void {
   }
   
   // Clear references
-  this.triangleVAO = null;
+  this.quadVAO = null;
   this.vertexBuffer = null;
   
   // Reset state
@@ -733,7 +734,7 @@ executor.dispose();
 
 1. **Geometry initialized** before any rendering
 2. **VAO bound** only during draw call
-3. **Single triangle** covers full viewport (3 vertices, not 6)
+3. **Full-screen quad** covers viewport (6 vertices, 2 triangles)
 4. **Viewport validated** for positive dimensions
 5. **Framebuffer complete** before rendering
 6. **Fence sync deleted** after readback
@@ -755,7 +756,7 @@ executor.dispose();
 ## Performance Requirements
 
 - Geometry setup: Once at initialization
-- Draw call: Single `drawArrays` per frame (3 vertices)
+- Draw call: Single `drawArrays` per frame (6 vertices)
 - State save/restore: < 1ms
 - Async readback: Non-blocking with fence
 - Sync readback: Blocks until complete
