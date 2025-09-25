@@ -1,265 +1,290 @@
+## Complete Implementation Blueprint
 
-# Complete Build Strategy
+### Phase 1: Minimal GPU Triangle
+**Build:**
+- Engine core: ModuleRegistry, SimpleCompiler, RenderExecutor
+- Hardcoded vertex/fragment shaders outputting red
+- Full-screen quad geometry setup
+- Basic WebGL initialization
 
-## Phase 0: Foundation (Day 1-2)
-**Goal**: Basic math and types
+**See:** Red screen
 
-```typescript
-src/
-├── math/
-│   ├── vec3.ts              // Vector operations
-│   ├── mat4.ts              // Matrix operations
-│   └── sampling.ts          // Random sampling utilities
-└── shared/
-    └── types.ts             // Core type definitions
-```
+**Architecture test:** Module validation, shader compilation, WebGL pipeline
 
-**Validation**: Math tests pass
+---
 
-## Phase 1: Minimal Triangle (Day 3-5)
-**Goal**: See a sphere with normal shading
+### Phase 2: First Ray + Minimal App Shell
+**Build:**
+- Euclidean geometry module (`geometry_geodesic`, `geometry_frame`)
+- Pinhole camera module (`camera_generateRay`)
+- MinimalApp class (holds Engine, has `render()` method)
+- KIND-based prefixing validation in Registry
 
-### 1.1 Minimal Engine
-```typescript
-src/engine/
-├── Engine.ts               // Just compile + render
-├── SimpleCompiler.ts       // String concatenation
-└── ModuleRegistry.ts       // Store modules
-```
+**See:** Ray directions as colors
 
-### 1.2 Hardcoded World
-```glsl
-// Hardcoded modules (no compilation yet)
-src/world/
-├── geometry/
-│   └── euclidean.glsl     // geometry_geodesic(), etc.
-└── hardcoded/
-    ├── scene.glsl         // scene_intersect() with one sphere
-    └── lighting.glsl      // lighting_sample() returns white
-```
+**Architecture test:** Module loading, KIND prefixing, concatenation order
 
-### 1.3 Minimal Photography
-```glsl
-src/photography/
-├── camera/
-│   └── pinhole.glsl       // camera_generateRay()
-├── transport/
-│   └── simple.glsl        // transport_trace() - first hit only
-├── interaction/
-│   └── debug_normal.glsl  // interaction_surface_shade() returns normal
-├── film/
-│   └── simple.glsl        // film_accumulate() - no accumulation
-└── developer/
-    └── linear.glsl        // developer_develop() - passthrough
-```
+---
 
-### 1.4 Minimal App
-```typescript
-src/app/
-└── main.ts                // Load modules, compile, render loop
-```
+### Phase 3: First Hit (Minimal)
+**Build:**
+- Hand-written Scene module with single sphere SDF
+- `scene_intersect()` with ray marching
+- Minimal Hit structure: `{p, n, t}`
+- Normal visualization (no materials yet!)
 
-**Validation**: Colored sphere on screen (normal visualization)
+**See:** Shaded sphere (normals as colors)
 
-## Phase 2: Basic Path Tracing (Day 6-8)
-**Goal**: Diffuse bounces with accumulation
+**Architecture test:** Ray marching, SDF evaluation
 
-### 2.1 Real Transport
-```glsl
-// Replace simple.glsl
-src/photography/transport/
-└── pathtracer.glsl        // Actual path tracing (no NEE yet)
-```
+---
 
-### 2.2 Lambert Interaction
-```glsl
-src/photography/interaction/
-└── lambert.glsl           // Cosine-weighted sampling
-```
+### Phase 4: First Material Property
+**Build:**
+- Extend Hit: `{p, n, t, material_to}`
+- `scene_material_properties()` returns just `{albedo}`
+- Simple Interaction module: `interaction_surface_shade()` returns albedo
+- Simple Transport: direct camera ray only, no bounces
 
-### 2.3 Working Film
-```glsl
-src/photography/film/
-└── accumulator.glsl       // Progressive averaging
-```
+**See:** Solid color sphere
 
-### 2.4 Add ParameterStore
-```typescript
-src/app/
-├── ParameterStore.ts      // State management
-└── RenderCoordinator.ts   // Reset logic
-```
+**Architecture test:** **DATA/BEHAVIOR SEPARATION** - Scene provides data, Interaction provides behavior
 
-**Validation**: Converging diffuse Cornell box
+---
 
-## Phase 3: World Compilation (Day 9-12)
-**Goal**: Compiled scenes from descriptions
+### Phase 5: First Parameters
+**Build:**
+- ParameterStore with `camera.position` and `camera.fov`
+- Wire to MinimalApp
+- Manual uniform updates through Engine
+- Direct onChange handler (no coordinator yet)
 
-### 3.1 Implement Compilers
-```typescript
-src/world/compiler/
-├── WorldCompiler.ts       // Orchestrator
-├── SceneCompiler.ts       // Objects → GLSL
-└── LightingCompiler.ts    // Lights → GLSL
-```
+**See:** Camera moves via parameters
 
-### 3.2 Scene Descriptions
-```typescript
-src/scenes/
-├── cornell-box.ts         // Classic test
-└── sphere-on-plane.ts     // Simple scene
-```
+**Architecture test:** Parameter flow, state management
 
-### 3.3 Material→Light System
-- Implement cross-referencing
-- Test emissive materials
-- Verify MIS setup
+---
 
-**Validation**: Compiled scene matches hardcoded
+### Phase 6: Lambert Direct Lighting (ONE-SHOT)
+**Build:**
+- Hand-written Lighting module with single point light
+- `lighting_sample()` returns light position/radiance
+- Shadow rays in Transport using `scene_intersect_any()`
+- Lambert shading with cosine weighting
+- Extend MaterialProperties: `{albedo, emission}`
+- Extend Hit: `{p, n, t, material_to, frame}`
+- **NO ACCUMULATION** - single sample per pixel
 
-## Phase 4: Complete Interaction (Day 13-16)
-**Goal**: Disney BRDF with proper MIS
+**See:** Lit sphere with hard shadows
 
-### 4.1 Disney Interaction
-```glsl
-src/photography/interaction/
-└── disney.glsl            // Full Disney BRDF
-```
+**Architecture test:** Direct lighting pipeline, shadow rays
 
-### 4.2 NEE in Transport
-- Add next event estimation
-- Implement MIS weights
-- Test with area lights
+---
 
-### 4.3 Additional Developers
-```glsl
-src/photography/developer/
-├── reinhard.glsl
-└── aces.glsl
-```
+### Phase 7: First Film (Still One-Shot)
+**Build:**
+- Film module with `film_accumulate()`
+- But `u_sample_count = 0` always (no accumulation yet)
+- Developer module with `developer_develop()` (just gamma correction)
+- Complete main() orchestration
 
-**Validation**: Glass sphere with caustics
+**See:** Same as Phase 6, but through complete pipeline
 
-## Phase 5: Complete Engine (Day 17-19)
-**Goal**: All subsystems working
+**Architecture test:** Film pipeline established, developer integration
 
-### 5.1 ResourceManager
-```typescript
-src/engine/
-└── ResourceManager.ts     // Per-recipe buffers
-```
+---
 
-### 5.2 RenderExecutor
-```typescript
-src/engine/
-└── RenderExecutor.ts      // Full-screen triangle
-```
+### Phase 8: Progressive Accumulation
+**Build:**
+- Add render loop to MinimalApp
+- Increment sample counter each frame
+- Film now accumulates (simple averaging: `mix(old, new, 1/(n+1))`)
+- Still just direct lighting Lambert!
 
-### 5.3 Recipe Switching
-- Test accumulation preservation
-- Verify instant switching
+**See:** Noisy shadows smoothing out over time
 
-**Validation**: Switch recipes without losing samples
+**Architecture test:** Accumulation mathematics, temporal integration
 
-## Phase 6: Full App (Day 20-22)
-**Goal**: Complete orchestration
+---
 
-### 6.1 ResearchApp
-```typescript
-src/app/
-├── ResearchApp.ts         // Main orchestrator
-└── SessionManager.ts      // Save/load
-```
+### Phase 9: Path Tracing WITHOUT NEE
+**Build:**
+- Multiple bounces in Transport (`MAX_BOUNCES = 10`)
+- **NO light sampling** - just trace until hitting emission
+- Materials get emission property
+- `interaction_surface_scatter()` for direction sampling
+- Russian roulette after 3 bounces
+- Material emission check: `if (props.emission > 0)`
 
-### 6.2 Core Extensions
-```typescript
-src/extensions/
-├── InputExtension.ts      // Camera controls
-├── UIExtension.ts         // Parameter panel
-└── StatsExtension.ts      // Performance display
-```
+**See:** Global illumination (very noisy without NEE!)
 
-**Validation**: Interactive research tool
+**Architecture test:** Indirect lighting, path throughput
 
-## Phase 7: Volumes (Day 23-25)
-**Goal**: Delta tracking
+---
 
-### 7.1 Volume Properties
-- Add to MaterialProperties
-- Implement in Scene
+### Phase 10: Reset Logic
+**Build:**
+- ParameterMetadata with `triggersReset` flag
+- Reset detection in MinimalApp
+- `u_film_reset` uniform flag
+- Reset prefixes: `camera.*`, `material.*`
+- No-reset prefixes: `developer.*`
 
-### 7.2 Volume Transport
-```glsl
-// Add to pathtracer.glsl
-- Delta tracking
-- Beer's law
-```
+**See:** Accumulation resets when camera moves
 
-### 7.3 Phase Functions
-```glsl
-// Add to interaction
-- Henyey-Greenstein
-- Isotropic
-```
+**Architecture test:** Parameter change detection, accumulation management
 
-**Validation**: Volumetric caustics
+---
 
-## Phase 8: Production Features (Day 26-28)
-**Goal**: Research-ready system
+### Phase 11: WorldCompiler Introduction
+**Build:**
+- SceneCompiler generates Scene module from descriptions
+- LightingCompiler generates Lighting module
+- Materials with `light_id = -1` (not emissive yet)
+- PassthroughCompiler for geometry (still hand-written)
 
-### 8.1 Advanced Extensions
-```typescript
-src/extensions/
-├── ExperimentExtension.ts // Parameter sweeps
-├── ExportExtension.ts     // Image/data export
-└── ComparisonExtension.ts // A/B testing
-```
+**See:** Same lit sphere, but from compiled modules
 
-### 8.2 Additional Geometries
-```glsl
-src/world/geometry/
-├── spherical.glsl
-└── hyperbolic.glsl
-```
+**Architecture test:** Compilation pipeline, module generation
 
-### 8.3 Environment Maps
-- HDR loading
-- Importance sampling
+---
 
-**Validation**: Publication-quality renders
+### Phase 12: Material→Light References
+**Build:**
+- Add emissive material to scene
+- WorldCompiler assigns `light_id >= 0` to emissive materials
+- Materials directly reference their lights
+- Transport checks `if (props.light_id >= 0)`
+- Still no MIS (full contribution from emissives)
 
-## Testing Strategy
+**See:** Glowing sphere
 
-Each phase should have tests:
+**Architecture test:** Material→light references work
 
-```typescript
-tests/
-├── phase1/
-│   └── sphere-visible.test.ts
-├── phase2/
-│   └── convergence.test.ts
-├── phase3/
-│   └── compilation.test.ts
-└── integration/
-    └── full-system.test.ts
-```
+---
 
-## Key Implementation Notes
+### Phase 13: NEE with MIS
+**Build:**
+- Complete Hit structure: `{p, n, t, material_from, material_to, frame, uv}`
+- `lighting_can_sample()` check in Transport
+- Power heuristic: `weight = (pdf_a^2) / (pdf_a^2 + pdf_b^2)`
+- Both light sampling AND BSDF sampling
+- Combine direct and indirect lighting
 
-1. **Start simple** - Get pixels on screen first
-2. **Test each phase** - Don't move on until working
-3. **Keep modules small** - Easy to debug
-4. **Use KIND prefixing** - `camera_generateRay()` for all cameras
-5. **Compile eagerly** - All recipes at startup
-6. **Direct wiring** - ParameterStore → Engine for performance
+**See:** Clean global illumination with proper variance reduction
 
-## Success Metrics
+**Architecture test:** MIS with light_ids, complete light transport
 
-- **Phase 1**: Something visible (2 days)
-- **Phase 2**: Convergence works (4 days)
-- **Phase 3**: Compilation works (8 days)
-- **Phase 4**: Quality renders (12 days)
-- **Phase 5**: Recipe switching (16 days)
-- **Phase 6**: Full app (20 days)
-- **Phase 7**: Volumes (24 days)
-- **Phase 8**: Production (28 days)
+---
+
+### Phase 14: RenderCoordinator
+**Build:**
+- Extract render loop from MinimalApp
+- Three modes: interactive/progressive/production
+- Mode-specific execution strategies
+- Reset decision logic moved to coordinator
+- Progress reporting callbacks
+
+**See:** Mode switching, progress tracking
+
+**Architecture test:** Execution management separated from app
+
+
+---
+
+### Phase 15: Full Transport Features
+**Build:**
+- Volume support with delta tracking
+- Complete material interface resolution
+- Advanced sampling strategies
+- Proper `material_from`/`material_to` handling
+
+**See:** Volumes, glass, nested dielectrics
+
+**Architecture test:** Complete transport algorithms
+
+
+
+---
+
+### Phase 16: Full ResearchApp + Recipes
+**Build:**
+- ResearchApp with recipe system
+- RecipeBundle with 2-3 recipes (pathtracer, debug, production)
+- Eager compilation at startup
+- Per-recipe film buffers
+- Instant recipe switching
+
+**See:** Switch between pathtracer/debug instantly, accumulation preserved
+
+**Architecture test:** Recipe management, resource preservation
+
+---
+
+### Phase 17: Extension System
+**Build:**
+- Extension interface with install/uninstall
+- Service registry pattern
+- EventBus for loose coupling
+- KeyboardInput extension (r=reset, space=pause)
+- Basic UI extension with stats
+
+**See:** Keyboard controls, stats overlay
+
+**Architecture test:** Extensions work, service discovery
+
+---
+
+### Phase 18: SessionManager
+**Build:**
+- State capture (parameters, camera, extensions)
+- JSON serialization
+- Save/load with version checking
+- Extension state persistence
+
+**See:** Save session, reload exactly same state
+
+**Architecture test:** Complete reproducibility
+
+---
+
+### Phase 19: Advanced Materials
+**Build:**
+- Disney BRDF in Interaction
+- Full MaterialProperties (roughness, metallic, IOR)
+- GGX distribution functions
+- Fresnel equations
+- Complex `interaction_surface_scatter()` with VNDF sampling
+
+**See:** Realistic materials (metals, rough surfaces, glass)
+
+**Architecture test:** Complex shading models
+
+---
+
+### Phase 20: Production Features
+**Build:**
+- UI panel extensions
+- Parameter sweep experiments
+- Screenshot/export extensions
+- Advanced developer modes (ACES, false color, variance visualization)
+- Tiled rendering in production mode
+
+**See:** Full research tool with all features
+
+**Architecture test:** System complete, ready for research
+
+---
+
+## Key Milestones
+
+- **Phase 4**: Data/behavior separation proven
+- **Phase 6**: Direct lighting without accumulation
+- **Phase 8**: Accumulation added to direct lighting
+- **Phase 9**: Path tracing without NEE (needs accumulation)
+- **Phase 12**: Material→light references established
+- **Phase 13**: Full MIS combining everything
+- **Phase 15**: Multi-recipe system with instant switching
+- **Phase 20**: Production-ready research tool
+
+This progression ensures we always have something working on screen while building the real architecture progressively!
