@@ -82,7 +82,7 @@ extension.install(app: ResearchApp, bus: EventEmitter) {
 
 **ShaderCompiler ↔ ModuleRegistry**
 ```typescript
-// Compiler asks Registry for modules
+// ShaderCompiler asks Registry for modules
 registry.resolveModules(recipe) → ModuleCollection
 registry.findProvider(functionName) → ModuleDescriptor
 registry.validateDependencies(modules) → ValidationResult
@@ -98,7 +98,7 @@ resourceManager.swapFilmBuffers() // For accumulation
 
 **UniformBinder ↔ ShaderCompiler**
 ```typescript
-// Compiler provides uniform locations to Binder
+// ShaderCompiler provides uniform locations to Binder
 compiler.extractUniforms(program) → Map<string, UniformInfo>
 binder.buildBindings(program: CompiledProgram)
 ```

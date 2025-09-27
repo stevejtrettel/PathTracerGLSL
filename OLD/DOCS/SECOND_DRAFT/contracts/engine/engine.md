@@ -130,7 +130,7 @@ constructor(gl: WebGL2RenderingContext, config?: EngineConfig) {
   this.executor = new RenderExecutor(gl, this.resources);
   this.executor.setupGeometry();
   
-  // 4. Compiler fourth - needs registry for modules
+  // 4. ShaderCompiler fourth - needs registry for modules
   this.compiler = new ShaderCompiler(gl, this.registry);
   
   // 5. UniformBinder last - operates on compiled programs

@@ -1,6 +1,6 @@
-// src/engine/shaders/shader-compiler.ts
+// src/engine/shaders/shader-ShaderCompiler.ts
 /**
- * shader-compiler.ts — v1.2.1
+ * shader-ShaderCompiler.ts — v1.2.1
  * ------------------------------------------------------------
  * PURPOSE
  *   Take an AssemblyRecipe (modules + constants + entrypoint) and produce
@@ -57,7 +57,7 @@ export interface UniformManifest {
     samplers: ReadonlyArray<SamplerBinding>;
 }
 
-/** Compiler result. */
+/** ShaderCompiler result. */
 export interface CompileOutput {
     vertexSrc: string;
     fragmentSrc: string;

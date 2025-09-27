@@ -145,7 +145,7 @@ constructor(gl: WebGL2RenderingContext, config?: EngineConfig) {
   this.executor = new RenderExecutor(gl, this.resources);
   this.executor.setupGeometry();
   
-  // 4. Compiler last - needs registry for modules
+  // 4. ShaderCompiler last - needs registry for modules
   this.compiler = new SimpleCompiler(gl, this.registry);
   
   // Set up context loss handling
@@ -538,7 +538,7 @@ private handleContextLoss(): void {
   // Notify all subsystems about context loss
   this.executor.handleContextLoss();
   this.resources.handleContextLoss();  // This will report available snapshots
-  // Note: Compiler and Registry don't need notification (no GPU resources)
+  // Note: ShaderCompiler and Registry don't need notification (no GPU resources)
   
   // Clear references to GPU resources (don't try to delete - they're gone)
   this.activeProgram = null;

@@ -191,7 +191,7 @@ private compileRecipe(recipe: Recipe): void {
   // 2. Registry: Resolve modules
   const modules = this.registry.resolveModules(recipe);
   
-  // 3. Compiler: Run 8-stage pipeline
+  // 3. ShaderCompiler: Run 8-stage pipeline
   const program = this.compiler.compile(recipe);
   
   // 4. Cache compiled program

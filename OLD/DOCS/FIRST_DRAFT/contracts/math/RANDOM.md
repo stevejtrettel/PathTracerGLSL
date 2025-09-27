@@ -362,7 +362,7 @@ float random_adaptive() {
 
 ### 2. Correlation Detection
 ```typescript
-// Compiler warns about potential correlation
+// ShaderCompiler warns about potential correlation
 function analyzeDimensionUsage(ast: ShaderAST): Warning[] {
     // Detect if same dimensions used in correlated ways
     // Suggest different sampling strategies
