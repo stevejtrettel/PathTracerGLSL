@@ -31,11 +31,20 @@ interface ModuleDescriptor {
         functions: string;    // The GLSL function definitions
         uniforms?: string;    // Uniform declarations (optional)
         constants?: string;   // #define statements (optional)
+        types?: string;       //structs that are needed (optional)
     };
+
+    uniformBindings?: UniformBinding[];  // NEW
 
     exports: string[];      // Functions this module provides (e.g., ["camera_generateRay"])
 }
 
+
+interface UniformBinding {
+    uniform: string;                    // e.g., 'u_camera_tan_fov'
+    parameters: string[];               // e.g., ['camera.fov']
+    compute: (params: Record<string, any>) => any;
+}
 
 
 /**
@@ -63,10 +72,20 @@ interface CompiledProgram {
 type EngineState = 'ready' | 'running';
 
 
+
+interface EngineUniforms {
+    resolution: [number, number];
+    frameIndex: number;
+    time: number;
+}
+
+
 export type {
     ModuleDescriptor,
     ModuleKind,
     ValidationResult,
     CompiledProgram,
-    EngineState
+    EngineState,
+    UniformBinding,
+    EngineUniforms
 };

@@ -1,4 +1,5 @@
 import type { ModuleDescriptor } from '../../engine/types.js';
+import {buildFrame} from "./utils/buildFrame";
 
 /**
  * Pinhole camera module
@@ -17,7 +18,6 @@ const pinholeCamera: ModuleDescriptor = {
       uniform vec3 u_camera_position;    // Camera position in world space
       uniform mat3 u_camera_frame;       // Camera orientation: [right, up, forward] as columns
       uniform float u_camera_tan_fov;    // tan(fov_y / 2) for vertical field of view
-      uniform vec2 u_resolution;         // Screen resolution [width, height]
     `,
 
         functions: `
@@ -56,6 +56,29 @@ const pinholeCamera: ModuleDescriptor = {
       }
     `
     },
+
+    uniformBindings: [
+        {
+            uniform: 'u_camera_position',
+            parameters: ['camera.position'],
+            compute: (params) => params['camera.position']
+        },
+        {
+            uniform: 'u_camera_tan_fov',
+            parameters: ['camera.fov'],
+            compute: (params) => Math.tan(params['camera.fov'] * Math.PI / 180 / 2)
+        },
+        {
+            uniform: 'u_camera_frame',
+            parameters: ['camera.position', 'camera.target'],
+            compute: (params) => {
+                const frame = buildFrame(params['camera.position'], params['camera.target']);
+                console.log('Camera frame matrix:', Array.from(frame));
+                return frame;
+            }
+        }
+    ],
+
 
     exports: ['camera_generateRay']
 };

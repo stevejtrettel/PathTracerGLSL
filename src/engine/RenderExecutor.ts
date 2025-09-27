@@ -15,12 +15,12 @@ class RenderExecutor {
     loadShader(fragmentSource: string): void {
         // Simple vertex shader - generates full-screen triangle from gl_VertexID
         const vertexSource = `#version 300 es
-void main() {
-    // Generate positions for full-screen triangle directly
-    float x = float((gl_VertexID & 1) << 2) - 1.0;
-    float y = float((gl_VertexID & 2) << 1) - 1.0;
-    gl_Position = vec4(x, y, 0.0, 1.0);
-}`;
+                    void main() {
+                        // Generate positions for full-screen triangle directly
+                        float x = float((gl_VertexID & 1) << 2) - 1.0;
+                        float y = float((gl_VertexID & 2) << 1) - 1.0;
+                        gl_Position = vec4(x, y, 0.0, 1.0);
+                    }`;
 
         const vertexShader = this.compileShader(vertexSource, this.gl.VERTEX_SHADER);
         const fragmentShader = this.compileShader(fragmentSource, this.gl.FRAGMENT_SHADER);

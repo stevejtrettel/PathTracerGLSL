@@ -1,4 +1,4 @@
-import type { ModuleDescriptor } from '../../../engine/types.js';
+import type { ModuleDescriptor} from "../../engine/types";
 
 /**
  * Simple sphere scene with material properties
@@ -8,12 +8,7 @@ const simpleSphereScene: ModuleDescriptor = {
     id: { kind: 'scene', name: 'simple-sphere', version: '1.0.0' },
 
     fragment: {
-        constants: `
-            // Material properties structure - owned by Scene
-            struct MaterialProperties {
-                vec3 albedo;    // Base color
-            };
-        `,
+        constants: ``,
 
         functions: `
             bool scene_intersect(Ray ray, out Hit hit) {

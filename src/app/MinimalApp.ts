@@ -3,10 +3,8 @@ import { ParameterStore } from './ParameterStore';
 import { euclideanAmbient } from '../objects/ambient/euclidean/euclidean-ambient';
 import { pinholeCamera } from '../optics/camera/pinhole-camera';
 import { simpleSphereScene } from '../objects/scene/simple-sphere';
-
 import { simpleInteraction } from "../optics/interaction/simple-interaction";
 import { simpleTransport } from "../optics/transport/simple-transport";
-
 
 /**
  * MinimalApp - basic application shell for Phase 3
@@ -53,32 +51,37 @@ class MinimalApp {
      * Set up default camera parameters
      */
     setupCameraParameters(): void {
-        this.parameterStore.set('camera.position', [0, 0, 5]);
-        this.parameterStore.set('camera.fov', 60);
+        this.parameterStore.batch({
+            'camera.position': [0, 0, 5],
+            'camera.target': [0, 0, 0],
+            'camera.fov': 60,
+            'resolution': [window.innerWidth, window.innerHeight]
+        });
     }
 
     /**
-     * Set camera position and orientation
+     * Set camera position and orientation - only semantic parameters
      */
     setCamera(position: [number, number, number], lookAt: [number, number, number], fov: number): void {
-        // Calculate camera frame matrix
-        const forward = this.normalize(this.subtract(lookAt, position));
-        const up = [0, 1, 0];
-        const right = this.normalize(this.cross(forward, up));
-        const correctedUp = this.cross(right, forward);
+        this.parameterStore.batch({
+            'camera.position': position,
+            'camera.target': lookAt,
+            'camera.fov': fov
+        });
+    }
 
-        // Build frame matrix (negated forward for correct ray direction)
-        const frameMatrix = new Float32Array([
-            right[0], correctedUp[0], -forward[0],
-            right[1], correctedUp[1], -forward[1],
-            right[2], correctedUp[2], -forward[2]
-        ]);
-
-        // Update all camera parameters
+    /**
+     * Convenience method to move camera
+     */
+    moveCamera(position: [number, number, number]): void {
         this.parameterStore.set('camera.position', position);
-        this.parameterStore.set('camera.frame', frameMatrix);
-        this.parameterStore.set('camera.tan_fov', Math.tan((fov * Math.PI / 180) / 2));
-        this.parameterStore.set('resolution', [window.innerWidth, window.innerHeight]);
+    }
+
+    /**
+     * Convenience method to look at target
+     */
+    lookAt(target: [number, number, number]): void {
+        this.parameterStore.set('camera.target', target);
     }
 
     /**
@@ -93,24 +96,6 @@ class MinimalApp {
      */
     dispose(): void {
         this.engine.dispose();
-    }
-
-    // Vector math utilities
-    private subtract(a: number[], b: number[]): number[] {
-        return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-    }
-
-    private cross(a: number[], b: number[]): number[] {
-        return [
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0]
-        ];
-    }
-
-    private normalize(v: number[]): number[] {
-        const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-        return [v[0] / len, v[1] / len, v[2] / len];
     }
 }
 

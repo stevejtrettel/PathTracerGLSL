@@ -36,10 +36,7 @@ class ParameterStore {
         const oldValue = this.parameters.get(path);
 
         // Skip if same
-        if (oldValue === value) return;
-        if (Array.isArray(oldValue) && Array.isArray(value) &&
-            oldValue.length === value.length &&
-            oldValue.every((v, i) => v === value[i])) return;
+        if (this.valuesEqual(oldValue, value)) return;
 
         this.parameters.set(path, value);
 
@@ -51,10 +48,41 @@ class ParameterStore {
     }
 
     /**
+     * Set multiple parameters and notify once
+     */
+    batch(updates: Record<string, any>): void {
+        const changes = [];
+
+        for (const [path, value] of Object.entries(updates)) {
+            const oldValue = this.parameters.get(path);
+
+            if (!this.valuesEqual(oldValue, value)) {
+                this.parameters.set(path, value);
+                changes.push({ path, oldValue, newValue: value });
+            }
+        }
+
+        if (changes.length > 0 && this._onChange) {
+            this._onChange({ changes });
+        }
+    }
+
+    /**
      * Get parameter value
      */
     get(path: string): any {
         return this.parameters.get(path);
+    }
+
+    /**
+     * Helper to compare values including arrays
+     */
+    private valuesEqual(a: any, b: any): boolean {
+        if (a === b) return true;
+        if (Array.isArray(a) && Array.isArray(b) &&
+            a.length === b.length &&
+            a.every((v, i) => v === b[i])) return true;
+        return false;
     }
 }
 

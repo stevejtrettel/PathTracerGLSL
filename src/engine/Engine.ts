@@ -1,7 +1,7 @@
 import { ModuleRegistry } from './ModuleRegistry.js';
 import { ShaderCompiler } from './ShaderCompiler.js';
 import { RenderExecutor } from './RenderExecutor.js';
-import type { ModuleDescriptor, EngineState } from './types.js';
+import type { ModuleDescriptor, EngineState, EngineUniforms } from './types.js';
 import type { ParameterChanges } from '../app/types.js';
 
 /**
@@ -14,11 +14,16 @@ class Engine {
     private executor: RenderExecutor;
     private state: EngineState = 'ready';
 
+    // Engine state tracking
+    private frameCount: number = 0;
+    private startTime: number;
+
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
         this.registry = new ModuleRegistry();
         this.compiler = new ShaderCompiler(gl);
         this.executor = new RenderExecutor(gl);
+        this.startTime = performance.now();
     }
 
     /**
@@ -36,6 +41,12 @@ class Engine {
 
         // Compile modules to GLSL
         const fragmentSource = this.compiler.compile(modules);
+
+        // Log the generated shader for debugging
+        console.log('=== GENERATED FRAGMENT SHADER ===');
+        console.log(fragmentSource);
+        console.log('=== END SHADER ===');
+
         this.executor.loadShader(fragmentSource);
 
         // Set up uniform management
@@ -64,7 +75,16 @@ class Engine {
         if (this.state !== 'running') {
             throw new Error(`Cannot render in state: ${this.state}`);
         }
+
+        // Update engine uniforms every frame
+        this.compiler.updateEngineUniforms({
+            resolution: [this.gl.canvas.width, this.gl.canvas.height],
+            frameIndex: this.frameCount,
+            time: (performance.now() - this.startTime) / 1000
+        });
+
         this.executor.execute();
+        this.frameCount++;
     }
 
     /**

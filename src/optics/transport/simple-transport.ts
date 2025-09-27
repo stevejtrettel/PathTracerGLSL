@@ -8,13 +8,14 @@ export const simpleTransport: ModuleDescriptor = {
             vec3 transport_trace(Ray ray) {
                 Hit hit;
                 if (!scene_intersect(ray, hit)) {
-                    return vec3(0.0);  // Black background
+                    return vec3(0);  // Black background
                 }
                 
                 vec3 wo = -ray.direction;  // Toward camera
                 vec3 wi = vec3(0.0);       // Placeholder
                 
-                return interaction_surface_shade(wi, wo, hit);
+          
+               return interaction_surface_shade(wi, wo, hit);
             }
         `
     },

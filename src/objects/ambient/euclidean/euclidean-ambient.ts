@@ -14,8 +14,9 @@ const euclideanAmbient: ModuleDescriptor = {
     },
 
     fragment: {
-        constants: `
-      // Type definitions for this ambient space
+
+
+        types: `
       #define Point vec3
       #define Direction vec3
     `,

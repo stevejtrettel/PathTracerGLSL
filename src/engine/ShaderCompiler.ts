@@ -1,13 +1,19 @@
-import type { ModuleDescriptor } from './types.js';
+import type { ModuleDescriptor, UniformBinding, EngineUniforms } from './types.js';
 import type { ParameterChanges } from '../app/types.js';
+import commonStructsGLSL from './common-structs.glsl?raw';
 
 /**
- * Minimal ShaderCompiler - concatenates modules into GLSL and manages uniforms
+ * Minimal ShaderCompiler - concatenates modules into GLSL and manages uniforms via bindings
  */
 class ShaderCompiler {
     private gl: WebGL2RenderingContext;
     private activeProgram: WebGLProgram | null = null;
     private uniformLocations = new Map<string, WebGLUniformLocation>();
+
+    // Uniform binding system
+    private uniformBindings = new Map<string, UniformBinding>();
+    private parameterCache = new Map<string, any>();
+    private parameterToBindings = new Map<string, Set<UniformBinding>>();
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
@@ -17,13 +23,35 @@ class ShaderCompiler {
      * Compile modules into complete fragment shader
      */
     compile(modules: ModuleDescriptor[]): string {
+        this.buildUniformBindings(modules);
+
         const parts: string[] = [];
 
         parts.push('#version 300 es');
         parts.push('precision highp float;');
         parts.push('');
 
-        // Simple fixed order for Phase 3: ambient -> scene -> camera
+        // Extract geometry types from ambient module first
+        const ambientModule = modules.find(m => m.id.kind === 'ambient');
+        if (ambientModule?.fragment.types) {
+            parts.push('// ============ GEOMETRY TYPES ============');
+            parts.push(ambientModule.fragment.types);
+            parts.push('');
+        }
+
+        // Include common structs that depend on Point/Direction
+        parts.push('// ============ COMMON STRUCTS ============');
+        parts.push(commonStructsGLSL);
+        parts.push('');
+
+        // ADD THIS: Engine uniforms (always available)
+        parts.push('// ============ ENGINE UNIFORMS ============');
+        parts.push('uniform vec2 u_resolution;');
+        parts.push('uniform int u_frame_index;');
+        parts.push('uniform float u_time;');
+        parts.push('');
+
+        // Process modules in order
         const orderedModules = this.orderModules(modules);
 
         for (const module of orderedModules) {
@@ -55,19 +83,85 @@ class ShaderCompiler {
     }
 
     /**
-     * Update uniforms from parameter changes
+     * Update uniforms from parameter changes using binding system
      */
     updateUniforms(changes: ParameterChanges): void {
         if (!this.activeProgram) return;
 
         this.gl.useProgram(this.activeProgram);
 
+        // Update parameter cache
         for (const change of changes.changes) {
-            const uniformName = this.pathToUniform(change.path);
-            const location = this.uniformLocations.get(uniformName);
+            this.parameterCache.set(change.path, change.newValue);
+        }
 
+        // Find affected bindings
+        const affectedBindings = new Set<UniformBinding>();
+        for (const change of changes.changes) {
+            const bindings = this.parameterToBindings.get(change.path);
+            if (bindings) {
+                bindings.forEach(binding => affectedBindings.add(binding));
+            }
+        }
+
+        // Execute bindings
+        for (const binding of affectedBindings) {
+            const paramValues: Record<string, any> = {};
+            for (const paramPath of binding.parameters) {
+                paramValues[paramPath] = this.parameterCache.get(paramPath);
+            }
+
+            const uniformValue = binding.compute(paramValues);
+            const location = this.uniformLocations.get(binding.uniform);
             if (location) {
-                this.setUniformValue(location, change.newValue);
+                this.setUniformValue(location, uniformValue);
+            }
+        }
+
+        console.log('Setting uniforms:', changes.changes.map(c => `${c.path} = ${JSON.stringify(c.newValue)}`));
+
+    }
+
+
+
+    updateEngineUniforms(uniforms: EngineUniforms): void {
+        if (!this.activeProgram) return;
+
+        this.gl.useProgram(this.activeProgram);
+
+        // Set standard engine uniforms
+        const setUniform = (name: string, value: any) => {
+            const location = this.uniformLocations.get(name);
+            if (location) {
+                this.setUniformValue(location, value);
+            }
+        };
+
+        setUniform('u_resolution', uniforms.resolution);
+        setUniform('u_frame_index', uniforms.frameIndex);
+        setUniform('u_time', uniforms.time);
+
+        console.log('Engine uniforms:', uniforms);
+    }
+
+    /**
+     * Build uniform bindings from modules
+     */
+    private buildUniformBindings(modules: ModuleDescriptor[]): void {
+        this.uniformBindings.clear();
+        this.parameterToBindings.clear();
+
+        for (const module of modules) {
+            for (const binding of module.uniformBindings || []) {
+                this.uniformBindings.set(binding.uniform, binding);
+
+                // Build reverse index: parameter -> bindings
+                for (const paramPath of binding.parameters) {
+                    if (!this.parameterToBindings.has(paramPath)) {
+                        this.parameterToBindings.set(paramPath, new Set());
+                    }
+                    this.parameterToBindings.get(paramPath)!.add(binding);
+                }
             }
         }
     }
@@ -117,13 +211,6 @@ class ShaderCompiler {
         }
 
         return result;
-    }
-
-    /**
-     * Convert parameter path to uniform name
-     */
-    private pathToUniform(path: string): string {
-        return 'u_' + path.replace('.', '_');
     }
 
     /**
