@@ -4,6 +4,10 @@ import { euclideanAmbient } from '../objects/ambient/euclidean/euclidean-ambient
 import { pinholeCamera } from '../optics/camera/pinhole-camera';
 import { simpleSphereScene } from '../objects/scene/simple-sphere';
 
+import { simpleInteraction } from "../optics/interaction/simple-interaction";
+import { simpleTransport } from "../optics/transport/simple-transport";
+
+
 /**
  * MinimalApp - basic application shell for Phase 3
  * Establishes ParameterStore → Engine architecture
@@ -36,7 +40,13 @@ class MinimalApp {
      * Load and compile modules
      */
     loadModules(): void {
-        this.engine.loadModules([euclideanAmbient, pinholeCamera, simpleSphereScene]);
+        this.engine.loadModules([
+            euclideanAmbient,
+            simpleSphereScene,
+            simpleInteraction,
+            simpleTransport,
+            pinholeCamera
+        ]);
     }
 
     /**

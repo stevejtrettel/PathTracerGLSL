@@ -99,14 +99,8 @@ class ShaderCompiler {
         return `void main() {
     vec2 pixel = gl_FragCoord.xy;
     Ray ray = camera_generateRay(pixel, vec2(0.0));
-    
-    Hit hit;
-    if (scene_intersect(ray, hit)) {
-        vec3 color = hit.n * 0.5 + 0.5;
-        fragColor = vec4(color, 1.0);
-    } else {
-        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
-    }
+    vec3 color = transport_trace(ray);
+    fragColor = vec4(color, 1.0);
 }`;
     }
 
@@ -114,7 +108,7 @@ class ShaderCompiler {
      * Simple module ordering for Phase 3
      */
     private orderModules(modules: ModuleDescriptor[]): ModuleDescriptor[] {
-        const order = ['ambient', 'scene', 'camera'];
+        const order = ['ambient', 'scene', 'interaction', 'transport', 'camera'];
         const result: ModuleDescriptor[] = [];
 
         for (const kind of order) {

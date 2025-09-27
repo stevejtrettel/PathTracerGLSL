@@ -22,6 +22,7 @@ struct Hit {
     Point p;           // World space intersection position
     Direction n;       // Surface normal at intersection
     float t;           // Distance along ray to intersection
+    int material_to;   // the material we hit
 };
 
 
