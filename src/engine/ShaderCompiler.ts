@@ -2,132 +2,127 @@ import type { ModuleDescriptor } from './types.js';
 import type { ParameterChanges } from '../app/types.js';
 
 /**
- * ShaderCompiler takes validated modules and concatenates them into complete GLSL
- * Phase 2: Also handles uniform management for the compiled program
+ * Minimal ShaderCompiler - concatenates modules into GLSL and manages uniforms
  */
 class ShaderCompiler {
     private gl: WebGL2RenderingContext;
     private activeProgram: WebGLProgram | null = null;
+    private uniformLocations = new Map<string, WebGLUniformLocation>();
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
     }
 
     /**
-     * Compile modules into complete fragment shader source
-     * Returns GLSL string ready for WebGL compilation
+     * Compile modules into complete fragment shader
      */
     compile(modules: ModuleDescriptor[]): string {
         const parts: string[] = [];
 
-        // WebGL version and precision
         parts.push('#version 300 es');
         parts.push('precision highp float;');
         parts.push('');
 
-        // Order modules by dependency: ambient → scene → lighting → camera → transport → interaction → film → developer
+        // Simple fixed order for Phase 3: ambient -> scene -> camera
         const orderedModules = this.orderModules(modules);
 
-        // Concatenate each module: constants, uniforms, then functions
         for (const module of orderedModules) {
             parts.push(`// ============ ${module.id.name} (${module.id.kind}) ============`);
 
             if (module.fragment.constants) {
                 parts.push(module.fragment.constants);
             }
-
             if (module.fragment.uniforms) {
                 parts.push(module.fragment.uniforms);
             }
-
             parts.push(module.fragment.functions);
             parts.push('');
         }
 
-        // Output variable
         parts.push('out vec4 fragColor;');
         parts.push('');
-
-        // Main function
-        parts.push(this.generateMainFunction(orderedModules));
+        parts.push(this.generateMainFunction());
 
         return parts.join('\n');
     }
 
     /**
-     * Set the active program for uniform management
+     * Set active program and cache uniform locations
      */
     setActiveProgram(program: WebGLProgram): void {
         this.activeProgram = program;
+        this.cacheUniformLocations();
     }
 
     /**
      * Update uniforms from parameter changes
-     * Phase 2: Simple path-to-uniform mapping
      */
     updateUniforms(changes: ParameterChanges): void {
-        if (!this.activeProgram) {
-            console.warn('ShaderCompiler: No active program for uniform updates');
-            return;
-        }
+        if (!this.activeProgram) return;
 
         this.gl.useProgram(this.activeProgram);
 
         for (const change of changes.changes) {
             const uniformName = this.pathToUniform(change.path);
-            const location = this.gl.getUniformLocation(this.activeProgram, uniformName);
+            const location = this.uniformLocations.get(uniformName);
 
             if (location) {
                 this.setUniformValue(location, change.newValue);
-            } else {
-                console.warn(`ShaderCompiler: Uniform '${uniformName}' not found`);
             }
         }
     }
 
     /**
-     * Generate main() function for camera ray visualization
-     * Phase 2: Assumes camera module is present
+     * Cache uniform locations
      */
-    private generateMainFunction(modules: ModuleDescriptor[]): string {
+    private cacheUniformLocations(): void {
+        if (!this.activeProgram) return;
+
+        this.uniformLocations.clear();
+        const numUniforms = this.gl.getProgramParameter(this.activeProgram, this.gl.ACTIVE_UNIFORMS);
+
+        for (let i = 0; i < numUniforms; i++) {
+            const uniformInfo = this.gl.getActiveUniform(this.activeProgram, i);
+            if (!uniformInfo) continue;
+
+            const location = this.gl.getUniformLocation(this.activeProgram, uniformInfo.name);
+            if (location) {
+                this.uniformLocations.set(uniformInfo.name, location);
+            }
+        }
+    }
+
+    /**
+     * Generate main function for Phase 3
+     */
+    private generateMainFunction(): string {
         return `void main() {
-  vec2 pixel = gl_FragCoord.xy;
-  vec2 xi = vec2(0.0);  // No antialiasing for Phase 2
-  
-  Ray ray = camera_generateRay(pixel, xi);
-  
-  // Visualize ray direction as color
-  // Map direction [-1,1] to color [0,1] for visibility
-  vec3 color = ray.direction * 0.5 + 0.5;
-  
-  fragColor = vec4(color, 1.0);
+    vec2 pixel = gl_FragCoord.xy;
+    Ray ray = camera_generateRay(pixel, vec2(0.0));
+    
+    Hit hit;
+    if (scene_intersect(ray, hit)) {
+        vec3 color = hit.n * 0.5 + 0.5;
+        fragColor = vec4(color, 1.0);
+    } else {
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
 }`;
     }
 
     /**
-     * Order modules by dependency requirements
-     * ambient → scene → lighting → camera → transport → interaction → film → developer
+     * Simple module ordering for Phase 3
      */
     private orderModules(modules: ModuleDescriptor[]): ModuleDescriptor[] {
-        const moduleOrder: string[] = [
-            'ambient', 'scene', 'lighting', 'camera',
-            'transport', 'interaction', 'film', 'developer', 'test'
-        ];
+        const order = ['ambient', 'scene', 'camera'];
+        const result: ModuleDescriptor[] = [];
 
-        const orderedModules: ModuleDescriptor[] = [];
-
-        // Add modules in dependency order
-        for (const kind of moduleOrder) {
-            const modulesOfKind = modules.filter(m => m.id.kind === kind);
-            orderedModules.push(...modulesOfKind);
+        for (const kind of order) {
+            const module = modules.find(m => m.id.kind === kind);
+            if (module) result.push(module);
         }
 
-        // Add any modules not in the standard order (future module types)
-        const handledKinds = new Set(moduleOrder);
-        const unhandledModules = modules.filter(m => !handledKinds.has(m.id.kind));
-        orderedModules.push(...unhandledModules);
-
-        return orderedModules;
+        return result;
     }
 
     /**
@@ -138,7 +133,7 @@ class ShaderCompiler {
     }
 
     /**
-     * Set uniform value based on type
+     * Set uniform value by type
      */
     private setUniformValue(location: WebGLUniformLocation, value: any): void {
         if (typeof value === 'number') {
@@ -150,7 +145,6 @@ class ShaderCompiler {
                 case 4: this.gl.uniform4fv(location, value); break;
                 case 9: this.gl.uniformMatrix3fv(location, false, value); break;
                 case 16: this.gl.uniformMatrix4fv(location, false, value); break;
-                default: console.warn(`ShaderCompiler: Unsupported uniform array length: ${value.length}`);
             }
         }
     }

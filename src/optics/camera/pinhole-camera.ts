@@ -21,12 +21,6 @@ const pinholeCamera: ModuleDescriptor = {
     `,
 
         functions: `
-      struct Ray {
-        Point origin;
-        Direction direction;
-        float tmin, tmax;
-      };
-      
       Ray camera_generateRay(vec2 pixel, vec2 xi) {
         // Convert pixel coordinates to normalized device coordinates [-1, 1]
         // Add random offset xi for antialiasing (Phase 2: xi = vec2(0) for now)

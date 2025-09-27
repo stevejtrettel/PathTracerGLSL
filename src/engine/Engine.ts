@@ -5,83 +5,56 @@ import type { ModuleDescriptor, EngineState } from './types.js';
 import type { ParameterChanges } from '../app/types.js';
 
 /**
- * Minimal Engine for Phase 2
- * Orchestrates subsystems and provides the real parameter interface
- * Architecturally correct but minimal implementation
+ * Engine orchestrates subsystems for modular rendering
  */
 class Engine {
     private gl: WebGL2RenderingContext;
     private registry: ModuleRegistry;
     private compiler: ShaderCompiler;
     private executor: RenderExecutor;
-
     private state: EngineState = 'ready';
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-
-        // Initialize subsystems in dependency order
         this.registry = new ModuleRegistry();
-        this.compiler = new ShaderCompiler(gl);  // Pass gl context
+        this.compiler = new ShaderCompiler(gl);
         this.executor = new RenderExecutor(gl);
-
-        console.log('Engine: Subsystems initialized');
     }
 
     /**
-     * Load modules and compile them (Phase 2: simple version of recipe system)
+     * Load and compile modules
      */
     loadModules(modules: ModuleDescriptor[]): void {
         if (this.state !== 'ready') {
             throw new Error(`Cannot load modules in state: ${this.state}`);
         }
 
-        // Register modules
+        // Register modules for validation
         for (const module of modules) {
             this.registry.register(module);
         }
 
-        // Compile to GLSL
+        // Compile modules to GLSL
         const fragmentSource = this.compiler.compile(modules);
-
-        // Load into executor and get program reference
         this.executor.loadShader(fragmentSource);
 
-        // Give compiler access to the program for uniform management
-        const program = this.getCompiledProgram();
+        // Set up uniform management
+        const program = this.executor.getProgram();
+        if (!program) {
+            throw new Error('Failed to compile program');
+        }
         this.compiler.setActiveProgram(program);
 
-        // Transition to running state
         this.state = 'running';
-
-        console.log(`Engine: ${modules.length} modules loaded and compiled`);
     }
 
     /**
-     * Update parameters from ParameterStore
-     * This is the key interface that establishes the real architecture
+     * Update uniforms from parameter changes
      */
     updateParameters(changes: ParameterChanges): void {
-        if (this.state !== 'running') {
-            console.warn('Engine: Cannot update parameters - not running');
-            return;
+        if (this.state === 'running') {
+            this.compiler.updateUniforms(changes);
         }
-
-        // Delegate uniform management to compiler (correct architecture)
-        this.compiler.updateUniforms(changes);
-    }
-
-    /**
-     * Get compiled program from executor
-     * Phase 2: Simple access, will be cleaner in full system
-     */
-    private getCompiledProgram(): WebGLProgram {
-        // Access executor's program for uniform management
-        const program = (this.executor as any).program;
-        if (!program) {
-            throw new Error('No compiled program available');
-        }
-        return program;
     }
 
     /**
@@ -91,38 +64,33 @@ class Engine {
         if (this.state !== 'running') {
             throw new Error(`Cannot render in state: ${this.state}`);
         }
-
         this.executor.execute();
     }
 
     /**
-     * Get current engine state
+     * Get current state
      */
     getState(): EngineState {
         return this.state;
     }
 
     /**
-     * Check if ready to load modules
+     * State checks
      */
     isReady(): boolean {
         return this.state === 'ready';
     }
 
-    /**
-     * Check if running and can render
-     */
     isRunning(): boolean {
         return this.state === 'running';
     }
 
     /**
-     * Convert parameter path to uniform name
-     * Phase 2: Simple mapping, will become sophisticated later
+     * Clean up resources
      */
-    private pathToUniform(path: string): string {
-        // Simple conversion: camera.position → u_camera_position
-        return 'u_' + path.replace('.', '_');
+    dispose(): void {
+        this.executor.dispose();
+        this.state = 'ready';
     }
 }
 

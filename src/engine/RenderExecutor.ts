@@ -1,40 +1,30 @@
 /**
- * RenderExecutor manages all WebGL interaction
- * Takes GLSL source from compiler and executes it on GPU
+ * RenderExecutor - compiles shaders and executes full-screen rendering
  */
 class RenderExecutor {
     private gl: WebGL2RenderingContext;
     private program: WebGLProgram | null = null;
-    private quadVAO: WebGLVertexArrayObject | null = null;
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-        this.setupQuad();
     }
 
     /**
-     * Compile vertex and fragment shaders, link into program
-     * Takes fragment shader source from ShaderCompiler
+     * Compile and link shaders into program
      */
     loadShader(fragmentSource: string): void {
-        // Hardcoded vertex shader - generates full-screen quad positions
+        // Simple vertex shader - generates full-screen triangle from gl_VertexID
         const vertexSource = `#version 300 es
 void main() {
-  // Generate full-screen quad from gl_VertexID
-  // No attributes needed - positions calculated directly
-  vec2 positions[3] = vec2[](
-    vec2(-1.0, -1.0),  // Bottom-left
-    vec2( 3.0, -1.0),  // Bottom-right (extends beyond)
-    vec2(-1.0,  3.0)   // Top-left (extends beyond)
-  );
-  gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+    // Generate positions for full-screen triangle directly
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
 }`;
 
-        // Compile shaders
         const vertexShader = this.compileShader(vertexSource, this.gl.VERTEX_SHADER);
         const fragmentShader = this.compileShader(fragmentSource, this.gl.FRAGMENT_SHADER);
 
-        // Link program
         this.program = this.gl.createProgram();
         if (!this.program) {
             throw new Error('Failed to create program');
@@ -55,41 +45,32 @@ void main() {
     }
 
     /**
-     * Execute the loaded shader program
-     * Draws full-screen quad triggering fragment shader
+     * Execute full-screen render
      */
     execute(): void {
-        if (!this.program || !this.quadVAO) {
-            throw new Error('No program loaded or quad not set up');
+        if (!this.program) {
+            throw new Error('No program loaded');
         }
 
-        // Bind program and VAO
         this.gl.useProgram(this.program);
-        this.gl.bindVertexArray(this.quadVAO);
-
-        // Draw full-screen quad (3 vertices = 1 triangle covering screen)
         this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
-
-        // Unbind
-        this.gl.bindVertexArray(null);
     }
 
     /**
-     * Set up VAO for full-screen quad
-     * No attributes needed - positions generated in vertex shader
+     * Get compiled program for uniform management
      */
-    private setupQuad(): void {
-        // Create VAO
-        this.quadVAO = this.gl.createVertexArray();
-        if (!this.quadVAO) {
-            throw new Error('Failed to create VAO');
+    getProgram(): WebGLProgram | null {
+        return this.program;
+    }
+
+    /**
+     * Clean up resources
+     */
+    dispose(): void {
+        if (this.program) {
+            this.gl.deleteProgram(this.program);
+            this.program = null;
         }
-
-        // Bind VAO (but no vertex buffer needed)
-        this.gl.bindVertexArray(this.quadVAO);
-
-        // Unbind - VAO is ready with no attributes
-        this.gl.bindVertexArray(null);
     }
 
     /**

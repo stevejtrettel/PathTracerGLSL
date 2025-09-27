@@ -1,11 +1,12 @@
-import { Engine } from '../engine/Engine.js';
-import { ParameterStore } from './ParameterStore.js';
-import { euclideanAmbient } from '../objects/ambient/euclidean/euclidean-ambient.js';
-import { pinholeCamera } from '../optics/camera/pinhole-camera.js';
+import { Engine } from '../engine/Engine';
+import { ParameterStore } from './ParameterStore';
+import { euclideanAmbient } from '../objects/ambient/euclidean/euclidean-ambient';
+import { pinholeCamera } from '../optics/camera/pinhole-camera';
+import { simpleSphereScene } from '../objects/scene/simple-sphere';
 
 /**
- * Minimal application shell for Phase 2
- * Establishes the real ParameterStore → Engine architecture
+ * MinimalApp - basic application shell for Phase 3
+ * Establishes ParameterStore → Engine architecture
  */
 class MinimalApp {
     private engine: Engine;
@@ -21,50 +22,33 @@ class MinimalApp {
             throw new Error('WebGL2 not supported');
         }
 
-        // Create the real architecture components
+        // Create architecture components
         this.engine = new Engine(gl);
         this.parameterStore = new ParameterStore();
 
-        // Wire parameter store to engine - THIS IS THE KEY PATTERN
+        // Wire parameter store to engine
         this.parameterStore.onChange = (changes) => {
             this.engine.updateParameters(changes);
         };
-
-        console.log('MinimalApp: Created with ParameterStore → Engine architecture');
     }
 
     /**
-     * Load and compile ambient + camera modules
+     * Load and compile modules
      */
     loadModules(): void {
-        // Load modules into engine
-        this.engine.loadModules([euclideanAmbient, pinholeCamera]);
-
-        console.log('MinimalApp: Modules loaded');
+        this.engine.loadModules([euclideanAmbient, pinholeCamera, simpleSphereScene]);
     }
 
     /**
-     * Set up camera parameters using the parameter system
+     * Set up default camera parameters
      */
     setupCameraParameters(): void {
-        // Register parameter metadata
-        this.parameterStore.registerMetadata('camera.position', {
-            type: 'vec3',
-            default: [0, 0, 5]
-        });
-
-        this.parameterStore.registerMetadata('camera.fov', {
-            type: 'float',
-            default: 60,
-            min: 10,
-            max: 170
-        });
-
-        console.log('MinimalApp: Camera parameters registered');
+        this.parameterStore.set('camera.position', [0, 0, 5]);
+        this.parameterStore.set('camera.fov', 60);
     }
 
     /**
-     * Set camera using the parameter system
+     * Set camera position and orientation
      */
     setCamera(position: [number, number, number], lookAt: [number, number, number], fov: number): void {
         // Calculate camera frame matrix
@@ -73,21 +57,18 @@ class MinimalApp {
         const right = this.normalize(this.cross(forward, up));
         const correctedUp = this.cross(right, forward);
 
+        // Build frame matrix (negated forward for correct ray direction)
         const frameMatrix = new Float32Array([
-            right[0], correctedUp[0], forward[0],
-            right[1], correctedUp[1], forward[1],
-            right[2], correctedUp[2], forward[2]
+            right[0], correctedUp[0], -forward[0],
+            right[1], correctedUp[1], -forward[1],
+            right[2], correctedUp[2], -forward[2]
         ]);
 
-        const tanFov = Math.tan((fov * Math.PI / 180) / 2);
-
-        // Set parameters through parameter store - this triggers Engine.updateParameters()
+        // Update all camera parameters
         this.parameterStore.set('camera.position', position);
         this.parameterStore.set('camera.frame', frameMatrix);
-        this.parameterStore.set('camera.tan_fov', tanFov);
+        this.parameterStore.set('camera.tan_fov', Math.tan((fov * Math.PI / 180) / 2));
         this.parameterStore.set('resolution', [window.innerWidth, window.innerHeight]);
-
-        console.log(`MinimalApp: Camera set via parameter system - pos: [${position.join(', ')}], fov: ${fov}°`);
     }
 
     /**
@@ -97,7 +78,14 @@ class MinimalApp {
         this.engine.renderFrame();
     }
 
-    // Simple vector math helpers
+    /**
+     * Clean up resources
+     */
+    dispose(): void {
+        this.engine.dispose();
+    }
+
+    // Vector math utilities
     private subtract(a: number[], b: number[]): number[] {
         return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
     }

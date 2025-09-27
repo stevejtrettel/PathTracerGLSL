@@ -10,6 +10,21 @@
 
 
 
+// Ray structure for intersection queries
+struct Ray {
+    Point origin;      // Starting position
+    Direction direction; // Ray direction (should be normalized)
+    float tmin, tmax;  // Near and far clipping distances
+};
+
+// Hit information from ray-surface intersection
+struct Hit {
+    Point p;           // World space intersection position
+    Direction n;       // Surface normal at intersection
+    float t;           // Distance along ray to intersection
+};
+
+
 // Geometric frame for building coordinate systems
 struct Frame {
     Point base;
