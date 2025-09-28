@@ -40,7 +40,7 @@ const averagingAccumulator: ModuleDescriptor = {
         {
             uniform: 'u_accumulator_reset',
             parameters: ['accumulator.reset'],
-           // type: 'bool',
+            type: 'bool',
             compute: (params) => params['accumulator.reset'] || false
         }
         // u_accumulator_radiance_previous is bound by ResourceManager

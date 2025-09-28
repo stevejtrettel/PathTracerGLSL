@@ -12,6 +12,8 @@ import {oneshotAccumulator} from "../optics/accumulator/oneshot-accumulator";
 import {gammaDeveloper} from "../optics/developer/gamma-developer";
 import {passthroughDeveloper} from "../optics/developer/passthrough-developer";
 import { averagingAccumulator} from "../optics/accumulator/average-accumulator";
+import {sphereFloorScene} from "../objects/scene/sphere-floor";
+import {pathTracingTransport} from "../optics/transport/path-tracer-transport";
 
 /**
  * MinimalApp - basic application shell for Phase 3
@@ -53,10 +55,10 @@ class MinimalApp {
     loadModules(): void {
         this.engine.loadModules([
             euclideanAmbient,
-            simpleSphereScene,
+            sphereFloorScene,
             pointLight,
             lambertInteraction,
-            directLightingTransport,
+            pathTracingTransport,
             pinholeCamera,
             averagingAccumulator,
             gammaDeveloper
@@ -71,7 +73,7 @@ class MinimalApp {
             'resolution': [window.innerWidth, window.innerHeight],
 
             // Light parameters
-            'light.position': [5, 5, 5],       // Above and to the right
+            'light.position': [5, 9, 5],       // Above and to the right
             'light.color': [1.0, 1.0, 1.0],   // White light
             'light.intensity': 200.0,           // Bright enough to see
 

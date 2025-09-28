@@ -41,11 +41,13 @@ const pointLight: ModuleDescriptor = {
         {
             uniform: 'u_light_position',
             parameters: ['light.position'],
+            type: 'vec3',
             compute: (params) => params['light.position']
         },
         {
             uniform: 'u_light_radiance',
             parameters: ['light.color', 'light.intensity'],
+            type: 'vec3',
             compute: (params) => {
                 const color = params['light.color'] || [1.0, 1.0, 1.0];
                 const intensity = params['light.intensity'] || 10.0;

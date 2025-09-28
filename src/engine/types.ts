@@ -2,9 +2,15 @@
 // These types establish the contracts between ModuleRegistry, SimpleCompiler, and RenderExecutor
 
 
-export const MODULE_ORDER: ModuleKind[] = [
-    'ambient', 'scene', 'lighting', 'camera',  'interaction', 'transport',
-    'accumulator', 'developer'
+const MODULE_ORDER = [
+    'ambient',     // Foundation
+    'scene',       // Geometry
+    'lighting',    // Lights
+    'camera',      // Ray gen
+    'interaction', // BRDFs
+    'transport',   // Uses interaction
+    'accumulator', // Uses transport output
+    'developer'    // Final output
 ];
 
 
@@ -45,10 +51,13 @@ interface ModuleDescriptor {
 }
 
 
-// types.ts
+
+type UniformType = 'float' | 'int' | 'bool' | 'vec2' | 'vec3' | 'vec4' | 'mat3' | 'mat4' | 'sampler2D' | 'samplerCube';
+
 interface UniformBinding {
     uniform: string;
     parameters: string[];
+    type: UniformType;
     compute: (params: Record<string, any>) => any;
 }
 
@@ -86,6 +95,8 @@ interface EngineUniforms {
 }
 
 
+export {MODULE_ORDER};
+
 export type {
     ModuleDescriptor,
     ModuleKind,
@@ -94,5 +105,5 @@ export type {
     EngineState,
     UniformBinding,
     EngineUniforms,
-    MODULE_ORDER,
+    UniformType,
 };

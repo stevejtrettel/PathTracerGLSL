@@ -66,16 +66,19 @@ const pinholeCamera: ModuleDescriptor = {
         {
             uniform: 'u_camera_position',
             parameters: ['camera.position'],
+            type: 'vec3',
             compute: (params) => params['camera.position']
         },
         {
             uniform: 'u_camera_tan_fov',
             parameters: ['camera.fov'],
+            type: 'float',
             compute: (params) => Math.tan(params['camera.fov'] * Math.PI / 180 / 2)
         },
         {
             uniform: 'u_camera_frame',
             parameters: ['camera.position', 'camera.target'],
+            type: 'mat3',
             compute: (params) => {
                 const frame = buildFrame(params['camera.position'], params['camera.target']);
                 return frame;
