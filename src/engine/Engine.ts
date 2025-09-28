@@ -14,7 +14,10 @@ class Engine {
     private executor: RenderExecutor;
     private state: EngineState = 'ready';
 
-    public readonly time: number = 0;
+    private time: number = 0;  // Make it properly private
+    getTime(): number {
+        return this.time;
+    }
 
     // Engine state tracking
     private frameCount: number = 0;
@@ -44,10 +47,13 @@ class Engine {
         // Compile modules to GLSL
         const fragmentSource = this.compiler.compile(modules);
 
-        // Log the generated shader for debugging
-        console.log('=== GENERATED FRAGMENT SHADER ===');
-        console.log(fragmentSource);
-        console.log('=== END SHADER ===');
+        // Log the generated shader with line numbers
+        const debugInfo = this.compiler.getDebugInfo();
+        if (debugInfo) {
+            console.log('=== GENERATED FRAGMENT SHADER ===');
+            console.log(debugInfo.numberedSource);
+            console.log('=== END SHADER ===');
+        }
 
         this.executor.loadShader(fragmentSource);
 
@@ -79,7 +85,7 @@ class Engine {
         }
 
         // Update time property each frame
-        (this as any).time = (performance.now() - this.startTime) / 1000;
+        this.time = (performance.now() - this.startTime) / 1000;
 
         // Use the stored time for engine uniforms
         this.compiler.updateEngineUniforms({
@@ -118,6 +124,9 @@ class Engine {
         this.state = 'ready';
     }
 
+    clearUniformCache(): void {
+        this.compiler.clearCache();
+    }
 
 }
 

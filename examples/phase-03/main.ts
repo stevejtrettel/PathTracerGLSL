@@ -32,12 +32,13 @@ async function main() {
     console.log('Camera configured via parameter system');
 
 
-    app.startLightAnimation()
+   // app.startLightAnimation()
 
     // Start continuous rendering to see animation
     function renderLoop() {
         app.render();
         requestAnimationFrame(renderLoop);
+
     }
 
     renderLoop();

@@ -24,6 +24,11 @@ const directLightingTransport: ModuleDescriptor = {
                     // No intersection - return background color
                     return RGB(0.1, 0.1, 0.2);  // Dark blue background
                 }
+               
+                //otherwise we hit the scene! so we can pick up some ambient light
+                MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+                Radiance objColor = Radiance(props.albedo*0.05);  // 5% ambient
+                
                 
                 // Sample light from hit point
                 LightSample ls = lighting_sample(hit.p);
@@ -38,8 +43,7 @@ const directLightingTransport: ModuleDescriptor = {
                 // Test for shadows
                 if (scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
                     // In shadow - return ambient lighting only
-                    MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
-                    return RGB(props.albedo * 0.1);  // 10% ambient
+                    return objColor;
                 }
                 
                 // Not in shadow - compute direct lighting
@@ -47,9 +51,9 @@ const directLightingTransport: ModuleDescriptor = {
                 Spectrum shading = interaction_surface_shade(ls.wi, wo, hit);
                 
                 // Combine BRDF result with incident light
-                Radiance outgoing = shading * ls.radiance;
+                Radiance diffuseLighting = shading * ls.radiance;
                 
-                return RGB(outgoing);
+                return objColor + diffuseLighting;
             }
         `
     },

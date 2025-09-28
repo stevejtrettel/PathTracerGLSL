@@ -20,15 +20,6 @@ Point origin;      // Starting position
     float tmin, tmax;  // Near and far clipping distances
 };
 
-// Hit information from ray-surface intersection
-struct Hit {
-Point p;           // World space intersection position
-    Direction n;       // Surface normal at intersection
-    float t;           // Distance along ray to intersection
-    int material_to;   // the material we hit
-};
-
-
 // Geometric frame for building coordinate systems
 struct Frame {
     Point base;
@@ -39,16 +30,35 @@ struct Frame {
 
 
 
-// Material properties structure - owned by Scene
-struct MaterialProperties {
-    vec3 albedo;    // Base color
+
+struct Hit {
+    Point p;
+    Direction v; //incident
+    Direction n; //surface normal
+    float t;
+    int material_from;   // Material we're leaving (0 = air)
+    int material_to;     // Material we're entering
+    vec2 uv;
+    Frame frame;
 };
 
-
+struct MaterialProperties {
+    vec3 albedo;
+    float roughness;     // Add these even if not using yet
+    float metallic;
+    float ior;
+    vec3 emission;
+    float emission_strength;
+    int light_id;        // Direct reference to light (-1 if non-emissive)
+};
 
 struct LightSample {
-    Point position;     // Position of light source
-    Direction wi;           // Direction from surface to light (normalized)
-    Radiance radiance;     // Incident radiance (color * intensity / distance²)
-    float distance;    // Distance to light source
+Point position;
+    Direction wi;
+    Radiance radiance;
+    float distance;
+    float pdf;          //For MIS (even if 1.0 for now)
 };
+
+
+

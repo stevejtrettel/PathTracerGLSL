@@ -2,6 +2,12 @@
 // These types establish the contracts between ModuleRegistry, SimpleCompiler, and RenderExecutor
 
 
+export const MODULE_ORDER: ModuleKind[] = [
+    'ambient', 'scene', 'lighting', 'camera',  'interaction', 'transport',
+    'accumulator', 'developer'
+];
+
+
 /**
  * Valid module types - determines required function prefixes
  */
@@ -10,9 +16,9 @@ type ModuleKind =
     | 'scene'         // Object intersection and materials (scene_*)
     | 'lighting'      // Light sampling (lighting_*)
     | 'camera'        // Ray generation (camera_*)
-    | 'transport'     // Integration algorithms (transport_*)
     | 'interaction'   // Light-matter physics (interaction_*)
-    | 'film'          // Accumulation (film_*)
+    | 'transport'     // Integration algorithms (transport_*)
+    | 'accumulator'   // Accumulation (accumulator_*)
     | 'developer'     // Tone mapping (developer_*)
     | 'test';         // Phase 1 testing (test_*)
 
@@ -86,5 +92,6 @@ export type {
     CompiledProgram,
     EngineState,
     UniformBinding,
-    EngineUniforms
+    EngineUniforms,
+    MODULE_ORDER,
 };

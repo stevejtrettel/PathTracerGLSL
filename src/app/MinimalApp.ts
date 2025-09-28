@@ -8,6 +8,9 @@ import { directTransport } from "../optics/transport/direct-transport";
 import {pointLight} from "../objects/lighting/point-light";
 import {directLightingTransport} from "../optics/transport/direct-lighting-transport";
 import {lambertInteraction} from "../optics/interaction/lambert-interaction";
+import {oneshotAccumulator} from "../optics/accumulator/oneshot-accumulator";
+import {gammaDeveloper} from "../optics/developer/gamma-developer";
+import {passthroughDeveloper} from "../optics/developer/passthrough-developer";
 
 /**
  * MinimalApp - basic application shell for Phase 3
@@ -45,10 +48,12 @@ class MinimalApp {
         this.engine.loadModules([
             euclideanAmbient,
             simpleSphereScene,
-            pointLight,              // NEW: Add the light
-            lambertInteraction,      // Replace simpleInteraction
-            directLightingTransport, // Replace simpleTransport
-            pinholeCamera
+            pointLight,
+            lambertInteraction,
+            directLightingTransport,
+            pinholeCamera,
+            oneshotAccumulator,
+            gammaDeveloper
         ]);
     }
 

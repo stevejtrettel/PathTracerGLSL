@@ -73,7 +73,6 @@ const pinholeCamera: ModuleDescriptor = {
             parameters: ['camera.position', 'camera.target'],
             compute: (params) => {
                 const frame = buildFrame(params['camera.position'], params['camera.target']);
-                console.log('Camera frame matrix:', Array.from(frame));
                 return frame;
             }
         }
