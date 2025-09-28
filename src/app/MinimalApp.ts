@@ -16,6 +16,7 @@ import {lambertInteraction} from "../optics/interaction/lambert-interaction";
 class MinimalApp {
     private engine: Engine;
     private parameterStore: ParameterStore;
+    private lightAnimationId: number | null = null;
 
     constructor(canvas: HTMLCanvasElement) {
         // Set up canvas size
@@ -51,7 +52,6 @@ class MinimalApp {
         ]);
     }
 
-
     setupParameters(): void {
         this.parameterStore.batch({
             'camera.position': [0, 0, 10],
@@ -66,7 +66,36 @@ class MinimalApp {
         });
     }
 
+    /**
+     * Start animating the light in a circle
+     */
+    startLightAnimation(): void {
+        const animate = () => {
+            const time = this.engine.time;
+            const radius = 8.0;
+            const speed = 0.5;
 
+            this.parameterStore.set('light.position', [
+                Math.cos(time * speed) * radius,
+                5.0,  // Fixed height
+                Math.sin(time * speed) * radius
+            ]);
+
+            this.lightAnimationId = requestAnimationFrame(animate);
+        };
+
+        animate();
+    }
+
+    /**
+     * Stop light animation
+     */
+    stopLightAnimation(): void {
+        if (this.lightAnimationId) {
+            cancelAnimationFrame(this.lightAnimationId);
+            this.lightAnimationId = null;
+        }
+    }
 
     /**
      * Set camera position and orientation - only semantic parameters
@@ -104,10 +133,9 @@ class MinimalApp {
      * Clean up resources
      */
     dispose(): void {
+        this.stopLightAnimation();
         this.engine.dispose();
     }
-
-
 
     /**
      * Move light position
@@ -122,8 +150,6 @@ class MinimalApp {
     setLightIntensity(intensity: number): void {
         this.parameterStore.set('light.intensity', intensity);
     }
-
-
 }
 
 export { MinimalApp };

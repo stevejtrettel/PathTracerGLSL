@@ -111,8 +111,6 @@ class ShaderCompiler {
             }
         }
 
-        console.log('Setting uniforms:', changes.changes.map(c => `${c.path} = ${JSON.stringify(c.newValue)}`));
-
     }
 
 
@@ -134,7 +132,6 @@ class ShaderCompiler {
         setUniform('u_frame_index', uniforms.frameIndex);
         setUniform('u_time', uniforms.time);
 
-        console.log('Engine uniforms:', uniforms);
     }
 
     /**

@@ -14,6 +14,8 @@ class Engine {
     private executor: RenderExecutor;
     private state: EngineState = 'ready';
 
+    public readonly time: number = 0;
+
     // Engine state tracking
     private frameCount: number = 0;
     private startTime: number;
@@ -76,11 +78,14 @@ class Engine {
             throw new Error(`Cannot render in state: ${this.state}`);
         }
 
-        // Update engine uniforms every frame
+        // Update time property each frame
+        (this as any).time = (performance.now() - this.startTime) / 1000;
+
+        // Use the stored time for engine uniforms
         this.compiler.updateEngineUniforms({
             resolution: [this.gl.canvas.width, this.gl.canvas.height],
             frameIndex: this.frameCount,
-            time: (performance.now() - this.startTime) / 1000
+            time: this.time
         });
 
         this.executor.execute();
@@ -112,6 +117,8 @@ class Engine {
         this.executor.dispose();
         this.state = 'ready';
     }
+
+
 }
 
 export { Engine };

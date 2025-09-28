@@ -32,8 +32,18 @@ async function main() {
     console.log('Camera configured via parameter system');
 
 
-    // Render one frame
-    app.render();
+    app.startLightAnimation()
+
+    // Start continuous rendering to see animation
+    function renderLoop() {
+        app.render();
+        requestAnimationFrame(renderLoop);
+    }
+
+    renderLoop();
+
+
+
     console.log('SUCCESS: Sphere with normal visualization rendered!');
 
     console.log('Expected result: Colored sphere against black background');
@@ -42,6 +52,8 @@ async function main() {
     console.log('- Colors should vary smoothly across sphere surface');
     console.log('Phase 3 complete - SDF ray marching works!');
 }
+
+
 
 // Handle window resize
 function handleResize() {
