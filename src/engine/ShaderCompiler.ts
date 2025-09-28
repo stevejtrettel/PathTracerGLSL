@@ -1,5 +1,6 @@
-import type { ModuleDescriptor, UniformBinding, EngineUniforms } from './types.js';
-import type { ParameterChanges } from '../app/types.js';
+import type { ModuleDescriptor, UniformBinding, EngineUniforms } from './types';
+import type { ParameterChanges } from '../app/types';
+
 import commonStructsGLSL from './common-structs.glsl?raw';
 
 /**
@@ -31,15 +32,7 @@ class ShaderCompiler {
         parts.push('precision highp float;');
         parts.push('');
 
-        // Extract geometry types from ambient module first
-        const ambientModule = modules.find(m => m.id.kind === 'ambient');
-        if (ambientModule?.fragment.types) {
-            parts.push('// ============ GEOMETRY TYPES ============');
-            parts.push(ambientModule.fragment.types);
-            parts.push('');
-        }
-
-        // Include common structs that depend on Point/Direction
+        // Include common structs that depend on Point/Direction, and
         parts.push('// ============ COMMON STRUCTS ============');
         parts.push(commonStructsGLSL);
         parts.push('');
@@ -202,7 +195,7 @@ class ShaderCompiler {
      * Simple module ordering for Phase 3
      */
     private orderModules(modules: ModuleDescriptor[]): ModuleDescriptor[] {
-        const order = ['ambient', 'scene', 'interaction', 'transport', 'camera'];
+        const order = ['ambient', 'scene', 'lighting', 'interaction', 'transport', 'camera'];
         const result: ModuleDescriptor[] = [];
 
         for (const kind of order) {

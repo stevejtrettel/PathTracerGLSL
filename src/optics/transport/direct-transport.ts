@@ -1,7 +1,7 @@
 import type {ModuleDescriptor} from "../../engine/types";
 
 
-export const simpleTransport: ModuleDescriptor = {
+export const directTransport: ModuleDescriptor = {
     id: { kind: 'transport', name: 'direct', version: '1.0.0' },
     fragment: {
         functions: `

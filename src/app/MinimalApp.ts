@@ -3,8 +3,11 @@ import { ParameterStore } from './ParameterStore';
 import { euclideanAmbient } from '../objects/ambient/euclidean/euclidean-ambient';
 import { pinholeCamera } from '../optics/camera/pinhole-camera';
 import { simpleSphereScene } from '../objects/scene/simple-sphere';
-import { simpleInteraction } from "../optics/interaction/simple-interaction";
-import { simpleTransport } from "../optics/transport/simple-transport";
+import { albedoInteraction } from "../optics/interaction/albedo-interaction";
+import { directTransport } from "../optics/transport/direct-transport";
+import {pointLight} from "../objects/lighting/point-light";
+import {directLightingTransport} from "../optics/transport/direct-lighting-transport";
+import {lambertInteraction} from "../optics/interaction/lambert-interaction";
 
 /**
  * MinimalApp - basic application shell for Phase 3
@@ -41,23 +44,29 @@ class MinimalApp {
         this.engine.loadModules([
             euclideanAmbient,
             simpleSphereScene,
-            simpleInteraction,
-            simpleTransport,
+            pointLight,              // NEW: Add the light
+            lambertInteraction,      // Replace simpleInteraction
+            directLightingTransport, // Replace simpleTransport
             pinholeCamera
         ]);
     }
 
-    /**
-     * Set up default camera parameters
-     */
-    setupCameraParameters(): void {
+
+    setupParameters(): void {
         this.parameterStore.batch({
-            'camera.position': [0, 0, 5],
+            'camera.position': [0, 0, 10],
             'camera.target': [0, 0, 0],
             'camera.fov': 60,
-            'resolution': [window.innerWidth, window.innerHeight]
+            'resolution': [window.innerWidth, window.innerHeight],
+
+            // Light parameters
+            'light.position': [5, 5, 5],       // Above and to the right
+            'light.color': [1.0, 1.0, 1.0],   // White light
+            'light.intensity': 200.0           // Bright enough to see
         });
     }
+
+
 
     /**
      * Set camera position and orientation - only semantic parameters
@@ -97,6 +106,24 @@ class MinimalApp {
     dispose(): void {
         this.engine.dispose();
     }
+
+
+
+    /**
+     * Move light position
+     */
+    moveLight(position: [number, number, number]): void {
+        this.parameterStore.set('light.position', position);
+    }
+
+    /**
+     * Set light intensity
+     */
+    setLightIntensity(intensity: number): void {
+        this.parameterStore.set('light.intensity', intensity);
+    }
+
+
 }
 
 export { MinimalApp };

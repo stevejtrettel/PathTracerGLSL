@@ -31,7 +31,6 @@ interface ModuleDescriptor {
         functions: string;    // The GLSL function definitions
         uniforms?: string;    // Uniform declarations (optional)
         constants?: string;   // #define statements (optional)
-        types?: string;       //structs that are needed (optional)
     };
 
     uniformBindings?: UniformBinding[];  // NEW

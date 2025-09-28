@@ -20,8 +20,8 @@ async function main() {
     console.log('Modules loaded: euclidean ambient + pinhole camera + simple sphere scene');
 
     // Set up parameter system
-    app.setupCameraParameters();
-    console.log('Camera parameters registered');
+    app.setupParameters();
+    console.log('Parameters registered');
 
     // Set up camera using parameter system
     const cameraPosition: [number, number, number] = [0, 0, 5];

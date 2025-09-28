@@ -1,12 +1,15 @@
 
-// Fallback aliases (these should be defined by geometry)
-#ifndef Point
-#define Point vec3
-#endif
+//in the future need to define these for each geometry
+#define Point      vec3
+#define Direction  vec3
 
-#ifndef Direction
-#define Direction vec3
-#endif
+
+
+// In the future need to define these differently in RGB vs spectral renderers
+#define Spectrum vec3 // Spectral radiance/reflectance
+#define Radiance vec3 // Outgoing light
+#define RGB      vec3 // Just return albedo for now   // Display color
+
 
 
 
@@ -28,7 +31,7 @@ Point p;           // World space intersection position
 
 // Geometric frame for building coordinate systems
 struct Frame {
-Point base;
+    Point base;
     Direction t, b, n;  // tangent, bitangent, normal (orthonormal basis)
 };
 
@@ -39,4 +42,13 @@ Point base;
 // Material properties structure - owned by Scene
 struct MaterialProperties {
     vec3 albedo;    // Base color
+};
+
+
+
+struct LightSample {
+    Point position;     // Position of light source
+    Direction wi;           // Direction from surface to light (normalized)
+    Radiance radiance;     // Incident radiance (color * intensity / distance²)
+    float distance;    // Distance to light source
 };

@@ -14,13 +14,6 @@ const euclideanAmbient: ModuleDescriptor = {
     },
 
     fragment: {
-
-
-        types: `
-      #define Point vec3
-      #define Direction vec3
-    `,
-
         functions: geoFunctions
     },
 

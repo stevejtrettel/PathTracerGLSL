@@ -35,6 +35,29 @@ const simpleSphereScene: ModuleDescriptor = {
                 return true;
             }
             
+         
+            bool scene_intersect_any(Ray ray, float max_distance) {
+                // Optimized occlusion query - just checks if path is blocked
+                // Used for shadow rays
+                
+                // Sphere at origin, radius 1.0 (same as main intersection)
+                vec3 oc = ray.origin;
+                float a = ambient_dot(ray.direction, ray.direction, ray.origin);
+                float b = 2.0 * ambient_dot(oc, ray.direction,ray.origin);
+                float c = ambient_dot(oc, oc,ray.origin) - 1.0;
+                float discriminant = b * b - 4.0 * a * c;
+                
+                if (discriminant < 0.0) return false;
+                
+                float t1 = (-b - sqrt(discriminant)) / (2.0 * a);
+                float t2 = (-b + sqrt(discriminant)) / (2.0 * a);
+                
+                float t = (t1 > ray.tmin && t1 < ray.tmax) ? t1 : t2;
+                
+                // Check if intersection is within shadow ray range
+                return (t >= ray.tmin && t <= min(ray.tmax, max_distance));
+            }
+            
             MaterialProperties scene_material_properties(int mat_id, Point p) {
                 MaterialProperties props;
                 
@@ -51,7 +74,7 @@ const simpleSphereScene: ModuleDescriptor = {
         `
     },
 
-    exports: ['scene_intersect', 'scene_material_properties']
+    exports: ['scene_intersect', 'scene_material_properties', 'scene_intersect_any']
 };
 
 export { simpleSphereScene };

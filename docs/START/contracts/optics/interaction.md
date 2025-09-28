@@ -30,7 +30,7 @@ Interaction modules implement the physics of light-matter interaction. They brid
 Spectrum interaction_surface_shade(vec3 wi, vec3 wo, Hit hit)
 
 // Sample outgoing direction given incident  
-vec3 interaction_surface_scatter(vec3 wi, Hit hit, vec2 xi, out float pdf)
+Direction interaction_surface_scatter(vec3 wi, Hit hit, vec2 xi, out float pdf)
 
 // Probability density of direction pair
 float interaction_surface_pdf(vec3 wi, vec3 wo, Hit hit)
@@ -46,7 +46,7 @@ Spectrum interaction_surface_emit(Hit hit)
 Spectrum interaction_volume_shade(vec3 wi, vec3 wo, vec3 p, int mat_id, float distance)
 
 // Sample scattering direction
-vec3 interaction_volume_scatter(vec3 wi, vec3 p, int mat_id, vec2 xi, out float pdf)
+Direction interaction_volume_scatter(vec3 wi, vec3 p, int mat_id, vec2 xi, out float pdf)
 
 // Phase function PDF
 float interaction_volume_pdf(vec3 wi, vec3 wo, vec3 p, int mat_id)
