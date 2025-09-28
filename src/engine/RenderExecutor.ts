@@ -1,98 +1,66 @@
-/**
- * RenderExecutor - compiles shaders and executes full-screen rendering
- */
-class RenderExecutor {
+// RenderExecutor.ts
+export class RenderExecutor {
     private gl: WebGL2RenderingContext;
-    private program: WebGLProgram | null = null;
+    private mainProgram: WebGLProgram | null = null;
+    private displayProgram: WebGLProgram | null = null;
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
     }
 
     /**
-     * Compile and link shaders into program
+     * Set both programs (called by Engine)
      */
-    loadShader(fragmentSource: string): void {
-        // Simple vertex shader - generates full-screen triangle from gl_VertexID
-        const vertexSource = `#version 300 es
-                    void main() {
-                        // Generate positions for full-screen triangle directly
-                        float x = float((gl_VertexID & 1) << 2) - 1.0;
-                        float y = float((gl_VertexID & 2) << 1) - 1.0;
-                        gl_Position = vec4(x, y, 0.0, 1.0);
-                    }`;
-
-        const vertexShader = this.compileShader(vertexSource, this.gl.VERTEX_SHADER);
-        const fragmentShader = this.compileShader(fragmentSource, this.gl.FRAGMENT_SHADER);
-
-        this.program = this.gl.createProgram();
-        if (!this.program) {
-            throw new Error('Failed to create program');
-        }
-
-        this.gl.attachShader(this.program, vertexShader);
-        this.gl.attachShader(this.program, fragmentShader);
-        this.gl.linkProgram(this.program);
-
-        if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
-            const log = this.gl.getProgramInfoLog(this.program);
-            throw new Error(`Program link failed: ${log}`);
-        }
-
-        // Clean up shaders
-        this.gl.deleteShader(vertexShader);
-        this.gl.deleteShader(fragmentShader);
+    setPrograms(main: WebGLProgram, display: WebGLProgram): void {
+        this.mainProgram = main;
+        this.displayProgram = display;
     }
 
     /**
-     * Execute full-screen render
+     * Execute main accumulation pass
      */
-    execute(): void {
-        if (!this.program) {
-            throw new Error('No program loaded');
+    executeMainPass(): void {
+        if (!this.mainProgram) {
+            throw new Error('No main program set - call setPrograms first');
         }
 
-        this.gl.useProgram(this.program);
+        this.gl.useProgram(this.mainProgram);
         this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
     }
 
     /**
-     * Get compiled program for uniform management
+     * Execute display/tone mapping pass
      */
-    getProgram(): WebGLProgram | null {
-        return this.program;
+    executeDisplayPass(radianceTexture: WebGLTexture): void {
+        if (!this.displayProgram) {
+            throw new Error('No display program set - call setPrograms first');
+        }
+
+        // Render to screen
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
+
+        // Use display program
+        this.gl.useProgram(this.displayProgram);
+
+        // Bind radiance texture
+        this.gl.activeTexture(this.gl.TEXTURE0);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, radianceTexture);
+
+        const loc = this.gl.getUniformLocation(this.displayProgram, 'u_radiance_texture');
+        if (loc) {
+            this.gl.uniform1i(loc, 0);
+        }
+
+        // Draw fullscreen triangle
+        this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
     }
 
     /**
-     * Clean up resources
+     * Clean up (programs owned by ShaderCompiler, so we don't delete)
      */
     dispose(): void {
-        if (this.program) {
-            this.gl.deleteProgram(this.program);
-            this.program = null;
-        }
-    }
-
-    /**
-     * Compile individual shader
-     */
-    private compileShader(source: string, type: number): WebGLShader {
-        const shader = this.gl.createShader(type);
-        if (!shader) {
-            throw new Error('Failed to create shader');
-        }
-
-        this.gl.shaderSource(shader, source);
-        this.gl.compileShader(shader);
-
-        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-            const log = this.gl.getShaderInfoLog(shader);
-            this.gl.deleteShader(shader);
-            throw new Error(`Shader compile failed: ${log}`);
-        }
-
-        return shader;
+        this.mainProgram = null;
+        this.displayProgram = null;
     }
 }
-
-export { RenderExecutor };

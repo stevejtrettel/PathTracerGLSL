@@ -3,6 +3,7 @@ import { ShaderCompiler } from './ShaderCompiler.js';
 import { RenderExecutor } from './RenderExecutor.js';
 import type { ModuleDescriptor, EngineState, EngineUniforms } from './types.js';
 import type { ParameterChanges } from '../app/types.js';
+import { ResourceManager } from './ResourceManager.js';
 
 /**
  * Engine orchestrates subsystems for modular rendering
@@ -12,22 +13,29 @@ class Engine {
     private registry: ModuleRegistry;
     private compiler: ShaderCompiler;
     private executor: RenderExecutor;
+    private resources: ResourceManager;
     private state: EngineState = 'ready';
 
-    private time: number = 0;  // Make it properly private
+    // Engine state tracking
+    private time: number = 0;
+    private frameCount: number = 0;
+    private sampleCount: number = 0;
+    private startTime: number;
+
     getTime(): number {
         return this.time;
     }
 
-    // Engine state tracking
-    private frameCount: number = 0;
-    private startTime: number;
+    get sampleCount(): number {
+        return this.sampleCount;
+    }
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
         this.registry = new ModuleRegistry();
         this.compiler = new ShaderCompiler(gl);
         this.executor = new RenderExecutor(gl);
+        this.resources = new ResourceManager(gl);
         this.startTime = performance.now();
     }
 
@@ -44,10 +52,22 @@ class Engine {
             this.registry.register(module);
         }
 
-        // Compile modules to GLSL
-        const fragmentSource = this.compiler.compile(modules);
+        // Compile BOTH shaders
+        this.compiler.compile(modules);
 
-        // Log the generated shader with line numbers
+        // Get the main program for accumulation
+        const mainProgram = this.compiler.getMainProgram();
+        if (!mainProgram) {
+            throw new Error('Failed to compile main program');
+        }
+
+        // Get the display program for tone mapping
+        const displayProgram = this.compiler.getDisplayProgram();
+        if (!displayProgram) {
+            throw new Error('Failed to compile display program');
+        }
+
+        // Log debug info if available
         const debugInfo = this.compiler.getDebugInfo();
         if (debugInfo) {
             console.log('=== GENERATED FRAGMENT SHADER ===');
@@ -55,14 +75,19 @@ class Engine {
             console.log('=== END SHADER ===');
         }
 
-        this.executor.loadShader(fragmentSource);
+        // Pass BOTH programs to RenderExecutor
+        this.executor.setPrograms(mainProgram, displayProgram);
 
-        // Set up uniform management
-        const program = this.executor.getProgram();
-        if (!program) {
-            throw new Error('Failed to compile program');
+        // Set up uniform management for main program
+        this.compiler.setActiveProgram(mainProgram);
+
+        // Bind texture uniform for accumulator
+        this.gl.useProgram(mainProgram);
+        const textureLoc = this.gl.getUniformLocation(mainProgram, 'u_accumulator_radiance_previous');
+        if (textureLoc) {
+            this.gl.uniform1i(textureLoc, 0);
+            console.log('Bound accumulator texture to unit 0');
         }
-        this.compiler.setActiveProgram(program);
 
         this.state = 'running';
     }
@@ -84,18 +109,36 @@ class Engine {
             throw new Error(`Cannot render in state: ${this.state}`);
         }
 
-        // Update time property each frame
-        this.time = (performance.now() - this.startTime) / 1000;
+        // 1. Prepare (bind previous texture, set render target)
+        this.resources.prepareFrame();
 
-        // Use the stored time for engine uniforms
+        // 2. Update uniforms
+        this.time = (performance.now() - this.startTime) / 1000;
         this.compiler.updateEngineUniforms({
             resolution: [this.gl.canvas.width, this.gl.canvas.height],
             frameIndex: this.frameCount,
-            time: this.time
+            time: this.time,
+            sampleCount: this.sampleCount
         });
 
-        this.executor.execute();
+        // 3. Execute main pass (accumulate radiance)
+        this.executor.executeMainPass();
+
+        // 4. Execute display pass (tone map to screen)
+        const radianceTexture = this.resources.getCurrentTexture();
+        this.executor.executeDisplayPass(radianceTexture);
+
+        // 5. Swap buffers for next frame
+        this.resources.finalizeFrame();
+
         this.frameCount++;
+        this.sampleCount++;
+    }
+
+    clearAccumulation(): void {
+        this.resources.clearFilmBuffers();
+        this.frameCount = 0;
+        this.sampleCount = 0;
     }
 
     /**
@@ -121,13 +164,13 @@ class Engine {
      */
     dispose(): void {
         this.executor.dispose();
+        this.resources.dispose();
         this.state = 'ready';
     }
 
     clearUniformCache(): void {
         this.compiler.clearCache();
     }
-
 }
 
 export { Engine };

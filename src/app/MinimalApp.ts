@@ -11,6 +11,7 @@ import {lambertInteraction} from "../optics/interaction/lambert-interaction";
 import {oneshotAccumulator} from "../optics/accumulator/oneshot-accumulator";
 import {gammaDeveloper} from "../optics/developer/gamma-developer";
 import {passthroughDeveloper} from "../optics/developer/passthrough-developer";
+import { averagingAccumulator} from "../optics/accumulator/average-accumulator";
 
 /**
  * MinimalApp - basic application shell for Phase 3
@@ -20,13 +21,18 @@ class MinimalApp {
     private engine: Engine;
     private parameterStore: ParameterStore;
     private lightAnimationId: number | null = null;
+    private renderLoopId: number | null = null;  // ADD THIS
 
     constructor(canvas: HTMLCanvasElement) {
         // Set up canvas size
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        const gl = canvas.getContext('webgl2');
+        const gl = canvas.getContext('webgl2', {
+            antialias: false,  // THIS is what you were missing
+            preserveDrawingBuffer: true
+        });
+
         if (!gl) {
             throw new Error('WebGL2 not supported');
         }
@@ -52,7 +58,7 @@ class MinimalApp {
             lambertInteraction,
             directLightingTransport,
             pinholeCamera,
-            oneshotAccumulator,
+            averagingAccumulator,
             gammaDeveloper
         ]);
     }
@@ -67,8 +73,41 @@ class MinimalApp {
             // Light parameters
             'light.position': [5, 5, 5],       // Above and to the right
             'light.color': [1.0, 1.0, 1.0],   // White light
-            'light.intensity': 200.0           // Bright enough to see
+            'light.intensity': 200.0,           // Bright enough to see
+
+            'accumulator.reset': false         // ADD THIS
         });
+    }
+
+    /**
+     * Start render loop - ADD THIS METHOD
+     */
+    startRenderLoop(): void {
+        // Initial reset
+        this.parameterStore.set('accumulator.reset', true);
+        this.engine.clearAccumulation();
+
+        const loop = () => {
+            // Turn off reset after first frame
+            if (this.engine.sampleCount === 1) {
+                this.parameterStore.set('accumulator.reset', false);
+            }
+
+            this.render();
+            this.renderLoopId = requestAnimationFrame(loop);
+        };
+
+        loop();
+    }
+
+    /**
+     * Stop render loop - ADD THIS METHOD
+     */
+    stopRenderLoop(): void {
+        if (this.renderLoopId) {
+            cancelAnimationFrame(this.renderLoopId);
+            this.renderLoopId = null;
+        }
     }
 
     /**
@@ -76,7 +115,7 @@ class MinimalApp {
      */
     startLightAnimation(): void {
         const animate = () => {
-            const time = this.engine.time;
+            const time = this.engine.getTime();
             const radius = 8.0;
             const speed = 0.5;
 
@@ -138,6 +177,7 @@ class MinimalApp {
      * Clean up resources
      */
     dispose(): void {
+        this.stopRenderLoop();  // ADD THIS
         this.stopLightAnimation();
         this.engine.dispose();
     }

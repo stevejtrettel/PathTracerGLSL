@@ -82,6 +82,7 @@ interface EngineUniforms {
     resolution: [number, number];
     frameIndex: number;
     time: number;
+    sampleCount: number;
 }
 
 

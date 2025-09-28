@@ -5,10 +5,14 @@ import type { ParameterChanges } from '../app/types';
 import commonStructsGLSL from './common-structs.glsl?raw';
 import randomGLSL from '../math/random.glsl?raw';
 
-
 class ShaderCompiler {
     private gl: WebGL2RenderingContext;
+
+    // TWO programs now
+    private mainProgram: WebGLProgram | null = null;
+    private displayProgram: WebGLProgram | null = null;
     private activeProgram: WebGLProgram | null = null;
+
     private uniformLocations = new Map<string, WebGLUniformLocation>();
 
     // Uniform binding system
@@ -20,17 +24,33 @@ class ShaderCompiler {
     private uniformValueCache = new Map<string, any>();
     private updateStats = { total: 0, skipped: 0 };
 
-    // NEW: Store debug info
+    // Store debug info
     private lastCompiledSource: string | null = null;
     private lastCompiledSourceWithLineNumbers: string | null = null;
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
     }
-// ShaderCompiler.ts - Update the compile method
+
     compile(modules: ModuleDescriptor[]): string {
         this.buildUniformBindings(modules);
 
+        // Build main shader (accumulation without developer)
+        const mainSource = this.buildMainShader(modules);
+        this.mainProgram = this.compileAndLinkProgram(mainSource, 'main');
+
+        // Build display shader (tone mapping)
+        const displaySource = this.buildDisplayShader(modules);
+        this.displayProgram = this.compileAndLinkProgram(displaySource, 'display');
+
+        // Store for debug access
+        this.lastCompiledSource = mainSource;
+        this.lastCompiledSourceWithLineNumbers = this.addLineNumbers(mainSource);
+
+        return mainSource;
+    }
+
+    private buildMainShader(modules: ModuleDescriptor[]): string {
         const parts: string[] = [];
 
         parts.push('#version 300 es');
@@ -49,13 +69,16 @@ class ShaderCompiler {
         parts.push('uniform vec2 u_resolution;');
         parts.push('uniform int u_frame_index;');
         parts.push('uniform float u_time;');
+        parts.push('uniform int u_sample_count;');
         parts.push('');
 
         const orderedModules = this.orderModules(modules);
 
+        // Add all modules EXCEPT developer
         for (const module of orderedModules) {
-            parts.push(`// ============ ${module.id.name} (${module.id.kind}) ============`);
+            if (module.id.kind === 'developer') continue;  // Skip developer
 
+            parts.push(`// ============ ${module.id.name} (${module.id.kind}) ============`);
             if (module.fragment.constants) {
                 parts.push(module.fragment.constants);
             }
@@ -70,18 +93,123 @@ class ShaderCompiler {
         parts.push('');
         parts.push(this.generateMainFunction());
 
-        const finalSource = parts.join('\n');
-
-        // Store for debug access
-        this.lastCompiledSource = finalSource;
-        this.lastCompiledSourceWithLineNumbers = this.addLineNumbers(finalSource);
-
-        return finalSource;
+        return parts.join('\n');
     }
 
+    private buildDisplayShader(modules: ModuleDescriptor[]): string {
+        // Find developer module
+        const developer = modules.find(m => m.id.kind === 'developer');
+        if (!developer) {
+            throw new Error('No developer module found');
+        }
 
+        const parts: string[] = [];
 
-    // NEW: Add line numbers to source
+        parts.push('#version 300 es');
+        parts.push('precision highp float;');
+        parts.push('');
+        parts.push('uniform sampler2D u_radiance_texture;');
+        parts.push('');
+        parts.push('#define Radiance vec3');
+        parts.push('#define RGB vec3');
+        parts.push('');
+
+        if (developer.fragment.constants) {
+            parts.push(developer.fragment.constants);
+        }
+
+        if (developer.fragment.uniforms) {
+            parts.push(developer.fragment.uniforms);
+        }
+        parts.push(developer.fragment.functions);
+        parts.push('');
+
+        parts.push('out vec4 fragColor;');
+        parts.push('');
+
+        parts.push(`void main() {
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    Radiance radiance = texelFetch(u_radiance_texture, coord, 0).rgb;
+    RGB color = developer_develop(radiance);
+    fragColor = vec4(color, 1.0);
+}`);
+
+        return parts.join('\n');
+    }
+
+    private compileAndLinkProgram(fragmentSource: string, name: string): WebGLProgram {
+        // Common vertex shader for both
+        const vertexSource = `#version 300 es
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}`;
+
+        const vertexShader = this.compileShader(vertexSource, this.gl.VERTEX_SHADER, `${name} vertex`);
+        const fragmentShader = this.compileShader(fragmentSource, this.gl.FRAGMENT_SHADER, `${name} fragment`);
+
+        const program = this.gl.createProgram();
+        if (!program) throw new Error(`Failed to create ${name} program`);
+
+        this.gl.attachShader(program, vertexShader);
+        this.gl.attachShader(program, fragmentShader);
+        this.gl.linkProgram(program);
+
+        if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
+            const log = this.gl.getProgramInfoLog(program);
+            throw new Error(`${name} program link failed: ${log}`);
+        }
+
+        this.gl.deleteShader(vertexShader);
+        this.gl.deleteShader(fragmentShader);
+
+        return program;
+    }
+
+    private compileShader(source: string, type: number, name: string): WebGLShader {
+        const shader = this.gl.createShader(type);
+        if (!shader) throw new Error(`Failed to create ${name} shader`);
+
+        this.gl.shaderSource(shader, source);
+        this.gl.compileShader(shader);
+
+        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+            const log = this.gl.getShaderInfoLog(shader);
+            this.gl.deleteShader(shader);
+            throw new Error(`${name} shader compilation failed: ${log}`);
+        }
+
+        return shader;
+    }
+
+    // NEW: Getters for both programs
+    getMainProgram(): WebGLProgram | null {
+        return this.mainProgram;
+    }
+
+    getDisplayProgram(): WebGLProgram | null {
+        return this.displayProgram;
+    }
+
+    // Generate main function that outputs RADIANCE
+    private generateMainFunction(): string {
+        return `
+void main(){
+    vec2 pixel = gl_FragCoord.xy;
+    uint rng_state = hash3(uint(pixel.x), uint(pixel.y), uint(u_frame_index));
+    vec2 xi = random2(rng_state);
+    
+    Ray ray = camera_generateRay(pixel, xi);
+    Spectrum spectrum = transport_trace(ray);
+    Radiance radiance = accumulator_accumulate(spectrum, pixel);
+    
+    // Output RADIANCE for accumulation (no developer)
+    fragColor = vec4(radiance, 1.0);
+}`;
+    }
+
+    // All existing methods stay exactly the same
     private addLineNumbers(source: string): string {
         const lines = source.split('\n');
         const lineNumWidth = String(lines.length).length;
@@ -91,7 +219,6 @@ class ShaderCompiler {
             return `${lineNum}: ${line}`;
         }).join('\n');
     }
-
 
     getDebugInfo(): { source: string, numberedSource: string } | null {
         if (!this.lastCompiledSource || !this.lastCompiledSourceWithLineNumbers) {
@@ -104,12 +231,10 @@ class ShaderCompiler {
     }
 
     setActiveProgram(program: WebGLProgram): void {
-        // Clear cache when switching programs
         if (this.activeProgram !== program) {
             this.uniformValueCache.clear();
             this.updateStats = { total: 0, skipped: 0 };
         }
-
         this.activeProgram = program;
         this.cacheUniformLocations();
     }
@@ -119,12 +244,10 @@ class ShaderCompiler {
 
         this.gl.useProgram(this.activeProgram);
 
-        // Update parameter cache
         for (const change of changes.changes) {
             this.parameterCache.set(change.path, change.newValue);
         }
 
-        // Find affected bindings
         const affectedBindings = new Set<UniformBinding>();
         for (const change of changes.changes) {
             const bindings = this.parameterToBindings.get(change.path);
@@ -133,7 +256,6 @@ class ShaderCompiler {
             }
         }
 
-        // Execute bindings WITH CACHE CHECK
         for (const binding of affectedBindings) {
             const paramValues: Record<string, any> = {};
             for (const paramPath of binding.parameters) {
@@ -142,14 +264,12 @@ class ShaderCompiler {
 
             const uniformValue = binding.compute(paramValues);
 
-            // CHECK CACHE - Skip GPU update if value unchanged
             const cachedValue = this.uniformValueCache.get(binding.uniform);
             if (this.valuesEqual(cachedValue, uniformValue)) {
                 this.updateStats.skipped++;
                 continue;
             }
 
-            // Value changed - update cache and GPU
             this.uniformValueCache.set(binding.uniform, uniformValue);
             const location = this.uniformLocations.get(binding.uniform);
             if (location) {
@@ -158,37 +278,29 @@ class ShaderCompiler {
             }
         }
 
-        // Log stats periodically (every 60 frames)
         if ((this.updateStats.total + this.updateStats.skipped) % 60 === 0) {
             const skipRate = (this.updateStats.skipped / (this.updateStats.total + this.updateStats.skipped) * 100).toFixed(1);
             console.log(`Uniform cache: ${skipRate}% GPU calls skipped`);
         }
-
     }
-
 
     updateEngineUniforms(uniforms: EngineUniforms): void {
         if (!this.activeProgram) return;
 
         this.gl.useProgram(this.activeProgram);
 
-        // Engine uniforms use the cache too
-        // this.setCachedUniform('u_resolution', uniforms.resolution);
-        // this.setCachedUniform('u_frame_index', uniforms.frameIndex);
-        // this.setCachedUniform('u_time', uniforms.time);
-
-        // Handle each uniform with correct type
         const locRes = this.uniformLocations.get('u_resolution');
         if (locRes) this.gl.uniform2fv(locRes, uniforms.resolution);
 
         const locFrame = this.uniformLocations.get('u_frame_index');
-        if (locFrame) this.gl.uniform1i(locFrame, uniforms.frameIndex); // uniform1i!
+        if (locFrame) this.gl.uniform1i(locFrame, uniforms.frameIndex);
 
         const locTime = this.uniformLocations.get('u_time');
         if (locTime) this.gl.uniform1f(locTime, uniforms.time);
 
+        const locSample = this.uniformLocations.get('u_sample_count');
+        if (locSample) this.gl.uniform1i(locSample, uniforms.sampleCount);
 
-        // Log stats every 60 FRAMES (not every 60 updates)
         if (uniforms.frameIndex % 60 === 0 && uniforms.frameIndex > 0) {
             const total = this.updateStats.total + this.updateStats.skipped;
             const skipRate = total > 0 ? (this.updateStats.skipped / total * 100) : 0;
@@ -196,11 +308,10 @@ class ShaderCompiler {
         }
     }
 
-
     private setCachedUniform(name: string, value: any): void {
         const cached = this.uniformValueCache.get(name);
         if (this.valuesEqual(cached, value)) {
-            this.updateStats.skipped++;  // ADD THIS
+            this.updateStats.skipped++;
             return;
         }
 
@@ -208,26 +319,22 @@ class ShaderCompiler {
         const location = this.uniformLocations.get(name);
         if (location) {
             this.setUniformValue(location, value);
-            this.updateStats.total++;  // ADD THIS
+            this.updateStats.total++;
         }
     }
 
-    // NEW: Value comparison including arrays and matrices
     private valuesEqual(a: any, b: any): boolean {
         if (a === b) return true;
         if (a == null || b == null) return false;
 
-        // Handle arrays (vec2, vec3, vec4, matrices)
         if (Array.isArray(a) && Array.isArray(b)) {
             if (a.length !== b.length) return false;
             for (let i = 0; i < a.length; i++) {
-                // Use epsilon for float comparison
                 if (Math.abs(a[i] - b[i]) > 0.00001) return false;
             }
             return true;
         }
 
-        // Handle typed arrays
         if (a instanceof Float32Array && b instanceof Float32Array) {
             if (a.length !== b.length) return false;
             for (let i = 0; i < a.length; i++) {
@@ -247,7 +354,6 @@ class ShaderCompiler {
             for (const binding of module.uniformBindings || []) {
                 this.uniformBindings.set(binding.uniform, binding);
 
-                // Build reverse index: parameter -> bindings
                 for (const paramPath of binding.parameters) {
                     if (!this.parameterToBindings.has(paramPath)) {
                         this.parameterToBindings.set(paramPath, new Set());
@@ -275,34 +381,6 @@ class ShaderCompiler {
         }
     }
 
-// ShaderCompiler.ts
-    private generateMainFunction(): string {
-        return `
-        void main() {
-    vec2 pixel = gl_FragCoord.xy;
-    
-    // 1. Initialize RNG state unique to this pixel at this frame
-    uint rng_state = hash3(uint(pixel.x), uint(pixel.y), uint(u_frame_index));
-    //                      ^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
-    //                      pixel X pos    pixel Y pos    current frame number
-    // This ensures each pixel gets different randoms, and they change each frame
-    
-    // 2. Generate 2D random offset in [0,1]²
-    vec2 xi = random2(rng_state);
-    
-    // 3. Pass to camera for sub-pixel jitter
-    Ray ray = camera_generateRay(pixel, xi);
-    //                                   ^^
-    // Camera will use xi to jitter within the pixel for anti-aliasing
-    
-    // Rest of pipeline unchanged
-    Spectrum spectrum = transport_trace(ray);
-    Radiance radiance = accumulator_accumulate(spectrum, pixel);
-    RGB color = developer_develop(radiance);
-    fragColor = vec4(color, 1.0);
-}`;
-    }
-
     private orderModules(mods: ModuleDescriptor[]): ModuleDescriptor[] {
         const moduleMap = new Map(mods.map(m => [m.id.kind, m]));
         const result: ModuleDescriptor[] = [];
@@ -315,7 +393,6 @@ class ShaderCompiler {
             }
         }
 
-        // Warn about unordered modules
         if (moduleMap.size > 0) {
             console.warn('Unordered modules:', Array.from(moduleMap.keys()));
         }
@@ -339,13 +416,11 @@ class ShaderCompiler {
         }
     }
 
-    // NEW: Clear cache (useful for recipe switching later)
     clearCache(): void {
         this.uniformValueCache.clear();
         this.updateStats = { total: 0, skipped: 0 };
     }
 
-    // NEW: Get cache stats (for debugging)
     getCacheStats(): { total: number, skipped: number, skipRate: number } {
         const total = this.updateStats.total + this.updateStats.skipped;
         return {
