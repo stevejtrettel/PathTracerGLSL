@@ -23,8 +23,13 @@ const pinholeCamera: ModuleDescriptor = {
         functions: `
       Ray camera_generateRay(vec2 pixel, vec2 xi) {
         // Convert pixel coordinates to normalized device coordinates [-1, 1]
-        // Add random offset xi for antialiasing (Phase 2: xi = vec2(0) for now)
-        vec2 ndc = (2.0 * (pixel + xi) / u_resolution) - 1.0;
+  
+          // xi is in [0,1], so shift to [-0.5, 0.5] for centered jitter
+          vec2 jittered_pixel = pixel + (xi - 0.5);
+    
+         // Now convert to NDC using the jittered position
+         vec2 ndc = (2.0 * jittered_pixel / u_resolution) - 1.0;
+
         
         // Account for aspect ratio - correct x coordinate
         float aspect = u_resolution.x / u_resolution.y;

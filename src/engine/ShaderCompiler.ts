@@ -3,6 +3,8 @@ import type { ModuleDescriptor, UniformBinding, EngineUniforms } from './types';
 import { MODULE_ORDER } from "./types";
 import type { ParameterChanges } from '../app/types';
 import commonStructsGLSL from './common-structs.glsl?raw';
+import randomGLSL from '../math/random.glsl?raw';
+
 
 class ShaderCompiler {
     private gl: WebGL2RenderingContext;
@@ -37,6 +39,10 @@ class ShaderCompiler {
 
         parts.push('// ============ COMMON STRUCTS ============');
         parts.push(commonStructsGLSL);
+        parts.push('');
+
+        parts.push('// ============ RANDOM NUMBERS ============');
+        parts.push(randomGLSL);
         parts.push('');
 
         parts.push('// ============ ENGINE UNIFORMS ============');
@@ -167,9 +173,20 @@ class ShaderCompiler {
         this.gl.useProgram(this.activeProgram);
 
         // Engine uniforms use the cache too
-        this.setCachedUniform('u_resolution', uniforms.resolution);
-        this.setCachedUniform('u_frame_index', uniforms.frameIndex);
-        this.setCachedUniform('u_time', uniforms.time);
+        // this.setCachedUniform('u_resolution', uniforms.resolution);
+        // this.setCachedUniform('u_frame_index', uniforms.frameIndex);
+        // this.setCachedUniform('u_time', uniforms.time);
+
+        // Handle each uniform with correct type
+        const locRes = this.uniformLocations.get('u_resolution');
+        if (locRes) this.gl.uniform2fv(locRes, uniforms.resolution);
+
+        const locFrame = this.uniformLocations.get('u_frame_index');
+        if (locFrame) this.gl.uniform1i(locFrame, uniforms.frameIndex); // uniform1i!
+
+        const locTime = this.uniformLocations.get('u_time');
+        if (locTime) this.gl.uniform1f(locTime, uniforms.time);
+
 
         // Log stats every 60 FRAMES (not every 60 updates)
         if (uniforms.frameIndex % 60 === 0 && uniforms.frameIndex > 0) {
@@ -260,9 +277,25 @@ class ShaderCompiler {
 
 // ShaderCompiler.ts
     private generateMainFunction(): string {
-        return `void main() {
+        return `
+        void main() {
     vec2 pixel = gl_FragCoord.xy;
-    Ray ray = camera_generateRay(pixel, vec2(0.0));
+    
+    // 1. Initialize RNG state unique to this pixel at this frame
+    uint rng_state = hash3(uint(pixel.x), uint(pixel.y), uint(u_frame_index));
+    //                      ^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+    //                      pixel X pos    pixel Y pos    current frame number
+    // This ensures each pixel gets different randoms, and they change each frame
+    
+    // 2. Generate 2D random offset in [0,1]²
+    vec2 xi = random2(rng_state);
+    
+    // 3. Pass to camera for sub-pixel jitter
+    Ray ray = camera_generateRay(pixel, xi);
+    //                                   ^^
+    // Camera will use xi to jitter within the pixel for anti-aliasing
+    
+    // Rest of pipeline unchanged
     Spectrum spectrum = transport_trace(ray);
     Radiance radiance = accumulator_accumulate(spectrum, pixel);
     RGB color = developer_develop(radiance);

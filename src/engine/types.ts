@@ -45,12 +45,12 @@ interface ModuleDescriptor {
 }
 
 
+// types.ts
 interface UniformBinding {
-    uniform: string;                    // e.g., 'u_camera_tan_fov'
-    parameters: string[];               // e.g., ['camera.fov']
+    uniform: string;
+    parameters: string[];
     compute: (params: Record<string, any>) => any;
 }
-
 
 /**
  * Result of module validation by the registry
