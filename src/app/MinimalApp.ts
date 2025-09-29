@@ -16,6 +16,9 @@ import {sphereFloorScene} from "../objects/scene/sphere-floor";
 import {pathTracingTransport} from "../optics/transport/path-tracer-transport";
 import {pathTracerDirectLight} from "../optics/transport/path-tracer-direct-light";
 import {cornellBoxScene} from "../objects/scene/cornell-box";
+import {sphereLight} from "../objects/lighting/sphere-light";
+
+
 
 /**
  * MinimalApp - basic application shell for Phase 3
@@ -58,7 +61,7 @@ class MinimalApp {
         this.engine.loadModules([
             euclideanAmbient,
             cornellBoxScene,
-            pointLight,
+            sphereLight,
             lambertInteraction,
             pathTracerDirectLight,
             pinholeCamera,
@@ -79,9 +82,14 @@ class MinimalApp {
             'resolution': [window.innerWidth, window.innerHeight],
 
             // Light parameters
-            'light.position': [0,3,0],       // Above and to the right
-            'light.color': [1.0, 1.0, 1.0],   // White light
-            'light.intensity': 1000.0,           // Bright enough to see
+            // 'light.position': [0,3,0],       // Above and to the right
+            // 'light.color': [1.0, 1.0, 1.0],   // White light
+            // 'light.intensity': 1000.0,           // Bright enough to see
+
+            'sphere_light.position': [0,3,0],
+            'sphere_light.radius': 0.5,
+            'sphere_light.color': [1.0, 1.0, 1.0],
+            'sphere_light.intensity': 20.0,
 
             'accumulator.reset': false         // ADD THIS
         });

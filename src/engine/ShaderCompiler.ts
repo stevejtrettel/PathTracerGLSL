@@ -1,9 +1,8 @@
-// ShaderCompiler.ts - Cleaned up with typed uniforms
+// ShaderCompiler.ts - With integrated RNG system
 import type { ModuleDescriptor, UniformBinding, EngineUniforms, UniformType } from './types';
 import {MODULE_ORDER} from "./types";
 import type { ParameterChanges } from '../app/types';
 import commonStructsGLSL from './common-structs.glsl?raw';
-import randomGLSL from '../math/random.glsl?raw';
 
 class ShaderCompiler {
     private gl: WebGL2RenderingContext;
@@ -276,6 +275,41 @@ class ShaderCompiler {
         return false;
     }
 
+    // ============ RNG SYSTEM ============
+
+    private getRNGSystem(): string {
+        return `
+// ============ RNG SYSTEM ============
+// Per-fragment RNG state that gets initialized in main()
+uint rng_seed;
+
+// Wang hash for generating random numbers
+uint wang_hash(uint seed) {
+    seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
+    seed *= uint(9);
+    seed = seed ^ (seed >> 4);
+    seed *= uint(0x27d4eb2d);
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
+
+// Get next random float in [0,1]
+float random() {
+    rng_seed = wang_hash(rng_seed);
+    return float(rng_seed) / 4294967296.0;
+}
+
+// Get two random floats
+vec2 random2() {
+    return vec2(random(), random());
+}
+
+// Get three random floats
+vec3 random3() {
+    return vec3(random(), random(), random());
+}`;
+    }
+
     // ============ SHADER BUILDING ============
 
     private buildMainShader(modules: ModuleDescriptor[]): string {
@@ -287,14 +321,15 @@ class ShaderCompiler {
         parts.push('// ============ COMMON STRUCTS ============');
         parts.push(commonStructsGLSL);
         parts.push('');
-        parts.push('// ============ RANDOM NUMBERS ============');
-        parts.push(randomGLSL);
-        parts.push('');
         parts.push('// ============ ENGINE UNIFORMS ============');
         parts.push('uniform vec2 u_resolution;');
         parts.push('uniform int u_frame_index;');
         parts.push('uniform float u_time;');
         parts.push('uniform int u_sample_count;');
+        parts.push('');
+
+        // Add the RNG system
+        parts.push(this.getRNGSystem());
         parts.push('');
 
         const orderedModules = this.orderModules(modules);
@@ -361,10 +396,14 @@ class ShaderCompiler {
         return `
 void main(){
     vec2 pixel = gl_FragCoord.xy;
-    uint rng_state = hash3(uint(pixel.x), uint(pixel.y), uint(u_frame_index));
-    vec2 xi = random2(rng_state);
     
-    Ray ray = camera_generateRay(pixel, xi);
+    // Initialize RNG seed once per pixel
+    rng_seed = uint(uint(pixel.x) * uint(1973) + 
+                   uint(pixel.y) * uint(9277) + 
+                   uint(u_frame_index) * uint(26699)) | uint(1);
+    
+    // Now just use random() or random2() anywhere!
+    Ray ray = camera_generateRay(pixel, random2());
     Spectrum spectrum = transport_trace(ray);
     Radiance radiance = accumulator_accumulate(spectrum, pixel);
     

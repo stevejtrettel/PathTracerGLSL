@@ -28,22 +28,9 @@ const pathTracingTransport: ModuleDescriptor = {
                 vec3 throughput = vec3(1.0);  // Path contribution weight
                 vec3 radiance = vec3(0.0);     // Accumulated light
                 
-                // Get RNG state from main - this is a bit hacky but works for now
-                vec2 pixel = gl_FragCoord.xy;
-                uint rng_state = hash3(uint(pixel.x), uint(pixel.y), uint(u_frame_index));
-                
                 Ray current_ray = ray;
                 
                 for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
-                
-                    // decorrelate
-                    uint rng_state = hash3(
-                        uint(pixel.x), 
-                        uint(pixel.y), 
-                        uint(u_frame_index) * 73u + uint(bounce) * 1931u
-                    );
-    
-                
                     Hit hit;
                     
                     // Find intersection
@@ -57,18 +44,16 @@ const pathTracingTransport: ModuleDescriptor = {
                     // Build local frame for shading
                     hit.frame = ambient_frame(hit.p, hit.n);
                     
-                  //  Add emission from surface we hit
+                    // Add emission from surface we hit
                     vec3 emission = interaction_surface_emit(hit);
                     if (length(emission) > 0.0) {
                         radiance += throughput * emission;
                     }
                     
-                    
-                    
                     // Russian roulette termination after a few bounces
                     if (bounce >= RR_START_DEPTH) {
                         float p_survive = min(0.95, luminance(throughput));
-                        if (random(rng_state) > p_survive) {
+                        if (random() > p_survive) {  // Just call random()!
                             break;  // Terminate path
                         }
                         throughput /= p_survive;  // Boost surviving paths
@@ -76,11 +61,10 @@ const pathTracingTransport: ModuleDescriptor = {
                     
                     // Sample next direction using BRDF importance sampling
                     float pdf;
-                    vec2 xi = random2(rng_state);
+                    vec2 xi = random2();  // Just call random2()!
                     Direction wi = interaction_surface_scatter(
                         -current_ray.direction,  // wo (toward viewer/previous point)
                         hit,
-                        xi,
                         pdf
                     );
                     
@@ -90,21 +74,15 @@ const pathTracingTransport: ModuleDescriptor = {
                     }
                     
                     // Evaluate BRDF for the sampled direction
-                    // Note: interaction_surface_shade expects (wi toward light, wo toward viewer)
                     Spectrum f = interaction_surface_shade(
                         wi,                      // New direction (toward next point)
                         -current_ray.direction,  // Where we came from
                         hit
                     );
                     
-                    // Update throughput with BRDF * cos(theta) / pdf
-                    // The cosine is already in interaction_surface_shade for Lambert
-                    // But we need to remove it since we importance sampled it
+                    // Update throughput
                     float cos_theta = max(0.0, ambient_dot(wi, hit.n, hit.p));
                     
-                    // For Lambert: f already includes cos_theta, so we have:
-                    // throughput *= (albedo/PI * cos_theta) / (cos_theta/PI) = albedo
-                    // But let's be explicit:
                     if (cos_theta > 0.0001) {
                         throughput *= f / pdf;
                     } else {

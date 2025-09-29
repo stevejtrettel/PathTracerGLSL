@@ -1,13 +1,13 @@
 import type { ModuleDescriptor } from '../../engine/types.js';
 
 /**
- * Path tracing transport module
- * Implements recursive light bouncing with Russian roulette termination
+ * Path tracing transport module with direct light sampling
+ * Implements recursive light bouncing with NEE
  */
 const pathTracerDirectLight: ModuleDescriptor = {
     id: {
         kind: 'transport',
-        name: 'pathtracer',
+        name: 'pathtracer-direct',
         version: '1.0.0'
     },
 
@@ -25,49 +25,26 @@ const pathTracerDirectLight: ModuleDescriptor = {
             }
             
             Radiance transport_trace(Ray ray) {
-                vec3 throughput = vec3(1.0);  // Path contribution weight
-                vec3 radiance = vec3(0.0);     // Accumulated light
-                
-                // Get RNG state from main - this is a bit hacky but works for now
-                vec2 pixel = gl_FragCoord.xy;
-                uint rng_state = hash3(uint(pixel.x), uint(pixel.y), uint(u_frame_index));
+                vec3 throughput = vec3(1.0);
+                vec3 radiance = vec3(0.0);
                 
                 Ray current_ray = ray;
                 
                 for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
-                
-                    // decorrelate
-                    uint rng_state = hash3(
-                        uint(pixel.x), 
-                        uint(pixel.y), 
-                        uint(u_frame_index) * 73u + uint(bounce) * 1931u
-                    );
-    
-                
                     Hit hit;
-                    
-                    // Find intersection
                     if (!scene_intersect(current_ray, hit)) {
-                        // Ray escaped - add background
-                        vec3 background = vec3(0.01, 0.01, 0.02);  // Dark blue-ish
+                        vec3 background = vec3(0.01, 0.01, 0.02);
                         radiance += throughput * background;
                         break;
                     }
                     
-                    // Build local frame for shading
                     hit.frame = ambient_frame(hit.p, hit.n);
                     
-                   // // Add emission from surface we hit
-                   //  vec3 emission = interaction_surface_emit(hit);
-                   //  if (length(emission) > 0.0) {
-                   //      radiance += throughput * emission;
-                   //  }
-
+                    // Sample the area light - NOW WITH RANDOM NUMBERS!
+                    LightSample ls = lighting_sample(hit.p); 
                     
-                    // NEW: Sample the point light at this vertex
-                    // THIS FILE WORKS WITH JUST SINGLE POINT LIGHT SOURCE
-                    LightSample ls = lighting_sample(hit.p);
-                   // if (ls.pdf > 0.0) {
+                    // Only add contribution if we got a valid sample
+                    if (ls.pdf > 0.0) {
                         Ray shadow_ray;
                         shadow_ray.origin = hit.p + hit.n * EPSILON;
                         shadow_ray.direction = ls.wi;
@@ -75,55 +52,48 @@ const pathTracerDirectLight: ModuleDescriptor = {
                         shadow_ray.tmax = ls.distance - EPSILON;
                         
                         if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
-                            vec3 f = interaction_surface_shade(ls.wi, -ray.direction, hit);
-                            radiance += throughput * ls.radiance * f *0.01;
+                            vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit);
+                            radiance += throughput * ls.radiance * f / ls.pdf;
                         }
-                       //}
+                    }
                     
                     // Russian roulette termination after a few bounces
                     if (bounce >= RR_START_DEPTH) {
                         float p_survive = min(0.95, luminance(throughput));
-                        if (random(rng_state) > p_survive) {
-                            break;  // Terminate path
+                        if (random() > p_survive) {  // Just call random()
+                            break;
                         }
-                        throughput /= p_survive;  // Boost surviving paths
+                        throughput /= p_survive;
                     }
                     
                     // Sample next direction using BRDF importance sampling
                     float pdf;
-                    vec2 xi = random2(rng_state);
+                    vec2 xi = random2();  // Just call random2()
                     Direction wi = interaction_surface_scatter(
-                        -current_ray.direction,  // wo (toward viewer/previous point)
+                        -current_ray.direction,
                         hit,
-                        xi,
                         pdf
                     );
                     
                     // Check for valid scatter
                     if (pdf <= 0.0001) {
-                        break;  // No valid scatter direction
+                        break;
                     }
                     
                     // Evaluate BRDF for the sampled direction
-                    // Note: interaction_surface_shade expects (wi toward light, wo toward viewer)
                     Spectrum f = interaction_surface_shade(
-                        wi,                      // New direction (toward next point)
-                        -current_ray.direction,  // Where we came from
+                        wi,
+                        -current_ray.direction,
                         hit
                     );
                     
-                    // Update throughput with BRDF * cos(theta) / pdf
-                    // The cosine is already in interaction_surface_shade for Lambert
-                    // But we need to remove it since we importance sampled it
+                    // Update throughput
                     float cos_theta = max(0.0, ambient_dot(wi, hit.n, hit.p));
                     
-                    // For Lambert: f already includes cos_theta, so we have:
-                    // throughput *= (albedo/PI * cos_theta) / (cos_theta/PI) = albedo
-                    // But let's be explicit:
                     if (cos_theta > 0.0001) {
                         throughput *= f / pdf;
                     } else {
-                        break;  // Terminate if we're going below surface
+                        break;
                     }
                     
                     // Set up next ray
