@@ -1,24 +1,15 @@
+// app/MinimalApp.ts
 import { Engine } from '../engine/Engine';
 import { ParameterStore } from './ParameterStore';
+import { FrameStats } from './FrameStats';
 import { euclideanAmbient } from '../objects/ambient/euclidean/euclidean-ambient';
 import { pinholeCamera } from '../optics/camera/pinhole-camera';
-import { simpleSphereScene } from '../objects/scene/simple-sphere';
-import { albedoInteraction } from "../optics/interaction/albedo-interaction";
-import { directTransport } from "../optics/transport/direct-transport";
-import {pointLight} from "../objects/lighting/point-light";
-import {directLightingTransport} from "../optics/transport/direct-lighting-transport";
-import {lambertInteraction} from "../optics/interaction/lambert-interaction";
-import {oneshotAccumulator} from "../optics/accumulator/oneshot-accumulator";
-import {gammaDeveloper} from "../optics/developer/gamma-developer";
-import {passthroughDeveloper} from "../optics/developer/passthrough-developer";
-import { averagingAccumulator} from "../optics/accumulator/average-accumulator";
-import {sphereFloorScene} from "../objects/scene/sphere-floor";
-import {pathTracingTransport} from "../optics/transport/path-tracer-transport";
-import {pathTracerDirectLight} from "../optics/transport/path-tracer-direct-light";
-import {cornellBoxScene} from "../objects/scene/cornell-box";
-import {sphereLight} from "../objects/lighting/sphere-light";
-
-
+import { lambertInteraction } from "../optics/interaction/lambert-interaction";
+import { gammaDeveloper } from "../optics/developer/gamma-developer";
+import { averagingAccumulator } from "../optics/accumulator/average-accumulator";
+import { pathTracerDirectLight } from "../optics/transport/path-tracer-direct-light";
+import { cornellBoxScene } from "../objects/scene/cornell-box";
+import { sphereLight } from "../objects/lighting/sphere-light";
 
 /**
  * MinimalApp - basic application shell for Phase 3
@@ -27,8 +18,8 @@ import {sphereLight} from "../objects/lighting/sphere-light";
 class MinimalApp {
     private engine: Engine;
     private parameterStore: ParameterStore;
-    private lightAnimationId: number | null = null;
-    private renderLoopId: number | null = null;  // ADD THIS
+    private frameStats: FrameStats;
+    private renderLoopId: number | null = null;
 
     constructor(canvas: HTMLCanvasElement) {
         // Set up canvas size
@@ -36,7 +27,7 @@ class MinimalApp {
         canvas.height = window.innerHeight;
 
         const gl = canvas.getContext('webgl2', {
-            antialias: false,  // THIS is what you were missing
+            antialias: false,
             preserveDrawingBuffer: true
         });
 
@@ -47,6 +38,7 @@ class MinimalApp {
         // Create architecture components
         this.engine = new Engine(gl);
         this.parameterStore = new ParameterStore();
+        this.frameStats = new FrameStats();
 
         // Wire parameter store to engine
         this.parameterStore.onChange = (changes) => {
@@ -70,34 +62,27 @@ class MinimalApp {
         ]);
     }
 
+    /**
+     * Initialize default parameters
+     */
     setupParameters(): void {
-
-
-
-
         this.parameterStore.batch({
             'camera.position': [0, 0, 5],
             'camera.target': [0, 0, 0],
             'camera.fov': 60,
             'resolution': [window.innerWidth, window.innerHeight],
 
-            // Light parameters
-            // 'light.position': [0,3,0],       // Above and to the right
-            // 'light.color': [1.0, 1.0, 1.0],   // White light
-            // 'light.intensity': 1000.0,           // Bright enough to see
-
-            'sphere_light.position': [0,3,0],
+            'sphere_light.position': [0, 3, 0],
             'sphere_light.radius': 0.1,
             'sphere_light.color': [1.0, 1.0, 1.0],
             'sphere_light.intensity': 500.0,
 
-            'accumulator.reset': false         // ADD THIS
+            'accumulator.reset': false
         });
-
     }
 
     /**
-     * Start render loop - ADD THIS METHOD
+     * Start render loop
      */
     startRenderLoop(): void {
         // Initial reset
@@ -111,6 +96,10 @@ class MinimalApp {
             }
 
             this.render();
+
+            // Update frame stats
+            this.frameStats.update(this.engine.sampleCount);
+
             this.renderLoopId = requestAnimationFrame(loop);
         };
 
@@ -118,7 +107,7 @@ class MinimalApp {
     }
 
     /**
-     * Stop render loop - ADD THIS METHOD
+     * Stop render loop
      */
     stopRenderLoop(): void {
         if (this.renderLoopId) {
@@ -128,89 +117,20 @@ class MinimalApp {
     }
 
     /**
-     * Start animating the light in a circle
-     */
-    startLightAnimation(): void {
-        const animate = () => {
-            const time = this.engine.getTime();
-            const radius = 8.0;
-            const speed = 0.5;
-
-            this.parameterStore.set('light.position', [
-                Math.cos(time * speed) * radius,
-                5.0,  // Fixed height
-                Math.sin(time * speed) * radius
-            ]);
-
-            this.lightAnimationId = requestAnimationFrame(animate);
-        };
-
-        animate();
-    }
-
-    /**
-     * Stop light animation
-     */
-    stopLightAnimation(): void {
-        if (this.lightAnimationId) {
-            cancelAnimationFrame(this.lightAnimationId);
-            this.lightAnimationId = null;
-        }
-    }
-
-    /**
-     * Set camera position and orientation - only semantic parameters
-     */
-    setCamera(position: [number, number, number], lookAt: [number, number, number], fov: number): void {
-        this.parameterStore.batch({
-            'camera.position': position,
-            'camera.target': lookAt,
-            'camera.fov': fov
-        });
-    }
-
-    /**
-     * Convenience method to move camera
-     */
-    moveCamera(position: [number, number, number]): void {
-        this.parameterStore.set('camera.position', position);
-    }
-
-    /**
-     * Convenience method to look at target
-     */
-    lookAt(target: [number, number, number]): void {
-        this.parameterStore.set('camera.target', target);
-    }
-
-    /**
      * Render one frame
      */
     render(): void {
         this.engine.renderFrame();
     }
 
+
     /**
      * Clean up resources
      */
     dispose(): void {
-        this.stopRenderLoop();  // ADD THIS
-        this.stopLightAnimation();
+        this.stopRenderLoop();
+        this.frameStats.dispose();
         this.engine.dispose();
-    }
-
-    /**
-     * Move light position
-     */
-    moveLight(position: [number, number, number]): void {
-        this.parameterStore.set('light.position', position);
-    }
-
-    /**
-     * Set light intensity
-     */
-    setLightIntensity(intensity: number): void {
-        this.parameterStore.set('light.intensity', intensity);
     }
 }
 
