@@ -26,7 +26,7 @@ class Engine {
         return this.time;
     }
 
-    get sampleCount(): number {
+    getSampleCount(): number {
         return this.sampleCount;
     }
 

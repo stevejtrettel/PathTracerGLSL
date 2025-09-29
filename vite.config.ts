@@ -10,4 +10,7 @@ export default defineConfig({
         globals: true,
         environment: 'node', // or 'jsdom' if you want DOM APIs
     },
+    build: {
+        minify: false,     // <- no minify (make true, or remove to go back to min)v
+    },
 })

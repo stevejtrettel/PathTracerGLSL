@@ -41,8 +41,11 @@ void main(){
     // Add time for better decorrelation if frame index doesnt update
     rng_seed = uint(uint(pixel.x) * uint(1973) + 
                    uint(pixel.y) * uint(9277) + 
-                   uint(u_frame_index) * uint(26699) +
-                   uint(u_time * 1000.0) * uint(7919)) | uint(1);
+                   uint(u_frame_index) * uint(26699)) | uint(1);
+                   
+               //     rng_seed = uint(uint(pixel.x) * uint(1973) + 
+               // uint(pixel.y) * uint(9277) + 
+               // uint(u_frame_index) * uint(26699)) | uint(1);
                    
     // Now just use random() or random2() anywhere!
     Ray ray = camera_generateRay(pixel, random2());

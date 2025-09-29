@@ -8,8 +8,12 @@ import { lambertInteraction } from "../optics/interaction/lambert-interaction";
 import { gammaDeveloper } from "../optics/developer/gamma-developer";
 import { averagingAccumulator } from "../optics/accumulator/average-accumulator";
 import { pathTracerDirectLight } from "../optics/transport/path-tracer-direct-light";
-import { cornellBoxScene } from "../objects/scene/cornell-box";
+import { pathTracingTransport } from "../optics/transport/path-tracer-transport";
 import { sphereLight } from "../objects/lighting/sphere-light";
+import {quadLight} from "../objects/lighting/quad-light";
+import {glossyInteraction} from "../optics/interaction/glossy-interaction";
+import {sceneRaymarch} from "../objects/scene/raymarch-scene";
+
 
 /**
  * MinimalApp - basic application shell for Phase 3
@@ -40,6 +44,9 @@ class MinimalApp {
         this.parameterStore = new ParameterStore();
         this.frameStats = new FrameStats();
 
+        // Set initial resolution
+        this.frameStats.setResolution(canvas.width, canvas.height);
+
         // Wire parameter store to engine
         this.parameterStore.onChange = (changes) => {
             this.engine.updateParameters(changes);
@@ -52,9 +59,9 @@ class MinimalApp {
     loadModules(): void {
         this.engine.loadModules([
             euclideanAmbient,
-            cornellBoxScene,
-            sphereLight,
-            lambertInteraction,
+            sceneRaymarch,
+            quadLight,
+            glossyInteraction,
             pathTracerDirectLight,
             pinholeCamera,
             averagingAccumulator,
@@ -72,10 +79,19 @@ class MinimalApp {
             'camera.fov': 60,
             'resolution': [window.innerWidth, window.innerHeight],
 
-            'sphere_light.position': [0, 3, 0],
-            'sphere_light.radius': 0.1,
-            'sphere_light.color': [1.0, 1.0, 1.0],
-            'sphere_light.intensity': 500.0,
+            // 'sphere_light.position': [0, 3, 0],
+            // 'sphere_light.radius': 0.1,
+            // 'sphere_light.color': [1.0, 1.0, 1.0],
+            // 'sphere_light.intensity': 500.0,
+
+            // Quad light (ceiling)
+            'quad.center': [0, 3.9, 0],  // Center at ceiling
+            'quad.width': 2.0,
+            'quad.height': 2.0,
+            'quad.direction1': [1, 0, 0],
+            'quad.direction2': [0, 0, 1],
+            'quad.intensity': 20.0,
+            'quad.color': [1, 1,1],
 
             'accumulator.reset': false
         });

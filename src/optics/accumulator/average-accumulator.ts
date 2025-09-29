@@ -23,8 +23,8 @@ const averagingAccumulator: ModuleDescriptor = {
                 }
                 
                 // Read previous accumulated value
-                vec2 uv = pixel / u_resolution;
-                vec3 previous = texture(u_accumulator_radiance_previous, uv).rgb;
+                ivec2 coord = ivec2(gl_FragCoord.xy);
+                vec3 previous = texelFetch(u_accumulator_radiance_previous, coord, 0).rgb;
                 
                 // Simple running average: new_avg = (old_avg * n + new_sample) / (n + 1)
                 // Which simplifies to: mix(old, new, 1/(n+1))

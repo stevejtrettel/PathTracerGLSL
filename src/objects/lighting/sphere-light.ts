@@ -66,10 +66,11 @@ const sphereLight: ModuleDescriptor = {
                 // Check if light sample faces the shading point
                 float cos_light = dot(-ls.wi, light_normal);
                 
+                
                 if (cos_light <= 0.0) {
-                    // Back side of sphere - no contribution
+                 // Back side of sphere - no contribution
                     ls.radiance = vec3(0.0);
-                    ls.pdf = 1.0;  // Avoid division by zero
+                    ls.pdf = 1.0;
                     return ls;
                 }
                 

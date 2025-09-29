@@ -1,18 +1,12 @@
-
 // app/FrameStats.ts
-
-
-//NOT HOW THIS WILL BE DONE LONG TERM!
-//WE WILL HAVE EXTENSIONS
-//THIS IS JUST FOR SOME DATA RN
-
 export class FrameStats {
     private frameCount = 0;
     private lastTime = performance.now();
     private fps = 0;
+    private resolution: [number, number] | null = null;
 
     private element: HTMLDivElement;
-    private visible = true;
+    public visible = true;
 
     constructor() {
         this.element = document.createElement('div');
@@ -47,12 +41,20 @@ export class FrameStats {
         }
     }
 
+    setResolution(width: number, height: number): void {
+        this.resolution = [width, height];
+        this.updateDisplay();
+    }
+
     private updateDisplay(sampleCount?: number): void {
         if (!this.visible) return;
 
         let html = `FPS: ${this.fps}`;
         if (sampleCount !== undefined) {
             html += `<br>SPP: ${sampleCount}`;
+        }
+        if (this.resolution) {
+            html += `<br>${this.resolution[0]}×${this.resolution[1]}`;
         }
         this.element.innerHTML = html;
     }
