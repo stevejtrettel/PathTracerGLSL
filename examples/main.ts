@@ -14,7 +14,7 @@ async function main() {
     app.setupParameters();
 
     // Configure camera
-    app.setCamera([0, 0, 5], [0, 0, 0], 60);
+    // app.setCamera([0, 0, 5], [0, 0, 0], 60);
 
     // Start progressive rendering
     app.startRenderLoop();

@@ -4,7 +4,7 @@ import type { ModuleDescriptor } from '../../engine/types.js';
  * Path tracing transport module
  * Implements recursive light bouncing with Russian roulette termination
  */
-const pathTracingTransport: ModuleDescriptor = {
+const pathTracerDirectLight: ModuleDescriptor = {
     id: {
         kind: 'transport',
         name: 'pathtracer',
@@ -57,13 +57,28 @@ const pathTracingTransport: ModuleDescriptor = {
                     // Build local frame for shading
                     hit.frame = ambient_frame(hit.p, hit.n);
                     
-                  //  Add emission from surface we hit
-                    vec3 emission = interaction_surface_emit(hit);
-                    if (length(emission) > 0.0) {
-                        radiance += throughput * emission;
-                    }
+                   // // Add emission from surface we hit
+                   //  vec3 emission = interaction_surface_emit(hit);
+                   //  if (length(emission) > 0.0) {
+                   //      radiance += throughput * emission;
+                   //  }
+
                     
-                    
+                    // NEW: Sample the point light at this vertex
+                    // THIS FILE WORKS WITH JUST SINGLE POINT LIGHT SOURCE
+                    LightSample ls = lighting_sample(hit.p);
+                   // if (ls.pdf > 0.0) {
+                        Ray shadow_ray;
+                        shadow_ray.origin = hit.p + hit.n * EPSILON;
+                        shadow_ray.direction = ls.wi;
+                        shadow_ray.tmin = EPSILON;
+                        shadow_ray.tmax = ls.distance - EPSILON;
+                        
+                        if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
+                            vec3 f = interaction_surface_shade(ls.wi, -ray.direction, hit);
+                            radiance += throughput * ls.radiance * f *0.01;
+                        }
+                       //}
                     
                     // Russian roulette termination after a few bounces
                     if (bounce >= RR_START_DEPTH) {
@@ -126,4 +141,4 @@ const pathTracingTransport: ModuleDescriptor = {
     exports: ['transport_trace']
 };
 
-export { pathTracingTransport };
+export { pathTracerDirectLight };
