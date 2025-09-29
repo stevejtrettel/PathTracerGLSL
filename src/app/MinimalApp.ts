@@ -87,9 +87,9 @@ class MinimalApp {
             // 'light.intensity': 1000.0,           // Bright enough to see
 
             'sphere_light.position': [0,3,0],
-            'sphere_light.radius': 0.5,
+            'sphere_light.radius': 0.1,
             'sphere_light.color': [1.0, 1.0, 1.0],
-            'sphere_light.intensity': 20.0,
+            'sphere_light.intensity': 500.0,
 
             'accumulator.reset': false         // ADD THIS
         });
