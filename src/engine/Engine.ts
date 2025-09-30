@@ -2,6 +2,8 @@
 import { ModuleRegistry } from './ModuleRegistry.js';
 import { ShaderCompiler } from './ShaderCompiler.js';
 import { RenderExecutor } from './RenderExecutor.js';
+import { TextureRegistry } from './TextureRegistry.js';
+import { HDRLoader } from './loaders/hdr-loader.js';
 import type { ModuleDescriptor, EngineState, EngineUniforms } from './types.js';
 import type { ParameterChanges } from '../app/types.js';
 import { ResourceManager } from './ResourceManager.js';
@@ -15,6 +17,7 @@ class Engine {
     private compiler: ShaderCompiler;
     private executor: RenderExecutor;
     private resources: ResourceManager;
+    private textureRegistry: TextureRegistry;
     private state: EngineState = 'ready';
 
     // Engine state tracking
@@ -36,6 +39,7 @@ class Engine {
         this.registry = new ModuleRegistry();
         this.compiler = new ShaderCompiler(gl);
         this.resources = new ResourceManager(gl);
+        this.textureRegistry = new TextureRegistry(gl, 1); // Reserve unit 0 for accumulator
         this.executor = new RenderExecutor(gl);
         this.startTime = performance.now();
     }
@@ -88,16 +92,66 @@ class Engine {
      * Load and bind an HDR environment map
      */
     async loadEnvironmentHDR(path: string): Promise<void> {
-        await this.resources.loadHDRTexture(path);
+        const response = await fetch(path);
+        if (!response.ok) {
+            throw new Error(`Failed to load HDR: ${response.statusText}`);
+        }
 
+        const buffer = await response.arrayBuffer();
+        const hdr = HDRLoader.parse(buffer);
+
+        // Create environment texture
+        // Create display texture (full resolution)
+        const displayTexture = this.createEnvironmentTexture(hdr.width, hdr.height, hdr.data);
+        this.textureRegistry.register('env_map', displayTexture);
+
+
+        // Bind to shader
         const mainProgram = this.compiler.getMainProgram();
         if (!mainProgram) return;
 
         this.gl.useProgram(mainProgram);
         const location = this.gl.getUniformLocation(mainProgram, 'u_env_map');
         if (location) {
-            this.resources.bindEnvironmentTexture(location);
+            this.textureRegistry.bind('env_map', location);
         }
+
+        console.log(`Loaded HDR environment: ${hdr.width}x${hdr.height}`);
+        
+    }
+
+    private createEnvironmentTexture(
+        width: number,
+        height: number,
+        data: Float32Array
+    ): WebGLTexture {
+        const texture = this.gl.createTexture();
+        if (!texture) throw new Error('Failed to create environment texture');
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+        this.gl.texImage2D(
+            this.gl.TEXTURE_2D,
+            0,
+            this.gl.RGB32F,
+            width,
+            height,
+            0,
+            this.gl.RGB,
+            this.gl.FLOAT,
+            data
+        );
+
+        // Check for linear filtering support
+        const linearExt = this.gl.getExtension('OES_texture_float_linear');
+        const filterMode = linearExt ? this.gl.LINEAR : this.gl.NEAREST;
+
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, filterMode);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, filterMode);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.REPEAT);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+        return texture;
     }
 
     /**
@@ -176,6 +230,7 @@ class Engine {
     dispose(): void {
         this.executor.dispose();
         this.resources.dispose();
+        this.textureRegistry.dispose();
         this.state = 'ready';
     }
 

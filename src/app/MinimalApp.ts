@@ -121,7 +121,7 @@ class MinimalApp {
             'quad.height': 2.0,
             'quad.direction1': [1, 0, 0],
             'quad.direction2': [0, 0, 1],
-            'quad.intensity': 20.0,
+            'quad.intensity': 10.0,
             'quad.color': [1, 1,1],
 
             'accumulator.reset': false
