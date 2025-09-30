@@ -24,7 +24,7 @@ import { hdriEnvironmentImportance} from "../world/environment/hdri-environment-
 import {pathTracerDirectEnv} from "../optics/transport/path-tracer-direct-env";
 
 //the hdri image (from public/)
-import envHDRI from '/hdri/table_mountain_2_puresky_1k.hdr';
+import envHDRI from '/hdri/autumn_field_1k.hdr';
 
 
 
@@ -100,7 +100,7 @@ class MinimalApp {
             hdriEnvironmentImportance,  // Using HDRI instead of const
             quadLight,
             glossyInteraction,
-            pathTracerDirectEnv,
+            pathTracerDirectLight,
             pinholeCamera,
             averagingAccumulator,
             reinhardDeveloper,
@@ -112,18 +112,18 @@ class MinimalApp {
      */
     setupParameters(): void {
         this.parameterStore.batch({
-            'camera.position': [0, 0, 5],
+            'camera.position': [1.5, 1, 5],
             'camera.target': [0, 0, 0],
             'camera.fov': 60,
             'resolution': [window.innerWidth, window.innerHeight],
 
             // Quad light (ceiling)
             'quad.center': [0, 3.9, 0],  // Center at ceiling
-            'quad.width': .01,
-            'quad.height': .01,
+            'quad.width': 2,
+            'quad.height': 2,
             'quad.direction1': [1, 0, 0],
             'quad.direction2': [0, 0, 1],
-            'quad.intensity': .0,
+            'quad.intensity': 30.0,
             'quad.color': [1, 1,1],
 
             'environment.intensity': 1.,

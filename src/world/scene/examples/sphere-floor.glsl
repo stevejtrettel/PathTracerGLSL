@@ -67,7 +67,7 @@ MaterialProperties scene_material_properties(int mat_id, Point p) {
     else if (mat_id == MAT_SPHERE) {
         props.albedo = vec3(0.9, 0.3, 0.3);  // White sphere
         props.emission = vec3(0.0);
-        props.roughness=1.;
+        props.roughness=0.8;
 
     }  else {
         props.albedo = vec3(0.0);

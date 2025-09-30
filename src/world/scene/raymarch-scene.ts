@@ -1,5 +1,5 @@
 import type { ModuleDescriptor } from "../../engine/types";
-import sceneGeometry from './examples/sphere-floor.glsl?raw';
+import sceneGeometry from './examples/menger-sponge.glsl?raw';
 
 const sceneRaymarch: ModuleDescriptor = {
     id: { kind: 'scene', name: 'scene-raymarch', version: '1.0.0' },

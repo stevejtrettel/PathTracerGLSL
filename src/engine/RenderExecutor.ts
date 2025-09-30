@@ -6,7 +6,7 @@ export class RenderExecutor {
     private mainProgram: WebGLProgram | null = null;
     private displayProgram: WebGLProgram | null = null;
 
-    constructor(gl: WebGL2RenderingContext, resources: ResourceManager) {
+    constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
     }
 
