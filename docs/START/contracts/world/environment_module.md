@@ -345,3 +345,251 @@ this.parameterStore.batch({
 - Optional `OES_texture_float_linear` for smooth interpolation
 - Maximum texture size limited by `gl.MAX_TEXTURE_SIZE` (typically 4096-16384)
 - No built-in tone mapping in module - handled by developer stage
+
+
+
+
+
+# HDRI Importance Sampling — Architecture & Integration
+
+This document explains the system we built to **importance sample** an equirectangular HDR environment map, how it’s wired into the engine, the shader-side API, and the math behind it. It’s designed to be simple, robust, and easy to maintain.
+
+---
+
+## High-level flow
+
+1. **Engine loads HDR** → uploads a single `RGB32F` texture: **`env_map`**.
+2. **CPU precompute** builds **binary-search CDFs** from the HDR pixels:
+
+    * **Conditional CDF** per row (size `W×H`, `R32F`)
+    * **Marginal CDF** over rows (size `1×H`, `R32F`)
+    * **Total weight** scalar and **env size** `(W, H)`
+3. Engine registers the two CDF textures, sets the small metadata uniforms.
+4. A dedicated **environment module** (GLSL) exposes:
+
+    * `environment_radiance(dir)`
+    * `environment_sample(p)` → `LightSample`
+    * `environment_pdf(dir)`
+5. The **transport** module uses **NEE** (next-event estimation) to sample the sky, and **MIS** (power heuristic) with BSDF sampling when rays escape.
+
+---
+
+## Engine wiring
+
+### 1) Loading & registering textures
+
+* **HDR**: use `TextureFactory.createRGB32F(hdr.data, W, H)` and register as **`env_map`**.
+* **CDFs**: call the CPU builder:
+
+```ts
+import { buildEnvironmentSampler } from './build-environment-sampler';
+
+const built = buildEnvironmentSampler(
+  gl,
+  textureRegistry,
+  hdr.data, W, H,
+  { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' }
+);
+```
+
+This:
+
+* uploads **`env_cdf_cond`** (`R32F`, `W×H`, NEAREST)
+* uploads **`env_cdf_marg`** (`R32F`, `1×H`, NEAREST)
+* returns `totalWeight` and `[W, H]`
+
+### 2) Setting uniforms (two ways)
+
+Pick **one**:
+
+* **Option A (direct set in loader)**
+  After linking the program:
+
+  ```ts
+  gl.uniform2f(locSize, W, H);                 // u_env_size (vec2)
+  gl.uniform1f(locTot, built.totalWeight);     // u_env_totalWeight (float)
+  ```
+
+  *Important*: `u_env_size` is **vec2**, so use `uniform2f` (not `uniform2i`).
+
+* **Option B (parameter system)**
+  Set params once and let your uniform bindings handle it:
+
+  ```ts
+  parameterStore.batch({
+    'environment.size':        [W, H],
+    'environment.totalWeight': built.totalWeight,
+    'environment.cdf.conditional': /* handle for env_cdf_cond */,
+    'environment.cdf.marginal':    /* handle for env_cdf_marg */,
+  });
+  ```
+
+`u_env_map` is already bound by the loader (as before).
+
+---
+
+## CPU precompute (math & data)
+
+For each texel at column `i ∈ [0..W-1]`, row `j ∈ [0..H-1]`:
+
+* Convert HDR RGB to **luminance**:
+  [
+  Y_{ij} = 0.2126,R + 0.7152,G + 0.0722,B
+  ]
+* Compute the row’s **polar angle** (center-of-texel):
+  [
+  \theta_j = \pi \frac{j + 0.5}{H}
+  ]
+* Form the discrete **importance weight** (radiance × solid-angle density):
+  [
+  w_{ij} = Y_{ij},\sin\theta_j
+  ]
+* Per row, build a **conditional CDF** (prefix sums over `i`, normalized to 1).
+* Across rows, build a **marginal CDF** over `j` from row sums, normalized to 1.
+* Keep the **total weight**:
+  [
+  W_{\text{tot}} = \sum_{j=0}^{H-1}\sum_{i=0}^{W-1} w_{ij}
+  ]
+
+> Note: The CDFs are built from **raw HDR pixels** (no exposure multiplier). The display exposure `u_env_intensity` is applied only when evaluating radiance, not when computing PDFs.
+
+---
+
+## Environment module (GLSL)
+
+### Uniforms (consumed by the module)
+
+* `u_env_map` — `sampler2D` (RGB32F HDR; filtered for evaluation)
+* **CDF tables** (NEAREST / `texelFetch`):
+
+    * `u_env_cdf_conditional` — `sampler2D` (R32F, `W×H`)
+    * `u_env_cdf_marginal` — `sampler2D` (R32F, `1×H`)
+* Metadata:
+
+    * `u_env_size` — `vec2(W, H)` (floats)
+    * `u_env_totalWeight` — `float`
+* Controls:
+
+    * `u_env_intensity` — `float` (exposure)
+    * `u_env_rotation` — `float` (yaw, radians)
+
+### Exports
+
+* `vec3 environment_radiance(vec3 dir)`
+  Equirect map with rotation, filtered texture sample, scaled by `u_env_intensity`.
+
+* `LightSample environment_sample(Point p)`
+
+    1. Draw two uniforms `xi = random2()`.
+    2. Binary search `xi.x` in **marginal CDF** → row `j`.
+    3. Binary search `xi.y` in **conditional CDF** of row `j` → col `i`.
+    4. Jitter inside texel → `(u, v)`.
+    5. Map to direction `wi`.
+    6. Fill:
+
+        * `ls.wi = wi`
+        * `ls.position = p + wi * 1e6` (for struct parity)
+        * `ls.distance = 1e6`
+        * `ls.radiance = texture(u_env_map, uv).rgb * u_env_intensity`
+        * `ls.pdf = env_pdf_texel(i, j)`
+
+* `float environment_pdf(vec3 dir)`
+  Map `dir → (u, v) → (i, j)` and reuse `env_pdf_texel(i, j)`.
+
+### PDF over solid angle
+
+Each texel approximately covers:
+[
+\Delta\omega_{ij} \approx \frac{2\pi}{W}\cdot\frac{\pi}{H}\cdot \sin\theta_j
+]
+
+The discrete probability of picking texel `(i,j)` is:
+[
+\Pr[i,j] = \frac{w_{ij}}{W_{\text{tot}}}
+]
+
+Thus the **solid-angle PDF**:
+[
+p_{\text{env}}(\omega \in \text{texel } ij) \approx
+\frac{\Pr[i,j]}{\Delta\omega_{ij}} =
+\frac{w_{ij}/W_{\text{tot}}}{\Delta\omega_{ij}} =
+\frac{Y_{ij},\sin\theta_j}{W_{\text{tot}}}\cdot \frac{1}{\Delta\omega_{ij}}
+]
+
+> Implementation detail: In `env_pdf_texel(i,j)` we fetch the **raw HDR** texel (no intensity), compute `Y_ij`, apply the equations above, and guard polar regions with `max(1e-6, sinθ)`.
+
+---
+
+## Transport integration (NEE + MIS)
+
+At each (non-specular) surface hit:
+
+1. **Environment NEE**:
+
+    * Sample sky: `LightSample ls = environment_sample(hit.p);`
+    * Shadow test to the env (use `ls.distance`).
+    * BSDF eval `f = interaction_surface_shade(ls.wi, -wo, hit)`
+      (in our setup **`f` includes `cosθ`**).
+    * **MIS** (power heuristic, β=2):
+
+      ```glsl
+      float pF = interaction_surface_pdf(-wo, ls.wi, hit);
+      float w  = (ls.pdf*ls.pdf) / max(1e-8, (ls.pdf*ls.pdf + pF*pF));
+      radiance += throughput * ls.radiance * f * (w / ls.pdf);
+      ```
+
+2. **BSDF continuation**:
+
+    * Sample BSDF: `wi, pdf = interaction_surface_scatter(-wo, hit, pdf)`.
+    * Update throughput: `throughput *= f / pdf;` (here `f` includes cosine).
+    * Trace; if **escape to env**:
+
+      ```glsl
+      vec3 Le = environment_radiance(ray.direction);
+      float pL = environment_pdf(ray.direction);
+      float w  = (pdf*pdf) / max(1e-8, (pdf*pdf + pL*pL));
+      radiance += throughput * Le * w;
+      break;
+      ```
+
+> With MIS off, include **only one** of the two strategies per bounce to avoid double counting. With MIS on, include both with weights as above.
+
+---
+
+## Controls & rebuild policy
+
+* **Exposure** (`u_env_intensity`) and **rotation** (`u_env_rotation`):
+  No CDF rebuild needed. The sampler, pdf, and eval all remain consistent.
+* **New HDR pixels** (different file or non-uniform edits):
+  Rebuild CDFs (call `buildEnvironmentSampler` again).
+* **Resolution changes**: handled automatically by the builder; remember to update `u_env_size`.
+
+---
+
+## Performance notes
+
+* **Binary search**: ~`log2(W) + log2(H)` comparisons per sample (e.g., ~20 for 2k×1k). Typically negligible versus tracing/BSDF work.
+* **Memory**: 2 float textures (R32F: `W×H` and `1×H`). Small and cache-friendly.
+* **Filtering**: CDFs use **NEAREST** with `texelFetch`; env map uses linear filtering for smooth evaluation.
+
+---
+
+## Common pitfalls (and fixes)
+
+* **Uniform type mismatch**: `u_env_size` is **vec2** → set with `uniform2f`, not `uniform2i`. If `(W,H)` end up as `(0,0)`, the sampler degenerates.
+* **Double-counting energy**: If MIS is off, don’t add both NEE and BSDF-escape env in the same bounce. With MIS on, add both with weights.
+* **Cosine factor**: Our `interaction_surface_shade` **includes `cosθ`**. Do **not** multiply by `cosθ` again in the NEE term.
+* **Intensity in PDF**: Compute `pdf` from **raw HDR** luminance (no intensity). Apply `u_env_intensity` only to `environment_radiance`/`ls.radiance`.
+* **Poles**: Guard `sinθ` with `max(1e-6, sinθ)`.
+
+---
+
+## Quick verification checklist
+
+* Loader prints: `HDR loaded: W×H (CDFs built)` and `totalWeight > 0`.
+* Rendering with a sun HDRI: highlights converge much faster with env NEE enabled.
+* Switching tonemapper (gamma → Reinhard) affects *look*, not energy. Reinhard/ACES are recommended with HDR skies.
+
+---
+
+That’s the complete architecture: small, modular, and easy to reason about. It keeps the engine clean (all textures in the registry, CPU-side precompute), gives the shader a tidy API, and integrates with transport through NEE + MIS for stable, fast convergence.

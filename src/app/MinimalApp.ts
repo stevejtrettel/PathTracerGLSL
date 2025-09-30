@@ -18,13 +18,13 @@ import { constEnvironment } from "../world/environment/const-environment";
 import { oneshotAccumulator } from "../optics/accumulator/oneshot-accumulator";
 import { albedoInteraction } from "../optics/interaction/albedo-interaction";
 import { hdriEnvironment } from "../world/environment/hdri-environment";
-import {pathTracerDirectEnv} from "../optics/transport/path-tracer-direct-env";
 import {acesDeveloper} from "../optics/developer/aces-developer";
 import {reinhardDeveloper} from "../optics/developer/reinhard-developer";
-
+import { hdriEnvironmentImportance} from "../world/environment/hdri-environment-importance";
+import {pathTracerDirectEnv} from "../optics/transport/path-tracer-direct-env";
 
 //the hdri image (from public/)
-import envHDRI from '/hdri/autumn_field_1k.hdr';
+import envHDRI from '/hdri/table_mountain_2_puresky_1k.hdr';
 
 
 
@@ -97,13 +97,13 @@ class MinimalApp {
         this.engine.loadModules([
             euclideanAmbient,
             sceneRaymarch,
-            hdriEnvironment,  // Using HDRI instead of const
+            hdriEnvironmentImportance,  // Using HDRI instead of const
             quadLight,
             glossyInteraction,
-            pathTracingTransport,
+            pathTracerDirectEnv,
             pinholeCamera,
             averagingAccumulator,
-            acesDeveloper,
+            reinhardDeveloper,
         ]);
     }
 
@@ -119,11 +119,11 @@ class MinimalApp {
 
             // Quad light (ceiling)
             'quad.center': [0, 3.9, 0],  // Center at ceiling
-            'quad.width': 2.0,
-            'quad.height': 2.0,
+            'quad.width': .01,
+            'quad.height': .01,
             'quad.direction1': [1, 0, 0],
             'quad.direction2': [0, 0, 1],
-            'quad.intensity': 10.0,
+            'quad.intensity': .0,
             'quad.color': [1, 1,1],
 
             'environment.intensity': 1.,

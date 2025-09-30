@@ -8,6 +8,7 @@ import type { ModuleDescriptor, EngineState, EngineUniforms } from './types.js';
 import type { ParameterChanges } from '../app/types.js';
 import { ResourceManager } from './ResourceManager.js';
 import { TextureFactory } from "./utils/TextureFactory";
+import { buildEnvironmentSampler } from "./loaders/build-environment-sampler";
 
 /**
  * Engine orchestrates subsystems for modular rendering
@@ -89,37 +90,69 @@ class Engine {
         this.state = 'running';
     }
 
-    /**
-     * Load and bind an HDR environment map
-     */
-    async loadEnvironmentHDR(path: string): Promise<void> {
-        console.log(`Loading HDR environment: ${path}`);
 
-        // 1) Fetch + parse HDR
-        const res = await fetch(path);
-        if (!res.ok) throw new Error(`Failed to load HDR: ${res.status} ${res.statusText}`);
+/**
+ * Load and bind an HDR environment map + build CDFs for importance sampling
+ */
+   async loadEnvironmentHDR(path: string): Promise<void> {
+            console.log(`Loading HDR environment: ${path}`);
+
+            // 1) Fetch + parse HDR
+            const res = await fetch(path);
+            if (!res.ok) throw new Error(`Failed to load HDR: ${res.status} ${res.statusText}`);
         const buffer = await res.arrayBuffer();
         const hdr = HDRLoader.parse(buffer); // { data: Float32Array, width, height }
+        const W = hdr.width, H = hdr.height;
 
         // 2) Create a single RGB32F texture via TextureFactory
         const tf = new TextureFactory(this.gl);
-        const envTex = tf.createRGB32F(hdr.data, hdr.width, hdr.height);
+        const envTex = tf.createRGB32F(hdr.data, W, H);
 
         // 3) Register in the TextureRegistry under a stable name
         this.textureRegistry.register('env_map', envTex);
 
-        // 4) Bind to u_env_map on the main program (if already linked)
+        // 3.5) Build + register CDF textures (binary-search tables)
+        const built = buildEnvironmentSampler(
+            this.gl,
+            this.textureRegistry,
+            hdr.data,
+            W,
+            H,
+            { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' }
+        );
+        // built.totalWeight is the scalar you’ll send to the shader
+
+        // 4) Bind uniforms on the main program (if already linked)
         const program = this.compiler.getMainProgram();
         if (program) {
             this.gl.useProgram(program);
-            const loc = this.gl.getUniformLocation(program, 'u_env_map');
-            if (loc) this.textureRegistry.bind('env_map', loc);
+
+            // existing env map binding
+            const locEnv = this.gl.getUniformLocation(program, 'u_env_map');
+            if (locEnv) this.textureRegistry.bind('env_map', locEnv);
+
+            // NEW: bind CDF textures
+            const locCond = this.gl.getUniformLocation(program, 'u_env_cdf_conditional');
+            if (locCond) this.textureRegistry.bind('env_cdf_cond', locCond);
+
+            const locMarg = this.gl.getUniformLocation(program, 'u_env_cdf_marginal');
+            if (locMarg) this.textureRegistry.bind('env_cdf_marg', locMarg);
+
+            // size: vec2 in GLSL → use uniform2f
+            const locSize = this.gl.getUniformLocation(program, 'u_env_size');
+            if (locSize) this.gl.uniform2f(locSize, hdr.width, hdr.height);
+
+            // total weight: float → uniform1f (already correct)
+            const locTot  = this.gl.getUniformLocation(program, 'u_env_totalWeight');
+            if (locTot) this.gl.uniform1f(locTot, built.totalWeight);
         }
 
-        console.log(`HDR loaded: ${hdr.width}×${hdr.height}`);
-    }
+        console.log(`HDR loaded: ${W}×${H} (CDFs built)`);
+        }
 
-    /**
+
+
+/**
      * Update uniforms from parameter changes
      */
     updateParameters(changes: ParameterChanges): void {
