@@ -59,7 +59,7 @@ export default class ShaderAssembler {
                 for (const e of entries) uniformDeclLines.push(`uniform ${e.type} ${e.prefixed};`);
             }
 
-            // Call once, reuse the same chunk objects everywhere
+            // Call once, reuse the same chunk world everywhere
             const chunks = p.chunks();
             chunksPerPlugin.set(p, chunks);
 

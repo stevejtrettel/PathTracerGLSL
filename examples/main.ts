@@ -8,21 +8,16 @@ async function main() {
         throw new Error('Canvas not found');
     }
 
-    // Create and initialize app
+    // Create app
     const app = new MinimalApp(canvas);
-    app.loadModules();
-    app.setupParameters();
 
-    // Configure camera
-    // app.setCamera([0, 0, 5], [0, 0, 0], 60);
+    // Initialize with HDR loading and start render loop
+    await app.initialize();
 
-    // Start progressive rendering
-    app.startRenderLoop();
+    console.log('Progressive rendering started with HDR environment');
 
-    // Optional: animate light
-    // app.startLightAnimation();
-
-    console.log('Progressive rendering started');
+    // Store app reference for resize handler
+    (window as any).app = app;
 }
 
 // Handle window resize
@@ -31,7 +26,13 @@ window.addEventListener('resize', () => {
     if (canvas) {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        // TODO: Need to handle resize in app/engine
+
+        // Get app reference and update resolution
+        const app = (window as any).app;
+        if (app) {
+            app.parameterStore.set('resolution', [window.innerWidth, window.innerHeight]);
+            app.engine.handleResize(window.innerWidth, window.innerHeight);
+        }
     }
 });
 
@@ -42,6 +43,7 @@ main().catch(error => {
         <div style="color: red; padding: 20px; font-family: monospace;">
             <h2>Failed to start</h2>
             <p>${error.message}</p>
+            <pre>${error.stack}</pre>
         </div>
     `;
 });

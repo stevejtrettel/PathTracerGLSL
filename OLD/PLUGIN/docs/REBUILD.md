@@ -132,7 +132,7 @@ interface Scene {
   // For participating media
   density?(point: Vec): number;
   
-  // For emissive objects
+  // For emissive world
   emission?(point: Vec, direction: Vec): Spectrum;
   
   // Future: acceleration structure hints
@@ -816,7 +816,7 @@ interface Geometry extends ShaderProvider, Parameterized {
   // But TypeScript ensures every Geometry can provide shader code
 }
 
-// Scene defines objects in space
+// Scene defines world in space
 interface Scene extends ShaderProvider, Parameterized, Updatable {
   // Might need update for animated scenes
 }

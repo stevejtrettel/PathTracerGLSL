@@ -76,7 +76,7 @@ float eval_object_sdf(int obj_id, vec3 p) {
   switch(obj_id) {
     case 0: return sphere_0_sdf(p);
     case 1: return box_1_sdf(p);
-    // Generated for all objects
+    // Generated for all world
   }
 }
 ```

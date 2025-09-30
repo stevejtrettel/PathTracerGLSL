@@ -267,7 +267,7 @@ Frame g_frame(Point p, Direction n) {
 
 **Step 4.2: Objects**
 ```typescript
-// src/world/objects/simpleObjects.ts
+// src/world/world/simpleObjects.ts
 export const simpleObjects: ModuleDescriptor = {
   id: { kind: 'Objects', name: 'simple', version: '1.0' },
   fragment: {

@@ -22,8 +22,8 @@ const directLightingTransport: ModuleDescriptor = {
                 // Find surface intersection
                 Hit hit;
                 if (!scene_intersect(ray, hit)) {
-                    // No intersection - return background color
-                    return RGB(0.1, 0.1, 0.2);  // Dark blue background
+                    // Use environment instead of black
+                    return environment_radiance(ray.direction);
                 }
 
                 //otherwise we hit the scene! so we can pick up some ambient light

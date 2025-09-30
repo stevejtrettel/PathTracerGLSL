@@ -1,4 +1,6 @@
 // engine/ResourceManager.ts
+import { HDRLoader } from './loaders/hdr-loader';
+
 export class ResourceManager {
     private gl: WebGL2RenderingContext;
 
@@ -11,6 +13,10 @@ export class ResourceManager {
         current: WebGLFramebuffer;
         previous: WebGLFramebuffer;
     };
+
+    // Environment texture management
+    private environmentTexture: WebGLTexture | null = null;
+    private environmentTextureUnit = 1;  // Unit 0 reserved for accumulator
 
     // Track dimensions
     private width: number;
@@ -110,6 +116,88 @@ export class ResourceManager {
     }
 
     /**
+     * Load an HDR environment texture, replacing any existing one
+     */
+    async loadHDRTexture(url: string): Promise<void> {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const buffer = await response.arrayBuffer();
+            const hdr = HDRLoader.parse(buffer);
+
+            // Clean up old texture if it exists
+            if (this.environmentTexture) {
+                this.gl.deleteTexture(this.environmentTexture);
+                this.environmentTexture = null;
+            }
+
+            // Create new environment texture
+            this.environmentTexture = this.createEnvironmentTexture(
+                hdr.width,
+                hdr.height,
+                hdr.data
+            );
+
+            console.log(`Loaded HDR environment: ${hdr.width}x${hdr.height}`);
+        } catch (error: any) {
+            throw new Error(`Failed to load HDR from ${url}: ${error.message}`);
+        }
+    }
+
+    private createEnvironmentTexture(
+        width: number,
+        height: number,
+        data: Float32Array
+    ): WebGLTexture {
+        const texture = this.gl.createTexture();
+        if (!texture) throw new Error('Failed to create environment texture');
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+
+        // Upload texture as RGB32F
+        this.gl.texImage2D(
+            this.gl.TEXTURE_2D,
+            0,
+            this.gl.RGB32F,
+            width,
+            height,
+            0,
+            this.gl.RGB,
+            this.gl.FLOAT,
+            data
+        );
+
+        // Check for linear filtering support and use appropriate filter
+        const linearExt = this.gl.getExtension('OES_texture_float_linear');
+        const filterMode = linearExt ? this.gl.LINEAR : this.gl.NEAREST;
+
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, filterMode);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, filterMode);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.REPEAT);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+        return texture;
+    }
+
+    /**
+     * Bind environment texture to a shader uniform location
+     */
+    bindEnvironmentTexture(location: WebGLUniformLocation): void {
+        if (!this.environmentTexture) {
+            console.warn('No environment texture loaded');
+            return;
+        }
+
+        this.gl.activeTexture(this.gl.TEXTURE1);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.environmentTexture);
+        this.gl.uniform1i(location, 1);
+    }
+
+    /**
      * Get current radiance texture for display pass
      */
     getCurrentTexture(): WebGLTexture {
@@ -134,7 +222,6 @@ export class ResourceManager {
      */
     finalizeFrame(): void {
         // Just swap buffers for next frame
-        // Display pass is now handled by RenderExecutor
         this.swapBuffers();
     }
 
@@ -180,6 +267,13 @@ export class ResourceManager {
      * Clean up GPU resources
      */
     dispose(): void {
+        // Clean up environment texture
+        if (this.environmentTexture) {
+            this.gl.deleteTexture(this.environmentTexture);
+            this.environmentTexture = null;
+        }
+
+        // Clean up film buffers
         if (this.textures) {
             this.gl.deleteTexture(this.textures.current);
             this.gl.deleteTexture(this.textures.previous);

@@ -126,7 +126,7 @@ vec3 normal_sphere_0(vec3 p)         // Surface normal
 float eval_object_sdf(int obj_id, vec3 p) {
     switch(obj_id) {
         case 0: return sphere_0_sdf(p);
-        // ... dispatch to all objects
+        // ... dispatch to all world
     }
 }
 ```
@@ -135,7 +135,7 @@ float eval_object_sdf(int obj_id, vec3 p) {
 ```glsl
 // Scene determines material interface using nearby tracking
 struct NearbyObjects {
-    float dists[3];    // Top 3 closest objects
+    float dists[3];    // Top 3 closest world
     int ids[3];        
     int count;         // Within boundary threshold
 };
@@ -407,7 +407,7 @@ vec3 dispatch_transport(...) {
 ### Tracing Nearby Objects
 ```glsl
 #if DEBUG_NEARBY
-    // Visualize how many objects are tracked
+    // Visualize how many world are tracked
     return vec3(float(nearby.count) / 3.0);
 #endif
 ```

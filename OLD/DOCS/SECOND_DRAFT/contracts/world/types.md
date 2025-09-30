@@ -39,7 +39,7 @@ struct Hit {
   
   // Object identity
   int object_id;        // Scene object index
-  int part_id;          // Sub-part for compound objects (-1 if none)
+  int part_id;          // Sub-part for compound world (-1 if none)
   
   // Material interface (Scene responsibility)
   int material_from;    // Material ray exits (may be MATERIAL_AIR)
@@ -96,7 +96,7 @@ struct EmissionSample {
 
 ```glsl
 struct NearbyObjects {
-  float dists[3];      // Distances to 3 closest objects
+  float dists[3];      // Distances to 3 closest world
   int ids[3];          // Object IDs (-1 if none)
   int count;           // Number within BOUNDARY_THRESHOLD
 }

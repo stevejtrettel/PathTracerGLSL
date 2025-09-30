@@ -1,5 +1,5 @@
 // shader-uniform-utils.ts
-import type { UniformType } from './types';
+import type { UniformType } from '../types';
 
 const EPSILON = 0.00001;
 

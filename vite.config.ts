@@ -13,4 +13,5 @@ export default defineConfig({
     build: {
         minify: false,     // <- no minify (make true, or remove to go back to min)v
     },
+    assetsInclude: ['**/*.hdr'],
 })

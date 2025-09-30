@@ -287,7 +287,7 @@ const EuclideanGeometry: ModuleDescriptor = {
 
 #### 3.2 Simple Objects
 ```typescript
-// world/objects/Sphere.ts
+// world/world/Sphere.ts
 const SphereObject: CompiledObject = {
   distance: `
     float sphere_sdf(vec3 p) {

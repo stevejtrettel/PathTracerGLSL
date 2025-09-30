@@ -5,6 +5,7 @@
 const MODULE_ORDER = [
     'ambient',     // Foundation
     'scene',       // Geometry
+    'environment', // EnvMaps and Fog
     'lighting',    // Lights
     'camera',      // Ray gen
     'interaction', // BRDFs
@@ -19,6 +20,7 @@ const MODULE_ORDER = [
  */
 type ModuleKind =
     | 'ambient'        // Ambient space geometry (ambient_*)
+    | 'environment'     //the evironment maps and fog
     | 'scene'         // Object intersection and materials (scene_*)
     | 'lighting'      // Light sampling (lighting_*)
     | 'camera'        // Ray generation (camera_*)

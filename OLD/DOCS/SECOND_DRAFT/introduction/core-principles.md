@@ -148,13 +148,13 @@ struct NearbyObjects {
     int count;           // Within threshold
 };
 
-// Resolution uses only nearby objects, not entire scene
+// Resolution uses only nearby world, not entire scene
 int resolve_material(vec3 p, NearbyObjects nearby) {
     // Fast path: one object (90% of cases)
     if (nearby.count <= 1) {
         // Check single object
     }
-    // Slow path: check 2-3 objects at boundaries
+    // Slow path: check 2-3 world at boundaries
 }
 ```
 
@@ -209,7 +209,7 @@ struct Hit {
   
   // Object identity
   int object_id;
-  int part_id;          // For multi-part objects
+  int part_id;          // For multi-part world
 };
 
 struct Frame {

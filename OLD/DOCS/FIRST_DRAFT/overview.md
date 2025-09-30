@@ -221,7 +221,7 @@ struct Frame {
 
 // Nearby object tracking for efficient boundaries
 struct NearbyObjects {
-  float dists[3];      // Distances to closest 3 objects
+  float dists[3];      // Distances to closest 3 world
   int ids[3];          // Object IDs
   int count;           // How many within threshold
 };
@@ -348,7 +348,7 @@ const estimator = new PathTracer({
 // Set observation algorithm  
 app.setPhotographer(estimator);
 
-// Materials work with IDs, not objects
+// Materials work with IDs, not world
 app.parameters.set("material[GLASS].ior", 1.5);
 
 // Run experiment comparing transport strategies

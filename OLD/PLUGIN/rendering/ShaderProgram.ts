@@ -21,7 +21,7 @@ export default class ShaderProgram {
         gl.attachShader(prog, fs);
         gl.linkProgram(prog);
 
-        // Clean up shader objects after linking.
+        // Clean up shader world after linking.
         gl.deleteShader(vs);
         gl.deleteShader(fs);
 

@@ -6,12 +6,12 @@ import {
     buildDisplayShaderSource,
     buildVertexShaderSource,
     addLineNumbers
-} from './shader-builder-utils';
+} from './utils/shader-builder-utils';
 import {
     setUniformValue,
     uniformValuesEqual,
     cacheUniformLocations
-} from './shader-uniform-utils';
+} from './utils/shader-uniform-utils';
 
 class ShaderCompiler {
     private gl: WebGL2RenderingContext;
@@ -202,6 +202,7 @@ class ShaderCompiler {
             }
         }
     }
+
 
     // ============ UTILITY ============
 

@@ -250,7 +250,7 @@ vec3 normal_glass_fog(vec3 p) {
 CSG operations are primitive operations provided by the Objects module:
 
 ```glsl
-// objects/compounds/operations.glsl
+// world/compounds/operations.glsl
 float op_union(float d1, float d2) {
     return min(d1, d2);
 }

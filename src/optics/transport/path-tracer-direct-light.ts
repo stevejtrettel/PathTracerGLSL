@@ -33,8 +33,9 @@ const pathTracerDirectLight: ModuleDescriptor = {
                 for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
                     Hit hit;
                     if (!scene_intersect(current_ray, hit)) {
-                        vec3 background = vec3(0.01, 0.01, 0.02);
-                        radiance += throughput * background;
+                        // Ray escaped - use environment
+                        vec3 env_radiance = environment_radiance(current_ray.direction);
+                        radiance += throughput * env_radiance;
                         break;
                     }
                     

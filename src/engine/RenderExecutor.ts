@@ -1,10 +1,12 @@
-// RenderExecutor.ts
+// engine/RenderExecutor.ts
+import { ResourceManager } from "./ResourceManager";
+
 export class RenderExecutor {
     private gl: WebGL2RenderingContext;
     private mainProgram: WebGLProgram | null = null;
     private displayProgram: WebGLProgram | null = null;
 
-    constructor(gl: WebGL2RenderingContext) {
+    constructor(gl: WebGL2RenderingContext, resources: ResourceManager) {
         this.gl = gl;
     }
 

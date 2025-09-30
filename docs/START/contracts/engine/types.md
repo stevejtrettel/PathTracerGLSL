@@ -50,7 +50,7 @@ interface ModuleReference {
 
 type ModuleKind = 
   | 'geometry'      // World: mathematical structure
-  | 'scene'         // World: objects and materials (compiled)
+  | 'scene'         // World: world and materials (compiled)
   | 'lighting'      // World: light sources (compiled)
   | 'camera'        // Photography: ray generation
   | 'transport'     // Photography: integration algorithms  

@@ -185,7 +185,7 @@ interface UniformDescriptor {
 ```typescript
 interface WorldCompilerConfig {
   lightStrategy: {
-    // How to handle emissive objects as lights
+    // How to handle emissive world as lights
     mode: 'all' | 'simple' | 'none';
     
     // For future bbox sampling
@@ -196,7 +196,7 @@ interface WorldCompilerConfig {
   };
   
   optimization: {
-    unrollThreshold: number;  // Unroll loops for < N objects
+    unrollThreshold: number;  // Unroll loops for < N world
     inlineMaterials: boolean;  // Inline material properties if few materials
   };
   

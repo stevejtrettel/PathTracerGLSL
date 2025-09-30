@@ -38,7 +38,7 @@ interface SceneDefinition {
 ### Generation Pipeline
 
 ```typescript
-// Build time: Arrange objects and generate optimized traversal
+// Build time: Arrange world and generate optimized traversal
 SceneOrganizer → analyze(objects) → optimize() → compile() → ModuleDescriptor
 ```
 
@@ -52,7 +52,7 @@ SceneOrganizer → analyze(objects) → optimize() → compile() → ModuleDescr
     version: string
   },
   provides: ['intersect', 'intersect_any', 'inside'],
-  requires: ['geometry', 'objects'],  // Needs both modules
+  requires: ['geometry', 'world'],  // Needs both modules
   fragment: {
     functions: string,           // Generated traversal code
     uniforms: string,           // Transform matrices, etc.
@@ -103,14 +103,14 @@ bool sc_inside(Point p, int object_id)
 The core optimization for efficient material interface resolution:
 
 ```glsl
-// Structure for tracking nearby objects during marching
+// Structure for tracking nearby world during marching
 struct NearbyObjects {
-    float dists[3];      // Distances to closest 3 objects
+    float dists[3];      // Distances to closest 3 world
     int ids[3];          // Object IDs of closest 3
     int count;           // How many are within BOUNDARY_THRESHOLD
 };
 
-// Helper to maintain top 3 closest objects
+// Helper to maintain top 3 closest world
 void track_object(inout NearbyObjects nearby, float dist, int obj_id) {
     if (dist < nearby.dists[2]) {
         nearby.dists[2] = dist;
@@ -140,7 +140,7 @@ float eval_object_sdf(int obj_id, vec3 p) {
         case 0: return sphere_sdf(p, sphere_0_transform);
         case 1: return box_sdf(p, box_1_transform);
         case 2: return gyroid_distance(p);
-        // ... generated for all objects
+        // ... generated for all world
     }
     return MAX_DIST;
 }
@@ -151,7 +151,7 @@ int get_object_material(int obj_id, vec3 p) {
         case 0: return classify_sphere_0(p);
         case 1: return classify_box_1(p);
         case 2: return classify_gyroid_0(p);
-        // ... generated for all objects
+        // ... generated for all world
     }
     return MATERIAL_AIR;
 }
@@ -162,7 +162,7 @@ vec3 get_object_normal(int obj_id, vec3 p) {
         case 0: return normal_sphere_0(p);
         case 1: return normal_box_1(p);
         case 2: return normal_gyroid_0(p);
-        // ... generated for all objects
+        // ... generated for all world
     }
     return vec3(0, 1, 0);
 }
@@ -173,7 +173,7 @@ vec3 get_object_normal(int obj_id, vec3 p) {
 Scene resolves which material is at any point using nearby object tracking:
 
 ```glsl
-// Efficient material resolution using only nearby objects
+// Efficient material resolution using only nearby world
 int resolve_material(vec3 p, NearbyObjects nearby) {
     // Fast path: only one object nearby (90%+ of cases)
     if(nearby.count <= 1) {
@@ -183,7 +183,7 @@ int resolve_material(vec3 p, NearbyObjects nearby) {
         return MATERIAL_AIR;
     }
     
-    // Boundary case: check 2-3 nearby objects only
+    // Boundary case: check 2-3 nearby world only
     int material = MATERIAL_AIR;
     float deepest = 0.0;
     
@@ -247,16 +247,16 @@ bool march_objects(Ray ray, out float hit_t, out int hit_object,
     for (int i = 0; i < MAX_STEPS && t < max_t; i++) {
         Point p = g_geodesic(ray.origin, ray.direction, t);
         
-        // Track closest objects
+        // Track closest world
         NearbyObjects nearby;
         nearby.dists = float[3](MAX_DIST, MAX_DIST, MAX_DIST);
         nearby.ids = int[3](-1, -1, -1);
         
-        // Evaluate all objects (unrolled for small scenes)
+        // Evaluate all world (unrolled for small scenes)
         track_object(nearby, sphere_sdf(transform_point(p, sphere_0_transform)), 0);
         track_object(nearby, box_sdf(transform_point(p, box_1_transform)), 1);
         
-        // Count objects within boundary threshold
+        // Count world within boundary threshold
         nearby.count = 0;
         for(int j = 0; j < 3; j++) {
             if(abs(nearby.dists[j]) < BOUNDARY_THRESHOLD) {
@@ -286,11 +286,11 @@ Hit create_hit(float t, vec3 p, vec3 ray_dir, int object_id,
     hit.object_id = object_id;
     hit.n = get_object_normal(object_id, p);
     
-    // Material interface using only nearby objects
+    // Material interface using only nearby world
     vec3 before = p - ray_dir * EPSILON;
     vec3 after = p + ray_dir * EPSILON;
     
-    // Update distances for offset points (only 3 objects max)
+    // Update distances for offset points (only 3 world max)
     NearbyObjects nearby_before = nearby;
     NearbyObjects nearby_after = nearby;
     
@@ -456,7 +456,7 @@ bool march_accelerated(Ray ray, out float hit_t, out int hit_object,
         nearby.dists = float[3](MAX_DIST, MAX_DIST, MAX_DIST);
         nearby.ids = int[3](-1, -1, -1);
         
-        // Only test objects in this cell
+        // Only test world in this cell
         int start = cell_starts[cell_hash];
         int count = cell_counts[cell_hash];
         
@@ -476,7 +476,7 @@ bool march_accelerated(Ray ray, out float hit_t, out int hit_object,
 ### 1. Scene Complexity Adaptation
 
 ```glsl
-// Small scenes (< 20 objects): Fully unrolled
+// Small scenes (< 20 world): Fully unrolled
 track_object(nearby, sphere_sdf(p - vec3(0,0,0), 1.0), 0);
 track_object(nearby, sphere_sdf(p - vec3(2,0,0), 0.5), 1);
 // ... unrolled for each object
@@ -561,7 +561,7 @@ class SceneCompiler {
     return {
       id: { kind: 'scene', name: 'compiled_scene', version: '1.0.0' },
       provides: ['intersect', 'intersect_any', 'inside'],
-      requires: ['geometry', 'objects'],
+      requires: ['geometry', 'world'],
       fragment: {
         dispatch,
         functions: marching + acceleration,

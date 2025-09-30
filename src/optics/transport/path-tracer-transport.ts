@@ -1,10 +1,9 @@
-import type { ModuleDescriptor } from '../../engine/types.js';
+// path-tracer-transport.ts
 
-/**
- * Path tracing transport module
- * Implements recursive light bouncing with Russian roulette termination
- */
-const pathTracingTransport: ModuleDescriptor = {
+import type {ModuleDescriptor} from "../../engine/types";
+
+
+export const pathTracingTransport: ModuleDescriptor = {
     id: {
         kind: 'transport',
         name: 'pathtracer',
@@ -35,9 +34,9 @@ const pathTracingTransport: ModuleDescriptor = {
                     
                     // Find intersection
                     if (!scene_intersect(current_ray, hit)) {
-                        // Ray escaped - add background
-                        vec3 background = vec3(0.01, 0.01, 0.02);  // Dark blue-ish
-                        radiance += throughput * background;
+                        // Ray escaped - use environment
+                        vec3 env_radiance = environment_radiance(current_ray.direction);
+                        radiance += throughput * env_radiance;
                         break;
                     }
                     
@@ -53,7 +52,7 @@ const pathTracingTransport: ModuleDescriptor = {
                     // Russian roulette termination after a few bounces
                     if (bounce >= RR_START_DEPTH) {
                         float p_survive = min(0.95, luminance(throughput));
-                        if (random() > p_survive) {  // Just call random()!
+                        if (random() > p_survive) {
                             break;  // Terminate path
                         }
                         throughput /= p_survive;  // Boost surviving paths
@@ -61,7 +60,6 @@ const pathTracingTransport: ModuleDescriptor = {
                     
                     // Sample next direction using BRDF importance sampling
                     float pdf;
-                    vec2 xi = random2();  // Just call random2()!
                     Direction wi = interaction_surface_scatter(
                         -current_ray.direction,  // wo (toward viewer/previous point)
                         hit,
@@ -103,5 +101,3 @@ const pathTracingTransport: ModuleDescriptor = {
 
     exports: ['transport_trace']
 };
-
-export { pathTracingTransport };

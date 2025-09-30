@@ -33,7 +33,7 @@ class MockGL implements Partial<WebGL2RenderingContext> {
     extFloat = true; // toggle in tests to simulate extension presence
     clearColorVal: [number, number, number, number] = [0, 0, 0, 0];
 
-    // --- mock objects ---
+    // --- mock world ---
     createTexture(): WebGLTexture | null {
         const t = {} as WebGLTexture;
         this.textures.push(t);

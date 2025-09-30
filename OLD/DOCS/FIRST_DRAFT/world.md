@@ -155,9 +155,9 @@ float sc_get_material_priority(int material_id)
 
 **Nearby Object Tracking:**
 ```glsl
-// Structure for tracking nearby objects during marching
+// Structure for tracking nearby world during marching
 struct NearbyObjects {
-    float dists[3];      // Distances to closest 3 objects
+    float dists[3];      // Distances to closest 3 world
     int ids[3];          // Object IDs of closest 3
     int count;           // How many are within BOUNDARY_THRESHOLD
 };
@@ -170,7 +170,7 @@ float eval_object_sdf(int obj_id, vec3 p) {
     switch(obj_id) {
         case 0: return sphere_sdf(p, sphere_0_transform);
         case 1: return box_sdf(p, box_1_transform);
-        // ... generated for all objects
+        // ... generated for all world
     }
 }
 
@@ -179,14 +179,14 @@ int get_object_material(int obj_id, vec3 p) {
     switch(obj_id) {
         case 0: return classify_sphere_0(p);
         case 1: return classify_box_1(p);
-        // ... objects know their material IDs
+        // ... world know their material IDs
     }
 }
 ```
 
 **Material Interface Resolution (using nearby tracking):**
 ```glsl
-// Efficient resolution using only 1-3 nearby objects
+// Efficient resolution using only 1-3 nearby world
 int resolve_material(vec3 p, NearbyObjects nearby) {
     // Fast path: only one object nearby (90%+ of cases)
     if(nearby.count <= 1) {
@@ -196,7 +196,7 @@ int resolve_material(vec3 p, NearbyObjects nearby) {
         return MATERIAL_AIR;
     }
     
-    // Boundary case: check 2-3 nearby objects only
+    // Boundary case: check 2-3 nearby world only
     int material = MATERIAL_AIR;
     float deepest = 0.0;
     
@@ -229,7 +229,7 @@ struct Hit {
   
   // Object information
   int object_id;        // Which object was hit
-  int part_id;          // Which part (-1 for simple objects)
+  int part_id;          // Which part (-1 for simple world)
   
   // Material interface (ALWAYS populated by scene using nearby tracking)
   int material_from;    // Material ray is traveling through
@@ -443,7 +443,7 @@ Hit create_hit(float t, vec3 p, vec3 ray_dir, int object_id,
                NearbyObjects nearby) {
     // ... geometric properties ...
     
-    // Efficient material resolution using only nearby objects
+    // Efficient material resolution using only nearby world
     hit.material_from = resolve_material(p - ray_dir * EPSILON, nearby);
     hit.material_to = resolve_material(p + ray_dir * EPSILON, nearby);
     hit.ior_ratio = material_iors[hit.material_from] / 

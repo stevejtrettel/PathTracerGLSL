@@ -30,7 +30,7 @@ interface SceneDefinition {
     version: string
   },
   provides: ['intersect', 'intersect_any', 'inside'],
-  requires: ['geometry', 'objects'],
+  requires: ['geometry', 'world'],
   fragment: {
     dispatch: string,     // Object dispatch functions
     functions: string,    // Marching and intersection
@@ -90,7 +90,7 @@ float eval_object_sdf(int obj_id, vec3 p) {
   switch(obj_id) {
     case 0: return sphere_0_sdf(p);
     case 1: return box_1_sdf(p);
-    // ... for all objects
+    // ... for all world
   }
   return MAX_DIST;
 }
@@ -99,7 +99,7 @@ int get_object_material(int obj_id, vec3 p) {
   switch(obj_id) {
     case 0: return classify_sphere_0(p);
     case 1: return classify_box_1(p);
-    // ... for all objects
+    // ... for all world
   }
   return MATERIAL_AIR;
 }
@@ -108,7 +108,7 @@ vec3 get_object_normal(int obj_id, vec3 p) {
   switch(obj_id) {
     case 0: return normal_sphere_0(p);
     case 1: return normal_box_1(p);
-    // ... for all objects
+    // ... for all world
   }
   return vec3(0, 1, 0);
 }
@@ -118,7 +118,7 @@ vec3 get_object_normal(int obj_id, vec3 p) {
 
 ```glsl
 void track_object(inout NearbyObjects nearby, float dist, int obj_id) {
-  // Maintain sorted list of 3 closest objects
+  // Maintain sorted list of 3 closest world
   if (dist < nearby.dists[2]) {
     nearby.dists[2] = dist;
     nearby.ids[2] = obj_id;
@@ -141,12 +141,12 @@ NearbyObjects find_nearby(vec3 p) {
   nearby.dists = float[3](MAX_DIST, MAX_DIST, MAX_DIST);
   nearby.ids = int[3](-1, -1, -1);
   
-  // Evaluate all objects (or use acceleration)
+  // Evaluate all world (or use acceleration)
   track_object(nearby, eval_object_sdf(0, p), 0);
   track_object(nearby, eval_object_sdf(1, p), 1);
   // ...
   
-  // Count objects within boundary
+  // Count world within boundary
   nearby.count = 0;
   for(int i = 0; i < 3; i++) {
     if(abs(nearby.dists[i]) < BOUNDARY_THRESHOLD) {
@@ -170,7 +170,7 @@ int resolve_material(vec3 p, NearbyObjects nearby) {
     return MATERIAL_AIR;
   }
   
-  // Multiple objects: deepest wins
+  // Multiple world: deepest wins
   int material = MATERIAL_AIR;
   float deepest = 0.0;
   
@@ -203,7 +203,7 @@ Hit create_hit(Ray ray, float t, int object_id, NearbyObjects nearby) {
   hit.n = get_object_normal(object_id, p);
   hit.uv = vec2(0);  // Object may provide
   
-  // Material interface (using nearby objects)
+  // Material interface (using nearby world)
   vec3 p_from = p - ray.direction * EPSILON;
   vec3 p_to = p + ray.direction * EPSILON;
   

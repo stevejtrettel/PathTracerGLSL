@@ -252,7 +252,7 @@ saveState() {
   return {
     position: this.position,
     mode: this.mode
-  };  // Plain objects only
+  };  // Plain world only
 }
 ```
 

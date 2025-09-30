@@ -59,7 +59,7 @@ float march_objects(Ray ray, out float hit_t, out int hit_object_id, float max_t
         float min_dist = MAX_DIST;
         int closest_object = -1;
         
-        // Test objects and track which is closest
+        // Test world and track which is closest
         float d0 = sphere_0_sdf(p);
         if(d0 < min_dist) {
             min_dist = d0;

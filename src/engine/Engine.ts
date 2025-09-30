@@ -1,3 +1,4 @@
+// engine/Engine.ts
 import { ModuleRegistry } from './ModuleRegistry.js';
 import { ShaderCompiler } from './ShaderCompiler.js';
 import { RenderExecutor } from './RenderExecutor.js';
@@ -22,11 +23,11 @@ class Engine {
     private sampleCount: number = 0;
     private startTime: number;
 
-    getTime(): number {
+    get time(): number {
         return this.time;
     }
 
-    getSampleCount(): number {
+    get sampleCount(): number {
         return this.sampleCount;
     }
 
@@ -34,8 +35,8 @@ class Engine {
         this.gl = gl;
         this.registry = new ModuleRegistry();
         this.compiler = new ShaderCompiler(gl);
-        this.executor = new RenderExecutor(gl);
         this.resources = new ResourceManager(gl);
+        this.executor = new RenderExecutor(gl);
         this.startTime = performance.now();
     }
 
@@ -52,7 +53,7 @@ class Engine {
             this.registry.register(module);
         }
 
-        // Compile BOTH shaders
+        // Compile both shaders
         this.compiler.compile(modules);
 
         // Get the main program for accumulation
@@ -67,29 +68,36 @@ class Engine {
             throw new Error('Failed to compile display program');
         }
 
-        // Log debug info if available
-        const debugInfo = this.compiler.getDebugInfo();
-        if (debugInfo) {
-            console.log('=== GENERATED FRAGMENT SHADER ===');
-            console.log(debugInfo.numberedSource);
-            console.log('=== END SHADER ===');
-        }
-
-        // Pass BOTH programs to RenderExecutor
+        // Pass both programs to RenderExecutor
         this.executor.setPrograms(mainProgram, displayProgram);
 
         // Set up uniform management for main program
         this.compiler.setActiveProgram(mainProgram);
 
-        // Bind texture uniform for accumulator
+        // Bind accumulator texture to unit 0
         this.gl.useProgram(mainProgram);
         const textureLoc = this.gl.getUniformLocation(mainProgram, 'u_accumulator_radiance_previous');
         if (textureLoc) {
             this.gl.uniform1i(textureLoc, 0);
-            console.log('Bound accumulator texture to unit 0');
         }
 
         this.state = 'running';
+    }
+
+    /**
+     * Load and bind an HDR environment map
+     */
+    async loadEnvironmentHDR(path: string): Promise<void> {
+        await this.resources.loadHDRTexture(path);
+
+        const mainProgram = this.compiler.getMainProgram();
+        if (!mainProgram) return;
+
+        this.gl.useProgram(mainProgram);
+        const location = this.gl.getUniformLocation(mainProgram, 'u_env_map');
+        if (location) {
+            this.resources.bindEnvironmentTexture(location);
+        }
     }
 
     /**
@@ -135,6 +143,9 @@ class Engine {
         this.sampleCount++;
     }
 
+    /**
+     * Reset accumulation buffers
+     */
     clearAccumulation(): void {
         this.resources.clearFilmBuffers();
         this.frameCount = 0;
@@ -168,6 +179,9 @@ class Engine {
         this.state = 'ready';
     }
 
+    /**
+     * Clear uniform cache
+     */
     clearUniformCache(): void {
         this.compiler.clearCache();
     }

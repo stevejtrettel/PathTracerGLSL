@@ -220,12 +220,12 @@ t += d * 0.9;  // Prevents penetration
 
 **Pitfall**: Material resolution at boundaries without nearby tracking
 ```glsl
-// BAD: Checking all objects at every boundary
+// BAD: Checking all world at every boundary
 for (int i = 0; i < 100; i++) {
     check_object(i);
 }
 
-// GOOD: Only check nearby objects
+// GOOD: Only check nearby world
 NearbyObjects nearby = find_nearby(p);
 for (int i = 0; i < nearby.count && i < 3; i++) {
     check_object(nearby.ids[i]);

@@ -2,17 +2,28 @@
 import { Engine } from '../engine/Engine';
 import { ParameterStore } from './ParameterStore';
 import { FrameStats } from './FrameStats';
-import { euclideanAmbient } from '../objects/ambient/euclidean/euclidean-ambient';
+import { euclideanAmbient } from '../world/ambient/euclidean/euclidean-ambient';
 import { pinholeCamera } from '../optics/camera/pinhole-camera';
 import { lambertInteraction } from "../optics/interaction/lambert-interaction";
 import { gammaDeveloper } from "../optics/developer/gamma-developer";
 import { averagingAccumulator } from "../optics/accumulator/average-accumulator";
 import { pathTracerDirectLight } from "../optics/transport/path-tracer-direct-light";
-import { pathTracingTransport } from "../optics/transport/path-tracer-transport";
-import { sphereLight } from "../objects/lighting/sphere-light";
-import {quadLight} from "../objects/lighting/quad-light";
+import { pathTracingTransport} from "../optics/transport/path-tracer-transport";
+import { sphereLight } from "../world/lighting/sphere-light";
+import { directTransport} from "../optics/transport/direct-transport";
+import {quadLight} from "../world/lighting/quad-light";
 import {glossyInteraction} from "../optics/interaction/glossy-interaction";
-import {sceneRaymarch} from "../objects/scene/raymarch-scene";
+import {sceneRaymarch} from "../world/scene/raymarch-scene";
+import { constEnvironment } from "../world/environment/const-environment";
+import { oneshotAccumulator } from "../optics/accumulator/oneshot-accumulator";
+import { albedoInteraction } from "../optics/interaction/albedo-interaction";
+import { hdriEnvironment } from "../world/environment/hdri-environment";
+
+
+
+//the hdri image (from public/)
+import envHDRI from '/hdri/autumn_field_1k.hdr';
+
 
 
 /**
@@ -54,18 +65,43 @@ class MinimalApp {
     }
 
     /**
+     * Initialize app with HDR environment
+     */
+    async initialize(): Promise<void> {
+        // Load modules
+        this.loadModules();
+
+        // Setup parameters
+        this.setupParameters();
+
+        // Load HDR environment map
+        // Put your HDR file in public/assets/hdri/
+        await this.engine.loadEnvironmentHDR(envHDRI);
+
+        // Set environment parameters
+        this.parameterStore.batch({
+            'environment.intensity': 1.0,
+            'environment.rotation': 0  // degrees
+        });
+
+        // Start rendering
+        this.startRenderLoop();
+    }
+
+    /**
      * Load and compile modules
      */
     loadModules(): void {
         this.engine.loadModules([
             euclideanAmbient,
             sceneRaymarch,
+            hdriEnvironment,  // Using HDRI instead of const
             quadLight,
             glossyInteraction,
             pathTracerDirectLight,
             pinholeCamera,
             averagingAccumulator,
-            gammaDeveloper
+            gammaDeveloper,
         ]);
     }
 
@@ -78,11 +114,6 @@ class MinimalApp {
             'camera.target': [0, 0, 0],
             'camera.fov': 60,
             'resolution': [window.innerWidth, window.innerHeight],
-
-            // 'sphere_light.position': [0, 3, 0],
-            // 'sphere_light.radius': 0.1,
-            // 'sphere_light.color': [1.0, 1.0, 1.0],
-            // 'sphere_light.intensity': 500.0,
 
             // Quad light (ceiling)
             'quad.center': [0, 3.9, 0],  // Center at ceiling
@@ -138,7 +169,6 @@ class MinimalApp {
     render(): void {
         this.engine.renderFrame();
     }
-
 
     /**
      * Clean up resources

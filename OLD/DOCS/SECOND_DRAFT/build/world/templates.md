@@ -61,7 +61,7 @@ const euclideanGeometry: ModuleDescriptor = {
 ### Simple SDF Sphere
 
 ```glsl
-// objects/sphere.glsl
+// world/sphere.glsl
 float sphere_sdf(vec3 p) {
     return length(p) - 1.0;  // Unit sphere at origin
 }
@@ -78,7 +78,7 @@ vec3 normal_sphere(vec3 p) {
 ### Parametric SDF with Transform
 
 ```glsl
-// objects/parametric_sphere.glsl
+// world/parametric_sphere.glsl
 uniform vec3 u_sphere_center;
 uniform float u_sphere_radius;
 uniform int u_sphere_material;
@@ -99,7 +99,7 @@ vec3 normal_sphere(vec3 p) {
 ### Multi-Region Object
 
 ```glsl
-// objects/shell.glsl
+// world/shell.glsl
 float shell_eval(vec3 p, out int region) {
     float d = length(p) - 1.0;  // Base sphere
     
@@ -233,7 +233,7 @@ int classify_point(Point p, int object_id) {
 ### Scene with Nearby Tracking
 
 ```glsl
-// scene/multiple_objects.glsl - Generated for multiple objects
+// scene/multiple_objects.glsl - Generated for multiple world
 void track_object(inout NearbyObjects nearby, float dist, int obj_id) {
     if (dist < nearby.dists[2]) {
         nearby.dists[2] = dist;
@@ -258,13 +258,13 @@ NearbyObjects find_nearby(vec3 p) {
     nearby.ids = int[3](-1, -1, -1);
     nearby.count = 0;
     
-    // Evaluate all objects
+    // Evaluate all world
     for (int i = 0; i < NUM_OBJECTS; i++) {
         float d = eval_object_sdf(i, p);
         track_object(nearby, d, i);
     }
     
-    // Count objects within boundary
+    // Count world within boundary
     for(int i = 0; i < 3; i++) {
         if(abs(nearby.dists[i]) < BOUNDARY_THRESHOLD) {
             nearby.count++;
@@ -283,7 +283,7 @@ int resolve_material(vec3 p, NearbyObjects nearby) {
         return MATERIAL_AIR;
     }
     
-    // Multiple objects: deepest wins
+    // Multiple world: deepest wins
     int material = MATERIAL_AIR;
     float deepest = 0.0;
     

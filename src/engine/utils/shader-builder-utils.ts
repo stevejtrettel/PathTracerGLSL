@@ -1,7 +1,7 @@
 // shader-builder-utils.ts
-import type { ModuleDescriptor } from './types';
-import { MODULE_ORDER } from './types';
-import commonStructsGLSL from './common-structs.glsl?raw';
+import type { ModuleDescriptor } from '../types';
+import { MODULE_ORDER } from '../types';
+import commonStructsGLSL from '../common-structs.glsl?raw';
 
 export function getRNGSystem(): string {
     return `

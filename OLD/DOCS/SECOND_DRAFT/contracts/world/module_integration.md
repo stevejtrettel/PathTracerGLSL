@@ -28,7 +28,7 @@ Lights (use material properties)
 ```typescript
 interface WorldDescriptor {
   geometry: ModuleDescriptor;    // Hand-written
-  objects: ModuleDescriptor[];   // Compiled objects
+  objects: ModuleDescriptor[];   // Compiled world
   scene: ModuleDescriptor;       // Generated arrangement
   material: ModuleDescriptor;    // ONE per scene
   lights: ModuleDescriptor;      // Hand-written or generated
@@ -124,7 +124,7 @@ class SceneCompiler {
     return {
       id: { kind: 'scene', name: 'compiled_scene', version: '1.0.0' },
       provides: ['intersect', 'intersect_any', 'inside'],
-      requires: ['geometry', 'objects'],
+      requires: ['geometry', 'world'],
       fragment: {
         dispatch,
         functions: marching + acceleration,
