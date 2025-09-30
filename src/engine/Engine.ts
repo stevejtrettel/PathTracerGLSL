@@ -7,6 +7,7 @@ import { HDRLoader } from './loaders/hdr-loader.js';
 import type { ModuleDescriptor, EngineState, EngineUniforms } from './types.js';
 import type { ParameterChanges } from '../app/types.js';
 import { ResourceManager } from './ResourceManager.js';
+import { TextureFactory } from "./utils/TextureFactory";
 
 /**
  * Engine orchestrates subsystems for modular rendering
@@ -92,66 +93,30 @@ class Engine {
      * Load and bind an HDR environment map
      */
     async loadEnvironmentHDR(path: string): Promise<void> {
-        const response = await fetch(path);
-        if (!response.ok) {
-            throw new Error(`Failed to load HDR: ${response.statusText}`);
+        console.log(`Loading HDR environment: ${path}`);
+
+        // 1) Fetch + parse HDR
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(`Failed to load HDR: ${res.status} ${res.statusText}`);
+        const buffer = await res.arrayBuffer();
+        const hdr = HDRLoader.parse(buffer); // { data: Float32Array, width, height }
+
+        // 2) Create a single RGB32F texture via TextureFactory
+        const tf = new TextureFactory(this.gl);
+        const envTex = tf.createRGB32F(hdr.data, hdr.width, hdr.height);
+
+        // 3) Register in the TextureRegistry under a stable name
+        this.textureRegistry.register('env_map', envTex);
+
+        // 4) Bind to u_env_map on the main program (if already linked)
+        const program = this.compiler.getMainProgram();
+        if (program) {
+            this.gl.useProgram(program);
+            const loc = this.gl.getUniformLocation(program, 'u_env_map');
+            if (loc) this.textureRegistry.bind('env_map', loc);
         }
 
-        const buffer = await response.arrayBuffer();
-        const hdr = HDRLoader.parse(buffer);
-
-        // Create environment texture
-        // Create display texture (full resolution)
-        const displayTexture = this.createEnvironmentTexture(hdr.width, hdr.height, hdr.data);
-        this.textureRegistry.register('env_map', displayTexture);
-
-
-        // Bind to shader
-        const mainProgram = this.compiler.getMainProgram();
-        if (!mainProgram) return;
-
-        this.gl.useProgram(mainProgram);
-        const location = this.gl.getUniformLocation(mainProgram, 'u_env_map');
-        if (location) {
-            this.textureRegistry.bind('env_map', location);
-        }
-
-        console.log(`Loaded HDR environment: ${hdr.width}x${hdr.height}`);
-        
-    }
-
-    private createEnvironmentTexture(
-        width: number,
-        height: number,
-        data: Float32Array
-    ): WebGLTexture {
-        const texture = this.gl.createTexture();
-        if (!texture) throw new Error('Failed to create environment texture');
-
-        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-        this.gl.texImage2D(
-            this.gl.TEXTURE_2D,
-            0,
-            this.gl.RGB32F,
-            width,
-            height,
-            0,
-            this.gl.RGB,
-            this.gl.FLOAT,
-            data
-        );
-
-        // Check for linear filtering support
-        const linearExt = this.gl.getExtension('OES_texture_float_linear');
-        const filterMode = linearExt ? this.gl.LINEAR : this.gl.NEAREST;
-
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, filterMode);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, filterMode);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.REPEAT);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
-
-        this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-        return texture;
+        console.log(`HDR loaded: ${hdr.width}×${hdr.height}`);
     }
 
     /**

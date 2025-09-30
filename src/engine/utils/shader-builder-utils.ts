@@ -3,34 +3,9 @@ import type { ModuleDescriptor } from '../types';
 import { MODULE_ORDER } from '../types';
 import commonStructsGLSL from '../common-structs.glsl?raw';
 
-export function getRNGSystem(): string {
-    return `
-// ============ RNG SYSTEM ============
-// Per-fragment RNG state that gets initialized in main()
-uint rng_seed;
+import rngSystem from '../../math/random/rng-system.glsl?raw'
 
-uint pcg_advance(uint seed) {
-    // This combines both steps of PCG
-    uint state = seed * 747796405u + 2891336453u;
-    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
-}
 
-float random() {
-    rng_seed = pcg_advance(rng_seed);
-    return float(rng_seed) / 4294967295.0;
-}
-
-// Get two random floats
-vec2 random2() {
-    return vec2(random(), random());
-}
-
-// Get three random floats
-vec3 random3() {
-    return vec3(random(), random(), random());
-}`;
-}
 
 export function generateMainFunction(): string {
     return `
@@ -38,14 +13,9 @@ void main(){
     vec2 pixel = gl_FragCoord.xy;
     
     // Initialize RNG seed once per pixel
-    // Add time for better decorrelation if frame index doesnt update
-    rng_seed = uint(uint(pixel.x) * uint(1973) + 
-                   uint(pixel.y) * uint(9277) + 
-                   uint(u_frame_index) * uint(26699)) | uint(1);
-                   
-               //     rng_seed = uint(uint(pixel.x) * uint(1973) + 
-               // uint(pixel.y) * uint(9277) + 
-               // uint(u_frame_index) * uint(26699)) | uint(1);
+    // robust seed from pixel + frame
+    rng_seed = hash_init(uvec2(pixel), uint(u_frame_index));
+    rng_counter = 0u;
                    
     // Now just use random() or random2() anywhere!
     Ray ray = camera_generateRay(pixel, random2());
@@ -73,7 +43,7 @@ export function buildMainShaderSource(modules: ModuleDescriptor[]): string {
     parts.push('');
 
     // Add the RNG system
-    parts.push(getRNGSystem());
+    parts.push(rngSystem);
     parts.push('');
 
     const orderedModules = orderModules(modules);

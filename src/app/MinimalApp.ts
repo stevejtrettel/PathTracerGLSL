@@ -18,7 +18,9 @@ import { constEnvironment } from "../world/environment/const-environment";
 import { oneshotAccumulator } from "../optics/accumulator/oneshot-accumulator";
 import { albedoInteraction } from "../optics/interaction/albedo-interaction";
 import { hdriEnvironment } from "../world/environment/hdri-environment";
-
+import {pathTracerDirectEnv} from "../optics/transport/path-tracer-direct-env";
+import {acesDeveloper} from "../optics/developer/aces-developer";
+import {reinhardDeveloper} from "../optics/developer/reinhard-developer";
 
 
 //the hdri image (from public/)
@@ -98,10 +100,10 @@ class MinimalApp {
             hdriEnvironment,  // Using HDRI instead of const
             quadLight,
             glossyInteraction,
-            pathTracerDirectLight,
+            pathTracingTransport,
             pinholeCamera,
             averagingAccumulator,
-            gammaDeveloper,
+            acesDeveloper,
         ]);
     }
 
@@ -124,7 +126,17 @@ class MinimalApp {
             'quad.intensity': 10.0,
             'quad.color': [1, 1,1],
 
+            'environment.intensity': 1.,
+
+
+            'developer.exposureEV':0,
+            'developer.desat':0.2,
+            'developer.whiteBalance':[1,1,1],
+
+
+
             'accumulator.reset': false
+
         });
     }
 
