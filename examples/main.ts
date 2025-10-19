@@ -1,6 +1,6 @@
 // main.ts - Phase 8: Progressive accumulation with anti-aliasing
 
-import { MinimalApp } from '../src/app/MinimalApp.js';
+import { App } from '../src/app/App.js';
 
 async function main() {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -9,7 +9,7 @@ async function main() {
     }
 
     // Create app
-    const app = new MinimalApp(canvas);
+    const app = new App(canvas);
 
     // Initialize with HDR loading and start render loop
     await app.initialize();

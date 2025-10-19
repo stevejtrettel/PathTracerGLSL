@@ -68,6 +68,23 @@ class ParameterStore {
     }
 
     /**
+     * Force re-send all parameters (useful after recipe switch)
+     */
+    resendAll(): void {
+        if (!this._onChange || this.parameters.size === 0) return;
+
+        // Treat all parameters as "changed" to force GPU update
+        this._onChange({
+            changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
+                path,
+                oldValue: value,  // Same as new, but forces update
+                newValue: value
+            }))
+        });
+    }
+
+
+    /**
      * Get parameter value
      */
     get(path: string): any {

@@ -97,6 +97,51 @@ interface EngineUniforms {
 }
 
 
+
+// Add these after your existing type definitions
+
+/**
+ * Reference to a module by kind and name (used in recipes)
+ */
+interface ModuleReference {
+    kind: ModuleKind;
+    name: string;
+    version?: string;
+}
+
+/**
+ * Complete rendering configuration - a recipe bundles modules and parameters
+ */
+interface Recipe {
+    id: string;
+    name: string;
+    description?: string;
+
+    world: {
+        ambient: ModuleReference;      // Mathematical space
+        environment: ModuleReference;  // Environment maps and fog
+        scene: ModuleReference;        // Objects and materials
+        lighting: ModuleReference;     // Light sources
+    };
+
+    optics: {  // Was 'photography' in docs
+        camera: ModuleReference;       // Ray generation
+        transport: ModuleReference;    // Integration algorithm
+        interaction: ModuleReference;  // Light-matter physics (BRDFs)
+        accumulator: ModuleReference;  // Sample accumulation
+        developer: ModuleReference;    // Tone mapping
+    };
+
+    parameters?: Record<string, any>;
+
+    config?: {
+        targetSamples?: number;
+        renderMode?: 'interactive' | 'progressive' | 'production';
+    };
+}
+
+
+
 export {MODULE_ORDER};
 
 export type {
@@ -108,4 +153,6 @@ export type {
     UniformBinding,
     EngineUniforms,
     UniformType,
+    ModuleReference,
+    Recipe
 };

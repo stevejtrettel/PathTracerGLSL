@@ -1,7 +1,7 @@
 import type {ModuleDescriptor} from "../../engine/types";
 
 export const albedoInteraction: ModuleDescriptor = {
-    id: { kind: 'interaction', name: 'simple', version: '1.0.0' },
+    id: { kind: 'interaction', name: 'albedo', version: '1.0.0' },
     fragment: {
         functions: `
             vec3 interaction_surface_shade(vec3 wi, vec3 wo, Hit hit) {

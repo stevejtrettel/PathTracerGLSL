@@ -1,6 +1,5 @@
-// ShaderCompiler.ts - Final simplified version
-import type { ModuleDescriptor, UniformBinding, EngineUniforms, UniformType } from './types';
-import type { ParameterChanges } from '../app/types';
+// engine/ShaderCompiler.ts
+import type { ModuleDescriptor, EngineUniforms, UniformType } from './types';
 import {
     buildMainShaderSource,
     buildDisplayShaderSource,
@@ -9,10 +8,13 @@ import {
 } from './utils/shader-builder-utils';
 import {
     setUniformValue,
-    uniformValuesEqual,
     cacheUniformLocations
 } from './utils/shader-uniform-utils';
 
+/**
+ * ShaderCompiler handles GLSL compilation only.
+ * Parameter management moved to ParameterManager.
+ */
 class ShaderCompiler {
     private gl: WebGL2RenderingContext;
 
@@ -21,15 +23,8 @@ class ShaderCompiler {
     private displayProgram: WebGLProgram | null = null;
     private activeProgram: WebGLProgram | null = null;
 
-    // Uniform management
+    // Uniform locations (for engine-driven uniforms only now)
     private uniformLocations = new Map<string, WebGLUniformLocation>();
-    private uniformBindings = new Map<string, UniformBinding>();
-    private parameterCache = new Map<string, any>();
-    private parameterToBindings = new Map<string, Set<UniformBinding>>();
-
-    // Caching
-    private uniformValueCache = new Map<string, any>();
-    private updateStats = { total: 0, skipped: 0 };
 
     // Debug info
     private lastCompiledSource: string | null = null;
@@ -39,9 +34,13 @@ class ShaderCompiler {
         this.gl = gl;
     }
 
-    compile(modules: ModuleDescriptor[]): string {
-        this.buildUniformBindings(modules);
-
+    /**
+     * Compile modules into programs
+     */
+    compile(modules: ModuleDescriptor[]): {
+        mainProgram: WebGLProgram;
+        displayProgram: WebGLProgram;
+    } {
         const mainSource = buildMainShaderSource(modules);
         const displaySource = buildDisplayShaderSource(modules);
         const vertexSource = buildVertexShaderSource();
@@ -52,7 +51,10 @@ class ShaderCompiler {
         this.lastCompiledSource = mainSource;
         this.lastCompiledSourceWithLineNumbers = addLineNumbers(mainSource);
 
-        return mainSource;
+        return {
+            mainProgram: this.mainProgram,
+            displayProgram: this.displayProgram
+        };
     }
 
     getMainProgram(): WebGLProgram | null {
@@ -63,64 +65,17 @@ class ShaderCompiler {
         return this.displayProgram;
     }
 
+    /**
+     * Set active program and cache engine uniform locations
+     */
     setActiveProgram(program: WebGLProgram): void {
-        if (this.activeProgram !== program) {
-            this.uniformValueCache.clear();
-            this.updateStats = { total: 0, skipped: 0 };
-        }
         this.activeProgram = program;
         this.uniformLocations = cacheUniformLocations(this.gl, program);
     }
 
-    // ============ UNIFORM UPDATES ============
-
-    updateUniforms(changes: ParameterChanges): void {
-        if (!this.activeProgram) return;
-
-        this.gl.useProgram(this.activeProgram);
-
-        // Update parameter cache
-        for (const change of changes.changes) {
-            this.parameterCache.set(change.path, change.newValue);
-        }
-
-        // Find affected uniform bindings
-        const affectedBindings = new Set<UniformBinding>();
-        for (const change of changes.changes) {
-            const bindings = this.parameterToBindings.get(change.path);
-            if (bindings) {
-                bindings.forEach(binding => affectedBindings.add(binding));
-            }
-        }
-
-        // Update each affected uniform
-        for (const binding of affectedBindings) {
-            const paramValues: Record<string, any> = {};
-            for (const paramPath of binding.parameters) {
-                paramValues[paramPath] = this.parameterCache.get(paramPath);
-            }
-
-            const uniformValue = binding.compute(paramValues);
-
-            // Skip if value unchanged
-            const cachedValue = this.uniformValueCache.get(binding.uniform);
-            if (uniformValuesEqual(cachedValue, uniformValue, binding.type)) {
-                this.updateStats.skipped++;
-                continue;
-            }
-
-            // Update cache and GPU
-            this.uniformValueCache.set(binding.uniform, uniformValue);
-            const location = this.uniformLocations.get(binding.uniform);
-            if (location) {
-                setUniformValue(this.gl, location, uniformValue, binding.type);
-                this.updateStats.total++;
-            }
-        }
-
-        this.logStatsIfNeeded();
-    }
-
+    /**
+     * Update engine-provided uniforms (time, resolution, etc.)
+     */
     updateEngineUniforms(uniforms: EngineUniforms): void {
         if (!this.activeProgram) return;
 
@@ -130,10 +85,6 @@ class ShaderCompiler {
         this.setEngineUniform('u_frame_index', uniforms.frameIndex, 'int');
         this.setEngineUniform('u_time', uniforms.time, 'float');
         this.setEngineUniform('u_sample_count', uniforms.sampleCount, 'int');
-
-        if (uniforms.frameIndex % 60 === 0 && uniforms.frameIndex > 0) {
-            this.logStatsIfNeeded();
-        }
     }
 
     private setEngineUniform(name: string, value: any, type: UniformType): void {
@@ -183,58 +134,15 @@ class ShaderCompiler {
         return shader;
     }
 
-    // ============ UNIFORM BINDING SETUP ============
+    // ============ DEBUG ============
 
-    private buildUniformBindings(modules: ModuleDescriptor[]): void {
-        this.uniformBindings.clear();
-        this.parameterToBindings.clear();
-
-        for (const module of modules) {
-            for (const binding of module.uniformBindings || []) {
-                this.uniformBindings.set(binding.uniform, binding);
-
-                for (const paramPath of binding.parameters) {
-                    if (!this.parameterToBindings.has(paramPath)) {
-                        this.parameterToBindings.set(paramPath, new Set());
-                    }
-                    this.parameterToBindings.get(paramPath)!.add(binding);
-                }
-            }
-        }
-    }
-
-
-    // ============ UTILITY ============
-
-    private logStatsIfNeeded(): void {
-        const total = this.updateStats.total + this.updateStats.skipped;
-        if (total % 60 === 0 && total > 0) {
-            const skipRate = (this.updateStats.skipped / total * 100).toFixed(1);
-            console.log(`Uniform cache: ${skipRate}% GPU calls skipped (${this.updateStats.skipped}/${total})`);
-        }
-    }
-
-    getDebugInfo(): { source: string, numberedSource: string } | null {
+    getDebugInfo(): { source: string; numberedSource: string } | null {
         if (!this.lastCompiledSource || !this.lastCompiledSourceWithLineNumbers) {
             return null;
         }
         return {
             source: this.lastCompiledSource,
             numberedSource: this.lastCompiledSourceWithLineNumbers
-        };
-    }
-
-    clearCache(): void {
-        this.uniformValueCache.clear();
-        this.updateStats = { total: 0, skipped: 0 };
-    }
-
-    getCacheStats(): { total: number, skipped: number, skipRate: number } {
-        const total = this.updateStats.total + this.updateStats.skipped;
-        return {
-            total: this.updateStats.total,
-            skipped: this.updateStats.skipped,
-            skipRate: total > 0 ? this.updateStats.skipped / total : 0
         };
     }
 }

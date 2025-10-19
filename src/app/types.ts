@@ -1,5 +1,35 @@
 // Types for the parameter system - Phase 2 minimal but correct
 
+import type { ModuleDescriptor } from '../engine/types';
+
+
+export interface RenderConfiguration {
+    name: string;
+    description?: string;
+
+    modules: {
+        ambient: ModuleDescriptor;
+        scene: ModuleDescriptor;
+        environment: ModuleDescriptor;
+        lighting: ModuleDescriptor;
+        camera: ModuleDescriptor;
+        interaction: ModuleDescriptor;
+        transport: ModuleDescriptor;
+        accumulator: ModuleDescriptor;
+        developer: ModuleDescriptor;
+    };
+
+    parameters: Record<string, any>;
+
+    environmentMap?: {
+        path: string;
+        intensity?: number;
+        rotation?: number;
+    };
+}
+
+
+
 /**
  * Metadata about a parameter for validation and UI
  */
