@@ -1,5 +1,4 @@
 // engine/Engine.ts
-import { ModuleRegistry } from './ModuleRegistry.js';
 import { ShaderCompiler } from './ShaderCompiler.js';
 import { ParameterManager } from './ParameterManager.js';
 import { RenderExecutor } from './RenderExecutor.js';
@@ -16,7 +15,6 @@ import { buildEnvironmentSampler } from "./loaders/build-environment-sampler.js"
  */
 class Engine {
     private gl: WebGL2RenderingContext;
-    private registry: ModuleRegistry;
     private compiler: ShaderCompiler;
     private parameters: ParameterManager;
     private executor: RenderExecutor;
@@ -47,7 +45,6 @@ class Engine {
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-        this.registry = new ModuleRegistry();
         this.compiler = new ShaderCompiler(gl);
         this.parameters = new ParameterManager(gl);
         this.resources = new ResourceManager(gl);
@@ -57,23 +54,7 @@ class Engine {
     }
 
     /**
-     * Register a single module for later use in recipes
-     */
-    registerModule(module: ModuleDescriptor): void {
-        this.registry.register(module);
-    }
-
-    /**
-     * Register multiple modules for later use in recipes
-     */
-    registerModules(modules: ModuleDescriptor[]): void {
-        for (const module of modules) {
-            this.registry.register(module);
-        }
-    }
-
-    /**
-     * Initialize engine with recipes (new primary initialization path)
+     * Initialize engine with recipes
      */
     initialize(recipes: Recipe[]): void {
         if (this.state !== 'ready') {
@@ -91,7 +72,7 @@ class Engine {
             // Store recipe for later access
             this.recipes.set(recipe.id, recipe);
 
-            const modules = this.resolveModules(recipe);
+            const modules = this.extractModules(recipe);
 
             // Compile both shaders
             const { mainProgram, displayProgram } = this.compiler.compile(modules);
@@ -138,8 +119,8 @@ class Engine {
             throw new Error(`Recipe metadata not found: ${recipeId}`);
         }
 
-        // Resolve modules for this recipe
-        const modules = this.resolveModules(recipe);
+        // Extract modules from this recipe
+        const modules = this.extractModules(recipe);
 
         // Set active programs
         this.compiler.setActiveProgram(programs.main);
@@ -345,13 +326,10 @@ class Engine {
     }
 
     /**
-     * Resolve Recipe's ModuleReferences to actual ModuleDescriptors
+     * Extract modules from recipe in MODULE_ORDER
      */
-    private resolveModules(recipe: Recipe): ModuleDescriptor[] {
-        const modules: ModuleDescriptor[] = [];
-
-        // Resolve in MODULE_ORDER
-        const refs = [
+    private extractModules(recipe: Recipe): ModuleDescriptor[] {
+        return [
             recipe.world.ambient,
             recipe.world.environment,
             recipe.world.scene,
@@ -362,16 +340,6 @@ class Engine {
             recipe.optics.accumulator,
             recipe.optics.developer
         ];
-
-        for (const ref of refs) {
-            const module = this.registry.get(ref.kind, ref.name);
-            if (!module) {
-                throw new Error(`Module not found: ${ref.kind}/${ref.name}`);
-            }
-            modules.push(module);
-        }
-
-        return modules;
     }
 }
 
