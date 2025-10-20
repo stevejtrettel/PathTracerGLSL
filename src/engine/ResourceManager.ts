@@ -4,7 +4,7 @@
  * Per-recipe accumulation resources
  * Each recipe maintains independent film buffers and accumulation state
  */
-interface FilmResources {
+interface AccumulatorResources {
     textures: {
         current: WebGLTexture;
         previous: WebGLTexture;
@@ -24,7 +24,7 @@ export class ResourceManager {
     private gl: WebGL2RenderingContext;
 
     // Per-recipe resources - enables instant recipe switching with preserved accumulation
-    private filmResourcesMap = new Map<string, FilmResources>();
+    private accumulatorResourcesMap = new Map<string, AccumulatorResources>();
     private activeRecipeId: string | null = null;
 
     // Track dimensions for all recipes
@@ -47,13 +47,13 @@ export class ResourceManager {
      * Setup film buffers for a specific recipe
      * Creates new buffers or reuses existing ones
      */
-    setupFilmBuffers(recipeId: string): FilmResources {
+    setupAccumulationBuffers(recipeId: string): AccumulatorResources {
         // TODO: Consider validating recipe ID format (non-empty, valid chars, etc)
 
         // Check if already exists
-        if (this.filmResourcesMap.has(recipeId)) {
+        if (this.accumulatorResourcesMap.has(recipeId)) {
             console.log(`Reusing film buffers for recipe '${recipeId}'`);
-            return this.filmResourcesMap.get(recipeId)!;
+            return this.accumulatorResourcesMap.get(recipeId)!;
         }
 
         console.log(`Creating film buffers for recipe '${recipeId}'`);
@@ -71,7 +71,7 @@ export class ResourceManager {
         };
 
         // Create resource bundle with fresh accumulation state
-        const resources: FilmResources = {
+        const resources: AccumulatorResources = {
             textures,
             framebuffers,
             accumulator: {
@@ -81,8 +81,8 @@ export class ResourceManager {
             }
         };
 
-        this.filmResourcesMap.set(recipeId, resources);
-        this.clearFilmBuffers(recipeId);
+        this.accumulatorResourcesMap.set(recipeId, resources);
+        this.clearAccumulationBuffers(recipeId);
 
         return resources;
     }
@@ -91,7 +91,7 @@ export class ResourceManager {
      * Set which recipe is active for rendering
      */
     setActiveRecipe(recipeId: string): void {
-        if (!this.filmResourcesMap.has(recipeId)) {
+        if (!this.accumulatorResourcesMap.has(recipeId)) {
             throw new Error(`No film resources for recipe: ${recipeId}`);
         }
         this.activeRecipeId = recipeId;
@@ -139,6 +139,14 @@ export class ResourceManager {
     }
 
     /**
+     * Get current accumulator framebuffer for reading radiance data
+     */
+    getCurrentFramebuffer(): WebGLFramebuffer {
+        const resources = this.getResources();
+        return resources.framebuffers.current;
+    }
+
+    /**
      * Prepare for rendering - bind previous frame and set render target
      */
     prepareFrame(): void {
@@ -164,7 +172,7 @@ export class ResourceManager {
     /**
      * Clear accumulation buffers (for specific recipe or active recipe)
      */
-    clearFilmBuffers(recipeId?: string): void {
+    clearAccumulationBuffers(recipeId?: string): void {
         const resources = this.getResources(recipeId);
 
         // Clear both buffers to black
@@ -189,7 +197,7 @@ export class ResourceManager {
         console.log(`Resizing all recipe buffers to ${width}x${height}`);
 
         // Save which recipes existed
-        const recipeIds = Array.from(this.filmResourcesMap.keys());
+        const recipeIds = Array.from(this.accumulatorResourcesMap.keys());
         const wasActive = this.activeRecipeId;
 
         // Dispose all old buffers
@@ -197,11 +205,11 @@ export class ResourceManager {
 
         // Recreate buffers for all recipes at new size
         for (const recipeId of recipeIds) {
-            this.setupFilmBuffers(recipeId);
+            this.setupAccumulationBuffers(recipeId);
         }
 
         // Restore active recipe if there was one
-        if (wasActive && this.filmResourcesMap.has(wasActive)) {
+        if (wasActive && this.accumulatorResourcesMap.has(wasActive)) {
             this.setActiveRecipe(wasActive);
         }
     }
@@ -212,22 +220,80 @@ export class ResourceManager {
     dispose(recipeId?: string): void {
         if (recipeId) {
             // Dispose specific recipe
-            const resources = this.filmResourcesMap.get(recipeId);
+            const resources = this.accumulatorResourcesMap.get(recipeId);
             if (resources) {
                 this.disposeResources(resources);
-                this.filmResourcesMap.delete(recipeId);
+                this.accumulatorResourcesMap.delete(recipeId);
                 if (this.activeRecipeId === recipeId) {
                     this.activeRecipeId = null;
                 }
             }
         } else {
             // Dispose all recipes
-            for (const resources of this.filmResourcesMap.values()) {
+            for (const resources of this.accumulatorResourcesMap.values()) {
                 this.disposeResources(resources);
             }
-            this.filmResourcesMap.clear();
+            this.accumulatorResourcesMap.clear();
             this.activeRecipeId = null;
         }
+    }
+
+
+    /**
+     * Handle WebGL context loss - called by Engine
+     */
+    handleContextLoss(): void {
+        console.warn('WebGL context lost - all GPU resources invalidated');
+        console.warn('IMPORTANT: All accumulated samples for all recipes will be lost');
+
+        // Clear references but DON'T try to delete - resources are already gone
+        this.accumulatorResourcesMap.clear();
+        this.activeRecipeId = null;
+
+        // Note: If context is restored, Engine will need to reinitialize
+    }
+
+
+
+    /**
+     * Handle canvas resize - resizes ALL recipe buffers
+     * WARNING: All accumulation will be lost (unavoidable - buffer dimensions changed)
+     */
+    resize(width: number, height: number): void {
+        if (width === this.width && height === this.height) {
+            console.log('Resize called but dimensions unchanged, skipping');
+            return;
+        }
+
+        console.log(`Resizing all accumulator buffers: ${this.width}x${this.height} → ${width}x${height}`);
+
+        // Update dimensions
+        this.width = width;
+        this.height = height;
+
+        // Save which recipes existed and which was active
+        const recipeIds = Array.from(this.accumulatorResourcesMap.keys());
+        const wasActive = this.activeRecipeId;
+
+        // Dispose all old buffers (they're wrong size now)
+        for (const recipeId of recipeIds) {
+            const resources = this.accumulatorResourcesMap.get(recipeId)!;
+            this.disposeResources(resources);
+        }
+        this.accumulatorResourcesMap.clear();
+        this.activeRecipeId = null;
+
+        // Recreate buffers at new size for all recipes
+        for (const recipeId of recipeIds) {
+            this.setupAccumulationBuffers(recipeId);
+        }
+
+        // Restore active recipe if there was one
+        if (wasActive && this.accumulatorResourcesMap.has(wasActive)) {
+            this.setActiveRecipe(wasActive);
+        }
+
+        console.log(`Resized ${recipeIds.length} recipe(s) - accumulation reset for all`);
     }
 
     // ============================================================================
@@ -238,13 +304,13 @@ export class ResourceManager {
      * Get resources for specific recipe or active recipe
      * Centralizes error handling for missing recipes
      */
-    private getResources(recipeId?: string): FilmResources {
+    private getResources(recipeId?: string): AccumulatorResources {
         const targetId = recipeId ?? this.activeRecipeId;
         if (!targetId) {
             throw new Error('No active recipe and no recipe ID provided');
         }
 
-        const resources = this.filmResourcesMap.get(targetId);
+        const resources = this.accumulatorResourcesMap.get(targetId);
         if (!resources) {
             throw new Error(`No resources found for recipe: ${targetId}`);
         }
@@ -252,7 +318,7 @@ export class ResourceManager {
         return resources;
     }
 
-    private swapBuffers(resources: FilmResources): void {
+    private swapBuffers(resources: AccumulatorResources): void {
         // Swap texture references
         [resources.textures.current, resources.textures.previous] =
             [resources.textures.previous, resources.textures.current];
@@ -262,7 +328,7 @@ export class ResourceManager {
             [resources.framebuffers.previous, resources.framebuffers.current];
     }
 
-    private disposeResources(resources: FilmResources): void {
+    private disposeResources(resources: AccumulatorResources): void {
         this.gl.deleteTexture(resources.textures.current);
         this.gl.deleteTexture(resources.textures.previous);
         this.gl.deleteFramebuffer(resources.framebuffers.current);
@@ -330,4 +396,7 @@ export class ResourceManager {
             default: return `Unknown (${status})`;
         }
     }
+
+
+
 }

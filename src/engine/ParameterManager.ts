@@ -39,7 +39,7 @@ class ParameterManager {
         // Cache locations for all parameter-driven uniforms
         this.cacheUniformLocations();
 
-        // Clear caches
+        // Clear caches - IMPORTANT for recipe switching
         this.parameterCache.clear();
         this.uniformValueCache.clear();
         this.updateStats = { total: 0, skipped: 0 };

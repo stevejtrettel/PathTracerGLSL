@@ -23,8 +23,8 @@ import { gammaDeveloper } from '../src/optics/developer/gamma-developer.js';
 import { OrbitControls } from "../src/app/extensions/OrbitControls";
 import { KeyboardControls } from "../src/app/extensions/KeyboardControls";
 import { StatsPanelExtension } from "../src/app/extensions/StatsPanel";
-
-
+import { ScreenshotExtension } from "../src/app/extensions/ScreenshotExtension";
+import { HDRExportExtension } from "../src/app/extensions/HDRExportExtension";
 
 // HDR environment
 import envHDRI from '/hdri/autumn_field_1k.hdr';
@@ -122,8 +122,9 @@ async function main() {
 
 
     app.use(new KeyboardControls());
-
     app.use(new StatsPanelExtension());
+    app.use(new ScreenshotExtension());
+    app.use(new HDRExportExtension());
 
     // Setup keyboard controls (1 = pathtracer, 2 = albedo, R = reset)
     app.setupKeyboardControls();
@@ -137,14 +138,14 @@ async function main() {
 // Handle window resize
 window.addEventListener('resize', () => {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-    if (canvas) {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+    const app = (window as any).app;
 
-        const app = (window as any).app;
-        if (app) {
-            app.handleResize(window.innerWidth, window.innerHeight);
-        }
+    if (canvas && app) {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // App handles everything
+        app.handleResize(width, height);
     }
 });
 

@@ -214,6 +214,9 @@ class App {
                 // Spacebar to pause/resume
                 this.toggleRendering();
             }
+            else if (e.key === 'p' || e.key === 'P') {
+                this.testPixelReadback();
+            }
         });
     }
 
@@ -274,8 +277,13 @@ class App {
      * Handle window/canvas resize
      */
     handleResize(width: number, height: number): void {
+        const canvas = this.engine['gl'].canvas as HTMLCanvasElement;
+        canvas.width = width;
+        canvas.height = height;
+
+        this.engine.resize(width, height);  // Cleaner!
         this.parameterStore.set('resolution', [width, height]);
-        // TODO: ResourceManager resize if needed
+        this.renderCoordinator.resetAccumulation('resize');
     }
 
     /**
@@ -297,6 +305,47 @@ class App {
         this.renderCoordinator.stop();
         this.engine.dispose();
         this.bus.removeAllListeners();
+    }
+
+    private testPixelReadback(): void {
+        console.log('=== Testing Pixel Readback ===');
+
+        const executor = this.engine['executor'];
+        const gl = this.engine['gl'];
+        const width = gl.canvas.width;
+        const height = gl.canvas.height;
+
+        // Test 1: Read HDR radiance
+        console.log('\n1. Reading HDR radiance from accumulator...');
+        const radiance = executor.readRadiance();
+        const radiancePixelCount = radiance.length / 4;
+        console.log(`✓ Read ${radiancePixelCount} pixels (${width}×${height})`);
+        console.log('  First pixel RGBA:', radiance.slice(0, 4));
+
+        // Find max without spread operator
+        let maxRadiance = 0;
+        for (let i = 0; i < radiance.length; i++) {
+            if (radiance[i] > maxRadiance) maxRadiance = radiance[i];
+        }
+        console.log('  Max value:', maxRadiance);
+        console.log('  Data size:', (radiance.length * 4 / 1024 / 1024).toFixed(2), 'MB');
+
+        // Test 2: Read LDR display
+        console.log('\n2. Reading LDR display from screen...');
+        const display = executor.readDisplay();
+        const displayPixelCount = display.length / 4;
+        console.log(`✓ Read ${displayPixelCount} pixels (${width}×${height})`);
+        console.log('  First pixel RGBA:', display.slice(0, 4));
+
+        // Find max without spread operator
+        let maxDisplay = 0;
+        for (let i = 0; i < display.length; i++) {
+            if (display[i] > maxDisplay) maxDisplay = display[i];
+        }
+        console.log('  Max value:', maxDisplay, '(should be ≤255)');
+        console.log('  Data size:', (display.length / 1024 / 1024).toFixed(2), 'MB');
+
+        console.log('\n=== Readback Test Complete ===');
     }
 }
 

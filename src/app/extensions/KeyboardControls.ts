@@ -73,8 +73,6 @@ class KeyboardControls implements Extension {
         this.lastTime = performance.now();
         this.startUpdateLoop();
 
-        console.log('KeyboardControl extension installed');
-        console.log('Controls: Arrows+\'/=move, WASD+QE=rotate, Shift=boost, Ctrl=slow, R=stabilize');
     }
 
     uninstall(): void {
@@ -119,7 +117,6 @@ class KeyboardControls implements Extension {
             this.frame = buildFrame(this.position, target);
 
             // IMMEDIATELY set it as a parameter to test
-            console.log('Setting initial frame:', this.frame);
             this.app.parameterStore.set('camera.frame', new Float32Array(this.frame));
         }
     }
@@ -187,20 +184,6 @@ class KeyboardControls implements Extension {
             moveLocal[1] * moveLocal[1] +
             moveLocal[2] * moveLocal[2]
         );
-
-
-        if (moveLen > 0) {
-            // DEBUG: Log position BEFORE move
-            console.log('Position before move:', [...this.position]);
-
-            // Move in local space
-            this.moveLocal(moveLocal, moveSpeed * dt);
-            moved = true;
-
-            // DEBUG: Log position AFTER move
-            console.log('Position after move:', [...this.position]);
-        }
-
 
 
         if (moveLen > 0) {

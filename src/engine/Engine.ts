@@ -10,8 +10,19 @@ import { ResourceManager } from './ResourceManager.js';
 import { TextureFactory } from "./utils/TextureFactory.js";
 import { buildEnvironmentSampler } from "./loaders/build-environment-sampler.js";
 
+
+
+
+
 /**
- * Engine orchestrates subsystems for modular rendering with recipe-based configuration
+ * Engine manages all GPU resources including:
+ * - Shader compilation and programs
+ * - Per-recipe accumulator buffers
+ * - Global texture registry (environment maps, etc.)
+ * - Render execution
+ *
+ * Environment maps are global - loaded once, shared by all recipes.
+ * Call loadEnvironmentHDR() after initialize() to load an HDR environment.
  */
 class Engine {
     private gl: WebGL2RenderingContext;
@@ -32,7 +43,6 @@ class Engine {
 
     // Engine state tracking
     private _time: number = 0;
-    private frameCount: number = 0;
     private startTime: number;
 
     get time(): number {
@@ -49,8 +59,15 @@ class Engine {
         this.parameters = new ParameterManager(gl);
         this.resources = new ResourceManager(gl);
         this.textureRegistry = new TextureRegistry(gl, 1); // Reserve unit 0 for accumulator
-        this.executor = new RenderExecutor(gl);
+        this.executor = new RenderExecutor(gl, this.resources);  // ADD PARAM
         this.startTime = performance.now();
+
+
+        // Handle context loss
+        gl.canvas.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            this.handleContextLoss();
+        });
     }
 
     /**
@@ -87,8 +104,8 @@ class Engine {
             // Store programs
             this.programs.set(recipe.id, { main: mainProgram, display: displayProgram });
 
-            // Setup film buffers for this recipe
-            this.resources.setupFilmBuffers(recipe.id);
+            // Setup accumulation buffers for this recipe
+            this.resources.setupAccumulationBuffers(recipe.id);
 
             // Bind accumulator texture to unit 0
             this.gl.useProgram(mainProgram);
@@ -130,7 +147,7 @@ class Engine {
         // This ensures uniform bindings are correct for this recipe
         this.parameters.initialize(programs.main, modules);
 
-        // Set active recipe in resources (switches film buffers)
+        // Set active recipe in resources (switches accumulation buffers)
         this.resources.setActiveRecipe(recipeId);
 
         // Update state
@@ -151,6 +168,16 @@ class Engine {
      */
     getActiveRecipeId(): string | null {
         return this.activeRecipeId;
+    }
+
+
+    /**
+     * Access resize from resources
+     */
+// Engine.ts
+    resize(width: number, height: number): void {
+        this.resources.resize(width, height);
+        this.executor.resize(width, height);  // Add this line!
     }
 
     /**
@@ -217,7 +244,7 @@ class Engine {
         const sampleCount = this.resources.getSampleCount();
         this.compiler.updateEngineUniforms({
             resolution: [this.gl.canvas.width, this.gl.canvas.height],
-            frameIndex: this.frameCount,
+            frameIndex:  sampleCount,
             time: this._time,
             sampleCount: sampleCount
         });
@@ -232,7 +259,6 @@ class Engine {
         // 5. Swap buffers for next frame
         this.resources.finalizeFrame();
 
-        this.frameCount++;
         this.resources.incrementSampleCount();
     }
 
@@ -240,9 +266,8 @@ class Engine {
      * Reset accumulation buffers for active recipe
      */
     clearAccumulation(): void {
-        this.resources.clearFilmBuffers();
+        this.resources.clearAccumulationBuffers();
         this.resources.resetSampleCount();
-        this.frameCount = 0;
     }
 
     /**
@@ -340,6 +365,14 @@ class Engine {
             recipe.optics.accumulator,
             recipe.optics.developer
         ];
+    }
+
+
+    private handleContextLoss(): void {
+        console.error('WebGL context lost - rendering stopped');
+        this.state = 'ready'; // Can't render anymore
+        this.resources.handleContextLoss();
+        // Note: Renderer would need to be recreated to continue
     }
 }
 
