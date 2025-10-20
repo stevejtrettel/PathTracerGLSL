@@ -1,5 +1,5 @@
 // engine/RenderExecutor.ts
-import { ResourceManager } from "./ResourceManager";
+import { ResourceManager } from './ResourceManager';
 
 interface Viewport {
     x: number;
@@ -15,21 +15,27 @@ interface Rectangle {
     height: number;
 }
 
+/**
+ * RenderExecutor - Manages WebGL rendering execution
+ *
+ * Responsibilities:
+ * - Execute main and display passes
+ * - Manage viewport state
+ * - Provide pixel readback (HDR radiance, LDR display)
+ */
 export class RenderExecutor {
     private gl: WebGL2RenderingContext;
     private resources: ResourceManager;
     private mainProgram: WebGLProgram | null = null;
     private displayProgram: WebGLProgram | null = null;
 
-    // Viewport management
+    // Current viewport
     private viewport: Viewport;
-    private viewportStack: Viewport[] = [];
 
     constructor(gl: WebGL2RenderingContext, resources: ResourceManager) {
         this.gl = gl;
         this.resources = resources;
 
-        // Initialize viewport from canvas
         const canvas = gl.canvas as HTMLCanvasElement;
         this.viewport = {
             x: 0,
@@ -40,7 +46,7 @@ export class RenderExecutor {
     }
 
     /**
-     * Set both programs (called by Engine)
+     * Set active programs
      */
     setPrograms(main: WebGLProgram, display: WebGLProgram): void {
         this.mainProgram = main;
@@ -52,7 +58,7 @@ export class RenderExecutor {
      */
     executeMainPass(): void {
         if (!this.mainProgram) {
-            throw new Error('No main program set - call setPrograms first');
+            throw new Error('No main program set');
         }
 
         this.gl.useProgram(this.mainProgram);
@@ -64,13 +70,10 @@ export class RenderExecutor {
      */
     executeDisplayPass(radianceTexture: WebGLTexture): void {
         if (!this.displayProgram) {
-            throw new Error('No display program set - call setPrograms first');
+            throw new Error('No display program set');
         }
 
-        // Render to screen
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-
-        // Use current viewport (might be full screen or a tile)
         this.gl.viewport(
             this.viewport.x,
             this.viewport.y,
@@ -78,7 +81,6 @@ export class RenderExecutor {
             this.viewport.height
         );
 
-        // Use display program
         this.gl.useProgram(this.displayProgram);
 
         // Bind radiance texture
@@ -90,81 +92,18 @@ export class RenderExecutor {
             this.gl.uniform1i(loc, 0);
         }
 
-        // Draw fullscreen triangle
         this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
     }
 
-    // ============================================================================
-    // Viewport Control
-    // ============================================================================
-
     /**
-     * Set viewport for rendering
-     * Used for tiled rendering - render to specific region of framebuffer
-     */
-    setViewport(x: number, y: number, width: number, height: number): void {
-        if (width <= 0 || height <= 0) {
-            throw new Error(`Invalid viewport dimensions: ${width}x${height}`);
-        }
-
-        this.viewport = { x, y, width, height };
-        this.gl.viewport(x, y, width, height);
-    }
-
-    /**
-     * Get current viewport
-     */
-    getViewport(): Viewport {
-        return { ...this.viewport }; // Return copy
-    }
-
-    /**
-     * Push current viewport and set new one
-     * Useful for temporarily changing viewport
-     */
-    pushViewport(viewport: Viewport): void {
-        // Save current viewport
-        this.viewportStack.push({ ...this.viewport });
-
-        // Set new viewport
-        this.setViewport(viewport.x, viewport.y, viewport.width, viewport.height);
-    }
-
-    /**
-     * Restore previous viewport
-     */
-    popViewport(): void {
-        const prev = this.viewportStack.pop();
-
-        if (!prev) {
-            console.warn('No viewport to pop - stack empty');
-            return;
-        }
-
-        this.setViewport(prev.x, prev.y, prev.width, prev.height);
-    }
-
-    // ============================================================================
-    // Resize Handling
-    // ============================================================================
-
-    /**
-     * Update viewport when canvas resizes
-     * Called by Engine when canvas dimensions change
+     * Update viewport on canvas resize
      */
     resize(width: number, height: number): void {
         if (width <= 0 || height <= 0) {
-            throw new Error(`Invalid resize dimensions: ${width}x${height}`);
+            throw new Error(`Invalid resize dimensions: ${width}×${height}`);
         }
 
-        this.viewport = {
-            x: 0,
-            y: 0,
-            width,
-            height
-        };
-
-        // Update WebGL viewport immediately
+        this.viewport = { x: 0, y: 0, width, height };
         this.gl.viewport(0, 0, width, height);
     }
 
@@ -173,27 +112,20 @@ export class RenderExecutor {
     // ============================================================================
 
     /**
-     * Read HDR radiance from accumulator buffer
+     * Read HDR radiance from accumulator
      *
-     * Use for: EXR export, scientific analysis, any HDR workflow
-     * Data format: RGBA32F (4 floats per pixel, unbounded values)
+     * Returns Float32Array with RGBA values (unbounded range)
+     * Use for: HDR export, scientific analysis, compositing
      *
-     * @param rect - Optional rectangle to read (defaults to full viewport)
-     * @returns Float32Array with RGBA data (length = width * height * 4)
+     * @param rect - Optional region to read (defaults to full viewport)
      */
     readRadiance(rect?: Rectangle): Float32Array {
         const r = rect || this.getFullViewportRect();
+        this.validateRect(r);
 
-        // Validate rectangle
-        if (r.x < 0 || r.y < 0 || r.width <= 0 || r.height <= 0) {
-            throw new Error(`Invalid readback rectangle: ${JSON.stringify(r)}`);
-        }
-
-        // Bind accumulator framebuffer (RGBA32F)
         const fb = this.resources.getCurrentFramebuffer();
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
 
-        // Allocate and read (RGBA = 4 floats per pixel)
         const pixels = new Float32Array(r.width * r.height * 4);
         this.gl.readPixels(
             r.x, r.y,
@@ -209,24 +141,17 @@ export class RenderExecutor {
     /**
      * Read tone-mapped display from screen
      *
-     * Use for: PNG/JPEG export, screenshots, social media
-     * Data format: RGBA8 (4 bytes per pixel, range 0-255)
+     * Returns Uint8Array with RGBA values (0-255 range)
+     * Use for: PNG/JPEG export, screenshots
      *
-     * @param rect - Optional rectangle to read (defaults to full viewport)
-     * @returns Uint8Array with RGBA data (length = width * height * 4)
+     * @param rect - Optional region to read (defaults to full viewport)
      */
     readDisplay(rect?: Rectangle): Uint8Array {
         const r = rect || this.getFullViewportRect();
+        this.validateRect(r);
 
-        // Validate rectangle
-        if (r.x < 0 || r.y < 0 || r.width <= 0 || r.height <= 0) {
-            throw new Error(`Invalid readback rectangle: ${JSON.stringify(r)}`);
-        }
-
-        // Bind default framebuffer (screen, RGBA8)
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 
-        // Allocate and read (RGBA = 4 bytes per pixel)
         const pixels = new Uint8Array(r.width * r.height * 4);
         this.gl.readPixels(
             r.x, r.y,
@@ -240,8 +165,17 @@ export class RenderExecutor {
     }
 
     /**
-     * Helper: Get rectangle for full viewport
+     * Clean up resources
      */
+    dispose(): void {
+        this.mainProgram = null;
+        this.displayProgram = null;
+    }
+
+    // ============================================================================
+    // Private Helpers
+    // ============================================================================
+
     private getFullViewportRect(): Rectangle {
         return {
             x: this.viewport.x,
@@ -251,17 +185,10 @@ export class RenderExecutor {
         };
     }
 
-    // ============================================================================
-    // Cleanup
-    // ============================================================================
-
-    /**
-     * Clean up (programs owned by ShaderCompiler, so we don't delete)
-     */
-    dispose(): void {
-        this.mainProgram = null;
-        this.displayProgram = null;
-        this.viewportStack = [];
+    private validateRect(rect: Rectangle): void {
+        if (rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0) {
+            throw new Error(`Invalid rectangle: ${JSON.stringify(rect)}`);
+        }
     }
 }
 

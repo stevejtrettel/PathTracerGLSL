@@ -1,28 +1,26 @@
 // engine/Engine.ts
-import { ShaderCompiler } from './ShaderCompiler.js';
-import { ParameterManager } from './ParameterManager.js';
-import { RenderExecutor } from './RenderExecutor.js';
-import { TextureRegistry } from './TextureRegistry.js';
-import { HDRLoader } from './loaders/hdr-loader.js';
-import type { ModuleDescriptor, EngineState, Recipe } from './types.js';
-import type { ParameterChanges } from '../app/types.js';
-import { ResourceManager } from './ResourceManager.js';
-import { TextureFactory } from "./utils/TextureFactory.js";
-import { buildEnvironmentSampler } from "./loaders/build-environment-sampler.js";
-
-
-
-
+import { ShaderCompiler } from './ShaderCompiler';
+import { ParameterManager } from './ParameterManager';
+import { RenderExecutor } from './RenderExecutor';
+import { TextureRegistry } from './TextureRegistry';
+import { HDRLoader } from './loaders/hdr-loader';
+import { ResourceManager } from './ResourceManager';
+import { TextureFactory } from './utils/TextureFactory';
+import { buildEnvironmentSampler } from './loaders/build-environment-sampler';
+import type { ModuleDescriptor, EngineState, Recipe } from './types';
+import type { ParameterChanges } from '../app/types';
 
 /**
- * Engine manages all GPU resources including:
- * - Shader compilation and programs
+ * Engine - Manages all GPU resources and rendering
+ *
+ * Responsibilities:
+ * - Shader compilation and program management
  * - Per-recipe accumulator buffers
  * - Global texture registry (environment maps, etc.)
  * - Render execution
+ * - Tiled rendering support (pixel offset, image size)
  *
  * Environment maps are global - loaded once, shared by all recipes.
- * Call loadEnvironmentHDR() after initialize() to load an HDR environment.
  */
 class Engine {
     private gl: WebGL2RenderingContext;
@@ -41,11 +39,13 @@ class Engine {
     private recipes = new Map<string, Recipe>();
     private activeRecipeId: string | null = null;
 
-    // Engine state tracking
+    // Time tracking
     private _time: number = 0;
     private startTime: number;
+
+    // Tiled rendering state
     private pixelOffset: [number, number] = [0, 0];
-    private imageSize: [number, number] = [0, 0];  //idk why it set to zero!
+    private imageSize: [number, number] = [0, 0];
 
     get time(): number {
         return this._time;
@@ -60,10 +60,9 @@ class Engine {
         this.compiler = new ShaderCompiler(gl);
         this.parameters = new ParameterManager(gl);
         this.resources = new ResourceManager(gl);
-        this.textureRegistry = new TextureRegistry(gl, 1); // Reserve unit 0 for accumulator
-        this.executor = new RenderExecutor(gl, this.resources);  // ADD PARAM
+        this.textureRegistry = new TextureRegistry(gl, 1);
+        this.executor = new RenderExecutor(gl, this.resources);
         this.startTime = performance.now();
-
 
         // Handle context loss
         gl.canvas.addEventListener('webglcontextlost', (e) => {
@@ -86,27 +85,18 @@ class Engine {
 
         console.log(`Initializing ${recipes.length} recipes...`);
 
-        // Compile all recipes eagerly
+        // Compile all recipes
         for (const recipe of recipes) {
-            // Store recipe for later access
             this.recipes.set(recipe.id, recipe);
 
             const modules = this.extractModules(recipe);
-
-            // Compile both shaders
             const { mainProgram, displayProgram } = this.compiler.compile(modules);
 
-            if (!mainProgram) {
-                throw new Error(`Failed to compile main program for recipe: ${recipe.id}`);
-            }
-            if (!displayProgram) {
-                throw new Error(`Failed to compile display program for recipe: ${recipe.id}`);
+            if (!mainProgram || !displayProgram) {
+                throw new Error(`Failed to compile programs for recipe: ${recipe.id}`);
             }
 
-            // Store programs
             this.programs.set(recipe.id, { main: mainProgram, display: displayProgram });
-
-            // Setup accumulation buffers for this recipe
             this.resources.setupAccumulationBuffers(recipe.id);
 
             // Bind accumulator texture to unit 0
@@ -117,15 +107,15 @@ class Engine {
             }
         }
 
-        // Select first recipe automatically (this will initialize parameters)
+        // Select first recipe
         this.selectRecipe(recipes[0].id);
-
         this.state = 'running';
+
         console.log(`Initialized with recipe: ${recipes[0].id}`);
     }
 
     /**
-     * Switch to a different recipe instantly (accumulation preserved per recipe)
+     * Switch to a different recipe
      */
     selectRecipe(recipeId: string): void {
         const programs = this.programs.get(recipeId);
@@ -138,91 +128,58 @@ class Engine {
             throw new Error(`Recipe metadata not found: ${recipeId}`);
         }
 
-        // Extract modules from this recipe
         const modules = this.extractModules(recipe);
 
-        // Set active programs
         this.compiler.setActiveProgram(programs.main);
         this.executor.setPrograms(programs.main, programs.display);
-
-        // Re-initialize ParameterManager with this recipe's program
-        // This ensures uniform bindings are correct for this recipe
         this.parameters.initialize(programs.main, modules);
-
-        // Set active recipe in resources (switches accumulation buffers)
         this.resources.setActiveRecipe(recipeId);
 
-        // Update state
         this.activeRecipeId = recipeId;
-
         console.log(`Switched to recipe '${recipeId}'`);
     }
 
     /**
-     * Get list of available recipe IDs
-     */
-    getAvailableRecipes(): string[] {
-        return Array.from(this.programs.keys());
-    }
-
-    /**
-     * Get currently active recipe ID
-     */
-    getActiveRecipeId(): string | null {
-        return this.activeRecipeId;
-    }
-
-
-    /**
-     * Access resize from resources
-     */
-// Engine.ts
-    resize(width: number, height: number): void {
-        this.resources.resize(width, height);
-        this.executor.resize(width, height);  // Add this line!
-    }
-
-    /**
-     * Load and bind an HDR environment map + build CDFs for importance sampling
-     * Environment is global (shared by all recipes)
+     * Load HDR environment map and build sampling CDFs
      */
     async loadEnvironmentHDR(path: string): Promise<void> {
         console.log(`Loading HDR environment: ${path}`);
 
-        // 1) Fetch + parse HDR
+        // Fetch and parse
         const res = await fetch(path);
-        if (!res.ok) throw new Error(`Failed to load HDR: ${res.status} ${res.statusText}`);
+        if (!res.ok) {
+            throw new Error(`Failed to load HDR: ${res.status} ${res.statusText}`);
+        }
+
         const buffer = await res.arrayBuffer();
         const hdr = HDRLoader.parse(buffer);
-        const W = hdr.width, H = hdr.height;
+        const { width, height, data } = hdr;
 
-        // 2) Create RGB32F texture
+        // Create texture
         const tf = new TextureFactory(this.gl);
-        const envTex = tf.createRGB32F(hdr.data, W, H);
-
-        // 3) Register in TextureRegistry
+        const envTex = tf.createRGB32F(data, width, height);
         this.textureRegistry.register('env_map', envTex);
 
-        // 4) Build + register CDF textures for importance sampling
+        // Build CDF textures for importance sampling
         const built = buildEnvironmentSampler(
             this.gl,
             this.textureRegistry,
-            hdr.data,
-            W,
-            H,
+            data,
+            width,
+            height,
             { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' }
         );
 
-        // 5) Bind environment uniforms to ALL recipe programs
+        // Bind to all recipe programs
         for (const [recipeId, programs] of this.programs.entries()) {
-            this.bindEnvironmentTexturesToProgram(programs.main, W, H, built.totalWeight);
+            this.bindEnvironmentTexturesToProgram(programs.main, width, height, built.totalWeight);
         }
 
-        console.log(`HDR loaded: ${W}×${H} (CDFs built), bound to ${this.programs.size} recipe(s)`);
+        console.log(`HDR loaded: ${width}×${height} (CDFs built), bound to ${this.programs.size} recipe(s)`);
     }
 
     /**
-     * Update uniforms from parameter changes
+     * Update shader uniforms from parameter changes
      */
     updateParameters(changes: ParameterChanges): void {
         if (this.state === 'running') {
@@ -238,44 +195,48 @@ class Engine {
             throw new Error(`Cannot render in state: ${this.state}`);
         }
 
-        // 1. Prepare (bind previous texture, set render target)
         this.resources.prepareFrame();
 
-        // 2. Update engine uniforms (time, resolution, etc.)
+        // Update engine uniforms
         this._time = (performance.now() - this.startTime) / 1000;
         const sampleCount = this.resources.getSampleCount();
         const width = this.gl.canvas.width;
         const height = this.gl.canvas.height;
 
-        // If imageSize not set, default to resolution (normal rendering)
+        // Use imageSize for tiled rendering, otherwise use framebuffer size
         const imgSize: [number, number] = this.imageSize[0] > 0
             ? this.imageSize
             : [width, height];
 
         this.compiler.updateEngineUniforms({
             resolution: [width, height],
-            imageSize: imgSize,  // ADD THIS
+            imageSize: imgSize,
             frameIndex: sampleCount,
             time: this._time,
             sampleCount: sampleCount,
             pixelOffset: this.pixelOffset
         });
 
-        // 3. Execute main pass (accumulate radiance)
+        // Execute rendering
         this.executor.executeMainPass();
-
-        // 4. Execute display pass (tone map to screen)
         const radianceTexture = this.resources.getCurrentTexture();
         this.executor.executeDisplayPass(radianceTexture);
 
-        // 5. Swap buffers for next frame
+        // Finalize
         this.resources.finalizeFrame();
-
         this.resources.incrementSampleCount();
     }
 
     /**
-     * Reset accumulation buffers for active recipe
+     * Resize framebuffers
+     */
+    resize(width: number, height: number): void {
+        this.resources.resize(width, height);
+        this.executor.resize(width, height);
+    }
+
+    /**
+     * Reset accumulation for active recipe
      */
     clearAccumulation(): void {
         this.resources.clearAccumulationBuffers();
@@ -283,32 +244,17 @@ class Engine {
     }
 
     /**
-     * Set pixel offset for tiled rendering
+     * Get available recipe IDs
      */
-    setPixelOffset(x: number, y: number): void {
-        this.pixelOffset = [x, y];
+    getAvailableRecipes(): string[] {
+        return Array.from(this.programs.keys());
     }
 
     /**
-     * Clear pixel offset (return to normal rendering)
+     * Get active recipe ID
      */
-    clearPixelOffset(): void {
-        this.pixelOffset = [0, 0];
-    }
-
-
-    /**
-     * Set image size for tiled rendering (full target image dimensions)
-     */
-    setImageSize(width: number, height: number): void {
-        this.imageSize = [width, height];
-    }
-
-    /**
-     * Clear image size (return to using framebuffer resolution)
-     */
-    clearImageSize(): void {
-        this.imageSize = [0, 0];
+    getActiveRecipeId(): string | null {
+        return this.activeRecipeId;
     }
 
     /**
@@ -319,28 +265,54 @@ class Engine {
     }
 
     /**
-     * State checks
+     * Check if ready
      */
     isReady(): boolean {
         return this.state === 'ready';
     }
 
+    /**
+     * Check if running
+     */
     isRunning(): boolean {
         return this.state === 'running';
     }
 
+    // ============================================================================
+    // Tiled Rendering
+    // ============================================================================
+
     /**
-     * Clean up resources
+     * Set pixel offset for tiled rendering
      */
-    dispose(): void {
-        this.executor.dispose();
-        this.resources.dispose();
-        this.textureRegistry.dispose();
-        this.programs.clear();
-        this.recipes.clear();
-        this.activeRecipeId = null;
-        this.state = 'ready';
+    setPixelOffset(x: number, y: number): void {
+        this.pixelOffset = [x, y];
     }
+
+    /**
+     * Clear pixel offset
+     */
+    clearPixelOffset(): void {
+        this.pixelOffset = [0, 0];
+    }
+
+    /**
+     * Set full image size for tiled rendering
+     */
+    setImageSize(width: number, height: number): void {
+        this.imageSize = [width, height];
+    }
+
+    /**
+     * Clear image size (use framebuffer resolution)
+     */
+    clearImageSize(): void {
+        this.imageSize = [0, 0];
+    }
+
+    // ============================================================================
+    // Debugging
+    // ============================================================================
 
     /**
      * Clear uniform cache
@@ -357,12 +329,26 @@ class Engine {
     }
 
     // ============================================================================
-    // Private Helpers
+    // Cleanup
     // ============================================================================
 
     /**
-     * Bind environment textures and uniforms to a specific program
+     * Dispose all resources
      */
+    dispose(): void {
+        this.executor.dispose();
+        this.resources.dispose();
+        this.textureRegistry.dispose();
+        this.programs.clear();
+        this.recipes.clear();
+        this.activeRecipeId = null;
+        this.state = 'ready';
+    }
+
+    // ============================================================================
+    // Private Helpers
+    // ============================================================================
+
     private bindEnvironmentTexturesToProgram(
         program: WebGLProgram,
         width: number,
@@ -371,29 +357,22 @@ class Engine {
     ): void {
         this.gl.useProgram(program);
 
-        // Bind environment map texture
         const locEnv = this.gl.getUniformLocation(program, 'u_env_map');
         if (locEnv) this.textureRegistry.bind('env_map', locEnv);
 
-        // Bind CDF textures
         const locCond = this.gl.getUniformLocation(program, 'u_env_cdf_conditional');
         if (locCond) this.textureRegistry.bind('env_cdf_cond', locCond);
 
         const locMarg = this.gl.getUniformLocation(program, 'u_env_cdf_marginal');
         if (locMarg) this.textureRegistry.bind('env_cdf_marg', locMarg);
 
-        // Bind size uniform
         const locSize = this.gl.getUniformLocation(program, 'u_env_size');
         if (locSize) this.gl.uniform2f(locSize, width, height);
 
-        // Bind total weight uniform
         const locTot = this.gl.getUniformLocation(program, 'u_env_totalWeight');
         if (locTot) this.gl.uniform1f(locTot, totalWeight);
     }
 
-    /**
-     * Extract modules from recipe in MODULE_ORDER
-     */
     private extractModules(recipe: Recipe): ModuleDescriptor[] {
         return [
             recipe.world.ambient,
@@ -408,12 +387,10 @@ class Engine {
         ];
     }
 
-
     private handleContextLoss(): void {
         console.error('WebGL context lost - rendering stopped');
-        this.state = 'ready'; // Can't render anymore
+        this.state = 'ready';
         this.resources.handleContextLoss();
-        // Note: Renderer would need to be recreated to continue
     }
 }
 

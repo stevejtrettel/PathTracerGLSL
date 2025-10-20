@@ -3,35 +3,32 @@ import type { Engine } from '../engine/Engine';
 import type { EventBus } from './EventBus';
 
 type RenderMode = 'interactive' | 'progressive' | 'production';
-
 type RenderState = 'idle' | 'rendering' | 'paused' | 'complete' | 'reset';
 
 interface ProgressInfo {
     mode: RenderMode;
     state: RenderState;
     timestamp: number;
-
-    // Progressive & Production
     samples?: number;
     elapsedTime?: number;
-
-    // Interactive
     fps?: number;
     frameTime?: number;
-
-    // Production
     percentComplete?: number;
     targetSamples?: number;
-
-    // Reset
     reason?: string;
 }
 
+interface ProductionConfig {
+    targetSamples: number;
+}
+
 /**
- * RenderCoordinator manages rendering execution across three modes:
- * - Interactive: Real-time preview, reports FPS
- * - Progressive: Continuous accumulation, reports samples
- * - Production: Accumulate to target, reports progress
+ * RenderCoordinator - Manages rendering execution across three modes
+ *
+ * Modes:
+ * - Interactive: Real-time preview with FPS reporting
+ * - Progressive: Continuous accumulation until manually stopped
+ * - Production: Accumulate to target sample count
  */
 class RenderCoordinator {
     private engine: Engine;
@@ -41,14 +38,16 @@ class RenderCoordinator {
     private animationId?: number;
     private startTime = 0;
 
-    // Reset rules (moved from App)
+    // Reset rules
     private resetPrefixes = ['camera.', 'quad.', 'material.', 'scene.'];
     private noResetPrefixes = ['developer.', 'debug.', 'resolution'];
 
-    // Production mode target (hardcoded for now)
-    private readonly PRODUCTION_TARGET_SAMPLES = 1000;
+    // Production mode configuration
+    private productionConfig: ProductionConfig = {
+        targetSamples: 1000
+    };
 
-    // Progress reporting callback
+    // Progress reporting
     public onProgress?: (info: ProgressInfo) => void;
 
     constructor(engine: Engine, bus: EventBus) {
@@ -64,18 +63,25 @@ class RenderCoordinator {
     }
 
     /**
-     * Set render mode (stops current rendering if active)
+     * Set render mode
      */
     setMode(mode: RenderMode): void {
         if (this.running) {
             this.stop();
         }
         this.mode = mode;
-        console.log(`Render mode set to: ${mode}`);
+        console.log(`Render mode: ${mode}`);
     }
 
     /**
-     * Start rendering in current mode
+     * Configure production mode settings
+     */
+    configure(config: Partial<ProductionConfig>): void {
+        this.productionConfig = { ...this.productionConfig, ...config };
+    }
+
+    /**
+     * Start rendering
      */
     start(): void {
         if (this.running) {
@@ -88,7 +94,6 @@ class RenderCoordinator {
 
         console.log(`Starting ${this.mode} mode`);
 
-        // Dispatch to mode-specific implementation
         switch (this.mode) {
             case 'interactive':
                 this.runInteractive();
@@ -131,10 +136,10 @@ class RenderCoordinator {
     }
 
     /**
-     * Determine if a parameter change requires accumulation reset
+     * Check if parameter change requires accumulation reset
      */
     shouldResetForParameter(path: string): boolean {
-        // Check no-reset list first (higher priority)
+        // Check no-reset list first
         for (const prefix of this.noResetPrefixes) {
             if (path.startsWith(prefix)) {
                 return false;
@@ -148,18 +153,16 @@ class RenderCoordinator {
             }
         }
 
-        // Conservative default: reset for unknown parameters
+        // Conservative default for unknown parameters
         console.warn(`Unknown parameter prefix: ${path}, resetting accumulation`);
         return true;
     }
 
     /**
-     * Reset accumulation (clears buffers and sample count)
+     * Reset accumulation
      */
     resetAccumulation(reason: string = 'manual'): void {
         this.engine.clearAccumulation();
-
-        // Reset the timer!
         this.startTime = performance.now();
 
         this.reportProgress({
@@ -168,32 +171,22 @@ class RenderCoordinator {
             reason
         });
 
-        // Emit reset event for extensions
         this.bus.emit('accumulation.reset', { reason });
-
         console.log(`Accumulation reset: ${reason}`);
     }
 
     // ============================================================================
-    // Private: Mode Implementations
+    // Private: Render Loops
     // ============================================================================
 
-    /**
-     * Interactive mode: Real-time preview, reports FPS
-     * Continuously renders, prioritizes responsiveness
-     */
     private runInteractive(): void {
         const loop = () => {
             if (!this.running || this.mode !== 'interactive') return;
 
             const frameStart = performance.now();
-
-            // Render one frame
             this.engine.renderFrame();
-
             const frameTime = performance.now() - frameStart;
 
-            // Report FPS
             this.reportProgress({
                 state: 'rendering',
                 fps: 1000 / frameTime,
@@ -207,23 +200,15 @@ class RenderCoordinator {
         this.animationId = requestAnimationFrame(loop);
     }
 
-    /**
-     * Progressive mode: Continuous accumulation, reports samples
-     * Renders forever until manually stopped
-     */
     private runProgressive(): void {
         const loop = () => {
             if (!this.running || this.mode !== 'progressive') return;
 
-            // Render one frame (adds one sample)
             this.engine.renderFrame();
 
-            const samples = this.engine.sampleCount;
-
-            // Report progress every frame
             this.reportProgress({
                 state: 'rendering',
-                samples,
+                samples: this.engine.sampleCount,
                 elapsedTime: performance.now() - this.startTime
             });
 
@@ -233,24 +218,22 @@ class RenderCoordinator {
         this.animationId = requestAnimationFrame(loop);
     }
 
-    /**
-     * Production mode: Accumulate to target, reports progress
-     * Stops automatically when target samples reached
-     */
     private runProduction(): void {
+        const targetSamples = this.productionConfig.targetSamples;
+
         const loop = () => {
             if (!this.running || this.mode !== 'production') return;
 
             const samples = this.engine.sampleCount;
 
-            // Check if target reached
-            if (samples >= this.PRODUCTION_TARGET_SAMPLES) {
+            // Check completion
+            if (samples >= targetSamples) {
                 this.running = false;
 
                 this.reportProgress({
                     state: 'complete',
                     samples,
-                    targetSamples: this.PRODUCTION_TARGET_SAMPLES,
+                    targetSamples,
                     percentComplete: 100,
                     elapsedTime: performance.now() - this.startTime
                 });
@@ -259,18 +242,15 @@ class RenderCoordinator {
                 return;
             }
 
-            // Render one frame
             this.engine.renderFrame();
 
-            // Report progress every 10 samples
+            // Report progress periodically
             if (samples % 10 === 0) {
-                const percent = (samples / this.PRODUCTION_TARGET_SAMPLES) * 100;
-
                 this.reportProgress({
                     state: 'rendering',
                     samples,
-                    targetSamples: this.PRODUCTION_TARGET_SAMPLES,
-                    percentComplete: percent,
+                    targetSamples,
+                    percentComplete: (samples / targetSamples) * 100,
                     elapsedTime: performance.now() - this.startTime
                 });
             }
@@ -281,20 +261,15 @@ class RenderCoordinator {
         this.animationId = requestAnimationFrame(loop);
     }
 
-    /**
-     * Report progress via callback
-     */
     private reportProgress(info: Partial<ProgressInfo>): void {
         if (!this.onProgress) return;
 
-        const fullInfo: ProgressInfo = {
+        this.onProgress({
             mode: this.mode,
             state: 'rendering',
             timestamp: performance.now(),
             ...info
-        };
-
-        this.onProgress(fullInfo);
+        } as ProgressInfo);
     }
 }
 

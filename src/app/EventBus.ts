@@ -3,8 +3,16 @@
 type EventHandler = (data?: any) => void;
 
 /**
- * Simple event bus for loose coupling between components
- * Enables pub/sub communication without direct dependencies
+ * EventBus - Simple pub/sub for loose coupling between components
+ *
+ * Common events:
+ * - render.started, render.stopped, render.complete
+ * - render.progress - ProgressInfo
+ * - parameter.changed - ParameterChanges
+ * - accumulation.reset - { reason: string }
+ * - recipe.switched - { recipeId: string }
+ * - session.saved, session.loaded
+ * - extension.installed - { name: string, version: string }
  */
 class EventBus {
     private listeners = new Map<string, EventHandler[]>();
@@ -16,7 +24,6 @@ class EventBus {
         if (!this.listeners.has(event)) {
             this.listeners.set(event, []);
         }
-
         this.listeners.get(event)!.push(handler);
     }
 
@@ -32,21 +39,19 @@ class EventBus {
             handlers.splice(index, 1);
         }
 
-        // Clean up empty arrays
         if (handlers.length === 0) {
             this.listeners.delete(event);
         }
     }
 
     /**
-     * Subscribe to an event for one-time notification
+     * Subscribe for one-time notification
      */
     once(event: string, handler: EventHandler): void {
         const onceHandler: EventHandler = (data) => {
             handler(data);
             this.off(event, onceHandler);
         };
-
         this.on(event, onceHandler);
     }
 
@@ -57,19 +62,17 @@ class EventBus {
         const handlers = this.listeners.get(event);
         if (!handlers) return;
 
-        // Call handlers in order
         for (const handler of handlers) {
             try {
                 handler(data);
             } catch (error) {
                 console.error(`Error in event handler for '${event}':`, error);
-                // Continue with other handlers even if one fails
             }
         }
     }
 
     /**
-     * Remove all listeners for an event (or all events)
+     * Remove all listeners for an event (or all events if no event specified)
      */
     removeAllListeners(event?: string): void {
         if (event) {
@@ -80,14 +83,14 @@ class EventBus {
     }
 
     /**
-     * Get count of listeners for an event
+     * Get listener count for an event
      */
     listenerCount(event: string): number {
         return this.listeners.get(event)?.length || 0;
     }
 
     /**
-     * Get list of all event names with listeners
+     * Get all event names that have listeners
      */
     eventNames(): string[] {
         return Array.from(this.listeners.keys());

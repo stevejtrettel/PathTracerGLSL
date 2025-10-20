@@ -21,7 +21,9 @@ export interface TileJob {
     config: TileJobConfig;
     grid: TileGrid;
     currentTile: [number, number];
+    currentTileNumber: number;
     completedTiles: [number, number][];
+    completedTileCount: number;
     jobId: string;
     startTime: number;
     state: 'running' | 'paused' | 'complete';
@@ -44,24 +46,16 @@ export class TiledRenderer {
     calculateGrid(config: TileJobConfig): TileGrid {
         const { targetWidth, targetHeight, targetTileSize } = config;
 
-        // Number of tiles (round up)
         const tilesX = Math.ceil(targetWidth / targetTileSize);
         const tilesY = Math.ceil(targetHeight / targetTileSize);
-
-        // Actual tile size (divide evenly)
         const tileWidth = Math.ceil(targetWidth / tilesX);
         const tileHeight = Math.ceil(targetHeight / tilesY);
 
-        return {
-            tilesX,
-            tilesY,
-            tileWidth,
-            tileHeight
-        };
+        return { tilesX, tilesY, tileWidth, tileHeight };
     }
 
     /**
-     * Start a new tiled render job (auto-renders all tiles)
+     * Start a new tiled render job
      */
     startJob(config: TileJobConfig): void {
         if (this.currentJob) {
@@ -80,18 +74,20 @@ export class TiledRenderer {
             config,
             grid,
             currentTile: [0, 0],
+            currentTileNumber: 0,
             completedTiles: [],
+            completedTileCount: 0,
             jobId: this.generateJobId(),
             startTime: Date.now(),
             state: 'running'
         };
 
-        // Start rendering tiles automatically
+        this.app.sessionManager.save(`${this.currentJob.jobId}_session.json`);
         this.renderNextTile();
     }
 
     /**
-     * Get current job (for session saving)
+     * Get current job state
      */
     getCurrentJob(): TileJob | null {
         return this.currentJob;
@@ -106,31 +102,36 @@ export class TiledRenderer {
         this.currentJob.state = 'paused';
         this.app.renderCoordinator.stop();
 
-        console.log(`Job paused at tile [${this.currentJob.currentTile}]`);
-        console.log(`Completed: ${this.currentJob.completedTiles.length}/${this.currentJob.grid.tilesX * this.currentJob.grid.tilesY}`);
+        const { completedTileCount, grid } = this.currentJob;
+        const totalTiles = grid.tilesX * grid.tilesY;
+
+        console.log(`Job paused at tile ${this.currentJob.currentTileNumber}`);
+        console.log(`Completed: ${completedTileCount}/${totalTiles}`);
     }
 
     /**
-     * Resume a job from session
+     * Resume job from session
      */
     resumeJob(job: TileJob): void {
+        // Convert tile number to grid coordinates if needed
+        if (job.currentTileNumber !== undefined) {
+            job.currentTile = this.tileNumberToCoords(job.currentTileNumber, job.grid.tilesX);
+        }
+
         this.currentJob = job;
-        this.currentJob.state = 'running';  // CRITICAL: Set to running
+        this.currentJob.state = 'running';
 
-        console.log(`Resuming tiled render from tile [${job.currentTile}]`);
-        console.log(`Completed: ${job.completedTiles.length}/${job.grid.tilesX * job.grid.tilesY} tiles`);
+        const totalTiles = job.grid.tilesX * job.grid.tilesY;
+        console.log(`Resuming from tile ${job.currentTileNumber} [${job.currentTile}]`);
+        console.log(`Completed: ${job.completedTileCount}/${totalTiles}`);
 
-        // Start rendering immediately
         this.renderNextTile();
     }
 
     // ============================================================================
-    // Private: Auto-Continuation
+    // Private: Rendering
     // ============================================================================
 
-    /**
-     * Render next tile in sequence (recursive)
-     */
     private async renderNextTile(): Promise<void> {
         if (!this.currentJob || this.currentJob.state !== 'running') return;
 
@@ -142,47 +143,32 @@ export class TiledRenderer {
             return;
         }
 
-        console.log(`\n[${this.currentJob.completedTiles.length + 1}/${grid.tilesX * grid.tilesY}] Rendering tile [${tx}, ${ty}]...`);
+        const totalTiles = grid.tilesX * grid.tilesY;
+        console.log(`\n[${this.currentJob.completedTileCount + 1}/${totalTiles}] Tile ${this.currentJob.currentTileNumber} [${tx}, ${ty}]`);
 
-        // 1. Resize framebuffer to tile dimensions
+        // Setup rendering environment
         this.app.handleResize(grid.tileWidth, grid.tileHeight);
-
-        // 2. Set full image size (camera needs this!)
         this.app.engine.setImageSize(config.targetWidth, config.targetHeight);
+        this.app.engine.setPixelOffset(tx * grid.tileWidth, ty * grid.tileHeight);
 
-        // 3. Set pixel offset
-        const offsetX = tx * grid.tileWidth;
-        const offsetY = ty * grid.tileHeight;
-        this.app.engine.setPixelOffset(offsetX, offsetY);
-
-        console.log(`  Framebuffer: ${grid.tileWidth}×${grid.tileHeight}`);
-        console.log(`  Image size: ${config.targetWidth}×${config.targetHeight}`);
-        console.log(`  Offset: [${offsetX}, ${offsetY}]`);
-
-        // 4. Clear and render
+        // Render tile
         this.app.renderCoordinator.resetAccumulation('tile_start');
         await this.renderToCompletion(config.samplesPerTile);
 
-        // 5. Read and save tile
+        // Save and advance
         await this.saveTile(tx, ty);
-
-        // 6. Mark complete and advance
         this.currentJob.completedTiles.push([tx, ty]);
+        this.currentJob.completedTileCount++;
         this.advanceToNextTile();
 
-        // 7. Continue to next tile
+        // Continue
         this.renderNextTile();
     }
 
-    /**
-     * Wait for rendering to reach target samples
-     */
     private async renderToCompletion(targetSamples: number): Promise<void> {
         return new Promise<void>((resolve) => {
             const checkComplete = () => {
-                const current = this.app.engine.sampleCount;
-
-                if (current >= targetSamples) {
+                if (this.app.engine.sampleCount >= targetSamples) {
                     this.app.renderCoordinator.stop();
                     resolve();
                 } else {
@@ -190,7 +176,6 @@ export class TiledRenderer {
                 }
             };
 
-            // Only start if not already running
             if (!this.app.renderCoordinator.isRunning()) {
                 this.app.renderCoordinator.start();
             }
@@ -199,12 +184,11 @@ export class TiledRenderer {
         });
     }
 
-    /**
-     * Advance to next tile position
-     */
     private advanceToNextTile(): void {
-        const [tx, ty] = this.currentJob!.currentTile;
-        const { tilesX } = this.currentJob!.grid;
+        if (!this.currentJob) return;
+
+        const [tx, ty] = this.currentJob.currentTile;
+        const { tilesX } = this.currentJob.grid;
 
         let nextX = tx + 1;
         let nextY = ty;
@@ -214,12 +198,10 @@ export class TiledRenderer {
             nextY++;
         }
 
-        this.currentJob!.currentTile = [nextX, nextY];
+        this.currentJob.currentTile = [nextX, nextY];
+        this.currentJob.currentTileNumber = this.coordsToTileNumber(nextX, nextY, tilesX);
     }
 
-    /**
-     * Job complete
-     */
     private completeJob(): void {
         if (!this.currentJob) return;
 
@@ -233,31 +215,25 @@ export class TiledRenderer {
         console.log(`Total time: ${(elapsed / 60).toFixed(1)} minutes`);
         console.log(`Avg per tile: ${(elapsed / totalTiles).toFixed(1)}s`);
 
-        // Clear tiling state
+        // Cleanup
         this.app.engine.clearPixelOffset();
-        this.app.engine.clearImageSize();  // ADD THIS
-
-        // Restore normal resolution
+        this.app.engine.clearImageSize();
         this.app.handleResize(window.innerWidth, window.innerHeight);
 
         this.currentJob = null;
     }
 
     // ============================================================================
-    // Private: File Saving
+    // Private: File Operations
     // ============================================================================
 
-    /**
-     * Save tile as HDR and/or PNG
-     */
     private async saveTile(tx: number, ty: number): Promise<void> {
-        const { config, grid, jobId } = this.currentJob!;
-        const executor = this.app.engine['executor'];
+        if (!this.currentJob) return;
 
-        // Generate filename
+        const { config, grid, jobId } = this.currentJob;
+        const executor = this.app.engine['executor'];
         const filename = `${jobId}_tile_${String(tx).padStart(2, '0')}_${String(ty).padStart(2, '0')}_${config.samplesPerTile}spp`;
 
-        // Save based on format
         if (config.format === 'hdr' || config.format === 'both') {
             const radiance = executor.readRadiance();
             saveHDRFile(radiance, grid.tileWidth, grid.tileHeight, `${filename}.hdr`);
@@ -271,9 +247,6 @@ export class TiledRenderer {
         console.log(`  ✓ Saved: ${filename}`);
     }
 
-    /**
-     * Generate unique job ID for file naming
-     */
     private generateJobId(): string {
         const now = new Date();
         const year = now.getFullYear();
@@ -283,5 +256,19 @@ export class TiledRenderer {
         const minutes = String(now.getMinutes()).padStart(2, '0');
 
         return `job_${year}_${month}${day}_${hours}${minutes}`;
+    }
+
+    // ============================================================================
+    // Private: Helpers
+    // ============================================================================
+
+    private tileNumberToCoords(tileNumber: number, tilesX: number): [number, number] {
+        const tx = tileNumber % tilesX;
+        const ty = Math.floor(tileNumber / tilesX);
+        return [tx, ty];
+    }
+
+    private coordsToTileNumber(tx: number, ty: number, tilesX: number): number {
+        return ty * tilesX + tx;
     }
 }
