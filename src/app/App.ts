@@ -1,21 +1,30 @@
 // app/App.ts
 import { Engine } from '../engine/Engine';
 import { ParameterStore } from './ParameterStore';
-import { FrameStats } from './FrameStats';
 import { RenderCoordinator } from './RenderCoordinator';
+import { EventBus } from './EventBus';
 import type { Recipe } from '../engine/types';
+import type { Extension } from './types';
 
 /**
  * App manages orchestration and user interactions
  * RenderCoordinator handles execution
+ * Extensions add features
  */
 class App {
+    // Core components (public for extensions)
     engine: Engine;
     parameterStore: ParameterStore;
     renderCoordinator: RenderCoordinator;
-    private frameStats: FrameStats;
+
+    // Extension system
+    private bus: EventBus;
+    private extensions = new Map<string, Extension>();
+    private services = new Map<string, any>();
+
+    // Internal components
     private currentRecipeId: string | null = null;
-    private isSwitchingRecipe = false;  // Flag to prevent reset during recipe switch
+    private isSwitchingRecipe = false;
 
     constructor(canvas: HTMLCanvasElement) {
         // Set up canvas size
@@ -34,16 +43,31 @@ class App {
         // Create architecture components
         this.engine = new Engine(gl);
         this.parameterStore = new ParameterStore();
-        this.renderCoordinator = new RenderCoordinator(this.engine);
-        this.frameStats = new FrameStats();
 
-        // Set initial resolution
-        this.frameStats.setResolution(canvas.width, canvas.height);
+
+        this.bus = new EventBus();        // Create extension system
+
+        //coordinate rendering
+        this.renderCoordinator = new RenderCoordinator(this.engine, this.bus);
+
+
+
+
+
+        // Register core services
+        this.registerService('app', this);
+        this.registerService('engine', this.engine);
+        this.registerService('parameters', this.parameterStore);
+        this.registerService('coordinator', this.renderCoordinator);
+
 
         // Wire parameter store to engine AND coordinator
         this.parameterStore.onChange = (changes) => {
             // Update uniforms
             this.engine.updateParameters(changes);
+
+            // Emit parameter change event
+            this.bus.emit('parameter.changed', changes);
 
             // Skip reset check if we're switching recipes
             if (this.isSwitchingRecipe) return;
@@ -60,16 +84,81 @@ class App {
 
         // Wire progress reporting
         this.renderCoordinator.onProgress = (info) => {
-            // Update frame stats based on mode
-            if (info.mode === 'progressive' || info.mode === 'production') {
-                this.frameStats.update(info.samples || 0);
-            }
+
+            // Emit progress event for extensions
+            this.bus.emit('render.progress', info);
 
             // Could add more sophisticated reporting here
             if (info.state === 'complete') {
                 console.log(`Render complete: ${info.samples} samples in ${(info.elapsedTime! / 1000).toFixed(1)}s`);
+                this.bus.emit('render.complete', info);
             }
         };
+    }
+
+    /**
+     * Install an extension
+     */
+    use(extension: Extension): App {
+        // Check dependencies
+        for (const dep of extension.dependencies || []) {
+            if (!this.extensions.has(dep)) {
+                throw new Error(
+                    `Extension '${extension.name}' requires '${dep}' to be installed first`
+                );
+            }
+        }
+
+        // Check for name collision
+        if (this.extensions.has(extension.name)) {
+            throw new Error(`Extension '${extension.name}' is already installed`);
+        }
+
+        // Install extension
+        console.log(`Installing extension: ${extension.name}`);
+
+        try {
+            extension.install(this, this.bus);
+            this.extensions.set(extension.name, extension);
+
+            // Emit installation event
+            this.bus.emit('extension.installed', {
+                name: extension.name,
+                version: extension.version
+            });
+
+        } catch (error) {
+            console.error(`Failed to install extension '${extension.name}':`, error);
+            throw error;
+        }
+
+        return this; // For chaining
+    }
+
+    /**
+     * Register a service for extension discovery
+     */
+    registerService(name: string, service: any): void {
+        if (this.services.has(name)) {
+            console.warn(`Service '${name}' already registered, replacing`);
+        }
+
+        this.services.set(name, service);
+        this.bus.emit('service.registered', { name });
+    }
+
+    /**
+     * Get a registered service
+     */
+    getService<T = any>(name: string): T | undefined {
+        return this.services.get(name);
+    }
+
+    /**
+     * Check if a service is registered
+     */
+    hasService(name: string): boolean {
+        return this.services.has(name);
     }
 
     /**
@@ -100,6 +189,7 @@ class App {
 
         // 4. Start rendering (via coordinator)
         this.renderCoordinator.start();
+        this.bus.emit('render.started');
 
         console.log('App initialized with recipes:', this.engine.getAvailableRecipes());
     }
@@ -146,6 +236,9 @@ class App {
 
         // Clear flag
         this.isSwitchingRecipe = false;
+
+        // Emit recipe switch event
+        this.bus.emit('recipe.switched', { recipeId });
     }
 
     /**
@@ -159,6 +252,9 @@ class App {
         setTimeout(() => {
             this.parameterStore.set('accumulator.reset', false);
         }, 100);
+
+        // Emit reset event
+        this.bus.emit('accumulation.reset');
     }
 
     /**
@@ -167,8 +263,10 @@ class App {
     toggleRendering(): void {
         if (this.renderCoordinator.isRunning()) {
             this.renderCoordinator.stop();
+            this.bus.emit('render.stopped');
         } else {
             this.renderCoordinator.start();
+            this.bus.emit('render.started');
         }
     }
 
@@ -176,7 +274,6 @@ class App {
      * Handle window/canvas resize
      */
     handleResize(width: number, height: number): void {
-        this.frameStats.setResolution(width, height);
         this.parameterStore.set('resolution', [width, height]);
         // TODO: ResourceManager resize if needed
     }
@@ -185,9 +282,21 @@ class App {
      * Clean up resources
      */
     dispose(): void {
+        // Uninstall extensions in reverse order
+        const extensions = Array.from(this.extensions.values()).reverse();
+        for (const extension of extensions) {
+            if (extension.uninstall) {
+                try {
+                    extension.uninstall();
+                } catch (error) {
+                    console.error(`Error uninstalling extension '${extension.name}':`, error);
+                }
+            }
+        }
+
         this.renderCoordinator.stop();
-        this.frameStats.dispose();
         this.engine.dispose();
+        this.bus.removeAllListeners();
     }
 }
 

@@ -1,5 +1,6 @@
 // app/RenderCoordinator.ts
 import type { Engine } from '../engine/Engine';
+import type { EventBus } from './EventBus';
 
 type RenderMode = 'interactive' | 'progressive' | 'production';
 
@@ -34,6 +35,7 @@ interface ProgressInfo {
  */
 class RenderCoordinator {
     private engine: Engine;
+    private bus: EventBus;
     private mode: RenderMode = 'progressive';
     private running = false;
     private animationId?: number;
@@ -49,8 +51,9 @@ class RenderCoordinator {
     // Progress reporting callback
     public onProgress?: (info: ProgressInfo) => void;
 
-    constructor(engine: Engine) {
+    constructor(engine: Engine, bus: EventBus) {
         this.engine = engine;
+        this.bus = bus;
     }
 
     /**
@@ -156,11 +159,17 @@ class RenderCoordinator {
     resetAccumulation(reason: string = 'manual'): void {
         this.engine.clearAccumulation();
 
+        // Reset the timer!
+        this.startTime = performance.now();
+
         this.reportProgress({
             state: 'reset',
             samples: 0,
             reason
         });
+
+        // Emit reset event for extensions
+        this.bus.emit('accumulation.reset', { reason });
 
         console.log(`Accumulation reset: ${reason}`);
     }
@@ -211,14 +220,12 @@ class RenderCoordinator {
 
             const samples = this.engine.sampleCount;
 
-            // Report progress every 10 samples
-            if (samples % 10 === 0) {
-                this.reportProgress({
-                    state: 'rendering',
-                    samples,
-                    elapsedTime: performance.now() - this.startTime
-                });
-            }
+            // Report progress every frame
+            this.reportProgress({
+                state: 'rendering',
+                samples,
+                elapsedTime: performance.now() - this.startTime
+            });
 
             this.animationId = requestAnimationFrame(loop);
         };

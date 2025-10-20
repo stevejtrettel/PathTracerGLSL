@@ -1,10 +1,13 @@
 import type { ModuleDescriptor } from '../../engine/types.js';
-import {buildFrame} from "./utils/buildFrame";
+import { buildFrame } from "./utils/buildFrame";
 
 /**
  * Pinhole camera module
  * Generates rays from screen coordinates using ideal pinhole camera model
- * Depends on ambient module for geometric operations
+ *
+ * Supports two modes:
+ * 1. Look-at mode: Provide position + target, frame is computed
+ * 2. Direct mode: Provide position + frame directly (for 6DOF controls)
  */
 const pinholeCamera: ModuleDescriptor = {
     id: {
@@ -77,15 +80,31 @@ const pinholeCamera: ModuleDescriptor = {
         },
         {
             uniform: 'u_camera_frame',
-            parameters: ['camera.position', 'camera.target'],
+            parameters: ['camera.position', 'camera.target', 'camera.frame'],
             type: 'mat3',
             compute: (params) => {
-                const frame = buildFrame(params['camera.position'], params['camera.target']);
-                return frame;
+                // Mode 1: Direct frame (for 6DOF controls)
+                // If camera.frame is explicitly set, use it directly
+                if (params['camera.frame']) {
+                    return params['camera.frame'];
+                }
+
+                // Mode 2: Look-at frame (for orbit controls)
+                // Build frame from position + target
+                if (params['camera.position'] && params['camera.target']) {
+                    return buildFrame(params['camera.position'], params['camera.target']);
+                }
+
+                // Fallback: identity frame (shouldn't happen in practice)
+                console.warn('Camera: Neither frame nor position+target provided, using identity');
+                return new Float32Array([
+                    1, 0, 0,  // right
+                    0, 1, 0,  // up
+                    0, 0, 1   // forward
+                ]);
             }
         }
     ],
-
 
     exports: ['camera_generateRay']
 };

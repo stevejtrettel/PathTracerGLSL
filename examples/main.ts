@@ -19,6 +19,13 @@ import { averagingAccumulator } from '../src/optics/accumulator/average-accumula
 import { oneshotAccumulator } from '../src/optics/accumulator/oneshot-accumulator.js';
 import { gammaDeveloper } from '../src/optics/developer/gamma-developer.js';
 
+
+import { OrbitControls } from "../src/app/extensions/OrbitControls";
+import { KeyboardControls } from "../src/app/extensions/KeyboardControls";
+import { StatsPanelExtension } from "../src/app/extensions/StatsPanel";
+
+
+
 // HDR environment
 import envHDRI from '/hdri/autumn_field_1k.hdr';
 
@@ -111,6 +118,12 @@ async function main() {
 
     // Initialize with recipes, HDR, and parameters
     await app.initialize(recipes, envHDRI, parameters);
+
+
+
+    app.use(new KeyboardControls());
+
+    app.use(new StatsPanelExtension());
 
     // Setup keyboard controls (1 = pathtracer, 2 = albedo, R = reset)
     app.setupKeyboardControls();

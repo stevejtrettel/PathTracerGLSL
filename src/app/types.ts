@@ -2,7 +2,6 @@
 
 import type { ModuleDescriptor } from '../engine/types';
 
-
 export interface RenderConfiguration {
     name: string;
     description?: string;
@@ -57,8 +56,35 @@ interface ParameterChanges {
 }
 
 
+/**
+ * Extensions!
+ */
+interface Extension {
+    name: string;
+    version?: string;
+    description?: string;
+    dependencies?: string[];
+
+    install(app: any, bus: any): void;  // app as 'any' to avoid circular import
+    uninstall?(): void;
+
+    saveState?(): any;
+    restoreState?(state: any): void;
+}
+
+
+
+/**
+ * Event handler type for EventBus
+ */
+type EventHandler = (data?: any) => void;
+
+
+
 export type {
     ParameterMetadata,
     ParameterChange,
     ParameterChanges,
+    Extension,
+    EventHandler
 };
