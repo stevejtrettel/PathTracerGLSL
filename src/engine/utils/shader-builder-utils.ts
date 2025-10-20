@@ -10,7 +10,8 @@ import rngSystem from '../../math/random/rng-system.glsl?raw'
 export function generateMainFunction(): string {
     return `
 void main(){
-    vec2 pixel = gl_FragCoord.xy;
+
+    vec2 pixel = gl_FragCoord.xy + u_pixel_offset;
     
     // Initialize RNG seed once per pixel
     // robust seed from pixel + frame
@@ -36,10 +37,12 @@ export function buildMainShaderSource(modules: ModuleDescriptor[]): string {
     parts.push(commonStructsGLSL);
     parts.push('');
     parts.push('// ============ ENGINE UNIFORMS ============');
-    parts.push('uniform vec2 u_resolution;');
+    parts.push('uniform vec2 u_resolution;');      // Framebuffer
+    parts.push('uniform vec2 u_image_size;');      // Full image (camera uses this)
     parts.push('uniform int u_frame_index;');
     parts.push('uniform float u_time;');
     parts.push('uniform int u_sample_count;');
+    parts.push('uniform vec2 u_pixel_offset;');
     parts.push('');
 
     // Add the RNG system

@@ -31,11 +31,11 @@ const pinholeCamera: ModuleDescriptor = {
           vec2 jittered_pixel = pixel + (xi - 0.5);
     
          // Now convert to NDC using the jittered position
-         vec2 ndc = (2.0 * jittered_pixel / u_resolution) - 1.0;
+         vec2 ndc = (2.0 * jittered_pixel / u_image_size) - 1.0;
 
         
         // Account for aspect ratio - correct x coordinate
-        float aspect = u_resolution.x / u_resolution.y;
+        float aspect = u_image_size.x / u_image_size.y;
         ndc.x *= aspect;
         
         // Convert to camera space direction using field of view

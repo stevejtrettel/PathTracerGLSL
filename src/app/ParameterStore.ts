@@ -91,6 +91,74 @@ class ParameterStore {
         return this.parameters.get(path);
     }
 
+
+    /**
+     * Export all parameters for session saving
+     */
+    serialize(): Record<string, any> {
+        const obj: Record<string, any> = {};
+
+        for (const [key, value] of this.parameters.entries()) {
+            // Handle special types
+            if (value instanceof Float32Array) {
+                obj[key] = Array.from(value);
+            } else if (Array.isArray(value)) {
+                obj[key] = [...value];  // Copy arrays
+            } else if (value && typeof value === 'object') {
+                obj[key] = JSON.parse(JSON.stringify(value));  // Deep copy objects
+            } else {
+                obj[key] = value;
+            }
+        }
+
+        return obj;
+    }
+
+    /**
+     * Import parameters without triggering onChange
+     * Used when loading sessions
+     */
+    restore(params: Record<string, any>): void {
+        // Disable onChange during bulk restore
+        const oldOnChange = this._onChange;
+        this._onChange = null;
+
+        // Clear existing parameters
+        this.parameters.clear();
+
+        // Restore each parameter
+        for (const [key, value] of Object.entries(params)) {
+            // Convert arrays back to Float32Array for certain parameters
+            if (key === 'camera.frame' && Array.isArray(value)) {
+                this.parameters.set(key, new Float32Array(value));
+            } else if (Array.isArray(value)) {
+                this.parameters.set(key, [...value]);  // Copy arrays
+            } else {
+                this.parameters.set(key, value);
+            }
+        }
+
+        // Re-enable onChange
+        this._onChange = oldOnChange;
+
+        // Send all parameters to GPU in one batch
+        if (this._onChange) {
+            this._onChange({
+                changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
+                    path,
+                    oldValue: undefined,
+                    newValue: value
+                }))
+            });
+        }
+    }
+
+
+
+
+
+
+
     /**
      * Helper to compare values including arrays
      */

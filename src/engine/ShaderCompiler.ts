@@ -81,10 +81,13 @@ class ShaderCompiler {
 
         this.gl.useProgram(this.activeProgram);
 
-        this.setEngineUniform('u_resolution', uniforms.resolution, 'vec2');
+        this.setEngineUniform('u_resolution', uniforms.resolution, 'vec2');  // framebuffer size
+        this.setEngineUniform('u_image_size', uniforms.imageSize, 'vec2');  // overall image size
         this.setEngineUniform('u_frame_index', uniforms.frameIndex, 'int');
         this.setEngineUniform('u_time', uniforms.time, 'float');
         this.setEngineUniform('u_sample_count', uniforms.sampleCount, 'int');
+        this.setEngineUniform('u_pixel_offset', uniforms.pixelOffset, 'vec2');
+
     }
 
     private setEngineUniform(name: string, value: any, type: UniformType): void {

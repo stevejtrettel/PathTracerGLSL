@@ -44,6 +44,8 @@ class Engine {
     // Engine state tracking
     private _time: number = 0;
     private startTime: number;
+    private pixelOffset: [number, number] = [0, 0];
+    private imageSize: [number, number] = [0, 0];  //idk why it set to zero!
 
     get time(): number {
         return this._time;
@@ -242,11 +244,21 @@ class Engine {
         // 2. Update engine uniforms (time, resolution, etc.)
         this._time = (performance.now() - this.startTime) / 1000;
         const sampleCount = this.resources.getSampleCount();
+        const width = this.gl.canvas.width;
+        const height = this.gl.canvas.height;
+
+        // If imageSize not set, default to resolution (normal rendering)
+        const imgSize: [number, number] = this.imageSize[0] > 0
+            ? this.imageSize
+            : [width, height];
+
         this.compiler.updateEngineUniforms({
-            resolution: [this.gl.canvas.width, this.gl.canvas.height],
-            frameIndex:  sampleCount,
+            resolution: [width, height],
+            imageSize: imgSize,  // ADD THIS
+            frameIndex: sampleCount,
             time: this._time,
-            sampleCount: sampleCount
+            sampleCount: sampleCount,
+            pixelOffset: this.pixelOffset
         });
 
         // 3. Execute main pass (accumulate radiance)
@@ -268,6 +280,35 @@ class Engine {
     clearAccumulation(): void {
         this.resources.clearAccumulationBuffers();
         this.resources.resetSampleCount();
+    }
+
+    /**
+     * Set pixel offset for tiled rendering
+     */
+    setPixelOffset(x: number, y: number): void {
+        this.pixelOffset = [x, y];
+    }
+
+    /**
+     * Clear pixel offset (return to normal rendering)
+     */
+    clearPixelOffset(): void {
+        this.pixelOffset = [0, 0];
+    }
+
+
+    /**
+     * Set image size for tiled rendering (full target image dimensions)
+     */
+    setImageSize(width: number, height: number): void {
+        this.imageSize = [width, height];
+    }
+
+    /**
+     * Clear image size (return to using framebuffer resolution)
+     */
+    clearImageSize(): void {
+        this.imageSize = [0, 0];
     }
 
     /**

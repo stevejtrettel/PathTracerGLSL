@@ -43,7 +43,7 @@ class RenderCoordinator {
 
     // Reset rules (moved from App)
     private resetPrefixes = ['camera.', 'quad.', 'material.', 'scene.'];
-    private noResetPrefixes = ['developer.', 'debug.'];
+    private noResetPrefixes = ['developer.', 'debug.', 'resolution'];
 
     // Production mode target (hardcoded for now)
     private readonly PRODUCTION_TARGET_SAMPLES = 1000;

@@ -81,10 +81,43 @@ type EventHandler = (data?: any) => void;
 
 
 
+interface SessionData {
+    // Metadata
+    version: string;
+    timestamp: number;
+
+    // Core state
+    activeRecipe: string;
+    parameters: Record<string, any>;
+
+    // Render state
+    renderMode: 'interactive' | 'progressive' | 'production';
+    sampleCount: number;
+
+    // Camera
+    camera: {
+        position: [number, number, number];
+        target?: [number, number, number];
+        frame?: number[];  // For KeyboardControls
+        fov?: number;
+    };
+
+    // Extension states
+    extensions: Record<string, any>;
+
+    // Optional metadata
+    metadata?: {
+        title?: string;
+        description?: string;
+    };
+}
+
+
 export type {
     ParameterMetadata,
     ParameterChange,
     ParameterChanges,
     Extension,
-    EventHandler
+    EventHandler,
+    SessionData
 };

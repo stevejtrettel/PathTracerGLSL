@@ -3,8 +3,12 @@ import { Engine } from '../engine/Engine';
 import { ParameterStore } from './ParameterStore';
 import { RenderCoordinator } from './RenderCoordinator';
 import { EventBus } from './EventBus';
+import {SessionManager} from "./SessionManager";
+import { TiledRenderer } from './TiledRenderer.js';
+
 import type { Recipe } from '../engine/types';
 import type { Extension } from './types';
+
 
 /**
  * App manages orchestration and user interactions
@@ -16,6 +20,8 @@ class App {
     engine: Engine;
     parameterStore: ParameterStore;
     renderCoordinator: RenderCoordinator;
+    sessionManager: SessionManager;
+    tiledRenderer: TiledRenderer;
 
     // Extension system
     private bus: EventBus;
@@ -47,9 +53,14 @@ class App {
 
         this.bus = new EventBus();        // Create extension system
 
+
+        this.sessionManager = new SessionManager(this);
+        this.registerService('session', this.sessionManager);
+
         //coordinate rendering
         this.renderCoordinator = new RenderCoordinator(this.engine, this.bus);
 
+        this.tiledRenderer = new TiledRenderer(this);
 
 
 
@@ -59,6 +70,7 @@ class App {
         this.registerService('engine', this.engine);
         this.registerService('parameters', this.parameterStore);
         this.registerService('coordinator', this.renderCoordinator);
+        this.registerService('tiler', this.tiledRenderer);
 
 
         // Wire parameter store to engine AND coordinator
@@ -217,6 +229,19 @@ class App {
             else if (e.key === 'p' || e.key === 'P') {
                 this.testPixelReadback();
             }
+
+            //J = save session
+            else if (e.key === 'j' || e.key === 'J') {
+                e.preventDefault();
+                this.sessionManager.quickSave();
+            }
+
+            // O - Load session
+            else if (e.key === 'o' || e.key === 'O') {
+                e.preventDefault();
+                this.loadSessionFromFile();
+            }
+
         });
     }
 
@@ -347,6 +372,27 @@ class App {
 
         console.log('\n=== Readback Test Complete ===');
     }
+
+    // ADD: File picker for loading
+    private loadSessionFromFile(): void {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) {
+                try {
+                    await this.sessionManager.loadFromFile(file);
+                    console.log('✓ Session loaded successfully');
+                } catch (error) {
+                    console.error('Failed to load session:', error);
+                    alert(`Failed to load session: ${error}`);
+                }
+            }
+        };
+        input.click();
+    }
+
 }
 
 export { App };

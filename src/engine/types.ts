@@ -90,10 +90,12 @@ type EngineState = 'ready' | 'running';
 
 
 interface EngineUniforms {
-    resolution: [number, number];
+    resolution: [number, number];      // Framebuffer size
+    imageSize: [number, number];       // Full image size (for camera)
     frameIndex: number;
     time: number;
     sampleCount: number;
+    pixelOffset: [number, number];  // for tiling
 }
 
 
