@@ -14,11 +14,22 @@ export class SessionManager {
         this.app = app;
     }
 
+
+
     /**
      * Capture complete application state
      */
     captureState(): SessionData {
         console.log('Capturing session state...');
+
+        // Capture tile job first to check if we're tiling
+        const tileJob = this.app.tiledRenderer.getCurrentJob();
+
+        // Capture parameters, but exclude resolution if tiling
+        const parameters = this.app.parameterStore.serialize();
+        if (tileJob) {
+            delete parameters['resolution'];
+        }
 
         const session: SessionData = {
             // Metadata
@@ -27,7 +38,7 @@ export class SessionManager {
 
             // Core state
             activeRecipe: this.app.engine.getActiveRecipeId() || '',
-            parameters: this.app.parameterStore.serialize(),
+            parameters: parameters,
 
             // Render state
             renderMode: this.app.renderCoordinator.getMode(),
@@ -37,7 +48,10 @@ export class SessionManager {
             camera: this.captureCamera(),
 
             // Extensions
-            extensions: this.captureExtensionStates()
+            extensions: this.captureExtensionStates(),
+
+            // Tiling
+            tileJob: tileJob || undefined
         };
 
         console.log('✓ State captured');
@@ -87,11 +101,16 @@ export class SessionManager {
             this.app.renderCoordinator.start();
         }
 
+        // 8. Restore tile job if present
+        if (session.tileJob) {
+            this.app.tiledRenderer.resumeJob(session.tileJob);
+        }
+
         console.log('✓ Session restored');
         this.app.bus.emit('session.loaded', { timestamp: session.timestamp });
     }
 
-    /**
+    /**app.tiledRenderer.stopJob();
      * Save session to file (downloads JSON)
      */
     async save(filename?: string): Promise<string> {

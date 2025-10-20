@@ -115,9 +115,12 @@ export class TiledRenderer {
      */
     resumeJob(job: TileJob): void {
         this.currentJob = job;
+        this.currentJob.state = 'running';  // CRITICAL: Set to running
+
         console.log(`Resuming tiled render from tile [${job.currentTile}]`);
         console.log(`Completed: ${job.completedTiles.length}/${job.grid.tilesX * job.grid.tilesY} tiles`);
 
+        // Start rendering immediately
         this.renderNextTile();
     }
 

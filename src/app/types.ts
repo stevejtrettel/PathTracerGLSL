@@ -80,8 +80,9 @@ interface Extension {
 type EventHandler = (data?: any) => void;
 
 
+import type { TileJob } from './TiledRenderer';  // ADD THIS IMPORT
 
-interface SessionData {
+export interface SessionData {
     // Metadata
     version: string;
     timestamp: number;
@@ -98,12 +99,15 @@ interface SessionData {
     camera: {
         position: [number, number, number];
         target?: [number, number, number];
-        frame?: number[];  // For KeyboardControls
+        frame?: number[];
         fov?: number;
     };
 
     // Extension states
     extensions: Record<string, any>;
+
+    // Tile job state (ADD THIS)
+    tileJob?: TileJob;
 
     // Optional metadata
     metadata?: {
@@ -111,7 +115,6 @@ interface SessionData {
         description?: string;
     };
 }
-
 
 export type {
     ParameterMetadata,
