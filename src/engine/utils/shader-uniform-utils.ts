@@ -1,10 +1,12 @@
-// shader-uniform-utils.ts
+// engine/utils/shader-uniform-utils.ts
 import type { UniformType } from '../types';
 
+// Epsilon for floating point comparison
 const EPSILON = 0.00001;
 
-// ============ UNIFORM SETTING ============
-
+/**
+ * Set a WebGL uniform value with optional type hint
+ */
 export function setUniformValue(
     gl: WebGL2RenderingContext,
     location: WebGLUniformLocation,
@@ -17,6 +19,46 @@ export function setUniformValue(
         setUniformInferred(gl, location, value);
     }
 }
+
+/**
+ * Compare two uniform values for equality
+ */
+export function uniformValuesEqual(a: any, b: any, type?: UniformType): boolean {
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+
+    if (type) {
+        return valuesEqualTyped(a, b, type);
+    }
+    return valuesEqualUntyped(a, b);
+}
+
+/**
+ * Cache all uniform locations for a program
+ */
+export function cacheUniformLocations(
+    gl: WebGL2RenderingContext,
+    program: WebGLProgram
+): Map<string, WebGLUniformLocation> {
+    const locations = new Map<string, WebGLUniformLocation>();
+    const numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+
+    for (let i = 0; i < numUniforms; i++) {
+        const uniformInfo = gl.getActiveUniform(program, i);
+        if (!uniformInfo) continue;
+
+        const location = gl.getUniformLocation(program, uniformInfo.name);
+        if (location) {
+            locations.set(uniformInfo.name, location);
+        }
+    }
+
+    return locations;
+}
+
+// ============================================================================
+// Private: Uniform Setting
+// ============================================================================
 
 function setUniformTyped(
     gl: WebGL2RenderingContext,
@@ -79,17 +121,9 @@ function setUniformInferred(
     }
 }
 
-// ============ VALUE COMPARISON ============
-
-export function uniformValuesEqual(a: any, b: any, type?: UniformType): boolean {
-    if (a === b) return true;
-    if (a == null || b == null) return false;
-
-    if (type) {
-        return valuesEqualTyped(a, b, type);
-    }
-    return valuesEqualUntyped(a, b);
-}
+// ============================================================================
+// Private: Value Comparison
+// ============================================================================
 
 function valuesEqualTyped(a: any, b: any, type: UniformType): boolean {
     switch (type) {
@@ -116,27 +150,12 @@ function valuesEqualTyped(a: any, b: any, type: UniformType): boolean {
     }
 }
 
-function arrayEquals(a: any, b: any, length: number): boolean {
-    if (!a || !b) return false;
-    if (a.length !== length || b.length !== length) return false;
-
-    for (let i = 0; i < length; i++) {
-        if (Math.abs(a[i] - b[i]) >= EPSILON) return false;
-    }
-    return true;
-}
-
 function valuesEqualUntyped(a: any, b: any): boolean {
-    if (Array.isArray(a) && Array.isArray(b)) {
+    // Handle arrays and typed arrays
+    if ((Array.isArray(a) || ArrayBuffer.isView(a)) &&
+        (Array.isArray(b) || ArrayBuffer.isView(b))) {
         if (a.length !== b.length) return false;
-        for (let i = 0; i < a.length; i++) {
-            if (Math.abs(a[i] - b[i]) > EPSILON) return false;
-        }
-        return true;
-    }
 
-    if (a instanceof Float32Array && b instanceof Float32Array) {
-        if (a.length !== b.length) return false;
         for (let i = 0; i < a.length; i++) {
             if (Math.abs(a[i] - b[i]) > EPSILON) return false;
         }
@@ -146,24 +165,13 @@ function valuesEqualUntyped(a: any, b: any): boolean {
     return false;
 }
 
-// ============ UNIFORM LOCATION CACHING ============
+function arrayEquals(a: any, b: any, length: number): boolean {
+    if (!a || !b) return false;
+    if (a.length !== length || b.length !== length) return false;
 
-export function cacheUniformLocations(
-    gl: WebGL2RenderingContext,
-    program: WebGLProgram
-): Map<string, WebGLUniformLocation> {
-    const locations = new Map<string, WebGLUniformLocation>();
-    const numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
-
-    for (let i = 0; i < numUniforms; i++) {
-        const uniformInfo = gl.getActiveUniform(program, i);
-        if (!uniformInfo) continue;
-
-        const location = gl.getUniformLocation(program, uniformInfo.name);
-        if (location) {
-            locations.set(uniformInfo.name, location);
-        }
+    for (let i = 0; i < length; i++) {
+        if (Math.abs(a[i] - b[i]) >= EPSILON) return false;
     }
 
-    return locations;
+    return true;
 }

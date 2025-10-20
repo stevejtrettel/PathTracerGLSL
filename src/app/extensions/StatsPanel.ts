@@ -1,9 +1,12 @@
 // app/extensions/StatsPanelExtension.ts
 import type { Extension } from '../types';
+import { EventManager } from '../utils/EventManager';
 
 /**
- * StatsPanelExtension displays rendering statistics
- * - Samples per second
+ * StatsPanelExtension - Displays rendering statistics overlay
+ *
+ * Shows:
+ * - Samples per second (rolling average)
  * - Total sample count
  * - Resolution
  * - Time since last reset
@@ -16,48 +19,40 @@ class StatsPanelExtension implements Extension {
     private app: any;
     private bus: any;
     private panel: HTMLDivElement | null = null;
+    private events = new EventManager();
 
     // Stats tracking
     private totalSamples = 0;
-    private samplesPerSecond = 0;
     private resolution = [0, 0];
     private timeSinceReset = 0;
+
+    // Rolling window for SPS calculation
+    private sampleWindow: Array<{ samples: number; time: number }> = [];
+    private readonly WINDOW_DURATION = 1000; // 1 second window in ms
 
     install(app: any, bus: any): void {
         this.app = app;
         this.bus = bus;
 
-        // Register as service
         app.registerService('stats', this);
 
-        // Create UI panel
         this.createPanel();
 
-        // Get initial resolution
         const res = app.parameterStore.get('resolution');
         if (res) {
             this.resolution = res;
         }
 
-        // Listen to render progress events
-        bus.on('render.progress', this.handleProgress);
-
-        // Listen to reset events
-        bus.on('accumulation.reset', this.handleReset);
-
-        // Listen to parameter changes for resolution updates
-        bus.on('parameter.changed', this.handleParameterChange);
+        this.events.onBus(bus, 'render.progress', this.handleProgress);
+        this.events.onBus(bus, 'accumulation.reset', this.handleReset);
+        this.events.onBus(bus, 'parameter.changed', this.handleParameterChange);
 
         console.log('StatsPanel extension installed');
     }
 
     uninstall(): void {
-        // Remove event listeners
-        this.bus.off('render.progress', this.handleProgress);
-        this.bus.off('accumulation.reset', this.handleReset);
-        this.bus.off('parameter.changed', this.handleParameterChange);
+        this.events.removeAll();
 
-        // Remove DOM element
         if (this.panel) {
             this.panel.remove();
             this.panel = null;
@@ -65,7 +60,7 @@ class StatsPanelExtension implements Extension {
     }
 
     // ============================================================================
-    // Private: UI Creation
+    // Private: UI
     // ============================================================================
 
     private createPanel(): void {
@@ -92,39 +87,55 @@ class StatsPanelExtension implements Extension {
         this.updateDisplay();
     }
 
+    private updateDisplay(): void {
+        if (!this.panel) return;
+
+        const sps = this.calculateSamplesPerSecond();
+        const spsDisplay = sps > 0 ? sps.toFixed(1) : '---';
+        const timeDisplay = this.formatTime(this.timeSinceReset);
+
+        this.panel.innerHTML = `
+            <div><strong>Samples/sec:</strong> ${spsDisplay}</div>
+            <div><strong>Total samples:</strong> ${this.totalSamples}</div>
+            <div><strong>Resolution:</strong> ${this.resolution[0]}×${this.resolution[1]}</div>
+            <div><strong>Time:</strong> ${timeDisplay}</div>
+        `;
+    }
+
     // ============================================================================
     // Private: Event Handlers
     // ============================================================================
 
     private handleProgress = (info: any): void => {
-        // Update stats from progress info
         if (info.samples !== undefined) {
             this.totalSamples = info.samples;
         }
 
         if (info.elapsedTime !== undefined) {
-            this.timeSinceReset = info.elapsedTime / 1000; // Convert to seconds
+            this.timeSinceReset = info.elapsedTime / 1000;
+
+            // Add to rolling window
+            this.sampleWindow.push({
+                samples: info.samples || 0,
+                time: info.elapsedTime
+            });
+
+            // Remove old entries outside window
+            const cutoffTime = info.elapsedTime - this.WINDOW_DURATION;
+            this.sampleWindow = this.sampleWindow.filter(entry => entry.time > cutoffTime);
         }
 
-        // Calculate samples per second
-        if (info.samples && info.elapsedTime) {
-            this.samplesPerSecond = (info.samples / (info.elapsedTime / 1000));
-        }
-
-        // Update display immediately (no throttling)
         this.updateDisplay();
     };
 
     private handleReset = (): void => {
-        // Reset counters
         this.totalSamples = 0;
         this.timeSinceReset = 0;
-        this.samplesPerSecond = 0;
+        this.sampleWindow = [];
         this.updateDisplay();
     };
 
     private handleParameterChange = (changes: any): void => {
-        // Check if resolution changed
         for (const change of changes.changes) {
             if (change.path === 'resolution') {
                 this.resolution = change.newValue;
@@ -135,24 +146,21 @@ class StatsPanelExtension implements Extension {
     };
 
     // ============================================================================
-    // Private: Display Update
+    // Private: Calculations
     // ============================================================================
 
-    private updateDisplay(): void {
-        if (!this.panel) return;
+    private calculateSamplesPerSecond(): number {
+        if (this.sampleWindow.length < 2) return 0;
 
-        const spsDisplay = this.samplesPerSecond > 0
-            ? this.samplesPerSecond.toFixed(1)
-            : '---';
+        const oldest = this.sampleWindow[0];
+        const newest = this.sampleWindow[this.sampleWindow.length - 1];
 
-        const timeDisplay = this.formatTime(this.timeSinceReset);
+        const sampleDiff = newest.samples - oldest.samples;
+        const timeDiff = (newest.time - oldest.time) / 1000; // Convert to seconds
 
-        this.panel.innerHTML = `
-            <div><strong>Samples/sec:</strong> ${spsDisplay}</div>
-            <div><strong>Total samples:</strong> ${this.totalSamples}</div>
-            <div><strong>Resolution:</strong> ${this.resolution[0]}×${this.resolution[1]}</div>
-            <div><strong>Time:</strong> ${timeDisplay}</div>
-        `;
+        if (timeDiff <= 0) return 0;
+
+        return sampleDiff / timeDiff;
     }
 
     private formatTime(seconds: number): string {

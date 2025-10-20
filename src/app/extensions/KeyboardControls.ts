@@ -1,30 +1,26 @@
 // app/extensions/KeyboardControls.ts
 import type { Extension } from '../types';
-import {buildFrame} from "../../optics/camera/utils/buildFrame";
+import { buildFrame } from '../../optics/camera/utils/buildFrame';
+import { AnimationLoop } from '../utils/AnimationLoop';
+import { EventManager } from '../utils/EventManager';
 
 /**
- * KeyboardControls provides 6DOF camera controls
+ * KeyboardControls - 6DOF camera controls
  *
- * Translation (arrows + '/)
- *   ↑ - move forward
- *   ↓ - move backward
- *   ← - strafe left
- *   → - strafe right
- *   ' - move up
- *   / - move down
+ * Translation (arrow keys + ' /)
+ *   ↑ - forward    ↓ - backward
+ *   ← - left       → - right
+ *   ' - up         / - down
  *
  * Rotation (WASD + QE)
- *   W - pitch up
- *   S - pitch down
- *   A - yaw left
- *   D - yaw right
- *   Q - roll left
- *   E - roll right
+ *   W - pitch up   S - pitch down
+ *   A - yaw left   D - yaw right
+ *   Q - roll left  E - roll right
  *
  * Modifiers
  *   Shift - boost (3x speed)
  *   Ctrl  - slow (0.3x speed)
- *   R     - stabilize frame
+ *   R     - stabilize (align with world up)
  */
 class KeyboardControls implements Extension {
     name = 'keyboard-control';
@@ -36,55 +32,38 @@ class KeyboardControls implements Extension {
 
     // Camera state
     private position: [number, number, number] = [0, 0, 5];
-    private frame: Float32Array = new Float32Array([
-        1, 0, 0,  // right
-        0, 1, 0,  // up
-        0, 0, 1   // forward
-    ]);
+    private frame: Frame;
 
-    // Key tracking
+    // Input state
     private pressed = new Set<string>();
 
     // Settings
-    private moveSpeed = 1.0;           // units per second
-    private rotSpeed =  Math.PI / 10;    //  degrees per second
+    private moveSpeed = 1.0;
+    private rotSpeed = Math.PI / 10;
     private boostFactor = 3.0;
     private slowFactor = 0.3;
 
-    // Update loop
-    private animationId?: number;
-    private lastTime = 0;
+    // Utilities
+    private loop = new AnimationLoop();
+    private events = new EventManager();
 
     install(app: any, bus: any): void {
         this.app = app;
         this.bus = bus;
 
-        // Register as service
         app.registerService('camera', this);
 
-        // Initialize from current camera state
         this.initializeFromParameters();
 
-        // Setup keyboard listeners
-        window.addEventListener('keydown', this.onKeyDown);
-        window.addEventListener('keyup', this.onKeyUp);
+        this.events.add(window, 'keydown', this.onKeyDown);
+        this.events.add(window, 'keyup', this.onKeyUp);
 
-        // Start update loop
-        this.lastTime = performance.now();
-        this.startUpdateLoop();
-
+        this.loop.start((dt) => this.update(dt));
     }
 
     uninstall(): void {
-        // Stop update loop
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = undefined;
-        }
-
-        // Remove keyboard listeners
-        window.removeEventListener('keydown', this.onKeyDown);
-        window.removeEventListener('keyup', this.onKeyUp);
+        this.loop.stop();
+        this.events.removeAll();
     }
 
     // ============================================================================
@@ -96,13 +75,12 @@ class KeyboardControls implements Extension {
     }
 
     getFrame(): Float32Array {
-        return new Float32Array(this.frame);
+        return this.frame.toFloat32Array();
     }
 
     // ============================================================================
     // Private: Initialization
     // ============================================================================
-
 
     private initializeFromParameters(): void {
         const pos = this.app.parameterStore.get('camera.position');
@@ -111,46 +89,28 @@ class KeyboardControls implements Extension {
         }
 
         const target = this.app.parameterStore.get('camera.target');
-
         if (target) {
-            // Build frame using camera's buildFrame
-            this.frame = buildFrame(this.position, target);
-
-            // IMMEDIATELY set it as a parameter to test
-            this.app.parameterStore.set('camera.frame', new Float32Array(this.frame));
+            const frameArray = buildFrame(this.position, target);
+            this.frame = Frame.fromFloat32Array(frameArray);
+            this.app.parameterStore.set('camera.frame', frameArray);
+        } else {
+            this.frame = new Frame(
+                [1, 0, 0],
+                [0, 1, 0],
+                [0, 0, 1]
+            );
         }
-    }
-
-    private buildFrameFromTarget(position: number[], target: number[]): Float32Array {
-        return buildFrame(position, target);
     }
 
     // ============================================================================
     // Private: Update Loop
     // ============================================================================
 
-    private startUpdateLoop(): void {
-        const loop = (time: number) => {
-            const dt = (time - this.lastTime) / 1000; // Convert to seconds
-            this.lastTime = time;
-
-            this.update(dt);
-
-            this.animationId = requestAnimationFrame(loop);
-        };
-
-        this.animationId = requestAnimationFrame(loop);
-    }
-
     private update(dt: number): void {
-        if (dt <= 0 || dt > 0.1) return; // Skip invalid or huge deltas
+        if (dt <= 0 || dt > 0.1) return;
 
-        let moved = false;
-        let rotated = false;
+        let changed = false;
 
-
-
-        // Check for speed modifiers
         let moveSpeed = this.moveSpeed;
         let rotSpeed = this.rotSpeed;
 
@@ -163,236 +123,91 @@ class KeyboardControls implements Extension {
             rotSpeed *= 0.5;
         }
 
-        // --- Translation (in local space) ---
-        const moveLocal = [0, 0, 0];
-
-        // Forward/back (arrows) - FIXED
-        if (this.pressed.has('ArrowUp'))   moveLocal[2] -= 1;
-        if (this.pressed.has('ArrowDown')) moveLocal[2] += 1;
-
-        // Strafe left/right (arrows)
-        if (this.pressed.has('ArrowRight')) moveLocal[0] += 1;
-        if (this.pressed.has('ArrowLeft'))  moveLocal[0] -= 1;
-
-        // Up/down (' and /)
-        if (this.pressed.has('Quote')) moveLocal[1] += 1;
-        if (this.pressed.has('Slash')) moveLocal[1] -= 1;
-
-        // Normalize diagonal movement
-        const moveLen = Math.sqrt(
-            moveLocal[0] * moveLocal[0] +
-            moveLocal[1] * moveLocal[1] +
-            moveLocal[2] * moveLocal[2]
-        );
-
-
-        if (moveLen > 0) {
-            moveLocal[0] /= moveLen;
-            moveLocal[1] /= moveLen;
-            moveLocal[2] /= moveLen;
-
-            // Move in local space
-            this.moveLocal(moveLocal, moveSpeed * dt);
-            moved = true;
+        const movement = this.getMovementInput();
+        if (movement) {
+            this.moveLocal(movement, moveSpeed * dt);
+            changed = true;
         }
 
-        // --- Rotation ---
-        const rotation = [0, 0, 0]; // [pitch, yaw, roll]
-
-        // Pitch (W/S)
-        if (this.pressed.has('KeyW')) rotation[0] -= 1;
-        if (this.pressed.has('KeyS')) rotation[0] += 1;
-
-        // Yaw (A/D)
-        if (this.pressed.has('KeyA')) rotation[1] -= 1;
-        if (this.pressed.has('KeyD')) rotation[1] += 1;
-
-        // Roll (Q/E)
-        if (this.pressed.has('KeyQ')) rotation[2] -= 1;
-        if (this.pressed.has('KeyE')) rotation[2] += 1;
-
-        const rotLen = Math.sqrt(
-            rotation[0] * rotation[0] +
-            rotation[1] * rotation[1] +
-            rotation[2] * rotation[2]
-        );
-
-        if (rotLen > 0) {
-            rotation[0] /= rotLen;
-            rotation[1] /= rotLen;
-            rotation[2] /= rotLen;
-
+        const rotation = this.getRotationInput();
+        if (rotation) {
             this.rotateLocal(rotation, rotSpeed * dt);
-            rotated = true;
+            changed = true;
         }
 
-        // Stabilize frame
         if (this.pressed.has('KeyR')) {
-            this.stabilizeFrame();
-            rotated = true;
+            this.frame.stabilize();
+            changed = true;
         }
 
-        // Update parameters if anything changed
-        if (moved || rotated) {
-            // Orthonormalize frame to prevent drift
-            this.orthonormalizeFrame();
+        if (changed) {
+            this.frame.orthonormalize();
             this.updateParameters();
         }
+    }
+
+    // ============================================================================
+    // Private: Input
+    // ============================================================================
+
+    private getMovementInput(): Vec3 | null {
+        const move: Vec3 = [0, 0, 0];
+
+        if (this.pressed.has('ArrowUp')) move[2] -= 1;
+        if (this.pressed.has('ArrowDown')) move[2] += 1;
+        if (this.pressed.has('ArrowRight')) move[0] += 1;
+        if (this.pressed.has('ArrowLeft')) move[0] -= 1;
+        if (this.pressed.has('Quote')) move[1] += 1;
+        if (this.pressed.has('Slash')) move[1] -= 1;
+
+        return vec3IsZero(move) ? null : vec3Normalize(move);
+    }
+
+    private getRotationInput(): Vec3 | null {
+        const rot: Vec3 = [0, 0, 0];
+
+        if (this.pressed.has('KeyW')) rot[0] -= 1;
+        if (this.pressed.has('KeyS')) rot[0] += 1;
+        if (this.pressed.has('KeyA')) rot[1] -= 1;
+        if (this.pressed.has('KeyD')) rot[1] += 1;
+        if (this.pressed.has('KeyQ')) rot[2] += 1;
+        if (this.pressed.has('KeyE')) rot[2] -= 1;
+
+        return vec3IsZero(rot) ? null : vec3Normalize(rot);
     }
 
     // ============================================================================
     // Private: Movement & Rotation
     // ============================================================================
 
-    private moveLocal(direction: number[], distance: number): void {
-        // direction is in local space [right, up, forward]
-        // Convert to world space using frame
+    private moveLocal(direction: Vec3, distance: number): void {
+        const worldDir = this.frame.localToWorld(direction);
 
-        const right   = [this.frame[0], this.frame[1], this.frame[2]];
-        const up      = [this.frame[3], this.frame[4], this.frame[5]];
-        const forward = [this.frame[6], this.frame[7], this.frame[8]];
-
-        // World movement = right*x + up*y + forward*z
-        this.position[0] += (right[0] * direction[0] + up[0] * direction[1] + forward[0] * direction[2]) * distance;
-        this.position[1] += (right[1] * direction[0] + up[1] * direction[1] + forward[1] * direction[2]) * distance;
-        this.position[2] += (right[2] * direction[0] + up[2] * direction[1] + forward[2] * direction[2]) * distance;
+        this.position[0] += worldDir[0] * distance;
+        this.position[1] += worldDir[1] * distance;
+        this.position[2] += worldDir[2] * distance;
     }
 
-    private rotateLocal(rotation: number[], angle: number): void {
-        // rotation is [pitch, yaw, roll] in local space
-        // Apply rotations to frame vectors
+    private rotateLocal(rotation: Vec3, angle: number): void {
+        const [pitch, yaw, roll] = rotation;
 
-        const pitch = rotation[0] * angle;
-        const yaw   = rotation[1] * angle;
-        const roll  = rotation[2] * angle;
-
-        // Rotate around local axes
-        if (pitch !== 0) this.rotatePitch(pitch);
-        if (yaw !== 0)   this.rotateYaw(yaw);
-        if (roll !== 0)  this.rotateRoll(roll);
+        if (pitch !== 0) this.frame.rotatePitch(pitch * angle);
+        if (yaw !== 0) this.frame.rotateYaw(yaw * angle);
+        if (roll !== 0) this.frame.rotateRoll(roll * angle);
     }
 
-    private rotatePitch(angle: number): void {
-        // Rotate around right axis (frame[0,1,2])
-        const axis = [this.frame[0], this.frame[1], this.frame[2]];
-        this.rotateFrameVector(3, axis, angle); // up
-        this.rotateFrameVector(6, axis, angle); // forward
-    }
-
-    private rotateYaw(angle: number): void {
-        // Rotate around up axis (frame[3,4,5])
-        const axis = [this.frame[3], this.frame[4], this.frame[5]];
-        this.rotateFrameVector(0, axis, angle); // right
-        this.rotateFrameVector(6, axis, angle); // forward
-    }
-
-    private rotateRoll(angle: number): void {
-        // Rotate around forward axis (frame[6,7,8])
-        const axis = [this.frame[6], this.frame[7], this.frame[8]];
-        this.rotateFrameVector(0, axis, angle); // right
-        this.rotateFrameVector(3, axis, angle); // up
-    }
-
-    private rotateFrameVector(startIdx: number, axis: number[], angle: number): void {
-        // Get vector from frame
-        const v = [this.frame[startIdx], this.frame[startIdx + 1], this.frame[startIdx + 2]];
-
-        // Rodrigues' rotation formula
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        const t = 1 - c;
-
-        const dot = v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2];
-        const cross = [
-            axis[1] * v[2] - axis[2] * v[1],
-            axis[2] * v[0] - axis[0] * v[2],
-            axis[0] * v[1] - axis[1] * v[0]
-        ];
-
-        // Write back to frame
-        this.frame[startIdx]     = v[0] * c + cross[0] * s + axis[0] * dot * t;
-        this.frame[startIdx + 1] = v[1] * c + cross[1] * s + axis[1] * dot * t;
-        this.frame[startIdx + 2] = v[2] * c + cross[2] * s + axis[2] * dot * t;
-    }
-
-    private stabilizeFrame(): void {
-        // Re-orthonormalize frame and align up with world up
-        const forward = [this.frame[6], this.frame[7], this.frame[8]];
-        const worldUp = [0, 1, 0];
-
-        // Right = forward × worldUp
-        const right = this.normalize(this.cross(forward, worldUp));
-
-        // Up = right × forward
-        const up = this.cross(right, forward);
-
-        // Update frame
-        this.frame[0] = right[0]; this.frame[1] = right[1]; this.frame[2] = right[2];
-        this.frame[3] = up[0];    this.frame[4] = up[1];    this.frame[5] = up[2];
-        this.frame[6] = forward[0]; this.frame[7] = forward[1]; this.frame[8] = forward[2];
-    }
-
-    private orthonormalizeFrame(): void {
-        // Gram-Schmidt orthonormalization
-        // Keep forward, recalculate right and up
-
-        // Normalize forward
-        let forward = [this.frame[6], this.frame[7], this.frame[8]];
-        forward = this.normalize(forward);
-
-        // Get up (might not be perpendicular)
-        let up = [this.frame[3], this.frame[4], this.frame[5]];
-
-        // Right = forward × up
-        let right = this.cross(forward, up);
-        right = this.normalize(right);
-
-        // Recalculate up = right × forward
-        up = this.cross(right, forward);
-
-        // Update frame
-        this.frame[0] = right[0];   this.frame[1] = right[1];   this.frame[2] = right[2];
-        this.frame[3] = up[0];      this.frame[4] = up[1];      this.frame[5] = up[2];
-        this.frame[6] = forward[0]; this.frame[7] = forward[1]; this.frame[8] = forward[2];
-    }
-
-    // ============================================================================
-    // Private: Vector Math
-    // ============================================================================
-
-    private normalize(v: number[]): number[] {
-        const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-        if (len === 0) return [0, 0, 1];
-        return [v[0] / len, v[1] / len, v[2] / len];
-    }
-
-    private cross(a: number[], b: number[]): number[] {
-        return [
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0]
-        ];
-    }
-
-    // ============================================================================
-    // Private: Parameter Updates
-    // ============================================================================
-
-     private updateParameters(): void {
-        // Create new arrays so ParameterStore detects changes
+    private updateParameters(): void {
         this.app.parameterStore.set('camera.position', [...this.position]);
-        this.app.parameterStore.set('camera.frame', new Float32Array(this.frame));
+        this.app.parameterStore.set('camera.frame', this.frame.toFloat32Array());
 
         this.bus.emit('camera.moved', {
             position: this.position,
-            frame: this.frame
+            frame: this.frame.toFloat32Array()
         });
     }
 
-
-
     // ============================================================================
-    // Private: Keyboard Events
+    // Private: Event Handlers
     // ============================================================================
 
     private onKeyDown = (e: KeyboardEvent): void => {
@@ -402,6 +217,112 @@ class KeyboardControls implements Extension {
     private onKeyUp = (e: KeyboardEvent): void => {
         this.pressed.delete(e.code);
     };
+}
+
+// ============================================================================
+// Frame Helper Class
+// ============================================================================
+
+type Vec3 = [number, number, number];
+
+class Frame {
+    right: Vec3;
+    up: Vec3;
+    forward: Vec3;
+
+    constructor(right: Vec3, up: Vec3, forward: Vec3) {
+        this.right = right;
+        this.up = up;
+        this.forward = forward;
+    }
+
+    static fromFloat32Array(arr: Float32Array): Frame {
+        return new Frame(
+            [arr[0], arr[1], arr[2]],
+            [arr[3], arr[4], arr[5]],
+            [arr[6], arr[7], arr[8]]
+        );
+    }
+
+    toFloat32Array(): Float32Array {
+        return new Float32Array([
+            ...this.right,
+            ...this.up,
+            ...this.forward
+        ]);
+    }
+
+    localToWorld(local: Vec3): Vec3 {
+        return [
+            this.right[0] * local[0] + this.up[0] * local[1] + this.forward[0] * local[2],
+            this.right[1] * local[0] + this.up[1] * local[1] + this.forward[1] * local[2],
+            this.right[2] * local[0] + this.up[2] * local[1] + this.forward[2] * local[2]
+        ];
+    }
+
+    rotatePitch(angle: number): void {
+        this.up = rotateVector(this.up, this.right, angle);
+        this.forward = rotateVector(this.forward, this.right, angle);
+    }
+
+    rotateYaw(angle: number): void {
+        this.right = rotateVector(this.right, this.up, angle);
+        this.forward = rotateVector(this.forward, this.up, angle);
+    }
+
+    rotateRoll(angle: number): void {
+        this.right = rotateVector(this.right, this.forward, angle);
+        this.up = rotateVector(this.up, this.forward, angle);
+    }
+
+    orthonormalize(): void {
+        this.forward = vec3Normalize(this.forward);
+        this.right = vec3Normalize(vec3Cross(this.forward, this.up));
+        this.up = vec3Cross(this.right, this.forward);
+    }
+
+    stabilize(): void {
+        const worldUp: Vec3 = [0, 1, 0];
+        this.right = vec3Normalize(vec3Cross(this.forward, worldUp));
+        this.up = vec3Cross(this.right, this.forward);
+    }
+}
+
+// ============================================================================
+// Vector Math Helpers
+// ============================================================================
+
+function vec3Normalize(v: Vec3): Vec3 {
+    const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    if (len === 0) return [0, 0, 1];
+    return [v[0] / len, v[1] / len, v[2] / len];
+}
+
+function vec3Cross(a: Vec3, b: Vec3): Vec3 {
+    return [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0]
+    ];
+}
+
+function vec3IsZero(v: Vec3): boolean {
+    return v[0] === 0 && v[1] === 0 && v[2] === 0;
+}
+
+function rotateVector(v: Vec3, axis: Vec3, angle: number): Vec3 {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const t = 1 - c;
+
+    const dot = v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2];
+    const cross = vec3Cross(axis, v);
+
+    return [
+        v[0] * c + cross[0] * s + axis[0] * dot * t,
+        v[1] * c + cross[1] * s + axis[1] * dot * t,
+        v[2] * c + cross[2] * s + axis[2] * dot * t
+    ];
 }
 
 export { KeyboardControls };

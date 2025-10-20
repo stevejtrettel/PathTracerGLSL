@@ -12,18 +12,21 @@ import {
 } from './utils/shader-uniform-utils';
 
 /**
- * ShaderCompiler handles GLSL compilation only.
- * Parameter management moved to ParameterManager.
+ * ShaderCompiler - Handles GLSL shader compilation and linking
+ *
+ * Responsibilities:
+ * - Compile vertex and fragment shaders
+ * - Link programs (main accumulation + display tone mapping)
+ * - Update engine-provided uniforms (time, resolution, etc.)
+ * - Provide debug info for shader errors
  */
 class ShaderCompiler {
     private gl: WebGL2RenderingContext;
-
-    // Programs
     private mainProgram: WebGLProgram | null = null;
     private displayProgram: WebGLProgram | null = null;
     private activeProgram: WebGLProgram | null = null;
 
-    // Uniform locations (for engine-driven uniforms only now)
+    // Engine uniform locations
     private uniformLocations = new Map<string, WebGLUniformLocation>();
 
     // Debug info
@@ -35,7 +38,7 @@ class ShaderCompiler {
     }
 
     /**
-     * Compile modules into programs
+     * Compile modules into shader programs
      */
     compile(modules: ModuleDescriptor[]): {
         mainProgram: WebGLProgram;
@@ -57,14 +60,6 @@ class ShaderCompiler {
         };
     }
 
-    getMainProgram(): WebGLProgram | null {
-        return this.mainProgram;
-    }
-
-    getDisplayProgram(): WebGLProgram | null {
-        return this.displayProgram;
-    }
-
     /**
      * Set active program and cache engine uniform locations
      */
@@ -74,21 +69,51 @@ class ShaderCompiler {
     }
 
     /**
-     * Update engine-provided uniforms (time, resolution, etc.)
+     * Update engine uniforms
      */
     updateEngineUniforms(uniforms: EngineUniforms): void {
         if (!this.activeProgram) return;
 
         this.gl.useProgram(this.activeProgram);
 
-        this.setEngineUniform('u_resolution', uniforms.resolution, 'vec2');  // framebuffer size
-        this.setEngineUniform('u_image_size', uniforms.imageSize, 'vec2');  // overall image size
+        this.setEngineUniform('u_resolution', uniforms.resolution, 'vec2');
+        this.setEngineUniform('u_image_size', uniforms.imageSize, 'vec2');
         this.setEngineUniform('u_frame_index', uniforms.frameIndex, 'int');
         this.setEngineUniform('u_time', uniforms.time, 'float');
         this.setEngineUniform('u_sample_count', uniforms.sampleCount, 'int');
         this.setEngineUniform('u_pixel_offset', uniforms.pixelOffset, 'vec2');
-
     }
+
+    /**
+     * Get main program
+     */
+    getMainProgram(): WebGLProgram | null {
+        return this.mainProgram;
+    }
+
+    /**
+     * Get display program
+     */
+    getDisplayProgram(): WebGLProgram | null {
+        return this.displayProgram;
+    }
+
+    /**
+     * Get debug info for last compiled shader
+     */
+    getDebugInfo(): { source: string; numberedSource: string } | null {
+        if (!this.lastCompiledSource || !this.lastCompiledSourceWithLineNumbers) {
+            return null;
+        }
+        return {
+            source: this.lastCompiledSource,
+            numberedSource: this.lastCompiledSourceWithLineNumbers
+        };
+    }
+
+    // ============================================================================
+    // Private: Compilation
+    // ============================================================================
 
     private setEngineUniform(name: string, value: any, type: UniformType): void {
         const location = this.uniformLocations.get(name);
@@ -96,8 +121,6 @@ class ShaderCompiler {
             setUniformValue(this.gl, location, value, type);
         }
     }
-
-    // ============ COMPILATION ============
 
     private compileAndLinkProgram(vertexSource: string, fragmentSource: string, name: string): WebGLProgram {
         const vertexShader = this.compileShader(vertexSource, this.gl.VERTEX_SHADER, `${name} vertex`);
@@ -135,18 +158,6 @@ class ShaderCompiler {
         }
 
         return shader;
-    }
-
-    // ============ DEBUG ============
-
-    getDebugInfo(): { source: string; numberedSource: string } | null {
-        if (!this.lastCompiledSource || !this.lastCompiledSourceWithLineNumbers) {
-            return null;
-        }
-        return {
-            source: this.lastCompiledSource,
-            numberedSource: this.lastCompiledSourceWithLineNumbers
-        };
     }
 }
 

@@ -120,7 +120,8 @@ async function main() {
     await app.initialize(recipes, envHDRI, parameters);
 
 
-    app.use(new KeyboardControls());
+   // app.use(new KeyboardControls());
+    app.use( new KeyboardControls());
     app.use(new StatsPanelExtension());
     app.use(new ScreenshotExtension());
     app.use(new HDRExportExtension());

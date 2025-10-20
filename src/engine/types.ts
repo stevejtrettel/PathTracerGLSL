@@ -1,61 +1,74 @@
-// Phase 1: Core type definitions for the Engine pillar
-// These types establish the contracts between ModuleRegistry, SimpleCompiler, and RenderExecutor
-
-
-const MODULE_ORDER = [
-    'ambient',     // Foundation
-    'scene',       // Geometry
-    'environment', // EnvMaps and Fog
-    'lighting',    // Lights
-    'camera',      // Ray gen
-    'interaction', // BRDFs
-    'transport',   // Uses interaction
-    'accumulator', // Uses transport output
-    'developer'    // Final output
-];
-
+// engine/types.ts
 
 /**
- * Valid module types - determines required function prefixes
+ * Module execution order for shader compilation
+ * Determines dependency chain from foundation to final output
+ */
+const MODULE_ORDER = [
+    'ambient',      // Foundation: mathematical space
+    'scene',        // Geometry and materials
+    'environment',  // Environment maps and fog
+    'lighting',     // Light sources
+    'camera',       // Ray generation
+    'interaction',  // BRDFs and light-matter physics
+    'transport',    // Integration algorithms
+    'accumulator',  // Sample accumulation
+    'developer'     // Tone mapping and output
+] as const;
+
+/**
+ * Valid module types
  */
 type ModuleKind =
-    | 'ambient'        // Ambient space geometry (ambient_*)
-    | 'environment'     //the evironment maps and fog
-    | 'scene'         // Object intersection and materials (scene_*)
-    | 'lighting'      // Light sampling (lighting_*)
-    | 'camera'        // Ray generation (camera_*)
-    | 'interaction'   // Light-matter physics (interaction_*)
-    | 'transport'     // Integration algorithms (transport_*)
-    | 'accumulator'   // Accumulation (accumulator_*)
-    | 'developer'     // Tone mapping (developer_*)
-    | 'test';         // Phase 1 testing (test_*)
-
+    | 'ambient'        // ambient_*
+    | 'environment'    // environment_*
+    | 'scene'          // scene_*
+    | 'lighting'       // lighting_*
+    | 'camera'         // camera_*
+    | 'interaction'    // interaction_*
+    | 'transport'      // transport_*
+    | 'accumulator'    // accumulator_*
+    | 'developer'      // developer_*
+    | 'test';          // test_*
 
 /**
- * Describes a single rendering module with its GLSL code and metadata
+ * Module descriptor with GLSL code and metadata
  */
 interface ModuleDescriptor {
     id: {
         kind: ModuleKind;
-        name: string;      // e.g., "pinhole", "euclidean", "red"
-        version: string;   // e.g., "1.0.0"
+        name: string;
+        version: string;
     };
 
     fragment: {
-        functions: string;    // The GLSL function definitions
-        uniforms?: string;    // Uniform declarations (optional)
-        constants?: string;   // #define statements (optional)
+        functions: string;
+        uniforms?: string;
+        constants?: string;
     };
 
-    uniformBindings?: UniformBinding[];  // NEW
-
-    exports: string[];      // Functions this module provides (e.g., ["camera_generateRay"])
+    uniformBindings?: UniformBinding[];
+    exports: string[];
 }
 
+/**
+ * Supported GLSL uniform types
+ */
+type UniformType =
+    | 'float'
+    | 'int'
+    | 'bool'
+    | 'vec2'
+    | 'vec3'
+    | 'vec4'
+    | 'mat3'
+    | 'mat4'
+    | 'sampler2D'
+    | 'samplerCube';
 
-
-type UniformType = 'float' | 'int' | 'bool' | 'vec2' | 'vec3' | 'vec4' | 'mat3' | 'mat4' | 'sampler2D' | 'samplerCube';
-
+/**
+ * Binding between shader uniform and application parameters
+ */
 interface UniformBinding {
     uniform: string;
     parameters: string[];
@@ -64,65 +77,68 @@ interface UniformBinding {
 }
 
 /**
- * Result of module validation by the registry
+ * Module validation result
  */
 interface ValidationResult {
     valid: boolean;
-    errors: string[];         // What went wrong
-    warnings?: string[];      // Non-fatal issues
+    errors: string[];
+    warnings?: string[];
 }
 
 /**
- * Complete compiled program ready for GPU execution
+ * Compiled shader program ready for execution
  */
 interface CompiledProgram {
-    id: string;                    // Identifier for debugging
-    program: WebGLProgram;         // Linked vertex + fragment shaders
-    vertexSource: string;          // Vertex shader source (for debugging)
-    fragmentSource: string;        // Fragment shader source (for debugging)
+    id: string;
+    program: WebGLProgram;
+    vertexSource: string;
+    fragmentSource: string;
 }
 
 /**
- * Engine state for Phase 2
+ * Engine execution state
  */
 type EngineState = 'ready' | 'running';
 
-
-
+/**
+ * Engine-provided shader uniforms
+ */
 interface EngineUniforms {
-    resolution: [number, number];      // Framebuffer size
-    imageSize: [number, number];       // Full image size (for camera)
+    resolution: [number, number];
+    imageSize: [number, number];
     frameIndex: number;
     time: number;
     sampleCount: number;
-    pixelOffset: [number, number];  // for tiling
+    pixelOffset: [number, number];
 }
 
-
-
-// Add these after your existing type definitions
-
+/**
+ * Complete rendering recipe
+ *
+ * A recipe defines a complete rendering configuration by composing
+ * modules for world representation, optical simulation, and output.
+ */
 interface Recipe {
     id: string;
     name: string;
     description?: string;
 
     world: {
-        ambient: ModuleDescriptor;      // Mathematical space (direct reference)
-        environment: ModuleDescriptor;  // Environment maps and fog
-        scene: ModuleDescriptor;        // Objects and materials
-        lighting: ModuleDescriptor;     // Light sources
+        ambient: ModuleDescriptor;
+        environment: ModuleDescriptor;
+        scene: ModuleDescriptor;
+        lighting: ModuleDescriptor;
     };
 
     optics: {
-        camera: ModuleDescriptor;       // Ray generation
-        interaction: ModuleDescriptor;  // Light-matter physics (BRDFs)
-        transport: ModuleDescriptor;    // Integration algorithm
-        accumulator: ModuleDescriptor;  // Sample accumulation
-        developer: ModuleDescriptor;    // Tone mapping
+        camera: ModuleDescriptor;
+        interaction: ModuleDescriptor;
+        transport: ModuleDescriptor;
+        accumulator: ModuleDescriptor;
+        developer: ModuleDescriptor;
     };
 
-    parameters?: Record<string, any>;  // Recipe-specific parameter overrides
+    parameters?: Record<string, any>;
 
     config?: {
         targetSamples?: number;
@@ -130,9 +146,7 @@ interface Recipe {
     };
 }
 
-
-
-export {MODULE_ORDER};
+export { MODULE_ORDER };
 
 export type {
     ModuleDescriptor,

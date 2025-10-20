@@ -1,8 +1,10 @@
-// engine/TextureFactory.ts
+// engine/utils/TextureFactory.ts
 
 /**
- * Simple factory for creating floating-point data textures
- * Focuses on the common case: R32F and RGB32F with linear filtering
+ * TextureFactory - Creates floating-point data textures
+ *
+ * Focuses on common cases: R32F (CDFs/PDFs) and RGB32F (HDR images)
+ * Automatically handles linear filtering fallback if unsupported
  */
 export class TextureFactory {
     private gl: WebGL2RenderingContext;
@@ -10,14 +12,14 @@ export class TextureFactory {
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
 
-        // Verify float texture support
         if (!gl.getExtension('EXT_color_buffer_float')) {
             throw new Error('Float textures required but not supported');
         }
     }
 
     /**
-     * Create a single-channel float texture (for CDFs, PDFs, etc)
+     * Create single-channel float texture
+     * Use for: CDFs, PDFs, 1D lookup tables
      */
     createR32F(data: Float32Array, width: number, height: number = 1): WebGLTexture {
         if (data.length !== width * height) {
@@ -40,7 +42,6 @@ export class TextureFactory {
             data
         );
 
-        // Linear filtering for smooth interpolation
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
@@ -51,7 +52,8 @@ export class TextureFactory {
     }
 
     /**
-     * Create an RGB float texture (for HDR images)
+     * Create RGB float texture
+     * Use for: HDR environment maps, radiance buffers
      */
     createRGB32F(data: Float32Array, width: number, height: number): WebGLTexture {
         if (data.length !== width * height * 3) {
@@ -74,13 +76,13 @@ export class TextureFactory {
             data
         );
 
-        // Check for linear filtering support on float textures
+        // Fallback to nearest filtering if linear not supported
         const linearExt = this.gl.getExtension('OES_texture_float_linear');
         const filterMode = linearExt ? this.gl.LINEAR : this.gl.NEAREST;
 
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, filterMode);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, filterMode);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.REPEAT);  // Repeat for environment maps
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.REPEAT);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
 
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);

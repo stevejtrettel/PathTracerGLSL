@@ -1,30 +1,45 @@
 // engine/TextureRegistry.ts
+
+/**
+ * TextureRegistry - Manages texture units and bindings
+ *
+ * Responsibilities:
+ * - Register textures and assign texture units
+ * - Bind textures to shader uniforms
+ * - Handle texture cleanup
+ *
+ * Note: Unit 0 is typically reserved for accumulator texture
+ */
 export class TextureRegistry {
     private gl: WebGL2RenderingContext;
     private textures = new Map<string, WebGLTexture>();
     private units = new Map<string, number>();
-    private nextUnit = 0;
+    private nextUnit: number;
 
     constructor(gl: WebGL2RenderingContext, reservedUnits: number = 1) {
         this.gl = gl;
-        this.nextUnit = reservedUnits; // Skip reserved units (0 for accumulator)
+        this.nextUnit = reservedUnits;
     }
 
+    /**
+     * Register a texture with optional unit assignment
+     */
     register(name: string, texture: WebGLTexture, requestedUnit?: number): void {
-        // Clean up old texture if replacing
+        // Clean up existing texture if replacing
         const oldTexture = this.textures.get(name);
         if (oldTexture) {
             this.gl.deleteTexture(oldTexture);
         }
 
-        // Store texture
         this.textures.set(name, texture);
 
-        // Assign unit (use requested or next available)
         const unit = requestedUnit ?? this.nextUnit++;
         this.units.set(name, unit);
     }
 
+    /**
+     * Bind texture to uniform location
+     */
     bind(name: string, location: WebGLUniformLocation): void {
         const texture = this.textures.get(name);
         const unit = this.units.get(name);
@@ -38,23 +53,16 @@ export class TextureRegistry {
         this.gl.uniform1i(location, unit);
     }
 
-    bindAll(program: WebGLProgram): void {
-        // Try to bind all registered textures to matching uniforms
-        for (const [name, texture] of this.textures) {
-            // Convert name to uniform name (environment → u_environment)
-            const uniformName = `u_${name}`;
-            const location = this.gl.getUniformLocation(program, uniformName);
-
-            if (location) {
-                this.bind(name, location);
-            }
-        }
-    }
-
+    /**
+     * Check if texture is registered
+     */
     has(name: string): boolean {
         return this.textures.has(name);
     }
 
+    /**
+     * Print debug information
+     */
     debug(): void {
         console.log('=== Texture Registry ===');
         for (const [name, unit] of this.units) {
@@ -64,6 +72,9 @@ export class TextureRegistry {
         console.log(`Next available unit: ${this.nextUnit}`);
     }
 
+    /**
+     * Clean up all textures
+     */
     dispose(): void {
         for (const texture of this.textures.values()) {
             this.gl.deleteTexture(texture);

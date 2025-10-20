@@ -1,13 +1,6 @@
 // engine/RenderExecutor.ts
 import { ResourceManager } from './ResourceManager';
 
-interface Viewport {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
-
 interface Rectangle {
     x: number;
     y: number;
@@ -19,9 +12,9 @@ interface Rectangle {
  * RenderExecutor - Manages WebGL rendering execution
  *
  * Responsibilities:
- * - Execute main and display passes
+ * - Execute main and display render passes
  * - Manage viewport state
- * - Provide pixel readback (HDR radiance, LDR display)
+ * - Provide pixel readback for HDR and LDR output
  */
 export class RenderExecutor {
     private gl: WebGL2RenderingContext;
@@ -29,24 +22,21 @@ export class RenderExecutor {
     private mainProgram: WebGLProgram | null = null;
     private displayProgram: WebGLProgram | null = null;
 
-    // Current viewport
-    private viewport: Viewport;
+    // Current viewport dimensions
+    private width: number;
+    private height: number;
 
     constructor(gl: WebGL2RenderingContext, resources: ResourceManager) {
         this.gl = gl;
         this.resources = resources;
 
         const canvas = gl.canvas as HTMLCanvasElement;
-        this.viewport = {
-            x: 0,
-            y: 0,
-            width: canvas.width,
-            height: canvas.height
-        };
+        this.width = canvas.width;
+        this.height = canvas.height;
     }
 
     /**
-     * Set active programs
+     * Set active shader programs
      */
     setPrograms(main: WebGLProgram, display: WebGLProgram): void {
         this.mainProgram = main;
@@ -74,13 +64,7 @@ export class RenderExecutor {
         }
 
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-        this.gl.viewport(
-            this.viewport.x,
-            this.viewport.y,
-            this.viewport.width,
-            this.viewport.height
-        );
-
+        this.gl.viewport(0, 0, this.width, this.height);
         this.gl.useProgram(this.displayProgram);
 
         // Bind radiance texture
@@ -96,14 +80,15 @@ export class RenderExecutor {
     }
 
     /**
-     * Update viewport on canvas resize
+     * Update viewport on resize
      */
     resize(width: number, height: number): void {
         if (width <= 0 || height <= 0) {
-            throw new Error(`Invalid resize dimensions: ${width}×${height}`);
+            throw new Error(`Invalid dimensions: ${width}×${height}`);
         }
 
-        this.viewport = { x: 0, y: 0, width, height };
+        this.width = width;
+        this.height = height;
         this.gl.viewport(0, 0, width, height);
     }
 
@@ -114,13 +99,11 @@ export class RenderExecutor {
     /**
      * Read HDR radiance from accumulator
      *
-     * Returns Float32Array with RGBA values (unbounded range)
+     * Returns Float32Array with RGBA values (unbounded HDR range)
      * Use for: HDR export, scientific analysis, compositing
-     *
-     * @param rect - Optional region to read (defaults to full viewport)
      */
     readRadiance(rect?: Rectangle): Float32Array {
-        const r = rect || this.getFullViewportRect();
+        const r = rect || this.getFullRect();
         this.validateRect(r);
 
         const fb = this.resources.getCurrentFramebuffer();
@@ -141,13 +124,11 @@ export class RenderExecutor {
     /**
      * Read tone-mapped display from screen
      *
-     * Returns Uint8Array with RGBA values (0-255 range)
+     * Returns Uint8Array with RGBA values (0-255 LDR range)
      * Use for: PNG/JPEG export, screenshots
-     *
-     * @param rect - Optional region to read (defaults to full viewport)
      */
     readDisplay(rect?: Rectangle): Uint8Array {
-        const r = rect || this.getFullViewportRect();
+        const r = rect || this.getFullRect();
         this.validateRect(r);
 
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
@@ -176,12 +157,12 @@ export class RenderExecutor {
     // Private Helpers
     // ============================================================================
 
-    private getFullViewportRect(): Rectangle {
+    private getFullRect(): Rectangle {
         return {
-            x: this.viewport.x,
-            y: this.viewport.y,
-            width: this.viewport.width,
-            height: this.viewport.height
+            x: 0,
+            y: 0,
+            width: this.width,
+            height: this.height
         };
     }
 
@@ -192,4 +173,4 @@ export class RenderExecutor {
     }
 }
 
-export type { Viewport, Rectangle };
+export type { Rectangle };

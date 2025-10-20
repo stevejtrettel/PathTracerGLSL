@@ -1,49 +1,11 @@
-// Types for the parameter system - Phase 2 minimal but correct
-
-import type { ModuleDescriptor } from '../engine/types';
-
-export interface RenderConfiguration {
-    name: string;
-    description?: string;
-
-    modules: {
-        ambient: ModuleDescriptor;
-        scene: ModuleDescriptor;
-        environment: ModuleDescriptor;
-        lighting: ModuleDescriptor;
-        camera: ModuleDescriptor;
-        interaction: ModuleDescriptor;
-        transport: ModuleDescriptor;
-        accumulator: ModuleDescriptor;
-        developer: ModuleDescriptor;
-    };
-
-    parameters: Record<string, any>;
-
-    environmentMap?: {
-        path: string;
-        intensity?: number;
-        rotation?: number;
-    };
-}
-
-
-
-/**
- * Metadata about a parameter for validation and UI
- */
-interface ParameterMetadata {
-    type: 'float' | 'vec3' | 'int' | 'bool';
-    default: any;
-    min?: number;
-    max?: number;
-}
+// app/types.ts
+import type { TileJob } from './TiledRenderer';
 
 /**
  * Single parameter change
  */
 interface ParameterChange {
-    path: string;          // "camera.position"
+    path: string;
     oldValue: any;
     newValue: any;
 }
@@ -55,9 +17,21 @@ interface ParameterChanges {
     changes: ParameterChange[];
 }
 
+/**
+ * Parameter metadata for validation and UI
+ */
+interface ParameterMetadata {
+    type: 'float' | 'vec3' | 'int' | 'bool';
+    default: any;
+    min?: number;
+    max?: number;
+}
 
 /**
- * Extensions!
+ * Extension interface for adding features to the app
+ *
+ * Extensions can add UI, modify rendering behavior, provide new services,
+ * and save/restore state with sessions.
  */
 interface Extension {
     name: string;
@@ -65,25 +39,25 @@ interface Extension {
     description?: string;
     dependencies?: string[];
 
-    install(app: any, bus: any): void;  // app as 'any' to avoid circular import
+    install(app: any, bus: any): void;
     uninstall?(): void;
 
     saveState?(): any;
     restoreState?(state: any): void;
 }
 
-
-
 /**
  * Event handler type for EventBus
  */
 type EventHandler = (data?: any) => void;
 
-
-import type { TileJob } from './TiledRenderer';  // ADD THIS IMPORT
-
-export interface SessionData {
-    // Metadata
+/**
+ * Complete session data for save/restore
+ *
+ * Captures all state needed to recreate a rendering session:
+ * active recipe, parameters, camera, accumulation, and tile jobs.
+ */
+interface SessionData {
     version: string;
     timestamp: number;
 
@@ -95,7 +69,7 @@ export interface SessionData {
     renderMode: 'interactive' | 'progressive' | 'production';
     sampleCount: number;
 
-    // Camera
+    // Camera state
     camera: {
         position: [number, number, number];
         target?: [number, number, number];
@@ -106,7 +80,7 @@ export interface SessionData {
     // Extension states
     extensions: Record<string, any>;
 
-    // Tile job state (ADD THIS)
+    // Tiled rendering state
     tileJob?: TileJob;
 
     // Optional metadata

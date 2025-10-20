@@ -1,20 +1,27 @@
-import type { ParameterChanges } from './types.js';
+// app/ParameterStore.ts
+import type { ParameterChanges } from './types';
 
 /**
- * Minimal ParameterStore - just stores values and notifies changes
+ * ParameterStore - Central parameter storage and change notification
+ *
+ * Responsibilities:
+ * - Store parameter values (numbers, vectors, arrays, etc.)
+ * - Notify listeners when parameters change
+ * - Batch updates to reduce notifications
+ * - Serialize/restore for session management
+ * - Handle recipe switching (resend all parameters)
  */
 class ParameterStore {
     private parameters = new Map<string, any>();
     private _onChange: ((changes: ParameterChanges) => void) | null = null;
 
     /**
-     * When onChange is set, immediately sync all existing parameters
+     * Set change callback - immediately syncs all existing parameters
      */
     set onChange(callback: ((changes: ParameterChanges) => void) | null) {
         this._onChange = callback;
 
         if (callback && this.parameters.size > 0) {
-            // Send all existing parameters immediately
             callback({
                 changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
                     path,
@@ -30,12 +37,11 @@ class ParameterStore {
     }
 
     /**
-     * Set parameter and notify if changed
+     * Set single parameter
      */
     set(path: string, value: any): void {
         const oldValue = this.parameters.get(path);
 
-        // Skip if same
         if (this.valuesEqual(oldValue, value)) return;
 
         this.parameters.set(path, value);
@@ -48,7 +54,7 @@ class ParameterStore {
     }
 
     /**
-     * Set multiple parameters and notify once
+     * Set multiple parameters in batch
      */
     batch(updates: Record<string, any>): void {
         const changes = [];
@@ -68,44 +74,38 @@ class ParameterStore {
     }
 
     /**
-     * Force re-send all parameters (useful after recipe switch)
-     */
-    resendAll(): void {
-        if (!this._onChange || this.parameters.size === 0) return;
-
-        // Treat all parameters as "changed" to force GPU update
-        this._onChange({
-            changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
-                path,
-                oldValue: value,  // Same as new, but forces update
-                newValue: value
-            }))
-        });
-    }
-
-
-    /**
      * Get parameter value
      */
     get(path: string): any {
         return this.parameters.get(path);
     }
 
+    /**
+     * Force re-send all parameters (for recipe switching)
+     */
+    resendAll(): void {
+        if (!this._onChange || this.parameters.size === 0) return;
+
+        this._onChange({
+            changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
+                path,
+                oldValue: value,
+                newValue: value
+            }))
+        });
+    }
 
     /**
-     * Export all parameters for session saving
+     * Serialize all parameters for session saving
      */
     serialize(): Record<string, any> {
         const obj: Record<string, any> = {};
 
         for (const [key, value] of this.parameters.entries()) {
-            // Handle special types
-            if (value instanceof Float32Array) {
+            if (value instanceof Float32Array || value instanceof Array) {
                 obj[key] = Array.from(value);
-            } else if (Array.isArray(value)) {
-                obj[key] = [...value];  // Copy arrays
             } else if (value && typeof value === 'object') {
-                obj[key] = JSON.parse(JSON.stringify(value));  // Deep copy objects
+                obj[key] = JSON.parse(JSON.stringify(value));
             } else {
                 obj[key] = value;
             }
@@ -115,33 +115,28 @@ class ParameterStore {
     }
 
     /**
-     * Import parameters without triggering onChange
-     * Used when loading sessions
+     * Restore parameters from session (without triggering individual changes)
      */
     restore(params: Record<string, any>): void {
-        // Disable onChange during bulk restore
         const oldOnChange = this._onChange;
         this._onChange = null;
 
-        // Clear existing parameters
         this.parameters.clear();
 
-        // Restore each parameter
         for (const [key, value] of Object.entries(params)) {
-            // Convert arrays back to Float32Array for certain parameters
+            // Convert arrays to Float32Array for camera.frame
             if (key === 'camera.frame' && Array.isArray(value)) {
                 this.parameters.set(key, new Float32Array(value));
             } else if (Array.isArray(value)) {
-                this.parameters.set(key, [...value]);  // Copy arrays
+                this.parameters.set(key, [...value]);
             } else {
                 this.parameters.set(key, value);
             }
         }
 
-        // Re-enable onChange
         this._onChange = oldOnChange;
 
-        // Send all parameters to GPU in one batch
+        // Send all parameters in one batch
         if (this._onChange) {
             this._onChange({
                 changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
@@ -153,20 +148,23 @@ class ParameterStore {
         }
     }
 
+    // ============================================================================
+    // Private Helpers
+    // ============================================================================
 
-
-
-
-
-
-    /**
-     * Helper to compare values including arrays
-     */
     private valuesEqual(a: any, b: any): boolean {
         if (a === b) return true;
-        if (Array.isArray(a) && Array.isArray(b) &&
-            a.length === b.length &&
-            a.every((v, i) => v === b[i])) return true;
+
+        // Handle arrays and typed arrays
+        if ((Array.isArray(a) || ArrayBuffer.isView(a)) &&
+            (Array.isArray(b) || ArrayBuffer.isView(b))) {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (a[i] !== b[i]) return false;
+            }
+            return true;
+        }
+
         return false;
     }
 }
