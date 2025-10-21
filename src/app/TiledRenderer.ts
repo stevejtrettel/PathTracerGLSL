@@ -20,8 +20,6 @@ export interface TileGrid {
 export interface TileJob {
     config: TileJobConfig;
     grid: TileGrid;
-    currentTile: [number, number];
-    currentTileNumber: number;
     completedTiles: [number, number][];
     completedTileCount: number;
     jobId: string;
@@ -31,6 +29,9 @@ export interface TileJob {
 
 /**
  * TiledRenderer - Production rendering with tiled output
+ *
+ * Uses production mode internally for each tile, providing
+ * automatic parameter locking and clean error handling.
  */
 export class TiledRenderer {
     private app: App;
@@ -57,7 +58,7 @@ export class TiledRenderer {
     /**
      * Start a new tiled render job
      */
-    startJob(config: TileJobConfig): void {
+    async startJob(config: TileJobConfig): Promise<void> {
         if (this.currentJob) {
             throw new Error('Job already running');
         }
@@ -73,8 +74,6 @@ export class TiledRenderer {
         this.currentJob = {
             config,
             grid,
-            currentTile: [0, 0],
-            currentTileNumber: 0,
             completedTiles: [],
             completedTileCount: 0,
             jobId: this.generateJobId(),
@@ -82,8 +81,8 @@ export class TiledRenderer {
             state: 'running'
         };
 
-        this.app.sessionManager.save(`${this.currentJob.jobId}_session.json`);
-        this.renderNextTile();
+        await this.app.sessionManager.save(`${this.currentJob.jobId}_session.json`);
+        await this.renderAllTiles();
     }
 
     /**
@@ -100,106 +99,94 @@ export class TiledRenderer {
         if (!this.currentJob) return;
 
         this.currentJob.state = 'paused';
-        this.app.renderCoordinator.stop();
+        this.app.stop();  // Stop current tile render
 
         const { completedTileCount, grid } = this.currentJob;
         const totalTiles = grid.tilesX * grid.tilesY;
 
-        console.log(`Job paused at tile ${this.currentJob.currentTileNumber}`);
-        console.log(`Completed: ${completedTileCount}/${totalTiles}`);
+        console.log(`Job paused`);
+        console.log(`Completed: ${completedTileCount}/${totalTiles} tiles`);
     }
 
     /**
      * Resume job from session
      */
-    resumeJob(job: TileJob): void {
-        // Convert tile number to grid coordinates if needed
-        if (job.currentTileNumber !== undefined) {
-            job.currentTile = this.tileNumberToCoords(job.currentTileNumber, job.grid.tilesX);
-        }
-
+    async resumeJob(job: TileJob): Promise<void> {
         this.currentJob = job;
         this.currentJob.state = 'running';
 
         const totalTiles = job.grid.tilesX * job.grid.tilesY;
-        console.log(`Resuming from tile ${job.currentTileNumber} [${job.currentTile}]`);
-        console.log(`Completed: ${job.completedTileCount}/${totalTiles}`);
+        console.log(`Resuming tile job`);
+        console.log(`Completed: ${job.completedTileCount}/${totalTiles} tiles`);
 
-        this.renderNextTile();
+        await this.renderAllTiles();
     }
 
     // ============================================================================
     // Private: Rendering
     // ============================================================================
 
-    private async renderNextTile(): Promise<void> {
-        if (!this.currentJob || this.currentJob.state !== 'running') return;
+    private async renderAllTiles(): Promise<void> {
+        if (!this.currentJob) return;
 
-        const [tx, ty] = this.currentJob.currentTile;
-        const { grid, config } = this.currentJob;
+        const { grid } = this.currentJob;
+        const totalTiles = grid.tilesX * grid.tilesY;
 
-        if (ty >= grid.tilesY) {
-            this.completeJob();
-            return;
+        for (let ty = 0; ty < grid.tilesY; ty++) {
+            for (let tx = 0; tx < grid.tilesX; tx++) {
+                // Check if job was stopped
+                if (!this.currentJob || this.currentJob.state !== 'running') {
+                    console.log('Tile job stopped');
+                    return;
+                }
+
+                // Skip already completed tiles (for resume)
+                const alreadyDone = this.currentJob.completedTiles.some(
+                    ([x, y]) => x === tx && y === ty
+                );
+                if (alreadyDone) continue;
+
+                // Render tile
+                const tileNum = ty * grid.tilesX + tx + 1;
+                console.log(`\n[${tileNum}/${totalTiles}] Rendering tile [${tx}, ${ty}]`);
+
+                try {
+                    await this.renderTile(tx, ty);
+
+                    this.currentJob.completedTiles.push([tx, ty]);
+                    this.currentJob.completedTileCount++;
+
+                } catch (error: any) {
+                    if (error.name === 'RenderStopped') {
+                        console.log(`Tile [${tx}, ${ty}] stopped`);
+                        this.currentJob.state = 'paused';
+                        return;
+                    } else {
+                        console.error(`Tile [${tx}, ${ty}] failed:`, error);
+                        throw error;
+                    }
+                }
+            }
         }
 
-        const totalTiles = grid.tilesX * grid.tilesY;
-        console.log(`\n[${this.currentJob.completedTileCount + 1}/${totalTiles}] Tile ${this.currentJob.currentTileNumber} [${tx}, ${ty}]`);
+        this.completeJob();
+    }
 
-        // Setup rendering environment
+    private async renderTile(tx: number, ty: number): Promise<void> {
+        if (!this.currentJob) return;
+
+        const { grid, config } = this.currentJob;
+
+        // Setup tile geometry
         this.app.handleResize(grid.tileWidth, grid.tileHeight);
         this.app.engine.setImageSize(config.targetWidth, config.targetHeight);
         this.app.engine.setPixelOffset(tx * grid.tileWidth, ty * grid.tileHeight);
 
-        // Render tile
-        this.app.renderCoordinator.resetAccumulation('tile_start');
-        await this.renderToCompletion(config.samplesPerTile);
+        // Render using production mode (automatically resets, locks, renders to target)
+        await this.app.renderProduction(config.samplesPerTile);
 
-        // Save and advance
+        // Save tile
         await this.saveTile(tx, ty);
-        this.currentJob.completedTiles.push([tx, ty]);
-        this.currentJob.completedTileCount++;
-        this.advanceToNextTile();
-
-        // Continue
-        this.renderNextTile();
-    }
-
-    private async renderToCompletion(targetSamples: number): Promise<void> {
-        return new Promise<void>((resolve) => {
-            const checkComplete = () => {
-                if (this.app.engine.sampleCount >= targetSamples) {
-                    this.app.renderCoordinator.stop();
-                    resolve();
-                } else {
-                    requestAnimationFrame(checkComplete);
-                }
-            };
-
-            if (!this.app.renderCoordinator.isRunning()) {
-                this.app.renderCoordinator.start();
-            }
-
-            checkComplete();
-        });
-    }
-
-    private advanceToNextTile(): void {
-        if (!this.currentJob) return;
-
-        const [tx, ty] = this.currentJob.currentTile;
-        const { tilesX } = this.currentJob.grid;
-
-        let nextX = tx + 1;
-        let nextY = ty;
-
-        if (nextX >= tilesX) {
-            nextX = 0;
-            nextY++;
-        }
-
-        this.currentJob.currentTile = [nextX, nextY];
-        this.currentJob.currentTileNumber = this.coordsToTileNumber(nextX, nextY, tilesX);
     }
 
     private completeJob(): void {
@@ -256,19 +243,5 @@ export class TiledRenderer {
         const minutes = String(now.getMinutes()).padStart(2, '0');
 
         return `job_${year}_${month}${day}_${hours}${minutes}`;
-    }
-
-    // ============================================================================
-    // Private: Helpers
-    // ============================================================================
-
-    private tileNumberToCoords(tileNumber: number, tilesX: number): [number, number] {
-        const tx = tileNumber % tilesX;
-        const ty = Math.floor(tileNumber / tilesX);
-        return [tx, ty];
-    }
-
-    private coordsToTileNumber(tx: number, ty: number, tilesX: number): number {
-        return ty * tilesX + tx;
     }
 }

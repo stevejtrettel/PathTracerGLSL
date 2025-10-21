@@ -85,7 +85,7 @@ class App {
             this.bus.emit('render.progress', info);
 
             if (info.state === 'complete') {
-                console.log(`Render complete: ${info.samples} samples in ${(info.elapsedTime! / 1000).toFixed(1)}s`);
+                console.log(`Render complete: ${info.samples} samples in ${(info.elapsedTime / 1000).toFixed(1)}s`);
                 this.bus.emit('render.complete', info);
             }
         };
@@ -114,7 +114,7 @@ class App {
             this.parameterStore.batch(initialParameters);
         }
 
-        this.renderCoordinator.start();
+        this.renderCoordinator.startInteractive();
         this.bus.emit('render.started');
 
         console.log('App initialized with recipes:', this.engine.getAvailableRecipes());
@@ -143,6 +143,21 @@ class App {
             else if (e.key === ' ') {
                 this.toggleRendering();
             }
+            else if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                this.startProductionRender();
+            }
+            else if (e.key === '\\') {
+                // Toggle pause/resume
+                if (this.renderCoordinator.isPaused()) {
+                    this.resume();
+                } else {
+                    this.pause();
+                }
+            }
+            else if (e.key === 'Escape') {
+                this.stop();
+            }
 
             // Session management
             else if (e.key === 'j' || e.key === 'J') {
@@ -170,6 +185,12 @@ class App {
 
         console.log(`Switching to recipe: ${recipeId}`);
 
+        //Block during production
+        if (this.renderCoordinator.isLocked()) {
+            console.warn('⚠️ Cannot switch recipes during production render');
+            return;
+        }
+
         this.isSwitchingRecipe = true;
         this.engine.selectRecipe(recipeId);
         this.currentRecipeId = recipeId;
@@ -184,13 +205,6 @@ class App {
      */
     resetAccumulation(): void {
         this.renderCoordinator.resetAccumulation('manual');
-        this.parameterStore.set('accumulator.reset', true);
-
-        setTimeout(() => {
-            this.parameterStore.set('accumulator.reset', false);
-        }, 100);
-
-        this.bus.emit('accumulation.reset');
     }
 
     /**
@@ -201,7 +215,7 @@ class App {
             this.renderCoordinator.stop();
             this.bus.emit('render.stopped');
         } else {
-            this.renderCoordinator.start();
+            this.renderCoordinator.startInteractive();
             this.bus.emit('render.started');
         }
     }
@@ -210,6 +224,11 @@ class App {
      * Handle canvas resize
      */
     handleResize(width: number, height: number): void {
+        if (this.renderCoordinator.isLocked()) {
+            console.warn('⚠️ Ignoring resize during production render');
+            return;
+        }
+
         const canvas = this.engine['gl'].canvas as HTMLCanvasElement;
         canvas.width = width;
         canvas.height = height;
@@ -217,6 +236,83 @@ class App {
         this.engine.resize(width, height);
         this.parameterStore.set('resolution', [width, height]);
         this.renderCoordinator.resetAccumulation('resize');
+    }
+
+    // ============================================================================
+    // Rendering API
+    // ============================================================================
+
+    /**
+     * Start interactive rendering (continuous, unlocked)
+     */
+    renderInteractive(): void {
+        this.renderCoordinator.startInteractive();
+    }
+
+    /**
+     * Render to completion (goal-driven, locked)
+     * Always resets accumulation before starting
+     */
+    async renderProduction(targetSamples: number): Promise<void> {
+        // Reset via coordinator (no parameter tricks)
+        this.renderCoordinator.resetAccumulation('production_start');
+
+        // Lock controls
+        this.parameterStore.lock();
+
+        try {
+            await this.renderCoordinator.startProduction({
+                targetSamples,
+                onProgress: (info) => {
+                    if (info.samples % 100 === 0) {
+                        const pct = info.percentComplete?.toFixed(1) || '0.0';
+                        console.log(`Progress: ${info.samples}/${targetSamples} (${pct}%)`);
+                    }
+                }
+            });
+
+            console.log(`✓ Production complete: ${targetSamples} samples`);
+
+        } catch (error: any) {
+            if (error.name === 'RenderStopped') {
+                console.log('Production render was stopped');
+            } else {
+                console.error('Production render failed:', error);
+                throw error;
+            }
+        } finally {
+            this.parameterStore.unlock();
+        }
+    }
+
+
+    /**
+     * Pause current rendering (any mode)
+     */
+    pause(): void {
+        this.renderCoordinator.pause();
+    }
+
+    /**
+     * Resume paused rendering
+     */
+    resume(): void {
+        this.renderCoordinator.resume();
+    }
+
+    /**
+     * Stop rendering completely
+     */
+    stop(): void {
+        this.renderCoordinator.stop();
+        this.parameterStore.unlock();  // Ensure unlocked
+    }
+
+    /**
+     * Check if rendering is locked (production mode)
+     */
+    isLocked(): boolean {
+        return this.renderCoordinator.isLocked();
     }
 
     // ============================================================================
@@ -307,6 +403,13 @@ class App {
     // ============================================================================
     // Private: User Input Handlers
     // ============================================================================
+
+    private startProductionRender(): void {
+        const samples = parseInt(prompt('Target samples?', '1000') || '1000');
+        if (samples > 0) {
+            this.renderProduction(samples);
+        }
+    }
 
     private startTileJob(): void {
         const width = parseInt(prompt('Target width?', '3840') || '3840');

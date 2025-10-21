@@ -5,11 +5,10 @@ import { EventManager } from '../utils/EventManager';
 /**
  * StatsPanelExtension - Displays rendering statistics overlay
  *
- * Shows:
- * - Samples per second (rolling average)
- * - Total sample count
- * - Resolution
- * - Time since last reset
+ * Adapts display based on rendering state:
+ * - Accumulating: Shows samples/sec, total samples, time
+ * - One-shot: Shows FPS only
+ * - Shows lock/pause status indicators
  */
 class StatsPanelExtension implements Extension {
     name = 'stats-panel';
@@ -26,8 +25,9 @@ class StatsPanelExtension implements Extension {
     private resolution = [0, 0];
     private timeSinceReset = 0;
 
-    // Rolling window for SPS calculation
+    // Rolling windows for rate calculations
     private sampleWindow: Array<{ samples: number; time: number }> = [];
+    private frameWindow: Array<{ time: number }> = [];
     private readonly WINDOW_DURATION = 1000; // 1 second window in ms
 
     install(app: any, bus: any): void {
@@ -46,6 +46,8 @@ class StatsPanelExtension implements Extension {
         this.events.onBus(bus, 'render.progress', this.handleProgress);
         this.events.onBus(bus, 'accumulation.reset', this.handleReset);
         this.events.onBus(bus, 'parameter.changed', this.handleParameterChange);
+        this.events.onBus(bus, 'render.paused', this.handlePause);
+        this.events.onBus(bus, 'render.resumed', this.handleResume);
 
         console.log('StatsPanel extension installed');
     }
@@ -90,16 +92,45 @@ class StatsPanelExtension implements Extension {
     private updateDisplay(): void {
         if (!this.panel) return;
 
-        const sps = this.calculateSamplesPerSecond();
-        const spsDisplay = sps > 0 ? sps.toFixed(1) : '---';
-        const timeDisplay = this.formatTime(this.timeSinceReset);
+        const coordinator = this.app.renderCoordinator;
+        const isAccumulating = coordinator.isAccumulating();
+        const isLocked = coordinator.isLocked();
+        const isPaused = coordinator.isPaused();
 
-        this.panel.innerHTML = `
-            <div><strong>Samples/sec:</strong> ${spsDisplay}</div>
-            <div><strong>Total samples:</strong> ${this.totalSamples}</div>
-            <div><strong>Resolution:</strong> ${this.resolution[0]}×${this.resolution[1]}</div>
-            <div><strong>Time:</strong> ${timeDisplay}</div>
-        `;
+        let html = '';
+
+        // Status indicators
+        if (isPaused) {
+            html += `<div style="color: orange; margin-bottom: 4px">⏸ PAUSED</div>`;
+        } else if (isLocked) {
+            html += `<div style="color: orange; margin-bottom: 4px">🔒 PRODUCTION</div>`;
+        }
+
+        // Accumulating: show sample statistics
+        if (isAccumulating) {
+            const sps = this.calculateSamplesPerSecond();
+            const spsDisplay = sps > 0 ? sps.toFixed(1) : '---';
+            const timeDisplay = this.formatTime(this.timeSinceReset);
+
+            html += `
+                <div><strong>Samples/sec:</strong> ${spsDisplay}</div>
+                <div><strong>Total samples:</strong> ${this.totalSamples}</div>
+                <div><strong>Resolution:</strong> ${this.resolution[0]}×${this.resolution[1]}</div>
+                <div><strong>Time:</strong> ${timeDisplay}</div>
+            `;
+        }
+        // One-shot: show FPS only
+        else {
+            const fps = this.calculateFPS();
+            const fpsDisplay = fps > 0 ? fps.toFixed(1) : '---';
+
+            html += `
+                <div><strong>FPS:</strong> ${fpsDisplay}</div>
+                <div><strong>Resolution:</strong> ${this.resolution[0]}×${this.resolution[1]}</div>
+            `;
+        }
+
+        this.panel.innerHTML = html;
     }
 
     // ============================================================================
@@ -114,7 +145,7 @@ class StatsPanelExtension implements Extension {
         if (info.elapsedTime !== undefined) {
             this.timeSinceReset = info.elapsedTime / 1000;
 
-            // Add to rolling window
+            // Add to sample window
             this.sampleWindow.push({
                 samples: info.samples || 0,
                 time: info.elapsedTime
@@ -125,6 +156,15 @@ class StatsPanelExtension implements Extension {
             this.sampleWindow = this.sampleWindow.filter(entry => entry.time > cutoffTime);
         }
 
+        if (info.timestamp !== undefined) {
+            // Track frames for FPS calculation
+            this.frameWindow.push({ time: info.timestamp });
+
+            // Remove old frames outside window
+            const cutoffTime = info.timestamp - this.WINDOW_DURATION;
+            this.frameWindow = this.frameWindow.filter(f => f.time > cutoffTime);
+        }
+
         this.updateDisplay();
     };
 
@@ -132,6 +172,7 @@ class StatsPanelExtension implements Extension {
         this.totalSamples = 0;
         this.timeSinceReset = 0;
         this.sampleWindow = [];
+        this.frameWindow = [];
         this.updateDisplay();
     };
 
@@ -143,6 +184,16 @@ class StatsPanelExtension implements Extension {
                 break;
             }
         }
+    };
+
+    private handlePause = (): void => {
+        // Force update to show pause indicator
+        this.updateDisplay();
+    };
+
+    private handleResume = (): void => {
+        // Force update to remove pause indicator
+        this.updateDisplay();
     };
 
     // ============================================================================
@@ -161,6 +212,19 @@ class StatsPanelExtension implements Extension {
         if (timeDiff <= 0) return 0;
 
         return sampleDiff / timeDiff;
+    }
+
+    private calculateFPS(): number {
+        if (this.frameWindow.length < 2) return 0;
+
+        const oldest = this.frameWindow[0];
+        const newest = this.frameWindow[this.frameWindow.length - 1];
+
+        const timeDiff = (newest.time - oldest.time) / 1000; // Convert to seconds
+
+        if (timeDiff <= 0) return 0;
+
+        return this.frameWindow.length / timeDiff;
     }
 
     private formatTime(seconds: number): string {

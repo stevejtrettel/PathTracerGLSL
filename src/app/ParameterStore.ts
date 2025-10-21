@@ -10,9 +10,11 @@ import type { ParameterChanges } from './types';
  * - Batch updates to reduce notifications
  * - Serialize/restore for session management
  * - Handle recipe switching (resend all parameters)
+ * - Lock/unlock for production renders
  */
 class ParameterStore {
     private parameters = new Map<string, any>();
+    private locked = false;
     private _onChange: ((changes: ParameterChanges) => void) | null = null;
 
     /**
@@ -37,9 +39,37 @@ class ParameterStore {
     }
 
     /**
+     * Lock parameters (production mode)
+     */
+    lock(): void {
+        this.locked = true;
+        console.log('🔒 Parameters locked');
+    }
+
+    /**
+     * Unlock parameters
+     */
+    unlock(): void {
+        this.locked = false;
+        console.log('🔓 Parameters unlocked');
+    }
+
+    /**
+     * Check if parameters are locked
+     */
+    isLocked(): boolean {
+        return this.locked;
+    }
+
+    /**
      * Set single parameter
      */
     set(path: string, value: any): void {
+        if (this.locked) {
+            console.warn(`⚠️ Ignoring parameter change during production: ${path}`);
+            return;
+        }
+
         const oldValue = this.parameters.get(path);
 
         if (this.valuesEqual(oldValue, value)) return;
@@ -57,6 +87,11 @@ class ParameterStore {
      * Set multiple parameters in batch
      */
     batch(updates: Record<string, any>): void {
+        if (this.locked) {
+            console.warn(`⚠️ Ignoring batch parameter update during production`);
+            return;
+        }
+
         const changes = [];
 
         for (const [path, value] of Object.entries(updates)) {
