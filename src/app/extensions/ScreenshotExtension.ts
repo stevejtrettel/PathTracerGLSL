@@ -35,7 +35,6 @@ class ScreenshotExtension implements Extension {
     };
 
     private async saveScreenshot(): Promise<void> {
-        const executor = this.app.engine['executor'];
         const gl = this.app.engine['gl'];
         const width = gl.canvas.width;
         const height = gl.canvas.height;
@@ -46,7 +45,7 @@ class ScreenshotExtension implements Extension {
         console.log(`Saving PNG screenshot (${width}×${height}, ${sampleCount}spp)...`);
 
         // Read tone-mapped display pixels
-        const pixels = executor.readDisplay();
+        const pixels = this.app.engine.readRGB();
 
         // Generate filename: screenshot_2025_1020_1905_235spp.png
         const now = new Date();

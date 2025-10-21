@@ -218,17 +218,16 @@ export class TiledRenderer {
         if (!this.currentJob) return;
 
         const { config, grid, jobId } = this.currentJob;
-        const executor = this.app.engine['executor'];
         const filename = `${jobId}_tile_${String(tx).padStart(2, '0')}_${String(ty).padStart(2, '0')}_${config.samplesPerTile}spp`;
 
         if (config.format === 'hdr' || config.format === 'both') {
-            const radiance = executor.readRadiance();
+            const radiance = this.app.engine.readRadiance();
             saveHDRFile(radiance, grid.tileWidth, grid.tileHeight, `${filename}.hdr`);
         }
 
         if (config.format === 'png' || config.format === 'both') {
-            const display = executor.readDisplay();
-            savePNGFile(display, grid.tileWidth, grid.tileHeight, `${filename}.png`);
+            const rgb = this.app.engine.readRGB();
+            savePNGFile(rgb, grid.tileWidth, grid.tileHeight, `${filename}.png`);
         }
 
         console.log(`  ✓ Saved: ${filename}`);

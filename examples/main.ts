@@ -26,6 +26,8 @@ import { StatsPanelExtension } from "../src/app/extensions/StatsPanel";
 import { ScreenshotExtension } from "../src/app/extensions/ScreenshotExtension";
 import { HDRExportExtension } from "../src/app/extensions/HDRExportExtension";
 
+
+
 // HDR environment
 import envHDRI from '/hdri/autumn_field_1k.hdr';
 
@@ -119,8 +121,7 @@ async function main() {
     // Initialize with recipes, HDR, and parameters
     await app.initialize(recipes, envHDRI, parameters);
 
-
-   // app.use(new KeyboardControls());
+    
     app.use( new KeyboardControls());
     app.use(new StatsPanelExtension());
     app.use(new ScreenshotExtension());

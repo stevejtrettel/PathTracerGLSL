@@ -35,7 +35,6 @@ class HDRExportExtension implements Extension {
     };
 
     private async saveHDR(): Promise<void> {
-        const executor = this.app.engine['executor'];
         const gl = this.app.engine['gl'];
         const width = gl.canvas.width;
         const height = gl.canvas.height;
@@ -46,7 +45,7 @@ class HDRExportExtension implements Extension {
         console.log(`Saving HDR radiance (${width}×${height}, ${sampleCount}spp)...`);
 
         // Read HDR radiance (RGBA32F)
-        const radiance = executor.readRadiance();
+        const radiance = this.app.engine.readRadiance();
 
         // Generate filename
         const now = new Date();

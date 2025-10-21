@@ -187,6 +187,24 @@ class Engine {
         }
     }
 
+
+
+    /**
+     * Read HDR radiance output (RGBA32F)
+     * Use for: EXR export, scientific analysis, compositing
+     */
+    readRadiance(rect?: { x: number; y: number; width: number; height: number }): Float32Array {
+        return this.executor.readRadiance(rect);
+    }
+
+    /**
+     * Read tone-mapped display output (RGBA8)
+     * Use for: PNG/JPEG export, screenshots
+     */
+    readRGB(rect?: { x: number; y: number; width: number; height: number }): Uint8Array {
+        return this.executor.readDisplay(rect);
+    }
+
     /**
      * Render one frame
      */
@@ -233,6 +251,13 @@ class Engine {
     resize(width: number, height: number): void {
         this.resources.resize(width, height);
         this.executor.resize(width, height);
+    }
+
+    /**
+     * Get the canvas size
+     */
+    getCanvasSize(): [number, number] {
+        return [this.gl.canvas.width, this.gl.canvas.height];
     }
 
     /**

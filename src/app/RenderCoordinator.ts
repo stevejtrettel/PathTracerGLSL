@@ -22,6 +22,7 @@ interface ProgressInfo {
 
 interface ProductionGoal {
     targetSamples: number;
+    displayUpdateInterval?: number;  // Update display every N samples (default: 1)
     onProgress?: (info: ProgressInfo) => void;
     onComplete?: () => void;
 }
@@ -51,6 +52,9 @@ class RenderCoordinator {
     private goal: ProductionGoal | null = null;
     private productionResolve?: () => void;
     private productionReject?: (reason: any) => void;
+
+    // Display throttling
+    private samplesSinceDisplay = 0;
 
     // Reset rules
     private resetPrefixes = ['camera.', 'quad.', 'material.', 'scene.'];
@@ -246,6 +250,7 @@ class RenderCoordinator {
     resetAccumulation(reason: string = 'manual'): void {
         this.engine.clearAccumulation();
         this.startTime = performance.now();
+        this.samplesSinceDisplay = 0;
 
         this.bus.emit('accumulation.reset', { reason });
         console.log(`Accumulation reset: ${reason}`);
@@ -259,7 +264,19 @@ class RenderCoordinator {
         const loop = () => {
             if (!this.running || this.paused) return;
 
+            // Always execute main render pass
             this.engine.renderFrame();
+
+            // Update display based on mode
+            const shouldUpdateDisplay = this.shouldUpdateDisplay();
+            if (shouldUpdateDisplay) {
+                const radianceTexture = this.engine['resources'].getCurrentTexture();
+                this.engine['executor'].executeDisplayPass(radianceTexture);
+                this.samplesSinceDisplay = 0;
+            } else {
+                this.samplesSinceDisplay++;
+            }
+
             this.reportProgress();
 
             // Production mode: check if goal met
@@ -272,6 +289,20 @@ class RenderCoordinator {
         };
 
         this.animationId = requestAnimationFrame(loop);
+    }
+
+    /**
+     * Determine if display should be updated this frame
+     */
+    private shouldUpdateDisplay(): boolean {
+        // Interactive mode: always update (every frame)
+        if (this.mode === 'interactive') {
+            return true;
+        }
+
+        // Production mode: respect display interval
+        const interval = this.goal?.displayUpdateInterval ?? 1;
+        return this.samplesSinceDisplay >= interval;
     }
 
     private checkGoalMet(): boolean {
