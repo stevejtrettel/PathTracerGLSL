@@ -68,6 +68,7 @@ export class SessionManager {
         }
 
         this.app.parameterStore.restore(session.parameters);
+        this.app.renderCoordinator.setMode(session.renderMode);
         this.app.renderCoordinator.resetAccumulation('session_load');
         this.restoreCamera(session.camera);
         this.restoreExtensionStates(session.extensions);
@@ -76,7 +77,7 @@ export class SessionManager {
         if (session.tileJob) {
             this.app.tiledRenderer.resumeJob(session.tileJob);
         } else if (wasRunning) {
-            this.app.renderCoordinator.startInteractive();
+            this.app.renderCoordinator.start();
         }
 
         console.log('✓ Session restored');

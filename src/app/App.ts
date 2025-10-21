@@ -53,7 +53,6 @@ class App {
         this.parameterStore = new ParameterStore();
         this.bus = new EventBus();
         this.renderCoordinator = new RenderCoordinator(this.engine, this.bus);
-        this.parameterStore.setCoordinator(this.renderCoordinator);
         this.sessionManager = new SessionManager(this);
         this.tiledRenderer = new TiledRenderer(this);
 
@@ -254,17 +253,16 @@ class App {
      * Render to completion (goal-driven, locked)
      * Always resets accumulation before starting
      */
-    async renderProduction(
-        targetSamples: number,
-        options?: { displayUpdateInterval?: number }
-    ): Promise<void> {
-        // Reset via coordinator
+    async renderProduction(targetSamples: number): Promise<void> {
+        // Reset via coordinator (no parameter tricks)
         this.renderCoordinator.resetAccumulation('production_start');
+
+        // Lock controls
+        this.parameterStore.lock();
 
         try {
             await this.renderCoordinator.startProduction({
                 targetSamples,
-                displayUpdateInterval: options?.displayUpdateInterval,
                 onProgress: (info) => {
                     if (info.samples % 100 === 0) {
                         const pct = info.percentComplete?.toFixed(1) || '0.0';
@@ -282,8 +280,11 @@ class App {
                 console.error('Production render failed:', error);
                 throw error;
             }
+        } finally {
+            this.parameterStore.unlock();
         }
     }
+
 
     /**
      * Pause current rendering (any mode)
@@ -304,6 +305,7 @@ class App {
      */
     stop(): void {
         this.renderCoordinator.stop();
+        this.parameterStore.unlock();  // Ensure unlocked
     }
 
     /**
@@ -379,13 +381,6 @@ class App {
     }
 
     /**
-     * Get extension map (for SessionManager)
-     */
-    getExtensions(): ReadonlyMap<string, Extension> {
-        return this.extensions;
-    }
-
-    /**
      * Clean up resources
      */
     dispose(): void {
@@ -411,9 +406,8 @@ class App {
 
     private startProductionRender(): void {
         const samples = parseInt(prompt('Target samples?', '1000') || '1000');
-
         if (samples > 0) {
-            this.renderProduction(samples, { displayUpdateInterval: 30 });
+            this.renderProduction(samples);
         }
     }
 

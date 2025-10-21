@@ -1,6 +1,5 @@
 // app/ParameterStore.ts
 import type { ParameterChanges } from './types';
-import type { RenderCoordinator } from './RenderCoordinator';
 
 /**
  * ParameterStore - Central parameter storage and change notification
@@ -11,19 +10,12 @@ import type { RenderCoordinator } from './RenderCoordinator';
  * - Batch updates to reduce notifications
  * - Serialize/restore for session management
  * - Handle recipe switching (resend all parameters)
+ * - Lock/unlock for production renders
  */
 class ParameterStore {
     private parameters = new Map<string, any>();
-    private suppressNotifications = false;
+    private locked = false;
     private _onChange: ((changes: ParameterChanges) => void) | null = null;
-    private coordinator: RenderCoordinator | null = null;
-
-    /**
-     * Set render coordinator (for lock state queries)
-     */
-    setCoordinator(coordinator: RenderCoordinator): void {
-        this.coordinator = coordinator;
-    }
 
     /**
      * Set change callback - immediately syncs all existing parameters
@@ -32,7 +24,7 @@ class ParameterStore {
         this._onChange = callback;
 
         if (callback && this.parameters.size > 0) {
-            this.notify({
+            callback({
                 changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
                     path,
                     oldValue: undefined,
@@ -47,17 +39,33 @@ class ParameterStore {
     }
 
     /**
-     * Check if parameters are locked (queries RenderCoordinator)
+     * Lock parameters (production mode)
+     */
+    lock(): void {
+        this.locked = true;
+        console.log('🔒 Parameters locked');
+    }
+
+    /**
+     * Unlock parameters
+     */
+    unlock(): void {
+        this.locked = false;
+        console.log('🔓 Parameters unlocked');
+    }
+
+    /**
+     * Check if parameters are locked
      */
     isLocked(): boolean {
-        return this.coordinator?.isLocked() ?? false;
+        return this.locked;
     }
 
     /**
      * Set single parameter
      */
     set(path: string, value: any): void {
-        if (this.isLocked()) {
+        if (this.locked) {
             console.warn(`⚠️ Ignoring parameter change during production: ${path}`);
             return;
         }
@@ -68,16 +76,18 @@ class ParameterStore {
 
         this.parameters.set(path, value);
 
-        this.notify({
-            changes: [{ path, oldValue, newValue: value }]
-        });
+        if (this._onChange) {
+            this._onChange({
+                changes: [{ path, oldValue, newValue: value }]
+            });
+        }
     }
 
     /**
      * Set multiple parameters in batch
      */
     batch(updates: Record<string, any>): void {
-        if (this.isLocked()) {
+        if (this.locked) {
             console.warn(`⚠️ Ignoring batch parameter update during production`);
             return;
         }
@@ -93,8 +103,8 @@ class ParameterStore {
             }
         }
 
-        if (changes.length > 0) {
-            this.notify({ changes });
+        if (changes.length > 0 && this._onChange) {
+            this._onChange({ changes });
         }
     }
 
@@ -109,9 +119,9 @@ class ParameterStore {
      * Force re-send all parameters (for recipe switching)
      */
     resendAll(): void {
-        if (this.parameters.size === 0) return;
+        if (!this._onChange || this.parameters.size === 0) return;
 
-        this.notify({
+        this._onChange({
             changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
                 path,
                 oldValue: value,
@@ -143,8 +153,8 @@ class ParameterStore {
      * Restore parameters from session (without triggering individual changes)
      */
     restore(params: Record<string, any>): void {
-        // Suppress notifications while loading
-        this.suppressNotifications = true;
+        const oldOnChange = this._onChange;
+        this._onChange = null;
 
         this.parameters.clear();
 
@@ -159,26 +169,23 @@ class ParameterStore {
             }
         }
 
-        this.suppressNotifications = false;
+        this._onChange = oldOnChange;
 
         // Send all parameters in one batch
-        this.notify({
-            changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
-                path,
-                oldValue: undefined,
-                newValue: value
-            }))
-        });
+        if (this._onChange) {
+            this._onChange({
+                changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
+                    path,
+                    oldValue: undefined,
+                    newValue: value
+                }))
+            });
+        }
     }
 
     // ============================================================================
     // Private Helpers
     // ============================================================================
-
-    private notify(changes: ParameterChanges): void {
-        if (this.suppressNotifications || !this._onChange) return;
-        this._onChange(changes);
-    }
 
     private valuesEqual(a: any, b: any): boolean {
         if (a === b) return true;
