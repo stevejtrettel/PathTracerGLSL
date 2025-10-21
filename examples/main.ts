@@ -25,17 +25,47 @@ import { KeyboardControls } from "../src/app/extensions/KeyboardControls";
 import { StatsPanelExtension } from "../src/app/extensions/StatsPanel";
 import { ScreenshotExtension } from "../src/app/extensions/ScreenshotExtension";
 import { HDRExportExtension } from "../src/app/extensions/HDRExportExtension";
+import { TouchOrbitControls } from "../src/app/extensions/TouchOrbitControls";
+
+
+
+// Add this helper function at the top
+function getOrCreateCanvas(id: string = 'canvas'): HTMLCanvasElement {
+    let canvas = document.getElementById(id) as HTMLCanvasElement;
+
+    if (!canvas) {
+        console.log('No canvas found, creating one...');
+        canvas = document.createElement('canvas');
+        canvas.id = id;
+        canvas.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            margin: 0;
+            padding: 0;
+        `;
+        document.body.style.cssText = `
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        `;
+        document.body.appendChild(canvas);
+    }
+
+    return canvas;
+}
+
 
 
 
 // HDR environment
-import envHDRI from '/hdri/autumn_field_1k.hdr';
+// import envHDRI from '/hdri/autumn_field_1k.hdr';
 
 async function main() {
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-    if (!canvas) {
-        throw new Error('Canvas not found');
-    }
+    const canvas = getOrCreateCanvas();
 
     // Create recipes
     const recipes: Recipe[] = [
@@ -119,10 +149,10 @@ async function main() {
     const app = new App(canvas);
 
     // Initialize with recipes, HDR, and parameters
-    await app.initialize(recipes, envHDRI, parameters);
+    await app.initialize(recipes, undefined, parameters);
 
-    
-    app.use( new KeyboardControls());
+    app.use( new TouchOrbitControls());
+    app.use( new OrbitControls());
     app.use(new StatsPanelExtension());
     app.use(new ScreenshotExtension());
     app.use(new HDRExportExtension());

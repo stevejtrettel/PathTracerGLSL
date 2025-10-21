@@ -213,10 +213,10 @@ class App {
     toggleRendering(): void {
         if (this.renderCoordinator.isRunning()) {
             this.renderCoordinator.stop();
-            this.bus.emit('render.stopped');
+            // this.bus.emit('render.stopped');
         } else {
             this.renderCoordinator.startInteractive();
-            this.bus.emit('render.started');
+            // this.bus.emit('render.started');
         }
     }
 

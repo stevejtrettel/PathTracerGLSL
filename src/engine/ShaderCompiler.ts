@@ -16,7 +16,7 @@ import {
  *
  * Responsibilities:
  * - Compile vertex and fragment shaders
- * - Link programs (main accumulation + display tone mapping)
+ * - Link programs (main accumulation + display tone mapping + composite)
  * - Update engine-provided uniforms (time, resolution, etc.)
  * - Provide debug info for shader errors
  */
@@ -24,6 +24,7 @@ class ShaderCompiler {
     private gl: WebGL2RenderingContext;
     private mainProgram: WebGLProgram | null = null;
     private displayProgram: WebGLProgram | null = null;
+    private compositeProgram: WebGLProgram | null = null;
     private activeProgram: WebGLProgram | null = null;
 
     // Engine uniform locations
@@ -43,20 +44,24 @@ class ShaderCompiler {
     compile(modules: ModuleDescriptor[]): {
         mainProgram: WebGLProgram;
         displayProgram: WebGLProgram;
+        compositeProgram: WebGLProgram;
     } {
         const mainSource = buildMainShaderSource(modules);
         const displaySource = buildDisplayShaderSource(modules);
+        const compositeSource = this.buildCompositeShaderSource();
         const vertexSource = buildVertexShaderSource();
 
         this.mainProgram = this.compileAndLinkProgram(vertexSource, mainSource, 'main');
         this.displayProgram = this.compileAndLinkProgram(vertexSource, displaySource, 'display');
+        this.compositeProgram = this.compileAndLinkProgram(vertexSource, compositeSource, 'composite');
 
         this.lastCompiledSource = mainSource;
         this.lastCompiledSourceWithLineNumbers = addLineNumbers(mainSource);
 
         return {
             mainProgram: this.mainProgram,
-            displayProgram: this.displayProgram
+            displayProgram: this.displayProgram,
+            compositeProgram: this.compositeProgram
         };
     }
 
@@ -99,6 +104,13 @@ class ShaderCompiler {
     }
 
     /**
+     * Get composite program
+     */
+    getCompositeProgram(): WebGLProgram | null {
+        return this.compositeProgram;
+    }
+
+    /**
      * Get debug info for last compiled shader
      */
     getDebugInfo(): { source: string; numberedSource: string } | null {
@@ -114,6 +126,21 @@ class ShaderCompiler {
     // ============================================================================
     // Private: Compilation
     // ============================================================================
+
+    private buildCompositeShaderSource(): string {
+        return `#version 300 es
+precision highp float;
+
+uniform sampler2D u_rgb_texture;
+
+out vec4 fragColor;
+
+void main() {
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 color = texelFetch(u_rgb_texture, coord, 0).rgb;
+    fragColor = vec4(color, 1.0);
+}`;
+    }
 
     private setEngineUniform(name: string, value: any, type: UniformType): void {
         const location = this.uniformLocations.get(name);

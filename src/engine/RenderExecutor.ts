@@ -12,7 +12,7 @@ interface Rectangle {
  * RenderExecutor - Manages WebGL rendering execution
  *
  * Responsibilities:
- * - Execute main and display render passes
+ * - Execute main, display, and composite render passes
  * - Manage viewport state
  * - Provide pixel readback for HDR and LDR output
  */
@@ -21,6 +21,7 @@ export class RenderExecutor {
     private resources: ResourceManager;
     private mainProgram: WebGLProgram | null = null;
     private displayProgram: WebGLProgram | null = null;
+    private compositeProgram: WebGLProgram | null = null;
 
     // Current viewport dimensions
     private width: number;
@@ -44,6 +45,13 @@ export class RenderExecutor {
     }
 
     /**
+     * Set composite shader program
+     */
+    setCompositeProgram(composite: WebGLProgram): void {
+        this.compositeProgram = composite;
+    }
+
+    /**
      * Execute main accumulation pass
      */
     executeMainPass(): void {
@@ -56,14 +64,16 @@ export class RenderExecutor {
     }
 
     /**
-     * Execute display/tone mapping pass
+     * Execute display/tone mapping pass (renders to RGB buffer)
      */
     executeDisplayPass(radianceTexture: WebGLTexture): void {
         if (!this.displayProgram) {
             throw new Error('No display program set');
         }
 
-        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        // Render to RGB framebuffer (not screen!)
+        const rgbFB = this.resources.getRGBFramebuffer();
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, rgbFB);
         this.gl.viewport(0, 0, this.width, this.height);
         this.gl.useProgram(this.displayProgram);
 
@@ -72,6 +82,32 @@ export class RenderExecutor {
         this.gl.bindTexture(this.gl.TEXTURE_2D, radianceTexture);
 
         const loc = this.gl.getUniformLocation(this.displayProgram, 'u_radiance_texture');
+        if (loc) {
+            this.gl.uniform1i(loc, 0);
+        }
+
+        this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+    }
+
+    /**
+     * Execute composite pass (renders RGB buffer to screen)
+     */
+    executeCompositePass(): void {
+        if (!this.compositeProgram) {
+            throw new Error('No composite program set');
+        }
+
+        // Render to screen
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.viewport(0, 0, this.width, this.height);
+        this.gl.useProgram(this.compositeProgram);
+
+        // Bind RGB texture
+        const rgbTexture = this.resources.getRGBTexture();
+        this.gl.activeTexture(this.gl.TEXTURE0);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, rgbTexture);
+
+        const loc = this.gl.getUniformLocation(this.compositeProgram, 'u_rgb_texture');
         if (loc) {
             this.gl.uniform1i(loc, 0);
         }
@@ -122,16 +158,18 @@ export class RenderExecutor {
     }
 
     /**
-     * Read tone-mapped display from screen
+     * Read tone-mapped RGB from RGB buffer
      *
      * Returns Uint8Array with RGBA values (0-255 LDR range)
      * Use for: PNG/JPEG export, screenshots
      */
-    readDisplay(rect?: Rectangle): Uint8Array {
+    readRGB(rect?: Rectangle): Uint8Array {
         const r = rect || this.getFullRect();
         this.validateRect(r);
 
-        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        // Read from RGB framebuffer (not screen!)
+        const rgbFB = this.resources.getRGBFramebuffer();
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, rgbFB);
 
         const pixels = new Uint8Array(r.width * r.height * 4);
         this.gl.readPixels(
@@ -151,6 +189,7 @@ export class RenderExecutor {
     dispose(): void {
         this.mainProgram = null;
         this.displayProgram = null;
+        this.compositeProgram = null;
     }
 
     // ============================================================================

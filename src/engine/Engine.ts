@@ -39,6 +39,9 @@ class Engine {
     private recipes = new Map<string, Recipe>();
     private activeRecipeId: string | null = null;
 
+    // Composite program (shared across all recipes)
+    private compositeProgram: WebGLProgram | null = null;
+
     // Time tracking
     private _time: number = 0;
     private startTime: number;
@@ -85,19 +88,25 @@ class Engine {
 
         console.log(`Initializing ${recipes.length} recipes...`);
 
-        // Compile all recipes
+        // Compile all recipes (composite program is shared)
         for (const recipe of recipes) {
             this.recipes.set(recipe.id, recipe);
 
             const modules = this.extractModules(recipe);
-            const { mainProgram, displayProgram } = this.compiler.compile(modules);
+            const { mainProgram, displayProgram, compositeProgram } = this.compiler.compile(modules);
 
-            if (!mainProgram || !displayProgram) {
+            if (!mainProgram || !displayProgram || !compositeProgram) {
                 throw new Error(`Failed to compile programs for recipe: ${recipe.id}`);
             }
 
             this.programs.set(recipe.id, { main: mainProgram, display: displayProgram });
             this.resources.setupAccumulationBuffers(recipe.id);
+
+            // Store composite program (same for all recipes)
+            if (!this.compositeProgram) {
+                this.compositeProgram = compositeProgram;
+                this.executor.setCompositeProgram(compositeProgram);
+            }
 
             // Bind accumulator texture to unit 0
             this.gl.useProgram(mainProgram);
@@ -198,11 +207,11 @@ class Engine {
     }
 
     /**
-     * Read tone-mapped display output (RGBA8)
+     * Read tone-mapped RGB output (RGBA8)
      * Use for: PNG/JPEG export, screenshots
      */
     readRGB(rect?: { x: number; y: number; width: number; height: number }): Uint8Array {
-        return this.executor.readDisplay(rect);
+        return this.executor.readRGB(rect);
     }
 
     /**
@@ -235,10 +244,13 @@ class Engine {
             pixelOffset: this.pixelOffset
         });
 
-        // Execute rendering
+        // Execute rendering: Main → Display → Composite
         this.executor.executeMainPass();
+
         const radianceTexture = this.resources.getCurrentTexture();
         this.executor.executeDisplayPass(radianceTexture);
+
+        this.executor.executeCompositePass();
 
         // Finalize
         this.resources.finalizeFrame();
@@ -367,6 +379,7 @@ class Engine {
         this.programs.clear();
         this.recipes.clear();
         this.activeRecipeId = null;
+        this.compositeProgram = null;
         this.state = 'ready';
     }
 

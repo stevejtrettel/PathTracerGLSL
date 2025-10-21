@@ -8,10 +8,12 @@ interface AccumulatorResources {
     textures: {
         current: WebGLTexture;
         previous: WebGLTexture;
+        rgb: WebGLTexture;          // NEW: tone-mapped output
     };
     framebuffers: {
         current: WebGLFramebuffer;
         previous: WebGLFramebuffer;
+        rgb: WebGLFramebuffer;      // NEW: for display pass
     };
     accumulator: {
         sampleCount: number;
@@ -24,7 +26,8 @@ interface AccumulatorResources {
  * ResourceManager - Manages per-recipe GPU resources
  *
  * Responsibilities:
- * - Create and manage RGBA32F framebuffers for each recipe
+ * - Create and manage RGBA32F framebuffers for radiance (each recipe)
+ * - Create and manage RGBA8 framebuffers for RGB output (each recipe)
  * - Track accumulation state per recipe
  * - Handle buffer swapping (ping-pong)
  * - Handle resize (recreates all buffers)
@@ -60,12 +63,14 @@ export class ResourceManager {
 
         const textures = {
             current: this.createFilmTexture(),
-            previous: this.createFilmTexture()
+            previous: this.createFilmTexture(),
+            rgb: this.createRGBTexture()
         };
 
         const framebuffers = {
             current: this.createFramebuffer(textures.current),
-            previous: this.createFramebuffer(textures.previous)
+            previous: this.createFramebuffer(textures.previous),
+            rgb: this.createFramebuffer(textures.rgb)
         };
 
         const resources: AccumulatorResources = {
@@ -137,6 +142,20 @@ export class ResourceManager {
      */
     getCurrentFramebuffer(): WebGLFramebuffer {
         return this.getResources().framebuffers.current;
+    }
+
+    /**
+     * Get RGB texture (tone-mapped output)
+     */
+    getRGBTexture(): WebGLTexture {
+        return this.getResources().textures.rgb;
+    }
+
+    /**
+     * Get RGB framebuffer (for display pass)
+     */
+    getRGBFramebuffer(): WebGLFramebuffer {
+        return this.getResources().framebuffers.rgb;
     }
 
     /**
@@ -275,8 +294,10 @@ export class ResourceManager {
     private disposeResources(resources: AccumulatorResources): void {
         this.gl.deleteTexture(resources.textures.current);
         this.gl.deleteTexture(resources.textures.previous);
+        this.gl.deleteTexture(resources.textures.rgb);
         this.gl.deleteFramebuffer(resources.framebuffers.current);
         this.gl.deleteFramebuffer(resources.framebuffers.previous);
+        this.gl.deleteFramebuffer(resources.framebuffers.rgb);
     }
 
     private createFilmTexture(): WebGLTexture {
@@ -294,6 +315,33 @@ export class ResourceManager {
             0,
             this.gl.RGBA,
             this.gl.FLOAT,
+            null
+        );
+
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+        return texture;
+    }
+
+    private createRGBTexture(): WebGLTexture {
+        const texture = this.gl.createTexture();
+        if (!texture) throw new Error('Failed to create RGB texture');
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+
+        this.gl.texImage2D(
+            this.gl.TEXTURE_2D,
+            0,
+            this.gl.RGBA8,           // 8-bit per channel (LDR)
+            this.width,
+            this.height,
+            0,
+            this.gl.RGBA,
+            this.gl.UNSIGNED_BYTE,
             null
         );
 
