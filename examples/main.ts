@@ -27,6 +27,7 @@ import { ScreenshotExtension } from "../src/app/extensions/ScreenshotExtension";
 import { HDRExportExtension } from "../src/app/extensions/HDRExportExtension";
 import { TouchOrbitControls } from "../src/app/extensions/TouchOrbitControls";
 import { ParameterPanelExtension } from "../src/app/extensions/ParameterPanelExtension";
+import { RenderProgressExtension } from "../src/app/extensions/RenderProgressExtension";
 
 
 
@@ -177,6 +178,7 @@ async function main() {
 
     // Install extensions
     app.use(new ParameterPanelExtension());  // Beautiful parameter UI!
+    app.use(new RenderProgressExtension());  // Production render progress bar
     app.use(new TouchOrbitControls());
     app.use(new OrbitControls());
     app.use(new StatsPanelExtension());
