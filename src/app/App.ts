@@ -282,6 +282,9 @@ class App {
 
             console.log(`✓ Production complete: ${targetSamples} samples`);
 
+            // Auto-save the production render before unlocking
+            await this.saveProductionRender();
+
         } catch (error: any) {
             if (error.name === 'RenderStopped') {
                 console.log('Production render was stopped');
@@ -292,10 +295,43 @@ class App {
         } finally {
             this.parameterStore.unlock();
 
-            // Resume interactive rendering after production completes
+            // Resume interactive rendering after save completes
             console.log('Resuming interactive rendering...');
             this.renderCoordinator.startInteractive();
         }
+    }
+
+    private async saveProductionRender(): Promise<void> {
+        const gl = this.engine['gl'];
+        const width = gl.canvas.width;
+        const height = gl.canvas.height;
+        const sampleCount = this.engine.sampleCount;
+
+        console.log(`Saving production render (${width}×${height}, ${sampleCount}spp)...`);
+
+        // Read tone-mapped display pixels (PNG)
+        const pixels = this.engine.readRGB();
+
+        // Generate filename: production_YYYY_MMDD_HHMM_NNNNspp.png
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+
+        const dateStr = `${month}${day}`;
+        const timeStr = `${hours}${minutes}`;
+        const filename = `production_${year}_${dateStr}_${timeStr}_${sampleCount}spp.png`;
+
+        // Import the utility function
+        const { savePNGFile } = await import('./utils/file-export.js');
+        savePNGFile(pixels, width, height, filename);
+
+        console.log(`✓ Saved ${filename}`);
+
+        // Emit event so other extensions can react
+        this.bus.emit('production.saved', { filename, width, height, sampleCount });
     }
 
 
