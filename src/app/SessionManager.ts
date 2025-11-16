@@ -68,7 +68,6 @@ export class SessionManager {
         }
 
         this.app.parameterStore.restore(session.parameters);
-        this.app.renderCoordinator.setMode(session.renderMode);
         this.app.renderCoordinator.resetAccumulation('session_load');
         this.restoreCamera(session.camera);
         this.restoreExtensionStates(session.extensions);
@@ -77,7 +76,14 @@ export class SessionManager {
         if (session.tileJob) {
             this.app.tiledRenderer.resumeJob(session.tileJob);
         } else if (wasRunning) {
-            this.app.renderCoordinator.start();
+            // Restore appropriate render mode
+            if (session.renderMode === 'interactive') {
+                this.app.renderCoordinator.startInteractive();
+            } else if (session.renderMode === 'production') {
+                // For production, we'd need the goal - for now default to interactive
+                console.warn('Production mode sessions not fully supported yet - starting in interactive mode');
+                this.app.renderCoordinator.startInteractive();
+            }
         }
 
         console.log('✓ Session restored');

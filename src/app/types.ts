@@ -66,8 +66,13 @@ interface SessionData {
     parameters: Record<string, any>;
 
     // Render state
-    renderMode: 'interactive' | 'progressive' | 'production';
+    renderMode: 'interactive' | 'production';
     sampleCount: number;
+
+    // Production mode state (optional)
+    productionGoal?: {
+        targetSamples: number;
+    };
 
     // Camera state
     camera: {
