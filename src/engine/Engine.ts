@@ -93,11 +93,16 @@ class Engine {
             this.recipes.set(recipe.id, recipe);
 
             const modules = this.extractModules(recipe);
-            const { mainProgram, displayProgram, compositeProgram } = this.compiler.compile(modules);
+            const result = this.compiler.compile(modules);
 
-            if (!mainProgram || !displayProgram || !compositeProgram) {
-                throw new Error(`Failed to compile programs for recipe: ${recipe.id}`);
+            if (!result.success) {
+                throw new Error(
+                    `Failed to compile recipe "${recipe.id}". ` +
+                    `See console for detailed error messages.`
+                );
             }
+
+            const { mainProgram, displayProgram, compositeProgram } = result;
 
             this.programs.set(recipe.id, { main: mainProgram, display: displayProgram });
             this.resources.setupAccumulationBuffers(recipe.id);

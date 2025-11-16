@@ -25,14 +25,12 @@ import { ShaderErrorFormatter } from './shader/ShaderErrorFormatter.js';
  * @param errorLog - Raw GLSL compiler error string
  * @param source - Full concatenated shader source
  * @param modules - Array of module descriptors
- * @param options - Formatting options
  * @returns Complete diagnostics
  */
 export function translateShaderErrors(
     errorLog: string,
     source: string,
-    modules: ModuleDescriptor[],
-    options?: Partial<FormatOptions>
+    modules: ModuleDescriptor[]
 ): ShaderDiagnostics {
     // 1. Parse raw errors
     const parser = new ShaderErrorParser();

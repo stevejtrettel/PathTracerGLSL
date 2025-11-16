@@ -178,6 +178,22 @@ interface Recipe {
     };
 }
 
+/**
+ * Result of shader compilation
+ * Discriminated union for success or failure with diagnostics
+ */
+type CompilationResult =
+    | {
+        success: true;
+        mainProgram: WebGLProgram;
+        displayProgram: WebGLProgram;
+        compositeProgram: WebGLProgram;
+    }
+    | {
+        success: false;
+        diagnostics: import('../errors/types.js').ShaderDiagnostics;
+    };
+
 export { MODULE_ORDER };
 
 export type {
@@ -185,6 +201,7 @@ export type {
     ModuleKind,
     ValidationResult,
     CompiledProgram,
+    CompilationResult,
     EngineState,
     UniformBinding,
     EngineUniforms,

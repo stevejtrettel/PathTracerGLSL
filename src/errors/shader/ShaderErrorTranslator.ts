@@ -1,4 +1,4 @@
-import type { GLSLError, LineMap, TranslatedError, ErrorCategory } from '../types.js';
+import type { GLSLError, LineMap, TranslatedError } from '../types.js';
 import type { ModuleDescriptor } from '../../engine/types.js';
 import { ShaderErrorParser } from './ShaderErrorParser.js';
 import { extractFunctionDeclarations } from './utils/function-extraction.js';
