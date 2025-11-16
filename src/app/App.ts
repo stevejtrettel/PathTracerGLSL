@@ -346,6 +346,8 @@ class App {
     }
 
     private showProductionCompleteDialog(filenames: { png: string; hdr: string }): void {
+        const currentSamples = this.engine.sampleCount;
+
         // Create overlay
         const overlay = document.createElement('div');
         overlay.style.cssText = `
@@ -397,6 +399,69 @@ class App {
                     <div style="margin-bottom: 8px;">📷 ${filenames.png}</div>
                     <div>🌈 ${filenames.hdr}</div>
                 </div>
+
+                <!-- Extend production section -->
+                <div style="margin-bottom: 20px;">
+                    <p style="
+                        margin: 0 0 12px 0;
+                        font-size: 13px;
+                        color: rgba(255, 255, 255, 0.6);
+                    ">
+                        Or continue accumulating samples:
+                    </p>
+                    <div style="
+                        display: flex;
+                        gap: 8px;
+                        justify-content: center;
+                        flex-wrap: wrap;
+                    ">
+                        <button class="extend-btn" data-samples="100" style="
+                            background: rgba(255, 255, 255, 0.08);
+                            color: rgba(255, 255, 255, 0.9);
+                            border: 1px solid rgba(255, 255, 255, 0.15);
+                            border-radius: 6px;
+                            padding: 8px 16px;
+                            font-size: 13px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        ">+100</button>
+                        <button class="extend-btn" data-samples="500" style="
+                            background: rgba(255, 255, 255, 0.08);
+                            color: rgba(255, 255, 255, 0.9);
+                            border: 1px solid rgba(255, 255, 255, 0.15);
+                            border-radius: 6px;
+                            padding: 8px 16px;
+                            font-size: 13px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        ">+500</button>
+                        <button class="extend-btn" data-samples="1000" style="
+                            background: rgba(255, 255, 255, 0.08);
+                            color: rgba(255, 255, 255, 0.9);
+                            border: 1px solid rgba(255, 255, 255, 0.15);
+                            border-radius: 6px;
+                            padding: 8px 16px;
+                            font-size: 13px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        ">+1000</button>
+                        <button id="extend-custom-btn" style="
+                            background: rgba(255, 255, 255, 0.08);
+                            color: rgba(255, 255, 255, 0.9);
+                            border: 1px solid rgba(255, 255, 255, 0.15);
+                            border-radius: 6px;
+                            padding: 8px 16px;
+                            font-size: 13px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        ">Custom...</button>
+                    </div>
+                </div>
+
                 <button id="resume-interactive-btn" style="
                     background: rgba(74, 158, 255, 0.9);
                     color: white;
@@ -407,6 +472,7 @@ class App {
                     font-weight: 600;
                     cursor: pointer;
                     transition: all 0.2s ease;
+                    width: 100%;
                 ">
                     Resume Interactive Mode
                 </button>
@@ -416,27 +482,101 @@ class App {
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
 
-        // Add button hover effect
-        const button = dialog.querySelector('#resume-interactive-btn') as HTMLButtonElement;
-        button.addEventListener('mouseenter', () => {
-            button.style.background = 'rgba(74, 158, 255, 1)';
-            button.style.transform = 'scale(1.05)';
-        });
-        button.addEventListener('mouseleave', () => {
-            button.style.background = 'rgba(74, 158, 255, 0.9)';
-            button.style.transform = 'scale(1)';
+        // Add hover effects for extend buttons
+        const extendButtons = dialog.querySelectorAll('.extend-btn') as NodeListOf<HTMLButtonElement>;
+        extendButtons.forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'rgba(255, 255, 255, 0.15)';
+                btn.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'rgba(255, 255, 255, 0.08)';
+                btn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            });
+            btn.addEventListener('click', () => {
+                const additionalSamples = parseInt(btn.dataset.samples || '0');
+                overlay.remove();
+                this.extendProduction(additionalSamples);
+            });
         });
 
-        // Handle button click
-        button.addEventListener('click', () => {
-            // Remove overlay
+        // Custom extend button
+        const customBtn = dialog.querySelector('#extend-custom-btn') as HTMLButtonElement;
+        customBtn.addEventListener('mouseenter', () => {
+            customBtn.style.background = 'rgba(255, 255, 255, 0.15)';
+            customBtn.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+        });
+        customBtn.addEventListener('mouseleave', () => {
+            customBtn.style.background = 'rgba(255, 255, 255, 0.08)';
+            customBtn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+        });
+        customBtn.addEventListener('click', () => {
+            const input = prompt('Additional samples to render:', '1000');
+            if (input) {
+                const additionalSamples = parseInt(input);
+                if (additionalSamples > 0) {
+                    overlay.remove();
+                    this.extendProduction(additionalSamples);
+                }
+            }
+        });
+
+        // Resume interactive button
+        const resumeButton = dialog.querySelector('#resume-interactive-btn') as HTMLButtonElement;
+        resumeButton.addEventListener('mouseenter', () => {
+            resumeButton.style.background = 'rgba(74, 158, 255, 1)';
+            resumeButton.style.transform = 'scale(1.02)';
+        });
+        resumeButton.addEventListener('mouseleave', () => {
+            resumeButton.style.background = 'rgba(74, 158, 255, 0.9)';
+            resumeButton.style.transform = 'scale(1)';
+        });
+        resumeButton.addEventListener('click', () => {
             overlay.remove();
-
-            // Unlock and resume
             this.parameterStore.unlock();
             console.log('Resuming interactive rendering...');
             this.renderCoordinator.startInteractive();
         });
+    }
+
+    /**
+     * Extend production render with additional samples (no reset)
+     */
+    private async extendProduction(additionalSamples: number): Promise<void> {
+        const currentSamples = this.engine.sampleCount;
+        const newTarget = currentSamples + additionalSamples;
+
+        console.log(`Extending production render: +${additionalSamples} samples (${currentSamples} → ${newTarget})`);
+
+        // Controls stay locked, no reset
+        try {
+            await this.renderCoordinator.startProduction({
+                targetSamples: newTarget,
+                onProgress: (info) => {
+                    if (info.samples % 100 === 0) {
+                        const pct = info.percentComplete?.toFixed(1) || '0.0';
+                        console.log(`Progress: ${info.samples}/${newTarget} (${pct}%)`);
+                    }
+                }
+            });
+
+            console.log(`✓ Extended production complete: ${newTarget} samples`);
+
+            // Save again and show dialog
+            const filenames = await this.saveProductionRender();
+            this.showProductionCompleteDialog(filenames);
+
+        } catch (error: any) {
+            if (error.name === 'RenderStopped') {
+                console.log('Extended production render was stopped');
+                this.parameterStore.unlock();
+                this.renderCoordinator.startInteractive();
+            } else {
+                console.error('Extended production render failed:', error);
+                this.parameterStore.unlock();
+                throw error;
+            }
+        }
     }
 
 
