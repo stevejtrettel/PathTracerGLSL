@@ -5,8 +5,8 @@ import { RenderCoordinator } from './RenderCoordinator';
 import { EventBus } from './EventBus';
 import { SessionManager } from './SessionManager';
 import { TiledRenderer } from './TiledRenderer';
-import type { Recipe } from '../engine/types';
-import type { Extension } from './types';
+import type { Recipe, ModuleDescriptor } from '../engine/types';
+import type { Extension, ParameterMetadata } from './types';
 
 /**
  * App - High-level orchestration and user interaction
@@ -29,6 +29,9 @@ class App {
     // Extension system
     private extensions = new Map<string, Extension>();
     private services = new Map<string, any>();
+
+    // Parameter metadata collected from modules
+    private parameterMetadata = new Map<string, ParameterMetadata>();
 
     // Internal state
     private currentRecipeId: string | null = null;
@@ -103,21 +106,27 @@ class App {
             throw new Error('At least one recipe required');
         }
 
+        // Collect parameter metadata from all modules
+        this.collectParameterMetadata(recipes);
+
+        // Initialize engine
         this.engine.initialize(recipes);
         this.currentRecipeId = recipes[0].id;
 
+        // Load environment if provided
         if (environmentHDR) {
             await this.engine.loadEnvironmentHDR(environmentHDR);
         }
 
-        if (initialParameters) {
-            this.parameterStore.batch(initialParameters);
-        }
+        // Initialize parameters with defaults, then apply overrides
+        this.initializeParameters(initialParameters);
 
+        // Start rendering
         this.renderCoordinator.startInteractive();
         this.bus.emit('render.started');
 
         console.log('App initialized with recipes:', this.engine.getAvailableRecipes());
+        console.log('Parameter metadata collected:', this.parameterMetadata.size, 'parameters');
     }
 
     /**
@@ -273,18 +282,127 @@ class App {
 
             console.log(`✓ Production complete: ${targetSamples} samples`);
 
+            // Save both PNG and HDR, then emit completion event
+            const filenames = await this.saveProductionRender();
+            this.bus.emit('production.complete', {
+                pngFilename: filenames.png,
+                hdrFilename: filenames.hdr,
+                samples: this.engine.sampleCount
+            });
+
         } catch (error: any) {
             if (error.name === 'RenderStopped') {
                 console.log('Production render was stopped');
+                this.parameterStore.unlock();
+                this.renderCoordinator.startInteractive();
             } else {
                 console.error('Production render failed:', error);
+                this.parameterStore.unlock();
                 throw error;
             }
-        } finally {
-            this.parameterStore.unlock();
         }
     }
 
+    private async saveProductionRender(): Promise<{ png: string; hdr: string }> {
+        const gl = this.engine['gl'];
+        const width = gl.canvas.width;
+        const height = gl.canvas.height;
+        const sampleCount = this.engine.sampleCount;
+
+        console.log(`Saving production render (${width}×${height}, ${sampleCount}spp)...`);
+
+        // Generate timestamp for filenames
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+
+        const dateStr = `${month}${day}`;
+        const timeStr = `${hours}${minutes}`;
+        const baseName = `production_${year}_${dateStr}_${timeStr}_${sampleCount}spp`;
+
+        // Save PNG (tone-mapped display)
+        const pngFilename = `${baseName}.png`;
+        const pixels = this.engine.readRGB();
+        const { savePNGFile } = await import('./utils/file-export.js');
+        savePNGFile(pixels, width, height, pngFilename);
+        console.log(`✓ Saved ${pngFilename}`);
+
+        // Save HDR (raw radiance)
+        const hdrFilename = `${baseName}.hdr`;
+        const radiance = this.engine.readRadiance();
+        const { saveHDRFile } = await import('./utils/file-export.js');
+        saveHDRFile(radiance, width, height, hdrFilename);
+        console.log(`✓ Saved ${hdrFilename}`);
+
+        // Emit event so other extensions can react
+        this.bus.emit('production.saved', {
+            pngFilename,
+            hdrFilename,
+            width,
+            height,
+            sampleCount
+        });
+
+        return { png: pngFilename, hdr: hdrFilename };
+    }
+
+    /**
+     * Extend production render with additional samples (no reset)
+     * Public method for extensions to call
+     */
+    async extendProduction(additionalSamples: number): Promise<void> {
+        const currentSamples = this.engine.sampleCount;
+        const newTarget = currentSamples + additionalSamples;
+
+        console.log(`Extending production render: +${additionalSamples} samples (${currentSamples} → ${newTarget})`);
+
+        // Controls stay locked, no reset
+        try {
+            await this.renderCoordinator.startProduction({
+                targetSamples: newTarget,
+                onProgress: (info) => {
+                    if (info.samples % 100 === 0) {
+                        const pct = info.percentComplete?.toFixed(1) || '0.0';
+                        console.log(`Progress: ${info.samples}/${newTarget} (${pct}%)`);
+                    }
+                }
+            });
+
+            console.log(`✓ Extended production complete: ${newTarget} samples`);
+
+            // Save again and emit completion event
+            const filenames = await this.saveProductionRender();
+            this.bus.emit('production.complete', {
+                pngFilename: filenames.png,
+                hdrFilename: filenames.hdr,
+                samples: this.engine.sampleCount
+            });
+
+        } catch (error: any) {
+            if (error.name === 'RenderStopped') {
+                console.log('Extended production render was stopped');
+                this.parameterStore.unlock();
+                this.renderCoordinator.startInteractive();
+            } else {
+                console.error('Extended production render failed:', error);
+                this.parameterStore.unlock();
+                throw error;
+            }
+        }
+    }
+
+    /**
+     * Resume interactive rendering (unlock and start)
+     * Public method for extensions to call
+     */
+    resumeInteractive(): void {
+        this.parameterStore.unlock();
+        console.log('Resuming interactive rendering...');
+        this.renderCoordinator.startInteractive();
+    }
 
     /**
      * Pause current rendering (any mode)
@@ -381,6 +499,20 @@ class App {
     }
 
     /**
+     * Get parameter metadata (for extensions)
+     */
+    getParameterMetadata(): Map<string, ParameterMetadata> {
+        return this.parameterMetadata;
+    }
+
+    /**
+     * Get metadata for a specific parameter
+     */
+    getParameterMeta(path: string): ParameterMetadata | undefined {
+        return this.parameterMetadata.get(path);
+    }
+
+    /**
      * Clean up resources
      */
     dispose(): void {
@@ -398,6 +530,90 @@ class App {
         this.renderCoordinator.stop();
         this.engine.dispose();
         this.bus.removeAllListeners();
+    }
+
+    // ============================================================================
+    // Private: Parameter Metadata Collection
+    // ============================================================================
+
+    /**
+     * Collect parameter metadata from all modules in all recipes
+     */
+    private collectParameterMetadata(recipes: Recipe[]): void {
+        for (const recipe of recipes) {
+            // Collect from world modules
+            this.collectModuleMetadata(recipe.world.ambient);
+            this.collectModuleMetadata(recipe.world.environment);
+            this.collectModuleMetadata(recipe.world.scene);
+            this.collectModuleMetadata(recipe.world.lighting);
+
+            // Collect from optics modules
+            this.collectModuleMetadata(recipe.optics.camera);
+            this.collectModuleMetadata(recipe.optics.interaction);
+            this.collectModuleMetadata(recipe.optics.transport);
+            this.collectModuleMetadata(recipe.optics.accumulator);
+            this.collectModuleMetadata(recipe.optics.developer);
+        }
+    }
+
+    /**
+     * Collect parameter metadata from a single module
+     */
+    private collectModuleMetadata(module: ModuleDescriptor): void {
+        if (!module.parameters) return;
+
+        for (const [path, meta] of Object.entries(module.parameters)) {
+            // Enrich metadata with auto-inferred values
+            const enriched: ParameterMetadata = {
+                ...meta,
+                name: meta.name ?? path,
+                group: meta.group ?? this.inferGroup(path),
+                triggersReset: meta.triggersReset ?? this.inferTriggersReset(path)
+            };
+
+            // Auto-calculate step if not provided and range exists
+            if (!enriched.step && enriched.range) {
+                const [min, max] = enriched.range;
+                enriched.step = (max - min) / 100;
+            }
+
+            this.parameterMetadata.set(path, enriched);
+        }
+    }
+
+    /**
+     * Infer group from parameter path (camera.fov -> Camera)
+     */
+    private inferGroup(path: string): string {
+        const prefix = path.split('.')[0];
+        return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+
+    /**
+     * Infer if parameter triggers reset (developer.* doesn't reset)
+     */
+    private inferTriggersReset(path: string): boolean {
+        return !path.startsWith('developer.') && !path.startsWith('debug.');
+    }
+
+    /**
+     * Initialize parameters with defaults from metadata, then apply overrides
+     */
+    private initializeParameters(overrides?: Record<string, any>): void {
+        const defaults: Record<string, any> = {};
+
+        // Collect defaults from metadata
+        for (const [path, meta] of this.parameterMetadata) {
+            defaults[path] = meta.default;
+        }
+
+        // Apply defaults first
+        this.parameterStore.batch(defaults);
+
+        // Then apply user overrides
+        if (overrides) {
+            this.parameterStore.batch(overrides);
+        }
     }
 
     // ============================================================================

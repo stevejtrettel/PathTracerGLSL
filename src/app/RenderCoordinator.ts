@@ -118,6 +118,7 @@ class RenderCoordinator {
 
         console.log(`Started production render: ${goal.targetSamples} samples`);
         this.bus.emit('render.started');
+        this.bus.emit('render.locked');  // Signal production mode started
 
         return new Promise<void>((resolve, reject) => {
             this.productionResolve = resolve;
@@ -161,6 +162,7 @@ class RenderCoordinator {
     stop(): void {
         if (!this.running) return;
 
+        const wasProduction = this.mode === 'production';
         this.running = false;
         this.paused = false;
 
@@ -179,6 +181,9 @@ class RenderCoordinator {
 
         this.goal = null;
         this.bus.emit('render.stopped');
+        if (wasProduction) {
+            this.bus.emit('render.unlocked');  // Signal production mode ended
+        }
         console.log('Rendering stopped');
     }
 
@@ -301,6 +306,7 @@ class RenderCoordinator {
             samples,
             elapsedTime: elapsed
         });
+        this.bus.emit('render.unlocked');  // Signal production mode ended
     }
 
     private clearProductionPromise(): void {

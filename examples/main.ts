@@ -26,6 +26,8 @@ import { StatsPanelExtension } from "../src/app/extensions/StatsPanel";
 import { ScreenshotExtension } from "../src/app/extensions/ScreenshotExtension";
 import { HDRExportExtension } from "../src/app/extensions/HDRExportExtension";
 import { TouchOrbitControls } from "../src/app/extensions/TouchOrbitControls";
+import { ParameterPanelExtension } from "../src/app/extensions/ParameterPanelExtension";
+import { ProductionRenderExtension } from "../src/app/extensions/ProductionRenderExtension";
 
 
 
@@ -151,8 +153,34 @@ async function main() {
     // Initialize with recipes, HDR, and parameters
     await app.initialize(recipes, undefined, parameters);
 
-    app.use( new TouchOrbitControls());
-    app.use( new OrbitControls());
+    // TEST: Log collected parameter metadata
+    console.log('=== PARAMETER METADATA TEST ===');
+    const metadata = app.getParameterMetadata();
+    console.log(`Collected ${metadata.size} parameters from modules`);
+
+    // Group and display
+    const byGroup = new Map();
+    for (const [path, meta] of metadata) {
+        const group = meta.group || 'Ungrouped';
+        if (!byGroup.has(group)) byGroup.set(group, []);
+        byGroup.get(group).push({ path, meta });
+    }
+
+    for (const [groupName, params] of byGroup) {
+        console.log(`\n--- ${groupName} (${params.length} parameters) ---`);
+        for (const { path, meta } of params) {
+            const rangeStr = meta.range ? ` [${meta.range[0]}..${meta.range[1]}]` : '';
+            const unitStr = meta.unit ? ` ${meta.unit}` : '';
+            console.log(`  ${meta.name} (${path}): ${meta.type}${rangeStr}${unitStr} = ${JSON.stringify(meta.default)}`);
+        }
+    }
+    console.log('\n=== END TEST ===\n');
+
+    // Install extensions
+    app.use(new ParameterPanelExtension());  // Beautiful parameter UI!
+    app.use(new ProductionRenderExtension());  // Production render UI (progress + dialog)
+    app.use(new TouchOrbitControls());
+    app.use(new OrbitControls());
     app.use(new StatsPanelExtension());
     app.use(new ScreenshotExtension());
     app.use(new HDRExportExtension());
