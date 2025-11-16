@@ -26,6 +26,7 @@ import { StatsPanelExtension } from "../src/app/extensions/StatsPanel";
 import { ScreenshotExtension } from "../src/app/extensions/ScreenshotExtension";
 import { HDRExportExtension } from "../src/app/extensions/HDRExportExtension";
 import { TouchOrbitControls } from "../src/app/extensions/TouchOrbitControls";
+import { ParameterPanelExtension } from "../src/app/extensions/ParameterPanelExtension";
 
 
 
@@ -174,8 +175,10 @@ async function main() {
     }
     console.log('\n=== END TEST ===\n');
 
-    app.use( new TouchOrbitControls());
-    app.use( new OrbitControls());
+    // Install extensions
+    app.use(new ParameterPanelExtension());  // Beautiful parameter UI!
+    app.use(new TouchOrbitControls());
+    app.use(new OrbitControls());
     app.use(new StatsPanelExtension());
     app.use(new ScreenshotExtension());
     app.use(new HDRExportExtension());
