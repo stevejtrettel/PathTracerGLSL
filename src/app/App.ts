@@ -282,9 +282,13 @@ class App {
 
             console.log(`✓ Production complete: ${targetSamples} samples`);
 
-            // Save both PNG and HDR, then show completion dialog
+            // Save both PNG and HDR, then emit completion event
             const filenames = await this.saveProductionRender();
-            this.showProductionCompleteDialog(filenames);
+            this.bus.emit('production.complete', {
+                pngFilename: filenames.png,
+                hdrFilename: filenames.hdr,
+                samples: this.engine.sampleCount
+            });
 
         } catch (error: any) {
             if (error.name === 'RenderStopped') {
@@ -345,204 +349,11 @@ class App {
         return { png: pngFilename, hdr: hdrFilename };
     }
 
-    private showProductionCompleteDialog(filenames: { png: string; hdr: string }): void {
-        const currentSamples = this.engine.sampleCount;
-
-        // Create overlay
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-        `;
-
-        // Create dialog
-        const dialog = document.createElement('div');
-        dialog.style.cssText = `
-            background: rgba(40, 40, 40, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
-            padding: 32px;
-            max-width: 500px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-        `;
-
-        dialog.innerHTML = `
-            <div style="text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
-                <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600; color: rgba(255, 255, 255, 0.95);">
-                    Production Render Complete
-                </h2>
-                <p style="margin: 0 0 24px 0; font-size: 14px; color: rgba(255, 255, 255, 0.7);">
-                    Your render has been saved in both formats
-                </p>
-                <div style="
-                    background: rgba(0, 0, 0, 0.3);
-                    border-radius: 8px;
-                    padding: 16px;
-                    margin-bottom: 24px;
-                    text-align: left;
-                    font-size: 13px;
-                    font-family: 'SF Mono', Monaco, monospace;
-                    color: rgba(255, 255, 255, 0.8);
-                ">
-                    <div style="margin-bottom: 8px;">📷 ${filenames.png}</div>
-                    <div>🌈 ${filenames.hdr}</div>
-                </div>
-
-                <!-- Extend production section -->
-                <div style="margin-bottom: 20px;">
-                    <p style="
-                        margin: 0 0 12px 0;
-                        font-size: 13px;
-                        color: rgba(255, 255, 255, 0.6);
-                    ">
-                        Or continue accumulating samples:
-                    </p>
-                    <div style="
-                        display: flex;
-                        gap: 8px;
-                        justify-content: center;
-                        flex-wrap: wrap;
-                    ">
-                        <button class="extend-btn" data-samples="100" style="
-                            background: rgba(255, 255, 255, 0.08);
-                            color: rgba(255, 255, 255, 0.9);
-                            border: 1px solid rgba(255, 255, 255, 0.15);
-                            border-radius: 6px;
-                            padding: 8px 16px;
-                            font-size: 13px;
-                            font-weight: 500;
-                            cursor: pointer;
-                            transition: all 0.2s ease;
-                        ">+100</button>
-                        <button class="extend-btn" data-samples="500" style="
-                            background: rgba(255, 255, 255, 0.08);
-                            color: rgba(255, 255, 255, 0.9);
-                            border: 1px solid rgba(255, 255, 255, 0.15);
-                            border-radius: 6px;
-                            padding: 8px 16px;
-                            font-size: 13px;
-                            font-weight: 500;
-                            cursor: pointer;
-                            transition: all 0.2s ease;
-                        ">+500</button>
-                        <button class="extend-btn" data-samples="1000" style="
-                            background: rgba(255, 255, 255, 0.08);
-                            color: rgba(255, 255, 255, 0.9);
-                            border: 1px solid rgba(255, 255, 255, 0.15);
-                            border-radius: 6px;
-                            padding: 8px 16px;
-                            font-size: 13px;
-                            font-weight: 500;
-                            cursor: pointer;
-                            transition: all 0.2s ease;
-                        ">+1000</button>
-                        <button id="extend-custom-btn" style="
-                            background: rgba(255, 255, 255, 0.08);
-                            color: rgba(255, 255, 255, 0.9);
-                            border: 1px solid rgba(255, 255, 255, 0.15);
-                            border-radius: 6px;
-                            padding: 8px 16px;
-                            font-size: 13px;
-                            font-weight: 500;
-                            cursor: pointer;
-                            transition: all 0.2s ease;
-                        ">Custom...</button>
-                    </div>
-                </div>
-
-                <button id="resume-interactive-btn" style="
-                    background: rgba(74, 158, 255, 0.9);
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 12px 32px;
-                    font-size: 15px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    width: 100%;
-                ">
-                    Resume Interactive Mode
-                </button>
-            </div>
-        `;
-
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
-
-        // Add hover effects for extend buttons
-        const extendButtons = dialog.querySelectorAll('.extend-btn') as NodeListOf<HTMLButtonElement>;
-        extendButtons.forEach(btn => {
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = 'rgba(255, 255, 255, 0.15)';
-                btn.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'rgba(255, 255, 255, 0.08)';
-                btn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-            });
-            btn.addEventListener('click', () => {
-                const additionalSamples = parseInt(btn.dataset.samples || '0');
-                overlay.remove();
-                this.extendProduction(additionalSamples);
-            });
-        });
-
-        // Custom extend button
-        const customBtn = dialog.querySelector('#extend-custom-btn') as HTMLButtonElement;
-        customBtn.addEventListener('mouseenter', () => {
-            customBtn.style.background = 'rgba(255, 255, 255, 0.15)';
-            customBtn.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-        });
-        customBtn.addEventListener('mouseleave', () => {
-            customBtn.style.background = 'rgba(255, 255, 255, 0.08)';
-            customBtn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-        });
-        customBtn.addEventListener('click', () => {
-            const input = prompt('Additional samples to render:', '1000');
-            if (input) {
-                const additionalSamples = parseInt(input);
-                if (additionalSamples > 0) {
-                    overlay.remove();
-                    this.extendProduction(additionalSamples);
-                }
-            }
-        });
-
-        // Resume interactive button
-        const resumeButton = dialog.querySelector('#resume-interactive-btn') as HTMLButtonElement;
-        resumeButton.addEventListener('mouseenter', () => {
-            resumeButton.style.background = 'rgba(74, 158, 255, 1)';
-            resumeButton.style.transform = 'scale(1.02)';
-        });
-        resumeButton.addEventListener('mouseleave', () => {
-            resumeButton.style.background = 'rgba(74, 158, 255, 0.9)';
-            resumeButton.style.transform = 'scale(1)';
-        });
-        resumeButton.addEventListener('click', () => {
-            overlay.remove();
-            this.parameterStore.unlock();
-            console.log('Resuming interactive rendering...');
-            this.renderCoordinator.startInteractive();
-        });
-    }
-
     /**
      * Extend production render with additional samples (no reset)
+     * Public method for extensions to call
      */
-    private async extendProduction(additionalSamples: number): Promise<void> {
+    async extendProduction(additionalSamples: number): Promise<void> {
         const currentSamples = this.engine.sampleCount;
         const newTarget = currentSamples + additionalSamples;
 
@@ -562,9 +373,13 @@ class App {
 
             console.log(`✓ Extended production complete: ${newTarget} samples`);
 
-            // Save again and show dialog
+            // Save again and emit completion event
             const filenames = await this.saveProductionRender();
-            this.showProductionCompleteDialog(filenames);
+            this.bus.emit('production.complete', {
+                pngFilename: filenames.png,
+                hdrFilename: filenames.hdr,
+                samples: this.engine.sampleCount
+            });
 
         } catch (error: any) {
             if (error.name === 'RenderStopped') {
@@ -579,6 +394,15 @@ class App {
         }
     }
 
+    /**
+     * Resume interactive rendering (unlock and start)
+     * Public method for extensions to call
+     */
+    resumeInteractive(): void {
+        this.parameterStore.unlock();
+        console.log('Resuming interactive rendering...');
+        this.renderCoordinator.startInteractive();
+    }
 
     /**
      * Pause current rendering (any mode)
