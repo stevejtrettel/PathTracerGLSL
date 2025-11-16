@@ -282,26 +282,24 @@ class App {
 
             console.log(`✓ Production complete: ${targetSamples} samples`);
 
-            // Auto-save the production render before unlocking
-            await this.saveProductionRender();
+            // Save both PNG and HDR, then show completion dialog
+            const filenames = await this.saveProductionRender();
+            this.showProductionCompleteDialog(filenames);
 
         } catch (error: any) {
             if (error.name === 'RenderStopped') {
                 console.log('Production render was stopped');
+                this.parameterStore.unlock();
+                this.renderCoordinator.startInteractive();
             } else {
                 console.error('Production render failed:', error);
+                this.parameterStore.unlock();
                 throw error;
             }
-        } finally {
-            this.parameterStore.unlock();
-
-            // Resume interactive rendering after save completes
-            console.log('Resuming interactive rendering...');
-            this.renderCoordinator.startInteractive();
         }
     }
 
-    private async saveProductionRender(): Promise<void> {
+    private async saveProductionRender(): Promise<{ png: string; hdr: string }> {
         const gl = this.engine['gl'];
         const width = gl.canvas.width;
         const height = gl.canvas.height;
@@ -309,10 +307,7 @@ class App {
 
         console.log(`Saving production render (${width}×${height}, ${sampleCount}spp)...`);
 
-        // Read tone-mapped display pixels (PNG)
-        const pixels = this.engine.readRGB();
-
-        // Generate filename: production_YYYY_MMDD_HHMM_NNNNspp.png
+        // Generate timestamp for filenames
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -322,16 +317,126 @@ class App {
 
         const dateStr = `${month}${day}`;
         const timeStr = `${hours}${minutes}`;
-        const filename = `production_${year}_${dateStr}_${timeStr}_${sampleCount}spp.png`;
+        const baseName = `production_${year}_${dateStr}_${timeStr}_${sampleCount}spp`;
 
-        // Import the utility function
+        // Save PNG (tone-mapped display)
+        const pngFilename = `${baseName}.png`;
+        const pixels = this.engine.readRGB();
         const { savePNGFile } = await import('./utils/file-export.js');
-        savePNGFile(pixels, width, height, filename);
+        savePNGFile(pixels, width, height, pngFilename);
+        console.log(`✓ Saved ${pngFilename}`);
 
-        console.log(`✓ Saved ${filename}`);
+        // Save HDR (raw radiance)
+        const hdrFilename = `${baseName}.hdr`;
+        const radiance = this.engine.readRadiance();
+        const { saveHDRFile } = await import('./utils/file-export.js');
+        saveHDRFile(radiance, width, height, hdrFilename);
+        console.log(`✓ Saved ${hdrFilename}`);
 
         // Emit event so other extensions can react
-        this.bus.emit('production.saved', { filename, width, height, sampleCount });
+        this.bus.emit('production.saved', {
+            pngFilename,
+            hdrFilename,
+            width,
+            height,
+            sampleCount
+        });
+
+        return { png: pngFilename, hdr: hdrFilename };
+    }
+
+    private showProductionCompleteDialog(filenames: { png: string; hdr: string }): void {
+        // Create overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        `;
+
+        // Create dialog
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: rgba(40, 40, 40, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        `;
+
+        dialog.innerHTML = `
+            <div style="text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
+                <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600; color: rgba(255, 255, 255, 0.95);">
+                    Production Render Complete
+                </h2>
+                <p style="margin: 0 0 24px 0; font-size: 14px; color: rgba(255, 255, 255, 0.7);">
+                    Your render has been saved in both formats
+                </p>
+                <div style="
+                    background: rgba(0, 0, 0, 0.3);
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-bottom: 24px;
+                    text-align: left;
+                    font-size: 13px;
+                    font-family: 'SF Mono', Monaco, monospace;
+                    color: rgba(255, 255, 255, 0.8);
+                ">
+                    <div style="margin-bottom: 8px;">📷 ${filenames.png}</div>
+                    <div>🌈 ${filenames.hdr}</div>
+                </div>
+                <button id="resume-interactive-btn" style="
+                    background: rgba(74, 158, 255, 0.9);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 12px 32px;
+                    font-size: 15px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                ">
+                    Resume Interactive Mode
+                </button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        // Add button hover effect
+        const button = dialog.querySelector('#resume-interactive-btn') as HTMLButtonElement;
+        button.addEventListener('mouseenter', () => {
+            button.style.background = 'rgba(74, 158, 255, 1)';
+            button.style.transform = 'scale(1.05)';
+        });
+        button.addEventListener('mouseleave', () => {
+            button.style.background = 'rgba(74, 158, 255, 0.9)';
+            button.style.transform = 'scale(1)';
+        });
+
+        // Handle button click
+        button.addEventListener('click', () => {
+            // Remove overlay
+            overlay.remove();
+
+            // Unlock and resume
+            this.parameterStore.unlock();
+            console.log('Resuming interactive rendering...');
+            this.renderCoordinator.startInteractive();
+        });
     }
 
 
