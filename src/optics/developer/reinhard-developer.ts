@@ -41,7 +41,7 @@ const reinhardDeveloper: ModuleDescriptor = {
     `
     },
 
-    exports: ['developer_develop']
+    // exports: ['developer_develop']  // Disabled: using GLSL compiler validation instead
 };
 
 export { reinhardDeveloper };

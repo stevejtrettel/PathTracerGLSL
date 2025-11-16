@@ -116,10 +116,10 @@ export const glossyInteraction: ModuleDescriptor = {
         `
     },
 
-    exports: [
-        'interaction_surface_shade',
-        'interaction_surface_scatter',
-        'interaction_surface_pdf',
-        'interaction_surface_emit'
-    ]
+    // exports: [  // Disabled: using GLSL compiler validation instead
+    //     'interaction_surface_shade',
+    //     'interaction_surface_scatter',
+    //     'interaction_surface_pdf',
+    //     'interaction_surface_emit'
+    // ]
 };

@@ -11,5 +11,5 @@ export const albedoInteraction: ModuleDescriptor = {
             }
         `
     },
-    exports: ['interaction_surface_shade']
+    // exports: ['interaction_surface_shade']  // Disabled: using GLSL compiler validation instead
 };

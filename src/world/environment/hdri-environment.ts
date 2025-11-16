@@ -59,5 +59,5 @@ export const hdriEnvironment: ModuleDescriptor = {
         }
     ],
 
-    exports: ['environment_radiance']
+    // exports: ['environment_radiance']  // Disabled: using GLSL compiler validation instead
 };

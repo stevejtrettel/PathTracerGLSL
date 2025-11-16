@@ -249,7 +249,7 @@ const hdriEnvironmentImportance: ModuleDescriptor = {
         // NOTE: we do NOT bind u_env_map here; the engine binds it in loadEnvironmentHDR().
     ],
 
-    exports: ['environment_radiance', 'environment_sample', 'environment_pdf'],
+    // exports: ['environment_radiance', 'environment_sample', 'environment_pdf'],  // Disabled: using GLSL compiler validation instead
 };
 
 export { hdriEnvironmentImportance };

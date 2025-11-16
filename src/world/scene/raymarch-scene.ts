@@ -82,7 +82,7 @@ const sceneRaymarch: ModuleDescriptor = {
         `
     },
 
-    exports: ['scene_intersect', 'scene_material_properties', 'scene_intersect_any']
+    // exports: ['scene_intersect', 'scene_material_properties', 'scene_intersect_any']  // Disabled: using GLSL compiler validation instead
 };
 
 

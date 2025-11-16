@@ -148,7 +148,7 @@ const quadLight: ModuleDescriptor = {
         }
     ],
 
-    exports: ['lighting_sample']
+    // exports: ['lighting_sample']  // Disabled: using GLSL compiler validation instead
 };
 
 export { quadLight };

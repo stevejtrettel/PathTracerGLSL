@@ -48,7 +48,7 @@ interface ModuleDescriptor {
     };
 
     uniformBindings?: UniformBinding[];
-    exports: string[];
+    exports?: string[];  // Optional: may be removed in favor of GLSL compiler validation
 
     /**
      * Parameter definitions for this module
