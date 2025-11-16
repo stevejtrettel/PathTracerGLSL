@@ -7,6 +7,7 @@ import { HDRLoader } from './loaders/hdr-loader';
 import { ResourceManager } from './ResourceManager';
 import { TextureFactory } from './utils/TextureFactory';
 import { buildEnvironmentSampler } from './loaders/build-environment-sampler';
+import { validateRecipe, validateRecipeModules } from '../errors/engine/validation';
 import type { ModuleDescriptor, EngineState, Recipe } from './types';
 import type { ParameterChanges } from '../app/types';
 
@@ -87,6 +88,31 @@ class Engine {
         }
 
         console.log(`Initializing ${recipes.length} recipes...`);
+
+        // Validate all recipes before compilation
+        for (const recipe of recipes) {
+            // Validate recipe structure (modules in correct slots)
+            const recipeResult = validateRecipe(recipe);
+            if (!recipeResult.valid) {
+                console.error(`\n❌ Recipe validation failed for '${recipe.id}':\n`);
+                recipeResult.errors.forEach(err => console.error(`  • ${err}`));
+                throw new Error(`Recipe validation failed for '${recipe.id}'. See console for details.`);
+            }
+
+            // Validate uniform bindings
+            const uniformResult = validateRecipeModules(recipe);
+            if (!uniformResult.valid) {
+                console.error(`\n❌ Uniform validation failed for '${recipe.id}':\n`);
+                uniformResult.errors.forEach(err => console.error(`  • ${err}`));
+                throw new Error(`Uniform validation failed for '${recipe.id}'. See console for details.`);
+            }
+
+            // Show warnings if any
+            if (uniformResult.warnings && uniformResult.warnings.length > 0) {
+                console.warn(`\n⚠️  Uniform warnings for '${recipe.id}':`);
+                uniformResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+            }
+        }
 
         // Compile all recipes (composite program is shared)
         for (const recipe of recipes) {

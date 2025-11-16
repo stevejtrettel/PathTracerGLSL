@@ -49,40 +49,75 @@ class ShaderCompiler {
         const compositeSource = this.buildCompositeShaderSource();
         const vertexSource = buildVertexShaderSource();
 
+        // Compile main shader (accumulation)
         try {
             this.mainProgram = this.compileAndLinkProgram(vertexSource, mainSource, 'main');
-            this.displayProgram = this.compileAndLinkProgram(vertexSource, displaySource, 'display');
-            this.compositeProgram = this.compileAndLinkProgram(vertexSource, compositeSource, 'composite');
-
-            this.lastCompiledSource = mainSource;
-            this.lastCompiledSourceWithLineNumbers = addLineNumbers(mainSource);
-
-            return {
-                success: true,
-                mainProgram: this.mainProgram,
-                displayProgram: this.displayProgram,
-                compositeProgram: this.compositeProgram
-            };
         } catch (error: any) {
-            // Compilation failed - translate errors using error reporting system
-            const errorLog = error.message || String(error);
+            return this.handleCompilationError(error, mainSource, modules, 'Main Accumulation Shader');
+        }
 
-            const diagnostics = translateShaderErrors(
-                errorLog,
-                mainSource,
-                modules
-            );
+        // Compile display shader (tone mapping)
+        try {
+            this.displayProgram = this.compileAndLinkProgram(vertexSource, displaySource, 'display');
+        } catch (error: any) {
+            return this.handleCompilationError(error, displaySource, modules, 'Display Shader');
+        }
 
-            // Format and log errors to console
-            const formatter = new ShaderErrorFormatter();
-            const formattedErrors = formatter.formatConsole(diagnostics);
-            console.error(formattedErrors);
-
+        // Compile composite shader (final output)
+        try {
+            this.compositeProgram = this.compileAndLinkProgram(vertexSource, compositeSource, 'composite');
+        } catch (error: any) {
+            // Composite shader is simple and doesn't use modules
+            console.error(`❌ Composite shader compilation failed`);
+            console.error(error.message || String(error));
             return {
                 success: false,
-                diagnostics
+                diagnostics: {
+                    success: false,
+                    errors: [],
+                    warnings: [],
+                    source: compositeSource,
+                    sourceWithLineNumbers: addLineNumbers(compositeSource),
+                    modules: [],
+                    stats: { totalErrors: 1, totalWarnings: 0, missingFunctions: 0, typeMismatches: 0, syntaxErrors: 0, linkerErrors: 0, other: 1 }
+                }
             };
         }
+
+        this.lastCompiledSource = mainSource;
+        this.lastCompiledSourceWithLineNumbers = addLineNumbers(mainSource);
+
+        return {
+            success: true,
+            mainProgram: this.mainProgram,
+            displayProgram: this.displayProgram,
+            compositeProgram: this.compositeProgram
+        };
+    }
+
+    /**
+     * Handle compilation error with full error reporting
+     */
+    private handleCompilationError(
+        error: any,
+        source: string,
+        modules: ModuleDescriptor[],
+        shaderName: string
+    ): CompilationResult {
+        const errorLog = error.message || String(error);
+
+        const diagnostics = translateShaderErrors(errorLog, source, modules);
+
+        // Format and log errors to console
+        const formatter = new ShaderErrorFormatter();
+        console.error(`\n❌ ${shaderName} compilation failed:\n`);
+        const formattedErrors = formatter.formatConsole(diagnostics);
+        console.error(formattedErrors);
+
+        return {
+            success: false,
+            diagnostics
+        };
     }
 
     /**

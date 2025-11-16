@@ -2,14 +2,17 @@
 export * from './types.js';
 export * from './shader/types.js';
 
-// Re-export main classes
+// Re-export shader error classes
 export { ShaderErrorParser } from './shader/ShaderErrorParser.js';
 export { ShaderErrorTranslator } from './shader/ShaderErrorTranslator.js';
 export { ShaderErrorFormatter } from './shader/ShaderErrorFormatter.js';
 
-// Re-export utilities
+// Re-export shader utilities
 export * from './shader/utils/function-extraction.js';
 export * from './shader/utils/typo-detection.js';
+
+// Re-export engine validation
+export { validateRecipe, validateModuleUniforms, validateRecipeModules } from './engine/validation.js';
 
 import type { ShaderDiagnostics, FormatOptions } from './types.js';
 import type { ModuleDescriptor } from '../engine/types.js';
