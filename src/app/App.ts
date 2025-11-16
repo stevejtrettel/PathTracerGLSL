@@ -291,6 +291,10 @@ class App {
             }
         } finally {
             this.parameterStore.unlock();
+
+            // Resume interactive rendering after production completes
+            console.log('Resuming interactive rendering...');
+            this.renderCoordinator.startInteractive();
         }
     }
 
