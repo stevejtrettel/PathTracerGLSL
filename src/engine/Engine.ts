@@ -7,7 +7,7 @@ import { HDRLoader } from './loaders/hdr-loader';
 import { ResourceManager } from './ResourceManager';
 import { TextureFactory } from './utils/TextureFactory';
 import { buildEnvironmentSampler } from './loaders/build-environment-sampler';
-import { validateRecipe, validateRecipeModules } from './validation';
+import { validateRecipe, validateRecipeModules } from '../errors/engine/validation';
 import type { ModuleDescriptor, EngineState, Recipe } from './types';
 import type { ParameterChanges } from '../app/types';
 
