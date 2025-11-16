@@ -5,8 +5,8 @@ import { RenderCoordinator } from './RenderCoordinator';
 import { EventBus } from './EventBus';
 import { SessionManager } from './SessionManager';
 import { TiledRenderer } from './TiledRenderer';
-import type { Recipe } from '../engine/types';
-import type { Extension } from './types';
+import type { Recipe, ModuleDescriptor, ParameterMetadata as EngineParameterMetadata } from '../engine/types';
+import type { Extension, ParameterMetadata } from './types';
 
 /**
  * App - High-level orchestration and user interaction
@@ -29,6 +29,9 @@ class App {
     // Extension system
     private extensions = new Map<string, Extension>();
     private services = new Map<string, any>();
+
+    // Parameter metadata collected from modules
+    private parameterMetadata = new Map<string, ParameterMetadata>();
 
     // Internal state
     private currentRecipeId: string | null = null;
@@ -103,21 +106,27 @@ class App {
             throw new Error('At least one recipe required');
         }
 
+        // Collect parameter metadata from all modules
+        this.collectParameterMetadata(recipes);
+
+        // Initialize engine
         this.engine.initialize(recipes);
         this.currentRecipeId = recipes[0].id;
 
+        // Load environment if provided
         if (environmentHDR) {
             await this.engine.loadEnvironmentHDR(environmentHDR);
         }
 
-        if (initialParameters) {
-            this.parameterStore.batch(initialParameters);
-        }
+        // Initialize parameters with defaults, then apply overrides
+        this.initializeParameters(initialParameters);
 
+        // Start rendering
         this.renderCoordinator.startInteractive();
         this.bus.emit('render.started');
 
         console.log('App initialized with recipes:', this.engine.getAvailableRecipes());
+        console.log('Parameter metadata collected:', this.parameterMetadata.size, 'parameters');
     }
 
     /**
@@ -381,6 +390,20 @@ class App {
     }
 
     /**
+     * Get parameter metadata (for extensions)
+     */
+    getParameterMetadata(): Map<string, ParameterMetadata> {
+        return this.parameterMetadata;
+    }
+
+    /**
+     * Get metadata for a specific parameter
+     */
+    getParameterMeta(path: string): ParameterMetadata | undefined {
+        return this.parameterMetadata.get(path);
+    }
+
+    /**
      * Clean up resources
      */
     dispose(): void {
@@ -398,6 +421,90 @@ class App {
         this.renderCoordinator.stop();
         this.engine.dispose();
         this.bus.removeAllListeners();
+    }
+
+    // ============================================================================
+    // Private: Parameter Metadata Collection
+    // ============================================================================
+
+    /**
+     * Collect parameter metadata from all modules in all recipes
+     */
+    private collectParameterMetadata(recipes: Recipe[]): void {
+        for (const recipe of recipes) {
+            // Collect from world modules
+            this.collectModuleMetadata(recipe.world.ambient);
+            this.collectModuleMetadata(recipe.world.environment);
+            this.collectModuleMetadata(recipe.world.scene);
+            this.collectModuleMetadata(recipe.world.lighting);
+
+            // Collect from optics modules
+            this.collectModuleMetadata(recipe.optics.camera);
+            this.collectModuleMetadata(recipe.optics.interaction);
+            this.collectModuleMetadata(recipe.optics.transport);
+            this.collectModuleMetadata(recipe.optics.accumulator);
+            this.collectModuleMetadata(recipe.optics.developer);
+        }
+    }
+
+    /**
+     * Collect parameter metadata from a single module
+     */
+    private collectModuleMetadata(module: ModuleDescriptor): void {
+        if (!module.parameters) return;
+
+        for (const [path, meta] of Object.entries(module.parameters)) {
+            // Enrich metadata with auto-inferred values
+            const enriched: ParameterMetadata = {
+                ...meta,
+                name: meta.name ?? path,
+                group: meta.group ?? this.inferGroup(path),
+                triggersReset: meta.triggersReset ?? this.inferTriggersReset(path)
+            };
+
+            // Auto-calculate step if not provided and range exists
+            if (!enriched.step && enriched.range) {
+                const [min, max] = enriched.range;
+                enriched.step = (max - min) / 100;
+            }
+
+            this.parameterMetadata.set(path, enriched);
+        }
+    }
+
+    /**
+     * Infer group from parameter path (camera.fov -> Camera)
+     */
+    private inferGroup(path: string): string {
+        const prefix = path.split('.')[0];
+        return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+
+    /**
+     * Infer if parameter triggers reset (developer.* doesn't reset)
+     */
+    private inferTriggersReset(path: string): boolean {
+        return !path.startsWith('developer.') && !path.startsWith('debug.');
+    }
+
+    /**
+     * Initialize parameters with defaults from metadata, then apply overrides
+     */
+    private initializeParameters(overrides?: Record<string, any>): void {
+        const defaults: Record<string, any> = {};
+
+        // Collect defaults from metadata
+        for (const [path, meta] of this.parameterMetadata) {
+            defaults[path] = meta.default;
+        }
+
+        // Apply defaults first
+        this.parameterStore.batch(defaults);
+
+        // Then apply user overrides
+        if (overrides) {
+            this.parameterStore.batch(overrides);
+        }
     }
 
     // ============================================================================

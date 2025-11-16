@@ -7,6 +7,57 @@ const quadLight: ModuleDescriptor = {
         version: '1.0.0'
     },
 
+    parameters: {
+        'quad.center': {
+            type: 'vec3',
+            default: [0, 3.9, 0],
+            name: 'Center',
+            help: 'Center position of the quad light'
+        },
+        'quad.width': {
+            type: 'float',
+            default: 2.0,
+            range: [0.1, 10],
+            step: 0.1,
+            unit: 'meters',
+            name: 'Width'
+        },
+        'quad.height': {
+            type: 'float',
+            default: 2.0,
+            range: [0.1, 10],
+            step: 0.1,
+            unit: 'meters',
+            name: 'Height'
+        },
+        'quad.direction1': {
+            type: 'vec3',
+            default: [1, 0, 0],
+            name: 'Width Direction',
+            help: 'Direction vector for width edge (will be normalized)'
+        },
+        'quad.direction2': {
+            type: 'vec3',
+            default: [0, 0, 1],
+            name: 'Height Direction',
+            help: 'Direction vector for height edge (will be normalized)'
+        },
+        'quad.color': {
+            type: 'color',
+            default: [1, 1, 1],
+            name: 'Color',
+            triggersReset: false  // Changing light color doesn't need reset
+        },
+        'quad.intensity': {
+            type: 'float',
+            default: 30.0,
+            range: [0, 200],
+            step: 1,
+            name: 'Intensity',
+            triggersReset: false  // Just changes brightness
+        }
+    },
+
     fragment: {
         uniforms: `
             uniform vec3 u_quad_center;     // Center of the quad

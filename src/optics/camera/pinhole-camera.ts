@@ -16,6 +16,30 @@ const pinholeCamera: ModuleDescriptor = {
         version: '1.0.0'
     },
 
+    parameters: {
+        'camera.position': {
+            type: 'vec3',
+            default: [0, 0, 5],
+            name: 'Position',
+            help: 'Camera position in world space'
+        },
+        'camera.target': {
+            type: 'vec3',
+            default: [0, 0, 0],
+            name: 'Look At',
+            help: 'Point the camera is looking at (orbit controls)'
+        },
+        'camera.fov': {
+            type: 'float',
+            default: 60,
+            range: [10, 170],
+            step: 1,
+            unit: 'degrees',
+            name: 'Field of View',
+            help: 'Vertical field of view angle'
+        }
+    },
+
     fragment: {
         uniforms: `
       uniform vec3 u_camera_position;    // Camera position in world space

@@ -49,6 +49,12 @@ interface ModuleDescriptor {
 
     uniformBindings?: UniformBinding[];
     exports: string[];
+
+    /**
+     * Parameter definitions for this module
+     * Maps parameter paths to their metadata (type, default, range, etc.)
+     */
+    parameters?: Record<string, ParameterMetadata>;
 }
 
 /**
@@ -74,6 +80,32 @@ interface UniformBinding {
     parameters: string[];
     type: UniformType;
     compute: (params: Record<string, any>) => any;
+}
+
+/**
+ * Parameter metadata for UI generation and validation
+ *
+ * Defines how module parameters behave and how they should be displayed.
+ * This is a subset of the full metadata used by the App layer.
+ */
+interface ParameterMetadata {
+    // Required
+    type: 'float' | 'int' | 'bool' | 'vec2' | 'vec3' | 'vec4' | 'color';
+    default: any;
+
+    // For numeric types
+    range?: [number, number];
+    step?: number;
+    values?: number[];
+
+    // UI hints
+    name?: string;
+    unit?: string;
+    group?: string;
+    help?: string;
+
+    // Behavior
+    triggersReset?: boolean;
 }
 
 /**
@@ -157,5 +189,6 @@ export type {
     UniformBinding,
     EngineUniforms,
     UniformType,
+    ParameterMetadata,
     Recipe
 };

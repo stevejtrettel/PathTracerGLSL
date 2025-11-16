@@ -18,13 +18,29 @@ interface ParameterChanges {
 }
 
 /**
- * Parameter metadata for validation and UI
+ * Parameter metadata for validation and UI generation
+ *
+ * Defines how parameters behave and how they should be displayed in UIs.
+ * All fields except type and default are optional.
  */
 interface ParameterMetadata {
-    type: 'float' | 'vec3' | 'int' | 'bool';
+    // Required
+    type: 'float' | 'int' | 'bool' | 'vec2' | 'vec3' | 'vec4' | 'color';
     default: any;
-    min?: number;
-    max?: number;
+
+    // For numeric types (float/int)
+    range?: [number, number];    // [min, max] - enables slider UI
+    step?: number;               // increment (auto-calculated if omitted)
+    values?: number[];           // discrete choices for int (renders dropdown)
+
+    // UI hints (all optional)
+    name?: string;               // Display name (falls back to parameter path)
+    unit?: string;               // 'degrees', 'meters', 'samples', etc.
+    group?: string;              // Override auto-inferred group from path prefix
+    help?: string;               // Tooltip text (optional, rarely used)
+
+    // Behavior (optional)
+    triggersReset?: boolean;     // Override auto-inferred reset behavior
 }
 
 /**
