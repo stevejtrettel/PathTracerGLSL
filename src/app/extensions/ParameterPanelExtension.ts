@@ -67,10 +67,10 @@ class ParameterPanelExtension implements Extension {
                 right: 0;
                 width: ${this.width}px;
                 height: 100vh;
-                background: rgba(20, 20, 20, 0.85);
+                background: rgba(30, 30, 30, 0.88);
                 backdrop-filter: blur(20px) saturate(180%);
                 -webkit-backdrop-filter: blur(20px) saturate(180%);
-                border-left: 1px solid rgba(255, 255, 255, 0.08);
+                border-left: 1px solid rgba(255, 255, 255, 0.12);
                 box-shadow: -8px 0 32px rgba(0, 0, 0, 0.6);
                 z-index: 9999;
                 overflow-y: auto;
@@ -117,7 +117,7 @@ class ParameterPanelExtension implements Extension {
                 border-bottom: 1px solid rgba(255, 255, 255, 0.08);
                 position: sticky;
                 top: 0;
-                background: rgba(20, 20, 20, 0.9);
+                background: rgba(30, 30, 30, 0.92);
                 backdrop-filter: blur(20px);
                 -webkit-backdrop-filter: blur(20px);
                 z-index: 10;
@@ -318,13 +318,13 @@ class ParameterPanelExtension implements Extension {
 
             .param-vector input {
                 width: 100%;
-                padding: 8px 8px 8px 20px;
+                padding: 6px 4px 6px 18px;
                 background: rgba(255, 255, 255, 0.08);
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 6px;
                 color: rgba(255, 255, 255, 0.95);
                 font-family: 'SF Mono', Monaco, monospace;
-                font-size: 12px;
+                font-size: 11px;
                 outline: none;
                 transition: all 0.15s ease;
             }
@@ -455,10 +455,10 @@ class ParameterPanelExtension implements Extension {
                 right: 20px;
                 width: 32px;
                 height: 32px;
-                background: rgba(20, 20, 20, 0.85);
+                background: rgba(30, 30, 30, 0.88);
                 backdrop-filter: blur(20px);
                 -webkit-backdrop-filter: blur(20px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.12);
                 border-radius: 8px;
                 display: flex;
                 align-items: center;
@@ -470,7 +470,7 @@ class ParameterPanelExtension implements Extension {
             }
 
             .param-chevron:hover {
-                background: rgba(40, 40, 40, 0.9);
+                background: rgba(45, 45, 45, 0.92);
                 border-color: rgba(255, 255, 255, 0.2);
                 transform: scale(1.05);
             }
