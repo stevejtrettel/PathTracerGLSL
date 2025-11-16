@@ -14,6 +14,15 @@ export * from './shader/utils/typo-detection.js';
 // Re-export engine validation
 export { validateRecipe, validateModuleUniforms, validateRecipeModules } from './engine/validation.js';
 
+// Re-export resource validation
+export {
+    validateHDRResponse,
+    validateHDRBuffer,
+    validateHDRData,
+    validateTextureCreation,
+    validateHDRLoad
+} from './resources/validation.js';
+
 import type { ShaderDiagnostics, FormatOptions } from './types.js';
 import type { ModuleDescriptor } from '../engine/types.js';
 import { ShaderErrorParser } from './shader/ShaderErrorParser.js';

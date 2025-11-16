@@ -8,6 +8,7 @@ import { ResourceManager } from './ResourceManager';
 import { TextureFactory } from './utils/TextureFactory';
 import { buildEnvironmentSampler } from './loaders/build-environment-sampler';
 import { validateRecipe, validateRecipeModules } from '../errors/engine/validation';
+import { validateHDRResponse, validateHDRBuffer, validateHDRData, validateTextureCreation } from '../errors/resources/validation';
 import type { ModuleDescriptor, EngineState, Recipe } from './types';
 import type { ParameterChanges } from '../app/types';
 
@@ -185,19 +186,72 @@ class Engine {
     async loadEnvironmentHDR(path: string): Promise<void> {
         console.log(`Loading HDR environment: ${path}`);
 
-        // Fetch and parse
+        // Fetch
         const res = await fetch(path);
-        if (!res.ok) {
-            throw new Error(`Failed to load HDR: ${res.status} ${res.statusText}`);
+
+        // Validate response
+        const responseResult = validateHDRResponse(res, path);
+        if (!responseResult.valid) {
+            console.error(`\n❌ HDR loading failed:\n`);
+            responseResult.errors.forEach(err => console.error(`  • ${err}`));
+            throw new Error(`Failed to load HDR from '${path}'. See console for details.`);
         }
 
+        // Get buffer
         const buffer = await res.arrayBuffer();
-        const hdr = HDRLoader.parse(buffer);
+
+        // Validate buffer
+        const bufferResult = validateHDRBuffer(buffer, path);
+        if (!bufferResult.valid) {
+            console.error(`\n❌ Invalid HDR file:\n`);
+            bufferResult.errors.forEach(err => console.error(`  • ${err}`));
+            throw new Error(`Invalid HDR file '${path}'. See console for details.`);
+        }
+
+        // Show warnings if any
+        if (bufferResult.warnings && bufferResult.warnings.length > 0) {
+            console.warn(`\n⚠️  HDR file warnings:`);
+            bufferResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+        }
+
+        // Parse
+        let hdr;
+        try {
+            hdr = HDRLoader.parse(buffer);
+        } catch (error: any) {
+            console.error(`\n❌ HDR parsing failed:\n`);
+            console.error(`  • ${error.message || String(error)}`);
+            throw new Error(`Failed to parse HDR file '${path}'. File may be corrupted.`);
+        }
+
         const { width, height, data } = hdr;
+
+        // Validate parsed data
+        const dataResult = validateHDRData(width, height, data.length, path);
+        if (!dataResult.valid) {
+            console.error(`\n❌ Invalid HDR data:\n`);
+            dataResult.errors.forEach(err => console.error(`  • ${err}`));
+            throw new Error(`Invalid HDR data in '${path}'. See console for details.`);
+        }
+
+        // Show data warnings if any
+        if (dataResult.warnings && dataResult.warnings.length > 0) {
+            console.warn(`\n⚠️  HDR data warnings:`);
+            dataResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+        }
 
         // Create texture
         const tf = new TextureFactory(this.gl);
         const envTex = tf.createRGB32F(data, width, height);
+
+        // Validate texture creation
+        const textureResult = validateTextureCreation(envTex, width, height, this.gl);
+        if (!textureResult.valid) {
+            console.error(`\n❌ Texture creation failed:\n`);
+            textureResult.errors.forEach(err => console.error(`  • ${err}`));
+            throw new Error(`Failed to create texture for '${path}'. See console for details.`);
+        }
+
         this.textureRegistry.register('env_map', envTex);
 
         // Build CDF textures for importance sampling
@@ -215,7 +269,7 @@ class Engine {
             this.bindEnvironmentTexturesToProgram(programs.main, width, height, built.totalWeight);
         }
 
-        console.log(`HDR loaded: ${width}×${height} (CDFs built), bound to ${this.programs.size} recipe(s)`);
+        console.log(`✅ HDR loaded: ${width}×${height} (CDFs built), bound to ${this.programs.size} recipe(s)`);
     }
 
     /**
