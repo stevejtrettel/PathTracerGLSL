@@ -67,10 +67,10 @@ class ParameterPanelExtension implements Extension {
                 right: 0;
                 width: ${this.width}px;
                 height: 100vh;
-                background: rgba(30, 30, 30, 0.88);
+                background: rgba(40, 40, 40, 0.90);
                 backdrop-filter: blur(20px) saturate(180%);
                 -webkit-backdrop-filter: blur(20px) saturate(180%);
-                border-left: 1px solid rgba(255, 255, 255, 0.12);
+                border-left: 1px solid rgba(255, 255, 255, 0.15);
                 box-shadow: -8px 0 32px rgba(0, 0, 0, 0.6);
                 z-index: 9999;
                 overflow-y: auto;
@@ -117,7 +117,7 @@ class ParameterPanelExtension implements Extension {
                 border-bottom: 1px solid rgba(255, 255, 255, 0.08);
                 position: sticky;
                 top: 0;
-                background: rgba(30, 30, 30, 0.92);
+                background: rgba(40, 40, 40, 0.95);
                 backdrop-filter: blur(20px);
                 -webkit-backdrop-filter: blur(20px);
                 z-index: 10;
@@ -297,20 +297,21 @@ class ParameterPanelExtension implements Extension {
             /* Vector Input */
             .param-vector {
                 display: flex;
-                gap: 6px;
+                gap: 4px;
             }
 
             .param-vector-component {
                 flex: 1;
                 position: relative;
+                min-width: 0;
             }
 
             .param-vector-label {
                 position: absolute;
-                left: 8px;
+                left: 6px;
                 top: 50%;
                 transform: translateY(-50%);
-                font-size: 10px;
+                font-size: 9px;
                 font-weight: 600;
                 color: rgba(255, 255, 255, 0.4);
                 pointer-events: none;
@@ -318,15 +319,16 @@ class ParameterPanelExtension implements Extension {
 
             .param-vector input {
                 width: 100%;
-                padding: 6px 4px 6px 18px;
+                padding: 6px 2px 6px 14px;
                 background: rgba(255, 255, 255, 0.08);
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 6px;
                 color: rgba(255, 255, 255, 0.95);
                 font-family: 'SF Mono', Monaco, monospace;
-                font-size: 11px;
+                font-size: 10px;
                 outline: none;
                 transition: all 0.15s ease;
+                box-sizing: border-box;
             }
 
             .param-vector input:hover {
@@ -455,10 +457,10 @@ class ParameterPanelExtension implements Extension {
                 right: 20px;
                 width: 32px;
                 height: 32px;
-                background: rgba(30, 30, 30, 0.88);
+                background: rgba(40, 40, 40, 0.90);
                 backdrop-filter: blur(20px);
                 -webkit-backdrop-filter: blur(20px);
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.15);
                 border-radius: 8px;
                 display: flex;
                 align-items: center;
@@ -470,8 +472,8 @@ class ParameterPanelExtension implements Extension {
             }
 
             .param-chevron:hover {
-                background: rgba(45, 45, 45, 0.92);
-                border-color: rgba(255, 255, 255, 0.2);
+                background: rgba(55, 55, 55, 0.95);
+                border-color: rgba(255, 255, 255, 0.25);
                 transform: scale(1.05);
             }
 
