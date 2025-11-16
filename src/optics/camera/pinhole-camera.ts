@@ -130,7 +130,7 @@ const pinholeCamera: ModuleDescriptor = {
         }
     ],
 
-    exports: ['camera_generateRay']
+    // exports: ['camera_generateRay']  // Disabled: using GLSL compiler validation instead
 };
 
 export { pinholeCamera };

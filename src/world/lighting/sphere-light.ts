@@ -134,7 +134,7 @@ const sphereLight: ModuleDescriptor = {
         }
     ],
 
-    exports: ['lighting_sample', 'lighting_can_sample', 'lighting_pdf']
+    // exports: ['lighting_sample', 'lighting_can_sample', 'lighting_pdf']  // Disabled: using GLSL compiler validation instead
 };
 
 export { sphereLight };

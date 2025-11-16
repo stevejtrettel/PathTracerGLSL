@@ -18,5 +18,5 @@ export const oneshotAccumulator: ModuleDescriptor = {
         `
     },
 
-    exports: ['accumulator_accumulate']
+    // exports: ['accumulator_accumulate']  // Disabled: using GLSL compiler validation instead
 };

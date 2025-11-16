@@ -17,12 +17,12 @@ const euclideanAmbient: ModuleDescriptor = {
         functions: geoFunctions
     },
 
-    exports: [
-        'ambient_geodesic',
-        'ambient_frame',
-        'ambient_dot',
-        'ambient_parallel_transport'
-    ]
+    // exports: [  // Disabled: using GLSL compiler validation instead
+    //     'ambient_geodesic',
+    //     'ambient_frame',
+    //     'ambient_dot',
+    //     'ambient_parallel_transport'
+    // ]
 };
 
 export { euclideanAmbient };

@@ -47,7 +47,7 @@ const averagingAccumulator: ModuleDescriptor = {
         // u_sample_count comes from Engine
     ],
 
-    exports: ['accumulator_accumulate']
+    // exports: ['accumulator_accumulate']  // Disabled: using GLSL compiler validation instead
 };
 
 export { averagingAccumulator };

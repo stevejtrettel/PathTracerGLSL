@@ -18,5 +18,5 @@ export const directTransport: ModuleDescriptor = {
             }
         `
     },
-    exports: ['transport_trace']
+    // exports: ['transport_trace']  // Disabled: using GLSL compiler validation instead
 };

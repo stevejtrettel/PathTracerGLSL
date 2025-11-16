@@ -1,5 +1,5 @@
 // engine/ShaderCompiler.ts
-import type { ModuleDescriptor, EngineUniforms, UniformType } from './types';
+import type { ModuleDescriptor, EngineUniforms, UniformType, CompilationResult } from './types';
 import {
     buildMainShaderSource,
     buildDisplayShaderSource,
@@ -10,6 +10,7 @@ import {
     setUniformValue,
     cacheUniformLocations
 } from './utils/shader-uniform-utils';
+import { translateShaderErrors, ShaderErrorFormatter } from '../errors/index.js';
 
 /**
  * ShaderCompiler - Handles GLSL shader compilation and linking
@@ -40,29 +41,48 @@ class ShaderCompiler {
 
     /**
      * Compile modules into shader programs
+     * Returns CompilationResult with either programs or diagnostics
      */
-    compile(modules: ModuleDescriptor[]): {
-        mainProgram: WebGLProgram;
-        displayProgram: WebGLProgram;
-        compositeProgram: WebGLProgram;
-    } {
+    compile(modules: ModuleDescriptor[]): CompilationResult {
         const mainSource = buildMainShaderSource(modules);
         const displaySource = buildDisplayShaderSource(modules);
         const compositeSource = this.buildCompositeShaderSource();
         const vertexSource = buildVertexShaderSource();
 
-        this.mainProgram = this.compileAndLinkProgram(vertexSource, mainSource, 'main');
-        this.displayProgram = this.compileAndLinkProgram(vertexSource, displaySource, 'display');
-        this.compositeProgram = this.compileAndLinkProgram(vertexSource, compositeSource, 'composite');
+        try {
+            this.mainProgram = this.compileAndLinkProgram(vertexSource, mainSource, 'main');
+            this.displayProgram = this.compileAndLinkProgram(vertexSource, displaySource, 'display');
+            this.compositeProgram = this.compileAndLinkProgram(vertexSource, compositeSource, 'composite');
 
-        this.lastCompiledSource = mainSource;
-        this.lastCompiledSourceWithLineNumbers = addLineNumbers(mainSource);
+            this.lastCompiledSource = mainSource;
+            this.lastCompiledSourceWithLineNumbers = addLineNumbers(mainSource);
 
-        return {
-            mainProgram: this.mainProgram,
-            displayProgram: this.displayProgram,
-            compositeProgram: this.compositeProgram
-        };
+            return {
+                success: true,
+                mainProgram: this.mainProgram,
+                displayProgram: this.displayProgram,
+                compositeProgram: this.compositeProgram
+            };
+        } catch (error: any) {
+            // Compilation failed - translate errors using error reporting system
+            const errorLog = error.message || String(error);
+
+            const diagnostics = translateShaderErrors(
+                errorLog,
+                mainSource,
+                modules
+            );
+
+            // Format and log errors to console
+            const formatter = new ShaderErrorFormatter();
+            const formattedErrors = formatter.formatConsole(diagnostics);
+            console.error(formattedErrors);
+
+            return {
+                success: false,
+                diagnostics
+            };
+        }
     }
 
     /**

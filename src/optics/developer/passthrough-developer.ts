@@ -23,7 +23,7 @@ const passthroughDeveloper: ModuleDescriptor = {
         `
     },
 
-    exports: ['developer_develop']  // Just this one function
+    // exports: ['developer_develop']  // Disabled: using GLSL compiler validation instead
 };
 
 export { passthroughDeveloper };
