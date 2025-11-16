@@ -6,8 +6,8 @@ const sceneRaymarch: ModuleDescriptor = {
 
     fragment: {
         constants: `
-            #define MAX_MARCH_STEPS 128
-            #define MARCH_EPSILON 0.001
+            #define MAX_MARCH_STEPS 256
+            #define MARCH_EPSILON 0.0001
         `,
 
         functions: `

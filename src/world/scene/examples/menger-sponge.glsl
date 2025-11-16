@@ -34,7 +34,7 @@ float _menger_core(vec3 p, int iters){
     float d = sdBox(p, vec3(1.0));
 
     float s = 1.0;
-    for (int m = 0; m < 8; ++m)
+    for (int m = 0; m < 10; ++m)
     {
         if(m>iters){break;}
         vec3 a = mod(p * s, 2.0) - 1.0;
@@ -104,7 +104,7 @@ float scene_sdf(vec3 p, out int material) {
 
     // Diffuse object (replace sphere with Menger sponge)
     vec3 sponge_pos = vec3(0., -0.5, 0.0);
-    float sponge = sdf_menger(p, sponge_pos, 1.0, 4);
+    float sponge = sdf_menger(p, sponge_pos, 1.0, 7);
     if (sponge < min_dist) {
         min_dist = sponge;
         material = MAT_SPHERE_DIFFUSE; // keep existing ID for materials
