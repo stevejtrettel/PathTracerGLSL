@@ -5,7 +5,7 @@ import { RenderCoordinator } from './RenderCoordinator';
 import { EventBus } from './EventBus';
 import { SessionManager } from './SessionManager';
 import { TiledRenderer } from './TiledRenderer';
-import type { Recipe, ModuleDescriptor, ParameterMetadata as EngineParameterMetadata } from '../engine/types';
+import type { Recipe, ModuleDescriptor } from '../engine/types';
 import type { Extension, ParameterMetadata } from './types';
 
 /**

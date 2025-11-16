@@ -151,6 +151,29 @@ async function main() {
     // Initialize with recipes, HDR, and parameters
     await app.initialize(recipes, undefined, parameters);
 
+    // TEST: Log collected parameter metadata
+    console.log('=== PARAMETER METADATA TEST ===');
+    const metadata = app.getParameterMetadata();
+    console.log(`Collected ${metadata.size} parameters from modules`);
+
+    // Group and display
+    const byGroup = new Map();
+    for (const [path, meta] of metadata) {
+        const group = meta.group || 'Ungrouped';
+        if (!byGroup.has(group)) byGroup.set(group, []);
+        byGroup.get(group).push({ path, meta });
+    }
+
+    for (const [groupName, params] of byGroup) {
+        console.log(`\n--- ${groupName} (${params.length} parameters) ---`);
+        for (const { path, meta } of params) {
+            const rangeStr = meta.range ? ` [${meta.range[0]}..${meta.range[1]}]` : '';
+            const unitStr = meta.unit ? ` ${meta.unit}` : '';
+            console.log(`  ${meta.name} (${path}): ${meta.type}${rangeStr}${unitStr} = ${JSON.stringify(meta.default)}`);
+        }
+    }
+    console.log('\n=== END TEST ===\n');
+
     app.use( new TouchOrbitControls());
     app.use( new OrbitControls());
     app.use(new StatsPanelExtension());

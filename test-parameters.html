@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parameter System Test</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #eee;
+            padding: 20px;
+        }
+        h1 { color: #4a9eff; }
+        h2 { color: #ff9a4a; margin-top: 20px; }
+        .param {
+            background: #2a2a2a;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #4a9eff;
+        }
+        .group {
+            margin: 20px 0;
+            padding: 15px;
+            background: #252525;
+            border-radius: 4px;
+        }
+        .success { color: #4aff9a; }
+        .error { color: #ff4a4a; }
+        pre {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Parameter Metadata System Test</h1>
+    <div id="status">Loading...</div>
+    <div id="results"></div>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script type="module">
+        import { App } from './src/app/App.js';
+
+        // Import modules
+        import { euclideanAmbient } from './src/world/ambient/euclidean/euclidean-ambient.js';
+        import { sceneRaymarch } from './src/world/scene/raymarch-scene.js';
+        import { constEnvironment } from './src/world/environment/const-environment.js';
+        import { quadLight } from './src/world/lighting/quad-light.js';
+
+        import { pinholeCamera } from './src/optics/camera/pinhole-camera.js';
+        import { lambertInteraction } from './src/optics/interaction/lambert-interaction.js';
+        import { pathTracerDirectLight } from './src/optics/transport/path-tracer-direct-light.js';
+        import { averagingAccumulator } from './src/optics/accumulator/average-accumulator.js';
+        import { gammaDeveloper } from './src/optics/developer/gamma-developer.js';
+
+        async function test() {
+            const statusEl = document.getElementById('status');
+            const resultsEl = document.getElementById('results');
+
+            try {
+                // Create canvas
+                const canvas = document.getElementById('canvas');
+                canvas.width = 800;
+                canvas.height = 600;
+
+                // Create minimal recipe
+                const recipe = {
+                    id: 'test',
+                    name: 'Test Recipe',
+                    world: {
+                        ambient: euclideanAmbient,
+                        environment: constEnvironment,
+                        scene: sceneRaymarch,
+                        lighting: quadLight
+                    },
+                    optics: {
+                        camera: pinholeCamera,
+                        interaction: lambertInteraction,
+                        transport: pathTracerDirectLight,
+                        accumulator: averagingAccumulator,
+                        developer: gammaDeveloper
+                    }
+                };
+
+                // Create app
+                statusEl.innerHTML = '<span class="success">✓ Creating App...</span>';
+                const app = new App(canvas);
+
+                // Initialize WITHOUT parameters to test defaults
+                statusEl.innerHTML = '<span class="success">✓ Initializing (collecting metadata)...</span>';
+                await app.initialize([recipe], undefined, undefined);
+
+                // Get collected metadata
+                const metadata = app.getParameterMetadata();
+
+                statusEl.innerHTML = '<span class="success">✓ SUCCESS! Metadata collected</span>';
+
+                // Display results
+                let html = `<h2>Collected ${metadata.size} parameters</h2>`;
+
+                // Group by group name
+                const byGroup = new Map();
+                for (const [path, meta] of metadata) {
+                    const group = meta.group || 'Ungrouped';
+                    if (!byGroup.has(group)) {
+                        byGroup.set(group, []);
+                    }
+                    byGroup.get(group).push({ path, meta });
+                }
+
+                // Display each group
+                for (const [groupName, params] of byGroup) {
+                    html += `<div class="group">`;
+                    html += `<h3>${groupName}</h3>`;
+
+                    for (const { path, meta } of params) {
+                        html += `<div class="param">`;
+                        html += `<strong>${meta.name}</strong> <code>(${path})</code><br>`;
+                        html += `Type: ${meta.type}`;
+                        if (meta.range) html += `, Range: [${meta.range[0]}, ${meta.range[1]}]`;
+                        if (meta.step) html += `, Step: ${meta.step}`;
+                        if (meta.unit) html += `, Unit: ${meta.unit}`;
+                        html += `<br>Default: <code>${JSON.stringify(meta.default)}</code>`;
+                        if (meta.help) html += `<br><em>${meta.help}</em>`;
+                        html += `<br>Triggers Reset: ${meta.triggersReset}`;
+                        html += `</div>`;
+                    }
+
+                    html += `</div>`;
+                }
+
+                // Show parameter store values
+                html += `<h2>Parameter Store Values</h2>`;
+                html += `<pre>${JSON.stringify(Array.from(app.parameterStore['values'].entries()), null, 2)}</pre>`;
+
+                resultsEl.innerHTML = html;
+
+                // Cleanup
+                app.stop();
+
+            } catch (error) {
+                statusEl.innerHTML = `<span class="error">✗ ERROR</span>`;
+                resultsEl.innerHTML = `<pre class="error">${error.stack}</pre>`;
+            }
+        }
+
+        test();
+    </script>
+</body>
+</html>
