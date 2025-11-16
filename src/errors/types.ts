@@ -137,7 +137,7 @@ export const DEFAULT_FORMAT_OPTIONS: FormatOptions = {
     showLineNumbers: true,
     showContext: true,
     showAllOccurrences: false,
-    maxContextLines: 2,
+    maxContextLines: 3,  // Increased from 2 for better context visibility
     useColors: true,
     groupByCategory: false,
     groupByModule: false

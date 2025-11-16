@@ -52,6 +52,8 @@ export class ShaderErrorTranslator {
         // Determine error category
         if (this.isMissingFunction(error)) {
             return this.translateMissingFunction(error);
+        } else if (this.isUniformError(error)) {
+            return this.translateUniformError(error);
         } else if (this.isTypeMismatch(error)) {
             return this.translateTypeMismatch(error);
         } else if (this.isSyntaxError(error)) {
@@ -63,10 +65,13 @@ export class ShaderErrorTranslator {
 
     /**
      * Check if error is a missing function
-     * Pattern: "'function_name' : no matching overloaded function found"
+     * Patterns:
+     * - "'function_name' : no matching overloaded function found"
+     * - "undeclared identifier 'function_name'"
+     * - "'return' : function return is not matching type" (indirect - missing function)
      */
     private isMissingFunction(error: GLSLError): boolean {
-        return /no matching overloaded function found|undeclared identifier|undefined/i.test(error.message);
+        return /no matching overloaded function found|undeclared identifier|undefined|function return is not matching type/i.test(error.message);
     }
 
     /**
@@ -86,11 +91,19 @@ export class ShaderErrorTranslator {
     }
 
     /**
+     * Check if error is a uniform error
+     * Pattern: undeclared uniform, uniform not found
+     */
+    private isUniformError(error: GLSLError): boolean {
+        return /undeclared.*uniform|uniform.*not (found|declared)/i.test(error.message);
+    }
+
+    /**
      * Translate missing function error with suggestions
      */
     private translateMissingFunction(error: GLSLError): TranslatedError {
-        const functionName = this.extractFunctionName(error.message);
         const location = this.parser.lineToLocation(error.line, this.lineMap, this.source);
+        const functionName = this.extractFunctionName(error.message, error.line);
 
         if (!functionName) {
             return this.translateGeneric(error);
@@ -174,6 +187,28 @@ export class ShaderErrorTranslator {
     }
 
     /**
+     * Translate uniform binding error
+     */
+    private translateUniformError(error: GLSLError): TranslatedError {
+        const location = this.parser.lineToLocation(error.line, this.lineMap, this.source);
+
+        // Try to extract uniform name from error
+        const uniformMatch = /'(u_\w+)'/.exec(error.message);
+        const uniformName = uniformMatch ? uniformMatch[1] : null;
+
+        return {
+            severity: error.type,
+            category: 'uniform_error',
+            message: uniformName ? `Uniform '${uniformName}' not found` : 'Uniform error',
+            detail: uniformName
+                ? `The uniform '${uniformName}' is used but not declared. Check module uniformBindings or shader uniforms.`
+                : error.message,
+            locations: location ? [location] : [],
+            originalError: error
+        };
+    }
+
+    /**
      * Generic translation for unrecognized errors
      */
     private translateGeneric(error: GLSLError): TranslatedError {
@@ -223,13 +258,17 @@ export class ShaderErrorTranslator {
     }
 
     /**
-     * Extract function name from error message
-     * Handles: "'function_name' : ..." or "undefined identifier `function_name`"
+     * Extract function name from error message or source context
+     * Handles:
+     * - "'function_name' : ..."
+     * - "undefined identifier `function_name`"
+     * - Extracts from source when error is indirect (e.g., return type mismatch)
      */
-    private extractFunctionName(message: string): string | null {
+    private extractFunctionName(message: string, line: number): string | null {
+        // Try to extract from error message first
         // Pattern 1: 'functionName'
         const match1 = /'(\w+)'/.exec(message);
-        if (match1) {
+        if (match1 && match1[1] !== 'return') {  // Ignore generic keywords
             return match1[1];
         }
 
@@ -237,6 +276,19 @@ export class ShaderErrorTranslator {
         const match2 = /`(\w+)`/.exec(message);
         if (match2) {
             return match2[1];
+        }
+
+        // Pattern 3: Extract from source code at error line
+        // This handles "function return is not matching type" errors
+        const sourceLines = this.source.split('\n');
+        if (line > 0 && line <= sourceLines.length) {
+            const sourceLine = sourceLines[line - 1];
+
+            // Match function calls: functionName(
+            const callMatch = /(\w+_\w+)\s*\(/g.exec(sourceLine);
+            if (callMatch) {
+                return callMatch[1];
+            }
         }
 
         return null;
