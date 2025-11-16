@@ -1,21 +1,20 @@
-// app/extensions/RenderProgressExtension.ts
+// app/extensions/ProductionRenderExtension.ts
 import type { Extension } from '../types';
 import { EventManager } from '../utils/EventManager';
 
 /**
- * RenderProgressExtension - Progress bar for production renders
+ * ProductionRenderExtension - Complete production render UI
  *
- * Shows:
- * - Progress bar (0-100%)
- * - Current/target samples
- * - Time elapsed + ETA
- * - Total ray samples cast
- * - Only visible during production mode (when targetSamples exists)
+ * Handles all production render UI:
+ * - Progress bar (0-100%, time, ETA, samples)
+ * - Completion dialog (extend/resume options)
+ * - Auto-shows during production mode
+ * - Event-driven coordination with App
  */
-class RenderProgressExtension implements Extension {
-    name = 'render-progress';
+class ProductionRenderExtension implements Extension {
+    name = 'production-render';
     version = '1.0.0';
-    description = 'Progress bar for production renders';
+    description = 'Production render UI (progress bar + completion dialog)';
 
     private app: any;
     private bus: any;
@@ -53,7 +52,7 @@ class RenderProgressExtension implements Extension {
         this.events.onBus(bus, 'render.unlocked', this.handleUnlocked);
         this.events.onBus(bus, 'production.complete', this.handleProductionComplete);
 
-        console.log('RenderProgress extension installed');
+        console.log('ProductionRender extension installed');
     }
 
     uninstall(): void {
@@ -523,4 +522,4 @@ class RenderProgressExtension implements Extension {
     }
 }
 
-export { RenderProgressExtension };
+export { ProductionRenderExtension };
