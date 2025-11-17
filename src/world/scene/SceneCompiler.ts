@@ -275,13 +275,74 @@ int scene_material_at(vec3 p) {
   }
 
   /**
-   * Generate material properties lookup
+   * Generate material properties lookup with procedural helper functions
    */
   private generateMaterialProperties(
     materials: Map<string, MaterialDescription>,
     materialIds: Map<string, number>,
     paramUsage: Map<string, 'vec3' | 'float'>
   ): string {
+    // Generate helper functions for procedural materials
+    const helperFunctions: string[] = [];
+
+    for (const [name, mat] of materials) {
+      const sanitizedName = this.sanitizeId(name);
+
+      // Generate helper for albedo if procedural
+      if (this.isProcedural(mat.albedo)) {
+        helperFunctions.push(this.generateProceduralHelper(
+          'vec3',
+          `material_${sanitizedName}_albedo`,
+          mat.albedo.glsl
+        ));
+      }
+
+      // Generate helper for roughness if procedural
+      if (this.isProcedural(mat.roughness)) {
+        helperFunctions.push(this.generateProceduralHelper(
+          'float',
+          `material_${sanitizedName}_roughness`,
+          mat.roughness.glsl
+        ));
+      }
+
+      // Generate helper for metallic if procedural
+      if (this.isProcedural(mat.metallic)) {
+        helperFunctions.push(this.generateProceduralHelper(
+          'float',
+          `material_${sanitizedName}_metallic`,
+          mat.metallic.glsl
+        ));
+      }
+
+      // Generate helper for ior if procedural
+      if (this.isProcedural(mat.ior)) {
+        helperFunctions.push(this.generateProceduralHelper(
+          'float',
+          `material_${sanitizedName}_ior`,
+          mat.ior.glsl
+        ));
+      }
+
+      // Generate helper for emission if procedural
+      if (this.isProcedural(mat.emission)) {
+        helperFunctions.push(this.generateProceduralHelper(
+          'vec3',
+          `material_${sanitizedName}_emission`,
+          mat.emission.glsl
+        ));
+      }
+
+      // Generate helper for emission_strength if procedural
+      if (this.isProcedural(mat.emission_strength)) {
+        helperFunctions.push(this.generateProceduralHelper(
+          'float',
+          `material_${sanitizedName}_emission_strength`,
+          mat.emission_strength.glsl
+        ));
+      }
+    }
+
     const cases: string[] = [];
 
     // Air case
@@ -299,40 +360,41 @@ int scene_material_at(vec3 p) {
     // Each material
     for (const [name, mat] of materials) {
       const constName = `MATERIAL_${this.toConstantName(name)}`;
+      const sanitizedName = this.sanitizeId(name);
 
-      // Generate property assignments (constant, uniform, or procedural)
+      // Generate property assignments (constant, uniform, or procedural function call)
       const albedoValue = this.isProcedural(mat.albedo)
-        ? mat.albedo.glsl
+        ? `material_${sanitizedName}_albedo(p)`
         : this.isParam(mat.albedo)
         ? this.paramToUniform(mat.albedo.param)
         : `vec3(${mat.albedo.map(v => this.toGLSLFloat(v)).join(', ')})`;
 
       const roughnessValue = this.isProcedural(mat.roughness)
-        ? mat.roughness.glsl
+        ? `material_${sanitizedName}_roughness(p)`
         : this.isParam(mat.roughness)
         ? this.paramToUniform(mat.roughness.param)
         : this.toGLSLFloat(mat.roughness);
 
       const metallicValue = this.isProcedural(mat.metallic)
-        ? mat.metallic.glsl
+        ? `material_${sanitizedName}_metallic(p)`
         : this.isParam(mat.metallic)
         ? this.paramToUniform(mat.metallic.param)
         : this.toGLSLFloat(mat.metallic);
 
       const iorValue = this.isProcedural(mat.ior)
-        ? mat.ior.glsl
+        ? `material_${sanitizedName}_ior(p)`
         : this.isParam(mat.ior)
         ? this.paramToUniform(mat.ior.param)
         : this.toGLSLFloat(mat.ior);
 
       const emissionValue = this.isProcedural(mat.emission)
-        ? mat.emission.glsl
+        ? `material_${sanitizedName}_emission(p)`
         : this.isParam(mat.emission)
         ? this.paramToUniform(mat.emission.param)
         : `vec3(${mat.emission.map(v => this.toGLSLFloat(v)).join(', ')})`;
 
       const emissionStrengthValue = this.isProcedural(mat.emission_strength)
-        ? mat.emission_strength.glsl
+        ? `material_${sanitizedName}_emission_strength(p)`
         : this.isParam(mat.emission_strength)
         ? this.paramToUniform(mat.emission_strength.param)
         : this.toGLSLFloat(mat.emission_strength);
@@ -349,7 +411,11 @@ int scene_material_at(vec3 p) {
   }`.trim());
     }
 
-    return `
+    const helperSection = helperFunctions.length > 0
+      ? '// ========== PROCEDURAL MATERIAL HELPERS ==========\n\n' + helperFunctions.join('\n\n') + '\n\n'
+      : '';
+
+    return helperSection + `
 // ========== MATERIAL PROPERTIES ==========
 
 MaterialProperties scene_material_properties(int mat_id, Point p) {
@@ -367,6 +433,31 @@ MaterialProperties scene_material_properties(int mat_id, Point p) {
   ${cases.join('\n  ')}
 
   return props;
+}`.trim();
+  }
+
+  /**
+   * Generate a procedural helper function
+   * Auto-adds return statement if the code doesn't have one
+   */
+  private generateProceduralHelper(returnType: string, functionName: string, glslCode: string): string {
+    const trimmedCode = glslCode.trim();
+
+    // Check if code already has a return statement
+    const hasReturn = /\breturn\b/.test(trimmedCode);
+
+    let body: string;
+    if (hasReturn) {
+      // Code has explicit return, use as-is
+      body = trimmedCode;
+    } else {
+      // No return - treat as expression and add return
+      body = `return ${trimmedCode};`;
+    }
+
+    return `
+${returnType} ${functionName}(Point p) {
+  ${body}
 }`.trim();
   }
 
