@@ -10,17 +10,17 @@ export const simpleSceneDescription: SceneDescription = {
   objects: [
     {
       id: 'floor',
-      sdf: 'p.y + 1.0',
+      sdf: 'float sdf(vec3 p) { return p.y + 1.0; }',
       material: 'concrete'
     },
     {
       id: 'red_sphere',
-      sdf: 'length(p - vec3(0.0, 0.0, 0.0)) - 1.0',
+      sdf: 'float sdf(vec3 p) { return length(p - vec3(0.0, 0.0, 0.0)) - 1.0; }',
       material: 'red_diffuse'
     },
     {
       id: 'glass_sphere',
-      sdf: 'length(p - vec3(2.5, 0.0, 0.0)) - 0.7',
+      sdf: 'float sdf(vec3 p) { return length(p - vec3(2.5, 0.0, 0.0)) - 0.7; }',
       material: 'glass'
     }
   ],

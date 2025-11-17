@@ -11,17 +11,17 @@ export const interactiveMaterialsScene: SceneDescription = {
   objects: [
     {
       id: 'floor',
-      sdf: 'p.y + 1.0',
+      sdf: 'float sdf(vec3 p) { return p.y + 1.0; }',
       material: 'floor'
     },
     {
       id: 'left_sphere',
-      sdf: 'length(p - vec3(-1.5, 0.0, 0.0)) - 0.8',
+      sdf: 'float sdf(vec3 p) { return length(p - vec3(-1.5, 0.0, 0.0)) - 0.8; }',
       material: 'rough_sphere'
     },
     {
       id: 'right_sphere',
-      sdf: 'length(p - vec3(1.5, 0.0, 0.0)) - 0.8',
+      sdf: 'float sdf(vec3 p) { return length(p - vec3(1.5, 0.0, 0.0)) - 0.8; }',
       material: 'metallic_sphere'
     }
   ],

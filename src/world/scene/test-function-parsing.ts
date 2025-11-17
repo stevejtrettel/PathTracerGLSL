@@ -19,7 +19,7 @@ const testScene: SceneDescription = {
     },
     {
       id: 'sphere',
-      sdf: 'length(p) - 1.0',  // Old style expression
+      sdf: 'float sdf(vec3 p) { return length(p) - 1.0; }',
       material: 'test'
     }
   ],

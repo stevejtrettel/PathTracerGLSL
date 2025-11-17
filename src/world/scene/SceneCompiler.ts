@@ -200,45 +200,29 @@ export class SceneCompiler {
 
   /**
    * Generate individual SDF functions for each object
-   * Supports three modes:
-   * 1. Full function definition - extracts body and replaces name
-   * 2. Function body with return - wraps in function
-   * 3. Expression without return - wraps as return statement
+   * Requires full GLSL function definition with signature
    */
   private generateObjectSDFs(objects: SimpleObject[]): string {
     const functions = objects.map((obj) => {
       const funcName = `sdf_${this.sanitizeId(obj.id)}`;
       const trimmedSdf = obj.sdf.trim();
 
-      // Try to parse as a full function definition
+      // Parse full function definition (required!)
       const functionMatch = trimmedSdf.match(/^\s*float\s+(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}\s*$/);
 
-      if (functionMatch) {
-        // Full function definition found!
-        const [, originalName, params, body] = functionMatch;
-
-        return `
-// ${obj.id}
-float ${funcName}(${params}) {${body}}`.trim();
+      if (!functionMatch) {
+        throw new Error(
+          `SDF for object "${obj.id}" must be a complete GLSL function.\n` +
+          `Example: float sdf(vec3 p) { return length(p) - 1.0; }\n` +
+          `Got: ${trimmedSdf.substring(0, 100)}...`
+        );
       }
 
-      // Not a full function - use old behavior
-      const hasReturn = /\breturn\b/.test(trimmedSdf);
-
-      let body: string;
-      if (hasReturn) {
-        // Multi-statement function - use as-is
-        body = trimmedSdf;
-      } else {
-        // Single expression - add return
-        body = `return ${trimmedSdf};`;
-      }
+      const [, originalName, params, body] = functionMatch;
 
       return `
 // ${obj.id}
-float ${funcName}(vec3 p) {
-  ${body}
-}`.trim();
+float ${funcName}(${params}) {${body}}`.trim();
     });
 
     return '// ========== OBJECT SDFs ==========\n\n' + functions.join('\n\n');
@@ -467,44 +451,37 @@ MaterialProperties scene_material_properties(int mat_id, Point p) {
 
   /**
    * Generate a procedural helper function
-   * Supports three modes:
-   * 1. Full function definition - extracts body and replaces name
-   * 2. Function body with return - wraps in function
-   * 3. Expression without return - wraps as return statement
+   * Requires full GLSL function definition with signature
    */
   private generateProceduralHelper(returnType: string, functionName: string, glslCode: string): string {
     const trimmedCode = glslCode.trim();
 
-    // Try to parse as a full function definition
+    // Parse full function definition (required!)
     const functionMatch = trimmedCode.match(/^\s*(float|vec3|vec2|vec4|int)\s+(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}\s*$/);
 
-    if (functionMatch) {
-      // Full function definition found!
-      const [, declaredReturnType, originalName, params, body] = functionMatch;
-
-      // Use the declared return type if it matches what we expect
-      const finalReturnType = declaredReturnType === returnType ? returnType : returnType;
-
-      return `
-${finalReturnType} ${functionName}(${params}) {${body}}`.trim();
+    if (!functionMatch) {
+      throw new Error(
+        `Procedural GLSL code must be a complete function.\n` +
+        `Expected: ${returnType} functionName(...) { ... }\n` +
+        `Example: vec3 myColor(vec3 p) { return vec3(1.0, 0.0, 0.0); }\n` +
+        `Got: ${trimmedCode.substring(0, 100)}...`
+      );
     }
 
-    // Not a full function - use old behavior (function body or expression)
-    const hasReturn = /\breturn\b/.test(trimmedCode);
+    const [, declaredReturnType, originalName, params, body] = functionMatch;
 
-    let body: string;
-    if (hasReturn) {
-      // Code has explicit return, use as-is
-      body = trimmedCode;
-    } else {
-      // No return - treat as expression and add return
-      body = `return ${trimmedCode};`;
+    // Validate return type matches expected
+    if (declaredReturnType !== returnType) {
+      throw new Error(
+        `Procedural function has wrong return type.\n` +
+        `Expected: ${returnType}\n` +
+        `Got: ${declaredReturnType}\n` +
+        `Function: ${originalName}`
+      );
     }
 
     return `
-${returnType} ${functionName}(Point p) {
-  ${body}
-}`.trim();
+${returnType} ${functionName}(${params}) {${body}}`.trim();
   }
 
   /**
