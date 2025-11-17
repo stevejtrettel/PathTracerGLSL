@@ -116,19 +116,19 @@ async function main() {
 
     // Initial parameters
     const parameters = {
-        // Camera
-        'camera.position': [0, 0, 6],
+        // Camera (inside the box, looking at back wall)
+        'camera.position': [0, 0, 1.8],
         'camera.target': [0, 0, 0],
         'camera.fov': 60,
         'resolution': [window.innerWidth, window.innerHeight],
 
-        // Light
-        'light.center': [0, 3.9, 0],
-        'light.width': 2,
-        'light.height': 2,
+        // Light (just below ceiling at y=2.0)
+        'light.center': [0, 1.9, 0],
+        'light.width': 1.0,
+        'light.height': 1.0,
         'light.direction1': [1, 0, 0],
         'light.direction2': [0, 0, 1],
-        'light.intensity': 30.0,
+        'light.intensity': 40.0,
         'light.color': [1, 1, 1],
 
         // Environment
