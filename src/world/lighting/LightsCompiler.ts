@@ -354,29 +354,7 @@ ${lightDataArray}
 #define SAMPLING_QUAD 4
 `;
 
-    const structs = `
-// Light data structure
-struct LightData {
-  vec3 radiance;      // Color * intensity
-  int sampling_type;  // Type of sampling
-  vec4 param0;        // Position / center
-  vec4 param1;        // Edge1 or other params
-  vec4 param2;        // Edge2 or other params
-};
-
-// Light sample structure
-struct LightSample {
-  vec3 position;   // Point on light
-  vec3 wi;         // Direction to light
-  float distance;  // Distance to light
-  vec3 radiance;   // Emitted radiance
-  float pdf;       // Sampling PDF
-};
-`;
-
     const functions = `
-${structs}
-
 // ========== LIGHT DATA ${isSingleLight ? 'ACCESSOR' : 'ARRAY'} ==========
 
 ${lightDataCode}
@@ -523,22 +501,6 @@ ${dispatchCases}
 #define NUM_LIGHTS 0
         `,
         functions: `
-struct LightSample {
-  vec3 position;
-  vec3 wi;
-  float distance;
-  vec3 radiance;
-  float pdf;
-};
-
-struct LightData {
-  vec3 radiance;
-  int sampling_type;
-  vec4 param0;
-  vec4 param1;
-  vec4 param2;
-};
-
 LightSample lighting_sample(vec3 p, vec2 xi) {
   LightSample ls;
   ls.pdf = 0.0;
