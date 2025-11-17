@@ -13,36 +13,19 @@ import type { QuadLight } from '../types.js';
 export interface SamplerOptions {
   index: number;
   isSingleLight: boolean;
-  useUniformAccessor?: boolean;  // Use lighting_get_light() for multi-light uniforms
 }
 
 /**
  * Generate GLSL sampler function for a quad light
  */
 export function generateQuadLightSampler(light: QuadLight, options: SamplerOptions): string {
-  const { index, isSingleLight, useUniformAccessor = false } = options;
+  const { index, isSingleLight } = options;
 
-  // Different access patterns: single light uniforms, array access, or dynamic accessor
-  let centerAccess, edge1Access, edge2Access, radianceAccess;
-
-  if (isSingleLight) {
-    centerAccess = 'u_light_center';
-    edge1Access = 'u_light_edge1';
-    edge2Access = 'u_light_edge2';
-    radianceAccess = '(u_light_color * u_light_intensity)';
-  } else if (useUniformAccessor) {
-    centerAccess = `lighting_get_light(${index}).param0.xyz`;
-    edge1Access = `lighting_get_light(${index}).param1.xyz`;
-    edge2Access = `lighting_get_light(${index}).param2.xyz`;
-    radianceAccess = `lighting_get_light(${index}).radiance`;
-  } else {
-    centerAccess = `u_lights[${index}].param0.xyz`;
-    edge1Access = `u_lights[${index}].param1.xyz`;
-    edge2Access = `u_lights[${index}].param2.xyz`;
-    radianceAccess = `u_lights[${index}].radiance`;
-  }
-
-  // Function signature depends on whether we're in single or multi-light mode
+  // Single light: access uniforms directly. Multi-light: always use lighting_get_light()
+  const centerAccess = isSingleLight ? 'u_light_center' : `lighting_get_light(${index}).param0.xyz`;
+  const edge1Access = isSingleLight ? 'u_light_edge1' : `lighting_get_light(${index}).param1.xyz`;
+  const edge2Access = isSingleLight ? 'u_light_edge2' : `lighting_get_light(${index}).param2.xyz`;
+  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `lighting_get_light(${index}).radiance`;
   const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
   const randomGen = isSingleLight ? 'vec2 xi = random2();' : '';
 

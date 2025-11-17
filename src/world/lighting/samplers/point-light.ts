@@ -14,29 +14,17 @@ import type { PointLight } from '../types.js';
 export interface SamplerOptions {
   index: number;
   isSingleLight: boolean;
-  useUniformAccessor?: boolean;  // Use lighting_get_light() for multi-light uniforms
 }
 
 /**
  * Generate GLSL sampler function for a point light
  */
 export function generatePointLightSampler(light: PointLight, options: SamplerOptions): string {
-  const { index, isSingleLight, useUniformAccessor = false } = options;
+  const { index, isSingleLight } = options;
 
-  // Different access patterns: single light uniforms, array access, or dynamic accessor
-  let posAccess, radianceAccess;
-
-  if (isSingleLight) {
-    posAccess = 'u_light_position';
-    radianceAccess = '(u_light_color * u_light_intensity)';
-  } else if (useUniformAccessor) {
-    posAccess = `lighting_get_light(${index}).param0.xyz`;
-    radianceAccess = `lighting_get_light(${index}).radiance`;
-  } else {
-    posAccess = `u_lights[${index}].param0.xyz`;
-    radianceAccess = `u_lights[${index}].radiance`;
-  }
-
+  // Single light: access uniforms directly. Multi-light: always use lighting_get_light()
+  const posAccess = isSingleLight ? 'u_light_position' : `lighting_get_light(${index}).param0.xyz`;
+  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `lighting_get_light(${index}).radiance`;
   const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
 
   return `

@@ -66,8 +66,7 @@ export class LightsCompiler {
     const samplers = lights.map((light, index) =>
       this.generateLightSampler(light, {
         index,
-        isSingleLight: useUniforms && isSingleLight,
-        useUniformAccessor: useUniforms && !isSingleLight
+        isSingleLight: useUniforms && isSingleLight
       })
     );
 
@@ -78,7 +77,7 @@ export class LightsCompiler {
   /**
    * Generate sampler for a specific light type
    */
-  private generateLightSampler(light: Light, options: { index: number; isSingleLight: boolean; useUniformAccessor?: boolean }): string {
+  private generateLightSampler(light: Light, options: { index: number; isSingleLight: boolean }): string {
     switch (light.type) {
       case 'point':
         return generatePointLightSampler(light, options);
@@ -207,9 +206,17 @@ export class LightsCompiler {
         )
         .join(',\n');
 
-      lightDataCode = `LightData u_lights[${numLights}] = LightData[${numLights}](
+      lightDataCode = `
+// Constant light data array
+const LightData u_lights[${numLights}] = LightData[${numLights}](
 ${lightDataArray}
-);`;
+);
+
+// Light data accessor (reads from constant array)
+LightData lighting_get_light(int light_id) {
+  return u_lights[light_id];
+}
+      `.trim();
     }
 
     const constants = `
@@ -246,15 +253,6 @@ ${this.generateLightSelection(lightPowers, totalPower)}
 ${this.generateMainSampler(numLights, lightPowers, totalPower)}
 
 // ========== QUERY FUNCTIONS ==========
-
-${isSingleLight ? '' : `
-LightData lighting_get_light(int light_id) {
-  if (light_id < 0 || light_id >= NUM_LIGHTS) {
-    return LightData(vec3(0.0), SAMPLING_NONE, vec4(0.0), vec4(0.0), vec4(0.0));
-  }
-  return u_lights[light_id];
-}
-`}
 
 bool lighting_can_sample(int light_id) {
   return (light_id >= 0 && light_id < NUM_LIGHTS);
