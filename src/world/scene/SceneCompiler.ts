@@ -192,8 +192,17 @@ int scene_material_at(vec3 p) {
     return `
 // ========== MATERIAL PROPERTIES ==========
 
-MaterialProperties scene_material_properties(int mat_id, vec3 p) {
+MaterialProperties scene_material_properties(int mat_id, Point p) {
   MaterialProperties props;
+
+  // Default initialization
+  props.albedo = vec3(1.0, 0.0, 1.0);  // Magenta = error color
+  props.roughness = 0.8;
+  props.metallic = 0.0;
+  props.ior = 1.5;
+  props.emission = vec3(0.0);
+  props.emission_strength = 0.0;
+  props.light_id = -1;
 
   ${cases.join('\n  ')}
 
@@ -231,17 +240,15 @@ bool scene_intersect(Ray ray, out Hit hit) {
     float d = dispatch_sdf(p, material);
 
     if (d < MARCH_EPSILON) {
-      // Hit detected - resolve interface
+      // Hit detected
       hit.t = t;
       hit.p = p;
       hit.n = scene_normal(p);
+      hit.uv = vec2(p.x * 0.1, p.z * 0.1);
 
-      // Epsilon sampling for material interface resolution
-      vec3 p_before = ambient_geodesic(ray.origin, ray.direction, t - 1e-4);
-      vec3 p_after = p;
-
-      hit.material_from = scene_material_at(p_before);
-      hit.material_to = scene_material_at(p_after);
+      // Material interface (simple: always from air)
+      hit.material_from = MATERIAL_AIR;
+      hit.material_to = material;
 
       // Build frame for shading
       hit.frame = ambient_frame(hit.p, hit.n);
