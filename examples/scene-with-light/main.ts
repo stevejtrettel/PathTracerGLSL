@@ -189,6 +189,15 @@ window.addEventListener('resize', () => {
     }
 });
 
+// Debug: intercept console.error to catch WebGL errors
+const originalError = console.error;
+console.error = function(...args) {
+    if (args[0] && typeof args[0] === 'string' && args[0].includes('compilation failed')) {
+        console.log('DEBUG: Full error details:', args);
+    }
+    originalError.apply(console, args);
+};
+
 // Run
 main().catch(error => {
     console.error('Failed to start:', error);
