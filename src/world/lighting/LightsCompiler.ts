@@ -302,7 +302,7 @@ LightSample lighting_sample(Point p) {
     }
 
     const dispatchCases = Array.from({ length: numLights }, (_, i) =>
-      `    case ${i}: return sample_light_${i}(p, xi);`
+      `    case ${i}: ls = sample_light_${i}(p, xi); break;`
     ).join('\n');
 
     return `
