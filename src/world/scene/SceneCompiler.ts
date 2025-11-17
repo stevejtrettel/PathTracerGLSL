@@ -16,8 +16,8 @@ export class SceneCompiler {
     // Build material ID mapping
     const materialIds = this.buildMaterialIds(scene.materials);
 
-    // Analyze parameter usage
-    const paramUsage = this.analyzeParameterUsage(scene.materials);
+    // Analyze parameter usage (both explicit references and all scene parameters)
+    const paramUsage = this.analyzeParameterUsage(scene.materials, scene.parameters || {});
 
     // Generate all code sections
     const constants = this.generateConstants(scene, materialIds);
@@ -57,6 +57,13 @@ export class SceneCompiler {
   }
 
   /**
+   * Check if a property value is procedural GLSL code
+   */
+  private isProcedural<T>(value: MaterialPropertyValue<T>): value is { glsl: string } {
+    return typeof value === 'object' && value !== null && 'glsl' in value;
+  }
+
+  /**
    * Get uniform name for a parameter
    */
   private paramToUniform(paramPath: string): string {
@@ -65,12 +72,17 @@ export class SceneCompiler {
 
   /**
    * Analyze which parameters are used and their types
+   * Includes both explicit parameter references AND all scene parameters
+   * (for use in procedural GLSL code)
    */
-  private analyzeParameterUsage(materials: Map<string, MaterialDescription>): Map<string, 'vec3' | 'float'> {
+  private analyzeParameterUsage(
+    materials: Map<string, MaterialDescription>,
+    parameters: Record<string, any>
+  ): Map<string, 'vec3' | 'float'> {
     const usage = new Map<string, 'vec3' | 'float'>();
 
+    // First, check for explicit parameter references in materials
     for (const [_, mat] of materials) {
-      // Check each property
       if (this.isParam(mat.albedo)) {
         usage.set(mat.albedo.param, 'vec3');
       }
@@ -88,6 +100,20 @@ export class SceneCompiler {
       }
       if (this.isParam(mat.emission_strength)) {
         usage.set(mat.emission_strength.param, 'float');
+      }
+    }
+
+    // Second, add ALL scene parameters (for procedural GLSL usage)
+    // Procedural code can reference any parameter via uniforms
+    for (const [paramPath, paramMeta] of Object.entries(parameters)) {
+      if (!usage.has(paramPath)) {
+        // Infer type from parameter metadata
+        const type = paramMeta.type;
+        if (type === 'color' || type === 'vec3') {
+          usage.set(paramPath, 'vec3');
+        } else if (type === 'float' || type === 'int') {
+          usage.set(paramPath, 'float');
+        }
       }
     }
 
@@ -274,28 +300,40 @@ int scene_material_at(vec3 p) {
     for (const [name, mat] of materials) {
       const constName = `MATERIAL_${this.toConstantName(name)}`;
 
-      // Generate property assignments (constant or uniform)
-      const albedoValue = this.isParam(mat.albedo)
+      // Generate property assignments (constant, uniform, or procedural)
+      const albedoValue = this.isProcedural(mat.albedo)
+        ? mat.albedo.glsl
+        : this.isParam(mat.albedo)
         ? this.paramToUniform(mat.albedo.param)
         : `vec3(${mat.albedo.map(v => this.toGLSLFloat(v)).join(', ')})`;
 
-      const roughnessValue = this.isParam(mat.roughness)
+      const roughnessValue = this.isProcedural(mat.roughness)
+        ? mat.roughness.glsl
+        : this.isParam(mat.roughness)
         ? this.paramToUniform(mat.roughness.param)
         : this.toGLSLFloat(mat.roughness);
 
-      const metallicValue = this.isParam(mat.metallic)
+      const metallicValue = this.isProcedural(mat.metallic)
+        ? mat.metallic.glsl
+        : this.isParam(mat.metallic)
         ? this.paramToUniform(mat.metallic.param)
         : this.toGLSLFloat(mat.metallic);
 
-      const iorValue = this.isParam(mat.ior)
+      const iorValue = this.isProcedural(mat.ior)
+        ? mat.ior.glsl
+        : this.isParam(mat.ior)
         ? this.paramToUniform(mat.ior.param)
         : this.toGLSLFloat(mat.ior);
 
-      const emissionValue = this.isParam(mat.emission)
+      const emissionValue = this.isProcedural(mat.emission)
+        ? mat.emission.glsl
+        : this.isParam(mat.emission)
         ? this.paramToUniform(mat.emission.param)
         : `vec3(${mat.emission.map(v => this.toGLSLFloat(v)).join(', ')})`;
 
-      const emissionStrengthValue = this.isParam(mat.emission_strength)
+      const emissionStrengthValue = this.isProcedural(mat.emission_strength)
+        ? mat.emission_strength.glsl
+        : this.isParam(mat.emission_strength)
         ? this.paramToUniform(mat.emission_strength.param)
         : this.toGLSLFloat(mat.emission_strength);
 

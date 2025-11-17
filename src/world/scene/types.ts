@@ -14,8 +14,11 @@ export interface SimpleObject {
   material: string;  // Reference to material name
 }
 
-// Material property value: either a constant or a parameter reference
-export type MaterialPropertyValue<T> = T | { param: string };
+// Material property value: constant, parameter reference, or GLSL code
+export type MaterialPropertyValue<T> =
+  | T                      // Constant value
+  | { param: string }      // Reference to UI parameter
+  | { glsl: string }       // GLSL code snippet (can use 'p' for position)
 
 export interface MaterialDescription {
   // Each property can be constant or reference a parameter
