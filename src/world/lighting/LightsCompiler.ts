@@ -355,6 +355,15 @@ ${lightDataArray}
 `;
 
     const functions = `
+// Light data structure (LightSample comes from common-structs.glsl)
+struct LightData {
+  vec3 radiance;      // Color * intensity
+  int sampling_type;  // Type of sampling
+  vec4 param0;        // Position / center
+  vec4 param1;        // Edge1 or other params
+  vec4 param2;        // Edge2 or other params
+};
+
 // ========== LIGHT DATA ${isSingleLight ? 'ACCESSOR' : 'ARRAY'} ==========
 
 ${lightDataCode}
@@ -501,6 +510,15 @@ ${dispatchCases}
 #define NUM_LIGHTS 0
         `,
         functions: `
+// Light data structure (LightSample comes from common-structs.glsl)
+struct LightData {
+  vec3 radiance;
+  int sampling_type;
+  vec4 param0;
+  vec4 param1;
+  vec4 param2;
+};
+
 LightSample lighting_sample(vec3 p, vec2 xi) {
   LightSample ls;
   ls.pdf = 0.0;

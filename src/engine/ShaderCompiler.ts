@@ -106,11 +106,14 @@ class ShaderCompiler {
     ): CompilationResult {
         const errorLog = error.message || String(error);
 
+        // Log raw error for debugging
+        console.error(`\n❌ ${shaderName} compilation failed:\n`);
+        console.error('RAW ERROR:', errorLog);
+
         const diagnostics = translateShaderErrors(errorLog, source, modules);
 
         // Format and log errors to console
         const formatter = new ShaderErrorFormatter();
-        console.error(`\n❌ ${shaderName} compilation failed:\n`);
         const formattedErrors = formatter.formatConsole(diagnostics);
         console.error(formattedErrors);
 

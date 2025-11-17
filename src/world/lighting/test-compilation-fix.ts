@@ -37,18 +37,24 @@ console.log(module.fragment.uniforms || '(none)');
 console.log('\nFunctions section (first 500 chars):');
 console.log(module.fragment.functions?.substring(0, 500) || '(none)');
 
-// Check that structs are NOT defined in the generated code
+// Check that LightSample is NOT redefined (comes from common-structs.glsl)
+// But LightData SHOULD be defined (not in common-structs.glsl)
 const functionsCode = module.fragment.functions || '';
 const hasLightSampleDef = functionsCode.includes('struct LightSample');
 const hasLightDataDef = functionsCode.includes('struct LightData');
 
-if (hasLightSampleDef || hasLightDataDef) {
-  console.error('\n❌ ERROR: Generated code still contains struct definitions!');
-  if (hasLightSampleDef) console.error('  - Found struct LightSample');
-  if (hasLightDataDef) console.error('  - Found struct LightData');
+if (hasLightSampleDef) {
+  console.error('\n❌ ERROR: LightSample struct redefinition found!');
+  console.error('  LightSample should come from common-structs.glsl, not be generated');
   process.exit(1);
-} else {
-  console.log('\n✓ No struct redefinitions found - structs will come from common-structs.glsl');
 }
 
+if (!hasLightDataDef) {
+  console.error('\n❌ ERROR: LightData struct NOT found!');
+  console.error('  LightData is not in common-structs.glsl and must be generated');
+  process.exit(1);
+}
+
+console.log('\n✓ LightData struct defined (correct - not in common-structs.glsl)');
+console.log('✓ LightSample struct NOT redefined (correct - comes from common-structs.glsl)');
 console.log('\n✓ All checks passed!');
