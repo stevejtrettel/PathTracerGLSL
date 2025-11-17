@@ -21,7 +21,7 @@ export const multiLightDescription: LightingDescription = {
       direction1: [1, 0, 0],  // X direction
       direction2: [0, 0, 1],  // Z direction
       color: [1.0, 1.0, 1.0],
-      intensity: 25.0
+      intensity: 12.0  // Reduced from 25
     },
 
     // Sphere light on left
@@ -31,7 +31,7 @@ export const multiLightDescription: LightingDescription = {
       position: [-1.5, 0.5, 0],
       radius: 0.3,
       color: [1.0, 0.3, 0.3],  // Red-ish
-      intensity: 15.0
+      intensity: 6.0  // Reduced from 15
     },
 
     // Point light on right
@@ -40,7 +40,7 @@ export const multiLightDescription: LightingDescription = {
       id: 'right_light',
       position: [1.5, 0.5, 0],
       color: [0.3, 0.3, 1.0],  // Blue-ish
-      intensity: 20.0
+      intensity: 8.0  // Reduced from 20
     }
   ]
 };
