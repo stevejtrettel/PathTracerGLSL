@@ -275,7 +275,8 @@ vec3 lighting_environment(vec3 dir) {
 
     return `
 // Power-based light selection
-const float light_powers[${lightPowers.length}] = float[${lightPowers.length}](${lightPowers.join(', ')});
+float light_powers[${lightPowers.length}] = float[${lightPowers.length}](${lightPowers.map((p, i) => `\n  ${p.toFixed(6)}${i < lightPowers.length - 1 ? ',' : ''}`).join('')}
+);
 const float total_power = ${totalPower.toFixed(6)};
 
 int select_light(float xi) {
