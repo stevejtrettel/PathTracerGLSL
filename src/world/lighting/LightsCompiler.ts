@@ -27,13 +27,18 @@ import type {
  * Generates GLSL sampler for a point light
  * EASY TO EXTEND: Copy this pattern for new light types!
  */
-function generatePointLightSampler(light: PointLight, index: number): string {
+function generatePointLightSampler(light: PointLight, index: number, isSingleLight: boolean): string {
+  // For single light, access uniforms directly; for multiple, use array
+  const posAccess = isSingleLight ? 'u_light_position' : 'u_lights[${index}].param0.xyz';
+  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : 'u_lights[${index}].radiance';
+  const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
+
   return `
     // Point light: ${light.id}
-    LightSample sample_light_${index}(Point p, vec2 xi) {
+    LightSample sample_light_${index}(${signature}) {
       LightSample ls;
 
-      vec3 light_pos = u_lights[${index}].param0.xyz;
+      vec3 light_pos = ${posAccess};
 
       // Direction from surface point to light
       vec3 light_vector = light_pos - p;
@@ -42,7 +47,7 @@ function generatePointLightSampler(light: PointLight, index: number): string {
       ls.position = light_pos;
 
       // Inverse square falloff
-      vec3 radiance = u_lights[${index}].radiance;
+      vec3 radiance = ${radianceAccess};
       ls.radiance = radiance / (ls.distance * ls.distance);
 
       // Delta distribution - probability 1 since it's a point
@@ -56,14 +61,21 @@ function generatePointLightSampler(light: PointLight, index: number): string {
 /**
  * Generates GLSL sampler for a sphere light
  */
-function generateSphereLightSampler(light: SphereLight, index: number): string {
+function generateSphereLightSampler(light: SphereLight, index: number, isSingleLight: boolean): string {
+  const centerAccess = isSingleLight ? 'u_light_position' : `u_lights[${index}].param0.xyz`;
+  const radiusAccess = isSingleLight ? 'u_light_radius' : `u_lights[${index}].param0.w`;
+  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `u_lights[${index}].radiance`;
+  const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
+  const randomGen = isSingleLight ? 'vec2 xi = random2();' : '';
+
   return `
     // Sphere light: ${light.id}
-    LightSample sample_light_${index}(Point p, vec2 xi) {
+    LightSample sample_light_${index}(${signature}) {
       LightSample ls;
 
-      vec3 center = u_lights[${index}].param0.xyz;
-      float radius = u_lights[${index}].param0.w;
+      ${randomGen}
+      vec3 center = ${centerAccess};
+      float radius = ${radiusAccess};
 
       // Sample point uniformly on sphere surface
       float z = 1.0 - 2.0 * xi.x;
@@ -95,7 +107,7 @@ function generateSphereLightSampler(light: SphereLight, index: number): string {
       float pdf_area = 1.0 / sphere_area;
       ls.pdf = pdf_area * distance * distance / cos_light;
 
-      ls.radiance = u_lights[${index}].radiance;
+      ls.radiance = ${radianceAccess};
 
       return ls;
     }
@@ -105,15 +117,23 @@ function generateSphereLightSampler(light: SphereLight, index: number): string {
 /**
  * Generates GLSL sampler for a quad light
  */
-function generateQuadLightSampler(light: QuadLight, index: number): string {
+function generateQuadLightSampler(light: QuadLight, index: number, isSingleLight: boolean): string {
+  const centerAccess = isSingleLight ? 'u_light_center' : `u_lights[${index}].param0.xyz`;
+  const edge1Access = isSingleLight ? 'u_light_edge1' : `u_lights[${index}].param1.xyz`;
+  const edge2Access = isSingleLight ? 'u_light_edge2' : `u_lights[${index}].param2.xyz`;
+  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `u_lights[${index}].radiance`;
+  const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
+  const randomGen = isSingleLight ? 'vec2 xi = random2();' : '';
+
   return `
     // Quad light: ${light.id}
-    LightSample sample_light_${index}(Point p, vec2 xi) {
+    LightSample sample_light_${index}(${signature}) {
       LightSample ls;
 
-      vec3 center = u_lights[${index}].param0.xyz;
-      vec3 edge1 = u_lights[${index}].param1.xyz;
-      vec3 edge2 = u_lights[${index}].param2.xyz;
+      ${randomGen}
+      vec3 center = ${centerAccess};
+      vec3 edge1 = ${edge1Access};
+      vec3 edge2 = ${edge2Access};
 
       // Sample point on quad
       vec3 light_point = center + (xi.x - 0.5) * edge1 + (xi.y - 0.5) * edge2;
@@ -142,7 +162,7 @@ function generateQuadLightSampler(light: QuadLight, index: number): string {
       // PDF conversion from area to solid angle
       ls.pdf = (distance * distance) / (area * cos_light);
 
-      ls.radiance = u_lights[${index}].radiance;
+      ls.radiance = ${radianceAccess};
 
       return ls;
     }
@@ -157,14 +177,14 @@ function generateQuadLightSampler(light: QuadLight, index: number): string {
  * Dispatches to the appropriate sampler generator based on light type
  * TO ADD NEW LIGHT TYPE: Add a new case here
  */
-function generateLightSampler(light: Light, index: number): string {
+function generateLightSampler(light: Light, index: number, isSingleLight: boolean): string {
   switch (light.type) {
     case 'point':
-      return generatePointLightSampler(light, index);
+      return generatePointLightSampler(light, index, isSingleLight);
     case 'sphere':
-      return generateSphereLightSampler(light, index);
+      return generateSphereLightSampler(light, index, isSingleLight);
     case 'quad':
-      return generateQuadLightSampler(light, index);
+      return generateQuadLightSampler(light, index, isSingleLight);
     default:
       // TypeScript ensures this is exhaustive
       const _exhaustive: never = light;
@@ -262,13 +282,15 @@ export class LightsCompiler {
       return this.generateEmptyLightingModule();
     }
 
+    const isSingleLight = lights.length === 1;
+
     // Encode all lights
     const encodedLights = lights.map(encodeLightData);
     const lightPowers = encodedLights.map(l => luminance(l.radiance));
     const totalPower = lightPowers.reduce((sum, p) => sum + p, 0);
 
     // Generate sampler functions for each light
-    const samplers = lights.map((light, index) => generateLightSampler(light, index));
+    const samplers = lights.map((light, index) => generateLightSampler(light, index, isSingleLight));
 
     // Generate the complete module
     return this.buildModule(lights, encodedLights, samplers, lightPowers, totalPower);
@@ -355,7 +377,7 @@ struct LightSample {
     const functions = `
 ${structs}
 
-// ========== LIGHT DATA ARRAY ==========
+// ========== LIGHT DATA ${isSingleLight ? 'ACCESSOR' : 'ARRAY'} ==========
 
 ${lightDataCode}
 
@@ -373,16 +395,17 @@ ${this.generateMainSampler(numLights, lightPowers, totalPower)}
 
 // ========== QUERY FUNCTIONS ==========
 
+${isSingleLight ? '' : `
 LightData lighting_get_light(int light_id) {
   if (light_id < 0 || light_id >= NUM_LIGHTS) {
     return LightData(vec3(0.0), SAMPLING_NONE, vec4(0.0), vec4(0.0), vec4(0.0));
   }
   return u_lights[light_id];
 }
+`}
 
 bool lighting_can_sample(int light_id) {
-  if (light_id < 0 || light_id >= NUM_LIGHTS) return false;
-  return u_lights[light_id].sampling_type != SAMPLING_NONE;
+  return (light_id >= 0 && light_id < NUM_LIGHTS);
 }
 
 int lighting_count() {
@@ -450,10 +473,10 @@ int select_light(float xi) {
    */
   private generateMainSampler(numLights: number, lightPowers: number[], totalPower: number): string {
     if (numLights === 1) {
-      // Single light optimization
+      // Single light optimization - match old signature
       return `
-LightSample lighting_sample(Point p, vec2 xi) {
-  return sample_light_0(p, xi);
+LightSample lighting_sample(Point p) {
+  return sample_light_0(p);
 }
       `.trim();
     }
@@ -577,55 +600,59 @@ uniform float u_light_intensity;
   }
 
   /**
-   * Generate dynamic light data array (populated from uniforms)
+   * Generate dynamic light data accessor (no global array - uniforms accessed directly)
    */
   private generateDynamicLightData(light: Light): string {
+    // For single light, we don't need a global array
+    // The sampler accesses uniforms directly
+    // But we provide a helper for compatibility
+    return `
+// Light data accessor (accesses uniforms directly)
+LightData lighting_get_light(int light_id) {
+  if (light_id != 0) {
+    return LightData(vec3(0.0), SAMPLING_NONE, vec4(0.0), vec4(0.0), vec4(0.0));
+  }
+
+  return LightData(
+    u_light_color * u_light_intensity,
+    ${this.getSamplingType(light)},
+    ${this.getParam0(light)},
+    ${this.getParam1(light)},
+    ${this.getParam2(light)}
+  );
+}
+    `.trim();
+  }
+
+  private getSamplingType(light: Light): number {
     switch (light.type) {
-      case 'point':
-        return `
-// Light data array (populated from uniforms)
-LightData u_lights[1] = LightData[](
-  LightData(
-    u_light_color * u_light_intensity,
-    ${1}, // SAMPLING_POINT
-    vec4(u_light_position, 0.0),
-    vec4(0.0),
-    vec4(0.0)
-  )
-);
-        `.trim();
+      case 'point': return 1; // SAMPLING_POINT
+      case 'sphere': return 3; // SAMPLING_SPHERE
+      case 'quad': return 4; // SAMPLING_QUAD
+      default: return 0;
+    }
+  }
 
-      case 'sphere':
-        return `
-// Light data array (populated from uniforms)
-LightData u_lights[1] = LightData[](
-  LightData(
-    u_light_color * u_light_intensity,
-    ${3}, // SAMPLING_SPHERE
-    vec4(u_light_position, u_light_radius),
-    vec4(0.0),
-    vec4(0.0)
-  )
-);
-        `.trim();
+  private getParam0(light: Light): string {
+    switch (light.type) {
+      case 'point': return 'vec4(u_light_position, 0.0)';
+      case 'sphere': return 'vec4(u_light_position, u_light_radius)';
+      case 'quad': return 'vec4(u_light_center, 0.0)';
+      default: return 'vec4(0.0)';
+    }
+  }
 
-      case 'quad':
-        return `
-// Light data array (populated from uniforms)
-LightData u_lights[1] = LightData[](
-  LightData(
-    u_light_color * u_light_intensity,
-    ${4}, // SAMPLING_QUAD
-    vec4(u_light_center, 0.0),
-    vec4(u_light_edge1, 0.0),
-    vec4(u_light_edge2, 0.0)
-  )
-);
-        `.trim();
+  private getParam1(light: Light): string {
+    switch (light.type) {
+      case 'quad': return 'vec4(u_light_edge1, 0.0)';
+      default: return 'vec4(0.0)';
+    }
+  }
 
-      default:
-        const _exhaustive: never = light;
-        return '';
+  private getParam2(light: Light): string {
+    switch (light.type) {
+      case 'quad': return 'vec4(u_light_edge2, 0.0)';
+      default: return 'vec4(0.0)';
     }
   }
 
