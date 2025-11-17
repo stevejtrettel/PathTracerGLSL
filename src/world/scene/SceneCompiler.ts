@@ -200,15 +200,29 @@ export class SceneCompiler {
 
   /**
    * Generate individual SDF functions for each object
+   * Supports both single-expression and multi-statement SDFs
    */
   private generateObjectSDFs(objects: SimpleObject[]): string {
     const functions = objects.map((obj) => {
       const funcName = `sdf_${this.sanitizeId(obj.id)}`;
+      const trimmedSdf = obj.sdf.trim();
+
+      // Check if SDF already has a return statement
+      const hasReturn = /\breturn\b/.test(trimmedSdf);
+
+      let body: string;
+      if (hasReturn) {
+        // Multi-statement function - use as-is
+        body = trimmedSdf;
+      } else {
+        // Single expression - add return
+        body = `return ${trimmedSdf};`;
+      }
 
       return `
 // ${obj.id}
 float ${funcName}(vec3 p) {
-  return ${obj.sdf};
+  ${body}
 }`.trim();
     });
 
