@@ -5,6 +5,7 @@ import type { Recipe } from '../src/engine/types.js';
 // World modules
 import { euclideanAmbient } from '../src/world/ambient/euclidean/euclidean-ambient.js';
 import { sceneRaymarch } from '../src/world/scene/raymarch-scene.js';
+import { compiledScene } from '../src/world/scene/examples/compiled-simple-scene.js';
 import { hdriEnvironmentImportance } from '../src/world/environment/hdri-environment-importance.js';
 import { constEnvironment } from '../src/world/environment/const-environment.js';
 import { quadLight } from '../src/world/lighting/quad-light.js';
@@ -80,7 +81,7 @@ async function main() {
             world: {
                 ambient: euclideanAmbient,
                 environment: constEnvironment,
-                scene: sceneRaymarch,
+                scene: compiledScene,
                 lighting: quadLight
             },
 
@@ -102,7 +103,7 @@ async function main() {
             world: {
                 ambient: euclideanAmbient,
                 environment: constEnvironment,
-                scene: sceneRaymarch,
+                scene: compiledScene,
                 lighting: quadLight
             },
 
