@@ -19,6 +19,7 @@ export default defineConfig({
                 'simple-scene': resolve(__dirname, 'examples/simple-scene/index.html'),
                 'interactive-materials': resolve(__dirname, 'examples/interactive-materials/index.html'),
                 'procedural-materials': resolve(__dirname, 'examples/procedural-materials/index.html'),
+                'scene-with-light': resolve(__dirname, 'examples/scene-with-light/index.html'),
             }
         }
     },
