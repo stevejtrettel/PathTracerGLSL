@@ -11,17 +11,17 @@ export const proceduralMaterialsScene: SceneDescription = {
   objects: [
     {
       id: 'floor',
-      sdf: 'p.y + 1.0',
+      sdf: 'float sdf(vec3 p) { return p.y + 1.0; }',
       material: 'checkerboard'
     },
     {
       id: 'left_sphere',
-      sdf: 'length(p - vec3(-1.5, 0.0, 0.0)) - 0.8',
+      sdf: 'float sdf(vec3 p) { return length(p - vec3(-1.5, 0.0, 0.0)) - 0.8; }',
       material: 'striped'
     },
     {
       id: 'right_sphere',
-      sdf: 'length(p - vec3(1.5, 0.0, 0.0)) - 0.8',
+      sdf: 'float sdf(vec3 p) { return length(p - vec3(1.5, 0.0, 0.0)) - 0.8; }',
       material: 'noisy'
     }
   ],
@@ -31,11 +31,13 @@ export const proceduralMaterialsScene: SceneDescription = {
     ['checkerboard', {
       albedo: {
         glsl: `
-          // Compute checkerboard pattern
-          float checker = mod(floor(p.x * 2.0) + floor(p.z * 2.0), 2.0);
-          vec3 color1 = vec3(0.8, 0.8, 0.8);
-          vec3 color2 = vec3(0.3, 0.3, 0.3);
-          return mix(color1, color2, checker);
+          vec3 checkerboard(vec3 p) {
+            // Compute checkerboard pattern
+            float checker = mod(floor(p.x * 2.0) + floor(p.z * 2.0), 2.0);
+            vec3 color1 = vec3(0.8, 0.8, 0.8);
+            vec3 color2 = vec3(0.3, 0.3, 0.3);
+            return mix(color1, color2, checker);
+          }
         `
       },
       roughness: 0.9,
@@ -49,11 +51,13 @@ export const proceduralMaterialsScene: SceneDescription = {
     ['striped', {
       albedo: {
         glsl: `
-          // Vertical stripes based on x-position
-          float stripes = sin(p.x * u_scene_stripe_freq) * 0.5 + 0.5;
-          vec3 color1 = u_scene_stripe_color1;
-          vec3 color2 = u_scene_stripe_color2;
-          return mix(color1, color2, stripes);
+          vec3 stripes(vec3 p) {
+            // Vertical stripes based on x-position
+            float stripes = sin(p.x * u_scene_stripe_freq) * 0.5 + 0.5;
+            vec3 color1 = u_scene_stripe_color1;
+            vec3 color2 = u_scene_stripe_color2;
+            return mix(color1, color2, stripes);
+          }
         `
       },
       roughness: 0.6,
@@ -67,19 +71,23 @@ export const proceduralMaterialsScene: SceneDescription = {
     ['noisy', {
       albedo: {
         glsl: `
-          // Simple hash-based noise pattern
-          float n = fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
-          vec3 baseColor = u_scene_noise_color;
-          vec3 result = baseColor * (0.7 + 0.3 * n);
-          return result;
+          vec3 noiseColor(vec3 p) {
+            // Simple hash-based noise pattern
+            float n = fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+            vec3 baseColor = u_scene_noise_color;
+            vec3 result = baseColor * (0.7 + 0.3 * n);
+            return result;
+          }
         `
       },
       roughness: {
         glsl: `
-          // Procedural roughness variation
-          float noise = fract(sin(dot(p, vec3(53.123, 91.456, 23.789))) * 21654.321);
-          float r = 0.3 + 0.4 * noise;
-          return r;
+          float noiseRoughness(vec3 p) {
+            // Procedural roughness variation
+            float noise = fract(sin(dot(p, vec3(53.123, 91.456, 23.789))) * 21654.321);
+            float r = 0.3 + 0.4 * noise;
+            return r;
+          }
         `
       },
       metallic: 0.0,

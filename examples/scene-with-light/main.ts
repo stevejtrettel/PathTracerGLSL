@@ -1,17 +1,22 @@
-// Interactive Materials Example
+// Scene With Light Example - Combining SceneCompiler + LightsCompiler
 import { App } from '../../src/app/App.js';
 import type { Recipe } from '../../src/engine/types.js';
 import { SceneCompiler } from '../../src/world/scene/SceneCompiler.js';
 import { LightsCompiler } from '../../src/world/lighting/LightsCompiler.js';
-import { interactiveMaterialsScene } from './sceneDescription.js';
+import { sceneDescription } from './sceneDescription.js';
 import { lightingDescription } from './lightingDescription.js';
 
-// Compile the scene at module load time
+// Compile the scene and lighting at module load time
+console.log('Compiling scene...');
 const sceneCompiler = new SceneCompiler();
-const compiledScene = sceneCompiler.compile(interactiveMaterialsScene);
+const compiledScene = sceneCompiler.compile(sceneDescription);
 
+console.log('Compiling lighting...');
 const lightsCompiler = new LightsCompiler();
 const compiledLighting = lightsCompiler.compile(lightingDescription);
+
+console.log('✓ Scene compiled:', compiledScene);
+console.log('✓ Lighting compiled:', compiledLighting);
 
 // World modules
 import { euclideanAmbient } from '../../src/world/ambient/euclidean/euclidean-ambient.js';
@@ -67,19 +72,19 @@ function getOrCreateCanvas(id: string = 'canvas'): HTMLCanvasElement {
 async function main() {
     const canvas = getOrCreateCanvas();
 
-    // Create recipes
+    // Create recipes using COMPILED scene and lighting
     const recipes: Recipe[] = [
         // Recipe 1: Full path tracer with GI
         {
             id: 'pathtracer',
             name: 'Path Tracer',
-            description: 'Full global illumination with direct light sampling',
+            description: 'Full global illumination with compiled scene + lighting',
 
             world: {
                 ambient: euclideanAmbient,
                 environment: constEnvironment,
-                scene: compiledScene,
-                lighting: compiledLighting
+                scene: compiledScene,      // ← From SceneCompiler
+                lighting: compiledLighting  // ← From LightsCompiler
             },
 
             optics: {
@@ -95,7 +100,7 @@ async function main() {
         {
             id: 'albedo',
             name: 'Albedo View',
-            description: 'Direct albedo visualization without lighting',
+            description: 'Direct albedo visualization',
 
             world: {
                 ambient: euclideanAmbient,
@@ -117,12 +122,12 @@ async function main() {
     // Initial parameters
     const parameters = {
         // Camera
-        'camera.position': [0, 1, 5],
+        'camera.position': [0, 2, 6],
         'camera.target': [0, 0, 0],
         'camera.fov': 60,
         'resolution': [window.innerWidth, window.innerHeight],
 
-        // Quad light
+        // Light parameters (from compiled lighting module)
         'light.center': [0, 3.9, 0],
         'light.width': 2,
         'light.height': 2,
@@ -132,9 +137,9 @@ async function main() {
         'light.color': [1, 1, 1],
 
         // Environment
-        'environment.intensity': 1.0,
+        'environment.intensity': 0.1,
         'environment.rotation': 0,
-        'environment.radiance': [1.0, 1.0, 1.0],
+        'environment.radiance': [0.5, 0.5, 0.6],
 
         // Developer settings
         'developer.exposureEV': 0,
@@ -142,15 +147,7 @@ async function main() {
         'developer.whiteBalance': [1, 1, 1],
 
         // Accumulator
-        'accumulator.reset': false,
-
-        // Material parameters (from scene description)
-        'floor.color': [0.5, 0.5, 0.5],
-        'rough.color': [0.8, 0.3, 0.3],
-        'rough.roughness': 0.8,
-        'metal.color': [0.9, 0.9, 0.95],
-        'metal.roughness': 0.1,
-        'metal.metallic': 0.9
+        'accumulator.reset': false
     };
 
     // Create app
@@ -160,7 +157,7 @@ async function main() {
     await app.initialize(recipes, undefined, parameters);
 
     // Install extensions
-    app.use(new ParameterPanelExtension());  // This will show our material controls!
+    app.use(new ParameterPanelExtension());
     app.use(new ProductionRenderExtension());
     app.use(new TouchOrbitControls());
     app.use(new OrbitControls());
@@ -171,9 +168,10 @@ async function main() {
     // Setup keyboard controls (1 = pathtracer, 2 = albedo, R = reset)
     app.setupKeyboardControls();
 
-    console.log('Interactive materials example running');
+    console.log('Scene with light example running');
     console.log('Press 1 for path tracer, 2 for albedo view, R to reset');
-    console.log('Open the parameter panel (P key) to adjust material properties!');
+    console.log('✓ Using SceneCompiler for geometry');
+    console.log('✓ Using LightsCompiler for lighting');
 
     // Store app reference for resize handler
     (window as any).app = app;

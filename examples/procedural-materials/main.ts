@@ -2,16 +2,20 @@
 import { App } from '../../src/app/App.js';
 import type { Recipe } from '../../src/engine/types.js';
 import { SceneCompiler } from '../../src/world/scene/SceneCompiler.js';
+import { LightsCompiler } from '../../src/world/lighting/LightsCompiler.js';
 import { proceduralMaterialsScene } from './sceneDescription.js';
+import { lightingDescription } from './lightingDescription.js';
 
 // Compile the scene at module load time
-const compiler = new SceneCompiler();
-const compiledScene = compiler.compile(proceduralMaterialsScene);
+const sceneCompiler = new SceneCompiler();
+const compiledScene = sceneCompiler.compile(proceduralMaterialsScene);
+
+const lightsCompiler = new LightsCompiler();
+const compiledLighting = lightsCompiler.compile(lightingDescription);
 
 // World modules
 import { euclideanAmbient } from '../../src/world/ambient/euclidean/euclidean-ambient.js';
 import { constEnvironment } from '../../src/world/environment/const-environment.js';
-import { quadLight } from '../../src/world/lighting/quad-light.js';
 
 // Optics modules
 import { pinholeCamera } from '../../src/optics/camera/pinhole-camera.js';
@@ -75,7 +79,7 @@ async function main() {
                 ambient: euclideanAmbient,
                 environment: constEnvironment,
                 scene: compiledScene,
-                lighting: quadLight
+                lighting: compiledLighting
             },
 
             optics: {
@@ -97,7 +101,7 @@ async function main() {
                 ambient: euclideanAmbient,
                 environment: constEnvironment,
                 scene: compiledScene,
-                lighting: quadLight
+                lighting: compiledLighting
             },
 
             optics: {
@@ -119,13 +123,13 @@ async function main() {
         'resolution': [window.innerWidth, window.innerHeight],
 
         // Quad light
-        'quad.center': [0, 3.9, 0],
-        'quad.width': 2,
-        'quad.height': 2,
-        'quad.direction1': [1, 0, 0],
-        'quad.direction2': [0, 0, 1],
-        'quad.intensity': 30.0,
-        'quad.color': [1, 1, 1],
+        'light.center': [0, 3.9, 0],
+        'light.width': 2,
+        'light.height': 2,
+        'light.direction1': [1, 0, 0],
+        'light.direction2': [0, 0, 1],
+        'light.intensity': 30.0,
+        'light.color': [1, 1, 1],
 
         // Environment
         'environment.intensity': 1.0,

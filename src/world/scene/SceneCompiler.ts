@@ -200,30 +200,29 @@ export class SceneCompiler {
 
   /**
    * Generate individual SDF functions for each object
-   * Supports both single-expression and multi-statement SDFs
+   * Requires full GLSL function definition with signature
    */
   private generateObjectSDFs(objects: SimpleObject[]): string {
     const functions = objects.map((obj) => {
       const funcName = `sdf_${this.sanitizeId(obj.id)}`;
       const trimmedSdf = obj.sdf.trim();
 
-      // Check if SDF already has a return statement
-      const hasReturn = /\breturn\b/.test(trimmedSdf);
+      // Parse full function definition (required!)
+      const functionMatch = trimmedSdf.match(/^\s*float\s+(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}\s*$/);
 
-      let body: string;
-      if (hasReturn) {
-        // Multi-statement function - use as-is
-        body = trimmedSdf;
-      } else {
-        // Single expression - add return
-        body = `return ${trimmedSdf};`;
+      if (!functionMatch) {
+        throw new Error(
+          `SDF for object "${obj.id}" must be a complete GLSL function.\n` +
+          `Example: float sdf(vec3 p) { return length(p) - 1.0; }\n` +
+          `Got: ${trimmedSdf.substring(0, 100)}...`
+        );
       }
+
+      const [, originalName, params, body] = functionMatch;
 
       return `
 // ${obj.id}
-float ${funcName}(vec3 p) {
-  ${body}
-}`.trim();
+float ${funcName}(${params}) {${body}}`.trim();
     });
 
     return '// ========== OBJECT SDFs ==========\n\n' + functions.join('\n\n');
@@ -452,27 +451,37 @@ MaterialProperties scene_material_properties(int mat_id, Point p) {
 
   /**
    * Generate a procedural helper function
-   * Auto-adds return statement if the code doesn't have one
+   * Requires full GLSL function definition with signature
    */
   private generateProceduralHelper(returnType: string, functionName: string, glslCode: string): string {
     const trimmedCode = glslCode.trim();
 
-    // Check if code already has a return statement
-    const hasReturn = /\breturn\b/.test(trimmedCode);
+    // Parse full function definition (required!)
+    const functionMatch = trimmedCode.match(/^\s*(float|vec3|vec2|vec4|int)\s+(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}\s*$/);
 
-    let body: string;
-    if (hasReturn) {
-      // Code has explicit return, use as-is
-      body = trimmedCode;
-    } else {
-      // No return - treat as expression and add return
-      body = `return ${trimmedCode};`;
+    if (!functionMatch) {
+      throw new Error(
+        `Procedural GLSL code must be a complete function.\n` +
+        `Expected: ${returnType} functionName(...) { ... }\n` +
+        `Example: vec3 myColor(vec3 p) { return vec3(1.0, 0.0, 0.0); }\n` +
+        `Got: ${trimmedCode.substring(0, 100)}...`
+      );
+    }
+
+    const [, declaredReturnType, originalName, params, body] = functionMatch;
+
+    // Validate return type matches expected
+    if (declaredReturnType !== returnType) {
+      throw new Error(
+        `Procedural function has wrong return type.\n` +
+        `Expected: ${returnType}\n` +
+        `Got: ${declaredReturnType}\n` +
+        `Function: ${originalName}`
+      );
     }
 
     return `
-${returnType} ${functionName}(Point p) {
-  ${body}
-}`.trim();
+${returnType} ${functionName}(${params}) {${body}}`.trim();
   }
 
   /**

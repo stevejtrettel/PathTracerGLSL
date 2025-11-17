@@ -1,17 +1,24 @@
-// Interactive Materials Example
+/**
+ * Interactive RGB Lights Example
+ *
+ * Demonstrates multi-light uniforms with runtime control.
+ * Adjust each light's position, color, and intensity in real-time!
+ */
+
 import { App } from '../../src/app/App.js';
 import type { Recipe } from '../../src/engine/types.js';
 import { SceneCompiler } from '../../src/world/scene/SceneCompiler.js';
 import { LightsCompiler } from '../../src/world/lighting/LightsCompiler.js';
-import { interactiveMaterialsScene } from './sceneDescription.js';
-import { lightingDescription } from './lightingDescription.js';
+import { rgbScene } from '../rgb-lights/sceneDescription.js';
+import { interactiveRgbLighting } from './lightingDescription.js';
 
-// Compile the scene at module load time
+// Compile the scene
 const sceneCompiler = new SceneCompiler();
-const compiledScene = sceneCompiler.compile(interactiveMaterialsScene);
+const compiledScene = sceneCompiler.compile(rgbScene);
 
+// Compile lighting - automatically generates uniforms for { param: '...' } references
 const lightsCompiler = new LightsCompiler();
-const compiledLighting = lightsCompiler.compile(lightingDescription);
+const compiledLighting = lightsCompiler.compile(interactiveRgbLighting);
 
 // World modules
 import { euclideanAmbient } from '../../src/world/ambient/euclidean/euclidean-ambient.js';
@@ -20,21 +27,16 @@ import { constEnvironment } from '../../src/world/environment/const-environment.
 // Optics modules
 import { pinholeCamera } from '../../src/optics/camera/pinhole-camera.js';
 import { lambertInteraction } from '../../src/optics/interaction/lambert-interaction.js';
-import { albedoInteraction } from '../../src/optics/interaction/albedo-interaction.js';
 import { pathTracerDirectLight } from '../../src/optics/transport/path-tracer-direct-light.js';
-import { directTransport } from '../../src/optics/transport/direct-transport.js';
 import { averagingAccumulator } from '../../src/optics/accumulator/average-accumulator.js';
-import { oneshotAccumulator } from '../../src/optics/accumulator/oneshot-accumulator.js';
 import { gammaDeveloper } from '../../src/optics/developer/gamma-developer.js';
 
 // Extensions
 import { OrbitControls } from "../../src/app/extensions/OrbitControls";
 import { StatsPanelExtension } from "../../src/app/extensions/StatsPanel";
 import { ScreenshotExtension } from "../../src/app/extensions/ScreenshotExtension";
-import { HDRExportExtension } from "../../src/app/extensions/HDRExportExtension";
 import { TouchOrbitControls } from "../../src/app/extensions/TouchOrbitControls";
 import { ParameterPanelExtension } from "../../src/app/extensions/ParameterPanelExtension";
-import { ProductionRenderExtension } from "../../src/app/extensions/ProductionRenderExtension";
 
 function getOrCreateCanvas(id: string = 'canvas'): HTMLCanvasElement {
     let canvas = document.getElementById(id) as HTMLCanvasElement;
@@ -67,13 +69,11 @@ function getOrCreateCanvas(id: string = 'canvas'): HTMLCanvasElement {
 async function main() {
     const canvas = getOrCreateCanvas();
 
-    // Create recipes
     const recipes: Recipe[] = [
-        // Recipe 1: Full path tracer with GI
         {
             id: 'pathtracer',
-            name: 'Path Tracer',
-            description: 'Full global illumination with direct light sampling',
+            name: 'Interactive RGB Lights',
+            description: 'Runtime-controllable multi-light with uniforms',
 
             world: {
                 ambient: euclideanAmbient,
@@ -89,97 +89,66 @@ async function main() {
                 accumulator: averagingAccumulator,
                 developer: gammaDeveloper
             }
-        },
-
-        // Recipe 2: Albedo debug view
-        {
-            id: 'albedo',
-            name: 'Albedo View',
-            description: 'Direct albedo visualization without lighting',
-
-            world: {
-                ambient: euclideanAmbient,
-                environment: constEnvironment,
-                scene: compiledScene,
-                lighting: compiledLighting
-            },
-
-            optics: {
-                camera: pinholeCamera,
-                interaction: albedoInteraction,
-                transport: directTransport,
-                accumulator: oneshotAccumulator,
-                developer: gammaDeveloper
-            }
         }
     ];
 
-    // Initial parameters
+    // Initial parameters - these can be changed at runtime!
     const parameters = {
         // Camera
-        'camera.position': [0, 1, 5],
+        'camera.position': [0, 1.5, 3.5],
         'camera.target': [0, 0, 0],
-        'camera.fov': 60,
+        'camera.fov': 50,
         'resolution': [window.innerWidth, window.innerHeight],
 
-        // Quad light
-        'light.center': [0, 3.9, 0],
-        'light.width': 2,
-        'light.height': 2,
-        'light.direction1': [1, 0, 0],
-        'light.direction2': [0, 0, 1],
-        'light.intensity': 30.0,
-        'light.color': [1, 1, 1],
+        // Red light (left)
+        'red_light.position': [-2.5, 1.5, 2.0],
+        'red_light.color': [1.0, 0.0, 0.0],
+        'red_light.intensity': 15.0,
 
-        // Environment
-        'environment.intensity': 1.0,
+        // Green light (top)
+        'green_light.position': [0.0, 3.0, 2.0],
+        'green_light.color': [0.0, 1.0, 0.0],
+        'green_light.intensity': 15.0,
+
+        // Blue light (right)
+        'blue_light.position': [2.5, 1.5, 2.0],
+        'blue_light.color': [0.0, 0.0, 1.0],
+        'blue_light.intensity': 15.0,
+
+        // Environment (off)
+        'environment.intensity': 0.0,
         'environment.rotation': 0,
-        'environment.radiance': [1.0, 1.0, 1.0],
+        'environment.radiance': [0.0, 0.0, 0.0],
 
         // Developer settings
         'developer.exposureEV': 0,
-        'developer.desat': 0.2,
+        'developer.desat': 0.0,
         'developer.whiteBalance': [1, 1, 1],
 
         // Accumulator
-        'accumulator.reset': false,
-
-        // Material parameters (from scene description)
-        'floor.color': [0.5, 0.5, 0.5],
-        'rough.color': [0.8, 0.3, 0.3],
-        'rough.roughness': 0.8,
-        'metal.color': [0.9, 0.9, 0.95],
-        'metal.roughness': 0.1,
-        'metal.metallic': 0.9
+        'accumulator.reset': false
     };
 
-    // Create app
     const app = new App(canvas);
 
-    // Initialize with recipes and parameters
     await app.initialize(recipes, undefined, parameters);
 
-    // Install extensions
-    app.use(new ParameterPanelExtension());  // This will show our material controls!
-    app.use(new ProductionRenderExtension());
+    // Install extensions - Parameter panel is key for interactive control!
+    app.use(new ParameterPanelExtension());
     app.use(new TouchOrbitControls());
     app.use(new OrbitControls());
     app.use(new StatsPanelExtension());
     app.use(new ScreenshotExtension());
-    app.use(new HDRExportExtension());
 
-    // Setup keyboard controls (1 = pathtracer, 2 = albedo, R = reset)
     app.setupKeyboardControls();
 
-    console.log('Interactive materials example running');
-    console.log('Press 1 for path tracer, 2 for albedo view, R to reset');
-    console.log('Open the parameter panel (P key) to adjust material properties!');
+    console.log('Interactive RGB Lights initialized!');
+    console.log('Open parameter panel to adjust lights in real-time');
+    console.log('3 controllable lights: red_light, green_light, blue_light');
 
-    // Store app reference for resize handler
     (window as any).app = app;
 }
 
-// Handle window resize
 window.addEventListener('resize', () => {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
     const app = (window as any).app;
@@ -191,7 +160,6 @@ window.addEventListener('resize', () => {
     }
 });
 
-// Run
 main().catch(error => {
     console.error('Failed to start:', error);
     document.body.innerHTML = `

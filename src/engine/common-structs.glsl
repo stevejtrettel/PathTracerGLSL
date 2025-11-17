@@ -53,11 +53,19 @@ struct MaterialProperties {
 };
 
 struct LightSample {
-Point position;
+    Point position;
     Direction wi;
     Radiance radiance;
     float distance;
     float pdf;          //For MIS (even if 1.0 for now)
+};
+
+struct LightData {
+    vec3 radiance;      // Color * intensity
+    int sampling_type;  // Type of sampling (SAMPLING_NONE, SAMPLING_POINT, etc.)
+    vec4 param0;        // Position / center
+    vec4 param1;        // Edge1 or other params
+    vec4 param2;        // Edge2 or other params
 };
 
 
