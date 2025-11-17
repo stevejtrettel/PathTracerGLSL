@@ -295,8 +295,14 @@ int select_light(float xi) {
   private generateMainSampler(numLights: number, lightPowers: number[], totalPower: number): string {
     if (numLights === 1) {
       return `
+// Single-argument version (backwards compatible)
 LightSample lighting_sample(Point p) {
   return sample_light_0(p);
+}
+
+// Two-argument version (for consistency with multi-light)
+LightSample lighting_sample(Point p, vec2 xi) {
+  return sample_light_0(p);  // Ignore xi for single light
 }
       `.trim();
     }
@@ -306,6 +312,13 @@ LightSample lighting_sample(Point p) {
     ).join('\n');
 
     return `
+// Single-argument version (backwards compatible)
+LightSample lighting_sample(Point p) {
+  vec2 xi = random2();
+  return lighting_sample(p, xi);
+}
+
+// Two-argument version (provides control over random numbers)
 LightSample lighting_sample(Point p, vec2 xi) {
   int light_idx = select_light(xi.x);
   vec2 light_xi = random2();
