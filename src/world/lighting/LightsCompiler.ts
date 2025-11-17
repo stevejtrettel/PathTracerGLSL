@@ -178,7 +178,7 @@ export class LightsCompiler {
         )
         .join(',\n');
 
-      lightDataCode = `LightData u_lights[${numLights}] = LightData[](
+      lightDataCode = `LightData u_lights[${numLights}] = LightData[${numLights}](
 ${lightDataArray}
 );`;
     }
@@ -295,6 +295,10 @@ int select_light(float xi) {
   private generateMainSampler(numLights: number, lightPowers: number[], totalPower: number): string {
     if (numLights === 1) {
       return `
+// Forward declarations
+LightSample lighting_sample(Point p);
+LightSample lighting_sample(Point p, vec2 xi);
+
 // Single-argument version (backwards compatible)
 LightSample lighting_sample(Point p) {
   return sample_light_0(p);
@@ -312,6 +316,10 @@ LightSample lighting_sample(Point p, vec2 xi) {
     ).join('\n');
 
     return `
+// Forward declarations
+LightSample lighting_sample(Point p);
+LightSample lighting_sample(Point p, vec2 xi);
+
 // Single-argument version (backwards compatible)
 LightSample lighting_sample(Point p) {
   vec2 xi = random2();
