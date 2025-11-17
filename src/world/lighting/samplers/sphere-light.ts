@@ -11,30 +11,21 @@ import type { SphereLight } from '../types.js';
 
 export interface SamplerOptions {
   index: number;
-  isSingleLight: boolean;
 }
 
 /**
  * Generate GLSL sampler function for a sphere light
  */
 export function generateSphereLightSampler(light: SphereLight, options: SamplerOptions): string {
-  const { index, isSingleLight } = options;
-
-  // Single light: access uniforms directly. Multi-light: always use lighting_get_light()
-  const centerAccess = isSingleLight ? 'u_light_position' : `lighting_get_light(${index}).param0.xyz`;
-  const radiusAccess = isSingleLight ? 'u_light_radius' : `lighting_get_light(${index}).param0.w`;
-  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `lighting_get_light(${index}).radiance`;
-  const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
-  const randomGen = isSingleLight ? 'vec2 xi = random2();' : '';
+  const { index } = options;
 
   return `
 // Sphere light: ${light.id}
-LightSample sample_light_${index}(${signature}) {
+LightSample sample_light_${index}(Point p, vec2 xi) {
   LightSample ls;
 
-  ${randomGen}
-  vec3 center = ${centerAccess};
-  float radius = ${radiusAccess};
+  vec3 center = lighting_get_light(${index}).param0.xyz;
+  float radius = lighting_get_light(${index}).param0.w;
 
   // Sample point uniformly on sphere surface using spherical coordinates
   // z ∈ [-1, 1] gives uniform distribution over sphere
@@ -74,7 +65,7 @@ LightSample sample_light_${index}(${signature}) {
   // pdf_solid_angle = pdf_area × (distance² / cos_theta)
   ls.pdf = pdf_area * distance * distance / cos_light;
 
-  ls.radiance = ${radianceAccess};
+  ls.radiance = lighting_get_light(${index}).radiance;
 
   return ls;
 }

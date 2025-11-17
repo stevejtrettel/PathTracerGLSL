@@ -12,32 +12,22 @@ import type { QuadLight } from '../types.js';
 
 export interface SamplerOptions {
   index: number;
-  isSingleLight: boolean;
 }
 
 /**
  * Generate GLSL sampler function for a quad light
  */
 export function generateQuadLightSampler(light: QuadLight, options: SamplerOptions): string {
-  const { index, isSingleLight } = options;
-
-  // Single light: access uniforms directly. Multi-light: always use lighting_get_light()
-  const centerAccess = isSingleLight ? 'u_light_center' : `lighting_get_light(${index}).param0.xyz`;
-  const edge1Access = isSingleLight ? 'u_light_edge1' : `lighting_get_light(${index}).param1.xyz`;
-  const edge2Access = isSingleLight ? 'u_light_edge2' : `lighting_get_light(${index}).param2.xyz`;
-  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `lighting_get_light(${index}).radiance`;
-  const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
-  const randomGen = isSingleLight ? 'vec2 xi = random2();' : '';
+  const { index } = options;
 
   return `
 // Quad light: ${light.id}
-LightSample sample_light_${index}(${signature}) {
+LightSample sample_light_${index}(Point p, vec2 xi) {
   LightSample ls;
 
-  ${randomGen}
-  vec3 center = ${centerAccess};
-  vec3 edge1 = ${edge1Access};
-  vec3 edge2 = ${edge2Access};
+  vec3 center = lighting_get_light(${index}).param0.xyz;
+  vec3 edge1 = lighting_get_light(${index}).param1.xyz;
+  vec3 edge2 = lighting_get_light(${index}).param2.xyz;
 
   // Sample point on quad
   // xi is [0,1]², shift to [-0.5, 0.5]² to center the sampling
@@ -69,7 +59,7 @@ LightSample sample_light_${index}(${signature}) {
   // pdf_solid_angle = pdf_area × (distance² / cos_theta)
   ls.pdf = (distance * distance) / (area * cos_light);
 
-  ls.radiance = ${radianceAccess};
+  ls.radiance = lighting_get_light(${index}).radiance;
 
   return ls;
 }

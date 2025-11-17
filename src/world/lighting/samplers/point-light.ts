@@ -13,26 +13,20 @@ import type { PointLight } from '../types.js';
 
 export interface SamplerOptions {
   index: number;
-  isSingleLight: boolean;
 }
 
 /**
  * Generate GLSL sampler function for a point light
  */
 export function generatePointLightSampler(light: PointLight, options: SamplerOptions): string {
-  const { index, isSingleLight } = options;
-
-  // Single light: access uniforms directly. Multi-light: always use lighting_get_light()
-  const posAccess = isSingleLight ? 'u_light_position' : `lighting_get_light(${index}).param0.xyz`;
-  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `lighting_get_light(${index}).radiance`;
-  const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
+  const { index } = options;
 
   return `
 // Point light: ${light.id}
-LightSample sample_light_${index}(${signature}) {
+LightSample sample_light_${index}(Point p, vec2 xi) {
   LightSample ls;
 
-  vec3 light_pos = ${posAccess};
+  vec3 light_pos = lighting_get_light(${index}).param0.xyz;
 
   // Direction from surface point to light
   vec3 light_vector = light_pos - p;
@@ -41,7 +35,7 @@ LightSample sample_light_${index}(${signature}) {
   ls.position = light_pos;
 
   // Inverse square falloff: intensity falls off with 1/r²
-  vec3 radiance = ${radianceAccess};
+  vec3 radiance = lighting_get_light(${index}).radiance;
   ls.radiance = radiance / (ls.distance * ls.distance);
 
   // Delta distribution - PDF is 1.0 by convention
