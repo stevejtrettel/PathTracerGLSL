@@ -16,11 +16,9 @@ import { interactiveRgbLighting } from './lightingDescription.js';
 const sceneCompiler = new SceneCompiler();
 const compiledScene = sceneCompiler.compile(rgbScene);
 
-// Compile lighting with UNIFORM MODE enabled!
+// Compile lighting - automatically generates uniforms for { param: '...' } references
 const lightsCompiler = new LightsCompiler();
-const compiledLighting = lightsCompiler.compile(interactiveRgbLighting, {
-  uniformMode: 'uniforms'  // Force uniforms for runtime control
-});
+const compiledLighting = lightsCompiler.compile(interactiveRgbLighting);
 
 // World modules
 import { euclideanAmbient } from '../../src/world/ambient/euclidean/euclidean-ambient.js';
