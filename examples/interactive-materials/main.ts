@@ -8,7 +8,6 @@ import { lightingDescription } from './lightingDescription.js';
 
 // Compile the scene at module load time
 const sceneCompiler = new SceneCompiler();
-import { LightsCompiler } from '../../src/world/lighting/LightsCompiler.js';
 const compiledScene = sceneCompiler.compile(interactiveMaterialsScene);
 
 const lightsCompiler = new LightsCompiler();

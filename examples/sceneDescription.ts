@@ -33,16 +33,28 @@ export const simpleScene: SceneDescription = {
 
   materials: new Map([
     ['floor_mat', {
-      type: 'lambert',
-      albedo: [0.5, 0.5, 0.5]
+      albedo: [0.5, 0.5, 0.5],
+      roughness: 0.9,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }],
     ['red_mat', {
-      type: 'lambert',
-      albedo: [0.8, 0.2, 0.2]
+      albedo: [0.8, 0.2, 0.2],
+      roughness: 0.9,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }],
     ['blue_mat', {
-      type: 'lambert',
-      albedo: [0.2, 0.2, 0.8]
+      albedo: [0.2, 0.2, 0.8],
+      roughness: 0.9,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }]
   ])
 };

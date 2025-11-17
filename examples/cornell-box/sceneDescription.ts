@@ -57,28 +57,52 @@ export const cornellBoxScene: SceneDescription = {
 
   materials: new Map([
     ['white_floor', {
-      type: 'lambert',
-      albedo: [0.8, 0.8, 0.8]
+      albedo: [0.8, 0.8, 0.8],
+      roughness: 0.9,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }],
     ['white_ceiling', {
-      type: 'lambert',
-      albedo: [0.8, 0.8, 0.8]
+      albedo: [0.8, 0.8, 0.8],
+      roughness: 0.9,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }],
     ['white_back', {
-      type: 'lambert',
-      albedo: [0.8, 0.8, 0.8]
+      albedo: [0.8, 0.8, 0.8],
+      roughness: 0.9,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }],
     ['red_left', {
-      type: 'lambert',
-      albedo: [0.8, 0.1, 0.1]
+      albedo: [0.8, 0.1, 0.1],
+      roughness: 0.9,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }],
     ['green_right', {
-      type: 'lambert',
-      albedo: [0.1, 0.8, 0.1]
+      albedo: [0.1, 0.8, 0.1],
+      roughness: 0.9,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }],
     ['reflective_sphere', {
-      type: 'lambert',
-      albedo: [0.9, 0.9, 0.9]
+      albedo: [0.9, 0.9, 0.9],
+      roughness: 0.1,
+      metallic: 0.0,
+      ior: 1.5,
+      emission: [0.0, 0.0, 0.0],
+      emission_strength: 0.0
     }]
   ])
 };
