@@ -8,7 +8,6 @@ import { sceneRaymarch } from '../src/world/scene/raymarch-scene.js';
 import { compiledScene } from '../src/world/scene/examples/compiled-simple-scene.js';
 import { hdriEnvironmentImportance } from '../src/world/environment/hdri-environment-importance.js';
 import { constEnvironment } from '../src/world/environment/const-environment.js';
-import { quadLight } from '../src/world/lighting/quad-light.js';
 
 // Optics modules
 import { pinholeCamera } from '../src/optics/camera/pinhole-camera.js';
@@ -82,7 +81,7 @@ async function main() {
                 ambient: euclideanAmbient,
                 environment: constEnvironment,
                 scene: compiledScene,
-                lighting: quadLight
+                lighting: compiledLighting
             },
 
             optics: {
@@ -104,7 +103,7 @@ async function main() {
                 ambient: euclideanAmbient,
                 environment: constEnvironment,
                 scene: compiledScene,
-                lighting: quadLight
+                lighting: compiledLighting
             },
 
             optics: {
@@ -126,13 +125,13 @@ async function main() {
         'resolution': [window.innerWidth, window.innerHeight],
 
         // Quad light (shared)
-        'quad.center': [0, 3.9, 0],
-        'quad.width': 2,
-        'quad.height': 2,
-        'quad.direction1': [1, 0, 0],
-        'quad.direction2': [0, 0, 1],
-        'quad.intensity': 30.0,
-        'quad.color': [1, 1, 1],
+        'light.center': [0, 3.9, 0],
+        'light.width': 2,
+        'light.height': 2,
+        'light.direction1': [1, 0, 0],
+        'light.direction2': [0, 0, 1],
+        'light.intensity': 30.0,
+        'light.color': [1, 1, 1],
 
         // Environment (shared)
         'environment.intensity': 1.0,
