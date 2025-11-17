@@ -36,15 +36,26 @@ import {
 export class LightsCompiler {
   /**
    * Compile a lighting description into a GLSL module
+   *
+   * @param description - Lighting setup to compile
+   * @param options - Compilation options
+   *   - uniformMode: 'auto' (default) | 'constants' | 'uniforms'
+   *     - 'auto': Single light uses uniforms, multiple lights use constants
+   *     - 'constants': Always use hardcoded constants
+   *     - 'uniforms': Always use uniforms (allows runtime control)
    */
-  compile(description: LightingDescription): ModuleDescriptor {
+  compile(description: LightingDescription, options: { uniformMode?: 'auto' | 'constants' | 'uniforms' } = {}): ModuleDescriptor {
     const { lights } = description;
+    const { uniformMode = 'auto' } = options;
 
     if (lights.length === 0) {
       return this.generateEmptyLightingModule();
     }
 
     const isSingleLight = lights.length === 1;
+
+    // Determine whether to use uniforms
+    const useUniforms = uniformMode === 'uniforms' || (uniformMode === 'auto' && isSingleLight);
 
     // Encode all lights using light-specific encoders
     const encodedLights = lights.map(light => this.encodeLightData(light));
@@ -53,11 +64,11 @@ export class LightsCompiler {
 
     // Generate sampler functions using light-specific generators
     const samplers = lights.map((light, index) =>
-      this.generateLightSampler(light, { index, isSingleLight })
+      this.generateLightSampler(light, { index, isSingleLight: useUniforms && isSingleLight })
     );
 
     // Generate the complete module
-    return this.buildModule(lights, encodedLights, samplers, lightPowers, totalPower);
+    return this.buildModule(lights, encodedLights, samplers, lightPowers, totalPower, useUniforms);
   }
 
   /**
@@ -146,6 +157,13 @@ export class LightsCompiler {
   }
 
   /**
+   * Get uniform name for a light property (symmetric with SceneCompiler.paramToUniform)
+   */
+  private lightToUniform(lightId: string, property: string): string {
+    return `u_light_${lightId}_${property}`;
+  }
+
+  /**
    * Build the complete GLSL module
    * (This stays in the main compiler - it's the orchestration logic)
    */
@@ -154,7 +172,8 @@ export class LightsCompiler {
     encodedLights: ReturnType<typeof encodePointLightData>[],
     samplers: string[],
     lightPowers: number[],
-    totalPower: number
+    totalPower: number,
+    useUniforms: boolean
   ): ModuleDescriptor {
     const numLights = lights.length;
     const isSingleLight = numLights === 1;
@@ -162,10 +181,16 @@ export class LightsCompiler {
     let uniformsCode = '';
     let lightDataCode = '';
 
-    if (isSingleLight) {
+    if (useUniforms && isSingleLight) {
+      // Single light with uniforms (original behavior)
       uniformsCode = this.generateUniformsForSingleLight(lights[0]);
       lightDataCode = this.generateDynamicLightData(lights[0]);
+    } else if (useUniforms && !isSingleLight) {
+      // Multiple lights with uniforms (NEW!)
+      uniformsCode = this.generateUniformsForMultipleLights(lights);
+      lightDataCode = this.generateDynamicMultiLightData(lights);
     } else {
+      // Constants mode (no uniforms)
       const lightDataArray = encodedLights
         .map(
           (data, i) => `  LightData(
@@ -244,8 +269,17 @@ vec3 lighting_environment(vec3 dir) {
 }
 `;
 
-    const parameters = isSingleLight ? this.generateParametersForLight(lights[0]) : {};
-    const uniformBindings = isSingleLight ? this.generateUniformBindingsForLight(lights[0]) : [];
+    const parameters = useUniforms
+      ? (isSingleLight
+          ? this.generateParametersForLight(lights[0])
+          : this.generateParametersForMultipleLights(lights))
+      : {};
+
+    const uniformBindings = useUniforms
+      ? (isSingleLight
+          ? this.generateUniformBindingsForLight(lights[0])
+          : this.generateUniformBindingsForMultipleLights(lights))
+      : [];
 
     return {
       id: {
@@ -392,6 +426,253 @@ LightData lighting_get_light(int light_id) {
       case 'quad': return 'vec4(u_light_edge2, 0.0)';
       default: return 'vec4(0.0)';
     }
+  }
+
+  /**
+   * Generate uniforms for multiple lights (symmetric with SceneCompiler pattern)
+   */
+  private generateUniformsForMultipleLights(lights: Light[]): string {
+    const uniforms: string[] = [];
+
+    for (const light of lights) {
+      const id = light.id;
+
+      // Common uniforms for all light types
+      uniforms.push(`uniform vec3 ${this.lightToUniform(id, 'color')};`);
+      uniforms.push(`uniform float ${this.lightToUniform(id, 'intensity')};`);
+
+      // Type-specific uniforms
+      switch (light.type) {
+        case 'point':
+          uniforms.push(`uniform vec3 ${this.lightToUniform(id, 'position')};`);
+          break;
+        case 'sphere':
+          uniforms.push(`uniform vec3 ${this.lightToUniform(id, 'position')};`);
+          uniforms.push(`uniform float ${this.lightToUniform(id, 'radius')};`);
+          break;
+        case 'quad':
+          uniforms.push(`uniform vec3 ${this.lightToUniform(id, 'center')};`);
+          uniforms.push(`uniform vec3 ${this.lightToUniform(id, 'edge1')};`);
+          uniforms.push(`uniform vec3 ${this.lightToUniform(id, 'edge2')};`);
+          break;
+      }
+    }
+
+    return uniforms.join('\n');
+  }
+
+  /**
+   * Generate dynamic LightData accessor for multiple lights with uniforms
+   */
+  private generateDynamicMultiLightData(lights: Light[]): string {
+    const cases = lights.map((light, index) => {
+      const id = light.id;
+      const colorUniform = this.lightToUniform(id, 'color');
+      const intensityUniform = this.lightToUniform(id, 'intensity');
+
+      let param0, param1, param2;
+
+      switch (light.type) {
+        case 'point':
+          param0 = `vec4(${this.lightToUniform(id, 'position')}, 0.0)`;
+          param1 = 'vec4(0.0)';
+          param2 = 'vec4(0.0)';
+          break;
+        case 'sphere':
+          param0 = `vec4(${this.lightToUniform(id, 'position')}, ${this.lightToUniform(id, 'radius')})`;
+          param1 = 'vec4(0.0)';
+          param2 = 'vec4(0.0)';
+          break;
+        case 'quad':
+          param0 = `vec4(${this.lightToUniform(id, 'center')}, 0.0)`;
+          param1 = `vec4(${this.lightToUniform(id, 'edge1')}, 0.0)`;
+          param2 = `vec4(${this.lightToUniform(id, 'edge2')}, 0.0)`;
+          break;
+        default:
+          param0 = param1 = param2 = 'vec4(0.0)';
+      }
+
+      return `
+  ${index > 0 ? 'else ' : ''}if (light_id == ${index}) {
+    return LightData(
+      ${colorUniform} * ${intensityUniform},
+      ${this.getSamplingType(light)},
+      ${param0},
+      ${param1},
+      ${param2}
+    );
+  }`.trim();
+    });
+
+    return `
+// Light data accessor (reads from uniforms)
+LightData lighting_get_light(int light_id) {
+  ${cases.join('\n  ')}
+
+  // Invalid light_id
+  return LightData(vec3(0.0), SAMPLING_NONE, vec4(0.0), vec4(0.0), vec4(0.0));
+}
+    `.trim();
+  }
+
+  /**
+   * Generate parameters for multiple lights
+   */
+  private generateParametersForMultipleLights(lights: Light[]): Record<string, ParameterMetadata> {
+    const params: Record<string, ParameterMetadata> = {};
+
+    for (const light of lights) {
+      const id = light.id;
+
+      // Common parameters
+      params[`${id}.color`] = {
+        type: 'color',
+        default: light.color,
+        name: `${id} Color`,
+        group: id
+      };
+
+      params[`${id}.intensity`] = {
+        type: 'float',
+        default: light.intensity,
+        range: [0, 100],
+        step: 0.1,
+        name: `${id} Intensity`,
+        group: id
+      };
+
+      // Type-specific parameters
+      switch (light.type) {
+        case 'point':
+          params[`${id}.position`] = {
+            type: 'vec3',
+            default: light.position,
+            name: `${id} Position`,
+            group: id
+          };
+          break;
+        case 'sphere':
+          params[`${id}.position`] = {
+            type: 'vec3',
+            default: light.position,
+            name: `${id} Position`,
+            group: id
+          };
+          params[`${id}.radius`] = {
+            type: 'float',
+            default: light.radius,
+            range: [0.01, 5],
+            step: 0.01,
+            name: `${id} Radius`,
+            group: id
+          };
+          break;
+        case 'quad':
+          params[`${id}.center`] = {
+            type: 'vec3',
+            default: light.center,
+            name: `${id} Center`,
+            group: id
+          };
+          params[`${id}.edge1`] = {
+            type: 'vec3',
+            default: [light.width * light.direction1[0], light.width * light.direction1[1], light.width * light.direction1[2]],
+            name: `${id} Edge1`,
+            group: id
+          };
+          params[`${id}.edge2`] = {
+            type: 'vec3',
+            default: [light.height * light.direction2[0], light.height * light.direction2[1], light.height * light.direction2[2]],
+            name: `${id} Edge2`,
+            group: id
+          };
+          break;
+      }
+    }
+
+    return params;
+  }
+
+  /**
+   * Generate uniform bindings for multiple lights
+   */
+  private generateUniformBindingsForMultipleLights(lights: Light[]): any[] {
+    const bindings: any[] = [];
+
+    for (const light of lights) {
+      const id = light.id;
+
+      // Common bindings
+      bindings.push({
+        uniform: this.lightToUniform(id, 'color'),
+        parameters: [`${id}.color`],
+        type: 'vec3',
+        compute: (params: any) => params[`${id}.color`] || light.color
+      });
+
+      bindings.push({
+        uniform: this.lightToUniform(id, 'intensity'),
+        parameters: [`${id}.intensity`],
+        type: 'float',
+        compute: (params: any) => params[`${id}.intensity`] || light.intensity
+      });
+
+      // Type-specific bindings
+      switch (light.type) {
+        case 'point':
+          bindings.push({
+            uniform: this.lightToUniform(id, 'position'),
+            parameters: [`${id}.position`],
+            type: 'vec3',
+            compute: (params: any) => params[`${id}.position`] || light.position
+          });
+          break;
+        case 'sphere':
+          bindings.push({
+            uniform: this.lightToUniform(id, 'position'),
+            parameters: [`${id}.position`],
+            type: 'vec3',
+            compute: (params: any) => params[`${id}.position`] || light.position
+          });
+          bindings.push({
+            uniform: this.lightToUniform(id, 'radius'),
+            parameters: [`${id}.radius`],
+            type: 'float',
+            compute: (params: any) => params[`${id}.radius`] || light.radius
+          });
+          break;
+        case 'quad':
+          bindings.push({
+            uniform: this.lightToUniform(id, 'center'),
+            parameters: [`${id}.center`],
+            type: 'vec3',
+            compute: (params: any) => params[`${id}.center`] || light.center
+          });
+          bindings.push({
+            uniform: this.lightToUniform(id, 'edge1'),
+            parameters: [`${id}.edge1`],
+            type: 'vec3',
+            compute: (params: any) => params[`${id}.edge1`] || [
+              light.width * light.direction1[0],
+              light.width * light.direction1[1],
+              light.width * light.direction1[2]
+            ]
+          });
+          bindings.push({
+            uniform: this.lightToUniform(id, 'edge2'),
+            parameters: [`${id}.edge2`],
+            type: 'vec3',
+            compute: (params: any) => params[`${id}.edge2`] || [
+              light.height * light.direction2[0],
+              light.height * light.direction2[1],
+              light.height * light.direction2[2]
+            ]
+          });
+          break;
+      }
+    }
+
+    return bindings;
   }
 
   private generateEmptyLightingModule(): ModuleDescriptor {

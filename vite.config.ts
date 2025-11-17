@@ -24,6 +24,7 @@ export default defineConfig({
                 'cornell-menger': resolve(__dirname, 'examples/cornell-menger/index.html'),
                 'multi-light-test': resolve(__dirname, 'examples/multi-light-test/index.html'),
                 'rgb-lights': resolve(__dirname, 'examples/rgb-lights/index.html'),
+                'rgb-lights-interactive': resolve(__dirname, 'examples/rgb-lights-interactive/index.html'),
             }
         }
     },
