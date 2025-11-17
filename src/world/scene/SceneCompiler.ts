@@ -61,7 +61,9 @@ export class SceneCompiler {
     const lines = [
       `#define NUM_OBJECTS ${scene.objects.length}`,
       `#define NUM_MATERIALS ${materialIds.size}`,
-      `#define MATERIAL_AIR 0`
+      `#define MATERIAL_AIR 0`,
+      `#define MAX_MARCH_STEPS 256`,
+      `#define MARCH_EPSILON 0.0001`
     ];
 
     for (const [name, id] of materialIds) {
@@ -177,12 +179,12 @@ int scene_material_at(vec3 p) {
 
       cases.push(`
   else if (mat_id == ${constName}) {
-    props.albedo = vec3(${mat.albedo.join(', ')});
-    props.roughness = ${mat.roughness};
-    props.metallic = ${mat.metallic};
-    props.ior = ${mat.ior};
-    props.emission = vec3(${mat.emission.join(', ')});
-    props.emission_strength = ${mat.emission_strength};
+    props.albedo = vec3(${mat.albedo.map(v => this.toGLSLFloat(v)).join(', ')});
+    props.roughness = ${this.toGLSLFloat(mat.roughness)};
+    props.metallic = ${this.toGLSLFloat(mat.metallic)};
+    props.ior = ${this.toGLSLFloat(mat.ior)};
+    props.emission = vec3(${mat.emission.map(v => this.toGLSLFloat(v)).join(', ')});
+    props.emission_strength = ${this.toGLSLFloat(mat.emission_strength)};
     props.light_id = -1;  // No lights yet
   }`.trim());
     }
@@ -288,5 +290,15 @@ bool scene_intersect_any(Ray ray, float max_distance) {
    */
   private toConstantName(name: string): string {
     return name.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+  }
+
+  /**
+   * Format a number as a GLSL float literal
+   * Ensures numbers have decimal point (0 -> 0.0)
+   */
+  private toGLSLFloat(value: number): string {
+    const str = value.toString();
+    // If no decimal point, add .0
+    return str.includes('.') ? str : str + '.0';
   }
 }
