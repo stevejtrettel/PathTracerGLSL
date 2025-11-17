@@ -3,7 +3,14 @@
  * Similar to scene descriptions, but for light sources
  */
 
+import type { ParameterMetadata } from '../../engine/types';
+
 export type vec3 = [number, number, number];
+
+// Light property value: constant or parameter reference (like MaterialPropertyValue)
+export type LightPropertyValue<T> =
+  | T                      // Constant value
+  | { param: string };     // Reference to UI parameter
 
 // ============================================
 // Individual Light Types
@@ -15,9 +22,9 @@ export type vec3 = [number, number, number];
 export interface PointLight {
   type: 'point';
   id: string;
-  position: vec3;
-  color: vec3;
-  intensity: number;
+  position: LightPropertyValue<vec3>;
+  color: LightPropertyValue<vec3>;
+  intensity: LightPropertyValue<number>;
 }
 
 /**
@@ -26,10 +33,10 @@ export interface PointLight {
 export interface SphereLight {
   type: 'sphere';
   id: string;
-  position: vec3;
-  radius: number;
-  color: vec3;
-  intensity: number;
+  position: LightPropertyValue<vec3>;
+  radius: LightPropertyValue<number>;
+  color: LightPropertyValue<vec3>;
+  intensity: LightPropertyValue<number>;
 }
 
 /**
@@ -38,13 +45,13 @@ export interface SphereLight {
 export interface QuadLight {
   type: 'quad';
   id: string;
-  center: vec3;
-  width: number;
-  height: number;
-  direction1: vec3;  // Width direction (will be normalized)
-  direction2: vec3;  // Height direction (will be normalized)
-  color: vec3;
-  intensity: number;
+  center: LightPropertyValue<vec3>;
+  width: LightPropertyValue<number>;
+  height: LightPropertyValue<number>;
+  direction1: LightPropertyValue<vec3>;  // Width direction (will be normalized)
+  direction2: LightPropertyValue<vec3>;  // Height direction (will be normalized)
+  color: LightPropertyValue<vec3>;
+  intensity: LightPropertyValue<number>;
 }
 
 /**
@@ -75,6 +82,7 @@ export interface EnvironmentDescription {
 export interface LightingDescription {
   lights: Light[];
   environment?: EnvironmentDescription;
+  parameters?: Record<string, ParameterMetadata>;  // Optional UI-controllable parameters
 }
 
 // ============================================
@@ -99,17 +107,4 @@ export interface CompilerLight {
   radiance: vec3;  // color * intensity
   sampling: LightSampling;
   source: 'explicit_light' | 'emissive_material' | 'visible_light';
-}
-
-/**
- * Parameter metadata for UI generation
- */
-export interface ParameterMetadata {
-  type: 'float' | 'int' | 'vec3' | 'color';
-  default: number | vec3;
-  range?: [number, number];
-  step?: number;
-  name?: string;
-  help?: string;
-  group?: string;
 }
