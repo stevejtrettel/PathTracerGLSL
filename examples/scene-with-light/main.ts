@@ -194,9 +194,27 @@ const originalError = console.error;
 console.error = function(...args) {
     if (args[0] && typeof args[0] === 'string' && args[0].includes('compilation failed')) {
         console.log('DEBUG: Full error details:', args);
+        console.log('DEBUG: All args:', JSON.stringify(args, null, 2));
     }
     originalError.apply(console, args);
 };
+
+// Also intercept the shader compiler
+import { ShaderCompiler } from '../../src/engine/ShaderCompiler.js';
+const originalCompile = ShaderCompiler.prototype['compileAndLinkProgram'];
+if (originalCompile) {
+    ShaderCompiler.prototype['compileAndLinkProgram'] = function(...args: any[]) {
+        try {
+            return originalCompile.apply(this, args);
+        } catch (e: any) {
+            console.log('DEBUG: Caught shader error:', e);
+            console.log('DEBUG: Error message:', e.message);
+            console.log('DEBUG: Error type:', typeof e);
+            console.log('DEBUG: Error keys:', Object.keys(e));
+            throw e;
+        }
+    };
+}
 
 // Run
 main().catch(error => {
