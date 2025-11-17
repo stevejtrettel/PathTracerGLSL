@@ -1,38 +1,37 @@
-// main.ts
-import { App } from '../src/app/App.js';
-import type { Recipe } from '../src/engine/types.js';
+// Interactive Materials Example
+import { App } from '../../src/app/App.js';
+import type { Recipe } from '../../src/engine/types.js';
+import { SceneCompiler } from '../../src/world/scene/SceneCompiler.js';
+import { interactiveMaterialsScene } from './sceneDescription.js';
+
+// Compile the scene at module load time
+const compiler = new SceneCompiler();
+const compiledScene = compiler.compile(interactiveMaterialsScene);
 
 // World modules
-import { euclideanAmbient } from '../src/world/ambient/euclidean/euclidean-ambient.js';
-import { sceneRaymarch } from '../src/world/scene/raymarch-scene.js';
-import { compiledScene } from '../src/world/scene/examples/compiled-simple-scene.js';
-import { hdriEnvironmentImportance } from '../src/world/environment/hdri-environment-importance.js';
-import { constEnvironment } from '../src/world/environment/const-environment.js';
-import { quadLight } from '../src/world/lighting/quad-light.js';
+import { euclideanAmbient } from '../../src/world/ambient/euclidean/euclidean-ambient.js';
+import { constEnvironment } from '../../src/world/environment/const-environment.js';
+import { quadLight } from '../../src/world/lighting/quad-light.js';
 
 // Optics modules
-import { pinholeCamera } from '../src/optics/camera/pinhole-camera.js';
-import { lambertInteraction } from '../src/optics/interaction/lambert-interaction.js';
-import { albedoInteraction } from '../src/optics/interaction/albedo-interaction.js';
-import { pathTracerDirectLight } from '../src/optics/transport/path-tracer-direct-light.js';
-import { directTransport } from '../src/optics/transport/direct-transport.js';
-import { averagingAccumulator } from '../src/optics/accumulator/average-accumulator.js';
-import { oneshotAccumulator } from '../src/optics/accumulator/oneshot-accumulator.js';
-import { gammaDeveloper } from '../src/optics/developer/gamma-developer.js';
+import { pinholeCamera } from '../../src/optics/camera/pinhole-camera.js';
+import { lambertInteraction } from '../../src/optics/interaction/lambert-interaction.js';
+import { albedoInteraction } from '../../src/optics/interaction/albedo-interaction.js';
+import { pathTracerDirectLight } from '../../src/optics/transport/path-tracer-direct-light.js';
+import { directTransport } from '../../src/optics/transport/direct-transport.js';
+import { averagingAccumulator } from '../../src/optics/accumulator/average-accumulator.js';
+import { oneshotAccumulator } from '../../src/optics/accumulator/oneshot-accumulator.js';
+import { gammaDeveloper } from '../../src/optics/developer/gamma-developer.js';
 
+// Extensions
+import { OrbitControls } from "../../src/app/extensions/OrbitControls";
+import { StatsPanelExtension } from "../../src/app/extensions/StatsPanel";
+import { ScreenshotExtension } from "../../src/app/extensions/ScreenshotExtension";
+import { HDRExportExtension } from "../../src/app/extensions/HDRExportExtension";
+import { TouchOrbitControls } from "../../src/app/extensions/TouchOrbitControls";
+import { ParameterPanelExtension } from "../../src/app/extensions/ParameterPanelExtension";
+import { ProductionRenderExtension } from "../../src/app/extensions/ProductionRenderExtension";
 
-import { OrbitControls } from "../src/app/extensions/OrbitControls";
-import { KeyboardControls } from "../src/app/extensions/KeyboardControls";
-import { StatsPanelExtension } from "../src/app/extensions/StatsPanel";
-import { ScreenshotExtension } from "../src/app/extensions/ScreenshotExtension";
-import { HDRExportExtension } from "../src/app/extensions/HDRExportExtension";
-import { TouchOrbitControls } from "../src/app/extensions/TouchOrbitControls";
-import { ParameterPanelExtension } from "../src/app/extensions/ParameterPanelExtension";
-import { ProductionRenderExtension } from "../src/app/extensions/ProductionRenderExtension";
-
-
-
-// Add this helper function at the top
 function getOrCreateCanvas(id: string = 'canvas'): HTMLCanvasElement {
     let canvas = document.getElementById(id) as HTMLCanvasElement;
 
@@ -60,12 +59,6 @@ function getOrCreateCanvas(id: string = 'canvas'): HTMLCanvasElement {
 
     return canvas;
 }
-
-
-
-
-// HDR environment
-// import envHDRI from '/hdri/autumn_field_1k.hdr';
 
 async function main() {
     const canvas = getOrCreateCanvas();
@@ -119,13 +112,13 @@ async function main() {
 
     // Initial parameters
     const parameters = {
-        // Camera (shared)
-        'camera.position': [1.5, 1, 5],
+        // Camera
+        'camera.position': [0, 1, 5],
         'camera.target': [0, 0, 0],
         'camera.fov': 60,
         'resolution': [window.innerWidth, window.innerHeight],
 
-        // Quad light (shared)
+        // Quad light
         'quad.center': [0, 3.9, 0],
         'quad.width': 2,
         'quad.height': 2,
@@ -134,52 +127,37 @@ async function main() {
         'quad.intensity': 30.0,
         'quad.color': [1, 1, 1],
 
-        // Environment (shared)
+        // Environment
         'environment.intensity': 1.0,
         'environment.rotation': 0,
         'environment.radiance': [1.0, 1.0, 1.0],
 
-        // Developer settings (shared)
+        // Developer settings
         'developer.exposureEV': 0,
         'developer.desat': 0.2,
         'developer.whiteBalance': [1, 1, 1],
 
         // Accumulator
-        'accumulator.reset': false
+        'accumulator.reset': false,
+
+        // Material parameters (from scene description)
+        'floor.color': [0.5, 0.5, 0.5],
+        'rough.color': [0.8, 0.3, 0.3],
+        'rough.roughness': 0.8,
+        'metal.color': [0.9, 0.9, 0.95],
+        'metal.roughness': 0.1,
+        'metal.metallic': 0.9
     };
 
     // Create app
     const app = new App(canvas);
 
-    // Initialize with recipes, HDR, and parameters
+    // Initialize with recipes and parameters
     await app.initialize(recipes, undefined, parameters);
 
-    // TEST: Log collected parameter metadata
-    console.log('=== PARAMETER METADATA TEST ===');
-    const metadata = app.getParameterMetadata();
-    console.log(`Collected ${metadata.size} parameters from modules`);
-
-    // Group and display
-    const byGroup = new Map();
-    for (const [path, meta] of metadata) {
-        const group = meta.group || 'Ungrouped';
-        if (!byGroup.has(group)) byGroup.set(group, []);
-        byGroup.get(group).push({ path, meta });
-    }
-
-    for (const [groupName, params] of byGroup) {
-        console.log(`\n--- ${groupName} (${params.length} parameters) ---`);
-        for (const { path, meta } of params) {
-            const rangeStr = meta.range ? ` [${meta.range[0]}..${meta.range[1]}]` : '';
-            const unitStr = meta.unit ? ` ${meta.unit}` : '';
-            console.log(`  ${meta.name} (${path}): ${meta.type}${rangeStr}${unitStr} = ${JSON.stringify(meta.default)}`);
-        }
-    }
-    console.log('\n=== END TEST ===\n');
-
     // Install extensions
-    app.use(new ParameterPanelExtension());  // Beautiful parameter UI!
-    app.use(new ProductionRenderExtension());  // Production render UI (progress + dialog)
+    app.use(new ParameterPanelExtension());  // This will show our material controls!
+    app.use(new ProductionRenderExtension());
     app.use(new TouchOrbitControls());
     app.use(new OrbitControls());
     app.use(new StatsPanelExtension());
@@ -189,7 +167,9 @@ async function main() {
     // Setup keyboard controls (1 = pathtracer, 2 = albedo, R = reset)
     app.setupKeyboardControls();
 
-    console.log('Progressive rendering started');
+    console.log('Interactive materials example running');
+    console.log('Press 1 for path tracer, 2 for albedo view, R to reset');
+    console.log('Open the parameter panel (P key) to adjust material properties!');
 
     // Store app reference for resize handler
     (window as any).app = app;
@@ -203,8 +183,6 @@ window.addEventListener('resize', () => {
     if (canvas && app) {
         const width = window.innerWidth;
         const height = window.innerHeight;
-
-        // App handles everything
         app.handleResize(width, height);
     }
 });
