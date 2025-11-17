@@ -12,17 +12,32 @@ import type { SphereLight } from '../types.js';
 export interface SamplerOptions {
   index: number;
   isSingleLight: boolean;
+  useUniformAccessor?: boolean;  // Use lighting_get_light() for multi-light uniforms
 }
 
 /**
  * Generate GLSL sampler function for a sphere light
  */
 export function generateSphereLightSampler(light: SphereLight, options: SamplerOptions): string {
-  const { index, isSingleLight } = options;
+  const { index, isSingleLight, useUniformAccessor = false } = options;
 
-  const centerAccess = isSingleLight ? 'u_light_position' : `u_lights[${index}].param0.xyz`;
-  const radiusAccess = isSingleLight ? 'u_light_radius' : `u_lights[${index}].param0.w`;
-  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `u_lights[${index}].radiance`;
+  // Different access patterns: single light uniforms, array access, or dynamic accessor
+  let centerAccess, radiusAccess, radianceAccess;
+
+  if (isSingleLight) {
+    centerAccess = 'u_light_position';
+    radiusAccess = 'u_light_radius';
+    radianceAccess = '(u_light_color * u_light_intensity)';
+  } else if (useUniformAccessor) {
+    centerAccess = `lighting_get_light(${index}).param0.xyz`;
+    radiusAccess = `lighting_get_light(${index}).param0.w`;
+    radianceAccess = `lighting_get_light(${index}).radiance`;
+  } else {
+    centerAccess = `u_lights[${index}].param0.xyz`;
+    radiusAccess = `u_lights[${index}].param0.w`;
+    radianceAccess = `u_lights[${index}].radiance`;
+  }
+
   const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';
   const randomGen = isSingleLight ? 'vec2 xi = random2();' : '';
 

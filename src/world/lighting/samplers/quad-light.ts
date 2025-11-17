@@ -13,19 +13,34 @@ import type { QuadLight } from '../types.js';
 export interface SamplerOptions {
   index: number;
   isSingleLight: boolean;
+  useUniformAccessor?: boolean;  // Use lighting_get_light() for multi-light uniforms
 }
 
 /**
  * Generate GLSL sampler function for a quad light
  */
 export function generateQuadLightSampler(light: QuadLight, options: SamplerOptions): string {
-  const { index, isSingleLight } = options;
+  const { index, isSingleLight, useUniformAccessor = false } = options;
 
-  // Different access patterns for single vs multiple lights
-  const centerAccess = isSingleLight ? 'u_light_center' : `u_lights[${index}].param0.xyz`;
-  const edge1Access = isSingleLight ? 'u_light_edge1' : `u_lights[${index}].param1.xyz`;
-  const edge2Access = isSingleLight ? 'u_light_edge2' : `u_lights[${index}].param2.xyz`;
-  const radianceAccess = isSingleLight ? '(u_light_color * u_light_intensity)' : `u_lights[${index}].radiance`;
+  // Different access patterns: single light uniforms, array access, or dynamic accessor
+  let centerAccess, edge1Access, edge2Access, radianceAccess;
+
+  if (isSingleLight) {
+    centerAccess = 'u_light_center';
+    edge1Access = 'u_light_edge1';
+    edge2Access = 'u_light_edge2';
+    radianceAccess = '(u_light_color * u_light_intensity)';
+  } else if (useUniformAccessor) {
+    centerAccess = `lighting_get_light(${index}).param0.xyz`;
+    edge1Access = `lighting_get_light(${index}).param1.xyz`;
+    edge2Access = `lighting_get_light(${index}).param2.xyz`;
+    radianceAccess = `lighting_get_light(${index}).radiance`;
+  } else {
+    centerAccess = `u_lights[${index}].param0.xyz`;
+    edge1Access = `u_lights[${index}].param1.xyz`;
+    edge2Access = `u_lights[${index}].param2.xyz`;
+    radianceAccess = `u_lights[${index}].radiance`;
+  }
 
   // Function signature depends on whether we're in single or multi-light mode
   const signature = isSingleLight ? 'Point p' : 'Point p, vec2 xi';

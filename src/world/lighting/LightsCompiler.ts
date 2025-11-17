@@ -64,7 +64,11 @@ export class LightsCompiler {
 
     // Generate sampler functions using light-specific generators
     const samplers = lights.map((light, index) =>
-      this.generateLightSampler(light, { index, isSingleLight: useUniforms && isSingleLight })
+      this.generateLightSampler(light, {
+        index,
+        isSingleLight: useUniforms && isSingleLight,
+        useUniformAccessor: useUniforms && !isSingleLight
+      })
     );
 
     // Generate the complete module
@@ -74,7 +78,7 @@ export class LightsCompiler {
   /**
    * Generate sampler for a specific light type
    */
-  private generateLightSampler(light: Light, options: { index: number; isSingleLight: boolean }): string {
+  private generateLightSampler(light: Light, options: { index: number; isSingleLight: boolean; useUniformAccessor?: boolean }): string {
     switch (light.type) {
       case 'point':
         return generatePointLightSampler(light, options);
