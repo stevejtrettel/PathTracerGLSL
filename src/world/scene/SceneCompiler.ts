@@ -200,14 +200,29 @@ export class SceneCompiler {
 
   /**
    * Generate individual SDF functions for each object
-   * Supports both single-expression and multi-statement SDFs
+   * Supports three modes:
+   * 1. Full function definition - extracts body and replaces name
+   * 2. Function body with return - wraps in function
+   * 3. Expression without return - wraps as return statement
    */
   private generateObjectSDFs(objects: SimpleObject[]): string {
     const functions = objects.map((obj) => {
       const funcName = `sdf_${this.sanitizeId(obj.id)}`;
       const trimmedSdf = obj.sdf.trim();
 
-      // Check if SDF already has a return statement
+      // Try to parse as a full function definition
+      const functionMatch = trimmedSdf.match(/^\s*float\s+(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}\s*$/);
+
+      if (functionMatch) {
+        // Full function definition found!
+        const [, originalName, params, body] = functionMatch;
+
+        return `
+// ${obj.id}
+float ${funcName}(${params}) {${body}}`.trim();
+      }
+
+      // Not a full function - use old behavior
       const hasReturn = /\breturn\b/.test(trimmedSdf);
 
       let body: string;
@@ -452,12 +467,29 @@ MaterialProperties scene_material_properties(int mat_id, Point p) {
 
   /**
    * Generate a procedural helper function
-   * Auto-adds return statement if the code doesn't have one
+   * Supports three modes:
+   * 1. Full function definition - extracts body and replaces name
+   * 2. Function body with return - wraps in function
+   * 3. Expression without return - wraps as return statement
    */
   private generateProceduralHelper(returnType: string, functionName: string, glslCode: string): string {
     const trimmedCode = glslCode.trim();
 
-    // Check if code already has a return statement
+    // Try to parse as a full function definition
+    const functionMatch = trimmedCode.match(/^\s*(float|vec3|vec2|vec4|int)\s+(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}\s*$/);
+
+    if (functionMatch) {
+      // Full function definition found!
+      const [, declaredReturnType, originalName, params, body] = functionMatch;
+
+      // Use the declared return type if it matches what we expect
+      const finalReturnType = declaredReturnType === returnType ? returnType : returnType;
+
+      return `
+${finalReturnType} ${functionName}(${params}) {${body}}`.trim();
+    }
+
+    // Not a full function - use old behavior (function body or expression)
     const hasReturn = /\breturn\b/.test(trimmedCode);
 
     let body: string;
