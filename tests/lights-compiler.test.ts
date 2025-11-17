@@ -2,8 +2,8 @@
  * Test that LightsCompiler generates valid GLSL without struct redefinition errors
  */
 
-import { LightsCompiler } from './LightsCompiler.js';
-import type { LightingDescription } from './types.js';
+import { LightsCompiler } from '../src/world/lighting/LightsCompiler.js';
+import type { LightingDescription } from '../src/world/lighting/types.js';
 
 const lightingDescription: LightingDescription = {
   lights: [
