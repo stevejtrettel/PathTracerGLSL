@@ -1,5 +1,5 @@
-import type { ModuleDescriptor } from '../../engine/types';
-import type { SceneDescription, SimpleObject, MaterialDescription } from './types';
+import type { ModuleDescriptor, UniformBinding } from '../../engine/types';
+import type { SceneDescription, SimpleObject, MaterialDescription, MaterialPropertyValue } from './types';
 
 /**
  * SceneCompiler transforms scene descriptions into optimized GLSL Scene modules.
@@ -7,26 +7,35 @@ import type { SceneDescription, SimpleObject, MaterialDescription } from './type
  * Generates:
  * - Object SDF functions
  * - Material dispatch
- * - Material property lookups
+ * - Material property lookups (with uniform support)
  * - Ray intersection code
+ * - Uniform bindings for parameters
  */
 export class SceneCompiler {
   compile(scene: SceneDescription): ModuleDescriptor {
     // Build material ID mapping
     const materialIds = this.buildMaterialIds(scene.materials);
 
+    // Analyze parameter usage
+    const paramUsage = this.analyzeParameterUsage(scene.materials);
+
     // Generate all code sections
     const constants = this.generateConstants(scene, materialIds);
+    const uniforms = this.generateUniforms(paramUsage);
     const objectSDFs = this.generateObjectSDFs(scene.objects);
     const dispatch = this.generateDispatch(scene.objects, materialIds);
     const materialAt = this.generateMaterialAt(scene.objects, materialIds);
-    const materialProps = this.generateMaterialProperties(scene.materials, materialIds);
+    const materialProps = this.generateMaterialProperties(scene.materials, materialIds, paramUsage);
     const intersection = this.generateIntersection();
+
+    // Build uniform bindings
+    const uniformBindings = this.generateUniformBindings(paramUsage, scene.parameters || {});
 
     return {
       id: { kind: 'scene', name: 'compiled-scene', version: '1.0.0' },
       fragment: {
         constants,
+        uniforms: uniforms || undefined,
         functions: [
           objectSDFs,
           dispatch,
@@ -34,8 +43,95 @@ export class SceneCompiler {
           materialProps,
           intersection
         ].join('\n\n')
-      }
+      },
+      uniformBindings: uniformBindings.length > 0 ? uniformBindings : undefined,
+      parameters: scene.parameters
     };
+  }
+
+  /**
+   * Check if a property value is a parameter reference
+   */
+  private isParam<T>(value: MaterialPropertyValue<T>): value is { param: string } {
+    return typeof value === 'object' && value !== null && 'param' in value;
+  }
+
+  /**
+   * Get uniform name for a parameter
+   */
+  private paramToUniform(paramPath: string): string {
+    return 'u_scene_' + paramPath.replace(/\./g, '_');
+  }
+
+  /**
+   * Analyze which parameters are used and their types
+   */
+  private analyzeParameterUsage(materials: Map<string, MaterialDescription>): Map<string, 'vec3' | 'float'> {
+    const usage = new Map<string, 'vec3' | 'float'>();
+
+    for (const [_, mat] of materials) {
+      // Check each property
+      if (this.isParam(mat.albedo)) {
+        usage.set(mat.albedo.param, 'vec3');
+      }
+      if (this.isParam(mat.emission)) {
+        usage.set(mat.emission.param, 'vec3');
+      }
+      if (this.isParam(mat.roughness)) {
+        usage.set(mat.roughness.param, 'float');
+      }
+      if (this.isParam(mat.metallic)) {
+        usage.set(mat.metallic.param, 'float');
+      }
+      if (this.isParam(mat.ior)) {
+        usage.set(mat.ior.param, 'float');
+      }
+      if (this.isParam(mat.emission_strength)) {
+        usage.set(mat.emission_strength.param, 'float');
+      }
+    }
+
+    return usage;
+  }
+
+  /**
+   * Generate uniform declarations
+   */
+  private generateUniforms(paramUsage: Map<string, 'vec3' | 'float'>): string | null {
+    if (paramUsage.size === 0) return null;
+
+    const lines: string[] = [];
+    for (const [paramPath, type] of paramUsage) {
+      const uniformName = this.paramToUniform(paramPath);
+      lines.push(`uniform ${type} ${uniformName};`);
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Generate uniform bindings
+   */
+  private generateUniformBindings(
+    paramUsage: Map<string, 'vec3' | 'float'>,
+    parameters: Record<string, any>
+  ): UniformBinding[] {
+    const bindings: UniformBinding[] = [];
+
+    for (const [paramPath, type] of paramUsage) {
+      const uniformName = this.paramToUniform(paramPath);
+      const paramMeta = parameters[paramPath];
+      const defaultValue = paramMeta?.default || (type === 'vec3' ? [1, 1, 1] : 1.0);
+
+      bindings.push({
+        uniform: uniformName,
+        parameters: [paramPath],
+        type: type,
+        compute: (params) => params[paramPath] || defaultValue
+      });
+    }
+
+    return bindings;
   }
 
   /**
@@ -99,13 +195,13 @@ float ${funcName}(vec3 p) {
   private generateDispatch(objects: SimpleObject[], materialIds: Map<string, number>): string {
     const checks = objects.map((obj) => {
       const funcName = `sdf_${this.sanitizeId(obj.id)}`;
-      const constName = `MATERIAL_${this.toConstantName(obj.material)}`;
+      const materialConst = `MATERIAL_${this.toConstantName(obj.material)}`;
 
       return `
   d = ${funcName}(p);
   if (d < min_d) {
     min_d = d;
-    closest_material = ${constName};
+    closest_material = ${materialConst};
   }`.trim();
     });
 
@@ -123,18 +219,18 @@ float dispatch_sdf(vec3 p, out int closest_material) {
   }
 
   /**
-   * Generate material classification (which material at point p)
+   * Generate material classification (which material a point is inside)
    */
   private generateMaterialAt(objects: SimpleObject[], materialIds: Map<string, number>): string {
     const checks = objects.map((obj) => {
       const funcName = `sdf_${this.sanitizeId(obj.id)}`;
-      const constName = `MATERIAL_${this.toConstantName(obj.material)}`;
+      const materialConst = `MATERIAL_${this.toConstantName(obj.material)}`;
 
       return `
   d = ${funcName}(p);
   if (d < 0.0 && -d > deepest) {
     deepest = -d;
-    inside_material = ${constName};
+    inside_material = ${materialConst};
   }`.trim();
     });
 
@@ -157,7 +253,8 @@ int scene_material_at(vec3 p) {
    */
   private generateMaterialProperties(
     materials: Map<string, MaterialDescription>,
-    materialIds: Map<string, number>
+    materialIds: Map<string, number>,
+    paramUsage: Map<string, 'vec3' | 'float'>
   ): string {
     const cases: string[] = [];
 
@@ -177,14 +274,39 @@ int scene_material_at(vec3 p) {
     for (const [name, mat] of materials) {
       const constName = `MATERIAL_${this.toConstantName(name)}`;
 
+      // Generate property assignments (constant or uniform)
+      const albedoValue = this.isParam(mat.albedo)
+        ? this.paramToUniform(mat.albedo.param)
+        : `vec3(${mat.albedo.map(v => this.toGLSLFloat(v)).join(', ')})`;
+
+      const roughnessValue = this.isParam(mat.roughness)
+        ? this.paramToUniform(mat.roughness.param)
+        : this.toGLSLFloat(mat.roughness);
+
+      const metallicValue = this.isParam(mat.metallic)
+        ? this.paramToUniform(mat.metallic.param)
+        : this.toGLSLFloat(mat.metallic);
+
+      const iorValue = this.isParam(mat.ior)
+        ? this.paramToUniform(mat.ior.param)
+        : this.toGLSLFloat(mat.ior);
+
+      const emissionValue = this.isParam(mat.emission)
+        ? this.paramToUniform(mat.emission.param)
+        : `vec3(${mat.emission.map(v => this.toGLSLFloat(v)).join(', ')})`;
+
+      const emissionStrengthValue = this.isParam(mat.emission_strength)
+        ? this.paramToUniform(mat.emission_strength.param)
+        : this.toGLSLFloat(mat.emission_strength);
+
       cases.push(`
   else if (mat_id == ${constName}) {
-    props.albedo = vec3(${mat.albedo.map(v => this.toGLSLFloat(v)).join(', ')});
-    props.roughness = ${this.toGLSLFloat(mat.roughness)};
-    props.metallic = ${this.toGLSLFloat(mat.metallic)};
-    props.ior = ${this.toGLSLFloat(mat.ior)};
-    props.emission = vec3(${mat.emission.map(v => this.toGLSLFloat(v)).join(', ')});
-    props.emission_strength = ${this.toGLSLFloat(mat.emission_strength)};
+    props.albedo = ${albedoValue};
+    props.roughness = ${roughnessValue};
+    props.metallic = ${metallicValue};
+    props.ior = ${iorValue};
+    props.emission = ${emissionValue};
+    props.emission_strength = ${emissionStrengthValue};
     props.light_id = -1;  // No lights yet
   }`.trim());
     }
@@ -283,29 +405,24 @@ bool scene_intersect_any(Ray ray, float max_distance) {
   }
 
   /**
-   * Sanitize object ID for use in function names
-   * "red sphere" -> "red_sphere"
-   * "Red-Sphere" -> "red_sphere"
-   */
-  private sanitizeId(id: string): string {
-    return id.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  }
-
-  /**
-   * Convert material name to constant name
-   * "red_diffuse" -> "RED_DIFFUSE"
+   * Utility: Convert name to CONSTANT_NAME format
    */
   private toConstantName(name: string): string {
-    return name.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    return name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
   }
 
   /**
-   * Format a number as a GLSL float literal
-   * Ensures numbers have decimal point (0 -> 0.0)
+   * Utility: Sanitize ID for function names
+   */
+  private sanitizeId(id: string): string {
+    return id.replace(/[^a-zA-Z0-9_]/g, '_');
+  }
+
+  /**
+   * Utility: Ensure number is formatted as GLSL float
    */
   private toGLSLFloat(value: number): string {
     const str = value.toString();
-    // If no decimal point, add .0
     return str.includes('.') ? str : str + '.0';
   }
 }
