@@ -24,7 +24,7 @@ export {
 } from './resources/validation.js';
 
 import type { ShaderDiagnostics, FormatOptions } from './types.js';
-import type { ModuleDescriptor } from '../engine/types.js';
+import type { ModuleDescriptor } from '../infrastructure/engine/types.js';
 import { ShaderErrorParser } from './shader/ShaderErrorParser.js';
 import { ShaderErrorTranslator } from './shader/ShaderErrorTranslator.js';
 import { ShaderErrorFormatter } from './shader/ShaderErrorFormatter.js';

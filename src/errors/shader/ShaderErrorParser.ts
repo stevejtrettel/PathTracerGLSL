@@ -1,5 +1,5 @@
 import type { GLSLError, LineMap, SourceLocation } from '../types.js';
-import type { ModuleDescriptor } from '../../engine/types.js';
+import type { ModuleDescriptor } from '../../infrastructure/engine/types.js';
 
 /**
  * Parses raw GLSL compiler output into structured errors

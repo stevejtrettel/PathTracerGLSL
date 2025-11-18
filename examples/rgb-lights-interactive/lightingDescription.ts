@@ -5,7 +5,7 @@
  * This follows the same pattern as SceneCompiler's interactive materials
  */
 
-import type { LightingDescription } from '../../src/world/lighting/types.js';
+import type { LightingDescription } from '../../src/research/world/lighting/types.js';
 
 export const interactiveRgbLighting: LightingDescription = {
   lights: [

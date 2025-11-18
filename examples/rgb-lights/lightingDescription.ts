@@ -13,7 +13,7 @@
  * - Red + Green + Blue = White
  */
 
-import type { LightingDescription } from '../../src/world/lighting/types.js';
+import type { LightingDescription } from '../../src/research/world/lighting/types.js';
 
 export const rgbLighting: LightingDescription = {
   lights: [

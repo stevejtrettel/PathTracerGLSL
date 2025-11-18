@@ -5,10 +5,10 @@
  * Should see contributions from all three lights with correct PDF.
  */
 
-import { App } from '../../src/app/App.js';
-import type { Recipe } from '../../src/engine/types.js';
-import { SceneCompiler } from '../../src/world/scene/SceneCompiler.js';
-import { LightsCompiler } from '../../src/world/lighting/LightsCompiler.js';
+import { App } from '../../src/infrastructure/app/App.js';
+import type { Recipe } from '../../src/infrastructure/engine/types.js';
+import { SceneCompiler } from '../../src/research/world/scene/SceneCompiler.js';
+import { LightsCompiler } from '../../src/research/world/lighting/LightsCompiler.js';
 import { multiLightTestScene } from './sceneDescription.js';
 import { multiLightDescription } from './lightingDescription.js';
 
@@ -20,15 +20,15 @@ const lightsCompiler = new LightsCompiler();
 const compiledLighting = lightsCompiler.compile(multiLightDescription);
 
 // World modules
-import { euclideanAmbient } from '../../src/world/ambient/euclidean/euclidean-ambient.js';
-import { constEnvironment } from '../../src/world/environment/const-environment.js';
+import { euclideanAmbient } from '../../src/research/world/ambient/euclidean/euclidean-ambient.js';
+import { constEnvironment } from '../../src/research/world/environment/const-environment.js';
 
 // Optics modules
-import { pinholeCamera } from '../../src/optics/camera/pinhole-camera.js';
-import { lambertInteraction } from '../../src/optics/interaction/lambert-interaction.js';
-import { pathTracerDirectLight } from '../../src/optics/transport/path-tracer-direct-light.js';
-import { averagingAccumulator } from '../../src/optics/accumulator/average-accumulator.js';
-import { gammaDeveloper } from '../../src/optics/developer/gamma-developer.js';
+import { pinholeCamera } from '../../src/research/optics/camera/pinhole-camera.js';
+import { lambertInteraction } from '../../src/research/optics/interaction/lambert-interaction.js';
+import { pathTracerDirectLight } from '../../src/research/optics/transport/path-tracer-direct-light.js';
+import { averagingAccumulator } from '../../src/research/optics/accumulator/average-accumulator.js';
+import { gammaDeveloper } from '../../src/research/optics/developer/gamma-developer.js';
 
 // Extensions
 import { OrbitControls } from "../../src/app/extensions/OrbitControls";

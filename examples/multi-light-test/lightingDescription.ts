@@ -7,7 +7,7 @@
  * - 1 point light (right side)
  */
 
-import type { LightingDescription } from '../../src/world/lighting/types.js';
+import type { LightingDescription } from '../../src/research/world/lighting/types.js';
 
 export const multiLightDescription: LightingDescription = {
   lights: [
