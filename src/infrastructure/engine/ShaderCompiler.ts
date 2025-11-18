@@ -1,16 +1,13 @@
 // engine/ShaderCompiler.ts
-import type { ModuleDescriptor, EngineUniforms, UniformType, CompilationResult } from './types';
+import type { EngineUniforms, UniformType, CompilationResult } from './types';
+import type { CompiledRecipe } from '../compiler/types';
 import {
-    buildMainShaderSource,
-    buildDisplayShaderSource,
-    buildVertexShaderSource,
     addLineNumbers
 } from '../compiler/utils/shader-builder-utils';
 import {
     setUniformValue,
     cacheUniformLocations
 } from './utils/shader-uniform-utils';
-import { translateShaderErrors, ShaderErrorFormatter } from '../../errors/index.js';
 
 /**
  * ShaderCompiler - Handles GLSL shader compilation and linking
@@ -40,52 +37,47 @@ class ShaderCompiler {
     }
 
     /**
-     * Compile modules into shader programs
+     * Compile GLSL shader programs from compiled recipe
      * Returns CompilationResult with either programs or diagnostics
      */
-    compile(modules: ModuleDescriptor[]): CompilationResult {
-        const mainSource = buildMainShaderSource(modules);
-        const displaySource = buildDisplayShaderSource(modules);
-        const compositeSource = this.buildCompositeShaderSource();
-        const vertexSource = buildVertexShaderSource();
+    compile(compiledRecipe: CompiledRecipe): CompilationResult {
+        const { shaders } = compiledRecipe;
 
         // Compile main shader (accumulation)
         try {
-            this.mainProgram = this.compileAndLinkProgram(vertexSource, mainSource, 'main');
+            this.mainProgram = this.compileAndLinkProgram(
+                shaders.main.vertex,
+                shaders.main.fragment,
+                'main'
+            );
         } catch (error: any) {
-            return this.handleCompilationError(error, mainSource, modules, 'Main Accumulation Shader');
+            return this.handleCompilationError(error, shaders.main.fragment, 'Main Accumulation Shader');
         }
 
         // Compile display shader (tone mapping)
         try {
-            this.displayProgram = this.compileAndLinkProgram(vertexSource, displaySource, 'display');
+            this.displayProgram = this.compileAndLinkProgram(
+                shaders.display.vertex,
+                shaders.display.fragment,
+                'display'
+            );
         } catch (error: any) {
-            return this.handleCompilationError(error, displaySource, modules, 'Display Shader');
+            return this.handleCompilationError(error, shaders.display.fragment, 'Display Shader');
         }
 
         // Compile composite shader (final output)
         try {
-            this.compositeProgram = this.compileAndLinkProgram(vertexSource, compositeSource, 'composite');
+            this.compositeProgram = this.compileAndLinkProgram(
+                shaders.composite.vertex,
+                shaders.composite.fragment,
+                'composite'
+            );
         } catch (error: any) {
-            // Composite shader is simple and doesn't use modules
-            console.error(`❌ Composite shader compilation failed`);
-            console.error(error.message || String(error));
-            return {
-                success: false,
-                diagnostics: {
-                    success: false,
-                    errors: [],
-                    warnings: [],
-                    source: compositeSource,
-                    sourceWithLineNumbers: addLineNumbers(compositeSource),
-                    modules: [],
-                    stats: { totalErrors: 1, totalWarnings: 0, missingFunctions: 0, typeMismatches: 0, syntaxErrors: 0, linkerErrors: 0, other: 1 }
-                }
-            };
+            return this.handleCompilationError(error, shaders.composite.fragment, 'Composite Shader');
         }
 
-        this.lastCompiledSource = mainSource;
-        this.lastCompiledSourceWithLineNumbers = addLineNumbers(mainSource);
+        this.lastCompiledSource = shaders.main.fragment;
+        this.lastCompiledSourceWithLineNumbers = addLineNumbers(shaders.main.fragment);
 
         return {
             success: true,
@@ -96,30 +88,42 @@ class ShaderCompiler {
     }
 
     /**
-     * Handle compilation error with full error reporting
+     * Handle compilation error
      */
     private handleCompilationError(
         error: any,
         source: string,
-        modules: ModuleDescriptor[],
         shaderName: string
     ): CompilationResult {
         const errorLog = error.message || String(error);
 
-        // Log raw error for debugging
+        // Log error for debugging
         console.error(`\n❌ ${shaderName} compilation failed:\n`);
-        console.error('RAW ERROR:', errorLog);
+        console.error(errorLog);
+        console.error('\nShader source with line numbers:');
+        console.error(addLineNumbers(source));
 
-        const diagnostics = translateShaderErrors(errorLog, source, modules);
-
-        // Format and log errors to console
-        const formatter = new ShaderErrorFormatter();
-        const formattedErrors = formatter.formatConsole(diagnostics);
-        console.error(formattedErrors);
-
+        // TODO: Re-implement error translation with source maps
+        // For now, return basic diagnostics
         return {
             success: false,
-            diagnostics
+            diagnostics: {
+                success: false,
+                errors: [],
+                warnings: [],
+                source,
+                sourceWithLineNumbers: addLineNumbers(source),
+                modules: [],
+                stats: {
+                    totalErrors: 1,
+                    totalWarnings: 0,
+                    missingFunctions: 0,
+                    typeMismatches: 0,
+                    syntaxErrors: 0,
+                    linkerErrors: 0,
+                    other: 1
+                }
+            }
         };
     }
 
@@ -184,21 +188,6 @@ class ShaderCompiler {
     // ============================================================================
     // Private: Compilation
     // ============================================================================
-
-    private buildCompositeShaderSource(): string {
-        return `#version 300 es
-precision highp float;
-
-uniform sampler2D u_rgb_texture;
-
-out vec4 fragColor;
-
-void main() {
-    ivec2 coord = ivec2(gl_FragCoord.xy);
-    vec3 color = texelFetch(u_rgb_texture, coord, 0).rgb;
-    fragColor = vec4(color, 1.0);
-}`;
-    }
 
     private setEngineUniform(name: string, value: any, type: UniformType): void {
         const location = this.uniformLocations.get(name);
