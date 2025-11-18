@@ -7,9 +7,9 @@ import { HDRLoader } from './loaders/hdr-loader';
 import { ResourceManager } from './ResourceManager';
 import { TextureFactory } from './utils/TextureFactory';
 import { buildEnvironmentSampler } from './loaders/build-environment-sampler';
-import { validateRecipe, validateRecipeModules } from '../../errors/engine/validation';
 import { validateHDRResponse, validateHDRBuffer, validateHDRData, validateTextureCreation } from '../../errors/resources/validation';
-import type { ModuleDescriptor, EngineState, Recipe } from './types';
+import type { EngineState } from './types';
+import type { CompiledRecipe } from '../compiler/types';
 import type { ParameterChanges } from '../app/types';
 
 /**
@@ -38,7 +38,7 @@ class Engine {
         main: WebGLProgram;
         display: WebGLProgram;
     }>();
-    private recipes = new Map<string, Recipe>();
+    private recipes = new Map<string, CompiledRecipe>();
     private activeRecipeId: string | null = null;
 
     // Composite program (shared across all recipes)
@@ -77,50 +77,25 @@ class Engine {
     }
 
     /**
-     * Initialize engine with recipes
+     * Initialize engine with compiled recipes
      */
-    initialize(recipes: Recipe[]): void {
+    initialize(compiledRecipes: CompiledRecipe[]): void {
         if (this.state !== 'ready') {
             throw new Error(`Cannot initialize in state: ${this.state}`);
         }
 
-        if (recipes.length === 0) {
+        if (compiledRecipes.length === 0) {
             throw new Error('At least one recipe required');
         }
 
-        console.log(`Initializing ${recipes.length} recipes...`);
+        console.log(`Initializing ${compiledRecipes.length} recipes...`);
 
-        // Validate all recipes before compilation
-        for (const recipe of recipes) {
-            // Validate recipe structure (modules in correct slots)
-            const recipeResult = validateRecipe(recipe);
-            if (!recipeResult.valid) {
-                console.error(`\n❌ Recipe validation failed for '${recipe.id}':\n`);
-                recipeResult.errors.forEach(err => console.error(`  • ${err}`));
-                throw new Error(`Recipe validation failed for '${recipe.id}'. See console for details.`);
-            }
-
-            // Validate uniform bindings
-            const uniformResult = validateRecipeModules(recipe);
-            if (!uniformResult.valid) {
-                console.error(`\n❌ Uniform validation failed for '${recipe.id}':\n`);
-                uniformResult.errors.forEach(err => console.error(`  • ${err}`));
-                throw new Error(`Uniform validation failed for '${recipe.id}'. See console for details.`);
-            }
-
-            // Show warnings if any
-            if (uniformResult.warnings && uniformResult.warnings.length > 0) {
-                console.warn(`\n⚠️  Uniform warnings for '${recipe.id}':`);
-                uniformResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
-            }
-        }
-
-        // Compile all recipes (composite program is shared)
-        for (const recipe of recipes) {
+        // Compile shaders for all recipes (composite program is shared)
+        for (const recipe of compiledRecipes) {
             this.recipes.set(recipe.id, recipe);
 
-            const modules = this.extractModules(recipe);
-            const result = this.compiler.compile(modules);
+            // Compile GLSL to WebGL programs
+            const result = this.compiler.compile(recipe);
 
             if (!result.success) {
                 throw new Error(
@@ -149,10 +124,10 @@ class Engine {
         }
 
         // Select first recipe
-        this.selectRecipe(recipes[0].id);
+        this.selectRecipe(compiledRecipes[0].id);
         this.state = 'running';
 
-        console.log(`Initialized with recipe: ${recipes[0].id}`);
+        console.log(`Initialized with recipe: ${compiledRecipes[0].id}`);
     }
 
     /**
@@ -169,11 +144,9 @@ class Engine {
             throw new Error(`Recipe metadata not found: ${recipeId}`);
         }
 
-        const modules = this.extractModules(recipe);
-
         this.compiler.setActiveProgram(programs.main);
         this.executor.setPrograms(programs.main, programs.display);
-        this.parameters.initialize(programs.main, modules);
+        this.parameters.initialize(programs.main, recipe.uniformBindings);
         this.resources.setActiveRecipe(recipeId);
 
         this.activeRecipeId = recipeId;
@@ -494,20 +467,6 @@ class Engine {
 
         const locTot = this.gl.getUniformLocation(program, 'u_env_totalWeight');
         if (locTot) this.gl.uniform1f(locTot, totalWeight);
-    }
-
-    private extractModules(recipe: Recipe): ModuleDescriptor[] {
-        return [
-            recipe.world.ambient,
-            recipe.world.environment,
-            recipe.world.scene,
-            recipe.world.lighting,
-            recipe.optics.camera,
-            recipe.optics.interaction,
-            recipe.optics.transport,
-            recipe.optics.accumulator,
-            recipe.optics.developer
-        ];
     }
 
     private handleContextLoss(): void {

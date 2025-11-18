@@ -1,5 +1,5 @@
 // engine/ParameterManager.ts
-import type { ModuleDescriptor, UniformBinding } from './types';
+import type { UniformBinding } from './types';
 import type { ParameterChanges } from '../app/types';
 import { setUniformValue, uniformValuesEqual } from './utils/shader-uniform-utils';
 
@@ -7,7 +7,7 @@ import { setUniformValue, uniformValuesEqual } from './utils/shader-uniform-util
  * ParameterManager - Manages parameter-to-uniform bindings
  *
  * Responsibilities:
- * - Build uniform bindings from module descriptors
+ * - Store uniform bindings from compiled recipes
  * - Update GPU uniforms when parameters change
  * - Cache uniform values to skip redundant GPU calls
  * - Track performance statistics
@@ -34,12 +34,12 @@ class ParameterManager {
     }
 
     /**
-     * Initialize with shader program and modules
+     * Initialize with shader program and uniform bindings
      */
-    initialize(program: WebGLProgram, modules: ModuleDescriptor[]): void {
+    initialize(program: WebGLProgram, uniformBindings: UniformBinding[]): void {
         this.program = program;
 
-        this.buildUniformBindings(modules);
+        this.buildUniformBindings(uniformBindings);
         this.cacheUniformLocations();
 
         // Clear caches for fresh start
@@ -123,20 +123,18 @@ class ParameterManager {
     // Private: Initialization
     // ============================================================================
 
-    private buildUniformBindings(modules: ModuleDescriptor[]): void {
+    private buildUniformBindings(bindings: UniformBinding[]): void {
         this.uniformBindings.clear();
         this.parameterToBindings.clear();
 
-        for (const module of modules) {
-            for (const binding of module.uniformBindings || []) {
-                this.uniformBindings.set(binding.uniform, binding);
+        for (const binding of bindings) {
+            this.uniformBindings.set(binding.uniform, binding);
 
-                for (const paramPath of binding.parameters) {
-                    if (!this.parameterToBindings.has(paramPath)) {
-                        this.parameterToBindings.set(paramPath, new Set());
-                    }
-                    this.parameterToBindings.get(paramPath)!.add(binding);
+            for (const paramPath of binding.parameters) {
+                if (!this.parameterToBindings.has(paramPath)) {
+                    this.parameterToBindings.set(paramPath, new Set());
                 }
+                this.parameterToBindings.get(paramPath)!.add(binding);
             }
         }
     }

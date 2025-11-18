@@ -31,11 +31,11 @@ import { averagingAccumulator } from '../../src/research/optics/accumulator/aver
 import { gammaDeveloper } from '../../src/research/optics/developer/gamma-developer.js';
 
 // Extensions
-import { OrbitControls } from "../../src/app/extensions/OrbitControls";
-import { StatsPanelExtension } from "../../src/app/extensions/StatsPanel";
-import { ScreenshotExtension } from "../../src/app/extensions/ScreenshotExtension";
-import { TouchOrbitControls } from "../../src/app/extensions/TouchOrbitControls";
-import { ParameterPanelExtension } from "../../src/app/extensions/ParameterPanelExtension";
+import { OrbitControls } from "../../src/infrastructure/app/extensions/OrbitControls";
+import { StatsPanelExtension } from "../../src/infrastructure/app/extensions/StatsPanel";
+import { ScreenshotExtension } from "../../src/infrastructure/app/extensions/ScreenshotExtension";
+import { TouchOrbitControls } from "../../src/infrastructure/app/extensions/TouchOrbitControls";
+import { ParameterPanelExtension } from "../../src/infrastructure/app/extensions/ParameterPanelExtension";
 
 function getOrCreateCanvas(id: string = 'canvas'): HTMLCanvasElement {
     let canvas = document.getElementById(id) as HTMLCanvasElement;

@@ -1,5 +1,6 @@
 // app/App.ts
 import { Engine } from '../engine/Engine';
+import { Compiler } from '../compiler/Compiler';
 import { ParameterStore } from './ParameterStore';
 import { RenderCoordinator } from './RenderCoordinator';
 import { EventBus } from './EventBus';
@@ -106,12 +107,16 @@ class App {
             throw new Error('At least one recipe required');
         }
 
-        // Collect parameter metadata from all modules
-        this.collectParameterMetadata(recipes);
+        // Compile recipes
+        const compiler = new Compiler();
+        const compiledRecipes = recipes.map(recipe => compiler.compile(recipe));
 
-        // Initialize engine
-        this.engine.initialize(recipes);
-        this.currentRecipeId = recipes[0].id;
+        // Collect parameter metadata from all recipes
+        this.collectParameterMetadata(compiledRecipes);
+
+        // Initialize engine with compiled recipes
+        this.engine.initialize(compiledRecipes);
+        this.currentRecipeId = compiledRecipes[0].id;
 
         // Load environment if provided
         if (environmentHDR) {
@@ -539,46 +544,35 @@ class App {
     /**
      * Collect parameter metadata from all modules in all recipes
      */
-    private collectParameterMetadata(recipes: Recipe[]): void {
-        for (const recipe of recipes) {
-            // Collect from world modules
-            this.collectModuleMetadata(recipe.world.ambient);
-            this.collectModuleMetadata(recipe.world.environment);
-            this.collectModuleMetadata(recipe.world.scene);
-            this.collectModuleMetadata(recipe.world.lighting);
+    private collectParameterMetadata(compiledRecipes: import('../compiler/types').CompiledRecipe[]): void {
+        for (const recipe of compiledRecipes) {
+            if (!recipe.parameters) continue;
 
-            // Collect from optics modules
-            this.collectModuleMetadata(recipe.optics.camera);
-            this.collectModuleMetadata(recipe.optics.interaction);
-            this.collectModuleMetadata(recipe.optics.transport);
-            this.collectModuleMetadata(recipe.optics.accumulator);
-            this.collectModuleMetadata(recipe.optics.developer);
+            for (const [path, meta] of Object.entries(recipe.parameters)) {
+                this.collectParamMetadata(path, meta);
+            }
         }
     }
 
     /**
-     * Collect parameter metadata from a single module
+     * Collect parameter metadata from a single parameter
      */
-    private collectModuleMetadata(module: ModuleDescriptor): void {
-        if (!module.parameters) return;
+    private collectParamMetadata(path: string, meta: import('./types').ParameterMetadata): void {
+        // Enrich metadata with auto-inferred values
+        const enriched: ParameterMetadata = {
+            ...meta,
+            name: meta.name ?? path,
+            group: meta.group ?? this.inferGroup(path),
+            triggersReset: meta.triggersReset ?? this.inferTriggersReset(path)
+        };
 
-        for (const [path, meta] of Object.entries(module.parameters)) {
-            // Enrich metadata with auto-inferred values
-            const enriched: ParameterMetadata = {
-                ...meta,
-                name: meta.name ?? path,
-                group: meta.group ?? this.inferGroup(path),
-                triggersReset: meta.triggersReset ?? this.inferTriggersReset(path)
-            };
-
-            // Auto-calculate step if not provided and range exists
-            if (!enriched.step && enriched.range) {
-                const [min, max] = enriched.range;
-                enriched.step = (max - min) / 100;
-            }
-
-            this.parameterMetadata.set(path, enriched);
+        // Auto-calculate step if not provided and range exists
+        if (!enriched.step && enriched.range) {
+            const [min, max] = enriched.range;
+            enriched.step = (max - min) / 100;
         }
+
+        this.parameterMetadata.set(path, enriched);
     }
 
     /**
