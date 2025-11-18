@@ -2,7 +2,7 @@
  * Simple Cornell box-style scene for multi-light testing
  */
 
-import type { SceneDescription } from '../../src/world/scene/types.js';
+import type { SceneDescription } from '../../src/research/world/scene/types.js';
 
 export const multiLightTestScene: SceneDescription = {
   objects: [

@@ -3,7 +3,7 @@
  * Single quad area light on the ceiling
  */
 
-import type { LightingDescription } from '../../src/world/lighting/types.js';
+import type { LightingDescription } from '../../src/research/world/lighting/types.js';
 
 export const lightingDescription: LightingDescription = {
   lights: [

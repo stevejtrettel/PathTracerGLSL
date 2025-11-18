@@ -1,4 +1,4 @@
-import type { SceneDescription } from '../../src/world/scene/types';
+import type { SceneDescription } from '../../src/research/world/scene/types';
 
 /**
  * Interactive materials example

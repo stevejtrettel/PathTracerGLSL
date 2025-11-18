@@ -1,6 +1,6 @@
 // errors/resources/validation.ts
 
-import type { ValidationResult } from '../../engine/types';
+import type { ValidationResult } from '../../infrastructure/engine/types';
 
 /**
  * HDR file validation configuration

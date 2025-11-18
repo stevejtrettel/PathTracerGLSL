@@ -1,6 +1,6 @@
 // errors/engine/validation.ts
 
-import type { Recipe, ModuleDescriptor, ValidationResult, ModuleKind } from '../../engine/types';
+import type { Recipe, ModuleDescriptor, ValidationResult, ModuleKind } from '../../infrastructure/engine/types';
 
 /**
  * Validate that recipe modules are in correct slots

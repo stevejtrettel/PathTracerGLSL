@@ -1,4 +1,4 @@
-import type { ModuleDescriptor } from '../engine/types.js';
+import type { ModuleDescriptor } from '../infrastructure/engine/types.js';
 
 // ============================================================================
 // Raw GLSL Compiler Output

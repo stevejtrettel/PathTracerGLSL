@@ -2,7 +2,7 @@
  * Scene description with simple geometry
  */
 
-import type { SceneDescription } from '../../src/world/scene/types.js';
+import type { SceneDescription } from '../../src/research/world/scene/types.js';
 
 export const sceneDescription: SceneDescription = {
   objects: [
