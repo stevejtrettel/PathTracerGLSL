@@ -411,13 +411,23 @@ bool scene_intersect(Ray ray, out Hit hit) {
 
 // Simple camera
 Ray generate_camera_ray(vec2 uv, vec2 jitter) {
-    // Perspective camera
+    // Perspective camera with better FOV
     vec2 ndc = (uv + jitter / u_resolution) * 2.0 - 1.0;
     ndc.x *= u_resolution.x / u_resolution.y;
 
-    vec3 origin = vec3(0.0, 0.0, 5.0);
-    vec3 target = vec3(ndc * 0.5, 0.0);
-    vec3 direction = normalize(target - origin);
+    // Camera positioned to see sphere and floor
+    vec3 origin = vec3(2.0, 1.0, 4.0);
+    vec3 lookAt = vec3(0.0, 0.0, 0.0);
+    vec3 up = vec3(0.0, 1.0, 0.0);
+
+    // Build camera basis
+    vec3 forward = normalize(lookAt - origin);
+    vec3 right = normalize(cross(forward, up));
+    vec3 camUp = cross(right, forward);
+
+    // FOV ~60 degrees
+    float fov = 1.0;
+    vec3 direction = normalize(forward + ndc.x * right * fov + ndc.y * camUp * fov);
 
     Ray ray;
     ray.origin = origin;
