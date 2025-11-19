@@ -548,7 +548,8 @@ void main() {
         });
 
         // Display shader (tone mapping pass, unchanged from regular pathtracer)
-        shaders.set('pathtracer-display', {
+        // NOTE: Use unique shader ID to avoid collision with regular pathtracer
+        shaders.set('pathtracer-aovs-display', {
             vertex: this._getFullscreenVertex(),
             fragment: this._getDisplayFragment()
         });
@@ -587,7 +588,7 @@ void main() {
                 },
                 {
                     id: 'display-pass',
-                    shader: 'pathtracer-display',
+                    shader: 'pathtracer-aovs-display',
                     inputs: {
                         textures: {
                             'u_radiance': 'accumulation_current:0'  // Display radiance attachment
