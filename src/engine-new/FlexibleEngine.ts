@@ -1,0 +1,512 @@
+// engine-new/FlexibleEngine.ts
+
+import { FlexibleResourceManager } from './FlexibleResourceManager.js';
+import { FlexibleRenderExecutor } from './FlexibleRenderExecutor.js';
+import { ParameterManager } from '../engine/ParameterManager.js';
+import { validateCompiledRenderer } from '../errors/compiler/validation.js';
+import type { CompiledRenderer } from '../compiler/types.js';
+import type { ParameterChanges } from '../app/types.js';
+import type { UniformBinding } from '../engine/types.js';
+
+/**
+ * Engine state
+ */
+type EngineState = 'ready' | 'running';
+
+/**
+ * Engine uniforms (provided by Engine, not user parameters)
+ */
+interface EngineUniforms {
+    resolution: [number, number];
+    imageSize: [number, number];
+    frameIndex: number;
+    time: number;
+    sampleCount: number;
+    pixelOffset: [number, number];
+}
+
+/**
+ * FlexibleEngine - Manages GPU resources and rendering with flexible pipelines
+ *
+ * Responsibilities:
+ * - Load CompiledRenderers from Compiler
+ * - Manage GPU resources (via FlexibleResourceManager)
+ * - Execute render pipelines (via FlexibleRenderExecutor)
+ * - Track rendering state (sample counts, time, etc.)
+ * - Handle parameter updates (via ParameterManager)
+ * - Support tiled rendering (pixel offset, image size)
+ *
+ * Key differences from old Engine:
+ * - Takes pre-compiled renderers (no shader compilation)
+ * - Executes arbitrary pipelines (no fixed 3-pass structure)
+ * - Data-driven GPU resource management
+ */
+export class FlexibleEngine {
+    private gl: WebGL2RenderingContext;
+    private resourceManager: FlexibleResourceManager;
+    private renderExecutor: FlexibleRenderExecutor;
+    private parameterManager: ParameterManager;
+
+    // Renderer storage
+    private renderers = new Map<string, CompiledRenderer>();
+    private activeRendererId: string | null = null;
+
+    // Per-renderer state
+    private sampleCounts = new Map<string, number>();
+
+    // Engine state
+    private state: EngineState = 'ready';
+
+    // Time tracking
+    private startTime: number;
+    private _time: number = 0;
+
+    // Tiled rendering state
+    private pixelOffset: [number, number] = [0, 0];
+    private imageSize: [number, number] = [0, 0];
+
+    // Engine uniform locations (cached per shader per renderer)
+    // Structure: rendererId → shaderId → uniformName → location
+    private uniformLocations = new Map<string, Map<string, Map<string, WebGLUniformLocation>>>();
+
+    constructor(gl: WebGL2RenderingContext) {
+        this.gl = gl;
+        this.resourceManager = new FlexibleResourceManager(gl);
+        this.renderExecutor = new FlexibleRenderExecutor(gl, this.resourceManager);
+        this.parameterManager = new ParameterManager(gl);
+        this.startTime = performance.now();
+
+        // Handle context loss
+        gl.canvas.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            this._handleContextLoss();
+        });
+    }
+
+    // ============ LOADING ============
+
+    /**
+     * Load a single renderer
+     */
+    loadRenderer(id: string, renderer: CompiledRenderer): void {
+        if (this.renderers.has(id)) {
+            console.log(`Renderer '${id}' already loaded, skipping`);
+            return;
+        }
+
+        console.log(`Loading renderer '${id}'...`);
+
+        // Validate renderer structure
+        // TODO: Enable once validation is implemented
+        // const validation = validateCompiledRenderer(renderer);
+        // if (!validation.valid) {
+        //     console.error(`❌ Renderer validation failed for '${id}':`);
+        //     validation.errors.forEach(err => console.error(`  • ${err}`));
+        //     throw new Error(`Renderer validation failed for '${id}'. See console for details.`);
+        // }
+
+        // Load shaders
+        try {
+            this.renderExecutor.loadShaders(renderer.shaders);
+        } catch (error: any) {
+            throw new Error(`Failed to compile shaders for '${id}': ${error.message}`);
+        }
+
+        // Load GPU resources
+        this.resourceManager.loadRenderer(id, renderer.pipeline);
+
+        // Cache uniform locations for all shaders
+        this._cacheRendererUniformLocations(id, renderer);
+
+        // Initialize parameter system
+        // TODO: Need to get active program for parameter manager
+        // For now, we'll defer parameter initialization until selectRenderer
+
+        // Store renderer
+        this.renderers.set(id, renderer);
+        this.sampleCounts.set(id, 0);
+
+        console.log(`✅ Renderer '${id}' loaded successfully`);
+    }
+
+    /**
+     * Load multiple renderers (convenience method)
+     */
+    loadRenderers(renderers: CompiledRenderer[]): void {
+        if (renderers.length === 0) {
+            throw new Error('At least one renderer required');
+        }
+
+        console.log(`Loading ${renderers.length} renderer(s)...`);
+
+        for (const renderer of renderers) {
+            this.loadRenderer(renderer.id, renderer);
+        }
+
+        // Select first renderer
+        this.selectRenderer(renderers[0].id);
+        this.state = 'running';
+
+        console.log(`Initialized with renderer: ${renderers[0].id}`);
+    }
+
+    /**
+     * Switch to a different renderer
+     */
+    selectRenderer(id: string): void {
+        if (!this.renderers.has(id)) {
+            throw new Error(`Renderer not loaded: ${id}`);
+        }
+
+        const renderer = this.renderers.get(id)!;
+
+        // Switch resource manager
+        this.resourceManager.selectRenderer(id);
+
+        // Set active pipeline in executor
+        this.renderExecutor.setActivePipeline(renderer.pipeline);
+
+        // Initialize parameter manager with first shader's program
+        // TODO: This is a simplification - need to handle multiple programs
+        const firstShaderId = renderer.pipeline.passes[0]?.shader;
+        if (firstShaderId) {
+            const program = this.renderExecutor.getProgram(firstShaderId);
+            if (program) {
+                // Initialize with uniform bindings from renderer
+                this._initializeParameterManager(program, renderer.uniforms);
+            }
+        }
+
+        this.activeRendererId = id;
+        console.log(`Switched to renderer '${id}'`);
+    }
+
+    // ============ RENDERING ============
+
+    /**
+     * Render one frame
+     */
+    renderFrame(): void {
+        if (this.state !== 'running') {
+            throw new Error(`Cannot render in state: ${this.state}`);
+        }
+
+        if (!this.activeRendererId) {
+            throw new Error('No active renderer');
+        }
+
+        const renderer = this.renderers.get(this.activeRendererId)!;
+        const sampleCount = this.sampleCounts.get(this.activeRendererId)!;
+
+        // Update time
+        this._time = (performance.now() - this.startTime) / 1000;
+
+        // Get canvas dimensions
+        const width = this.gl.canvas.width;
+        const height = this.gl.canvas.height;
+
+        // Use imageSize for tiled rendering, otherwise use framebuffer size
+        const imgSize: [number, number] = this.imageSize[0] > 0
+            ? this.imageSize
+            : [width, height];
+
+        // Engine uniforms to set
+        const engineUniforms: EngineUniforms = {
+            resolution: [width, height],
+            imageSize: imgSize,
+            frameIndex: sampleCount,
+            time: this._time,
+            sampleCount: sampleCount,
+            pixelOffset: this.pixelOffset
+        };
+
+        // Set engine uniforms for all shaders in pipeline
+        this._setEngineUniforms(this.activeRendererId, renderer, engineUniforms);
+
+        // Execute pipeline
+        this.renderExecutor.executePipeline(renderer.pipeline);
+
+        // Increment sample count
+        this.sampleCounts.set(this.activeRendererId, sampleCount + 1);
+    }
+
+    // ============ PARAMETERS ============
+
+    /**
+     * Update shader uniforms from parameter changes
+     */
+    updateParameters(changes: ParameterChanges): void {
+        if (this.state === 'running') {
+            this.parameterManager.updateUniforms(changes);
+        }
+    }
+
+    // ============ STATE QUERIES ============
+
+    /**
+     * Get current state
+     */
+    getState(): EngineState {
+        return this.state;
+    }
+
+    /**
+     * Check if ready
+     */
+    isReady(): boolean {
+        return this.state === 'ready';
+    }
+
+    /**
+     * Check if running
+     */
+    isRunning(): boolean {
+        return this.state === 'running';
+    }
+
+    /**
+     * Get active renderer ID
+     */
+    getActiveRendererId(): string | null {
+        return this.activeRendererId;
+    }
+
+    /**
+     * Get available renderer IDs
+     */
+    getAvailableRendererIds(): string[] {
+        return Array.from(this.renderers.keys());
+    }
+
+    /**
+     * Get sample count for active renderer
+     */
+    getSampleCount(): number {
+        if (!this.activeRendererId) return 0;
+        return this.sampleCounts.get(this.activeRendererId) || 0;
+    }
+
+    /**
+     * Get current time (seconds since engine creation)
+     */
+    get time(): number {
+        return this._time;
+    }
+
+    // ============ UTILITIES ============
+
+    /**
+     * Clear accumulation for active renderer
+     */
+    clearAccumulation(): void {
+        if (!this.activeRendererId) return;
+
+        // Reset sample count
+        this.sampleCounts.set(this.activeRendererId, 0);
+
+        // Clear double_buffer framebuffers
+        // TODO: Add method to FlexibleResourceManager to clear specific buffers
+        // For now, this is a placeholder
+        console.log(`Accumulation cleared for renderer '${this.activeRendererId}'`);
+    }
+
+    /**
+     * Resize framebuffers
+     */
+    resize(width: number, height: number): void {
+        this.resourceManager.resize(width, height);
+        // Note: RenderExecutor doesn't need resize in new architecture
+        // (viewport is set per-pass in executePass)
+    }
+
+    /**
+     * Get canvas size
+     */
+    getCanvasSize(): [number, number] {
+        return [this.gl.canvas.width, this.gl.canvas.height];
+    }
+
+    // ============ TILED RENDERING ============
+
+    /**
+     * Set pixel offset for tiled rendering
+     */
+    setPixelOffset(x: number, y: number): void {
+        this.pixelOffset = [x, y];
+    }
+
+    /**
+     * Clear pixel offset
+     */
+    clearPixelOffset(): void {
+        this.pixelOffset = [0, 0];
+    }
+
+    /**
+     * Set full image size for tiled rendering
+     */
+    setImageSize(width: number, height: number): void {
+        this.imageSize = [width, height];
+    }
+
+    /**
+     * Clear image size (use framebuffer resolution)
+     */
+    clearImageSize(): void {
+        this.imageSize = [0, 0];
+    }
+
+    // ============ CLEANUP ============
+
+    /**
+     * Dispose all resources
+     */
+    dispose(): void {
+        this.renderExecutor.cleanup();
+        this.resourceManager.cleanup();
+        this.renderers.clear();
+        this.sampleCounts.clear();
+        this.uniformLocations.clear();
+        this.activeRendererId = null;
+        this.state = 'ready';
+    }
+
+    // ============ PRIVATE METHODS ============
+
+    /**
+     * Cache uniform locations for all shaders in a renderer
+     */
+    private _cacheRendererUniformLocations(rendererId: string, renderer: CompiledRenderer): void {
+        const rendererLocations = new Map<string, Map<string, WebGLUniformLocation>>();
+
+        for (const [shaderId, shaderProgram] of renderer.shaders) {
+            const program = this.renderExecutor.getProgram(shaderId);
+            if (!program) continue;
+
+            const shaderLocations = new Map<string, WebGLUniformLocation>();
+
+            // Cache locations for engine uniforms
+            const engineUniformNames = [
+                'u_resolution',
+                'u_image_size',
+                'u_frame_index',
+                'u_time',
+                'u_sample_count',
+                'u_pixel_offset'
+            ];
+
+            for (const uniformName of engineUniformNames) {
+                const location = this.gl.getUniformLocation(program, uniformName);
+                if (location) {
+                    shaderLocations.set(uniformName, location);
+                }
+            }
+
+            rendererLocations.set(shaderId, shaderLocations);
+        }
+
+        this.uniformLocations.set(rendererId, rendererLocations);
+    }
+
+    /**
+     * Set engine uniforms for all shaders in active renderer
+     */
+    private _setEngineUniforms(
+        rendererId: string,
+        renderer: CompiledRenderer,
+        uniforms: EngineUniforms
+    ): void {
+        const rendererLocations = this.uniformLocations.get(rendererId);
+        if (!rendererLocations) return;
+
+        // Set uniforms for each shader used in the pipeline
+        for (const pass of renderer.pipeline.passes) {
+            const program = this.renderExecutor.getProgram(pass.shader);
+            if (!program) continue;
+
+            const locations = rendererLocations.get(pass.shader);
+            if (!locations) continue;
+
+            // Use program
+            this.gl.useProgram(program);
+
+            // Set each uniform
+            const loc_resolution = locations.get('u_resolution');
+            if (loc_resolution) {
+                this.gl.uniform2f(loc_resolution, uniforms.resolution[0], uniforms.resolution[1]);
+            }
+
+            const loc_imageSize = locations.get('u_image_size');
+            if (loc_imageSize) {
+                this.gl.uniform2f(loc_imageSize, uniforms.imageSize[0], uniforms.imageSize[1]);
+            }
+
+            const loc_frameIndex = locations.get('u_frame_index');
+            if (loc_frameIndex) {
+                this.gl.uniform1i(loc_frameIndex, uniforms.frameIndex);
+            }
+
+            const loc_time = locations.get('u_time');
+            if (loc_time) {
+                this.gl.uniform1f(loc_time, uniforms.time);
+            }
+
+            const loc_sampleCount = locations.get('u_sample_count');
+            if (loc_sampleCount) {
+                this.gl.uniform1i(loc_sampleCount, uniforms.sampleCount);
+            }
+
+            const loc_pixelOffset = locations.get('u_pixel_offset');
+            if (loc_pixelOffset) {
+                this.gl.uniform2f(loc_pixelOffset, uniforms.pixelOffset[0], uniforms.pixelOffset[1]);
+            }
+        }
+    }
+
+    /**
+     * Initialize parameter manager with uniform bindings
+     */
+    private _initializeParameterManager(program: WebGLProgram, uniforms: UniformBinding[]): void {
+        // Create fake modules array for parameter manager
+        // TODO: Update ParameterManager to accept UniformBinding[] directly
+        const fakeModules = [{
+            id: { kind: 'test' as const, name: 'compiled', version: '1.0.0' },
+            fragment: { functions: '' },
+            uniformBindings: uniforms
+        }];
+
+        this.parameterManager.initialize(program, fakeModules);
+    }
+
+    /**
+     * Handle WebGL context loss
+     */
+    private _handleContextLoss(): void {
+        console.error('WebGL context lost - rendering stopped');
+        this.state = 'ready';
+        this.resourceManager.handleContextLoss();
+    }
+}
+
+// ============ DEFERRED FEATURES (TODOs) ============
+//
+// 1. READ OPERATIONS (readRadiance, readRGB)
+//    - Need to decide which framebuffer to read from
+//    - Add methods to read HDR (rgba32f) and LDR (rgba8) data
+//    - Important for production rendering and export
+//
+// 2. HDR ENVIRONMENT LOADING
+//    - TextureRegistry for global textures
+//    - HDR parsing and CDF building for importance sampling
+//    - Binding environment textures to shaders
+//    - May belong in separate TextureManager or content loading system
+//
+// 3. VALIDATION
+//    - Implement full validateCompiledRenderer()
+//    - Implement full validatePipeline()
+//    - Check shader/framebuffer/texture ID consistency
+//
+// 4. CLEAR ACCUMULATION BUFFERS
+//    - Add FlexibleResourceManager.clearBuffer(rendererId, bufferId)
+//    - Call from clearAccumulation() to actually clear GPU buffers
+//
