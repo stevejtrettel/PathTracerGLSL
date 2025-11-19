@@ -547,11 +547,11 @@ void main() {
             fragment: this._getPathtracerMRTFragment()
         });
 
-        // Display shader (tone mapping pass, unchanged from regular pathtracer)
+        // Display shader with AOV visualization support
         // NOTE: Use unique shader ID to avoid collision with regular pathtracer
         shaders.set('pathtracer-aovs-display', {
             vertex: this._getFullscreenVertex(),
-            fragment: this._getDisplayFragment()
+            fragment: this._getAOVDisplayFragment()
         });
 
         // Pipeline: MRT accumulation with 3 attachments
@@ -591,7 +591,9 @@ void main() {
                     shader: 'pathtracer-aovs-display',
                     inputs: {
                         textures: {
-                            'u_radiance': 'accumulation_current:0'  // Display radiance attachment
+                            'u_radiance': 'accumulation_current:0',
+                            'u_albedo': 'accumulation_current:1',
+                            'u_normal': 'accumulation_current:2'
                         }
                     },
                     output: 'screen',
@@ -611,7 +613,7 @@ void main() {
             }
         };
 
-        // Uniforms (same as regular pathtracer)
+        // Uniforms (including display mode for AOV visualization)
         const uniforms: UniformBinding[] = [
             {
                 uniform: 'u_resolution',
@@ -636,6 +638,12 @@ void main() {
                 parameters: ['engine.time'],
                 type: 'float',
                 compute: (params) => params['engine.time']
+            },
+            {
+                uniform: 'u_display_mode',
+                parameters: ['renderer.displayMode'],
+                type: 'int',
+                compute: (params) => params['renderer.displayMode'] || 0
             }
         ];
 
@@ -879,6 +887,48 @@ void main() {
     o_radiance = vec4(accumulated_radiance, 1.0);
     o_albedo = vec4(first_hit_albedo, 1.0);
     o_normal = vec4(first_hit_normal, 1.0);
+}`;
+    }
+
+    /**
+     * Get AOV display fragment shader
+     * Supports switching between radiance, albedo, and normal display
+     */
+    private _getAOVDisplayFragment(): string {
+        return `#version 300 es
+precision highp float;
+
+out vec4 fragColor;
+
+uniform vec2 u_resolution;
+uniform sampler2D u_radiance;
+uniform sampler2D u_albedo;
+uniform sampler2D u_normal;
+uniform int u_display_mode;  // 0=radiance, 1=albedo, 2=normal
+
+// Gamma correction
+vec3 gamma_correct(vec3 linear) {
+    return pow(clamp(linear, 0.0, 1.0), vec3(1.0 / 2.2));
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+
+    vec3 color;
+
+    if (u_display_mode == 1) {
+        // Albedo (already in [0,1], but apply gamma)
+        color = gamma_correct(texture(u_albedo, uv).rgb);
+    } else if (u_display_mode == 2) {
+        // Normal (encoded as [0,1], display directly)
+        color = texture(u_normal, uv).rgb;
+    } else {
+        // Radiance (default, tone map + gamma)
+        vec3 radiance = texture(u_radiance, uv).rgb;
+        color = gamma_correct(radiance);
+    }
+
+    fragColor = vec4(color, 1.0);
 }`;
     }
 }

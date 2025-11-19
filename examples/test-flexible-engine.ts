@@ -183,17 +183,28 @@ async function main() {
     const btnPathtracerAOVs = document.getElementById('btn-pathtracer-aovs') as HTMLButtonElement;
     const btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
     const btnTestExport = document.getElementById('btn-test-export') as HTMLButtonElement;
+    const btnAOVRadiance = document.getElementById('btn-aov-radiance') as HTMLButtonElement;
+    const btnAOVAlbedo = document.getElementById('btn-aov-albedo') as HTMLButtonElement;
+    const btnAOVNormal = document.getElementById('btn-aov-normal') as HTMLButtonElement;
     const statSamples = document.getElementById('stat-samples') as HTMLSpanElement;
     const statFps = document.getElementById('stat-fps') as HTMLSpanElement;
 
-    // Track active renderer
+    // Track active renderer and display mode
     let activeRendererId = 'pathtracer-test-scene';
+    let displayMode = 0;  // 0=radiance, 1=albedo, 2=normal
 
     // Update active button state
     function updateButtonStates() {
         btnDebug.classList.toggle('active', activeRendererId === 'debug-test-scene');
         btnPathtracer.classList.toggle('active', activeRendererId === 'pathtracer-test-scene');
         btnPathtracerAOVs.classList.toggle('active', activeRendererId === 'pathtracer-aovs-test-scene');
+    }
+
+    // Update AOV button states
+    function updateAOVButtonStates() {
+        btnAOVRadiance.classList.toggle('active', displayMode === 0);
+        btnAOVAlbedo.classList.toggle('active', displayMode === 1);
+        btnAOVNormal.classList.toggle('active', displayMode === 2);
     }
 
     // Renderer switching
@@ -222,6 +233,28 @@ async function main() {
     btnReset.addEventListener('click', () => {
         console.log('Resetting accumulation');
         engine.clearAccumulation();
+    });
+
+    // AOV display mode switching
+    btnAOVRadiance.addEventListener('click', () => {
+        console.log('Switching to radiance display');
+        displayMode = 0;
+        engine.setParameter('renderer.displayMode', displayMode);
+        updateAOVButtonStates();
+    });
+
+    btnAOVAlbedo.addEventListener('click', () => {
+        console.log('Switching to albedo display');
+        displayMode = 1;
+        engine.setParameter('renderer.displayMode', displayMode);
+        updateAOVButtonStates();
+    });
+
+    btnAOVNormal.addEventListener('click', () => {
+        console.log('Switching to normal display');
+        displayMode = 2;
+        engine.setParameter('renderer.displayMode', displayMode);
+        updateAOVButtonStates();
     });
 
     // Test export reading
@@ -253,8 +286,9 @@ async function main() {
         }
     });
 
-    // Initial button state
+    // Initial button states
     updateButtonStates();
+    updateAOVButtonStates();
 
     // FPS tracking
     const fpsTracker = new FPSTracker();
