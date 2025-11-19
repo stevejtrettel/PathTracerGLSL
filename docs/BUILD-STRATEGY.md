@@ -26,6 +26,8 @@ This document outlines the complete build strategy for migrating from the module
 
 **Success criteria:** Can render existing scenes with new Engine + SimpleCompiler
 
+**Note on architecture:** The Compiler's core API is simple: `compile(scene, strategy) → renderer`. SimpleCompiler will provide a convenience method `compileProject(project)` for testing that internally just loops over strategies, but the architecture is based on individual compilation.
+
 ---
 
 ### Track 2: Real Compiler (After Engine Works)
@@ -38,7 +40,7 @@ This document outlines the complete build strategy for migrating from the module
 - Scene analysis
 - Code generation infrastructure
 - Algorithm library
-- Full Compiler
+- Full Compiler (with simple API: compile one strategy at a time)
 
 **Success criteria:** Can replace SimpleCompiler with Compiler, same output
 
@@ -68,8 +70,9 @@ This document outlines the complete build strategy for migrating from the module
    ```
 
 2. **Define core types**
-   - Project, RenderStrategy, CompiledProject, CompiledRenderer
+   - SceneDescription, RenderStrategy, CompiledRenderer
    - RenderPipeline, FramebufferConfig, RenderPass
+   - Project (user-level type, not part of core Compiler API)
    - Copy from COMPILER-ENGINE-ARCHITECTURE.md
 
 3. **Setup testing infrastructure**
@@ -95,11 +98,24 @@ This document outlines the complete build strategy for migrating from the module
 
 ```typescript
 class SimpleCompiler {
-  compile(project: Project): CompiledProject {
-    // Hardcoded: just pathtracer and debug strategies
+  // Core API (matches real Compiler)
+  compile(scene: SceneDescription, strategy: RenderStrategy): CompiledRenderer {
+    // Hardcoded logic for debug/pathtracer strategies
+  }
+  
+  // Convenience method for testing (compiles multiple strategies)
+  compileProject(project: Project): Map<string, CompiledRenderer> {
+    const compiled = new Map();
+    for (const strategy of project.strategies) {
+      const renderer = this.compile(project.scene, strategy);
+      compiled.set(strategy.id, renderer);
+    }
+    return compiled;
   }
 }
 ```
+
+**Note:** The core API `compile(scene, strategy)` matches the real Compiler's API. The `compileProject()` method is just a convenience wrapper for testing multiple strategies at once.
 
 **Tasks:**
 - Create class skeleton
@@ -109,7 +125,8 @@ class SimpleCompiler {
 
 **Testing:**
 - Can instantiate
-- Can call compile()
+- Can call compile() with single strategy
+- Can call compileProject() with multiple strategies
 - Output has correct structure
 
 **Estimated time:** 1 day
@@ -164,13 +181,21 @@ class SimpleCompiler {
 ```typescript
 {
   framebuffers: [
-    { id: 'accumulation', type: 'accumulation', format: 'rgba32f' },
+    { id: 'accumulation', type: 'double_buffer', format: 'rgba32f' },
     { id: 'screen', type: 'screen', format: 'rgba8' }
   ],
   passes: [
-    { shader: 'pathtracer', output: 'accumulation', execution: { type: 'accumulate' } },
+    { 
+      shader: 'pathtracer', 
+      output: 'accumulation_current', 
+      inputs: { textures: { 'u_previous': 'accumulation_previous' } },
+      execution: { type: 'once' } 
+    },
     { shader: 'display', output: 'screen', execution: { type: 'once' } }
-  ]
+  ],
+  postFrame: {
+    swaps: [{ type: 'swap', buffers: ['accumulation'] }]
+  }
 }
 ```
 
@@ -283,16 +308,18 @@ class FlexibleResourceManager {
 
 **Three framebuffer types to support:**
 
-**Type: `'accumulation'`**
+**Type: `'double_buffer'`**
 - Create ping + pong pair
 - Both RGBA32F (or specified format)
-- Store as `{id}_ping`, `{id}_pong`
-- Track current/previous
+- Store as `{id}_current`, `{id}_previous`
+- Track which is which for swapping
 
 ```typescript
-createAccumulationBuffers(config: FramebufferConfig): {
-  ping: WebGLFramebuffer,
-  pong: WebGLFramebuffer
+createDoubleBuffer(config: FramebufferConfig): {
+  current: WebGLFramebuffer,
+  previous: WebGLFramebuffer,
+  currentTexture: WebGLTexture,
+  previousTexture: WebGLTexture
 }
 ```
 
@@ -345,7 +372,7 @@ setupStrategy(strategyId: string, pipeline: RenderPipeline): void {
 
 **Testing:**
 - Can setup debug pipeline (just screen)
-- Can setup pathtracer pipeline (accumulation + screen)
+- Can setup pathtracer pipeline (double_buffer + screen)
 - Resources are tracked correctly
 - No leaks
 
@@ -390,29 +417,45 @@ getPreviousTexture(accId: string): WebGLTexture
 
 ---
 
-#### 2.5: Buffer Swapping
+#### 2.5: Buffer Swapping and Rotation
 
-**Purpose:** Swap ping/pong for accumulation buffers
+**Purpose:** Execute swap instructions from RenderPipeline
 
 ```typescript
-swapAccumulationBuffers(accId: string): void {
-  // Swap current ↔ previous
+executeSwap(swap: SwapInstruction): void {
+  if (swap.type === 'swap') {
+    // Swap ping/pong for double_buffer
+    // buffers[0] is the double_buffer id
+    const db = this.doubleBuffers.get(swap.buffers[0]);
+    [db.current, db.previous] = [db.previous, db.current];
+    [db.currentTexture, db.previousTexture] = [db.previousTexture, db.currentTexture];
+  } else if (swap.type === 'rotate') {
+    // Rotate queue of texture buffers
+    // Last buffer content is discarded, others shift down
+    this.rotateBuffers(swap.buffers);
+  }
 }
 
-finalizeFrame(): void {
-  // Swap all accumulation buffers marked for swapping
+executePostFrame(postFrame?: { swaps?: SwapInstruction[] }): void {
+  if (!postFrame?.swaps) return;
+  
+  for (const swap of postFrame.swaps) {
+    this.executeSwap(swap);
+  }
 }
 ```
 
 **Tasks:**
-- Track which buffers need swapping
-- Implement swap logic
-- Call at end of frame
+- Implement swap logic (ping/pong)
+- Implement rotate logic (queue rotation)
+- Called by RenderExecutor after all passes
+- Support multiple independent swaps
 
 **Testing:**
-- Can swap
-- Current/previous switch correctly
-- Multiple accumulation buffers swap independently
+- Can swap double buffers
+- Can rotate texture queues
+- Multiple swaps execute correctly
+- State is correct after swapping
 
 **Estimated time:** 0.5 days
 
@@ -568,10 +611,7 @@ private executePass(pass: RenderPass): void {
   // 6. Draw
   this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
   
-  // 7. Handle execution type
-  if (pass.execution.type === 'accumulate') {
-    this.resources.swapAccumulationBuffers(pass.output);
-  }
+  // Note: No swapping here - that happens in postFrame
 }
 ```
 
@@ -579,7 +619,7 @@ private executePass(pass: RenderPass): void {
 - Implement framebuffer binding
 - Implement texture binding
 - Implement draw call
-- Handle execution types (once, accumulate)
+- Handle execution types (once, loop)
 - Add error handling
 
 **Testing:**
@@ -599,8 +639,14 @@ private executePass(pass: RenderPass): void {
 
 ```typescript
 executePipeline(pipeline: RenderPipeline): void {
+  // Execute all passes
   for (const pass of pipeline.passes) {
     this.executePass(pass);
+  }
+  
+  // Execute postFrame operations (buffer swapping/rotation)
+  if (pipeline.postFrame?.swaps) {
+    this.resources.executePostFrame(pipeline.postFrame);
   }
 }
 ```
@@ -608,6 +654,7 @@ executePipeline(pipeline: RenderPipeline): void {
 **Tasks:**
 - Iterate over passes
 - Execute each
+- Execute postFrame swaps after all passes
 - Handle state between passes
 - Track timing (optional)
 
@@ -615,6 +662,7 @@ executePipeline(pipeline: RenderPipeline): void {
 - Can execute single-pass pipeline (debug)
 - Can execute two-pass pipeline (pathtracer)
 - State transitions work
+- Swaps execute after passes
 - Accumulation swaps at right time
 
 **Estimated time:** 0.5 days
@@ -669,7 +717,7 @@ private bindTextures(textureInputs?: Record<string, string>): void {
 - Can execute single-pass pipeline
 - Can execute multi-pass pipeline
 - Textures bind correctly
-- Accumulation swaps correctly
+- PostFrame swaps execute correctly
 
 **Risk mitigation:** Test each method with mock data before integrating
 
@@ -683,7 +731,7 @@ private bindTextures(textureInputs?: Record<string, string>): void {
 
 #### 4.1: New Engine Class
 
-**Purpose:** High-level API matching old Engine
+**Purpose:** High-level API matching new architecture
 
 ```typescript
 class FlexibleEngine {
@@ -692,13 +740,21 @@ class FlexibleEngine {
   private executor: FlexibleRenderExecutor;
   private parameterManager: ParameterManager; // Reuse existing!
   
-  private compiledProject: CompiledProject | null;
-  private activeStrategyId: string | null;
+  private renderers = new Map<string, CompiledRenderer>();
+  private activeRendererId: string | null;
   
-  loadProject(compiled: CompiledProject): void { }
-  selectStrategy(strategyId: string): void { }
+  // Core API
+  loadRenderer(id: string, renderer: CompiledRenderer): void { }
+  selectRenderer(id: string): void { }
   renderFrame(): void { }
   resize(width: number, height: number): void { }
+  
+  // Convenience method for loading multiple
+  loadRenderers(renderers: Map<string, CompiledRenderer>): void {
+    for (const [id, renderer] of renderers) {
+      this.loadRenderer(id, renderer);
+    }
+  }
 }
 ```
 
@@ -716,31 +772,48 @@ class FlexibleEngine {
 
 ---
 
-#### 4.2: Project Loading
+#### 4.2: Renderer Loading
 
-**Purpose:** Setup resources for all strategies
+**Purpose:** Setup resources for renderers
 
 ```typescript
-loadProject(compiled: CompiledProject): void {
-  this.compiledProject = compiled;
-  
-  // Setup resources for each strategy
-  for (const [strategyId, renderer] of compiled.renderers) {
-    this.resources.setupStrategy(strategyId, renderer.pipeline);
-    this.executor.setPrograms(renderer.shaders);
-  }
+loadRenderer(id: string, renderer: CompiledRenderer): void {
+  // Setup resources for this renderer
+  this.resources.setupStrategy(id, renderer.pipeline);
+  this.executor.setPrograms(renderer.shaders);
   
   // Setup parameters (reuse existing ParameterManager)
-  // Select first strategy by default
-  this.selectStrategy(Array.from(compiled.renderers.keys())[0]);
+  this.parameterManager.initialize(id, renderer.uniforms);
+  
+  // Store renderer
+  this.renderers.set(id, renderer);
+}
+
+// Convenience for testing (load multiple at once)
+loadRenderers(renderers: Map<string, CompiledRenderer>): void {
+  for (const [id, renderer] of renderers) {
+    this.loadRenderer(id, renderer);
+  }
+  
+  // Select first by default
+  if (this.activeRendererId === null && renderers.size > 0) {
+    this.selectRenderer(Array.from(renderers.keys())[0]);
+  }
 }
 ```
 
+**Usage in tests:**
+```typescript
+const project = defineTestProject();
+const compiled = simpleCompiler.compileProject(project);
+engine.loadRenderers(compiled);  // Load all at once for testing
+```
+
 **Tasks:**
-- Call resource setup for each strategy
-- Compile shaders for each strategy
+- Implement individual renderer loading
+- Call resource setup
+- Compile shaders
 - Setup parameter bindings
-- Select default strategy
 
 **Testing:**
 - Can load compiled project
@@ -752,32 +825,32 @@ loadProject(compiled: CompiledProject): void {
 
 ---
 
-#### 4.3: Strategy Selection
+#### 4.3: Renderer Selection
 
-**Purpose:** Switch between strategies instantly
+**Purpose:** Switch between renderers instantly
 
 ```typescript
-selectStrategy(strategyId: string): void {
-  if (!this.compiledProject?.renderers.has(strategyId)) {
-    throw new Error(`Unknown strategy: ${strategyId}`);
+selectRenderer(id: string): void {
+  if (!this.renderers.has(id)) {
+    throw new Error(`Unknown renderer: ${id}`);
   }
   
-  this.activeStrategyId = strategyId;
-  this.resources.setActiveStrategy(strategyId);
+  this.activeRendererId = id;
+  this.resources.setActiveStrategy(id);
   
   // Resources already exist, just switch active
-  // Each strategy maintains its own accumulation
+  // Each renderer maintains its own accumulation
 }
 ```
 
 **Tasks:**
-- Validate strategy exists
-- Switch active strategy
+- Validate renderer exists
+- Switch active renderer
 - Preserve accumulation state
 
 **Testing:**
-- Can switch strategies
-- Accumulation preserved per-strategy
+- Can switch renderers
+- Accumulation preserved per-renderer
 - No recompilation needed
 
 **Estimated time:** 0.5 days
@@ -786,13 +859,13 @@ selectStrategy(strategyId: string): void {
 
 #### 4.4: Render Loop
 
-**Purpose:** Execute active strategy's pipeline
+**Purpose:** Execute active renderer's pipeline
 
 ```typescript
 renderFrame(): void {
-  if (!this.activeStrategyId) return;
+  if (!this.activeRendererId) return;
   
-  const renderer = this.compiledProject!.renderers.get(this.activeStrategyId)!;
+  const renderer = this.renderers.get(this.activeRendererId)!;
   
   // Prepare frame
   this.resources.prepareFrame();
