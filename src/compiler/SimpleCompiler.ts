@@ -59,28 +59,17 @@ export class SimpleCompiler implements ICompiler {
 
         // Debug shader: simple UV visualization
         shaders.set('debug', {
-            vertex: `#version 300 es
-precision highp float;
-
-in vec2 a_position;
-in vec2 a_uv;
-
-out vec2 v_uv;
-
-void main() {
-    v_uv = a_uv;
-    gl_Position = vec4(a_position, 0.0, 1.0);
-}`,
+            vertex: this._getFullscreenVertex(),
             fragment: `#version 300 es
 precision highp float;
 
-in vec2 v_uv;
 out vec4 fragColor;
 
 uniform vec2 u_resolution;
 uniform float u_time;
 
 void main() {
+    vec2 v_uv = gl_FragCoord.xy / u_resolution;
     // Visualize based on debug output setting
     ${this._getDebugVisualization(strategy)}
 }
@@ -282,20 +271,15 @@ void main() {
     }
 
     /**
-     * Get standard fullscreen quad vertex shader
+     * Get fullscreen triangle vertex shader (uses gl_VertexID trick)
+     * No VAO needed - generates fullscreen triangle from vertex ID
      */
     private _getFullscreenVertex(): string {
         return `#version 300 es
-precision highp float;
-
-in vec2 a_position;
-in vec2 a_uv;
-
-out vec2 v_uv;
-
 void main() {
-    v_uv = a_uv;
-    gl_Position = vec4(a_position, 0.0, 1.0);
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
 }`;
     }
 
@@ -307,7 +291,6 @@ void main() {
         return `#version 300 es
 precision highp float;
 
-in vec2 v_uv;
 out vec4 fragColor;
 
 uniform vec2 u_resolution;
@@ -456,6 +439,9 @@ vec3 shade(Hit hit) {
 }
 
 void main() {
+    // Compute UVs from fragment coordinates
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+
     // Initialize RNG
     uvec2 pixel = uvec2(gl_FragCoord.xy);
     rng_seed = hash_init(pixel, uint(u_frame_index));
@@ -463,7 +449,7 @@ void main() {
 
     // Generate ray with jitter
     vec2 jitter = random2() - 0.5;
-    Ray ray = generate_camera_ray(v_uv, jitter);
+    Ray ray = generate_camera_ray(uv, jitter);
 
     // Trace
     Hit hit;
@@ -477,7 +463,7 @@ void main() {
     }
 
     // Accumulate with previous frame
-    vec3 prev = texture(u_previous, v_uv).rgb;
+    vec3 prev = texture(u_previous, uv).rgb;
     float blend = 1.0 / float(u_sample_count + 1);
     vec3 accumulated = mix(prev, color, blend);
 
@@ -492,9 +478,9 @@ void main() {
         return `#version 300 es
 precision highp float;
 
-in vec2 v_uv;
 out vec4 fragColor;
 
+uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 
 // Gamma correction
@@ -503,7 +489,8 @@ vec3 gamma_correct(vec3 linear) {
 }
 
 void main() {
-    vec3 radiance = texture(u_radiance, v_uv).rgb;
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec3 radiance = texture(u_radiance, uv).rgb;
     vec3 color = gamma_correct(radiance);
     fragColor = vec4(color, 1.0);
 }`;
