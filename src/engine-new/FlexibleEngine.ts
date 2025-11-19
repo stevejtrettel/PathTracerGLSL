@@ -3,6 +3,7 @@
 import { FlexibleResourceManager } from './FlexibleResourceManager.js';
 import { FlexibleRenderExecutor } from './FlexibleRenderExecutor.js';
 import { ParameterManager } from '../engine/ParameterManager.js';
+import { GPUProfiler } from './GPUProfiler.js';
 import { validateCompiledRenderer } from '../errors/compiler/validation.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 import type { ParameterChanges } from '../app/types.js';
@@ -46,6 +47,7 @@ export class FlexibleEngine {
     private resourceManager: FlexibleResourceManager;
     private renderExecutor: FlexibleRenderExecutor;
     private parameterManager: ParameterManager;
+    private profiler: GPUProfiler;
 
     // Renderer storage
     private renderers = new Map<string, CompiledRenderer>();
@@ -78,6 +80,10 @@ export class FlexibleEngine {
         this.renderExecutor = new FlexibleRenderExecutor(gl, this.resourceManager);
         this.parameterManager = new ParameterManager(gl);
         this.startTime = performance.now();
+
+        // Initialize GPU profiler
+        this.profiler = new GPUProfiler(gl);
+        this.renderExecutor.setProfiler(this.profiler);
 
         // Handle context loss
         gl.canvas.addEventListener('webglcontextlost', (e) => {
@@ -268,6 +274,47 @@ export class FlexibleEngine {
         if (this.state === 'running') {
             this.parameterManager.updateUniforms(changes);
         }
+    }
+
+    // ============ PROFILING ============
+
+    /**
+     * Enable GPU profiling
+     * @returns true if extension supported, false otherwise
+     */
+    enableProfiling(): boolean {
+        return this.profiler.enable();
+    }
+
+    /**
+     * Disable GPU profiling
+     */
+    disableProfiling(): void {
+        this.profiler.disable();
+    }
+
+    /**
+     * Get timing for a specific render pass
+     * @param passId - Pass ID from pipeline (e.g., 'main-pass', 'display-pass')
+     * @returns Timing in milliseconds, or null if not available yet
+     */
+    getPassTiming(passId: string): number | null {
+        return this.profiler.getPassTiming(passId);
+    }
+
+    /**
+     * Get all render pass timings
+     * @returns Map of passId -> timing (ms)
+     */
+    getAllPassTimings(): Map<string, number> {
+        return this.profiler.getAllTimings();
+    }
+
+    /**
+     * Check if profiling is enabled
+     */
+    isProfilingEnabled(): boolean {
+        return this.profiler.isEnabled();
     }
 
     // ============ STATE QUERIES ============

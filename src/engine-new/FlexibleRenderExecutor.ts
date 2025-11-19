@@ -2,6 +2,7 @@
 
 import type { RenderPipeline, RenderPass, ShaderProgram } from '../compiler/types.js';
 import type { FlexibleResourceManager } from './FlexibleResourceManager.js';
+import type { GPUProfiler } from './GPUProfiler.js';
 
 /**
  * FlexibleRenderExecutor
@@ -27,10 +28,20 @@ export class FlexibleRenderExecutor {
     // Current active pipeline
     private activePipeline: RenderPipeline | null = null;
 
+    // GPU profiler (optional)
+    private profiler: GPUProfiler | null = null;
+
     constructor(gl: WebGL2RenderingContext, resourceManager: FlexibleResourceManager) {
         this.gl = gl;
         this.resourceManager = resourceManager;
         this.programs = new Map();
+    }
+
+    /**
+     * Set GPU profiler (optional)
+     */
+    setProfiler(profiler: GPUProfiler): void {
+        this.profiler = profiler;
     }
 
     /**
@@ -123,8 +134,18 @@ export class FlexibleRenderExecutor {
      * 2. Execute post-frame operations (swaps)
      */
     executePipeline(pipeline: RenderPipeline): void {
+        // Update profiler (poll for results from previous frame)
+        if (this.profiler) {
+            this.profiler.update();
+        }
+
         // Execute all passes
         for (const pass of pipeline.passes) {
+            // Begin GPU timing
+            if (this.profiler) {
+                this.profiler.beginPass(pass.id);
+            }
+
             // Handle execution type
             if (pass.execution.type === 'once') {
                 this.executePass(pass);
@@ -133,6 +154,11 @@ export class FlexibleRenderExecutor {
                 for (let i = 0; i < iterations; i++) {
                     this.executePass(pass);
                 }
+            }
+
+            // End GPU timing
+            if (this.profiler) {
+                this.profiler.endPass(pass.id);
             }
         }
 

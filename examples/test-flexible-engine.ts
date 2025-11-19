@@ -177,6 +177,12 @@ async function main() {
     (window as any).engine = engine;
     (window as any).gl = gl;
 
+    // Enable GPU profiling
+    const profilingSupported = engine.enableProfiling();
+    if (!profilingSupported) {
+        console.warn('GPU profiling not supported on this device');
+    }
+
     // UI setup
     const btnDebug = document.getElementById('btn-debug') as HTMLButtonElement;
     const btnPathtracer = document.getElementById('btn-pathtracer') as HTMLButtonElement;
@@ -188,6 +194,8 @@ async function main() {
     const btnAOVNormal = document.getElementById('btn-aov-normal') as HTMLButtonElement;
     const statSamples = document.getElementById('stat-samples') as HTMLSpanElement;
     const statFps = document.getElementById('stat-fps') as HTMLSpanElement;
+    const statGPUMain = document.getElementById('stat-gpu-main') as HTMLSpanElement;
+    const statGPUDisplay = document.getElementById('stat-gpu-display') as HTMLSpanElement;
 
     // Track active renderer and display mode
     let activeRendererId = 'pathtracer-test-scene';
@@ -306,6 +314,19 @@ async function main() {
 
             statSamples.textContent = samples.toString();
             statFps.textContent = fps.toFixed(1);
+
+            // Update GPU profiling stats
+            if (engine.isProfilingEnabled()) {
+                const mainTime = engine.getPassTiming('main-pass');
+                const displayTime = engine.getPassTiming('display-pass');
+
+                if (mainTime !== null) {
+                    statGPUMain.textContent = mainTime.toFixed(2);
+                }
+                if (displayTime !== null) {
+                    statGPUDisplay.textContent = displayTime.toFixed(2);
+                }
+            }
 
             // Log first few frames
             if (frameCount < 5) {
