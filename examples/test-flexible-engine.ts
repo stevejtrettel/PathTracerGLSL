@@ -122,6 +122,10 @@ async function main() {
         id: 'pathtracer'
     };
 
+    const pathtracerAOVsStrategy: RenderStrategy = {
+        id: 'pathtracer-aovs'
+    };
+
     // Compile renderers
     console.log('Compiling renderers...');
     const compiler = new SimpleCompiler();
@@ -132,6 +136,9 @@ async function main() {
     const pathtracerRenderer = compiler.compile(scene, pathtracerStrategy);
     console.log('✅ Pathtracer renderer compiled');
 
+    const pathtracerAOVsRenderer = compiler.compile(scene, pathtracerAOVsStrategy);
+    console.log('✅ Pathtracer+AOVs (MRT) renderer compiled');
+
     // Create engine
     console.log('Creating engine...');
     const engine = new FlexibleEngine(gl);
@@ -139,7 +146,7 @@ async function main() {
 
     // Load renderers
     console.log('Loading renderers...');
-    engine.loadRenderers([debugRenderer, pathtracerRenderer]);
+    engine.loadRenderers([debugRenderer, pathtracerRenderer, pathtracerAOVsRenderer]);
     console.log('✅ Renderers loaded');
 
     // Test export functionality
@@ -173,6 +180,7 @@ async function main() {
     // UI setup
     const btnDebug = document.getElementById('btn-debug') as HTMLButtonElement;
     const btnPathtracer = document.getElementById('btn-pathtracer') as HTMLButtonElement;
+    const btnPathtracerAOVs = document.getElementById('btn-pathtracer-aovs') as HTMLButtonElement;
     const btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
     const btnTestExport = document.getElementById('btn-test-export') as HTMLButtonElement;
     const statSamples = document.getElementById('stat-samples') as HTMLSpanElement;
@@ -185,6 +193,7 @@ async function main() {
     function updateButtonStates() {
         btnDebug.classList.toggle('active', activeRendererId === 'debug-test-scene');
         btnPathtracer.classList.toggle('active', activeRendererId === 'pathtracer-test-scene');
+        btnPathtracerAOVs.classList.toggle('active', activeRendererId === 'pathtracer-aovs-test-scene');
     }
 
     // Renderer switching
@@ -199,6 +208,13 @@ async function main() {
         console.log('Switching to pathtracer renderer');
         engine.selectRenderer('pathtracer-test-scene');
         activeRendererId = 'pathtracer-test-scene';
+        updateButtonStates();
+    });
+
+    btnPathtracerAOVs.addEventListener('click', () => {
+        console.log('Switching to pathtracer+AOVs (MRT) renderer');
+        engine.selectRenderer('pathtracer-aovs-test-scene');
+        activeRendererId = 'pathtracer-aovs-test-scene';
         updateButtonStates();
     });
 

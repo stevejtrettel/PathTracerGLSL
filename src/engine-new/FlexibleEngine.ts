@@ -357,7 +357,7 @@ export class FlexibleEngine {
             );
         }
 
-        return this.readBuffer(target.bufferId, target.format, rect);
+        return this.readBuffer(target.bufferId, target.format, target.attachment || 0, rect);
     }
 
     /**
@@ -368,12 +368,14 @@ export class FlexibleEngine {
      *
      * @param bufferId - Framebuffer id (e.g., 'accumulation_current', 'screen')
      * @param format - Data format ('float' for HDR, 'byte' for LDR)
+     * @param attachment - Which color attachment to read (for MRT framebuffers), defaults to 0
      * @param rect - Optional region to read (defaults to full framebuffer)
      * @returns Pixel data as Float32Array or Uint8Array
      */
     readBuffer(
         bufferId: string,
         format: 'float' | 'byte',
+        attachment: number = 0,
         rect?: Rectangle
     ): Float32Array | Uint8Array {
         const gl = this.gl;
@@ -395,9 +397,18 @@ export class FlexibleEngine {
         // Get framebuffer
         const framebuffer = this.resourceManager.getFramebuffer(bufferId);
 
-        // Bind and read
+        // Bind framebuffer
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 
+        // Set read buffer for MRT (which attachment to read from)
+        if (attachment > 0) {
+            gl.readBuffer(gl.COLOR_ATTACHMENT0 + attachment);
+        } else {
+            // Default to COLOR_ATTACHMENT0
+            gl.readBuffer(gl.COLOR_ATTACHMENT0);
+        }
+
+        // Read pixels
         if (format === 'float') {
             const pixels = new Float32Array(r.width * r.height * 4);
             gl.readPixels(

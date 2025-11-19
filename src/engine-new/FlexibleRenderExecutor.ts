@@ -67,10 +67,11 @@ export class FlexibleRenderExecutor {
      * Steps:
      * 1. Bind output framebuffer
      * 2. Set viewport
-     * 3. Clear if needed
-     * 4. Use shader program
-     * 5. Bind input textures
-     * 6. Draw fullscreen triangle
+     * 3. Set up draw buffers (for MRT)
+     * 4. Clear if needed
+     * 5. Use shader program
+     * 6. Bind input textures
+     * 7. Draw fullscreen triangle
      */
     executePass(pass: RenderPass): void {
         const gl = this.gl;
@@ -81,15 +82,23 @@ export class FlexibleRenderExecutor {
             throw new Error(`Shader not found: ${pass.shader}`);
         }
 
-        // Bind output framebuffer
-        const framebuffer = this.resourceManager.getFramebuffer(pass.output);
+        // Normalize output to array
+        const outputs = Array.isArray(pass.output) ? pass.output : [pass.output];
+
+        // Bind output framebuffer (use first output to get framebuffer)
+        const framebuffer = this.resourceManager.getFramebuffer(outputs[0]);
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 
         // Set viewport (get dimensions from canvas)
         const canvas = gl.canvas as HTMLCanvasElement;
         gl.viewport(0, 0, canvas.width, canvas.height);
 
-        // Clear if requested
+        // Set up draw buffers if MRT
+        if (outputs.length > 1) {
+            this._setupDrawBuffers(outputs);
+        }
+
+        // Clear if requested (clears all attachments)
         if (pass.execution.clearBeforeRender) {
             gl.clear(gl.COLOR_BUFFER_BIT);
         }
@@ -242,7 +251,7 @@ export class FlexibleRenderExecutor {
         let textureUnit = 0;
 
         for (const [uniformName, textureId] of Object.entries(textures)) {
-            // Get texture from resource manager
+            // Get texture from resource manager (handles :N suffix for MRT)
             const texture = this.resourceManager.getTexture(textureId);
 
             // Bind texture to unit
@@ -257,5 +266,42 @@ export class FlexibleRenderExecutor {
 
             textureUnit++;
         }
+    }
+
+    /**
+     * Set up draw buffers for MRT
+     *
+     * Parses output IDs to extract attachment locations and sets gl.drawBuffers()
+     *
+     * @param outputs - Array of output buffer IDs (e.g., ['buffer:0', 'buffer:1', 'buffer:2'])
+     */
+    private _setupDrawBuffers(outputs: string[]): void {
+        const gl = this.gl;
+
+        // Parse attachment indices from output strings
+        const attachments: number[] = [];
+
+        for (const output of outputs) {
+            // Parse :N suffix
+            const colonIndex = output.lastIndexOf(':');
+            let attachment = 0;
+
+            if (colonIndex !== -1) {
+                const attachmentStr = output.substring(colonIndex + 1);
+                const attachmentNum = parseInt(attachmentStr, 10);
+                if (!isNaN(attachmentNum)) {
+                    attachment = attachmentNum;
+                }
+            }
+
+            attachments.push(attachment);
+        }
+
+        // Sort and create draw buffers array
+        const sortedAttachments = [...attachments].sort((a, b) => a - b);
+        const drawBuffers = sortedAttachments.map(a => gl.COLOR_ATTACHMENT0 + a);
+
+        // Set draw buffers
+        gl.drawBuffers(drawBuffers);
     }
 }

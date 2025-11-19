@@ -17,11 +17,11 @@ export interface SceneDescription {
  * Render strategy specification (minimal for SimpleCompiler)
  *
  * Describes which rendering algorithms to use.
- * For SimpleCompiler: 'debug' or 'pathtracer'
+ * For SimpleCompiler: 'debug', 'pathtracer', or 'pathtracer-aovs'
  * For real Compiler: full algorithm specifications
  */
 export interface RenderStrategy {
-    id: 'debug' | 'pathtracer' | string;
+    id: 'debug' | 'pathtracer' | 'pathtracer-aovs' | string;
     algorithms?: {
         transport?: string;
         sampling?: string;
@@ -60,14 +60,24 @@ export interface FramebufferConfig {
     type: 'screen' | 'texture' | 'double_buffer';
 
     /**
-     * Texture format
+     * Texture format(s)
+     *
+     * Single attachment:
+     * - format: 'rgba32f' → single texture at COLOR_ATTACHMENT0
+     *
+     * Multiple Render Targets (MRT):
+     * - format: ['rgba32f', 'rgba8', 'rgba16f'] → attachments at locations 0, 1, 2
+     *
+     * Array index corresponds to attachment location (COLOR_ATTACHMENT0 + index)
+     *
+     * Supported formats:
      * - rgba32f: 32-bit float RGBA (HDR accumulation)
      * - rgba16f: 16-bit float RGBA (HDR intermediate)
      * - rgba8: 8-bit RGBA (LDR display)
      * - r32f: 32-bit float single channel
-     * - depth: depth buffer
      */
-    format?: 'rgba32f' | 'rgba16f' | 'rgba8' | 'r32f' | 'depth';
+    format?: 'rgba32f' | 'rgba16f' | 'rgba8' | 'r32f'
+           | ('rgba32f' | 'rgba16f' | 'rgba8' | 'r32f')[];
 }
 
 /**
@@ -97,13 +107,34 @@ export interface RenderPass {
     /** Which shader to execute */
     shader: string;
 
-    /** Input resources (textures, etc.) */
+    /**
+     * Input resources (textures, etc.)
+     *
+     * For MRT framebuffers, use ':N' syntax to specify attachment:
+     * - 'u_previous': 'accumulation_previous' → reads attachment 0
+     * - 'u_albedo': 'accumulation_previous:1' → reads attachment 1
+     * - 'u_normal': 'accumulation_previous:2' → reads attachment 2
+     */
     inputs?: {
-        textures?: Record<string, string>;  // uniform name → texture id
+        textures?: Record<string, string>;  // uniform name → texture id (with optional :N)
     };
 
-    /** Output framebuffer id */
-    output: string;
+    /**
+     * Output framebuffer id(s)
+     *
+     * Single output:
+     * - output: 'accumulation_current' → writes to attachment 0
+     *
+     * Multiple Render Targets (MRT) - use array with ':N' syntax:
+     * - output: ['accumulation_current:0', 'accumulation_current:1', 'accumulation_current:2']
+     *
+     * For MRT, fragment shader must declare multiple outputs:
+     * layout(location = 0) out vec4 o_radiance;
+     * layout(location = 1) out vec4 o_albedo;
+     *
+     * Note: All MRT outputs must reference the same base framebuffer
+     */
+    output: string | string[];
 
     /** Execution control */
     execution: {
@@ -117,7 +148,10 @@ export interface RenderPass {
         /** Number of iterations (for 'loop' type) */
         iterations?: number;
 
-        /** Clear framebuffer before rendering */
+        /**
+         * Clear framebuffer before rendering
+         * For MRT, clears all attachments
+         */
         clearBeforeRender?: boolean;
     };
 }
@@ -187,6 +221,17 @@ export interface ExportTarget {
 
     /** Optional: number of channels (1=depth, 3=RGB, 4=RGBA). Default: 4 */
     channels?: 1 | 3 | 4;
+
+    /**
+     * Which color attachment to read (for MRT framebuffers)
+     * Defaults to 0 if not specified
+     *
+     * Example:
+     * - attachment: 0 → reads from COLOR_ATTACHMENT0 (radiance)
+     * - attachment: 1 → reads from COLOR_ATTACHMENT1 (albedo)
+     * - attachment: 2 → reads from COLOR_ATTACHMENT2 (normal)
+     */
+    attachment?: number;
 }
 
 /**

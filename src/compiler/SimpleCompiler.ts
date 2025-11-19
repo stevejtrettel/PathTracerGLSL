@@ -40,6 +40,9 @@ export class SimpleCompiler implements ICompiler {
             case 'pathtracer':
                 return this._generatePathtracerRenderer(scene, strategy);
 
+            case 'pathtracer-aovs':
+                return this._generatePathtracerAOVsRenderer(scene, strategy);
+
             default:
                 throw new Error(`Unknown strategy: ${strategy.id}`);
         }
@@ -520,6 +523,361 @@ void main() {
     vec3 radiance = texture(u_radiance, uv).rgb;
     vec3 color = gamma_correct(radiance);
     fragColor = vec4(color, 1.0);
+}`;
+    }
+
+    /**
+     * Generate pathtracer renderer with AOVs (MRT example)
+     *
+     * Three-pass MRT accumulation renderer:
+     * 1. Main pass: raytrace and write to 3 attachments (radiance, albedo, normal)
+     * 2. Display pass: tone map radiance to screen
+     *
+     * Demonstrates Multiple Render Targets (MRT) for outputting AOVs.
+     */
+    private _generatePathtracerAOVsRenderer(
+        scene: SceneDescription,
+        strategy: RenderStrategy
+    ): CompiledRenderer {
+        const shaders = new Map<string, ShaderProgram>();
+
+        // MRT pathtracer shader (writes to 3 attachments)
+        shaders.set('pathtracer-mrt-main', {
+            vertex: this._getFullscreenVertex(),
+            fragment: this._getPathtracerMRTFragment()
+        });
+
+        // Display shader (tone mapping pass, unchanged from regular pathtracer)
+        shaders.set('pathtracer-display', {
+            vertex: this._getFullscreenVertex(),
+            fragment: this._getDisplayFragment()
+        });
+
+        // Pipeline: MRT accumulation with 3 attachments
+        const pipeline: RenderPipeline = {
+            framebuffers: [
+                {
+                    id: 'accumulation',
+                    type: 'double_buffer',
+                    format: ['rgba32f', 'rgba8', 'rgba16f']  // radiance, albedo, normal
+                },
+                {
+                    id: 'screen',
+                    type: 'screen'
+                }
+            ],
+            passes: [
+                {
+                    id: 'main-pass',
+                    shader: 'pathtracer-mrt-main',
+                    inputs: {
+                        textures: {
+                            'u_previous': 'accumulation_previous:0'  // Read radiance from attachment 0
+                        }
+                    },
+                    output: [
+                        'accumulation_current:0',  // Write radiance
+                        'accumulation_current:1',  // Write albedo
+                        'accumulation_current:2'   // Write normal
+                    ],
+                    execution: {
+                        type: 'once',
+                        clearBeforeRender: false
+                    }
+                },
+                {
+                    id: 'display-pass',
+                    shader: 'pathtracer-display',
+                    inputs: {
+                        textures: {
+                            'u_radiance': 'accumulation_current:0'  // Display radiance attachment
+                        }
+                    },
+                    output: 'screen',
+                    execution: {
+                        type: 'once',
+                        clearBeforeRender: true
+                    }
+                }
+            ],
+            postFrame: {
+                swaps: [
+                    {
+                        type: 'swap',
+                        buffers: ['accumulation']
+                    }
+                ]
+            }
+        };
+
+        // Uniforms (same as regular pathtracer)
+        const uniforms: UniformBinding[] = [
+            {
+                uniform: 'u_resolution',
+                parameters: ['engine.resolution'],
+                type: 'vec2',
+                compute: (params) => params['engine.resolution']
+            },
+            {
+                uniform: 'u_sample_count',
+                parameters: ['engine.sampleCount'],
+                type: 'int',
+                compute: (params) => params['engine.sampleCount']
+            },
+            {
+                uniform: 'u_frame_index',
+                parameters: ['engine.frameIndex'],
+                type: 'int',
+                compute: (params) => params['engine.frameIndex']
+            },
+            {
+                uniform: 'u_time',
+                parameters: ['engine.time'],
+                type: 'float',
+                compute: (params) => params['engine.time']
+            }
+        ];
+
+        return {
+            id: `pathtracer-aovs-${scene.id}`,
+            shaders,
+            pipeline,
+            uniforms,
+            sourceMaps: new Map(),
+            exportTargets: {
+                'hdr': {
+                    bufferId: 'accumulation_current',
+                    format: 'float',
+                    attachment: 0
+                },
+                'albedo': {
+                    bufferId: 'accumulation_current',
+                    format: 'byte',
+                    attachment: 1
+                },
+                'normal': {
+                    bufferId: 'accumulation_current',
+                    format: 'float',
+                    attachment: 2
+                },
+                'ldr': {
+                    bufferId: 'screen',
+                    format: 'byte'
+                }
+            }
+        };
+    }
+
+    /**
+     * Get MRT pathtracer fragment shader
+     * Outputs to 3 attachments: radiance, albedo, normal
+     */
+    private _getPathtracerMRTFragment(): string {
+        return `#version 300 es
+precision highp float;
+
+// MRT outputs
+layout(location = 0) out vec4 o_radiance;
+layout(location = 1) out vec4 o_albedo;
+layout(location = 2) out vec4 o_normal;
+
+uniform vec2 u_resolution;
+uniform int u_sample_count;
+uniform int u_frame_index;
+uniform float u_time;
+uniform sampler2D u_previous;  // Previous radiance
+
+// ============ RNG SYSTEM ============
+uint rng_seed;
+uint rng_counter;
+
+uint mix32(uint z) {
+    z ^= z >> 16;
+    z *= 0x7feb352dU;
+    z ^= z >> 15;
+    z *= 0x846ca68bU;
+    z ^= z >> 16;
+    return z;
+}
+
+uint hash_init(uvec2 pixel, uint frame) {
+    uint h = 2166136261U;
+    h = (h ^ pixel.x) * 16777619U;
+    h = (h ^ pixel.y) * 16777619U;
+    h = (h ^ frame) * 16777619U;
+    return mix32(h | 1U);
+}
+
+uint rng_u32() {
+    uint x = rng_seed + rng_counter * 0x9E3779B9U;
+    rng_counter++;
+    return mix32(x);
+}
+
+float random() {
+    return float(rng_u32()) * (1.0 / 4294967296.0);
+}
+
+vec2 random2() {
+    return vec2(random(), random());
+}
+
+vec3 random3() {
+    return vec3(random(), random(), random());
+}
+
+// ============ SIMPLE SCENE ============
+struct Ray {
+    vec3 origin;
+    vec3 direction;
+    float tmin;
+    float tmax;
+};
+
+struct Hit {
+    vec3 p;
+    vec3 n;
+    float t;
+    vec3 albedo;
+};
+
+// Simple sphere SDF
+float sdf_sphere(vec3 p, vec3 center, float radius) {
+    return length(p - center) - radius;
+}
+
+// Simple scene: sphere and floor
+float scene_sdf(vec3 p, out vec3 albedo) {
+    // Floor
+    float floor = p.y + 2.0;
+    float dist = floor;
+    albedo = vec3(0.8);
+
+    // Sphere
+    float sphere = sdf_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
+    if (sphere < dist) {
+        dist = sphere;
+        albedo = vec3(0.9, 0.3, 0.3);
+    }
+
+    return dist;
+}
+
+// Raymarch intersection
+bool scene_intersect(Ray ray, out Hit hit) {
+    float t = ray.tmin;
+    vec3 albedo;
+
+    for (int i = 0; i < 100; i++) {
+        vec3 p = ray.origin + ray.direction * t;
+        float d = scene_sdf(p, albedo);
+
+        if (d < 0.001) {
+            // Hit!
+            hit.p = p;
+            hit.t = t;
+            hit.albedo = albedo;
+
+            // Compute normal via gradient
+            vec2 e = vec2(0.001, 0.0);
+            vec3 dummy;
+            hit.n = normalize(vec3(
+                scene_sdf(p + e.xyy, dummy) - scene_sdf(p - e.xyy, dummy),
+                scene_sdf(p + e.yxy, dummy) - scene_sdf(p - e.yxy, dummy),
+                scene_sdf(p + e.yyx, dummy) - scene_sdf(p - e.yyx, dummy)
+            ));
+
+            return true;
+        }
+
+        if (t > ray.tmax) break;
+        t += d;
+    }
+
+    return false;
+}
+
+// Simple camera
+Ray generate_camera_ray(vec2 uv, vec2 jitter) {
+    // Perspective camera with better FOV
+    vec2 ndc = (uv + jitter / u_resolution) * 2.0 - 1.0;
+    ndc.x *= u_resolution.x / u_resolution.y;
+
+    // Camera positioned to see sphere and floor
+    vec3 origin = vec3(2.0, 1.0, 4.0);
+    vec3 lookAt = vec3(0.0, 0.0, 0.0);
+    vec3 up = vec3(0.0, 1.0, 0.0);
+
+    // Build camera basis
+    vec3 forward = normalize(lookAt - origin);
+    vec3 right = normalize(cross(forward, up));
+    vec3 camUp = cross(right, forward);
+
+    // FOV ~60 degrees
+    float fov = 1.0;
+    vec3 direction = normalize(forward + ndc.x * right * fov + ndc.y * camUp * fov);
+
+    Ray ray;
+    ray.origin = origin;
+    ray.direction = direction;
+    ray.tmin = 0.001;
+    ray.tmax = 100.0;
+
+    return ray;
+}
+
+// Simple shading
+vec3 shade(Hit hit) {
+    // Lambertian diffuse with simple sky lighting
+    vec3 sky_dir = vec3(0.0, 1.0, 0.0);
+    float ndotl = max(0.0, dot(hit.n, sky_dir));
+    vec3 sky_color = vec3(0.5, 0.7, 1.0);
+
+    return hit.albedo * (sky_color * ndotl + vec3(0.1));
+}
+
+void main() {
+    // Compute UVs from fragment coordinates
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+
+    // Initialize RNG
+    uvec2 pixel = uvec2(gl_FragCoord.xy);
+    rng_seed = hash_init(pixel, uint(u_frame_index));
+    rng_counter = 0U;
+
+    // Generate ray with jitter
+    vec2 jitter = random2() - 0.5;
+    Ray ray = generate_camera_ray(uv, jitter);
+
+    // Trace
+    Hit hit;
+    vec3 radiance = vec3(0.0);
+    vec3 first_hit_albedo = vec3(0.0);
+    vec3 first_hit_normal = vec3(0.5);  // Default to "no hit" encoding
+
+    if (scene_intersect(ray, hit)) {
+        // Compute radiance (expensive path tracing)
+        radiance = shade(hit);
+
+        // Write first-hit data (very cheap - we already computed it!)
+        first_hit_albedo = hit.albedo;
+        first_hit_normal = hit.n * 0.5 + 0.5;  // Encode [-1,1] to [0,1]
+    } else {
+        // Sky
+        radiance = mix(vec3(1.0), vec3(0.5, 0.7, 1.0), ray.direction.y * 0.5 + 0.5);
+        first_hit_albedo = vec3(0.0);  // No hit
+        first_hit_normal = vec3(0.5);  // Encode "no hit"
+    }
+
+    // Accumulate radiance with previous frame
+    vec3 prev_radiance = texture(u_previous, uv).rgb;
+    float blend = 1.0 / float(u_sample_count + 1);
+    vec3 accumulated_radiance = mix(prev_radiance, radiance, blend);
+
+    // Write MRT outputs
+    o_radiance = vec4(accumulated_radiance, 1.0);
+    o_albedo = vec4(first_hit_albedo, 1.0);
+    o_normal = vec4(first_hit_normal, 1.0);
 }`;
     }
 }

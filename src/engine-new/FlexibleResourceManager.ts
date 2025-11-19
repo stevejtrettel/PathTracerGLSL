@@ -8,7 +8,20 @@ import type { RenderPipeline, FramebufferConfig, SwapInstruction } from '../comp
 interface FramebufferResource {
     config: FramebufferConfig;
     framebuffers: WebGLFramebuffer[];  // 1 for texture/screen, 2 for double_buffer
-    textures: WebGLTexture[];           // 1 for texture, 2 for double_buffer
+
+    /**
+     * Textures organized as 2D array: [attachmentIndex][bufferIndex]
+     *
+     * Single attachment:
+     * - texture: textures[0][0]
+     * - double_buffer: textures[0][0], textures[0][1]
+     *
+     * MRT (3 attachments):
+     * - texture: textures[0][0], textures[1][0], textures[2][0]
+     * - double_buffer: textures[0][0..1], textures[1][0..1], textures[2][0..1]
+     */
+    textures: WebGLTexture[][];
+
     currentIndex: number;               // 0 or 1 (for double_buffer)
 }
 
@@ -121,24 +134,35 @@ export class FlexibleResourceManager {
     }
 
     /**
-     * Get texture by id (resolves current/previous for double_buffer)
+     * Get texture by id (resolves current/previous for double_buffer, :N for MRT)
+     *
+     * Examples:
+     * - 'accumulation_current' → attachment 0, current buffer
+     * - 'accumulation_previous:1' → attachment 1, previous buffer
+     * - 'myTexture:2' → attachment 2
      */
     getTexture(id: string): WebGLTexture {
-        const { baseId, qualifier } = this._parseId(id);
+        const { baseId, qualifier, attachment } = this._parseId(id);
         const resource = this._getActiveResource(baseId);
 
         if (resource.config.type === 'screen') {
             throw new Error('Cannot get texture for screen framebuffer');
         }
 
-        if (resource.config.type === 'double_buffer') {
-            // Resolve current/previous
-            const index = this._resolveIndex(resource, qualifier);
-            return resource.textures[index];
+        // Validate attachment index
+        if (attachment >= resource.textures.length) {
+            throw new Error(
+                `Attachment ${attachment} out of range for '${baseId}' ` +
+                `(has ${resource.textures.length} attachment(s))`
+            );
         }
 
-        // Single texture
-        return resource.textures[0];
+        // Get buffer index (for double_buffer)
+        const bufferIndex = resource.config.type === 'double_buffer'
+            ? this._resolveIndex(resource, qualifier)
+            : 0;
+
+        return resource.textures[attachment][bufferIndex];
     }
 
     /**
@@ -238,35 +262,48 @@ export class FlexibleResourceManager {
             };
         }
 
-        if (config.type === 'texture') {
-            // Single framebuffer + texture
-            const texture = this._createTexture(config.format || 'rgba8');
-            const framebuffer = this._createFramebuffer(texture);
+        // Normalize format to array (single format → [format])
+        const formats = Array.isArray(config.format)
+            ? config.format
+            : [config.format || 'rgba8'];
 
-            return {
-                config,
-                framebuffers: [framebuffer],
-                textures: [texture],
-                currentIndex: 0
-            };
+        const isMRT = formats.length > 1;
+        const numBuffers = config.type === 'double_buffer' ? 2 : 1;
+
+        // Validate MRT doesn't exceed WebGL limits
+        if (isMRT) {
+            const maxDrawBuffers = gl.getParameter(gl.MAX_DRAW_BUFFERS);
+            if (formats.length > maxDrawBuffers) {
+                throw new Error(
+                    `MRT attachment count (${formats.length}) exceeds MAX_DRAW_BUFFERS (${maxDrawBuffers})`
+                );
+            }
         }
 
-        if (config.type === 'double_buffer') {
-            // Ping-pong pair
-            const texture0 = this._createTexture(config.format || 'rgba32f');
-            const texture1 = this._createTexture(config.format || 'rgba32f');
-            const framebuffer0 = this._createFramebuffer(texture0);
-            const framebuffer1 = this._createFramebuffer(texture1);
-
-            return {
-                config,
-                framebuffers: [framebuffer0, framebuffer1],
-                textures: [texture0, texture1],
-                currentIndex: 0
-            };
+        // Create textures: 2D array [attachmentIndex][bufferIndex]
+        const textures: WebGLTexture[][] = [];
+        for (let a = 0; a < formats.length; a++) {
+            const attachmentTextures: WebGLTexture[] = [];
+            for (let b = 0; b < numBuffers; b++) {
+                attachmentTextures.push(this._createTexture(formats[a]));
+            }
+            textures.push(attachmentTextures);
         }
 
-        throw new Error(`Unknown framebuffer type: ${config.type}`);
+        // Create framebuffers and attach all textures
+        const framebuffers: WebGLFramebuffer[] = [];
+        for (let b = 0; b < numBuffers; b++) {
+            // Collect textures for this buffer (one from each attachment)
+            const bufferTextures = textures.map(attachmentTextures => attachmentTextures[b]);
+            framebuffers.push(this._createFramebuffer(bufferTextures, isMRT));
+        }
+
+        return {
+            config,
+            framebuffers,
+            textures,
+            currentIndex: 0
+        };
     }
 
     /**
@@ -364,21 +401,34 @@ export class FlexibleResourceManager {
     }
 
     /**
-     * Create framebuffer and attach texture
+     * Create framebuffer and attach texture(s)
+     *
+     * @param textures - Array of textures to attach (one per attachment location)
+     * @param isMRT - Whether this is an MRT framebuffer (sets up drawBuffers)
      */
-    private _createFramebuffer(texture: WebGLTexture): WebGLFramebuffer {
+    private _createFramebuffer(textures: WebGLTexture[], isMRT: boolean): WebGLFramebuffer {
         const gl = this.gl;
         const framebuffer = gl.createFramebuffer();
         if (!framebuffer) throw new Error('Failed to create framebuffer');
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-        gl.framebufferTexture2D(
-            gl.FRAMEBUFFER,
-            gl.COLOR_ATTACHMENT0,
-            gl.TEXTURE_2D,
-            texture,
-            0
-        );
+
+        // Attach all textures
+        for (let i = 0; i < textures.length; i++) {
+            gl.framebufferTexture2D(
+                gl.FRAMEBUFFER,
+                gl.COLOR_ATTACHMENT0 + i,
+                gl.TEXTURE_2D,
+                textures[i],
+                0
+            );
+        }
+
+        // Set draw buffers if MRT
+        if (isMRT) {
+            const drawBuffers = textures.map((_, i) => gl.COLOR_ATTACHMENT0 + i);
+            gl.drawBuffers(drawBuffers);
+        }
 
         // Check framebuffer status
         const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
@@ -430,10 +480,15 @@ export class FlexibleResourceManager {
      * Resize textures in a resource
      */
     private _resizeTextures(resource: FramebufferResource): void {
-        const format = resource.config.format || 'rgba8';
+        const formats = Array.isArray(resource.config.format)
+            ? resource.config.format
+            : [resource.config.format || 'rgba8'];
 
-        for (const texture of resource.textures) {
-            this._allocateTextureStorage(texture, format);
+        // Resize all textures in 2D array
+        for (let a = 0; a < resource.textures.length; a++) {
+            for (let b = 0; b < resource.textures[a].length; b++) {
+                this._allocateTextureStorage(resource.textures[a][b], formats[a]);
+            }
         }
     }
 
@@ -459,28 +514,45 @@ export class FlexibleResourceManager {
     }
 
     /**
-     * Parse id into base and qualifier
+     * Parse id into base, qualifier, and attachment
      *
      * Examples:
-     * - 'accumulation' → { baseId: 'accumulation', qualifier: null }
-     * - 'accumulation_current' → { baseId: 'accumulation', qualifier: 'current' }
-     * - 'accumulation_previous' → { baseId: 'accumulation', qualifier: 'previous' }
+     * - 'accumulation' → { baseId: 'accumulation', qualifier: null, attachment: 0 }
+     * - 'accumulation_current' → { baseId: 'accumulation', qualifier: 'current', attachment: 0 }
+     * - 'accumulation_previous' → { baseId: 'accumulation', qualifier: 'previous', attachment: 0 }
+     * - 'accumulation_current:1' → { baseId: 'accumulation', qualifier: 'current', attachment: 1 }
+     * - 'myBuffer:2' → { baseId: 'myBuffer', qualifier: null, attachment: 2 }
      */
-    private _parseId(id: string): { baseId: string; qualifier: string | null } {
-        const parts = id.split('_');
+    private _parseId(id: string): {
+        baseId: string;
+        qualifier: string | null;
+        attachment: number;
+    } {
+        // Parse attachment suffix first: 'buffer:2' → attachment=2, rest='buffer'
+        let rest = id;
+        let attachment = 0;
 
-        if (parts.length === 1) {
-            return { baseId: id, qualifier: null };
+        const colonIndex = id.lastIndexOf(':');
+        if (colonIndex !== -1) {
+            const attachmentStr = id.substring(colonIndex + 1);
+            const attachmentNum = parseInt(attachmentStr, 10);
+            if (!isNaN(attachmentNum)) {
+                attachment = attachmentNum;
+                rest = id.substring(0, colonIndex);
+            }
         }
 
+        // Parse _current/_previous suffix: 'accumulation_current' → qualifier='current'
+        const parts = rest.split('_');
         const lastPart = parts[parts.length - 1];
+
         if (lastPart === 'current' || lastPart === 'previous') {
             const baseId = parts.slice(0, -1).join('_');
-            return { baseId, qualifier: lastPart };
+            return { baseId, qualifier: lastPart, attachment };
         }
 
         // Not a qualifier, treat as base id
-        return { baseId: id, qualifier: null };
+        return { baseId: rest, qualifier: null, attachment };
     }
 
     /**
