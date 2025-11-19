@@ -69,6 +69,9 @@ export class FlexibleEngine {
     // Structure: rendererId → shaderId → uniformName → location
     private uniformLocations = new Map<string, Map<string, Map<string, WebGLUniformLocation>>>();
 
+    // Custom parameter storage (for renderer-specific parameters like displayMode)
+    private customParameters = new Map<string, any>();
+
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
         this.resourceManager = new FlexibleResourceManager(gl);
@@ -223,6 +226,9 @@ export class FlexibleEngine {
         // Set engine uniforms for all shaders in pipeline
         this._setEngineUniforms(this.activeRendererId, renderer, engineUniforms);
 
+        // Set custom uniforms from UniformBinding
+        this._setCustomUniforms(this.activeRendererId, renderer, engineUniforms);
+
         // Execute pipeline
         this.renderExecutor.executePipeline(renderer.pipeline);
 
@@ -231,6 +237,29 @@ export class FlexibleEngine {
     }
 
     // ============ PARAMETERS ============
+
+    /**
+     * Set a custom parameter value
+     *
+     * Parameters are used to compute uniform values via UniformBinding.compute()
+     * Common parameter namespaces:
+     * - 'engine.*' - engine-provided (resolution, time, etc.)
+     * - 'renderer.*' - renderer-specific (displayMode, etc.)
+     * - 'scene.*' - scene parameters
+     *
+     * @param name - Parameter name (e.g., 'renderer.displayMode')
+     * @param value - Parameter value (number, array, etc.)
+     */
+    setParameter(name: string, value: any): void {
+        this.customParameters.set(name, value);
+    }
+
+    /**
+     * Get a parameter value
+     */
+    getParameter(name: string): any {
+        return this.customParameters.get(name);
+    }
 
     /**
      * Update shader uniforms from parameter changes
@@ -538,6 +567,14 @@ export class FlexibleEngine {
                 }
             }
 
+            // Cache locations for custom uniforms from UniformBinding
+            for (const binding of renderer.uniforms) {
+                const location = this.gl.getUniformLocation(program, binding.uniform);
+                if (location) {
+                    shaderLocations.set(binding.uniform, location);
+                }
+            }
+
             rendererLocations.set(shaderId, shaderLocations);
         }
 
@@ -596,6 +633,96 @@ export class FlexibleEngine {
             if (loc_pixelOffset) {
                 this.gl.uniform2f(loc_pixelOffset, uniforms.pixelOffset[0], uniforms.pixelOffset[1]);
             }
+        }
+    }
+
+    /**
+     * Set custom uniforms from UniformBinding for all shaders in active renderer
+     */
+    private _setCustomUniforms(
+        rendererId: string,
+        renderer: CompiledRenderer,
+        engineUniforms: EngineUniforms
+    ): void {
+        const rendererLocations = this.uniformLocations.get(rendererId);
+        if (!rendererLocations) return;
+
+        // Build parameter map (engine + custom)
+        const parameters: Record<string, any> = {
+            'engine.resolution': engineUniforms.resolution,
+            'engine.imageSize': engineUniforms.imageSize,
+            'engine.frameIndex': engineUniforms.frameIndex,
+            'engine.time': engineUniforms.time,
+            'engine.sampleCount': engineUniforms.sampleCount,
+            'engine.pixelOffset': engineUniforms.pixelOffset
+        };
+
+        // Add custom parameters
+        for (const [name, value] of this.customParameters) {
+            parameters[name] = value;
+        }
+
+        // Set uniforms for each shader used in the pipeline
+        for (const pass of renderer.pipeline.passes) {
+            const program = this.renderExecutor.getProgram(pass.shader);
+            if (!program) continue;
+
+            const locations = rendererLocations.get(pass.shader);
+            if (!locations) continue;
+
+            // Use program
+            this.gl.useProgram(program);
+
+            // Process each uniform binding
+            for (const binding of renderer.uniforms) {
+                const location = locations.get(binding.uniform);
+                if (!location) continue;
+
+                // Collect parameter values needed for this binding
+                const paramValues: Record<string, any> = {};
+                for (const paramPath of binding.parameters) {
+                    paramValues[paramPath] = parameters[paramPath];
+                }
+
+                // Compute uniform value
+                const value = binding.compute(paramValues);
+
+                // Set uniform based on type
+                this._setUniformValue(location, value, binding.type);
+            }
+        }
+    }
+
+    /**
+     * Set a uniform value based on type
+     */
+    private _setUniformValue(location: WebGLUniformLocation, value: any, type: string): void {
+        const gl = this.gl;
+
+        switch (type) {
+            case 'int':
+                gl.uniform1i(location, value);
+                break;
+            case 'float':
+                gl.uniform1f(location, value);
+                break;
+            case 'vec2':
+                gl.uniform2f(location, value[0], value[1]);
+                break;
+            case 'vec3':
+                gl.uniform3f(location, value[0], value[1], value[2]);
+                break;
+            case 'vec4':
+                gl.uniform4f(location, value[0], value[1], value[2], value[3]);
+                break;
+            case 'mat3':
+                gl.uniformMatrix3fv(location, false, value);
+                break;
+            case 'mat4':
+                gl.uniformMatrix4fv(location, false, value);
+                break;
+            default:
+                console.warn(`Unknown uniform type: ${type}`);
         }
     }
 
