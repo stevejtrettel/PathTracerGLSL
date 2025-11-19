@@ -142,6 +142,30 @@ async function main() {
     engine.loadRenderers([debugRenderer, pathtracerRenderer]);
     console.log('✅ Renderers loaded');
 
+    // Test export functionality
+    console.log('\n=== Testing Export Functionality ===');
+
+    // Test with pathtracer renderer
+    engine.selectRenderer('pathtracer-test-scene');
+    console.log('Active renderer: pathtracer-test-scene');
+
+    const pathtracerExports = engine.getExportNames();
+    console.log('Available exports for pathtracer:', pathtracerExports);
+
+    const availableBuffers = engine.getAvailableBuffers();
+    console.log('Available buffers:', availableBuffers);
+
+    // Test with debug renderer
+    engine.selectRenderer('debug-test-scene');
+    console.log('\nActive renderer: debug-test-scene');
+
+    const debugExports = engine.getExportNames();
+    console.log('Available exports for debug:', debugExports);
+
+    // Switch back to pathtracer
+    engine.selectRenderer('pathtracer-test-scene');
+    console.log('✅ Export tests completed\n');
+
     // Store engine globally for debugging
     (window as any).engine = engine;
     (window as any).gl = gl;
@@ -150,6 +174,7 @@ async function main() {
     const btnDebug = document.getElementById('btn-debug') as HTMLButtonElement;
     const btnPathtracer = document.getElementById('btn-pathtracer') as HTMLButtonElement;
     const btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
+    const btnTestExport = document.getElementById('btn-test-export') as HTMLButtonElement;
     const statSamples = document.getElementById('stat-samples') as HTMLSpanElement;
     const statFps = document.getElementById('stat-fps') as HTMLSpanElement;
 
@@ -181,6 +206,35 @@ async function main() {
     btnReset.addEventListener('click', () => {
         console.log('Resetting accumulation');
         engine.clearAccumulation();
+    });
+
+    // Test export reading
+    btnTestExport.addEventListener('click', () => {
+        console.log('\n=== Testing Export Reading ===');
+
+        try {
+            // Get available exports for current renderer
+            const exportNames = engine.getExportNames();
+            console.log('Available exports:', exportNames);
+
+            // Test reading each export
+            for (const exportName of exportNames) {
+                const data = engine.readExport(exportName);
+                console.log(`Read export '${exportName}':`, {
+                    type: data.constructor.name,
+                    length: data.length,
+                    firstPixel: Array.from(data.slice(0, 4))
+                });
+            }
+
+            // Get all available buffers
+            const buffers = engine.getAvailableBuffers();
+            console.log('Available buffers:', buffers);
+
+            console.log('✅ Export reading test completed');
+        } catch (error: any) {
+            console.error('❌ Export reading test failed:', error.message);
+        }
     });
 
     // Initial button state
