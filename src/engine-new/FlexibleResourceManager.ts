@@ -37,17 +37,33 @@ export class FlexibleResourceManager {
     private renderers: Map<string, Map<string, FramebufferResource>>;
     private activeRenderer: string | null = null;
 
-    constructor(gl: WebGL2RenderingContext, width: number, height: number) {
+    constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-        this.width = width;
-        this.height = height;
+
+        // Get dimensions from canvas (matches original ResourceManager pattern)
+        this.width = gl.canvas.width;
+        this.height = gl.canvas.height;
+
         this.renderers = new Map();
+
+        // Validate required extensions (critical for HDR rendering)
+        const ext = gl.getExtension('EXT_color_buffer_float');
+        if (!ext) {
+            throw new Error('EXT_color_buffer_float extension required for HDR rendering');
+        }
     }
 
     /**
      * Load a renderer's pipeline and create its GPU resources
      */
     loadRenderer(rendererId: string, pipeline: RenderPipeline): void {
+        if (this.renderers.has(rendererId)) {
+            console.log(`Reusing resources for renderer '${rendererId}'`);
+            return;
+        }
+
+        console.log(`Creating resources for renderer '${rendererId}'`);
+
         // Create resource map for this renderer
         const resources = new Map<string, FramebufferResource>();
 
@@ -55,6 +71,11 @@ export class FlexibleResourceManager {
         for (const fbConfig of pipeline.framebuffers) {
             const resource = this._createFramebufferResource(fbConfig);
             resources.set(fbConfig.id, resource);
+
+            // Clear buffers for double_buffer types
+            if (fbConfig.type === 'double_buffer') {
+                this._clearFramebuffers(resource);
+            }
         }
 
         // Store resources
@@ -69,6 +90,7 @@ export class FlexibleResourceManager {
             throw new Error(`Renderer not loaded: ${rendererId}`);
         }
         this.activeRenderer = rendererId;
+        console.log(`Switched to renderer '${rendererId}'`);
     }
 
     /**
@@ -139,8 +161,17 @@ export class FlexibleResourceManager {
 
     /**
      * Resize all textures to new dimensions
+     * WARNING: All accumulation will be lost
      */
     resize(width: number, height: number): void {
+        if (width === this.width && height === this.height) {
+            console.log('Resize called but dimensions unchanged, skipping');
+            return;
+        }
+
+        console.log(`Resizing buffers: ${this.width}×${this.height} → ${width}×${height}`);
+
+        const rendererCount = this.renderers.size;
         this.width = width;
         this.height = height;
 
@@ -152,6 +183,17 @@ export class FlexibleResourceManager {
                 }
             }
         }
+
+        console.log(`Resized ${rendererCount} renderer(s) - accumulation reset for all`);
+    }
+
+    /**
+     * Handle WebGL context loss
+     */
+    handleContextLoss(): void {
+        console.warn('WebGL context lost - all GPU resources invalidated');
+        this.renderers.clear();
+        this.activeRenderer = null;
     }
 
     /**
@@ -341,12 +383,47 @@ export class FlexibleResourceManager {
         // Check framebuffer status
         const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
         if (status !== gl.FRAMEBUFFER_COMPLETE) {
-            throw new Error(`Framebuffer incomplete: ${status}`);
+            throw new Error(`Framebuffer incomplete: ${this._getFramebufferStatus(status)}`);
         }
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
         return framebuffer;
+    }
+
+    /**
+     * Clear framebuffers (set to black/transparent)
+     */
+    private _clearFramebuffers(resource: FramebufferResource): void {
+        const gl = this.gl;
+
+        for (const framebuffer of resource.framebuffers) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    /**
+     * Get human-readable framebuffer status
+     */
+    private _getFramebufferStatus(status: number): string {
+        const gl = this.gl;
+
+        switch (status) {
+            case gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+                return 'INCOMPLETE_ATTACHMENT';
+            case gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+                return 'MISSING_ATTACHMENT';
+            case gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
+                return 'INCOMPLETE_DIMENSIONS';
+            case gl.FRAMEBUFFER_UNSUPPORTED:
+                return 'UNSUPPORTED';
+            default:
+                return `Unknown (${status})`;
+        }
     }
 
     /**
