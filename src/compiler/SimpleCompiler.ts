@@ -8,7 +8,8 @@ import type {
     ShaderProgram,
     RenderPipeline,
     FramebufferConfig,
-    RenderPass
+    RenderPass,
+    ExportTarget
 } from './types.js';
 
 import type { UniformBinding } from '../engine/types.js';
@@ -118,7 +119,13 @@ void main() {
             shaders,
             pipeline,
             uniforms,
-            sourceMaps: new Map()
+            sourceMaps: new Map(),
+            exportTargets: {
+                'ldr': {
+                    bufferId: 'screen',
+                    format: 'byte'
+                }
+            }
         };
     }
 
@@ -266,7 +273,17 @@ void main() {
             shaders,
             pipeline,
             uniforms,
-            sourceMaps: new Map()
+            sourceMaps: new Map(),
+            exportTargets: {
+                'hdr': {
+                    bufferId: 'accumulation_current',
+                    format: 'float'
+                },
+                'ldr': {
+                    bufferId: 'screen',
+                    format: 'byte'
+                }
+            }
         };
     }
 

@@ -173,6 +173,23 @@ export interface SourceLocation {
 }
 
 /**
+ * Export target specification
+ *
+ * Defines how to export a specific output (HDR, LDR, AOVs, etc.)
+ * from a rendered frame.
+ */
+export interface ExportTarget {
+    /** Which framebuffer to read from */
+    bufferId: string;
+
+    /** Data format to read */
+    format: 'float' | 'byte';
+
+    /** Optional: number of channels (1=depth, 3=RGB, 4=RGBA). Default: 4 */
+    channels?: 1 | 3 | 4;
+}
+
+/**
  * Compiled renderer output
  *
  * Complete output from Compiler, input to Engine.
@@ -196,6 +213,18 @@ export interface CompiledRenderer {
 
     /** Optional: parameter metadata for UI */
     parameters?: Record<string, ParameterMetadata>;
+
+    /**
+     * Optional: export targets for reading rendered outputs
+     *
+     * Standard exports:
+     * - 'hdr': HDR radiance (float, RGBA)
+     * - 'ldr': LDR display (byte, RGBA)
+     *
+     * Custom exports (AOVs):
+     * - 'albedo', 'normal', 'depth', etc.
+     */
+    exportTargets?: Record<string, ExportTarget>;
 }
 
 /**

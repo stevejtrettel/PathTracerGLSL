@@ -326,6 +326,131 @@ export class FlexibleEngine {
         return [this.gl.canvas.width, this.gl.canvas.height];
     }
 
+    // ============ EXPORT / READ OPERATIONS ============
+
+    /**
+     * Read a named export from active renderer
+     *
+     * Common exports:
+     * - 'hdr': HDR radiance (Float32Array)
+     * - 'ldr': LDR display (Uint8Array)
+     * - 'albedo', 'normal', 'depth': AOV passes
+     *
+     * @param name - Export name (must be defined in renderer.exportTargets)
+     * @param rect - Optional region to read (defaults to full framebuffer)
+     * @returns Pixel data as Float32Array or Uint8Array
+     */
+    readExport(name: string, rect?: Rectangle): Float32Array | Uint8Array {
+        if (!this.activeRendererId) {
+            throw new Error('No active renderer');
+        }
+
+        const renderer = this.renderers.get(this.activeRendererId)!;
+        const target = renderer.exportTargets?.[name];
+
+        if (!target) {
+            const available = this.getExportNames();
+            const availableStr = available.length > 0 ? available.join(', ') : 'none';
+            throw new Error(
+                `Export target '${name}' not defined in renderer '${this.activeRendererId}'. ` +
+                `Available exports: ${availableStr}`
+            );
+        }
+
+        return this.readBuffer(target.bufferId, target.format, rect);
+    }
+
+    /**
+     * Read framebuffer data directly (low-level)
+     *
+     * Reads any framebuffer by id, bypassing the export system.
+     * Useful for debugging or advanced use cases.
+     *
+     * @param bufferId - Framebuffer id (e.g., 'accumulation_current', 'screen')
+     * @param format - Data format ('float' for HDR, 'byte' for LDR)
+     * @param rect - Optional region to read (defaults to full framebuffer)
+     * @returns Pixel data as Float32Array or Uint8Array
+     */
+    readBuffer(
+        bufferId: string,
+        format: 'float' | 'byte',
+        rect?: Rectangle
+    ): Float32Array | Uint8Array {
+        const gl = this.gl;
+        const canvas = gl.canvas as HTMLCanvasElement;
+
+        // Get rectangle (default to full framebuffer)
+        const r = rect || {
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height
+        };
+
+        // Validate rectangle
+        if (r.x < 0 || r.y < 0 || r.width <= 0 || r.height <= 0) {
+            throw new Error(`Invalid rectangle: ${JSON.stringify(r)}`);
+        }
+
+        // Get framebuffer
+        const framebuffer = this.resourceManager.getFramebuffer(bufferId);
+
+        // Bind and read
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+        if (format === 'float') {
+            const pixels = new Float32Array(r.width * r.height * 4);
+            gl.readPixels(
+                r.x,
+                r.y,
+                r.width,
+                r.height,
+                gl.RGBA,
+                gl.FLOAT,
+                pixels
+            );
+            return pixels;
+        } else {
+            const pixels = new Uint8Array(r.width * r.height * 4);
+            gl.readPixels(
+                r.x,
+                r.y,
+                r.width,
+                r.height,
+                gl.RGBA,
+                gl.UNSIGNED_BYTE,
+                pixels
+            );
+            return pixels;
+        }
+    }
+
+    /**
+     * Get list of available export names for active renderer
+     *
+     * @returns Array of export names (e.g., ['hdr', 'ldr', 'albedo'])
+     */
+    getExportNames(): string[] {
+        if (!this.activeRendererId) return [];
+
+        const renderer = this.renderers.get(this.activeRendererId)!;
+        return Object.keys(renderer.exportTargets || {});
+    }
+
+    /**
+     * Get list of all framebuffer ids in active renderer's pipeline
+     *
+     * Useful for debugging - shows all buffers that can be read with readBuffer()
+     *
+     * @returns Array of buffer ids (e.g., ['accumulation', 'screen', 'albedo-fb'])
+     */
+    getAvailableBuffers(): string[] {
+        if (!this.activeRendererId) return [];
+
+        const renderer = this.renderers.get(this.activeRendererId)!;
+        return renderer.pipeline.framebuffers.map(fb => fb.id);
+    }
+
     // ============ TILED RENDERING ============
 
     /**
