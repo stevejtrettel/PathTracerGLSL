@@ -321,6 +321,19 @@ void main() {
                 parameters: ['engine.time'],
                 type: 'float',
                 compute: (params) => params['engine.time']
+            },
+            // Camera uniforms - connected to parameter panel
+            {
+                uniform: 'u_cameraPosition',
+                parameters: ['camera.position'],
+                type: 'vec3',
+                compute: (params) => params['camera.position'] || [2.0, 1.0, 4.0]
+            },
+            {
+                uniform: 'u_cameraTarget',
+                parameters: ['camera.target'],
+                type: 'vec3',
+                compute: (params) => params['camera.target'] || [0.0, 0.0, 0.0]
             }
         ];
 
@@ -407,6 +420,10 @@ uniform int u_sampleCount;
 uniform int u_frameIndex;
 uniform float u_time;
 uniform sampler2D u_previous;
+
+// Camera uniforms (controlled via parameter panel)
+uniform vec3 u_cameraPosition;
+uniform vec3 u_cameraTarget;
 
 // ============ RNG SYSTEM ============
 uint rng_seed;
@@ -518,16 +535,16 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-// Simple camera
+// Simple camera - uses uniforms for position/target
 Ray generate_camera_ray(vec2 uv, vec2 jitter, vec2 imageSize) {
     // Perspective camera with better FOV
     // Use full image size for aspect ratio (important for tiled rendering)
     vec2 ndc = (uv + jitter / imageSize) * 2.0 - 1.0;
     ndc.x *= imageSize.x / imageSize.y;
 
-    // Camera positioned to see sphere and floor
-    vec3 origin = vec3(2.0, 1.0, 4.0);
-    vec3 lookAt = vec3(0.0, 0.0, 0.0);
+    // Camera from uniforms (fallback to defaults if zero)
+    vec3 origin = length(u_cameraPosition) > 0.0 ? u_cameraPosition : vec3(2.0, 1.0, 4.0);
+    vec3 lookAt = length(u_cameraTarget) > 0.0 || length(u_cameraPosition) > 0.0 ? u_cameraTarget : vec3(0.0, 0.0, 0.0);
     vec3 up = vec3(0.0, 1.0, 0.0);
 
     // Build camera basis
@@ -787,6 +804,19 @@ void main() {
                 parameters: ['renderer.displayMode'],
                 type: 'int',
                 compute: (params) => params['renderer.displayMode'] || 0
+            },
+            // Camera uniforms - connected to parameter panel
+            {
+                uniform: 'u_cameraPosition',
+                parameters: ['camera.position'],
+                type: 'vec3',
+                compute: (params) => params['camera.position'] || [2.0, 1.0, 4.0]
+            },
+            {
+                uniform: 'u_cameraTarget',
+                parameters: ['camera.target'],
+                type: 'vec3',
+                compute: (params) => params['camera.target'] || [0.0, 0.0, 0.0]
             }
         ];
 
@@ -840,6 +870,10 @@ uniform int u_sampleCount;
 uniform int u_frameIndex;
 uniform float u_time;
 uniform sampler2D u_previous;  // Previous radiance
+
+// Camera uniforms (controlled via parameter panel)
+uniform vec3 u_cameraPosition;
+uniform vec3 u_cameraTarget;
 
 // ============ RNG SYSTEM ============
 uint rng_seed;
@@ -951,16 +985,16 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-// Simple camera
+// Simple camera - uses uniforms for position/target
 Ray generate_camera_ray(vec2 uv, vec2 jitter, vec2 imageSize) {
     // Perspective camera with better FOV
     // Use full image size for aspect ratio (important for tiled rendering)
     vec2 ndc = (uv + jitter / imageSize) * 2.0 - 1.0;
     ndc.x *= imageSize.x / imageSize.y;
 
-    // Camera positioned to see sphere and floor
-    vec3 origin = vec3(2.0, 1.0, 4.0);
-    vec3 lookAt = vec3(0.0, 0.0, 0.0);
+    // Camera from uniforms (fallback to defaults if zero)
+    vec3 origin = length(u_cameraPosition) > 0.0 ? u_cameraPosition : vec3(2.0, 1.0, 4.0);
+    vec3 lookAt = length(u_cameraTarget) > 0.0 || length(u_cameraPosition) > 0.0 ? u_cameraTarget : vec3(0.0, 0.0, 0.0);
     vec3 up = vec3(0.0, 1.0, 0.0);
 
     // Build camera basis
