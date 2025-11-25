@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comprehensive Feature Test</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #111;
+      font-family: system-ui, sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+    #canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+    #panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.9);
+      padding: 20px;
+      border-radius: 12px;
+      z-index: 1000;
+      max-width: 400px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    h1 { margin: 0 0 10px; font-size: 18px; color: #4CAF50; }
+    h3 { margin: 15px 0 8px; font-size: 13px; color: #888; border-bottom: 1px solid #333; padding-bottom: 5px; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    button {
+      padding: 8px 12px;
+      background: #333;
+      color: #fff;
+      border: 1px solid #555;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    button:hover { background: #444; }
+    button.active { background: #4CAF50; border-color: #4CAF50; }
+    button.feature { background: rgba(74, 158, 255, 0.3); border-color: rgba(74, 158, 255, 0.5); }
+    button.feature:hover { background: rgba(74, 158, 255, 0.4); }
+    .stat { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+    .stat-label { color: #666; }
+    .stat-value { color: #fff; font-family: monospace; }
+    #log {
+      background: #000;
+      border: 1px solid #333;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 11px;
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 10px;
+      border-radius: 6px;
+    }
+    .log-entry { padding: 2px 0; border-bottom: 1px solid #222; }
+    .log-ok { color: #4CAF50; }
+    .log-err { color: #f44336; }
+    .log-info { color: #2196F3; }
+    .checklist { font-size: 12px; margin: 10px 0; }
+    .check-item { padding: 3px 0; display: flex; align-items: center; gap: 6px; }
+    .check-icon { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+    .check-pending { background: #333; color: #888; }
+    .check-ok { background: #4CAF50; color: #fff; }
+    .check-fail { background: #f44336; color: #fff; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="panel">
+    <h1>Comprehensive Test</h1>
+
+    <h3>Feature Checklist</h3>
+    <div class="checklist">
+      <div class="check-item"><span id="chk-app" class="check-icon check-pending">?</span> FlexibleApp created</div>
+      <div class="check-item"><span id="chk-init" class="check-icon check-pending">?</span> Initialized with renderers</div>
+      <div class="check-item"><span id="chk-render" class="check-icon check-pending">?</span> Rendering started</div>
+      <div class="check-item"><span id="chk-orbit" class="check-icon check-pending">?</span> OrbitControls installed</div>
+      <div class="check-item"><span id="chk-touch" class="check-icon check-pending">?</span> TouchOrbitControls installed</div>
+      <div class="check-item"><span id="chk-param" class="check-icon check-pending">?</span> ParameterPanel installed</div>
+      <div class="check-item"><span id="chk-tiled" class="check-icon check-pending">?</span> TiledRenderer created</div>
+      <div class="check-item"><span id="chk-keys" class="check-icon check-pending">?</span> Keyboard controls setup</div>
+    </div>
+
+    <h3>Renderers</h3>
+    <div class="btn-group">
+      <button id="btn-r1">Pathtracer</button>
+      <button id="btn-r2">AOVs</button>
+      <button id="btn-r3">Debug</button>
+    </div>
+
+    <h3>New Features</h3>
+    <div class="btn-group">
+      <button id="btn-tab" class="feature">Open Param Panel</button>
+      <button id="btn-tiled" class="feature">Tiled Render Test</button>
+    </div>
+
+    <h3>Stats</h3>
+    <div class="stat"><span class="stat-label">Samples</span><span class="stat-value" id="stat-samples">0</span></div>
+    <div class="stat"><span class="stat-label">FPS</span><span class="stat-value" id="stat-fps">0</span></div>
+    <div class="stat"><span class="stat-label">Mode</span><span class="stat-value" id="stat-mode">-</span></div>
+
+    <h3>Actions</h3>
+    <div class="btn-group">
+      <button id="btn-reset">Reset</button>
+      <button id="btn-pause">Pause</button>
+      <button id="btn-save">Save Session (j)</button>
+      <button id="btn-load">Load Session (o)</button>
+    </div>
+
+    <h3>Export</h3>
+    <div class="btn-group">
+      <button id="btn-png">PNG</button>
+      <button id="btn-hdr">HDR</button>
+    </div>
+
+    <h3>Log</h3>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    // Log helper
+    const logEl = document.getElementById('log');
+    function log(msg, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = 'log-entry log-' + type;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(`[${type.toUpperCase()}]`, msg);
+    }
+
+    function setCheck(id, ok) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.className = 'check-icon ' + (ok ? 'check-ok' : 'check-fail');
+        el.textContent = ok ? '✓' : '✗';
+      }
+    }
+
+    // Main
+    async function main() {
+      log('Starting comprehensive test...', 'info');
+
+      try {
+        // Import modules
+        log('Importing FlexibleApp...', 'info');
+        const {
+          FlexibleApp,
+          STRATEGY_PRESETS,
+          TiledRenderer,
+          OrbitControls,
+          TouchOrbitControls,
+          ParameterPanelExtension
+        } = await import('./src/app-new/index.js');
+        log('Imports successful', 'ok');
+
+        // Get canvas
+        const canvas = document.getElementById('canvas');
+        if (!canvas) throw new Error('Canvas not found');
+
+        // Create app
+        log('Creating FlexibleApp...', 'info');
+        const app = new FlexibleApp(canvas);
+        setCheck('chk-app', true);
+        log('FlexibleApp created', 'ok');
+        window.app = app;
+
+        // Initialize
+        log('Initializing with strategies...', 'info');
+        await app.initialize({
+          scene: { id: 'test', name: 'Test Scene' },
+          strategies: [
+            STRATEGY_PRESETS.pathtracer.strategy,
+            STRATEGY_PRESETS['pathtracer-aovs'].strategy,
+            STRATEGY_PRESETS.debug.strategy
+          ]
+        });
+        setCheck('chk-init', true);
+        log(`Initialized with renderers: ${app.getAvailableRendererIds().join(', ')}`, 'ok');
+
+        // Install OrbitControls
+        log('Installing OrbitControls...', 'info');
+        try {
+          const orbit = new OrbitControls();
+          app.use(orbit);
+          setCheck('chk-orbit', true);
+          log('OrbitControls installed', 'ok');
+          window.orbitControls = orbit;
+        } catch (e) {
+          setCheck('chk-orbit', false);
+          log('OrbitControls failed: ' + e.message, 'err');
+        }
+
+        // Install TouchOrbitControls
+        log('Installing TouchOrbitControls...', 'info');
+        try {
+          const touch = new TouchOrbitControls();
+          app.use(touch);
+          setCheck('chk-touch', true);
+          log('TouchOrbitControls installed', 'ok');
+        } catch (e) {
+          setCheck('chk-touch', false);
+          log('TouchOrbitControls failed: ' + e.message, 'err');
+        }
+
+        // Install ParameterPanelExtension
+        log('Installing ParameterPanelExtension...', 'info');
+        try {
+          const paramPanel = new ParameterPanelExtension();
+          app.use(paramPanel);
+          setCheck('chk-param', true);
+          log('ParameterPanelExtension installed', 'ok');
+          window.paramPanel = paramPanel;
+
+          // Check if panel element was created
+          const panelEl = document.querySelector('.param-panel');
+          const chevronEl = document.querySelector('.param-chevron');
+          log(`Panel element: ${panelEl ? 'EXISTS' : 'MISSING'}`, panelEl ? 'ok' : 'err');
+          log(`Chevron element: ${chevronEl ? 'EXISTS' : 'MISSING'}`, chevronEl ? 'ok' : 'err');
+        } catch (e) {
+          setCheck('chk-param', false);
+          log('ParameterPanelExtension failed: ' + e.message, 'err');
+          console.error(e);
+        }
+
+        // Create TiledRenderer
+        log('Creating TiledRenderer...', 'info');
+        try {
+          const tiledRenderer = new TiledRenderer(app);
+          setCheck('chk-tiled', true);
+          log('TiledRenderer created', 'ok');
+          window.tiledRenderer = tiledRenderer;
+        } catch (e) {
+          setCheck('chk-tiled', false);
+          log('TiledRenderer failed: ' + e.message, 'err');
+        }
+
+        // Setup keyboard controls
+        log('Setting up keyboard controls...', 'info');
+        try {
+          app.setupKeyboardControls();
+          setCheck('chk-keys', true);
+          log('Keyboard controls enabled', 'ok');
+        } catch (e) {
+          setCheck('chk-keys', false);
+          log('Keyboard controls failed: ' + e.message, 'err');
+        }
+
+        // Progress callback
+        app.onProgress = (info) => {
+          document.getElementById('stat-samples').textContent = info.samples;
+          document.getElementById('stat-fps').textContent = info.fps.toFixed(1);
+          document.getElementById('stat-mode').textContent = info.mode || 'interactive';
+        };
+
+        // Start rendering
+        log('Starting render loop...', 'info');
+        app.start();
+        setCheck('chk-render', true);
+        log('Rendering started!', 'ok');
+
+        // Handle resize
+        window.addEventListener('resize', () => app.resizeToWindow());
+
+        // Button handlers
+        const rendererIds = app.getAvailableRendererIds();
+
+        document.getElementById('btn-r1').onclick = () => {
+          app.selectRenderer(rendererIds[0]);
+          log('Switched to: ' + rendererIds[0], 'info');
+        };
+        document.getElementById('btn-r2').onclick = () => {
+          app.selectRenderer(rendererIds[1]);
+          log('Switched to: ' + rendererIds[1], 'info');
+        };
+        document.getElementById('btn-r3').onclick = () => {
+          app.selectRenderer(rendererIds[2]);
+          log('Switched to: ' + rendererIds[2], 'info');
+        };
+
+        document.getElementById('btn-tab').onclick = () => {
+          log('Attempting to open parameter panel...', 'info');
+          const panel = window.paramPanel;
+          if (panel) {
+            log('paramPanel exists, calling open()', 'info');
+            panel.open();
+            log('open() called', 'ok');
+          } else {
+            log('paramPanel not found!', 'err');
+          }
+        };
+
+        document.getElementById('btn-tiled').onclick = () => {
+          log('Testing TiledRenderer (small test)...', 'info');
+          const tr = window.tiledRenderer;
+          if (tr) {
+            tr.startJob({
+              targetWidth: 512,
+              targetHeight: 256,
+              targetTileSize: 256,
+              samplesPerTile: 10,
+              format: 'png'
+            }).then(() => {
+              log('Tiled render complete!', 'ok');
+            }).catch(err => {
+              log('Tiled render error: ' + err.message, 'err');
+            });
+          } else {
+            log('TiledRenderer not available', 'err');
+          }
+        };
+
+        document.getElementById('btn-reset').onclick = () => {
+          app.clearAccumulation();
+          log('Accumulation reset', 'info');
+        };
+
+        document.getElementById('btn-pause').onclick = () => {
+          if (app.isPaused()) {
+            app.resume();
+            log('Resumed', 'info');
+          } else {
+            app.pause();
+            log('Paused', 'info');
+          }
+        };
+
+        document.getElementById('btn-save').onclick = () => {
+          log('Quick save session...', 'info');
+          app.quickSave();
+          log('Session saved', 'ok');
+        };
+
+        document.getElementById('btn-load').onclick = () => {
+          log('Load session from file...', 'info');
+          app.loadSessionFromFile();
+        };
+
+        document.getElementById('btn-png').onclick = () => {
+          log('Exporting PNG...', 'info');
+          app.exportPNG();
+          log('PNG exported', 'ok');
+        };
+
+        document.getElementById('btn-hdr').onclick = () => {
+          log('Exporting HDR...', 'info');
+          app.exportHDR();
+          log('HDR exported', 'ok');
+        };
+
+        log('=== Test setup complete! ===', 'ok');
+        log('Try: Tab key to toggle param panel', 'info');
+        log('Try: Mouse drag to orbit camera', 'info');
+        log('Try: Scroll to zoom', 'info');
+
+      } catch (err) {
+        log('FATAL ERROR: ' + err.message, 'err');
+        console.error(err);
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>

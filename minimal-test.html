@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Minimal Test</title>
+  <style>
+    body { margin: 0; background: #111; color: #fff; font-family: sans-serif; padding: 20px; }
+    #canvas { width: 800px; height: 600px; border: 1px solid #333; display: block; margin-bottom: 20px; }
+    .btn { padding: 10px 20px; margin: 5px; background: #333; color: #fff; border: 1px solid #555; cursor: pointer; }
+    .btn:hover { background: #444; }
+    .btn.feature { background: #2196F3; border-color: #1976D2; }
+    #status { background: #000; padding: 15px; margin-top: 20px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>Minimal Feature Test</h1>
+  <canvas id="canvas"></canvas>
+
+  <div>
+    <button class="btn feature" id="btn-open-panel">Open Parameter Panel</button>
+    <button class="btn feature" id="btn-close-panel">Close Parameter Panel</button>
+    <button class="btn" id="btn-reset">Reset Accumulation</button>
+    <button class="btn" id="btn-save">Save Session (j)</button>
+  </div>
+
+  <div id="status">Loading...</div>
+
+  <script type="module">
+    const status = document.getElementById('status');
+    function log(msg) {
+      status.textContent += '\n' + msg;
+      console.log(msg);
+      status.scrollTop = status.scrollHeight;
+    }
+
+    async function main() {
+      log('=== MINIMAL TEST STARTING ===');
+
+      try {
+        log('Step 1: Importing modules...');
+        const mod = await import('./src/app-new/index.js');
+        log('  FlexibleApp: ' + (mod.FlexibleApp ? 'OK' : 'MISSING'));
+        log('  STRATEGY_PRESETS: ' + (mod.STRATEGY_PRESETS ? 'OK' : 'MISSING'));
+        log('  TiledRenderer: ' + (mod.TiledRenderer ? 'OK' : 'MISSING'));
+        log('  OrbitControls: ' + (mod.OrbitControls ? 'OK' : 'MISSING'));
+        log('  TouchOrbitControls: ' + (mod.TouchOrbitControls ? 'OK' : 'MISSING'));
+        log('  ParameterPanelExtension: ' + (mod.ParameterPanelExtension ? 'OK' : 'MISSING'));
+
+        const { FlexibleApp, STRATEGY_PRESETS, OrbitControls, TouchOrbitControls, ParameterPanelExtension } = mod;
+
+        log('\nStep 2: Creating FlexibleApp...');
+        const canvas = document.getElementById('canvas');
+        const app = new FlexibleApp(canvas);
+        window.app = app;
+        log('  App created: OK');
+
+        log('\nStep 3: Initializing...');
+        await app.initialize({
+          scene: { id: 'test', name: 'Test' },
+          strategies: [
+            STRATEGY_PRESETS.pathtracer.strategy,
+            STRATEGY_PRESETS['pathtracer-aovs'].strategy,
+            STRATEGY_PRESETS.debug.strategy
+          ]
+        });
+        log('  Renderers: ' + app.getAvailableRendererIds().join(', '));
+        log('  Active: ' + app.getActiveRendererId());
+
+        log('\nStep 4: Installing OrbitControls...');
+        try {
+          app.use(new OrbitControls());
+          log('  OrbitControls: OK');
+        } catch (e) {
+          log('  OrbitControls ERROR: ' + e.message);
+        }
+
+        log('\nStep 5: Installing TouchOrbitControls...');
+        try {
+          app.use(new TouchOrbitControls());
+          log('  TouchOrbitControls: OK');
+        } catch (e) {
+          log('  TouchOrbitControls ERROR: ' + e.message);
+        }
+
+        log('\nStep 6: Installing ParameterPanelExtension...');
+        let paramPanel = null;
+        try {
+          paramPanel = new ParameterPanelExtension();
+          app.use(paramPanel);
+          window.paramPanel = paramPanel;
+          log('  ParameterPanelExtension: OK');
+
+          // Check DOM elements
+          const panelEl = document.querySelector('.param-panel');
+          const chevronEl = document.querySelector('.param-chevron');
+          log('  Panel element exists: ' + (panelEl ? 'YES' : 'NO'));
+          log('  Chevron element exists: ' + (chevronEl ? 'YES' : 'NO'));
+
+          if (panelEl) {
+            log('  Panel CSS transform: ' + getComputedStyle(panelEl).transform);
+            log('  Panel z-index: ' + getComputedStyle(panelEl).zIndex);
+          }
+        } catch (e) {
+          log('  ParameterPanelExtension ERROR: ' + e.message);
+          console.error(e);
+        }
+
+        log('\nStep 7: Setting up keyboard controls...');
+        app.setupKeyboardControls();
+        log('  Keyboard controls: OK');
+
+        log('\nStep 8: Starting render...');
+        app.start();
+        log('  Render started: OK');
+
+        // Progress callback
+        app.onProgress = (info) => {
+          document.title = `Samples: ${info.samples} | FPS: ${info.fps.toFixed(1)}`;
+        };
+
+        // Button handlers
+        document.getElementById('btn-open-panel').onclick = () => {
+          log('\n>> Opening parameter panel...');
+          if (paramPanel) {
+            paramPanel.open();
+            log('   Called paramPanel.open()');
+            const panelEl = document.querySelector('.param-panel');
+            if (panelEl) {
+              log('   Panel has "open" class: ' + panelEl.classList.contains('open'));
+            }
+          } else {
+            log('   ERROR: paramPanel is null');
+          }
+        };
+
+        document.getElementById('btn-close-panel').onclick = () => {
+          log('\n>> Closing parameter panel...');
+          if (paramPanel) {
+            paramPanel.close();
+            log('   Called paramPanel.close()');
+          }
+        };
+
+        document.getElementById('btn-reset').onclick = () => {
+          log('\n>> Resetting accumulation...');
+          app.clearAccumulation();
+        };
+
+        document.getElementById('btn-save').onclick = () => {
+          log('\n>> Saving session...');
+          app.quickSave();
+        };
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+          app.resizeToWindow();
+        });
+
+        log('\n=== TEST COMPLETE ===');
+        log('');
+        log('Try these:');
+        log('  - Press TAB to toggle parameter panel');
+        log('  - Click "Open Parameter Panel" button');
+        log('  - Click on chevron (>) in top-right corner');
+        log('  - Drag on canvas to orbit camera');
+        log('  - Scroll to zoom');
+
+      } catch (err) {
+        log('\n!!! FATAL ERROR !!!');
+        log(err.message);
+        log(err.stack);
+        console.error(err);
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>
