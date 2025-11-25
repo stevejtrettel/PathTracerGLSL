@@ -915,6 +915,13 @@ export class FlexibleApp {
      */
     setupKeyboardControls(): void {
         window.addEventListener('keydown', (e) => {
+            // Skip keyboard shortcuts when user is typing in input fields
+            const target = e.target as HTMLElement;
+            const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+            if (isTyping) {
+                return; // Let the input handle the keypress
+            }
+
             // Don't handle if locked in production (except escape)
             if (this.isLocked() && e.key !== 'Escape') {
                 console.warn('Locked in production mode - press Escape to stop');
