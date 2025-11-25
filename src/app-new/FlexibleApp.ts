@@ -609,6 +609,45 @@ export class FlexibleApp {
         console.log(`Resized to ${width}×${height}`);
     }
 
+    // ============================================================================
+    // Tiled Rendering Support
+    // ============================================================================
+
+    /**
+     * Set pixel offset for tiled rendering
+     *
+     * Used when rendering a tile that's part of a larger image.
+     * The shader uses this offset to compute correct pixel positions.
+     */
+    setPixelOffset(x: number, y: number): void {
+        this.engine.setPixelOffset(x, y);
+    }
+
+    /**
+     * Clear pixel offset (return to normal rendering)
+     */
+    clearPixelOffset(): void {
+        this.engine.clearPixelOffset();
+    }
+
+    /**
+     * Set full image size for tiled rendering
+     *
+     * When rendering tiles, this is the total output image size
+     * (not the current framebuffer size). Used for correct aspect ratio
+     * and sampling patterns in progressive rendering.
+     */
+    setImageSize(width: number, height: number): void {
+        this.engine.setImageSize(width, height);
+    }
+
+    /**
+     * Clear image size (use framebuffer resolution)
+     */
+    clearImageSize(): void {
+        this.engine.clearImageSize();
+    }
+
     /**
      * Resize to window dimensions
      */

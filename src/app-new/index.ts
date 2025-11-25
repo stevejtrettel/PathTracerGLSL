@@ -12,6 +12,13 @@ export {
 } from './FlexibleRenderCoordinator.js';
 
 export {
+    TiledRenderer,
+    type TileJobConfig,
+    type TileGrid,
+    type TileJob
+} from './TiledRenderer.js';
+
+export {
     STRATEGY_PRESETS,
     type FlexibleAppConfig,
     type StrategyPreset,
