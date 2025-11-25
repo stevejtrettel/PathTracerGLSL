@@ -5,6 +5,7 @@ import { SimpleCompiler } from '../compiler/SimpleCompiler.js';
 import { FlexibleEngine } from '../engine-new/FlexibleEngine.js';
 import { FlexibleRenderCoordinator, type ProgressInfo } from './FlexibleRenderCoordinator.js';
 import { ParameterStore } from '../app/ParameterStore.js';
+import { saveHDRFile, savePNGFile } from '../app/utils/file-export.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
 import type { FlexibleAppConfig, RenderProgress, StrategyPreset } from './types.js';
 
@@ -540,7 +541,7 @@ export class FlexibleApp {
     }
 
     /**
-     * Read export data
+     * Read export data (low-level)
      */
     readExport(name: string): Float32Array | Uint8Array {
         return this.engine.readExport(name);
@@ -552,6 +553,113 @@ export class FlexibleApp {
     getCanvasSize(): [number, number] {
         const canvas = this.gl.canvas as HTMLCanvasElement;
         return [canvas.width, canvas.height];
+    }
+
+    /**
+     * Generate default filename with timestamp and sample count
+     */
+    private _generateFilename(prefix: string, extension: string): string {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const spp = this.getSampleCount();
+
+        return `${prefix}_${year}${month}${day}_${hours}${minutes}_${spp}spp.${extension}`;
+    }
+
+    /**
+     * Export PNG screenshot (LDR)
+     *
+     * Reads from 'ldr' export target and saves as PNG.
+     * @param filename - Optional custom filename (auto-generated if not provided)
+     */
+    exportPNG(filename?: string): void {
+        const exports = this.getAvailableExports();
+        if (!exports.includes('ldr')) {
+            console.warn('LDR export not available for current renderer');
+            return;
+        }
+
+        const [width, height] = this.getCanvasSize();
+        const pixels = this.readExport('ldr') as Uint8Array;
+        const name = filename || this._generateFilename('screenshot', 'png');
+
+        savePNGFile(pixels, width, height, name);
+        console.log(`Exported PNG: ${name}`);
+    }
+
+    /**
+     * Export HDR file (Radiance RGBE format)
+     *
+     * Reads from 'hdr' export target and saves as .hdr file.
+     * @param filename - Optional custom filename (auto-generated if not provided)
+     */
+    exportHDR(filename?: string): void {
+        const exports = this.getAvailableExports();
+        if (!exports.includes('hdr')) {
+            console.warn('HDR export not available for current renderer');
+            return;
+        }
+
+        const [width, height] = this.getCanvasSize();
+        const pixels = this.readExport('hdr') as Float32Array;
+        const name = filename || this._generateFilename('radiance', 'hdr');
+
+        saveHDRFile(pixels, width, height, name);
+        console.log(`Exported HDR: ${name}`);
+    }
+
+    /**
+     * Export AOV (Arbitrary Output Variable)
+     *
+     * Exports a specific AOV like 'albedo', 'normal', etc.
+     * @param aovName - Name of the AOV to export
+     * @param filename - Optional custom filename
+     */
+    exportAOV(aovName: string, filename?: string): void {
+        const exports = this.getAvailableExports();
+        if (!exports.includes(aovName)) {
+            console.warn(`AOV '${aovName}' not available. Available: ${exports.join(', ')}`);
+            return;
+        }
+
+        const [width, height] = this.getCanvasSize();
+        const pixels = this.readExport(aovName);
+        const name = filename || this._generateFilename(aovName, 'hdr');
+
+        if (pixels instanceof Float32Array) {
+            saveHDRFile(pixels, width, height, name);
+            console.log(`Exported AOV (HDR): ${name}`);
+        } else {
+            // LDR AOV - save as PNG
+            const pngName = filename || this._generateFilename(aovName, 'png');
+            savePNGFile(pixels, width, height, pngName);
+            console.log(`Exported AOV (PNG): ${pngName}`);
+        }
+    }
+
+    /**
+     * Export all available AOVs
+     *
+     * Exports all AOVs (excluding standard 'hdr' and 'ldr').
+     */
+    exportAllAOVs(): void {
+        const exports = this.getAvailableExports();
+        const aovs = exports.filter(e => e !== 'hdr' && e !== 'ldr');
+
+        if (aovs.length === 0) {
+            console.warn('No AOVs available for export');
+            return;
+        }
+
+        console.log(`Exporting ${aovs.length} AOVs...`);
+        for (const aov of aovs) {
+            this.exportAOV(aov);
+        }
+        console.log('AOV export complete');
     }
 
     // ============================================================================
@@ -636,10 +744,22 @@ export class FlexibleApp {
                 this.stop();
             }
 
-            // x/X: Export (placeholder - will be implemented in Phase 4)
-            else if (e.key === 'x' || e.key === 'X') {
-                console.log('Export triggered (not yet implemented)');
-                // TODO: Implement in Phase 4
+            // x: Export PNG screenshot
+            else if (e.key === 'x') {
+                e.preventDefault();
+                this.exportPNG();
+            }
+
+            // X (shift+x): Export HDR
+            else if (e.key === 'X') {
+                e.preventDefault();
+                this.exportHDR();
+            }
+
+            // a/A: Export all AOVs (if available)
+            else if (e.key === 'a' || e.key === 'A') {
+                e.preventDefault();
+                this.exportAllAOVs();
             }
         });
 
@@ -650,7 +770,7 @@ export class FlexibleApp {
         console.log('  \\: Pause/resume');
         console.log('  p: Production render');
         console.log('  Escape: Stop');
-        console.log('  x: Export (TODO)');
+        console.log('  x: Export PNG, X: Export HDR, a: Export AOVs');
     }
 
     // ============================================================================
