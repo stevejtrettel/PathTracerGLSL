@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>New Features Test - Phase 7-10</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      touch-action: none;
+    }
+
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: grab;
+    }
+
+    #canvas:active {
+      cursor: grabbing;
+    }
+
+    /* Loading overlay */
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      transition: opacity 0.5s;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #4CAF50;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: #666;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+
+    /* Feature indicator */
+    #feature-hint {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(74, 158, 255, 0.9);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 13px;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.5s;
+      pointer-events: none;
+    }
+
+    #feature-hint.show {
+      opacity: 1;
+    }
+
+    #feature-hint kbd {
+      background: rgba(255,255,255,0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin: 0 2px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading path tracer...</div>
+  </div>
+
+  <div id="feature-hint">
+    Press <kbd>Tab</kbd> to open Parameter Panel &bull;
+    Drag to orbit &bull;
+    Scroll to zoom
+  </div>
+
+  <script type="module">
+    import('./examples/test-new-features.ts').then(() => {
+      // Hide loading overlay
+      setTimeout(() => {
+        const loading = document.getElementById('loading');
+        if (loading) loading.classList.add('hidden');
+
+        // Show feature hint
+        const hint = document.getElementById('feature-hint');
+        if (hint) {
+          hint.classList.add('show');
+          setTimeout(() => hint.classList.remove('show'), 5000);
+        }
+      }, 500);
+    }).catch(err => {
+      console.error('Failed to load:', err);
+      document.getElementById('loading').innerHTML = `
+        <div style="color: #ff5252; text-align: center; max-width: 500px;">
+          <h2 style="margin: 0 0 10px 0;">Failed to Load</h2>
+          <p style="margin: 0; opacity: 0.7;">${err.message}</p>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html>
