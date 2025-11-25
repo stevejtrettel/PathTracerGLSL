@@ -137,6 +137,7 @@ async function main() {
     (window as any).app = app;
     (window as any).tiledRenderer = tiledRenderer;
     (window as any).orbitControls = orbitControls;
+    (window as any).paramPanel = paramPanel;
 
     // Setup UI
     setupUI(app, tiledRenderer);
@@ -428,9 +429,19 @@ function setupUI(app: FlexibleApp, tiledRenderer: TiledRenderer) {
 
     // NEW FEATURE: Parameter Panel toggle
     document.getElementById('btn-param-panel')?.addEventListener('click', () => {
-        // Simulate Tab key press to toggle panel
-        const event = new KeyboardEvent('keydown', { key: 'Tab' });
-        window.dispatchEvent(event);
+        // Access paramPanel from window (set in main)
+        const panel = (window as any).paramPanel;
+        if (panel && panel.open) {
+            // Toggle: check if panel element has 'open' class
+            const panelEl = document.querySelector('.param-panel');
+            if (panelEl?.classList.contains('open')) {
+                panel.close();
+            } else {
+                panel.open();
+            }
+        } else {
+            console.warn('Parameter panel not available');
+        }
     });
 
     // NEW FEATURE: Tiled Render

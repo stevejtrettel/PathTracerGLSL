@@ -330,6 +330,40 @@ void main() {
             pipeline,
             uniforms,
             sourceMaps: new Map(),
+            // Test parameter metadata for ParameterPanelExtension
+            parameters: {
+                'camera.position': {
+                    type: 'vec3',
+                    default: [0, 0, 5],
+                    name: 'Camera Position',
+                    group: 'Camera',
+                    triggersReset: true
+                },
+                'camera.target': {
+                    type: 'vec3',
+                    default: [0, 0, 0],
+                    name: 'Camera Target',
+                    group: 'Camera',
+                    triggersReset: true
+                },
+                'render.exposure': {
+                    type: 'float',
+                    default: 1.0,
+                    range: [0.1, 5.0],
+                    step: 0.1,
+                    name: 'Exposure',
+                    group: 'Render',
+                    triggersReset: false
+                },
+                'render.maxBounces': {
+                    type: 'int',
+                    default: 4,
+                    range: [1, 10],
+                    name: 'Max Bounces',
+                    group: 'Render',
+                    triggersReset: true
+                }
+            },
             exportTargets: {
                 'hdr': {
                     bufferId: 'accumulation_current',
