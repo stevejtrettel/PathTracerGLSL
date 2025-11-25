@@ -296,7 +296,7 @@ void main() {
             }
         };
 
-        // Uniforms for pathtracer
+        // Uniforms for pathtracer (camelCase: u_variableName convention)
         const uniforms: UniformBinding[] = [
             {
                 uniform: 'u_resolution',
@@ -305,13 +305,13 @@ void main() {
                 compute: (params) => params['engine.resolution']
             },
             {
-                uniform: 'u_sample_count',
+                uniform: 'u_sampleCount',
                 parameters: ['engine.sampleCount'],
                 type: 'int',
                 compute: (params) => params['engine.sampleCount']
             },
             {
-                uniform: 'u_frame_index',
+                uniform: 'u_frameIndex',
                 parameters: ['engine.frameIndex'],
                 type: 'int',
                 compute: (params) => params['engine.frameIndex']
@@ -401,8 +401,8 @@ precision highp float;
 out vec4 fragColor;
 
 uniform vec2 u_resolution;
-uniform int u_sample_count;
-uniform int u_frame_index;
+uniform int u_sampleCount;
+uniform int u_frameIndex;
 uniform float u_time;
 uniform sampler2D u_previous;
 
@@ -561,7 +561,7 @@ void main() {
 
     // Initialize RNG
     uvec2 pixel = uvec2(gl_FragCoord.xy);
-    rng_seed = hash_init(pixel, uint(u_frame_index));
+    rng_seed = hash_init(pixel, uint(u_frameIndex));
     rng_counter = 0U;
 
     // Generate ray with jitter
@@ -581,7 +581,7 @@ void main() {
 
     // Accumulate with previous frame
     vec3 prev = texture(u_previous, uv).rgb;
-    float blend = 1.0 / float(u_sample_count + 1);
+    float blend = 1.0 / float(u_sampleCount + 1);
     vec3 accumulated = mix(prev, color, blend);
 
     fragColor = vec4(accumulated, 1.0);
@@ -757,13 +757,13 @@ void main() {
                 compute: (params) => params['engine.resolution']
             },
             {
-                uniform: 'u_sample_count',
+                uniform: 'u_sampleCount',
                 parameters: ['engine.sampleCount'],
                 type: 'int',
                 compute: (params) => params['engine.sampleCount']
             },
             {
-                uniform: 'u_frame_index',
+                uniform: 'u_frameIndex',
                 parameters: ['engine.frameIndex'],
                 type: 'int',
                 compute: (params) => params['engine.frameIndex']
@@ -775,7 +775,7 @@ void main() {
                 compute: (params) => params['engine.time']
             },
             {
-                uniform: 'u_display_mode',
+                uniform: 'u_displayMode',
                 parameters: ['renderer.displayMode'],
                 type: 'int',
                 compute: (params) => params['renderer.displayMode'] || 0
@@ -826,8 +826,8 @@ layout(location = 1) out vec4 o_albedo;
 layout(location = 2) out vec4 o_normal;
 
 uniform vec2 u_resolution;
-uniform int u_sample_count;
-uniform int u_frame_index;
+uniform int u_sampleCount;
+uniform int u_frameIndex;
 uniform float u_time;
 uniform sampler2D u_previous;  // Previous radiance
 
@@ -986,7 +986,7 @@ void main() {
 
     // Initialize RNG
     uvec2 pixel = uvec2(gl_FragCoord.xy);
-    rng_seed = hash_init(pixel, uint(u_frame_index));
+    rng_seed = hash_init(pixel, uint(u_frameIndex));
     rng_counter = 0U;
 
     // Generate ray with jitter
@@ -1015,7 +1015,7 @@ void main() {
 
     // Accumulate radiance with previous frame
     vec3 prev_radiance = texture(u_previous, uv).rgb;
-    float blend = 1.0 / float(u_sample_count + 1);
+    float blend = 1.0 / float(u_sampleCount + 1);
     vec3 accumulated_radiance = mix(prev_radiance, radiance, blend);
 
     // Write MRT outputs
@@ -1039,7 +1039,7 @@ uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 uniform sampler2D u_albedo;
 uniform sampler2D u_normal;
-uniform int u_display_mode;  // 0=radiance, 1=albedo, 2=normal
+uniform int u_displayMode;  // 0=radiance, 1=albedo, 2=normal
 
 // Gamma correction
 vec3 gamma_correct(vec3 linear) {
@@ -1051,10 +1051,10 @@ void main() {
 
     vec3 color;
 
-    if (u_display_mode == 1) {
+    if (u_displayMode == 1) {
         // Albedo (already in [0,1], but apply gamma)
         color = gamma_correct(texture(u_albedo, uv).rgb);
-    } else if (u_display_mode == 2) {
+    } else if (u_displayMode == 2) {
         // Normal (encoded as [0,1], display directly)
         color = texture(u_normal, uv).rgb;
     } else {

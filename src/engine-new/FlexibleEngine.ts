@@ -736,10 +736,10 @@ export class FlexibleEngine {
             if (envCdfMargLoc) this.textureRegistry.bind('env_cdf_marg', envCdfMargLoc);
 
             // Set environment uniform values
-            const envResLoc = gl.getUniformLocation(program, 'u_envResolution');
+            const envSizeLoc = gl.getUniformLocation(program, 'u_envSize');
             const envWeightLoc = gl.getUniformLocation(program, 'u_envTotalWeight');
 
-            if (envResLoc) gl.uniform2f(envResLoc, envWidth, envHeight);
+            if (envSizeLoc) gl.uniform2f(envSizeLoc, envWidth, envHeight);
             if (envWeightLoc) gl.uniform1f(envWeightLoc, totalWeight);
         }
     }
@@ -784,11 +784,11 @@ export class FlexibleEngine {
             // Cache locations for engine uniforms
             const engineUniformNames = [
                 'u_resolution',
-                'u_image_size',
-                'u_frame_index',
+                'u_imageSize',
+                'u_frameIndex',
                 'u_time',
-                'u_sample_count',
-                'u_pixel_offset'
+                'u_sampleCount',
+                'u_pixelOffset'
             ];
 
             for (const uniformName of engineUniformNames) {
@@ -834,18 +834,18 @@ export class FlexibleEngine {
             // Use program
             this.gl.useProgram(program);
 
-            // Set each uniform
+            // Set each uniform (using camelCase: u_variableName convention)
             const loc_resolution = locations.get('u_resolution');
             if (loc_resolution) {
                 this.gl.uniform2f(loc_resolution, uniforms.resolution[0], uniforms.resolution[1]);
             }
 
-            const loc_imageSize = locations.get('u_image_size');
+            const loc_imageSize = locations.get('u_imageSize');
             if (loc_imageSize) {
                 this.gl.uniform2f(loc_imageSize, uniforms.imageSize[0], uniforms.imageSize[1]);
             }
 
-            const loc_frameIndex = locations.get('u_frame_index');
+            const loc_frameIndex = locations.get('u_frameIndex');
             if (loc_frameIndex) {
                 this.gl.uniform1i(loc_frameIndex, uniforms.frameIndex);
             }
@@ -855,12 +855,12 @@ export class FlexibleEngine {
                 this.gl.uniform1f(loc_time, uniforms.time);
             }
 
-            const loc_sampleCount = locations.get('u_sample_count');
+            const loc_sampleCount = locations.get('u_sampleCount');
             if (loc_sampleCount) {
                 this.gl.uniform1i(loc_sampleCount, uniforms.sampleCount);
             }
 
-            const loc_pixelOffset = locations.get('u_pixel_offset');
+            const loc_pixelOffset = locations.get('u_pixelOffset');
             if (loc_pixelOffset) {
                 this.gl.uniform2f(loc_pixelOffset, uniforms.pixelOffset[0], uniforms.pixelOffset[1]);
             }
