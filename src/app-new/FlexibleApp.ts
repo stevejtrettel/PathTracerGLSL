@@ -4,6 +4,7 @@
 import { SimpleCompiler } from '../compiler/SimpleCompiler.js';
 import { FlexibleEngine } from '../engine-new/FlexibleEngine.js';
 import { FlexibleRenderCoordinator, type ProgressInfo } from './FlexibleRenderCoordinator.js';
+import { ParameterStore } from '../app/ParameterStore.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
 import type { FlexibleAppConfig, RenderProgress, StrategyPreset } from './types.js';
 
@@ -29,6 +30,7 @@ export class FlexibleApp {
     private compiler: ICompiler;
     private engine: FlexibleEngine;
     private coordinator: FlexibleRenderCoordinator;
+    private parameterStore: ParameterStore;
     private gl: WebGL2RenderingContext;
 
     // State
@@ -40,6 +42,7 @@ export class FlexibleApp {
     // Callbacks
     public onProgress?: (progress: RenderProgress) => void;
     public onRendererChanged?: (rendererId: string) => void;
+    public onParameterChanged?: (path: string, value: any) => void;
 
     constructor(canvas: HTMLCanvasElement) {
         // Setup canvas
@@ -66,6 +69,29 @@ export class FlexibleApp {
         this.compiler = new SimpleCompiler();
         this.engine = new FlexibleEngine(gl);
         this.coordinator = new FlexibleRenderCoordinator(this.engine);
+        this.parameterStore = new ParameterStore();
+
+        // Wire ParameterStore changes to engine and accumulation reset
+        this.parameterStore.onChange = (changes) => {
+            for (const change of changes.changes) {
+                // Forward to engine
+                this.engine.setParameter(change.path, change.newValue);
+
+                // Check if should reset accumulation
+                // Skip if this is a "resend" (oldValue === newValue) from renderer switch
+                const isResend = change.oldValue === change.newValue;
+                const isRendering = this.coordinator.isRunning() || this.coordinator.isPaused();
+
+                if (!isResend && isRendering) {
+                    if (this.coordinator.shouldResetForParameter(change.path)) {
+                        this.coordinator.resetAccumulation(`parameter: ${change.path}`);
+                    }
+                }
+
+                // Notify external listeners
+                this.onParameterChanged?.(change.path, change.newValue);
+            }
+        };
 
         // Wire coordinator progress to app callback
         this.coordinator.onProgress = (info: ProgressInfo) => {
@@ -123,11 +149,9 @@ export class FlexibleApp {
         this.engine.selectRenderer(firstRenderer.id);
         this.activeRendererId = firstRenderer.id;
 
-        // Apply initial parameters if provided
+        // Apply initial parameters if provided (via store for change notification)
         if (initialParameters) {
-            for (const [key, value] of Object.entries(initialParameters)) {
-                this.engine.setParameter(key, value);
-            }
+            this.parameterStore.batch(initialParameters);
         }
 
         // TODO: Load environment HDR if provided
@@ -187,7 +211,7 @@ export class FlexibleApp {
     /**
      * Switch to a different renderer
      *
-     * Preserves common parameter values across the switch.
+     * Preserves parameter values across the switch using ParameterStore.
      */
     selectRenderer(rendererId: string): void {
         if (rendererId === this.activeRendererId) {
@@ -199,19 +223,13 @@ export class FlexibleApp {
             return;
         }
 
-        // Get current parameter values to preserve
-        const currentParams = this.engine.getAllParameters();
-
-        // Switch renderer
+        // Switch renderer in engine
         this.engine.selectRenderer(rendererId);
         this.activeRendererId = rendererId;
 
-        // Re-apply common parameters (parameter persistence)
-        for (const [key, value] of Object.entries(currentParams)) {
-            // Skip engine-internal parameters
-            if (key.startsWith('engine.')) continue;
-            this.engine.setParameter(key, value);
-        }
+        // Re-send all parameters to the new renderer (parameter persistence)
+        // This bypasses accumulation reset since it's a renderer switch
+        this.parameterStore.resendAll();
 
         // Reset accumulation for new renderer
         this.engine.clearAccumulation();
@@ -295,26 +313,37 @@ export class FlexibleApp {
      * Start production rendering (goal-driven, locked)
      *
      * Resets accumulation before starting.
+     * Locks parameters during render.
      * Returns Promise that resolves when target samples reached.
      */
     async renderProduction(targetSamples: number): Promise<void> {
+        // Lock parameters during production
+        this.parameterStore.lock();
+
         // Reset accumulation before production
         this.coordinator.resetAccumulation('production_start');
 
-        return this.coordinator.startProduction({
-            targetSamples,
-            onProgress: (info) => {
-                // Log every 100 samples
-                if (info.samples % 100 === 0) {
-                    const pct = info.percentComplete?.toFixed(1) || '0.0';
-                    console.log(`Production: ${info.samples}/${targetSamples} (${pct}%)`);
+        try {
+            await this.coordinator.startProduction({
+                targetSamples,
+                onProgress: (info) => {
+                    // Log every 100 samples
+                    if (info.samples % 100 === 0) {
+                        const pct = info.percentComplete?.toFixed(1) || '0.0';
+                        console.log(`Production: ${info.samples}/${targetSamples} (${pct}%)`);
+                    }
                 }
-            }
-        });
+            });
+        } finally {
+            // Always unlock parameters when done (success or error)
+            this.parameterStore.unlock();
+        }
     }
 
     /**
      * Extend production render with additional samples (no reset)
+     *
+     * Parameters remain locked during extension.
      */
     async extendProduction(additionalSamples: number): Promise<void> {
         const currentSamples = this.coordinator.getSampleCount();
@@ -322,9 +351,22 @@ export class FlexibleApp {
 
         console.log(`Extending production: +${additionalSamples} (${currentSamples} → ${newTarget})`);
 
-        return this.coordinator.startProduction({
-            targetSamples: newTarget
-        });
+        // Lock parameters if not already locked
+        const wasLocked = this.parameterStore.isLocked();
+        if (!wasLocked) {
+            this.parameterStore.lock();
+        }
+
+        try {
+            await this.coordinator.startProduction({
+                targetSamples: newTarget
+            });
+        } finally {
+            // Only unlock if we locked it
+            if (!wasLocked) {
+                this.parameterStore.unlock();
+            }
+        }
     }
 
     // ============================================================================
@@ -386,23 +428,79 @@ export class FlexibleApp {
 
     /**
      * Set a parameter value
+     *
+     * Changes flow through ParameterStore:
+     * 1. Store validates and persists the value
+     * 2. onChange forwards to engine
+     * 3. Coordinator checks if accumulation should reset
+     * 4. External listeners are notified
      */
     setParameter(path: string, value: any): void {
-        this.engine.setParameter(path, value);
+        this.parameterStore.set(path, value);
+    }
+
+    /**
+     * Set multiple parameters in a batch
+     *
+     * More efficient than individual setParameter calls.
+     */
+    setParameters(params: Record<string, any>): void {
+        this.parameterStore.batch(params);
     }
 
     /**
      * Get a parameter value
      */
     getParameter(path: string): any {
-        return this.engine.getParameter(path);
+        return this.parameterStore.get(path);
     }
 
     /**
      * Get all parameter values
      */
     getAllParameters(): Record<string, any> {
-        return this.engine.getAllParameters();
+        return this.parameterStore.serialize();
+    }
+
+    /**
+     * Check if parameters are locked (during production render)
+     */
+    areParametersLocked(): boolean {
+        return this.parameterStore.isLocked();
+    }
+
+    // ============================================================================
+    // Session Management
+    // ============================================================================
+
+    /**
+     * Save session state (parameters only for now)
+     *
+     * Returns a JSON-serializable object that can be stored and
+     * passed to restoreSession() later.
+     */
+    saveSession(): { parameters: Record<string, any>; rendererId: string | null } {
+        return {
+            parameters: this.parameterStore.serialize(),
+            rendererId: this.activeRendererId
+        };
+    }
+
+    /**
+     * Restore session state
+     *
+     * Restores parameters and optionally switches to the saved renderer.
+     */
+    restoreSession(session: { parameters: Record<string, any>; rendererId?: string | null }): void {
+        // Restore parameters
+        this.parameterStore.restore(session.parameters);
+
+        // Optionally restore renderer selection
+        if (session.rendererId && this.renderers.has(session.rendererId)) {
+            this.selectRenderer(session.rendererId);
+        }
+
+        console.log('Session restored');
     }
 
     // ============================================================================
