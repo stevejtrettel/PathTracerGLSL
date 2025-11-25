@@ -287,6 +287,10 @@ export class TiledRenderer {
         this.app.clearImageSize();
         this.app.resizeToWindow();
 
+        // Clear accumulation and restart interactive rendering
+        this.app.clearAccumulation();
+        this.app.start();
+
         this.currentJob = null;
     }
 

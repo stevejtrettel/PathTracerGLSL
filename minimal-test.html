@@ -19,6 +19,7 @@
   <div>
     <button class="btn feature" id="btn-open-panel">Open Parameter Panel</button>
     <button class="btn feature" id="btn-close-panel">Close Parameter Panel</button>
+    <button class="btn feature" id="btn-tiled">Tiled Render Test</button>
     <button class="btn" id="btn-reset">Reset Accumulation</button>
     <button class="btn" id="btn-save">Save Session (j)</button>
   </div>
@@ -46,7 +47,7 @@
         log('  TouchOrbitControls: ' + (mod.TouchOrbitControls ? 'OK' : 'MISSING'));
         log('  ParameterPanelExtension: ' + (mod.ParameterPanelExtension ? 'OK' : 'MISSING'));
 
-        const { FlexibleApp, STRATEGY_PRESETS, OrbitControls, TouchOrbitControls, ParameterPanelExtension } = mod;
+        const { FlexibleApp, STRATEGY_PRESETS, TiledRenderer, OrbitControls, TouchOrbitControls, ParameterPanelExtension } = mod;
 
         log('\nStep 2: Creating FlexibleApp...');
         const canvas = document.getElementById('canvas');
@@ -109,7 +110,12 @@
         app.setupKeyboardControls();
         log('  Keyboard controls: OK');
 
-        log('\nStep 8: Starting render...');
+        log('\nStep 8: Creating TiledRenderer...');
+        const tiledRenderer = new TiledRenderer(app);
+        window.tiledRenderer = tiledRenderer;
+        log('  TiledRenderer: OK');
+
+        log('\nStep 9: Starting render...');
         app.start();
         log('  Render started: OK');
 
@@ -149,6 +155,22 @@
         document.getElementById('btn-save').onclick = () => {
           log('\n>> Saving session...');
           app.quickSave();
+        };
+
+        document.getElementById('btn-tiled').onclick = () => {
+          log('\n>> Starting tiled render test...');
+          log('   Config: 512x256, tiles=256, samples=10');
+          tiledRenderer.startJob({
+            targetWidth: 512,
+            targetHeight: 256,
+            targetTileSize: 256,
+            samplesPerTile: 10,
+            format: 'png'
+          }).then(() => {
+            log('   Tiled render COMPLETE!');
+          }).catch(err => {
+            log('   Tiled render ERROR: ' + err.message);
+          });
         };
 
         // Resize handler
