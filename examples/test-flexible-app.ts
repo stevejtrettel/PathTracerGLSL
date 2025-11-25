@@ -1,27 +1,74 @@
 // examples/test-flexible-app.ts
-// Test for FlexibleApp architecture
+// Test for FlexibleApp architecture with full UI
 
-import { FlexibleApp, STRATEGY_PRESETS } from '../src/app-new/index.js';
+import { FlexibleApp, STRATEGY_PRESETS, type Extension } from '../src/app-new/index.js';
 import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 
 /**
- * Simple FPS tracker
+ * Simple stats extension demonstrating the extension API
  */
-class FPSTracker {
-    private frames: number[] = [];
-    private lastTime = performance.now();
+class StatsExtension implements Extension {
+    name = 'stats';
+    version = '1.0.0';
+    description = 'Displays render statistics';
 
-    update(): number {
-        const now = performance.now();
-        const delta = now - this.lastTime;
-        this.lastTime = now;
+    private app: FlexibleApp | null = null;
+    private unsubscribe: (() => void)[] = [];
 
-        this.frames.push(1000 / delta);
-        if (this.frames.length > 60) {
-            this.frames.shift();
+    install(app: FlexibleApp, bus: any): void {
+        this.app = app;
+
+        // Subscribe to events
+        const onProgress = (info: any) => {
+            this.updateDisplay(info);
+        };
+
+        const onRendererSwitch = (data: any) => {
+            console.log(`[StatsExtension] Renderer switched: ${data.rendererId}`);
+        };
+
+        bus.on('render.progress', onProgress);
+        bus.on('renderer.switched', onRendererSwitch);
+
+        this.unsubscribe.push(() => bus.off('render.progress', onProgress));
+        this.unsubscribe.push(() => bus.off('renderer.switched', onRendererSwitch));
+
+        console.log('[StatsExtension] Installed');
+    }
+
+    uninstall(): void {
+        for (const unsub of this.unsubscribe) {
+            unsub();
         }
+        this.unsubscribe = [];
+        console.log('[StatsExtension] Uninstalled');
+    }
 
-        return this.frames.reduce((a, b) => a + b, 0) / this.frames.length;
+    private updateDisplay(info: any): void {
+        // Update mode/state display
+        const modeEl = document.getElementById('stat-mode');
+        const stateEl = document.getElementById('stat-state');
+        const timeEl = document.getElementById('stat-time');
+
+        if (modeEl) modeEl.textContent = info.mode;
+        if (stateEl) stateEl.textContent = info.state;
+        if (timeEl) timeEl.textContent = (info.elapsedTime / 1000).toFixed(1) + 's';
+
+        // Update progress bar for production mode
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        if (info.mode === 'production' && info.percentComplete !== undefined) {
+            if (progressBar) {
+                progressBar.style.width = info.percentComplete + '%';
+                progressBar.style.display = 'block';
+            }
+            if (progressText) {
+                progressText.textContent = `${info.percentComplete.toFixed(1)}%`;
+            }
+        } else {
+            if (progressBar) progressBar.style.display = 'none';
+            if (progressText) progressText.textContent = '';
+        }
     }
 }
 
@@ -49,7 +96,7 @@ async function main() {
 
     // Create app
     const app = new FlexibleApp(canvas);
-    console.log('✅ FlexibleApp created');
+    console.log('FlexibleApp created');
 
     // Define scene
     const scene: SceneDescription = {
@@ -69,7 +116,10 @@ async function main() {
         scene,
         strategies
     });
-    console.log('✅ FlexibleApp initialized');
+    console.log('FlexibleApp initialized');
+
+    // Install stats extension
+    app.use(new StatsExtension());
 
     // Store globally for debugging
     (window as any).app = app;
@@ -78,20 +128,18 @@ async function main() {
     setupUI(app);
 
     // Setup progress tracking
-    const fpsTracker = new FPSTracker();
     app.onProgress = (progress) => {
-        updateStats(progress.samples, fpsTracker.update());
+        updateStats(progress.samples, progress.fps);
     };
 
     // Setup renderer change callback
     app.onRendererChanged = (rendererId) => {
         updateActiveButton(rendererId);
-        console.log(`Renderer changed to: ${rendererId}`);
     };
 
     // Start rendering
     app.start();
-    console.log('✅ Render loop started');
+    console.log('Render loop started');
 
     // Handle resize
     window.addEventListener('resize', () => {
@@ -99,7 +147,14 @@ async function main() {
     });
 
     console.log('=== FlexibleApp Test Running ===');
-    console.log('Press 1-3 to switch renderers, R to reset, Space to pause');
+    console.log('Controls:');
+    console.log('  1-3: Switch renderers');
+    console.log('  r: Reset accumulation');
+    console.log('  Space: Toggle rendering');
+    console.log('  \\: Pause/resume');
+    console.log('  p: Production render');
+    console.log('  Escape: Stop');
+    console.log('  x/X/a: Export PNG/HDR/AOVs');
 }
 
 /**
@@ -115,17 +170,20 @@ function setupUI(app: FlexibleApp) {
                 position: fixed;
                 top: 20px;
                 left: 20px;
-                background: rgba(0, 0, 0, 0.8);
+                background: rgba(0, 0, 0, 0.85);
                 color: #fff;
                 padding: 20px;
                 border-radius: 8px;
-                font-family: system-ui, sans-serif;
+                font-family: system-ui, -apple-system, sans-serif;
                 font-size: 14px;
                 z-index: 1000;
+                min-width: 280px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             }
             #ui h2 {
                 margin: 0 0 15px 0;
                 color: #4CAF50;
+                font-size: 18px;
             }
             .ui-section {
                 margin-bottom: 15px;
@@ -133,28 +191,37 @@ function setupUI(app: FlexibleApp) {
             .ui-label {
                 display: block;
                 margin-bottom: 5px;
-                color: #aaa;
-                font-size: 12px;
+                color: #888;
+                font-size: 11px;
                 text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             .button-group {
                 display: flex;
                 gap: 8px;
+                flex-wrap: wrap;
             }
             button {
-                padding: 8px 16px;
+                padding: 8px 14px;
                 background: #333;
                 color: #fff;
                 border: 1px solid #555;
                 border-radius: 4px;
                 cursor: pointer;
+                font-size: 13px;
+                transition: all 0.15s;
             }
             button:hover {
                 background: #444;
+                border-color: #666;
             }
             button.active {
                 background: #4CAF50;
                 border-color: #4CAF50;
+            }
+            button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
             }
             .stat {
                 display: flex;
@@ -162,8 +229,36 @@ function setupUI(app: FlexibleApp) {
                 padding: 5px 0;
                 border-bottom: 1px solid #333;
             }
-            .stat-label { color: #999; }
-            .stat-value { color: #fff; font-weight: bold; }
+            .stat:last-child {
+                border-bottom: none;
+            }
+            .stat-label { color: #888; }
+            .stat-value { color: #fff; font-weight: 500; font-variant-numeric: tabular-nums; }
+            .progress-container {
+                height: 4px;
+                background: #333;
+                border-radius: 2px;
+                margin-top: 10px;
+                overflow: hidden;
+            }
+            #progress-bar {
+                height: 100%;
+                background: #4CAF50;
+                width: 0%;
+                transition: width 0.1s;
+                display: none;
+            }
+            .export-group {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            .info-text {
+                font-size: 11px;
+                color: #666;
+                margin-top: 10px;
+                line-height: 1.4;
+            }
         </style>
         <h2>FlexibleApp Test</h2>
 
@@ -171,7 +266,7 @@ function setupUI(app: FlexibleApp) {
             <span class="ui-label">Renderer</span>
             <div class="button-group">
                 <button id="btn-debug">1: Debug</button>
-                <button id="btn-pathtracer" class="active">2: Pathtracer</button>
+                <button id="btn-pathtracer" class="active">2: Path</button>
                 <button id="btn-aovs">3: AOVs</button>
             </div>
         </div>
@@ -186,10 +281,46 @@ function setupUI(app: FlexibleApp) {
                 <span class="stat-label">FPS</span>
                 <span class="stat-value" id="stat-fps">0</span>
             </div>
+            <div class="stat">
+                <span class="stat-label">Time</span>
+                <span class="stat-value" id="stat-time">0s</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Mode</span>
+                <span class="stat-value" id="stat-mode">interactive</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">State</span>
+                <span class="stat-value" id="stat-state">rendering</span>
+            </div>
+            <div class="progress-container">
+                <div id="progress-bar"></div>
+            </div>
+            <span id="progress-text" style="font-size: 12px; color: #4CAF50;"></span>
         </div>
 
         <div class="ui-section">
-            <button id="btn-reset" style="width: 100%;">Reset (R)</button>
+            <span class="ui-label">Controls</span>
+            <div class="button-group">
+                <button id="btn-reset">Reset (r)</button>
+                <button id="btn-pause">Pause (\\)</button>
+                <button id="btn-production">Prod (p)</button>
+            </div>
+        </div>
+
+        <div class="ui-section">
+            <span class="ui-label">Export</span>
+            <div class="export-group">
+                <button id="btn-png">PNG (x)</button>
+                <button id="btn-hdr">HDR (X)</button>
+                <button id="btn-aov">All AOVs (a)</button>
+                <button id="btn-session">Save Session</button>
+            </div>
+        </div>
+
+        <div class="info-text">
+            Press 1-3 for renderers, Space to start/stop<br>
+            Available exports: <span id="export-list">-</span>
         </div>
     `;
     document.body.appendChild(ui);
@@ -213,6 +344,67 @@ function setupUI(app: FlexibleApp) {
         app.clearAccumulation();
     });
 
+    document.getElementById('btn-pause')?.addEventListener('click', () => {
+        if (app.isPaused()) {
+            app.resume();
+        } else {
+            app.pause();
+        }
+        updatePauseButton(app);
+    });
+
+    document.getElementById('btn-production')?.addEventListener('click', () => {
+        const samples = prompt('Target samples?', '500');
+        if (samples) {
+            const count = parseInt(samples);
+            if (count > 0) {
+                app.renderProduction(count).then(() => {
+                    console.log('Production complete!');
+                }).catch(err => {
+                    if (err.name === 'RenderStopped') {
+                        console.log('Production stopped');
+                    }
+                });
+            }
+        }
+    });
+
+    document.getElementById('btn-png')?.addEventListener('click', () => {
+        app.exportPNG();
+    });
+
+    document.getElementById('btn-hdr')?.addEventListener('click', () => {
+        app.exportHDR();
+    });
+
+    document.getElementById('btn-aov')?.addEventListener('click', () => {
+        app.exportAllAOVs();
+    });
+
+    document.getElementById('btn-session')?.addEventListener('click', () => {
+        const session = app.saveSession();
+        const json = JSON.stringify(session, null, 2);
+        console.log('Session saved:', session);
+
+        // Download as JSON file
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'session.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // Show available exports
+    setTimeout(() => {
+        const exports = app.getAvailableExports();
+        const exportList = document.getElementById('export-list');
+        if (exportList) {
+            exportList.textContent = exports.join(', ') || 'none';
+        }
+    }, 100);
+
     // Keyboard controls
     app.setupKeyboardControls();
 }
@@ -229,6 +421,16 @@ function updateStats(samples: number, fps: number) {
 }
 
 /**
+ * Update pause button text
+ */
+function updatePauseButton(app: FlexibleApp) {
+    const btn = document.getElementById('btn-pause');
+    if (btn) {
+        btn.textContent = app.isPaused() ? 'Resume (\\)' : 'Pause (\\)';
+    }
+}
+
+/**
  * Update active button state
  */
 function updateActiveButton(rendererId: string) {
@@ -239,6 +441,18 @@ function updateActiveButton(rendererId: string) {
     btnDebug?.classList.toggle('active', rendererId.includes('debug'));
     btnPathtracer?.classList.toggle('active', rendererId.includes('pathtracer') && !rendererId.includes('aovs'));
     btnAovs?.classList.toggle('active', rendererId.includes('aovs'));
+
+    // Update export list when renderer changes
+    setTimeout(() => {
+        const app = (window as any).app as FlexibleApp;
+        if (app) {
+            const exports = app.getAvailableExports();
+            const exportList = document.getElementById('export-list');
+            if (exportList) {
+                exportList.textContent = exports.join(', ') || 'none';
+            }
+        }
+    }, 100);
 }
 
 // Run
