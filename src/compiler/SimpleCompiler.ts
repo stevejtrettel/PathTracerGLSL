@@ -401,6 +401,8 @@ precision highp float;
 out vec4 fragColor;
 
 uniform vec2 u_resolution;
+uniform vec2 u_imageSize;     // Full image size for tiled rendering
+uniform vec2 u_pixelOffset;   // Tile offset in full image
 uniform int u_sampleCount;
 uniform int u_frameIndex;
 uniform float u_time;
@@ -517,10 +519,11 @@ bool scene_intersect(Ray ray, out Hit hit) {
 }
 
 // Simple camera
-Ray generate_camera_ray(vec2 uv, vec2 jitter) {
+Ray generate_camera_ray(vec2 uv, vec2 jitter, vec2 imageSize) {
     // Perspective camera with better FOV
-    vec2 ndc = (uv + jitter / u_resolution) * 2.0 - 1.0;
-    ndc.x *= u_resolution.x / u_resolution.y;
+    // Use full image size for aspect ratio (important for tiled rendering)
+    vec2 ndc = (uv + jitter / imageSize) * 2.0 - 1.0;
+    ndc.x *= imageSize.x / imageSize.y;
 
     // Camera positioned to see sphere and floor
     vec3 origin = vec3(2.0, 1.0, 4.0);
@@ -556,17 +559,20 @@ vec3 shade(Hit hit) {
 }
 
 void main() {
-    // Compute UVs from fragment coordinates
-    vec2 uv = gl_FragCoord.xy / u_resolution;
+    // For tiled rendering: use full image size if set, otherwise use resolution
+    vec2 imageSize = u_imageSize.x > 0.0 ? u_imageSize : u_resolution;
 
-    // Initialize RNG
-    uvec2 pixel = uvec2(gl_FragCoord.xy);
+    // Compute UVs accounting for tile offset in full image
+    vec2 uv = (gl_FragCoord.xy + u_pixelOffset) / imageSize;
+
+    // Initialize RNG using global pixel position for consistent noise across tiles
+    uvec2 pixel = uvec2(gl_FragCoord.xy + u_pixelOffset);
     rng_seed = hash_init(pixel, uint(u_frameIndex));
     rng_counter = 0U;
 
     // Generate ray with jitter
     vec2 jitter = random2() - 0.5;
-    Ray ray = generate_camera_ray(uv, jitter);
+    Ray ray = generate_camera_ray(uv, jitter, imageSize);
 
     // Trace
     Hit hit;
@@ -826,6 +832,8 @@ layout(location = 1) out vec4 o_albedo;
 layout(location = 2) out vec4 o_normal;
 
 uniform vec2 u_resolution;
+uniform vec2 u_imageSize;     // Full image size for tiled rendering
+uniform vec2 u_pixelOffset;   // Tile offset in full image
 uniform int u_sampleCount;
 uniform int u_frameIndex;
 uniform float u_time;
@@ -942,10 +950,11 @@ bool scene_intersect(Ray ray, out Hit hit) {
 }
 
 // Simple camera
-Ray generate_camera_ray(vec2 uv, vec2 jitter) {
+Ray generate_camera_ray(vec2 uv, vec2 jitter, vec2 imageSize) {
     // Perspective camera with better FOV
-    vec2 ndc = (uv + jitter / u_resolution) * 2.0 - 1.0;
-    ndc.x *= u_resolution.x / u_resolution.y;
+    // Use full image size for aspect ratio (important for tiled rendering)
+    vec2 ndc = (uv + jitter / imageSize) * 2.0 - 1.0;
+    ndc.x *= imageSize.x / imageSize.y;
 
     // Camera positioned to see sphere and floor
     vec3 origin = vec3(2.0, 1.0, 4.0);
@@ -981,17 +990,20 @@ vec3 shade(Hit hit) {
 }
 
 void main() {
-    // Compute UVs from fragment coordinates
-    vec2 uv = gl_FragCoord.xy / u_resolution;
+    // For tiled rendering: use full image size if set, otherwise use resolution
+    vec2 imageSize = u_imageSize.x > 0.0 ? u_imageSize : u_resolution;
 
-    // Initialize RNG
-    uvec2 pixel = uvec2(gl_FragCoord.xy);
+    // Compute UVs accounting for tile offset in full image
+    vec2 uv = (gl_FragCoord.xy + u_pixelOffset) / imageSize;
+
+    // Initialize RNG using global pixel position for consistent noise across tiles
+    uvec2 pixel = uvec2(gl_FragCoord.xy + u_pixelOffset);
     rng_seed = hash_init(pixel, uint(u_frameIndex));
     rng_counter = 0U;
 
     // Generate ray with jitter
     vec2 jitter = random2() - 0.5;
-    Ray ray = generate_camera_ray(uv, jitter);
+    Ray ray = generate_camera_ray(uv, jitter, imageSize);
 
     // Trace
     Hit hit;
