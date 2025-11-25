@@ -937,16 +937,21 @@ export class ParameterPanelExtension implements Extension {
     }
 
     private attachKeyboardShortcut(): void {
+        // Use capture phase to intercept Tab before browser's focus cycling
         window.addEventListener('keydown', (e) => {
-            if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                // Only intercept if not in an input field
+            if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+                // Allow Tab in form fields within the param panel itself
                 const target = e.target as HTMLElement;
-                if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'SELECT') {
+                const inParamPanel = target.closest('.param-panel');
+
+                if (!inParamPanel) {
+                    // Outside param panel - toggle it
                     e.preventDefault();
+                    e.stopPropagation();
                     this.toggle();
                 }
             }
-        });
+        }, { capture: true });
     }
 
     // ============================================================================
