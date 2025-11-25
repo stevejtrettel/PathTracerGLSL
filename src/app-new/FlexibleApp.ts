@@ -363,7 +363,11 @@ export class FlexibleApp {
      * Locks parameters during render.
      * Returns Promise that resolves when target samples reached.
      */
-    async renderProduction(targetSamples: number): Promise<void> {
+    async renderProduction(targetSamples: number, options?: {
+        autoSave?: boolean;
+        autoExportPNG?: boolean;
+        autoExportHDR?: boolean;
+    }): Promise<void> {
         // Lock parameters during production
         this.parameterStore.lock();
 
@@ -381,6 +385,20 @@ export class FlexibleApp {
                     }
                 }
             });
+
+            // Auto-export/save on successful completion
+            if (options?.autoExportPNG) {
+                console.log('Auto-exporting PNG...');
+                await this.exportPNG();
+            }
+            if (options?.autoExportHDR) {
+                console.log('Auto-exporting HDR...');
+                await this.exportHDR();
+            }
+            if (options?.autoSave) {
+                console.log('Auto-saving session...');
+                this.quickSave();
+            }
         } finally {
             // Always unlock parameters when done (success or error)
             this.parameterStore.unlock();
@@ -611,6 +629,69 @@ export class FlexibleApp {
 
         console.log('Session restored');
         this.eventBus.emit('session.loaded', session);
+    }
+
+    /**
+     * Quick save session to file download
+     *
+     * Generates a timestamped filename and triggers a download.
+     */
+    quickSave(): void {
+        const session = this.saveSession();
+        const filename = this._generateSessionFilename();
+
+        const json = JSON.stringify(session, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        console.log(`Session saved: ${filename}`);
+    }
+
+    /**
+     * Load session from file via file picker dialog
+     *
+     * Opens a file picker and loads the selected JSON session file.
+     */
+    loadSessionFromFile(): void {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const session = JSON.parse(text);
+                this.restoreSession(session);
+                console.log(`Session loaded from: ${file.name}`);
+            } catch (err) {
+                console.error('Failed to load session:', err);
+            }
+        };
+
+        input.click();
+    }
+
+    /**
+     * Generate timestamped session filename
+     */
+    private _generateSessionFilename(): string {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+
+        return `session_${year}${month}${day}_${hours}${minutes}${seconds}.json`;
     }
 
     // ============================================================================
@@ -916,6 +997,18 @@ export class FlexibleApp {
                 e.preventDefault();
                 this.exportAllAOVs();
             }
+
+            // j/J: Quick save session
+            else if (e.key === 'j' || e.key === 'J') {
+                e.preventDefault();
+                this.quickSave();
+            }
+
+            // o/O: Open/load session from file
+            else if (e.key === 'o' || e.key === 'O') {
+                e.preventDefault();
+                this.loadSessionFromFile();
+            }
         });
 
         console.log('Keyboard controls enabled:');
@@ -926,6 +1019,7 @@ export class FlexibleApp {
         console.log('  p: Production render');
         console.log('  Escape: Stop');
         console.log('  x: Export PNG, X: Export HDR, a: Export AOVs');
+        console.log('  j: Save session, o: Load session');
     }
 
     // ============================================================================
