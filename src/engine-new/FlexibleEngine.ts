@@ -4,6 +4,16 @@ import { FlexibleResourceManager } from './FlexibleResourceManager.js';
 import { FlexibleRenderExecutor } from './FlexibleRenderExecutor.js';
 import { ParameterManager } from '../engine/ParameterManager.js';
 import { GPUProfiler } from './GPUProfiler.js';
+import { TextureRegistry } from '../engine/TextureRegistry.js';
+import { TextureFactory } from '../engine/utils/TextureFactory.js';
+import { HDRLoader } from '../engine/loaders/hdr-loader.js';
+import { buildEnvironmentSampler } from '../engine/loaders/build-environment-sampler.js';
+import {
+    validateHDRResponse,
+    validateHDRBuffer,
+    validateHDRData,
+    validateTextureCreation
+} from '../errors/resources/validation.js';
 // import { validateCompiledRenderer } from '../errors/compiler/validation.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 import type { ParameterChanges } from '../app/types.js';
@@ -58,6 +68,7 @@ export class FlexibleEngine {
     private renderExecutor: FlexibleRenderExecutor;
     private parameterManager: ParameterManager;
     private profiler: GPUProfiler;
+    private textureRegistry: TextureRegistry;
 
     // Renderer storage
     private renderers = new Map<string, CompiledRenderer>();
@@ -89,6 +100,7 @@ export class FlexibleEngine {
         this.resourceManager = new FlexibleResourceManager(gl);
         this.renderExecutor = new FlexibleRenderExecutor(gl, this.resourceManager);
         this.parameterManager = new ParameterManager(gl);
+        this.textureRegistry = new TextureRegistry(gl, 1);  // Reserve unit 0 for accumulator
         this.startTime = performance.now();
 
         // Initialize GPU profiler
@@ -397,6 +409,8 @@ export class FlexibleEngine {
 
     /**
      * Clear accumulation for active renderer
+     *
+     * Resets sample count and clears all GPU buffers to black.
      */
     clearAccumulation(): void {
         if (!this.activeRendererId) return;
@@ -404,9 +418,9 @@ export class FlexibleEngine {
         // Reset sample count
         this.sampleCounts.set(this.activeRendererId, 0);
 
-        // Clear double_buffer framebuffers
-        // TODO: Add method to FlexibleResourceManager to clear specific buffers
-        // For now, this is a placeholder
+        // Clear all framebuffers (accumulation, etc.)
+        this.resourceManager.clearAllBuffers();
+
         console.log(`Accumulation cleared for renderer '${this.activeRendererId}'`);
     }
 
@@ -592,6 +606,144 @@ export class FlexibleEngine {
         this.imageSize = [0, 0];
     }
 
+    // ============ ENVIRONMENT LOADING ============
+
+    /**
+     * Load HDR environment map and build sampling CDFs
+     *
+     * Loads an HDR file, creates textures for:
+     * - env_map: The HDR environment image
+     * - env_cdf_cond: Conditional CDF for importance sampling
+     * - env_cdf_marg: Marginal CDF for importance sampling
+     *
+     * After loading, binds the textures to all loaded renderers.
+     *
+     * @param path - Path to the .hdr file
+     */
+    async loadEnvironmentHDR(path: string): Promise<void> {
+        console.log(`Loading HDR environment: ${path}`);
+
+        // Fetch
+        const res = await fetch(path);
+
+        // Validate response
+        const responseResult = validateHDRResponse(res, path);
+        if (!responseResult.valid) {
+            console.error(`\n❌ HDR loading failed:\n`);
+            responseResult.errors.forEach(err => console.error(`  • ${err}`));
+            throw new Error(`Failed to load HDR from '${path}'. See console for details.`);
+        }
+
+        // Get buffer
+        const buffer = await res.arrayBuffer();
+
+        // Validate buffer
+        const bufferResult = validateHDRBuffer(buffer, path);
+        if (!bufferResult.valid) {
+            console.error(`\n❌ Invalid HDR file:\n`);
+            bufferResult.errors.forEach(err => console.error(`  • ${err}`));
+            throw new Error(`Invalid HDR file '${path}'. See console for details.`);
+        }
+
+        // Show warnings if any
+        if (bufferResult.warnings && bufferResult.warnings.length > 0) {
+            console.warn(`\n⚠️  HDR file warnings:`);
+            bufferResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+        }
+
+        // Parse
+        let hdr;
+        try {
+            hdr = HDRLoader.parse(buffer);
+        } catch (error: any) {
+            console.error(`\n❌ HDR parsing failed:\n`);
+            console.error(`  • ${error.message || String(error)}`);
+            throw new Error(`Failed to parse HDR file '${path}'. File may be corrupted.`);
+        }
+
+        const { width, height, data } = hdr;
+
+        // Validate parsed data
+        const dataResult = validateHDRData(width, height, data.length, path);
+        if (!dataResult.valid) {
+            console.error(`\n❌ Invalid HDR data:\n`);
+            dataResult.errors.forEach(err => console.error(`  • ${err}`));
+            throw new Error(`Invalid HDR data in '${path}'. See console for details.`);
+        }
+
+        // Show data warnings if any
+        if (dataResult.warnings && dataResult.warnings.length > 0) {
+            console.warn(`\n⚠️  HDR data warnings:`);
+            dataResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+        }
+
+        // Create texture
+        const tf = new TextureFactory(this.gl);
+        const envTex = tf.createRGB32F(data, width, height);
+
+        // Validate texture creation
+        const textureResult = validateTextureCreation(envTex, width, height, this.gl);
+        if (!textureResult.valid) {
+            console.error(`\n❌ Texture creation failed:\n`);
+            textureResult.errors.forEach(err => console.error(`  • ${err}`));
+            throw new Error(`Failed to create texture for '${path}'. See console for details.`);
+        }
+
+        this.textureRegistry.register('env_map', envTex);
+
+        // Build CDF textures for importance sampling
+        const built = buildEnvironmentSampler(
+            this.gl,
+            this.textureRegistry,
+            data,
+            width,
+            height,
+            { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' }
+        );
+
+        // Bind to all renderer programs
+        for (const [_rendererId, renderer] of this.renderers.entries()) {
+            this._bindEnvironmentTexturesToRenderer(renderer, width, height, built.totalWeight);
+        }
+
+        console.log(`✅ HDR loaded: ${width}×${height} (CDFs built), bound to ${this.renderers.size} renderer(s)`);
+    }
+
+    /**
+     * Bind environment textures to a renderer's shaders
+     */
+    private _bindEnvironmentTexturesToRenderer(
+        renderer: CompiledRenderer,
+        envWidth: number,
+        envHeight: number,
+        totalWeight: number
+    ): void {
+        const gl = this.gl;
+
+        for (const [shaderId, _shaderProgram] of renderer.shaders) {
+            const program = this.renderExecutor.getProgram(shaderId);
+            if (!program) continue;
+
+            gl.useProgram(program);
+
+            // Bind environment textures
+            const envMapLoc = gl.getUniformLocation(program, 'u_envMap');
+            const envCdfCondLoc = gl.getUniformLocation(program, 'u_envCDFCond');
+            const envCdfMargLoc = gl.getUniformLocation(program, 'u_envCDFMarg');
+
+            if (envMapLoc) this.textureRegistry.bind('env_map', envMapLoc);
+            if (envCdfCondLoc) this.textureRegistry.bind('env_cdf_cond', envCdfCondLoc);
+            if (envCdfMargLoc) this.textureRegistry.bind('env_cdf_marg', envCdfMargLoc);
+
+            // Set environment uniform values
+            const envResLoc = gl.getUniformLocation(program, 'u_envResolution');
+            const envWeightLoc = gl.getUniformLocation(program, 'u_envTotalWeight');
+
+            if (envResLoc) gl.uniform2f(envResLoc, envWidth, envHeight);
+            if (envWeightLoc) gl.uniform1f(envWeightLoc, totalWeight);
+        }
+    }
+
     // ============ CLEANUP ============
 
     /**
@@ -600,11 +752,19 @@ export class FlexibleEngine {
     dispose(): void {
         this.renderExecutor.cleanup();
         this.resourceManager.cleanup();
+        this.textureRegistry.dispose();
         this.renderers.clear();
         this.sampleCounts.clear();
         this.uniformLocations.clear();
         this.activeRendererId = null;
         this.state = 'ready';
+    }
+
+    /**
+     * Get texture registry (for environment loading, etc.)
+     */
+    getTextureRegistry(): TextureRegistry {
+        return this.textureRegistry;
     }
 
     // ============ PRIVATE METHODS ============

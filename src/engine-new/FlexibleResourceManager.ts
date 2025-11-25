@@ -244,6 +244,50 @@ export class FlexibleResourceManager {
         this.activeRenderer = null;
     }
 
+    /**
+     * Clear a specific buffer (set to black/transparent)
+     *
+     * For double_buffer types, clears both current and previous buffers.
+     * This is used to reset accumulation.
+     *
+     * @param bufferId - The buffer id (e.g., 'accumulation')
+     */
+    clearBuffer(bufferId: string): void {
+        const { baseId } = this._parseId(bufferId);
+        const resource = this._getActiveResource(baseId);
+
+        if (resource.config.type === 'screen') {
+            // Clear screen framebuffer
+            const gl = this.gl;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            return;
+        }
+
+        // Clear all framebuffers for this resource
+        this._clearFramebuffers(resource);
+    }
+
+    /**
+     * Clear all buffers for the active renderer
+     *
+     * Clears all framebuffers including accumulation buffers.
+     * Used when switching renderers or resetting state.
+     */
+    clearAllBuffers(): void {
+        if (!this.activeRenderer) return;
+
+        const resources = this.renderers.get(this.activeRenderer);
+        if (!resources) return;
+
+        for (const resource of resources.values()) {
+            if (resource.config.type !== 'screen') {
+                this._clearFramebuffers(resource);
+            }
+        }
+    }
+
     // ============ PRIVATE METHODS ============
 
     /**

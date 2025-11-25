@@ -177,10 +177,10 @@ export class FlexibleApp {
             this.parameterStore.batch(initialParameters);
         }
 
-        // TODO: Load environment HDR if provided
-        // if (config.environmentHDR) {
-        //     await this.engine.loadEnvironmentHDR(config.environmentHDR);
-        // }
+        // Load environment HDR if provided
+        if (config.environmentHDR) {
+            await this.engine.loadEnvironmentHDR(config.environmentHDR);
+        }
 
         console.log(`FlexibleApp initialized with ${compiledRenderers.length} renderers`);
         console.log(`  Available renderers: ${this.getAvailableRendererIds().join(', ')}`);
@@ -203,6 +203,25 @@ export class FlexibleApp {
         });
 
         await this.initialize({ scene, strategies });
+    }
+
+    // ============================================================================
+    // Content Loading
+    // ============================================================================
+
+    /**
+     * Load HDR environment map
+     *
+     * Can be called after initialization to load or change the environment map.
+     * Creates textures for the environment and importance sampling CDFs.
+     *
+     * @param path - Path to the .hdr file
+     */
+    async loadEnvironmentHDR(path: string): Promise<void> {
+        await this.engine.loadEnvironmentHDR(path);
+
+        // Reset accumulation since environment changed
+        this.clearAccumulation();
     }
 
     // ============================================================================
