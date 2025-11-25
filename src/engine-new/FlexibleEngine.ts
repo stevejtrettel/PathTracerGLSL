@@ -268,6 +268,20 @@ export class FlexibleEngine {
     }
 
     /**
+     * Get all custom parameter values
+     *
+     * Returns a snapshot of all user-set parameters (not engine internals).
+     * Useful for parameter persistence when switching renderers.
+     */
+    getAllParameters(): Record<string, any> {
+        const result: Record<string, any> = {};
+        for (const [key, value] of this.customParameters) {
+            result[key] = value;
+        }
+        return result;
+    }
+
+    /**
      * Update shader uniforms from parameter changes
      */
     updateParameters(changes: ParameterChanges): void {
