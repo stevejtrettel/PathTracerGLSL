@@ -5,9 +5,11 @@ import { SimpleCompiler } from '../compiler/SimpleCompiler.js';
 import { FlexibleEngine } from '../engine-new/FlexibleEngine.js';
 import { FlexibleRenderCoordinator, type ProgressInfo } from './FlexibleRenderCoordinator.js';
 import { ParameterStore } from '../app/ParameterStore.js';
+import { EventBus } from '../app/EventBus.js';
 import { saveHDRFile, savePNGFile } from '../app/utils/file-export.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
 import type { FlexibleAppConfig, RenderProgress, StrategyPreset } from './types.js';
+import type { Extension } from '../app/types.js';
 
 /**
  * FlexibleApp - High-level orchestration for the new architecture
@@ -32,6 +34,7 @@ export class FlexibleApp {
     private engine: FlexibleEngine;
     private coordinator: FlexibleRenderCoordinator;
     private parameterStore: ParameterStore;
+    private eventBus: EventBus;
     private gl: WebGL2RenderingContext;
 
     // State
@@ -40,7 +43,10 @@ export class FlexibleApp {
     private renderers: Map<string, CompiledRenderer> = new Map();
     private activeRendererId: string | null = null;
 
-    // Callbacks
+    // Extensions
+    private extensions: Map<string, Extension> = new Map();
+
+    // Callbacks (for direct subscribers, in addition to EventBus)
     public onProgress?: (progress: RenderProgress) => void;
     public onRendererChanged?: (rendererId: string) => void;
     public onParameterChanged?: (path: string, value: any) => void;
@@ -69,10 +75,13 @@ export class FlexibleApp {
         // Create core components
         this.compiler = new SimpleCompiler();
         this.engine = new FlexibleEngine(gl);
-        this.coordinator = new FlexibleRenderCoordinator(this.engine);
+        this.eventBus = new EventBus();
         this.parameterStore = new ParameterStore();
 
-        // Wire ParameterStore changes to engine and accumulation reset
+        // Create coordinator with EventBus for render events
+        this.coordinator = new FlexibleRenderCoordinator(this.engine, this.eventBus);
+
+        // Wire ParameterStore changes to engine, EventBus, and accumulation reset
         this.parameterStore.onChange = (changes) => {
             for (const change of changes.changes) {
                 // Forward to engine
@@ -89,13 +98,26 @@ export class FlexibleApp {
                     }
                 }
 
-                // Notify external listeners
+                // Emit parameter change event (skip resends)
+                if (!isResend) {
+                    this.eventBus.emit('parameter.changed', {
+                        path: change.path,
+                        oldValue: change.oldValue,
+                        newValue: change.newValue
+                    });
+                }
+
+                // Notify direct callback subscribers
                 this.onParameterChanged?.(change.path, change.newValue);
             }
         };
 
-        // Wire coordinator progress to app callback
+        // Wire coordinator progress to app callback and EventBus
         this.coordinator.onProgress = (info: ProgressInfo) => {
+            // Emit progress event
+            this.eventBus.emit('render.progress', info);
+
+            // Notify direct callback subscriber
             if (this.onProgress) {
                 this.onProgress({
                     samples: info.samples,
@@ -236,6 +258,11 @@ export class FlexibleApp {
         this.engine.clearAccumulation();
 
         console.log(`Switched to renderer: ${rendererId}`);
+
+        // Emit event
+        this.eventBus.emit('renderer.switched', { rendererId });
+
+        // Notify direct callback subscriber
         this.onRendererChanged?.(rendererId);
     }
 
@@ -475,24 +502,54 @@ export class FlexibleApp {
     // ============================================================================
 
     /**
-     * Save session state (parameters only for now)
+     * Session state structure
+     */
+    private _buildSessionState(): {
+        parameters: Record<string, any>;
+        rendererId: string | null;
+        extensions: Record<string, any>;
+    } {
+        // Collect extension states
+        const extensionStates: Record<string, any> = {};
+        for (const [name, ext] of this.extensions) {
+            if (ext.saveState) {
+                extensionStates[name] = ext.saveState();
+            }
+        }
+
+        return {
+            parameters: this.parameterStore.serialize(),
+            rendererId: this.activeRendererId,
+            extensions: extensionStates
+        };
+    }
+
+    /**
+     * Save session state
      *
      * Returns a JSON-serializable object that can be stored and
      * passed to restoreSession() later.
      */
-    saveSession(): { parameters: Record<string, any>; rendererId: string | null } {
-        return {
-            parameters: this.parameterStore.serialize(),
-            rendererId: this.activeRendererId
-        };
+    saveSession(): {
+        parameters: Record<string, any>;
+        rendererId: string | null;
+        extensions: Record<string, any>;
+    } {
+        const session = this._buildSessionState();
+        this.eventBus.emit('session.saved', session);
+        return session;
     }
 
     /**
      * Restore session state
      *
-     * Restores parameters and optionally switches to the saved renderer.
+     * Restores parameters, renderer selection, and extension states.
      */
-    restoreSession(session: { parameters: Record<string, any>; rendererId?: string | null }): void {
+    restoreSession(session: {
+        parameters: Record<string, any>;
+        rendererId?: string | null;
+        extensions?: Record<string, any>;
+    }): void {
         // Restore parameters
         this.parameterStore.restore(session.parameters);
 
@@ -501,7 +558,18 @@ export class FlexibleApp {
             this.selectRenderer(session.rendererId);
         }
 
+        // Restore extension states
+        if (session.extensions) {
+            for (const [name, state] of Object.entries(session.extensions)) {
+                const ext = this.extensions.get(name);
+                if (ext?.restoreState) {
+                    ext.restoreState(state);
+                }
+            }
+        }
+
         console.log('Session restored');
+        this.eventBus.emit('session.loaded', session);
     }
 
     // ============================================================================
@@ -774,6 +842,82 @@ export class FlexibleApp {
     }
 
     // ============================================================================
+    // Extensions
+    // ============================================================================
+
+    /**
+     * Install an extension
+     *
+     * Extensions receive the app instance and EventBus for integration.
+     * @param extension - Extension to install
+     */
+    use(extension: Extension): void {
+        if (this.extensions.has(extension.name)) {
+            console.warn(`Extension '${extension.name}' already installed`);
+            return;
+        }
+
+        // Check dependencies
+        if (extension.dependencies) {
+            for (const dep of extension.dependencies) {
+                if (!this.extensions.has(dep)) {
+                    throw new Error(`Extension '${extension.name}' requires '${dep}'`);
+                }
+            }
+        }
+
+        // Install
+        extension.install(this, this.eventBus);
+        this.extensions.set(extension.name, extension);
+
+        console.log(`Extension installed: ${extension.name}${extension.version ? ` v${extension.version}` : ''}`);
+        this.eventBus.emit('extension.installed', {
+            name: extension.name,
+            version: extension.version
+        });
+    }
+
+    /**
+     * Uninstall an extension
+     */
+    unuse(extensionName: string): void {
+        const extension = this.extensions.get(extensionName);
+        if (!extension) {
+            console.warn(`Extension '${extensionName}' not installed`);
+            return;
+        }
+
+        extension.uninstall?.();
+        this.extensions.delete(extensionName);
+
+        console.log(`Extension uninstalled: ${extensionName}`);
+        this.eventBus.emit('extension.uninstalled', { name: extensionName });
+    }
+
+    /**
+     * Get installed extension names
+     */
+    getExtensionNames(): string[] {
+        return Array.from(this.extensions.keys());
+    }
+
+    /**
+     * Get extension by name
+     */
+    getExtension<T extends Extension>(name: string): T | undefined {
+        return this.extensions.get(name) as T | undefined;
+    }
+
+    /**
+     * Get EventBus for direct event subscriptions
+     *
+     * Allows external code to subscribe to app events without being an extension.
+     */
+    getEventBus(): EventBus {
+        return this.eventBus;
+    }
+
+    // ============================================================================
     // Cleanup
     // ============================================================================
 
@@ -782,9 +926,22 @@ export class FlexibleApp {
      */
     dispose(): void {
         this.stop();
+
+        // Uninstall all extensions
+        for (const [name, extension] of this.extensions) {
+            extension.uninstall?.();
+            console.log(`Extension uninstalled: ${name}`);
+        }
+        this.extensions.clear();
+
+        // Clear event bus
+        this.eventBus.removeAllListeners();
+
+        // Dispose engine
         this.engine.dispose();
         this.renderers.clear();
         this.strategies.clear();
+
         console.log('FlexibleApp disposed');
     }
 }

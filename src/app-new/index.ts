@@ -21,3 +21,7 @@ export {
     type SceneDescription,
     type CompiledRenderer
 } from './types.js';
+
+// Re-export EventBus and Extension for external use
+export { EventBus } from '../app/EventBus.js';
+export type { Extension, EventHandler } from '../app/types.js';
