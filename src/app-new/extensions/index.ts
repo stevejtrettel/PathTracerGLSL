@@ -3,3 +3,4 @@
 
 export { OrbitControls } from './OrbitControls.js';
 export { TouchOrbitControls } from './TouchOrbitControls.js';
+export { ParameterPanelExtension } from './ParameterPanelExtension.js';

@@ -510,6 +510,28 @@ export class FlexibleApp {
     }
 
     /**
+     * Get parameter metadata for active renderer
+     *
+     * Returns metadata from the CompiledRenderer's parameters field.
+     * Useful for auto-generating UI controls.
+     */
+    getParameterMetadata(): Map<string, import('../app/types.js').ParameterMetadata> {
+        const result = new Map<string, import('../app/types.js').ParameterMetadata>();
+
+        if (!this.activeRendererId) return result;
+
+        const renderer = this.renderers.get(this.activeRendererId);
+        if (!renderer?.parameters) return result;
+
+        // Convert Record to Map
+        for (const [path, meta] of Object.entries(renderer.parameters)) {
+            result.set(path, meta);
+        }
+
+        return result;
+    }
+
+    /**
      * Check if parameters are locked (during production render)
      */
     areParametersLocked(): boolean {
