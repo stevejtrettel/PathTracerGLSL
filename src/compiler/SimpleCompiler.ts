@@ -51,8 +51,12 @@ export class SimpleCompiler implements ICompiler {
     /**
      * Generate debug renderer
      *
-     * Simple single-pass renderer that visualizes UVs or outputs solid color.
-     * No accumulation, no complex shading - just prove the pipeline works.
+     * Two-pass renderer that visualizes UVs or outputs solid color.
+     * Uses RGB buffer for reliable LDR export.
+     *
+     * Pipeline:
+     * 1. Debug pass: render to RGB buffer
+     * 2. Composite pass: copy RGB to screen
      */
     private _generateDebugRenderer(
         scene: SceneDescription,
@@ -80,9 +84,20 @@ void main() {
 `
         });
 
-        // Pipeline: single pass to screen
+        // Composite shader: copy RGB buffer to screen
+        shaders.set('debug-composite', {
+            vertex: this._getFullscreenVertex(),
+            fragment: this._getCompositeFragment()
+        });
+
+        // Pipeline: debug → rgb, composite → screen
         const pipeline: RenderPipeline = {
             framebuffers: [
+                {
+                    id: 'rgb',
+                    type: 'texture',
+                    format: 'rgba8'
+                },
                 {
                     id: 'screen',
                     type: 'screen'
@@ -92,10 +107,24 @@ void main() {
                 {
                     id: 'debug-pass',
                     shader: 'debug',
-                    output: 'screen',
+                    output: 'rgb',
                     execution: {
                         type: 'once',
                         clearBeforeRender: true
+                    }
+                },
+                {
+                    id: 'composite-pass',
+                    shader: 'debug-composite',
+                    inputs: {
+                        textures: {
+                            'u_rgb': 'rgb'
+                        }
+                    },
+                    output: 'screen',
+                    execution: {
+                        type: 'once',
+                        clearBeforeRender: false
                     }
                 }
             ]
@@ -125,7 +154,7 @@ void main() {
             sourceMaps: new Map(),
             exportTargets: {
                 'ldr': {
-                    bufferId: 'screen',
+                    bufferId: 'rgb',
                     format: 'byte'
                 }
             }
@@ -166,11 +195,13 @@ void main() {
     /**
      * Generate pathtracer renderer
      *
-     * Two-pass accumulation renderer:
+     * Three-pass accumulation renderer:
      * 1. Main pass: raytrace and accumulate into HDR buffer
-     * 2. Display pass: tone map to screen
+     * 2. Display pass: tone map to RGB buffer
+     * 3. Composite pass: copy RGB to screen
      *
      * Uses ping-pong buffers for progressive accumulation.
+     * RGB buffer enables reliable LDR export.
      */
     private _generatePathtracerRenderer(
         scene: SceneDescription,
@@ -190,13 +221,24 @@ void main() {
             fragment: this._getDisplayFragment()
         });
 
-        // Pipeline: two passes with ping-pong accumulation
+        // Composite shader (copy to screen)
+        shaders.set('pathtracer-composite', {
+            vertex: this._getFullscreenVertex(),
+            fragment: this._getCompositeFragment()
+        });
+
+        // Pipeline: three passes with ping-pong accumulation
         const pipeline: RenderPipeline = {
             framebuffers: [
                 {
                     id: 'accumulation',
                     type: 'double_buffer',
                     format: 'rgba32f'
+                },
+                {
+                    id: 'rgb',
+                    type: 'texture',
+                    format: 'rgba8'
                 },
                 {
                     id: 'screen',
@@ -226,10 +268,24 @@ void main() {
                             'u_radiance': 'accumulation_current'
                         }
                     },
+                    output: 'rgb',
+                    execution: {
+                        type: 'once',
+                        clearBeforeRender: false
+                    }
+                },
+                {
+                    id: 'composite-pass',
+                    shader: 'pathtracer-composite',
+                    inputs: {
+                        textures: {
+                            'u_rgb': 'rgb'
+                        }
+                    },
                     output: 'screen',
                     execution: {
                         type: 'once',
-                        clearBeforeRender: true
+                        clearBeforeRender: false
                     }
                 }
             ],
@@ -283,7 +339,7 @@ void main() {
                     format: 'float'
                 },
                 'ldr': {
-                    bufferId: 'screen',
+                    bufferId: 'rgb',
                     format: 'byte'
                 }
             }
@@ -527,13 +583,36 @@ void main() {
     }
 
     /**
+     * Get composite fragment shader (copy RGB buffer to screen)
+     *
+     * This pass exists so we have a readable LDR buffer for screenshots/export.
+     * Reading from screen (default framebuffer) is unreliable in WebGL.
+     */
+    private _getCompositeFragment(): string {
+        return `#version 300 es
+precision highp float;
+
+out vec4 fragColor;
+
+uniform vec2 u_resolution;
+uniform sampler2D u_rgb;
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    fragColor = texture(u_rgb, uv);
+}`;
+    }
+
+    /**
      * Generate pathtracer renderer with AOVs (MRT example)
      *
-     * Three-pass MRT accumulation renderer:
+     * Four-pass MRT accumulation renderer:
      * 1. Main pass: raytrace and write to 3 attachments (radiance, albedo, normal)
-     * 2. Display pass: tone map radiance to screen
+     * 2. Display pass: tone map selected AOV to RGB buffer
+     * 3. Composite pass: copy RGB to screen
      *
      * Demonstrates Multiple Render Targets (MRT) for outputting AOVs.
+     * RGB buffer enables reliable LDR export.
      */
     private _generatePathtracerAOVsRenderer(
         scene: SceneDescription,
@@ -554,13 +633,24 @@ void main() {
             fragment: this._getAOVDisplayFragment()
         });
 
-        // Pipeline: MRT accumulation with 3 attachments
+        // Composite shader (copy to screen)
+        shaders.set('pathtracer-aovs-composite', {
+            vertex: this._getFullscreenVertex(),
+            fragment: this._getCompositeFragment()
+        });
+
+        // Pipeline: MRT accumulation with 3 attachments + RGB buffer
         const pipeline: RenderPipeline = {
             framebuffers: [
                 {
                     id: 'accumulation',
                     type: 'double_buffer',
                     format: ['rgba32f', 'rgba8', 'rgba16f']  // radiance, albedo, normal
+                },
+                {
+                    id: 'rgb',
+                    type: 'texture',
+                    format: 'rgba8'
                 },
                 {
                     id: 'screen',
@@ -596,10 +686,24 @@ void main() {
                             'u_normal': 'accumulation_current:2'
                         }
                     },
+                    output: 'rgb',
+                    execution: {
+                        type: 'once',
+                        clearBeforeRender: false
+                    }
+                },
+                {
+                    id: 'composite-pass',
+                    shader: 'pathtracer-aovs-composite',
+                    inputs: {
+                        textures: {
+                            'u_rgb': 'rgb'
+                        }
+                    },
                     output: 'screen',
                     execution: {
                         type: 'once',
-                        clearBeforeRender: true
+                        clearBeforeRender: false
                     }
                 }
             ],
@@ -670,7 +774,7 @@ void main() {
                     attachment: 2
                 },
                 'ldr': {
-                    bufferId: 'screen',
+                    bufferId: 'rgb',
                     format: 'byte'
                 }
             }
