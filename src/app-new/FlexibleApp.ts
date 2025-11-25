@@ -682,6 +682,13 @@ export class FlexibleApp {
     }
 
     /**
+     * Get canvas element
+     */
+    getCanvas(): HTMLCanvasElement {
+        return this.gl.canvas as HTMLCanvasElement;
+    }
+
+    /**
      * Generate default filename with timestamp and sample count
      */
     private _generateFilename(prefix: string, extension: string): string {
