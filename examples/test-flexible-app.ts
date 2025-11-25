@@ -141,6 +141,10 @@ async function main() {
     app.start();
     console.log('Render loop started');
 
+    // Sync initial button state with actual renderer
+    const activeId = app.getActiveRendererId();
+    if (activeId) updateActiveButton(activeId);
+
     // Handle resize
     window.addEventListener('resize', () => {
         app.resizeToWindow();
