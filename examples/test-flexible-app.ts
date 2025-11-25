@@ -104,11 +104,11 @@ async function main() {
         name: 'Test Scene'
     };
 
-    // Define strategies (using presets)
+    // Define strategies (using presets) - pathtracer first as default
     const strategies: RenderStrategy[] = [
-        STRATEGY_PRESETS.debug.strategy,
         STRATEGY_PRESETS.pathtracer.strategy,
-        STRATEGY_PRESETS['pathtracer-aovs'].strategy
+        STRATEGY_PRESETS['pathtracer-aovs'].strategy,
+        STRATEGY_PRESETS.debug.strategy
     ];
 
     // Initialize
@@ -269,9 +269,9 @@ function setupUI(app: FlexibleApp) {
         <div class="ui-section">
             <span class="ui-label">Renderer</span>
             <div class="button-group">
-                <button id="btn-debug">1: Debug</button>
-                <button id="btn-pathtracer" class="active">2: Path</button>
-                <button id="btn-aovs">3: AOVs</button>
+                <button id="btn-pathtracer">1: Path</button>
+                <button id="btn-aovs">2: AOVs</button>
+                <button id="btn-debug">3: Debug</button>
             </div>
         </div>
 
@@ -332,15 +332,15 @@ function setupUI(app: FlexibleApp) {
     // Button handlers
     const rendererIds = app.getAvailableRendererIds();
 
-    document.getElementById('btn-debug')?.addEventListener('click', () => {
+    document.getElementById('btn-pathtracer')?.addEventListener('click', () => {
         app.selectRenderer(rendererIds[0]);
     });
 
-    document.getElementById('btn-pathtracer')?.addEventListener('click', () => {
+    document.getElementById('btn-aovs')?.addEventListener('click', () => {
         app.selectRenderer(rendererIds[1]);
     });
 
-    document.getElementById('btn-aovs')?.addEventListener('click', () => {
+    document.getElementById('btn-debug')?.addEventListener('click', () => {
         app.selectRenderer(rendererIds[2]);
     });
 
