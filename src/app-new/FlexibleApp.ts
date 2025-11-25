@@ -3,6 +3,7 @@
 
 import { SimpleCompiler } from '../compiler/SimpleCompiler.js';
 import { FlexibleEngine } from '../engine-new/FlexibleEngine.js';
+import { FlexibleRenderCoordinator, type ProgressInfo } from './FlexibleRenderCoordinator.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
 import type { FlexibleAppConfig, RenderProgress, StrategyPreset } from './types.js';
 
@@ -10,9 +11,10 @@ import type { FlexibleAppConfig, RenderProgress, StrategyPreset } from './types.
  * FlexibleApp - High-level orchestration for the new architecture
  *
  * Key responsibilities:
- * - Own Compiler and Engine
+ * - Own Compiler, Engine, and RenderCoordinator
  * - Compile scene with multiple strategies at initialization
  * - Manage renderer switching
+ * - Provide interactive and production render modes
  * - Handle resize
  * - Provide clean API for rendering and export
  *
@@ -26,6 +28,7 @@ export class FlexibleApp {
     // Core components
     private compiler: ICompiler;
     private engine: FlexibleEngine;
+    private coordinator: FlexibleRenderCoordinator;
     private gl: WebGL2RenderingContext;
 
     // State
@@ -33,15 +36,6 @@ export class FlexibleApp {
     private strategies: Map<string, RenderStrategy> = new Map();
     private renderers: Map<string, CompiledRenderer> = new Map();
     private activeRendererId: string | null = null;
-
-    // Animation
-    private animationId: number | null = null;
-    private isRunning = false;
-
-    // Progress tracking
-    private lastFrameTime = 0;
-    private frameCount = 0;
-    private fpsHistory: number[] = [];
 
     // Callbacks
     public onProgress?: (progress: RenderProgress) => void;
@@ -71,6 +65,22 @@ export class FlexibleApp {
         // Create core components
         this.compiler = new SimpleCompiler();
         this.engine = new FlexibleEngine(gl);
+        this.coordinator = new FlexibleRenderCoordinator(this.engine);
+
+        // Wire coordinator progress to app callback
+        this.coordinator.onProgress = (info: ProgressInfo) => {
+            if (this.onProgress) {
+                this.onProgress({
+                    samples: info.samples,
+                    fps: info.fps,
+                    elapsedTime: info.elapsedTime,
+                    mode: info.mode,
+                    state: info.state,
+                    targetSamples: info.targetSamples,
+                    percentComplete: info.percentComplete
+                });
+            }
+        };
 
         console.log('FlexibleApp created');
     }
@@ -225,45 +235,101 @@ export class FlexibleApp {
     }
 
     // ============================================================================
-    // Rendering
+    // Rendering - Interactive Mode
     // ============================================================================
 
     /**
-     * Start the render loop
+     * Start interactive rendering (continuous, unlocked)
      */
     start(): void {
-        if (this.isRunning) return;
-
-        this.isRunning = true;
-        this.lastFrameTime = performance.now();
-        this.frameCount = 0;
-
-        console.log('Render loop started');
-        this.renderLoop();
+        this.coordinator.startInteractive();
     }
 
     /**
-     * Stop the render loop
+     * Stop rendering (both interactive and production)
      */
     stop(): void {
-        if (!this.isRunning) return;
-
-        this.isRunning = false;
-
-        if (this.animationId !== null) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = null;
-        }
-
-        console.log('Render loop stopped');
+        this.coordinator.stop();
     }
 
     /**
-     * Check if render loop is running
+     * Pause rendering
+     */
+    pause(): void {
+        this.coordinator.pause();
+    }
+
+    /**
+     * Resume paused rendering
+     */
+    resume(): void {
+        this.coordinator.resume();
+    }
+
+    /**
+     * Check if render loop is running (not paused)
      */
     isActive(): boolean {
-        return this.isRunning;
+        return this.coordinator.isRunning();
     }
+
+    /**
+     * Check if paused
+     */
+    isPaused(): boolean {
+        return this.coordinator.isPaused();
+    }
+
+    /**
+     * Check if in locked production mode
+     */
+    isLocked(): boolean {
+        return this.coordinator.isLocked();
+    }
+
+    // ============================================================================
+    // Rendering - Production Mode
+    // ============================================================================
+
+    /**
+     * Start production rendering (goal-driven, locked)
+     *
+     * Resets accumulation before starting.
+     * Returns Promise that resolves when target samples reached.
+     */
+    async renderProduction(targetSamples: number): Promise<void> {
+        // Reset accumulation before production
+        this.coordinator.resetAccumulation('production_start');
+
+        return this.coordinator.startProduction({
+            targetSamples,
+            onProgress: (info) => {
+                // Log every 100 samples
+                if (info.samples % 100 === 0) {
+                    const pct = info.percentComplete?.toFixed(1) || '0.0';
+                    console.log(`Production: ${info.samples}/${targetSamples} (${pct}%)`);
+                }
+            }
+        });
+    }
+
+    /**
+     * Extend production render with additional samples (no reset)
+     */
+    async extendProduction(additionalSamples: number): Promise<void> {
+        const currentSamples = this.coordinator.getSampleCount();
+        const newTarget = currentSamples + additionalSamples;
+
+        console.log(`Extending production: +${additionalSamples} (${currentSamples} → ${newTarget})`);
+
+        return this.coordinator.startProduction({
+            targetSamples: newTarget
+        });
+    }
+
+    // ============================================================================
+    // Rendering - Utilities
+    // ============================================================================
 
     /**
      * Render a single frame (manual control)
@@ -276,14 +342,42 @@ export class FlexibleApp {
      * Reset accumulation (clear samples)
      */
     clearAccumulation(): void {
-        this.engine.clearAccumulation();
+        this.coordinator.resetAccumulation('manual');
     }
 
     /**
      * Get current sample count
      */
     getSampleCount(): number {
-        return this.engine.getSampleCount();
+        return this.coordinator.getSampleCount();
+    }
+
+    /**
+     * Get elapsed render time in milliseconds
+     */
+    getElapsedTime(): number {
+        return this.coordinator.getElapsedTime();
+    }
+
+    /**
+     * Get current FPS
+     */
+    getFPS(): number {
+        return this.coordinator.getFPS();
+    }
+
+    /**
+     * Get current render mode
+     */
+    getRenderMode(): 'interactive' | 'production' {
+        return this.coordinator.getMode();
+    }
+
+    /**
+     * Get current render state
+     */
+    getRenderState(): 'rendering' | 'paused' | 'complete' | 'stopped' {
+        return this.coordinator.getState();
     }
 
     // ============================================================================
@@ -363,18 +457,28 @@ export class FlexibleApp {
     }
 
     // ============================================================================
-    // Keyboard Controls (Basic)
+    // Keyboard Controls
     // ============================================================================
 
     /**
-     * Setup basic keyboard controls
+     * Setup keyboard controls
      *
      * - 1-9: Switch renderers
      * - r/R: Reset accumulation
      * - Space: Toggle rendering
+     * - \: Pause/resume
+     * - p/P: Start production render (prompts for samples)
+     * - Escape: Stop rendering
+     * - x/X: Export screenshot (placeholder)
      */
     setupKeyboardControls(): void {
         window.addEventListener('keydown', (e) => {
+            // Don't handle if locked in production (except escape)
+            if (this.isLocked() && e.key !== 'Escape') {
+                console.warn('Locked in production mode - press Escape to stop');
+                return;
+            }
+
             const rendererIds = this.getAvailableRendererIds();
 
             // 1-9: Switch renderers
@@ -392,15 +496,63 @@ export class FlexibleApp {
 
             // Space: Toggle rendering
             else if (e.key === ' ') {
-                if (this.isRunning) {
+                e.preventDefault();
+                if (this.isActive()) {
                     this.stop();
                 } else {
                     this.start();
                 }
             }
+
+            // \: Pause/resume
+            else if (e.key === '\\') {
+                if (this.isPaused()) {
+                    this.resume();
+                } else {
+                    this.pause();
+                }
+            }
+
+            // p/P: Production render
+            else if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                const samplesStr = prompt('Target samples?', '1000');
+                if (samplesStr) {
+                    const samples = parseInt(samplesStr);
+                    if (samples > 0) {
+                        this.renderProduction(samples).then(() => {
+                            console.log('Production render complete!');
+                        }).catch(err => {
+                            if (err.name === 'RenderStopped') {
+                                console.log('Production render stopped');
+                            } else {
+                                console.error('Production render failed:', err);
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Escape: Stop rendering
+            else if (e.key === 'Escape') {
+                this.stop();
+            }
+
+            // x/X: Export (placeholder - will be implemented in Phase 4)
+            else if (e.key === 'x' || e.key === 'X') {
+                console.log('Export triggered (not yet implemented)');
+                // TODO: Implement in Phase 4
+            }
         });
 
-        console.log('Keyboard controls enabled (1-9: renderers, r: reset, space: toggle)');
+        console.log('Keyboard controls enabled:');
+        console.log('  1-9: Switch renderers');
+        console.log('  r: Reset accumulation');
+        console.log('  Space: Toggle rendering');
+        console.log('  \\: Pause/resume');
+        console.log('  p: Production render');
+        console.log('  Escape: Stop');
+        console.log('  x: Export (TODO)');
     }
 
     // ============================================================================
@@ -416,43 +568,5 @@ export class FlexibleApp {
         this.renderers.clear();
         this.strategies.clear();
         console.log('FlexibleApp disposed');
-    }
-
-    // ============================================================================
-    // Private: Render Loop
-    // ============================================================================
-
-    private renderLoop(): void {
-        if (!this.isRunning) return;
-
-        // Render frame
-        this.engine.renderFrame();
-        this.frameCount++;
-
-        // Calculate FPS
-        const now = performance.now();
-        const delta = now - this.lastFrameTime;
-        this.lastFrameTime = now;
-
-        const fps = 1000 / delta;
-        this.fpsHistory.push(fps);
-        if (this.fpsHistory.length > 60) {
-            this.fpsHistory.shift();
-        }
-
-        // Report progress
-        if (this.onProgress) {
-            const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
-            this.onProgress({
-                samples: this.engine.getSampleCount(),
-                fps: avgFps,
-                elapsedTime: now,
-                mode: 'interactive',
-                state: 'rendering'
-            });
-        }
-
-        // Schedule next frame
-        this.animationId = requestAnimationFrame(() => this.renderLoop());
     }
 }

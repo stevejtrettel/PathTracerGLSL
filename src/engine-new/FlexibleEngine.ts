@@ -4,7 +4,7 @@ import { FlexibleResourceManager } from './FlexibleResourceManager.js';
 import { FlexibleRenderExecutor } from './FlexibleRenderExecutor.js';
 import { ParameterManager } from '../engine/ParameterManager.js';
 import { GPUProfiler } from './GPUProfiler.js';
-import { validateCompiledRenderer } from '../errors/compiler/validation.js';
+// import { validateCompiledRenderer } from '../errors/compiler/validation.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 import type { ParameterChanges } from '../app/types.js';
 import type { UniformBinding } from '../engine/types.js';
@@ -24,6 +24,16 @@ interface EngineUniforms {
     time: number;
     sampleCount: number;
     pixelOffset: [number, number];
+}
+
+/**
+ * Rectangle region for reading pixel data
+ */
+interface Rectangle {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
 }
 
 /**
@@ -605,7 +615,7 @@ export class FlexibleEngine {
     private _cacheRendererUniformLocations(rendererId: string, renderer: CompiledRenderer): void {
         const rendererLocations = new Map<string, Map<string, WebGLUniformLocation>>();
 
-        for (const [shaderId, shaderProgram] of renderer.shaders) {
+        for (const [shaderId, _shaderProgram] of renderer.shaders) {
             const program = this.renderExecutor.getProgram(shaderId);
             if (!program) continue;
 

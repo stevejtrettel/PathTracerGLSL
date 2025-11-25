@@ -4,6 +4,14 @@
 export { FlexibleApp } from './FlexibleApp.js';
 
 export {
+    FlexibleRenderCoordinator,
+    type RenderMode,
+    type RenderState,
+    type ProgressInfo,
+    type ProductionGoal
+} from './FlexibleRenderCoordinator.js';
+
+export {
     STRATEGY_PRESETS,
     type FlexibleAppConfig,
     type StrategyPreset,

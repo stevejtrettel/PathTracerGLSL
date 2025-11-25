@@ -74,7 +74,7 @@ export class GPUProfiler {
     /**
      * End timing a pass
      */
-    endPass(passId: string): void {
+    endPass(_passId: string): void {
         if (!this.enabled) return;
         this.gl.endQuery(this.ext.TIME_ELAPSED_EXT);
     }

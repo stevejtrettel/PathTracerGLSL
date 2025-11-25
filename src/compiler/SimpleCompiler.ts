@@ -6,10 +6,7 @@ import type {
     RenderStrategy,
     CompiledRenderer,
     ShaderProgram,
-    RenderPipeline,
-    FramebufferConfig,
-    RenderPass,
-    ExportTarget
+    RenderPipeline
 } from './types.js';
 
 import type { UniformBinding } from '../engine/types.js';
@@ -205,7 +202,7 @@ void main() {
      */
     private _generatePathtracerRenderer(
         scene: SceneDescription,
-        strategy: RenderStrategy
+        _strategy: RenderStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
@@ -616,7 +613,7 @@ void main() {
      */
     private _generatePathtracerAOVsRenderer(
         scene: SceneDescription,
-        strategy: RenderStrategy
+        _strategy: RenderStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
