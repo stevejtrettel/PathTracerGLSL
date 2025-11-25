@@ -586,7 +586,9 @@ void main() {
     }
 
     // Accumulate with previous frame
-    vec3 prev = texture(u_previous, uv).rgb;
+    // Use local UV for texture sampling (texture is tile-sized, not full image)
+    vec2 localUV = gl_FragCoord.xy / u_resolution;
+    vec3 prev = texture(u_previous, localUV).rgb;
     float blend = 1.0 / float(u_sampleCount + 1);
     vec3 accumulated = mix(prev, color, blend);
 
@@ -1026,7 +1028,9 @@ void main() {
     }
 
     // Accumulate radiance with previous frame
-    vec3 prev_radiance = texture(u_previous, uv).rgb;
+    // Use local UV for texture sampling (texture is tile-sized, not full image)
+    vec2 localUV = gl_FragCoord.xy / u_resolution;
+    vec3 prev_radiance = texture(u_previous, localUV).rgb;
     float blend = 1.0 / float(u_sampleCount + 1);
     vec3 accumulated_radiance = mix(prev_radiance, radiance, blend);
 
