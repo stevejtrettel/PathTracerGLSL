@@ -1,4 +1,4 @@
-// engine-new/FlexibleRenderExecutor.ts
+// engine/FlexibleRenderExecutor.ts
 
 import type { RenderPipeline, RenderPass, ShaderProgram } from '../compiler/types.js';
 import type { FlexibleResourceManager } from './FlexibleResourceManager.js';

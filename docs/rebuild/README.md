@@ -64,9 +64,9 @@ The test page demonstrates:
 **New Architecture:**
 - `src/compiler/types.ts` - Core type definitions
 - `src/compiler/SimpleCompiler.ts` - Validation compiler
-- `src/engine-new/FlexibleEngine.ts` - Main engine orchestration
-- `src/engine-new/FlexibleResourceManager.ts` - GPU resource management
-- `src/engine-new/FlexibleRenderExecutor.ts` - Pipeline execution
+- `src/engine/FlexibleEngine.ts` - Main engine orchestration
+- `src/engine/FlexibleResourceManager.ts` - GPU resource management
+- `src/engine/FlexibleRenderExecutor.ts` - Pipeline execution
 
 **Test:**
 - `examples/test-flexible-engine.ts` - End-to-end test

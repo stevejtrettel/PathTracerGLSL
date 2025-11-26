@@ -1,6 +1,108 @@
 // app/types.ts
 import type { TileJob } from './TiledRenderer';
 
+// Re-export compiler types that are used by app consumers
+export type {
+    RenderStrategy,
+    SceneDescription,
+    CompiledRenderer
+} from '../compiler/types.js';
+
+import type { RenderStrategy, SceneDescription } from '../compiler/types.js';
+
+/**
+ * Strategy preset - maps strategy ID to strategy configuration
+ */
+export interface StrategyPreset {
+    name: string;
+    description: string;
+    strategy: RenderStrategy;
+}
+
+/**
+ * Configuration for FlexibleApp initialization
+ */
+export interface FlexibleAppConfig {
+    scene: SceneDescription;
+    strategies: RenderStrategy[];
+    initialParameters?: Record<string, any>;
+}
+
+/**
+ * Render progress information
+ */
+export interface RenderProgress {
+    currentSamples: number;
+    targetSamples?: number;
+    elapsedMs: number;
+    samplesPerSecond: number;
+    estimatedRemainingMs?: number;
+}
+
+/**
+ * Export format for saving images
+ */
+export type ExportFormat = 'png' | 'exr' | 'hdr';
+
+/**
+ * Built-in strategy presets
+ */
+export const STRATEGY_PRESETS: Record<string, StrategyPreset> = {
+    'pathtracer': {
+        name: 'Path Tracer',
+        description: 'Full path tracing with global illumination',
+        strategy: {
+            id: 'pathtracer',
+            settings: {
+                maxBounces: 8,
+                samplesPerFrame: 1
+            }
+        }
+    },
+    'pathtracer-aovs': {
+        name: 'Path Tracer + AOVs',
+        description: 'Path tracing with Arbitrary Output Variables',
+        strategy: {
+            id: 'pathtracer-aovs',
+            settings: {
+                maxBounces: 8,
+                samplesPerFrame: 1
+            }
+        }
+    },
+    'debug': {
+        name: 'Debug',
+        description: 'Debug visualization mode',
+        strategy: {
+            id: 'debug',
+            settings: {
+                debugOutput: 'normal'
+            }
+        }
+    },
+    'pathtracer-full': {
+        name: 'Full Path Tracer',
+        description: 'Multi-bounce path tracing with Cornell box scene',
+        strategy: {
+            id: 'pathtracer-full',
+            settings: {
+                maxBounces: 8,
+                samplesPerFrame: 1
+            }
+        }
+    },
+    'debug-aovs': {
+        name: 'Debug AOVs',
+        description: 'Debug visualization with albedo, distance, and march steps',
+        strategy: {
+            id: 'debug-aovs',
+            settings: {
+                defaultOutput: 'albedo'
+            }
+        }
+    }
+};
+
 /**
  * Single parameter change
  */

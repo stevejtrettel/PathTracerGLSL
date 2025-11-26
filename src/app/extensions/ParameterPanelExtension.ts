@@ -1,8 +1,10 @@
 // app/extensions/ParameterPanelExtension.ts
-import type { Extension, ParameterMetadata } from '../types';
-import type { App } from '../App';
-import type { EventBus } from '../EventBus';
-import { MODULE_ORDER } from '../../engine/types';
+// Adapted from app/extensions/ParameterPanelExtension.ts for FlexibleApp
+
+import type { Extension, ParameterMetadata } from '../types.js';
+import type { FlexibleApp } from '../FlexibleApp.js';
+import type { EventBus } from '../EventBus.js';
+import { MODULE_ORDER } from '../../engine/types.js';
 
 /**
  * ParameterPanelExtension
@@ -14,11 +16,12 @@ import { MODULE_ORDER } from '../../engine/types';
  * - Grouped by module type, sorted by MODULE_ORDER
  * - Throttled updates for smooth performance
  */
-class ParameterPanelExtension implements Extension {
+export class ParameterPanelExtension implements Extension {
     name = 'parameter-panel';
     version = '1.0.0';
+    description = 'Auto-generated parameter controls panel';
 
-    private app!: App;
+    private app!: FlexibleApp;
     private bus!: EventBus;
     private panel!: HTMLElement;
     private chevron!: HTMLElement;
@@ -30,7 +33,7 @@ class ParameterPanelExtension implements Extension {
     private throttleTimer: number | null = null;
     private readonly THROTTLE_MS = 16; // ~60fps
 
-    install(app: App, bus: EventBus): void {
+    install(app: FlexibleApp, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
 
@@ -40,12 +43,16 @@ class ParameterPanelExtension implements Extension {
         this.populatePanel();
         this.attachKeyboardShortcut();
 
-        console.log('✓ Parameter Panel installed (Tab to toggle)');
+        console.log('Parameter Panel installed (Tab to toggle)');
     }
 
     uninstall(): void {
         this.panel?.remove();
         this.chevron?.remove();
+
+        // Remove injected styles
+        const style = document.getElementById('parameter-panel-styles');
+        style?.remove();
 
         if (this.throttleTimer !== null) {
             clearTimeout(this.throttleTimer);
@@ -57,6 +64,9 @@ class ParameterPanelExtension implements Extension {
     // ============================================================================
 
     private injectStyles(): void {
+        // Check if styles already exist
+        if (document.getElementById('parameter-panel-styles')) return;
+
         const style = document.createElement('style');
         style.id = 'parameter-panel-styles';
         style.textContent = `
@@ -281,6 +291,7 @@ class ParameterPanelExtension implements Extension {
                 font-size: 13px;
                 outline: none;
                 transition: all 0.15s ease;
+                box-sizing: border-box;
             }
 
             .param-number:hover {
@@ -492,6 +503,14 @@ class ParameterPanelExtension implements Extension {
             .param-chevron.open::after {
                 transform: rotate(180deg);
             }
+
+            /* Empty state message */
+            .param-empty {
+                padding: 40px 20px;
+                text-align: center;
+                color: rgba(255, 255, 255, 0.5);
+                font-size: 13px;
+            }
         `;
 
         document.head.appendChild(style);
@@ -534,6 +553,15 @@ class ParameterPanelExtension implements Extension {
 
     private populatePanel(): void {
         const metadata = this.app.getParameterMetadata();
+
+        // Show empty state if no parameters
+        if (metadata.size === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'param-empty';
+            empty.textContent = 'No parameters available for current renderer';
+            this.panel.appendChild(empty);
+            return;
+        }
 
         // Group parameters by group name
         const groups = this.groupParameters(metadata);
@@ -617,7 +645,7 @@ class ParameterPanelExtension implements Extension {
         let widget: HTMLElement;
 
         if (meta.type === 'float' && meta.range) {
-            widget = this.createSlider(path, meta);
+            widget = this.createSlider(path, meta, label);
         } else if (meta.type === 'float' || meta.type === 'int') {
             widget = this.createNumberInput(path, meta);
         } else if (meta.type === 'bool') {
@@ -659,7 +687,7 @@ class ParameterPanelExtension implements Extension {
         return label;
     }
 
-    private createSlider(path: string, meta: ParameterMetadata): HTMLElement {
+    private createSlider(path: string, meta: ParameterMetadata, label: HTMLElement): HTMLElement {
         const container = document.createElement('div');
         container.className = 'param-slider-container';
 
@@ -670,7 +698,7 @@ class ParameterPanelExtension implements Extension {
         slider.max = String(meta.range![1]);
         slider.step = String(meta.step || (meta.range![1] - meta.range![0]) / 100);
 
-        const currentValue = this.app.parameterStore.get(path);
+        const currentValue = this.app.getParameter(path);
         slider.value = String(currentValue ?? meta.default);
 
         // Value display
@@ -682,11 +710,8 @@ class ParameterPanelExtension implements Extension {
         };
         updateDisplay(parseFloat(slider.value));
 
-        // Find and update label
-        const label = container.parentElement?.querySelector('.param-label');
-        if (label) {
-            label.appendChild(valueDisplay);
-        }
+        // Append value display to label
+        label.appendChild(valueDisplay);
 
         slider.oninput = () => {
             const value = meta.type === 'int' ? parseInt(slider.value) : parseFloat(slider.value);
@@ -712,7 +737,7 @@ class ParameterPanelExtension implements Extension {
             input.step = String(meta.step);
         }
 
-        const currentValue = this.app.parameterStore.get(path);
+        const currentValue = this.app.getParameter(path);
         input.value = String(currentValue ?? meta.default);
 
         input.oninput = () => {
@@ -733,7 +758,7 @@ class ParameterPanelExtension implements Extension {
         checkbox.type = 'checkbox';
         checkbox.className = 'param-checkbox';
 
-        const currentValue = this.app.parameterStore.get(path);
+        const currentValue = this.app.getParameter(path);
         checkbox.checked = currentValue ?? meta.default;
 
         checkbox.onchange = () => {
@@ -756,7 +781,7 @@ class ParameterPanelExtension implements Extension {
         const components = meta.type === 'vec2' ? 2 : meta.type === 'vec3' ? 3 : 4;
         const labels = ['X', 'Y', 'Z', 'W'];
 
-        const currentValue = this.app.parameterStore.get(path) || meta.default;
+        const currentValue = this.app.getParameter(path) || meta.default;
         const inputs: HTMLInputElement[] = [];
 
         for (let i = 0; i < components; i++) {
@@ -793,7 +818,7 @@ class ParameterPanelExtension implements Extension {
         const container = document.createElement('div');
         container.className = 'param-color-container';
 
-        const currentValue = this.app.parameterStore.get(path) || meta.default;
+        const currentValue = this.app.getParameter(path) || meta.default;
 
         // Color swatch
         const swatch = document.createElement('div');
@@ -836,7 +861,7 @@ class ParameterPanelExtension implements Extension {
         const select = document.createElement('select');
         select.className = 'param-dropdown';
 
-        const currentValue = this.app.parameterStore.get(path) ?? meta.default;
+        const currentValue = this.app.getParameter(path) ?? meta.default;
 
         for (const value of meta.values!) {
             const option = document.createElement('option');
@@ -872,7 +897,7 @@ class ParameterPanelExtension implements Extension {
 
     private flushUpdates(): void {
         for (const [path, value] of this.updateQueue) {
-            this.app.parameterStore.set(path, value);
+            this.app.setParameter(path, value);
         }
         this.updateQueue.clear();
     }
@@ -893,17 +918,40 @@ class ParameterPanelExtension implements Extension {
         }
     }
 
+    /**
+     * Programmatically open the panel
+     */
+    open(): void {
+        if (!this.isOpen) {
+            this.toggle();
+        }
+    }
+
+    /**
+     * Programmatically close the panel
+     */
+    close(): void {
+        if (this.isOpen) {
+            this.toggle();
+        }
+    }
+
     private attachKeyboardShortcut(): void {
+        // Use capture phase to intercept Tab before browser's focus cycling
         window.addEventListener('keydown', (e) => {
-            if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                // Only intercept if not in an input field
+            if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+                // Allow Tab in form fields within the param panel itself
                 const target = e.target as HTMLElement;
-                if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+                const inParamPanel = target.closest('.param-panel');
+
+                if (!inParamPanel) {
+                    // Outside param panel - toggle it
                     e.preventDefault();
+                    e.stopPropagation();
                     this.toggle();
                 }
             }
-        });
+        }, { capture: true });
     }
 
     // ============================================================================
@@ -924,5 +972,3 @@ class ParameterPanelExtension implements Extension {
         return [r, g, b];
     }
 }
-
-export { ParameterPanelExtension };

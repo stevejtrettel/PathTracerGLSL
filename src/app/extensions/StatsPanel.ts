@@ -1,63 +1,71 @@
-// app/extensions/StatsPanelExtension.ts
-import type { Extension } from '../types';
-import { EventManager } from '../utils/EventManager';
+// app/extensions/StatsPanel.ts
+import type { FlexibleApp } from '../FlexibleApp.js';
+import type { EventBus } from '../EventBus.js';
 
 /**
- * StatsPanelExtension - Displays rendering statistics overlay
+ * StatsPanel - Simple rendering statistics overlay
  *
- * Adapts display based on rendering state:
- * - Accumulating: Shows samples/sec, total samples, time
- * - One-shot: Shows FPS only
- * - Shows lock/pause status indicators
+ * Displays:
+ * - Samples and samples/sec
+ * - FPS
+ * - Resolution
+ * - GPU pass timings (if profiling enabled)
+ * - Render state indicators
+ *
+ * Toggle visibility with 'i' key (info)
  */
-class StatsPanelExtension implements Extension {
+export class StatsPanel {
     name = 'stats-panel';
     version = '1.0.0';
-    description = 'Displays rendering statistics overlay';
+    description = 'Rendering statistics overlay';
 
-    private app: any;
-    private bus: any;
+    private app!: FlexibleApp;
+    private bus!: EventBus;
     private panel: HTMLDivElement | null = null;
-    private events = new EventManager();
+    private visible = true;
+    private updateInterval: number | null = null;
 
-    // Stats tracking
-    private totalSamples = 0;
-    private resolution = [0, 0];
-    private timeSinceReset = 0;
-
-    // Rolling windows for rate calculations
-    private sampleWindow: Array<{ samples: number; time: number }> = [];
-    private frameWindow: Array<{ time: number }> = [];
-    private readonly WINDOW_DURATION = 1000; // 1 second window in ms
-
-    install(app: any, bus: any): void {
+    install(app: FlexibleApp, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
 
-        app.registerService('stats', this);
-
         this.createPanel();
+        this.startUpdating();
 
-        const res = app.parameterStore.get('resolution');
-        if (res) {
-            this.resolution = res;
-        }
+        // Toggle with 'i' key
+        window.addEventListener('keydown', this.onKeyDown);
 
-        this.events.onBus(bus, 'render.progress', this.handleProgress);
-        this.events.onBus(bus, 'accumulation.reset', this.handleReset);
-        this.events.onBus(bus, 'parameter.changed', this.handleParameterChange);
-        this.events.onBus(bus, 'render.paused', this.handlePause);
-        this.events.onBus(bus, 'render.resumed', this.handleResume);
-
-        console.log('StatsPanel extension installed');
+        console.log('StatsPanel installed (press i to toggle)');
     }
 
     uninstall(): void {
-        this.events.removeAll();
-
+        window.removeEventListener('keydown', this.onKeyDown);
+        this.stopUpdating();
         if (this.panel) {
             this.panel.remove();
             this.panel = null;
+        }
+    }
+
+    // ============================================================================
+    // Public API
+    // ============================================================================
+
+    show(): void {
+        this.visible = true;
+        if (this.panel) this.panel.style.display = 'block';
+    }
+
+    hide(): void {
+        this.visible = false;
+        if (this.panel) this.panel.style.display = 'none';
+    }
+
+    toggle(): void {
+        if (this.visible) {
+            this.hide();
+        } else {
+            this.show();
         }
     }
 
@@ -73,161 +81,79 @@ class StatsPanelExtension implements Extension {
             top: 10px;
             left: 10px;
             background: rgba(0, 0, 0, 0.75);
-            color: white;
-            padding: 12px 16px;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.6;
+            color: #fff;
+            padding: 10px 14px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
             border-radius: 4px;
             z-index: 1000;
             pointer-events: none;
             user-select: none;
-            min-width: 200px;
+            min-width: 160px;
         `;
 
         document.body.appendChild(this.panel);
-        this.updateDisplay();
+    }
+
+    private startUpdating(): void {
+        // Update at 10 Hz (every 100ms)
+        this.updateInterval = window.setInterval(() => {
+            this.updateDisplay();
+        }, 100);
+    }
+
+    private stopUpdating(): void {
+        if (this.updateInterval !== null) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
     }
 
     private updateDisplay(): void {
-        if (!this.panel) return;
+        if (!this.panel || !this.visible) return;
 
-        const coordinator = this.app.renderCoordinator;
-        const isAccumulating = coordinator.isAccumulating();
-        const isLocked = coordinator.isLocked();
-        const isPaused = coordinator.isPaused();
+        const stats = this.app.getStats();
+        const lines: string[] = [];
 
-        let html = '';
-
-        // Status indicators
-        if (isPaused) {
-            html += `<div style="color: orange; margin-bottom: 4px">⏸ PAUSED</div>`;
-        } else if (isLocked) {
-            html += `<div style="color: orange; margin-bottom: 4px">🔒 PRODUCTION</div>`;
+        // State indicator
+        if (stats.state === 'paused') {
+            lines.push('<span style="color: #ffa500;">PAUSED</span>');
+        } else if (stats.mode === 'production') {
+            lines.push('<span style="color: #4a9eff;">PRODUCTION</span>');
         }
 
-        // Accumulating: show sample statistics
-        if (isAccumulating) {
-            const sps = this.calculateSamplesPerSecond();
-            const spsDisplay = sps > 0 ? sps.toFixed(1) : '---';
-            const timeDisplay = this.formatTime(this.timeSinceReset);
+        // Core stats
+        lines.push(`<b>Samples:</b> ${stats.samples.toLocaleString()}`);
+        lines.push(`<b>FPS:</b> ${stats.fps.toFixed(1)}`);
+        lines.push(`<b>Resolution:</b> ${stats.resolution[0]}×${stats.resolution[1]}`);
+        lines.push(`<b>Time:</b> ${this.formatTime(stats.elapsedMs)}`);
 
-            html += `
-                <div><strong>Samples/sec:</strong> ${spsDisplay}</div>
-                <div><strong>Total samples:</strong> ${this.totalSamples}</div>
-                <div><strong>Resolution:</strong> ${this.resolution[0]}×${this.resolution[1]}</div>
-                <div><strong>Time:</strong> ${timeDisplay}</div>
-            `;
-        }
-        // One-shot: show FPS only
-        else {
-            const fps = this.calculateFPS();
-            const fpsDisplay = fps > 0 ? fps.toFixed(1) : '---';
-
-            html += `
-                <div><strong>FPS:</strong> ${fpsDisplay}</div>
-                <div><strong>Resolution:</strong> ${this.resolution[0]}×${this.resolution[1]}</div>
-            `;
+        // Renderer
+        if (stats.rendererId) {
+            const shortId = stats.rendererId.split('-').slice(0, 2).join('-');
+            lines.push(`<b>Renderer:</b> ${shortId}`);
         }
 
-        this.panel.innerHTML = html;
-    }
+        // GPU timings (if profiling enabled)
+        if (stats.profilingEnabled && stats.gpuTimings) {
+            lines.push('<span style="color: #888;">─────────────</span>');
+            lines.push('<b>GPU Timings:</b>');
 
-    // ============================================================================
-    // Private: Event Handlers
-    // ============================================================================
-
-    private handleProgress = (info: any): void => {
-        if (info.samples !== undefined) {
-            this.totalSamples = info.samples;
-        }
-
-        if (info.elapsedTime !== undefined) {
-            this.timeSinceReset = info.elapsedTime / 1000;
-
-            // Add to sample window
-            this.sampleWindow.push({
-                samples: info.samples || 0,
-                time: info.elapsedTime
-            });
-
-            // Remove old entries outside window
-            const cutoffTime = info.elapsedTime - this.WINDOW_DURATION;
-            this.sampleWindow = this.sampleWindow.filter(entry => entry.time > cutoffTime);
-        }
-
-        if (info.timestamp !== undefined) {
-            // Track frames for FPS calculation
-            this.frameWindow.push({ time: info.timestamp });
-
-            // Remove old frames outside window
-            const cutoffTime = info.timestamp - this.WINDOW_DURATION;
-            this.frameWindow = this.frameWindow.filter(f => f.time > cutoffTime);
-        }
-
-        this.updateDisplay();
-    };
-
-    private handleReset = (): void => {
-        this.totalSamples = 0;
-        this.timeSinceReset = 0;
-        this.sampleWindow = [];
-        this.frameWindow = [];
-        this.updateDisplay();
-    };
-
-    private handleParameterChange = (changes: any): void => {
-        for (const change of changes.changes) {
-            if (change.path === 'resolution') {
-                this.resolution = change.newValue;
-                this.updateDisplay();
-                break;
+            let totalGpu = 0;
+            for (const [passId, timeMs] of Object.entries(stats.gpuTimings)) {
+                const shortPass = passId.replace('-pass', '');
+                lines.push(`  ${shortPass}: ${timeMs.toFixed(2)}ms`);
+                totalGpu += timeMs;
             }
+            lines.push(`  <b>Total:</b> ${totalGpu.toFixed(2)}ms`);
         }
-    };
 
-    private handlePause = (): void => {
-        // Force update to show pause indicator
-        this.updateDisplay();
-    };
-
-    private handleResume = (): void => {
-        // Force update to remove pause indicator
-        this.updateDisplay();
-    };
-
-    // ============================================================================
-    // Private: Calculations
-    // ============================================================================
-
-    private calculateSamplesPerSecond(): number {
-        if (this.sampleWindow.length < 2) return 0;
-
-        const oldest = this.sampleWindow[0];
-        const newest = this.sampleWindow[this.sampleWindow.length - 1];
-
-        const sampleDiff = newest.samples - oldest.samples;
-        const timeDiff = (newest.time - oldest.time) / 1000; // Convert to seconds
-
-        if (timeDiff <= 0) return 0;
-
-        return sampleDiff / timeDiff;
+        this.panel.innerHTML = lines.join('<br>');
     }
 
-    private calculateFPS(): number {
-        if (this.frameWindow.length < 2) return 0;
-
-        const oldest = this.frameWindow[0];
-        const newest = this.frameWindow[this.frameWindow.length - 1];
-
-        const timeDiff = (newest.time - oldest.time) / 1000; // Convert to seconds
-
-        if (timeDiff <= 0) return 0;
-
-        return this.frameWindow.length / timeDiff;
-    }
-
-    private formatTime(seconds: number): string {
+    private formatTime(ms: number): string {
+        const seconds = ms / 1000;
         if (seconds < 60) {
             return `${seconds.toFixed(1)}s`;
         } else if (seconds < 3600) {
@@ -240,6 +166,22 @@ class StatsPanelExtension implements Extension {
             return `${hours}h ${mins}m`;
         }
     }
-}
 
-export { StatsPanelExtension };
+    // ============================================================================
+    // Private: Event Handlers
+    // ============================================================================
+
+    private onKeyDown = (e: KeyboardEvent): void => {
+        // Skip if typing in input
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+            return;
+        }
+
+        // Toggle with 'i' key
+        if (e.key === 'i' || e.key === 'I') {
+            e.preventDefault();
+            this.toggle();
+        }
+    };
+}

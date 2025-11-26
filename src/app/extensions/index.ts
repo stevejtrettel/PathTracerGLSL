@@ -1,0 +1,8 @@
+// app/extensions/index.ts
+// Export all extensions for FlexibleApp
+
+export { OrbitControls } from './OrbitControls.js';
+export { TouchOrbitControls } from './TouchOrbitControls.js';
+export { ParameterPanelExtension } from './ParameterPanelExtension.js';
+export { KeyboardControls } from './KeyboardControls.js';
+export { StatsPanel } from './StatsPanel.js';

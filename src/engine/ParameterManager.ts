@@ -1,7 +1,7 @@
 // engine/ParameterManager.ts
-import type { ModuleDescriptor, UniformBinding } from './types';
-import type { ParameterChanges } from '../app/types';
-import { setUniformValue, uniformValuesEqual } from './utils/shader-uniform-utils';
+import type { ModuleDescriptor, UniformBinding } from './types.js';
+import type { ParameterChanges } from '../app/types.js';
+import { setUniformValue, uniformValuesEqual } from './utils/shader-uniform-utils.js';
 
 /**
  * ParameterManager - Manages parameter-to-uniform bindings

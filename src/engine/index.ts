@@ -1,4 +1,4 @@
-// engine-new/index.ts
+// engine/index.ts
 
 export { FlexibleEngine } from './FlexibleEngine.js';
 export { FlexibleResourceManager } from './FlexibleResourceManager.js';

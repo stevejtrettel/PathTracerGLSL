@@ -60,7 +60,7 @@ This document outlines the complete build strategy for migrating from the module
    ├── compiler-new/           # New Compiler (empty initially)
    │   ├── SimpleCompiler.ts   # Phase 1 implementation
    │   └── types.ts            # Shared types
-   ├── engine-new/             # New Engine classes
+   ├── engine/             # New Engine classes
    │   ├── FlexibleResourceManager.ts
    │   ├── FlexibleRenderExecutor.ts
    │   └── types.ts
