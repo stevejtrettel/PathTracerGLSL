@@ -111,8 +111,8 @@ export class FlexibleResourceManager {
      *
      * Examples:
      * - getFramebuffer('screen') → null (default framebuffer)
-     * - getFramebuffer('accumulation_current') → current ping-pong buffer
-     * - getFramebuffer('accumulation_previous') → previous ping-pong buffer
+     * - getFramebuffer('accumulation-current') → current ping-pong buffer
+     * - getFramebuffer('accumulation-previous') → previous ping-pong buffer
      * - getFramebuffer('myTexture') → single framebuffer
      */
     getFramebuffer(id: string): WebGLFramebuffer | null {
@@ -137,8 +137,8 @@ export class FlexibleResourceManager {
      * Get texture by id (resolves current/previous for double_buffer, :N for MRT)
      *
      * Examples:
-     * - 'accumulation_current' → attachment 0, current buffer
-     * - 'accumulation_previous:1' → attachment 1, previous buffer
+     * - 'accumulation-current' → attachment 0, current buffer
+     * - 'accumulation-previous:1' → attachment 1, previous buffer
      * - 'myTexture:2' → attachment 2
      */
     getTexture(id: string): WebGLTexture {
@@ -379,6 +379,7 @@ export class FlexibleResourceManager {
      */
     private _allocateTextureStorage(texture: WebGLTexture, format: string): void {
         const gl = this.gl;
+        // FUTURE: Add WebGL error checking after GL calls (checkGLError utility)
 
         gl.bindTexture(gl.TEXTURE_2D, texture);
 
@@ -574,9 +575,9 @@ export class FlexibleResourceManager {
      *
      * Examples:
      * - 'accumulation' → { baseId: 'accumulation', qualifier: null, attachment: 0 }
-     * - 'accumulation_current' → { baseId: 'accumulation', qualifier: 'current', attachment: 0 }
-     * - 'accumulation_previous' → { baseId: 'accumulation', qualifier: 'previous', attachment: 0 }
-     * - 'accumulation_current:1' → { baseId: 'accumulation', qualifier: 'current', attachment: 1 }
+     * - 'accumulation-current' → { baseId: 'accumulation', qualifier: 'current', attachment: 0 }
+     * - 'accumulation-previous' → { baseId: 'accumulation', qualifier: 'previous', attachment: 0 }
+     * - 'accumulation-current:1' → { baseId: 'accumulation', qualifier: 'current', attachment: 1 }
      * - 'myBuffer:2' → { baseId: 'myBuffer', qualifier: null, attachment: 2 }
      */
     private _parseId(id: string): {
@@ -598,12 +599,12 @@ export class FlexibleResourceManager {
             }
         }
 
-        // Parse _current/_previous suffix: 'accumulation_current' → qualifier='current'
-        const parts = rest.split('_');
+        // Parse -current/-previous suffix: 'accumulation-current' → qualifier='current'
+        const parts = rest.split('-');
         const lastPart = parts[parts.length - 1];
 
         if (lastPart === 'current' || lastPart === 'previous') {
-            const baseId = parts.slice(0, -1).join('_');
+            const baseId = parts.slice(0, -1).join('-');
             return { baseId, qualifier: lastPart, attachment };
         }
 

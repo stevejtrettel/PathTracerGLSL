@@ -103,7 +103,7 @@ export const STRATEGY_PRESETS: Record<string, StrategyPreset> = {
 /**
  * Single parameter change
  */
-interface ParameterChange {
+export interface ParameterChange {
     path: string;
     oldValue: any;
     newValue: any;
@@ -112,7 +112,7 @@ interface ParameterChange {
 /**
  * Batch of parameter changes
  */
-interface ParameterChanges {
+export interface ParameterChanges {
     changes: ParameterChange[];
 }
 
@@ -125,7 +125,7 @@ export type { ParameterMetadata } from '../engine/types.js';
  * Extensions can add UI, modify rendering behavior, provide new services,
  * and save/restore state with sessions.
  */
-interface Extension {
+export interface Extension {
     name: string;
     version?: string;
     description?: string;
@@ -141,7 +141,7 @@ interface Extension {
 /**
  * Event handler type for EventBus
  */
-type EventHandler = (data?: any) => void;
+export type EventHandler = (data?: any) => void;
 
 /**
  * Complete session data for save/restore
@@ -149,7 +149,7 @@ type EventHandler = (data?: any) => void;
  * Captures all state needed to recreate a rendering session:
  * active recipe, parameters, camera, accumulation, and tile jobs.
  */
-interface SessionData {
+export interface SessionData {
     version: string;
     timestamp: number;
 
@@ -186,11 +186,3 @@ interface SessionData {
         description?: string;
     };
 }
-
-export type {
-    ParameterChange,
-    ParameterChanges,
-    Extension,
-    EventHandler,
-    SessionData
-};

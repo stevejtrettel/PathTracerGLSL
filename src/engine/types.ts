@@ -19,7 +19,7 @@ const MODULE_ORDER = [
 /**
  * Valid module types
  */
-type ModuleKind =
+export type ModuleKind =
     | 'ambient'        // ambient_*
     | 'environment'    // environment_*
     | 'scene'          // scene_*
@@ -34,7 +34,7 @@ type ModuleKind =
 /**
  * Module descriptor with GLSL code and metadata
  */
-interface ModuleDescriptor {
+export interface ModuleDescriptor {
     id: {
         kind: ModuleKind;
         name: string;
@@ -60,7 +60,7 @@ interface ModuleDescriptor {
 /**
  * Supported GLSL uniform types
  */
-type UniformType =
+export type UniformType =
     | 'float'
     | 'int'
     | 'bool'
@@ -75,7 +75,7 @@ type UniformType =
 /**
  * Binding between shader uniform and application parameters
  */
-interface UniformBinding {
+export interface UniformBinding {
     uniform: string;
     parameters: string[];
     type: UniformType;
@@ -111,7 +111,7 @@ export interface ParameterMetadata {
 /**
  * Module validation result
  */
-interface ValidationResult {
+export interface ValidationResult {
     valid: boolean;
     errors: string[];
     warnings?: string[];
@@ -120,7 +120,7 @@ interface ValidationResult {
 /**
  * Compiled shader program ready for execution
  */
-interface CompiledProgram {
+export interface CompiledProgram {
     id: string;
     program: WebGLProgram;
     vertexSource: string;
@@ -130,12 +130,12 @@ interface CompiledProgram {
 /**
  * Engine execution state
  */
-type EngineState = 'ready' | 'running';
+export type EngineState = 'ready' | 'running';
 
 /**
  * Engine-provided shader uniforms
  */
-interface EngineUniforms {
+export interface EngineUniforms {
     resolution: [number, number];
     imageSize: [number, number];
     frameIndex: number;
@@ -150,7 +150,7 @@ interface EngineUniforms {
  * A recipe defines a complete rendering configuration by composing
  * modules for world representation, optical simulation, and output.
  */
-interface Recipe {
+export interface Recipe {
     id: string;
     name: string;
     description?: string;
@@ -182,7 +182,7 @@ interface Recipe {
  * Result of shader compilation
  * Discriminated union for success or failure with diagnostics
  */
-type CompilationResult =
+export type CompilationResult =
     | {
         success: true;
         mainProgram: WebGLProgram;
@@ -195,17 +195,3 @@ type CompilationResult =
     };
 
 export { MODULE_ORDER };
-
-export type {
-    ModuleDescriptor,
-    ModuleKind,
-    ValidationResult,
-    CompiledProgram,
-    CompilationResult,
-    EngineState,
-    UniformBinding,
-    EngineUniforms,
-    UniformType,
-    ParameterMetadata,
-    Recipe
-};

@@ -254,10 +254,10 @@ void main() {
                     shader: 'pathtracer-main',
                     inputs: {
                         textures: {
-                            'u_previous': 'accumulation_previous'
+                            'u_previous': 'accumulation-previous'
                         }
                     },
-                    output: 'accumulation_current',
+                    output: 'accumulation-current',
                     execution: {
                         type: 'once',
                         clearBeforeRender: false
@@ -268,7 +268,7 @@ void main() {
                     shader: 'pathtracer-display',
                     inputs: {
                         textures: {
-                            'u_radiance': 'accumulation_current'
+                            'u_radiance': 'accumulation-current'
                         }
                     },
                     output: 'rgb',
@@ -451,7 +451,7 @@ void main() {
             },
             exportTargets: {
                 'hdr': {
-                    bufferId: 'accumulation_current',
+                    bufferId: 'accumulation-current',
                     format: 'float'
                 },
                 'ldr': {
@@ -862,13 +862,13 @@ void main() {
                     shader: 'pathtracer-mrt-main',
                     inputs: {
                         textures: {
-                            'u_previous': 'accumulation_previous:0'  // Read radiance from attachment 0
+                            'u_previous': 'accumulation-previous:0'  // Read radiance from attachment 0
                         }
                     },
                     output: [
-                        'accumulation_current:0',  // Write radiance
-                        'accumulation_current:1',  // Write albedo
-                        'accumulation_current:2'   // Write normal
+                        'accumulation-current:0',  // Write radiance
+                        'accumulation-current:1',  // Write albedo
+                        'accumulation-current:2'   // Write normal
                     ],
                     execution: {
                         type: 'once',
@@ -880,9 +880,9 @@ void main() {
                     shader: 'pathtracer-aovs-display',
                     inputs: {
                         textures: {
-                            'u_radiance': 'accumulation_current:0',
-                            'u_albedo': 'accumulation_current:1',
-                            'u_normal': 'accumulation_current:2'
+                            'u_radiance': 'accumulation-current:0',
+                            'u_albedo': 'accumulation-current:1',
+                            'u_normal': 'accumulation-current:2'
                         }
                     },
                     output: 'rgb',
@@ -1002,17 +1002,17 @@ void main() {
             sourceMaps: new Map(),
             exportTargets: {
                 'hdr': {
-                    bufferId: 'accumulation_current',
+                    bufferId: 'accumulation-current',
                     format: 'float',
                     attachment: 0
                 },
                 'albedo': {
-                    bufferId: 'accumulation_current',
+                    bufferId: 'accumulation-current',
                     format: 'byte',
                     attachment: 1
                 },
                 'normal': {
-                    bufferId: 'accumulation_current',
+                    bufferId: 'accumulation-current',
                     format: 'float',
                     attachment: 2
                 },
@@ -1407,10 +1407,10 @@ void main() {
                     shader: 'pathtracer-full-main',
                     inputs: {
                         textures: {
-                            'u_previous': 'accumulation_previous'
+                            'u_previous': 'accumulation-previous'
                         }
                     },
-                    output: 'accumulation_current',
+                    output: 'accumulation-current',
                     execution: {
                         type: 'once',
                         clearBeforeRender: false
@@ -1421,7 +1421,7 @@ void main() {
                     shader: 'pathtracer-full-display',
                     inputs: {
                         textures: {
-                            'u_radiance': 'accumulation_current'
+                            'u_radiance': 'accumulation-current'
                         }
                     },
                     output: 'rgb',
@@ -1609,7 +1609,7 @@ void main() {
             },
             exportTargets: {
                 'hdr': {
-                    bufferId: 'accumulation_current',
+                    bufferId: 'accumulation-current',
                     format: 'float'
                 },
                 'ldr': {

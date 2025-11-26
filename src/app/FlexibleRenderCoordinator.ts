@@ -339,6 +339,7 @@ export class FlexibleRenderCoordinator {
 
         // Reject production promise if running
         if (this.productionReject) {
+            // FUTURE: Create proper RenderStoppedError class extends Error
             const error = new Error('Production render stopped');
             error.name = 'RenderStopped';
             this.productionReject(error);

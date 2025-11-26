@@ -127,8 +127,10 @@ export class FlexibleEngine {
 
         console.log(`Loading renderer '${id}'...`);
 
-        // Validate renderer structure
-        // TODO: Enable once validation is implemented
+        // FUTURE: Add validation for CompiledRenderer structure
+        // - Verify all referenced shaders exist in shaders map
+        // - Verify all framebuffer references in passes are valid
+        // - Verify pipeline structure is well-formed
         // const validation = validateCompiledRenderer(renderer);
         // if (!validation.valid) {
         //     console.error(`❌ Renderer validation failed for '${id}':`);
@@ -991,6 +993,10 @@ export class FlexibleEngine {
         console.error('WebGL context lost - rendering stopped');
         this.state = 'ready';
         this.resourceManager.handleContextLoss();
+        // FUTURE: Implement context restoration
+        // - Cache renderer compilation results
+        // - Recreate all WebGL resources after context restore
+        // - Resume rendering if it was in progress
     }
 }
 
