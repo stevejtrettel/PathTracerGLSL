@@ -1,18 +1,18 @@
-// app/FlexibleApp.ts
+// app/App.ts
 // Main orchestrator for the new architecture
 
 import { SimpleCompiler } from '../compiler/SimpleCompiler.js';
-import { FlexibleEngine } from '../engine/FlexibleEngine.js';
-import { FlexibleRenderCoordinator, type ProgressInfo } from './FlexibleRenderCoordinator.js';
+import { Engine } from '../engine/Engine.js';
+import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
 import { ParameterStore } from './ParameterStore.js';
 import { EventBus } from './EventBus.js';
 import { saveHDRFile, savePNGFile } from './utils/file-export.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
-import type { FlexibleAppConfig, RenderProgress, StrategyPreset } from './types.js';
+import type { AppConfig, RenderProgress, StrategyPreset } from './types.js';
 import type { Extension } from './types.js';
 
 /**
- * FlexibleApp - High-level orchestration for the new architecture
+ * App - High-level orchestration for the new architecture
  *
  * Key responsibilities:
  * - Own Compiler, Engine, and RenderCoordinator
@@ -28,11 +28,11 @@ import type { Extension } from './types.js';
  * - Camera as parameters (no recompilation for camera changes)
  * - Parameter persistence across renderer switches
  */
-export class FlexibleApp {
+export class App {
     // Core components
     private compiler: ICompiler;
-    private engine: FlexibleEngine;
-    private coordinator: FlexibleRenderCoordinator;
+    private engine: Engine;
+    private coordinator: RenderCoordinator;
     private parameterStore: ParameterStore;
     private eventBus: EventBus;
     private gl: WebGL2RenderingContext;
@@ -74,12 +74,12 @@ export class FlexibleApp {
 
         // Create core components
         this.compiler = new SimpleCompiler();
-        this.engine = new FlexibleEngine(gl);
+        this.engine = new Engine(gl);
         this.eventBus = new EventBus();
         this.parameterStore = new ParameterStore();
 
         // Create coordinator with EventBus for render events
-        this.coordinator = new FlexibleRenderCoordinator(this.engine, this.eventBus);
+        this.coordinator = new RenderCoordinator(this.engine, this.eventBus);
 
         // Wire ParameterStore changes to engine, EventBus, and accumulation reset
         this.parameterStore.onChange = (changes) => {
@@ -131,7 +131,7 @@ export class FlexibleApp {
             }
         };
 
-        console.log('FlexibleApp created');
+        console.log('App created');
     }
 
     // ============================================================================
@@ -143,7 +143,7 @@ export class FlexibleApp {
      *
      * Compiles all strategy combinations upfront for fast switching.
      */
-    async initialize(config: FlexibleAppConfig): Promise<void> {
+    async initialize(config: AppConfig): Promise<void> {
         const { scene, strategies, initialParameters } = config;
 
         if (strategies.length === 0) {
@@ -151,7 +151,7 @@ export class FlexibleApp {
         }
 
         this.scene = scene;
-        console.log(`Initializing FlexibleApp with scene: ${scene.id}`);
+        console.log(`Initializing App with scene: ${scene.id}`);
 
         // Compile all strategies
         const compiledRenderers: CompiledRenderer[] = [];
@@ -182,7 +182,7 @@ export class FlexibleApp {
             await this.engine.loadEnvironmentHDR(config.environmentHDR);
         }
 
-        console.log(`FlexibleApp initialized with ${compiledRenderers.length} renderers`);
+        console.log(`App initialized with ${compiledRenderers.length} renderers`);
         console.log(`  Available renderers: ${this.getAvailableRendererIds().join(', ')}`);
     }
 
@@ -1095,6 +1095,6 @@ export class FlexibleApp {
         this.renderers.clear();
         this.strategies.clear();
 
-        console.log('FlexibleApp disposed');
+        console.log('App disposed');
     }
 }

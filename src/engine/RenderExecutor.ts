@@ -1,11 +1,11 @@
-// engine/FlexibleRenderExecutor.ts
+// engine/RenderExecutor.ts
 
 import type { RenderPipeline, RenderPass, ShaderProgram } from '../compiler/types.js';
-import type { FlexibleResourceManager } from './FlexibleResourceManager.js';
+import type { ResourceManager } from './ResourceManager.js';
 import type { GPUProfiler } from './GPUProfiler.js';
 
 /**
- * FlexibleRenderExecutor
+ * RenderExecutor
  *
  * Generic pass execution engine that reads RenderPipeline and executes it.
  * Data-driven - doesn't know about scenes/strategies, just executes passes.
@@ -18,9 +18,9 @@ import type { GPUProfiler } from './GPUProfiler.js';
  *
  * Uses fullscreen triangle technique (no VAO needed, gl.drawArrays with 3 vertices)
  */
-export class FlexibleRenderExecutor {
+export class RenderExecutor {
     private gl: WebGL2RenderingContext;
-    private resourceManager: FlexibleResourceManager;
+    private resourceManager: ResourceManager;
 
     // Compiled shader programs (shader id → WebGLProgram)
     private programs: Map<string, WebGLProgram>;
@@ -31,7 +31,7 @@ export class FlexibleRenderExecutor {
     // Cached draw buffers per pass (passId → drawBuffers array)
     private drawBuffersCache: Map<string, number[]> = new Map();
 
-    constructor(gl: WebGL2RenderingContext, resourceManager: FlexibleResourceManager) {
+    constructor(gl: WebGL2RenderingContext, resourceManager: ResourceManager) {
         this.gl = gl;
         this.resourceManager = resourceManager;
         this.programs = new Map();

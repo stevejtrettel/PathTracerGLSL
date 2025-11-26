@@ -1,7 +1,7 @@
 /**
  * Cornell Box Example
  *
- * Demonstrates the FlexibleApp system with:
+ * Demonstrates the App system with:
  * - Full path tracer (multi-bounce GI)
  * - Direct lighting (single bounce)
  * - Debug visualization (albedo, distance, steps)
@@ -20,7 +20,7 @@
  * - x/X: Export PNG/HDR
  */
 
-import { FlexibleApp, STRATEGY_PRESETS } from '../src/app/index.js';
+import { App, STRATEGY_PRESETS } from '../src/app/index.js';
 import {
     OrbitControls,
     TouchOrbitControls,
@@ -39,7 +39,7 @@ async function main() {
     }
 
     // Create app
-    const app = new FlexibleApp(canvas);
+    const app = new App(canvas);
 
     // Initialize with our strategies
     await app.initialize({

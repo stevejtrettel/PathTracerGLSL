@@ -1,7 +1,7 @@
-// app/FlexibleRenderCoordinator.ts
-// Manages rendering execution for FlexibleEngine
+// app/RenderCoordinator.ts
+// Manages rendering execution for Engine
 
-import type { FlexibleEngine } from '../engine/FlexibleEngine.js';
+import type { Engine } from '../engine/Engine.js';
 
 /**
  * Render mode
@@ -48,7 +48,7 @@ export interface EventEmitter {
 }
 
 /**
- * FlexibleRenderCoordinator - Manages rendering execution
+ * RenderCoordinator - Manages rendering execution
  *
  * Two modes:
  * - Interactive: Continuous rendering, unlocked, can be interrupted
@@ -57,8 +57,8 @@ export interface EventEmitter {
  * Both modes support pause/resume.
  * Production mode returns a Promise that resolves on completion.
  */
-export class FlexibleRenderCoordinator {
-    private engine: FlexibleEngine;
+export class RenderCoordinator {
+    private engine: Engine;
     private eventEmitter?: EventEmitter;
 
     // State
@@ -83,7 +83,7 @@ export class FlexibleRenderCoordinator {
     // Progress callback
     public onProgress?: (info: ProgressInfo) => void;
 
-    constructor(engine: FlexibleEngine, eventEmitter?: EventEmitter) {
+    constructor(engine: Engine, eventEmitter?: EventEmitter) {
         this.engine = engine;
         this.eventEmitter = eventEmitter;
     }

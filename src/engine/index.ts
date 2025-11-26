@@ -1,5 +1,5 @@
 // engine/index.ts
 
-export { FlexibleEngine } from './FlexibleEngine.js';
-export { FlexibleResourceManager } from './FlexibleResourceManager.js';
-export { FlexibleRenderExecutor } from './FlexibleRenderExecutor.js';
+export { Engine } from './Engine.js';
+export { ResourceManager } from './ResourceManager.js';
+export { RenderExecutor } from './RenderExecutor.js';

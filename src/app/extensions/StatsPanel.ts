@@ -1,5 +1,5 @@
 // app/extensions/StatsPanel.ts
-import type { FlexibleApp } from '../FlexibleApp.js';
+import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 
 /**
@@ -19,13 +19,13 @@ export class StatsPanel {
     version = '1.0.0';
     description = 'Rendering statistics overlay';
 
-    private app!: FlexibleApp;
+    private app!: App;
     private bus!: EventBus;
     private panel: HTMLDivElement | null = null;
     private visible = true;
     private updateInterval: number | null = null;
 
-    install(app: FlexibleApp, bus: EventBus): void {
+    install(app: App, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
 

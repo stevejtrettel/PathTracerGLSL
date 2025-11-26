@@ -1,7 +1,7 @@
-// engine/FlexibleEngine.ts
+// engine/Engine.ts
 
-import { FlexibleResourceManager } from './FlexibleResourceManager.js';
-import { FlexibleRenderExecutor } from './FlexibleRenderExecutor.js';
+import { ResourceManager } from './ResourceManager.js';
+import { RenderExecutor } from './RenderExecutor.js';
 import { ParameterManager } from './ParameterManager.js';
 import { GPUProfiler } from './GPUProfiler.js';
 import { TextureRegistry } from './TextureRegistry.js';
@@ -47,12 +47,12 @@ interface Rectangle {
 }
 
 /**
- * FlexibleEngine - Manages GPU resources and rendering with flexible pipelines
+ * Engine - Manages GPU resources and rendering with flexible pipelines
  *
  * Responsibilities:
  * - Load CompiledRenderers from Compiler
- * - Manage GPU resources (via FlexibleResourceManager)
- * - Execute render pipelines (via FlexibleRenderExecutor)
+ * - Manage GPU resources (via ResourceManager)
+ * - Execute render pipelines (via RenderExecutor)
  * - Track rendering state (sample counts, time, etc.)
  * - Handle parameter updates (via ParameterManager)
  * - Support tiled rendering (pixel offset, image size)
@@ -62,10 +62,10 @@ interface Rectangle {
  * - Executes arbitrary pipelines (no fixed 3-pass structure)
  * - Data-driven GPU resource management
  */
-export class FlexibleEngine {
+export class Engine {
     private gl: WebGL2RenderingContext;
-    private resourceManager: FlexibleResourceManager;
-    private renderExecutor: FlexibleRenderExecutor;
+    private resourceManager: ResourceManager;
+    private renderExecutor: RenderExecutor;
     private parameterManager: ParameterManager;
     private profiler: GPUProfiler;
     private textureRegistry: TextureRegistry;
@@ -97,8 +97,8 @@ export class FlexibleEngine {
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-        this.resourceManager = new FlexibleResourceManager(gl);
-        this.renderExecutor = new FlexibleRenderExecutor(gl, this.resourceManager);
+        this.resourceManager = new ResourceManager(gl);
+        this.renderExecutor = new RenderExecutor(gl, this.resourceManager);
         this.parameterManager = new ParameterManager(gl);
         this.textureRegistry = new TextureRegistry(gl, 1);  // Reserve unit 0 for accumulator
         this.startTime = performance.now();
@@ -1027,6 +1027,6 @@ export class FlexibleEngine {
 //    - Check shader/framebuffer/texture ID consistency
 //
 // 4. CLEAR ACCUMULATION BUFFERS
-//    - Add FlexibleResourceManager.clearBuffer(rendererId, bufferId)
+//    - Add ResourceManager.clearBuffer(rendererId, bufferId)
 //    - Call from clearAccumulation() to actually clear GPU buffers
 //

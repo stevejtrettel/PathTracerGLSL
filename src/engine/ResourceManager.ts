@@ -1,4 +1,4 @@
-// engine/FlexibleResourceManager.ts
+// engine/ResourceManager.ts
 
 import type { RenderPipeline, FramebufferConfig, SwapInstruction } from '../compiler/types.js';
 
@@ -26,7 +26,7 @@ interface FramebufferResource {
 }
 
 /**
- * FlexibleResourceManager
+ * ResourceManager
  *
  * Dynamically creates and manages GPU resources from RenderPipeline specifications.
  * Handles different framebuffer types:
@@ -41,7 +41,7 @@ interface FramebufferResource {
  * - Handle resize (recreate textures)
  * - Clean up resources
  */
-export class FlexibleResourceManager {
+export class ResourceManager {
     private gl: WebGL2RenderingContext;
     private width: number;
     private height: number;

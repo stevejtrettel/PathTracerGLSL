@@ -20,9 +20,9 @@ export interface StrategyPreset {
 }
 
 /**
- * Configuration for FlexibleApp initialization
+ * Configuration for App initialization
  */
-export interface FlexibleAppConfig {
+export interface AppConfig {
     scene: SceneDescription;
     strategies: RenderStrategy[];
     initialParameters?: Record<string, any>;

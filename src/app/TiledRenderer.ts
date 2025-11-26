@@ -1,7 +1,7 @@
 // app/TiledRenderer.ts
-// Production rendering with tiled output for FlexibleApp
+// Production rendering with tiled output for App
 
-import type { FlexibleApp } from './FlexibleApp.js';
+import type { App } from './App.js';
 import { saveHDRFile, savePNGFile } from './utils/file-export.js';
 
 /**
@@ -76,10 +76,10 @@ export interface TileJob {
  *   });
  */
 export class TiledRenderer {
-    private app: FlexibleApp;
+    private app: App;
     private currentJob: TileJob | null = null;
 
-    constructor(app: FlexibleApp) {
+    constructor(app: App) {
         this.app = app;
     }
 

@@ -1,8 +1,8 @@
 // app/extensions/ParameterPanelExtension.ts
-// Adapted from app/extensions/ParameterPanelExtension.ts for FlexibleApp
+// Parameter panel UI extension for App
 
 import type { Extension, ParameterMetadata } from '../types.js';
-import type { FlexibleApp } from '../FlexibleApp.js';
+import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import { MODULE_ORDER } from '../../engine/types.js';
 
@@ -21,7 +21,7 @@ export class ParameterPanelExtension implements Extension {
     version = '1.0.0';
     description = 'Auto-generated parameter controls panel';
 
-    private app!: FlexibleApp;
+    private app!: App;
     private bus!: EventBus;
     private panel!: HTMLElement;
     private chevron!: HTMLElement;
@@ -33,7 +33,7 @@ export class ParameterPanelExtension implements Extension {
     private throttleTimer: number | null = null;
     private readonly THROTTLE_MS = 16; // ~60fps
 
-    install(app: FlexibleApp, bus: EventBus): void {
+    install(app: App, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
 

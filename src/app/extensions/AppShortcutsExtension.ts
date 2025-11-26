@@ -1,6 +1,6 @@
 // app/extensions/AppShortcutsExtension.ts
 
-import type { FlexibleApp } from '../FlexibleApp.js';
+import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 
 /**
@@ -28,10 +28,10 @@ export class AppShortcutsExtension {
     version = '1.0.0';
     description = 'Application keyboard shortcuts';
 
-    private app!: FlexibleApp;
+    private app!: App;
     private boundHandler: ((e: KeyboardEvent) => void) | null = null;
 
-    install(app: FlexibleApp, _bus: EventBus): void {
+    install(app: App, _bus: EventBus): void {
         this.app = app;
 
         this.boundHandler = this.handleKeyDown.bind(this);

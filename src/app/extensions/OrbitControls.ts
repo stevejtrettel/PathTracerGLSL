@@ -1,8 +1,8 @@
 // app/extensions/OrbitControls.ts
-// Adapted from app/extensions/OrbitControls.ts for FlexibleApp
+// Mouse-based orbit camera controls for App
 
 import type { Extension } from '../types.js';
-import type { FlexibleApp } from '../FlexibleApp.js';
+import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import { EventManager } from '../utils/EventManager.js';
 
@@ -24,7 +24,7 @@ export class OrbitControls implements Extension {
     version = '1.0.0';
     description = 'Mouse orbit camera controls';
 
-    private app: FlexibleApp | null = null;
+    private app: App | null = null;
     private bus: EventBus | null = null;
     private canvas: HTMLCanvasElement | null = null;
     private events = new EventManager();
@@ -48,7 +48,7 @@ export class OrbitControls implements Extension {
     private minDistance = 0.1;
     private maxDistance = 100;
 
-    install(app: FlexibleApp, bus: EventBus): void {
+    install(app: App, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
 

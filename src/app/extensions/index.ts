@@ -1,5 +1,5 @@
 // app/extensions/index.ts
-// Export all extensions for FlexibleApp
+// Export all extensions for App
 
 export { OrbitControls } from './OrbitControls.js';
 export { TouchOrbitControls } from './TouchOrbitControls.js';

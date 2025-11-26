@@ -1,5 +1,5 @@
 // app/extensions/KeyboardControls.ts
-import type { FlexibleApp } from '../FlexibleApp.js';
+import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 
 type Vec3 = [number, number, number];
@@ -22,7 +22,7 @@ type Vec3 = [number, number, number];
  *   Ctrl  - slow (0.3x speed)
  *   G     - stabilize (align with world up)
  *
- * Note: This is for 6DOF camera navigation, separate from FlexibleApp's
+ * Note: This is for 6DOF camera navigation, separate from App's
  * application shortcuts (1-9 for renderers, r for reset, etc.)
  */
 export class KeyboardControls {
@@ -30,7 +30,7 @@ export class KeyboardControls {
     version = '1.0.0';
     description = '6DOF keyboard camera navigation';
 
-    private app!: FlexibleApp;
+    private app!: App;
     private bus!: EventBus;
 
     // Camera state
@@ -50,7 +50,7 @@ export class KeyboardControls {
     private animationId: number | null = null;
     private lastTime = 0;
 
-    install(app: FlexibleApp, bus: EventBus): void {
+    install(app: App, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
 
