@@ -69,7 +69,7 @@ export function saveHDRFile(pixels: Float32Array, width: number, height: number,
     const rgbe = floatToRGBE(pixels, width, height);
     const hdrFile = buildHDRFile(rgbe, width, height);
 
-    const blob = new Blob([hdrFile], { type: 'application/octet-stream' });
+    const blob = new Blob([hdrFile as BlobPart], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

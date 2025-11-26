@@ -159,7 +159,7 @@ export class OrbitControls implements Extension {
         if (state.distance !== undefined) this.distance = state.distance;
         if (state.azimuth !== undefined) this.azimuth = state.azimuth;
         if (state.elevation !== undefined) this.elevation = state.elevation;
-        if (state.target !== undefined) this.target = [...state.target];
+        if (state.target !== undefined) this.target = [state.target[0], state.target[1], state.target[2]];
         this.updateCamera();
     }
 

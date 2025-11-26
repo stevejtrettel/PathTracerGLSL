@@ -193,9 +193,11 @@ class ParameterStore {
         // Handle arrays and typed arrays
         if ((Array.isArray(a) || ArrayBuffer.isView(a)) &&
             (Array.isArray(b) || ArrayBuffer.isView(b))) {
-            if (a.length !== b.length) return false;
-            for (let i = 0; i < a.length; i++) {
-                if (a[i] !== b[i]) return false;
+            const arrA = a as ArrayLike<number>;
+            const arrB = b as ArrayLike<number>;
+            if (arrA.length !== arrB.length) return false;
+            for (let i = 0; i < arrA.length; i++) {
+                if (arrA[i] !== arrB[i]) return false;
             }
             return true;
         }

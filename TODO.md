@@ -4,12 +4,12 @@
 
 ### ParameterManager Cleanup
 
-**Location:** `src/engine/ParameterManager.ts`, `src/engine/FlexibleEngine.ts`
+**Location:** `src/engine/ParameterManager.ts`, `src/engine/Engine.ts`
 
 **Problem:**
-ParameterManager was designed for the old `ModuleDescriptor[]` architecture, but FlexibleEngine now uses `CompiledRenderer` with `UniformBinding[]` directly.
+ParameterManager was designed for the old `ModuleDescriptor[]` architecture, but Engine now uses `CompiledRenderer` with `UniformBinding[]` directly.
 
-Current workaround in `FlexibleEngine._initializeParameterManager()` (lines 977-987):
+Current workaround in `Engine._initializeParameterManager()` (lines ~980):
 ```typescript
 // TODO: Update ParameterManager to accept UniformBinding[] directly
 const fakeModules = [{
@@ -32,27 +32,27 @@ this.parameterManager.initialize(program, fakeModules);
    - Add `initializeFromBindings(program, uniforms: UniformBinding[])`
    - More code, but non-breaking
 
-3. **Option C: Remove ParameterManager from FlexibleEngine entirely**
-   - FlexibleEngine already handles uniform setting in `_setCustomUniforms()`
+3. **Option C: Remove ParameterManager from Engine entirely**
+   - Engine already handles uniform setting in `_setCustomUniforms()`
    - ParameterManager's main value is caching (skip redundant GPU calls)
-   - Could inline caching logic directly in FlexibleEngine
+   - Could inline caching logic directly in Engine
    - Most radical, but simplest architecture
 
 **Recommendation:** Option A or C. The old module-based architecture is being replaced by the compiler, so backwards compatibility may not matter.
 
 **Files involved:**
 - `src/engine/ParameterManager.ts` - Main file to refactor
-- `src/engine/FlexibleEngine.ts:977-987` - Remove fake module workaround
+- `src/engine/Engine.ts:~980` - Remove fake module workaround
 - `src/engine/types.ts` - `ModuleDescriptor` may become obsolete
 
 ---
 
 ### ResourceManager Format Normalization
 
-**Location:** `src/engine/FlexibleResourceManager.ts`
+**Location:** `src/engine/ResourceManager.ts`
 
 **Problem:**
-Format array normalization happens in multiple places (lines 309-313, 529-531):
+Format array normalization happens in multiple places:
 ```typescript
 const formats = Array.isArray(config.format)
     ? config.format
@@ -75,45 +75,9 @@ interface FramebufferResource {
 
 ## Medium Priority
 
-### Error System Framework
-
-**Design chosen:** DiagnosticBag pattern (compiler-style)
-
-**Minimal implementation needed:**
-```typescript
-// src/errors/Diagnostic.ts
-interface Diagnostic {
-    severity: 'error' | 'warning' | 'info' | 'hint';
-    code: string;
-    message: string;
-    source?: string;
-    location?: SourceLocation;
-    suggestions?: Suggestion[];
-}
-
-// src/errors/DiagnosticBag.ts
-class DiagnosticBag {
-    add(diagnostic: Diagnostic): void;
-    error(code: string, message: string, source?: string): void;
-    warning(code: string, message: string, source?: string): void;
-    hasErrors(): boolean;
-    getAll(): Diagnostic[];
-}
-```
-
-**Benefits:**
-- Accumulates multiple errors (doesn't stop at first)
-- Warnings don't block compilation
-- Source location tracking for beautiful error messages
-- Pluggable renderers (console, HTML overlay, VS Code)
-
-**Implement when:** Building the real compiler.
-
----
-
 ### CompiledRenderer Validation
 
-**Status:** Ready to implement
+**Status:** Ready to implement using DiagnosticBag
 
 The `CompiledRenderer` objects from `SimpleCompiler` are already well-formed. Validation would check:
 
@@ -123,7 +87,7 @@ The `CompiledRenderer` objects from `SimpleCompiler` are already well-formed. Va
 4. Export targets reference valid buffers and attachments
 5. Uniform bindings have valid types
 
-**Location:** `src/errors/compiler/validation.ts` (skeleton exists)
+**Location:** Create `src/errors/compiler/validation.ts`
 
 **Implement when:** Before building real compiler, to catch mistakes early.
 
@@ -133,7 +97,7 @@ The `CompiledRenderer` objects from `SimpleCompiler` are already well-formed. Va
 
 ### Uniform Location Warning
 
-**Location:** `src/engine/FlexibleEngine.ts:788-827`
+**Location:** `src/engine/Engine.ts:~790`
 
 **Idea:** Add warning when a UniformBinding references a uniform that doesn't exist in the shader. Currently fails silently (location is null, uniform is skipped).
 
@@ -149,6 +113,13 @@ if (!location) {
 
 ## Completed
 
-- [x] Move keyboard controls from FlexibleApp to AppShortcutsExtension
-- [x] Add 'error' state to FlexibleEngine
-- [x] Cache draw buffer setup in FlexibleRenderExecutor
+- [x] Move keyboard controls from App to AppShortcutsExtension
+- [x] Add 'error' state to Engine
+- [x] Cache draw buffer setup in RenderExecutor
+- [x] Rename Flexible* files (FlexibleApp → App, etc.)
+- [x] Design and implement DiagnosticBag error system
+- [x] Migrate HDR validation to use DiagnosticBag
+- [x] Remove legacy error files (~1700 lines deleted)
+- [x] Rename formatters/ to reporters/
+- [x] Fix all 29 TypeScript errors
+- [x] Add GLSL module type declarations (src/glsl.d.ts)

@@ -22,7 +22,6 @@ export class ParameterPanelExtension implements Extension {
     description = 'Auto-generated parameter controls panel';
 
     private app!: App;
-    private bus!: EventBus;
     private panel!: HTMLElement;
     private chevron!: HTMLElement;
     private isOpen = false;
@@ -33,9 +32,8 @@ export class ParameterPanelExtension implements Extension {
     private throttleTimer: number | null = null;
     private readonly THROTTLE_MS = 16; // ~60fps
 
-    install(app: App, bus: EventBus): void {
+    install(app: App, _bus: EventBus): void {
         this.app = app;
-        this.bus = bus;
 
         this.injectStyles();
         this.createChevronIndicator();

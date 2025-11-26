@@ -153,7 +153,7 @@ export class KeyboardControls {
 
         const target = this.app.getParameter('camera.target');
         if (target && Array.isArray(target)) {
-            this.lookAt(target);
+            this.lookAt([target[0], target[1], target[2]]);
         }
     }
 

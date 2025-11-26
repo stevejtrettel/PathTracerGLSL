@@ -26,6 +26,7 @@ export interface AppConfig {
     scene: SceneDescription;
     strategies: RenderStrategy[];
     initialParameters?: Record<string, any>;
+    environmentHDR?: string;
 }
 
 /**

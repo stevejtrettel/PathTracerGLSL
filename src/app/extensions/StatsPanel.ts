@@ -20,14 +20,12 @@ export class StatsPanel {
     description = 'Rendering statistics overlay';
 
     private app!: App;
-    private bus!: EventBus;
     private panel: HTMLDivElement | null = null;
     private visible = true;
     private updateInterval: number | null = null;
 
-    install(app: App, bus: EventBus): void {
+    install(app: App, _bus: EventBus): void {
         this.app = app;
-        this.bus = bus;
 
         this.createPanel();
         this.startUpdating();

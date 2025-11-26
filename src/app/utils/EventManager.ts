@@ -29,14 +29,14 @@ export class EventManager {
      * @param handler - Event handler function
      * @param options - Optional addEventListener options
      */
-    add(
+    add<K extends keyof HTMLElementEventMap>(
         target: EventTarget,
-        event: string,
-        handler: EventListener,
+        event: K,
+        handler: (e: HTMLElementEventMap[K]) => void,
         options?: AddEventListenerOptions
     ): void {
-        target.addEventListener(event, handler, options);
-        this.domListeners.push({ target, event, handler, options });
+        target.addEventListener(event, handler as EventListener, options);
+        this.domListeners.push({ target, event, handler: handler as EventListener, options });
     }
 
     /**
