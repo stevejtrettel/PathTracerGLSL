@@ -789,6 +789,9 @@ export class Engine {
     private _cacheRendererUniformLocations(rendererId: string, renderer: CompiledRenderer): void {
         const rendererLocations = new Map<string, Map<string, WebGLUniformLocation>>();
 
+        // Track which custom uniforms are found in at least one shader
+        const uniformFoundInShader = new Set<string>();
+
         for (const [shaderId, _shaderProgram] of renderer.shaders) {
             const program = this.renderExecutor.getProgram(shaderId);
             if (!program) continue;
@@ -817,13 +820,18 @@ export class Engine {
                 const location = this.gl.getUniformLocation(program, binding.uniform);
                 if (location) {
                     shaderLocations.set(binding.uniform, location);
-                } else {
-                    // TODO: Could collect in DiagnosticBag for batch reporting
-                    console.warn(`Uniform '${binding.uniform}' not found in shader '${shaderId}' (may be optimized out)`);
+                    uniformFoundInShader.add(binding.uniform);
                 }
             }
 
             rendererLocations.set(shaderId, shaderLocations);
+        }
+
+        // Only warn about uniforms not found in ANY shader
+        for (const binding of renderer.uniforms) {
+            if (!uniformFoundInShader.has(binding.uniform)) {
+                console.warn(`Uniform '${binding.uniform}' not found in any shader (may be optimized out or misspelled)`);
+            }
         }
 
         this.uniformLocations.set(rendererId, rendererLocations);
