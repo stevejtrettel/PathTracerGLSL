@@ -379,6 +379,7 @@ export class FlexibleResourceManager {
      */
     private _allocateTextureStorage(texture: WebGLTexture, format: string): void {
         const gl = this.gl;
+        // FUTURE: Add WebGL error checking after GL calls (checkGLError utility)
 
         gl.bindTexture(gl.TEXTURE_2D, texture);
 
@@ -524,6 +525,7 @@ export class FlexibleResourceManager {
      * Resize textures in a resource
      */
     private _resizeTextures(resource: FramebufferResource): void {
+        const gl = this.gl;
         const formats = Array.isArray(resource.config.format)
             ? resource.config.format
             : [resource.config.format || 'rgba8'];
@@ -534,6 +536,17 @@ export class FlexibleResourceManager {
                 this._allocateTextureStorage(resource.textures[a][b], formats[a]);
             }
         }
+
+        // Verify framebuffer completeness after resize
+        // (Textures have new storage, need to ensure attachments are still valid)
+        for (const framebuffer of resource.framebuffers) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+            const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+            if (status !== gl.FRAMEBUFFER_COMPLETE) {
+                throw new Error(`Framebuffer incomplete after resize: ${this._getFramebufferStatus(status)}`);
+            }
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
     /**

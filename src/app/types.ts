@@ -32,17 +32,14 @@ export interface FlexibleAppConfig {
  * Render progress information
  */
 export interface RenderProgress {
-    currentSamples: number;
+    samples: number;
     targetSamples?: number;
-    elapsedMs: number;
-    samplesPerSecond: number;
-    estimatedRemainingMs?: number;
+    elapsedTime: number;
+    fps: number;
+    mode: 'interactive' | 'production';
+    state: 'rendering' | 'paused' | 'complete' | 'stopped';
+    percentComplete?: number;
 }
-
-/**
- * Export format for saving images
- */
-export type ExportFormat = 'png' | 'exr' | 'hdr';
 
 /**
  * Built-in strategy presets
@@ -106,7 +103,7 @@ export const STRATEGY_PRESETS: Record<string, StrategyPreset> = {
 /**
  * Single parameter change
  */
-interface ParameterChange {
+export interface ParameterChange {
     path: string;
     oldValue: any;
     newValue: any;
@@ -115,35 +112,12 @@ interface ParameterChange {
 /**
  * Batch of parameter changes
  */
-interface ParameterChanges {
+export interface ParameterChanges {
     changes: ParameterChange[];
 }
 
-/**
- * Parameter metadata for validation and UI generation
- *
- * Defines how parameters behave and how they should be displayed in UIs.
- * All fields except type and default are optional.
- */
-interface ParameterMetadata {
-    // Required
-    type: 'float' | 'int' | 'bool' | 'vec2' | 'vec3' | 'vec4' | 'color';
-    default: any;
-
-    // For numeric types (float/int)
-    range?: [number, number];    // [min, max] - enables slider UI
-    step?: number;               // increment (auto-calculated if omitted)
-    values?: number[];           // discrete choices for int (renders dropdown)
-
-    // UI hints (all optional)
-    name?: string;               // Display name (falls back to parameter path)
-    unit?: string;               // 'degrees', 'meters', 'samples', etc.
-    group?: string;              // Override auto-inferred group from path prefix
-    help?: string;               // Tooltip text (optional, rarely used)
-
-    // Behavior (optional)
-    triggersReset?: boolean;     // Override auto-inferred reset behavior
-}
+// Re-export ParameterMetadata from engine (single source of truth)
+export type { ParameterMetadata } from '../engine/types.js';
 
 /**
  * Extension interface for adding features to the app
@@ -151,7 +125,7 @@ interface ParameterMetadata {
  * Extensions can add UI, modify rendering behavior, provide new services,
  * and save/restore state with sessions.
  */
-interface Extension {
+export interface Extension {
     name: string;
     version?: string;
     description?: string;
@@ -167,7 +141,7 @@ interface Extension {
 /**
  * Event handler type for EventBus
  */
-type EventHandler = (data?: any) => void;
+export type EventHandler = (data?: any) => void;
 
 /**
  * Complete session data for save/restore
@@ -175,7 +149,7 @@ type EventHandler = (data?: any) => void;
  * Captures all state needed to recreate a rendering session:
  * active recipe, parameters, camera, accumulation, and tile jobs.
  */
-interface SessionData {
+export interface SessionData {
     version: string;
     timestamp: number;
 
@@ -212,12 +186,3 @@ interface SessionData {
         description?: string;
     };
 }
-
-export type {
-    ParameterMetadata,
-    ParameterChange,
-    ParameterChanges,
-    Extension,
-    EventHandler,
-    SessionData
-};

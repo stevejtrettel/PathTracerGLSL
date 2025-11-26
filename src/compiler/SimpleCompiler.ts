@@ -150,7 +150,7 @@ void main() {
         ];
 
         return {
-            id: 'debug',
+            id: `${strategy.id}-${scene.id}`,
             shaders,
             pipeline,
             uniforms,
@@ -208,7 +208,7 @@ void main() {
      */
     private _generatePathtracerRenderer(
         scene: SceneDescription,
-        _strategy: RenderStrategy
+        strategy: RenderStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
@@ -375,7 +375,7 @@ void main() {
         ];
 
         return {
-            id: 'oneshot',
+            id: `${strategy.id}-${scene.id}`,
             shaders,
             pipeline,
             uniforms,
@@ -815,7 +815,7 @@ void main() {
      */
     private _generatePathtracerAOVsRenderer(
         scene: SceneDescription,
-        _strategy: RenderStrategy
+        strategy: RenderStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
@@ -995,7 +995,7 @@ void main() {
         ];
 
         return {
-            id: 'oneshot-aovs',
+            id: `${strategy.id}-${scene.id}`,
             shaders,
             pipeline,
             uniforms,
@@ -1526,7 +1526,7 @@ void main() {
         ];
 
         return {
-            id: 'pathtracer',
+            id: `${strategy.id}-${scene.id}`,
             shaders,
             pipeline,
             uniforms,
@@ -2128,7 +2128,7 @@ void main() {
         ];
 
         return {
-            id: 'debug-aovs',
+            id: `${strategy.id}-${scene.id}`,
             shaders,
             pipeline,
             uniforms,

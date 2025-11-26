@@ -176,6 +176,7 @@ export class TiledRenderer {
      * @param job - Previously saved job state
      */
     async resumeJob(job: TileJob): Promise<void> {
+        // FUTURE: Validate job structure (version field, grid consistency)
         this.currentJob = job;
         this.currentJob.state = 'running';
 
