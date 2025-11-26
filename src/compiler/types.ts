@@ -31,6 +31,7 @@ export interface RenderStrategy {
         maxBounces?: number;
         samplesPerFrame?: number;
         debugOutput?: 'albedo' | 'normal' | 'depth' | 'uv';
+        defaultOutput?: 'albedo' | 'normal' | 'depth' | 'uv';
     };
 }
 

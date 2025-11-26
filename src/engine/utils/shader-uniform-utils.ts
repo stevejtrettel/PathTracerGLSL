@@ -154,10 +154,12 @@ function valuesEqualUntyped(a: any, b: any): boolean {
     // Handle arrays and typed arrays
     if ((Array.isArray(a) || ArrayBuffer.isView(a)) &&
         (Array.isArray(b) || ArrayBuffer.isView(b))) {
-        if (a.length !== b.length) return false;
+        const arrA = a as ArrayLike<number>;
+        const arrB = b as ArrayLike<number>;
+        if (arrA.length !== arrB.length) return false;
 
-        for (let i = 0; i < a.length; i++) {
-            if (Math.abs(a[i] - b[i]) > EPSILON) return false;
+        for (let i = 0; i < arrA.length; i++) {
+            if (Math.abs(arrA[i] - arrB[i]) > EPSILON) return false;
         }
         return true;
     }

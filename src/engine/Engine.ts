@@ -1,7 +1,7 @@
-// engine/FlexibleEngine.ts
+// engine/Engine.ts
 
-import { FlexibleResourceManager } from './FlexibleResourceManager.js';
-import { FlexibleRenderExecutor } from './FlexibleRenderExecutor.js';
+import { ResourceManager } from './ResourceManager.js';
+import { RenderExecutor } from './RenderExecutor.js';
 import { ParameterManager } from './ParameterManager.js';
 import { GPUProfiler } from './GPUProfiler.js';
 import { TextureRegistry } from './TextureRegistry.js';
@@ -12,9 +12,10 @@ import {
     validateHDRResponse,
     validateHDRBuffer,
     validateHDRData,
-    validateTextureCreation
-} from '../errors/resources/validation.js';
-// import { validateCompiledRenderer } from '../errors/compiler/validation.js';
+    validateTextureCreation,
+    validateCompiledRenderer,
+    ConsoleReporter
+} from '../errors/index.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 import type { ParameterChanges } from '../app/types.js';
 import type { UniformBinding } from './types.js';
@@ -22,7 +23,7 @@ import type { UniformBinding } from './types.js';
 /**
  * Engine state
  */
-type EngineState = 'ready' | 'running';
+type EngineState = 'ready' | 'running' | 'error';
 
 /**
  * Engine uniforms (provided by Engine, not user parameters)
@@ -47,12 +48,12 @@ interface Rectangle {
 }
 
 /**
- * FlexibleEngine - Manages GPU resources and rendering with flexible pipelines
+ * Engine - Manages GPU resources and rendering with flexible pipelines
  *
  * Responsibilities:
  * - Load CompiledRenderers from Compiler
- * - Manage GPU resources (via FlexibleResourceManager)
- * - Execute render pipelines (via FlexibleRenderExecutor)
+ * - Manage GPU resources (via ResourceManager)
+ * - Execute render pipelines (via RenderExecutor)
  * - Track rendering state (sample counts, time, etc.)
  * - Handle parameter updates (via ParameterManager)
  * - Support tiled rendering (pixel offset, image size)
@@ -62,10 +63,10 @@ interface Rectangle {
  * - Executes arbitrary pipelines (no fixed 3-pass structure)
  * - Data-driven GPU resource management
  */
-export class FlexibleEngine {
+export class Engine {
     private gl: WebGL2RenderingContext;
-    private resourceManager: FlexibleResourceManager;
-    private renderExecutor: FlexibleRenderExecutor;
+    private resourceManager: ResourceManager;
+    private renderExecutor: RenderExecutor;
     private parameterManager: ParameterManager;
     private profiler: GPUProfiler;
     private textureRegistry: TextureRegistry;
@@ -97,8 +98,8 @@ export class FlexibleEngine {
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-        this.resourceManager = new FlexibleResourceManager(gl);
-        this.renderExecutor = new FlexibleRenderExecutor(gl, this.resourceManager);
+        this.resourceManager = new ResourceManager(gl);
+        this.renderExecutor = new RenderExecutor(gl, this.resourceManager);
         this.parameterManager = new ParameterManager(gl);
         this.textureRegistry = new TextureRegistry(gl, 1);  // Reserve unit 0 for accumulator
         this.startTime = performance.now();
@@ -127,21 +128,21 @@ export class FlexibleEngine {
 
         console.log(`Loading renderer '${id}'...`);
 
-        // FUTURE: Add validation for CompiledRenderer structure
-        // - Verify all referenced shaders exist in shaders map
-        // - Verify all framebuffer references in passes are valid
-        // - Verify pipeline structure is well-formed
-        // const validation = validateCompiledRenderer(renderer);
-        // if (!validation.valid) {
-        //     console.error(`❌ Renderer validation failed for '${id}':`);
-        //     validation.errors.forEach(err => console.error(`  • ${err}`));
-        //     throw new Error(`Renderer validation failed for '${id}'. See console for details.`);
-        // }
+        // Validate CompiledRenderer structure
+        const validation = validateCompiledRenderer(renderer);
+        if (validation.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(validation));
+            throw new Error(`Renderer validation failed for '${id}'. See console for details.`);
+        }
+        if (validation.hasWarnings()) {
+            console.warn(new ConsoleReporter().formatBag(validation));
+        }
 
         // Load shaders
         try {
             this.renderExecutor.loadShaders(renderer.shaders);
         } catch (error: any) {
+            this.state = 'error';
             throw new Error(`Failed to compile shaders for '${id}': ${error.message}`);
         }
 
@@ -380,6 +381,13 @@ export class FlexibleEngine {
      */
     isRunning(): boolean {
         return this.state === 'running';
+    }
+
+    /**
+     * Check if in error state
+     */
+    isError(): boolean {
+        return this.state === 'error';
     }
 
     /**
@@ -642,9 +650,8 @@ export class FlexibleEngine {
 
         // Validate response
         const responseResult = validateHDRResponse(res, path);
-        if (!responseResult.valid) {
-            console.error(`\n❌ HDR loading failed:\n`);
-            responseResult.errors.forEach(err => console.error(`  • ${err}`));
+        if (responseResult.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(responseResult));
             throw new Error(`Failed to load HDR from '${path}'. See console for details.`);
         }
 
@@ -653,16 +660,13 @@ export class FlexibleEngine {
 
         // Validate buffer
         const bufferResult = validateHDRBuffer(buffer, path);
-        if (!bufferResult.valid) {
-            console.error(`\n❌ Invalid HDR file:\n`);
-            bufferResult.errors.forEach(err => console.error(`  • ${err}`));
+        if (bufferResult.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(bufferResult));
             throw new Error(`Invalid HDR file '${path}'. See console for details.`);
         }
-
         // Show warnings if any
-        if (bufferResult.warnings && bufferResult.warnings.length > 0) {
-            console.warn(`\n⚠️  HDR file warnings:`);
-            bufferResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+        if (bufferResult.hasWarnings()) {
+            console.warn(new ConsoleReporter().formatBag(bufferResult));
         }
 
         // Parse
@@ -679,16 +683,13 @@ export class FlexibleEngine {
 
         // Validate parsed data
         const dataResult = validateHDRData(width, height, data.length, path);
-        if (!dataResult.valid) {
-            console.error(`\n❌ Invalid HDR data:\n`);
-            dataResult.errors.forEach(err => console.error(`  • ${err}`));
+        if (dataResult.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(dataResult));
             throw new Error(`Invalid HDR data in '${path}'. See console for details.`);
         }
-
         // Show data warnings if any
-        if (dataResult.warnings && dataResult.warnings.length > 0) {
-            console.warn(`\n⚠️  HDR data warnings:`);
-            dataResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+        if (dataResult.hasWarnings()) {
+            console.warn(new ConsoleReporter().formatBag(dataResult));
         }
 
         // Create texture
@@ -697,9 +698,8 @@ export class FlexibleEngine {
 
         // Validate texture creation
         const textureResult = validateTextureCreation(envTex, width, height, this.gl);
-        if (!textureResult.valid) {
-            console.error(`\n❌ Texture creation failed:\n`);
-            textureResult.errors.forEach(err => console.error(`  • ${err}`));
+        if (textureResult.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(textureResult));
             throw new Error(`Failed to create texture for '${path}'. See console for details.`);
         }
 
@@ -817,6 +817,9 @@ export class FlexibleEngine {
                 const location = this.gl.getUniformLocation(program, binding.uniform);
                 if (location) {
                     shaderLocations.set(binding.uniform, location);
+                } else {
+                    // TODO: Could collect in DiagnosticBag for batch reporting
+                    console.warn(`Uniform '${binding.uniform}' not found in shader '${shaderId}' (may be optimized out)`);
                 }
             }
 
@@ -1019,6 +1022,6 @@ export class FlexibleEngine {
 //    - Check shader/framebuffer/texture ID consistency
 //
 // 4. CLEAR ACCUMULATION BUFFERS
-//    - Add FlexibleResourceManager.clearBuffer(rendererId, bufferId)
+//    - Add ResourceManager.clearBuffer(rendererId, bufferId)
 //    - Call from clearAccumulation() to actually clear GPU buffers
 //

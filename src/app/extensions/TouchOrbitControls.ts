@@ -1,8 +1,8 @@
 // app/extensions/TouchOrbitControls.ts
-// Adapted from app/extensions/TouchOrbitControls.ts for FlexibleApp
+// Touch-based orbit camera controls for App
 
 import type { Extension } from '../types.js';
-import type { FlexibleApp } from '../FlexibleApp.js';
+import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import { EventManager } from '../utils/EventManager.js';
 
@@ -36,7 +36,7 @@ export class TouchOrbitControls implements Extension {
     version = '1.0.0';
     description = 'Touch orbit controls for mobile';
 
-    private app: FlexibleApp | null = null;
+    private app: App | null = null;
     private bus: EventBus | null = null;
     private events = new EventManager();
     private state: TouchOrbitState = {
@@ -57,7 +57,7 @@ export class TouchOrbitControls implements Extension {
     private readonly MIN_ELEVATION = 0.1;
     private readonly MAX_ELEVATION = Math.PI - 0.1;
 
-    install(app: FlexibleApp, bus: EventBus): void {
+    install(app: App, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
 

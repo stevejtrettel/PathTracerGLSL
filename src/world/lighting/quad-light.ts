@@ -123,7 +123,7 @@ const quadLight: ModuleDescriptor = {
             compute: (params) => {
                 const width = params['quad.width'] || 2.0;
                 const dir = params['quad.direction1'] || [1, 0, 0];
-                return dir.map(d => d * width);
+                return dir.map((d: number) => d * width);
             }
         },
         {
@@ -133,7 +133,7 @@ const quadLight: ModuleDescriptor = {
             compute: (params) => {
                 const height = params['quad.height'] || 2.0;
                 const dir = params['quad.direction2'] || [0, 0, 1];
-                return dir.map(d => d * height);
+                return dir.map((d: number) => d * height);
             }
         },
         {
@@ -143,7 +143,7 @@ const quadLight: ModuleDescriptor = {
             compute: (params) => {
                 const color = params['quad.color'] || [1.0, 1.0, 1.0];
                 const intensity = params['quad.intensity'] || 25.0;
-                return color.map(c => c * intensity);
+                return color.map((c: number) => c * intensity);
             }
         }
     ],

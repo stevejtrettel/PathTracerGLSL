@@ -1,4 +1,4 @@
-// engine/FlexibleResourceManager.ts
+// engine/ResourceManager.ts
 
 import type { RenderPipeline, FramebufferConfig, SwapInstruction } from '../compiler/types.js';
 
@@ -7,7 +7,8 @@ import type { RenderPipeline, FramebufferConfig, SwapInstruction } from '../comp
  */
 interface FramebufferResource {
     config: FramebufferConfig;
-    framebuffers: WebGLFramebuffer[];  // 1 for texture/screen, 2 for double_buffer
+    formats: string[];                  // Normalized format array (always array, even for single)
+    framebuffers: WebGLFramebuffer[];   // 1 for texture/screen, 2 for double_buffer
 
     /**
      * Textures organized as 2D array: [attachmentIndex][bufferIndex]
@@ -26,7 +27,7 @@ interface FramebufferResource {
 }
 
 /**
- * FlexibleResourceManager
+ * ResourceManager
  *
  * Dynamically creates and manages GPU resources from RenderPipeline specifications.
  * Handles different framebuffer types:
@@ -41,7 +42,7 @@ interface FramebufferResource {
  * - Handle resize (recreate textures)
  * - Clean up resources
  */
-export class FlexibleResourceManager {
+export class ResourceManager {
     private gl: WebGL2RenderingContext;
     private width: number;
     private height: number;
@@ -300,6 +301,7 @@ export class FlexibleResourceManager {
             // Screen has no framebuffer/texture
             return {
                 config,
+                formats: [],
                 framebuffers: [],
                 textures: [],
                 currentIndex: 0
@@ -344,6 +346,7 @@ export class FlexibleResourceManager {
 
         return {
             config,
+            formats,
             framebuffers,
             textures,
             currentIndex: 0
@@ -526,14 +529,11 @@ export class FlexibleResourceManager {
      */
     private _resizeTextures(resource: FramebufferResource): void {
         const gl = this.gl;
-        const formats = Array.isArray(resource.config.format)
-            ? resource.config.format
-            : [resource.config.format || 'rgba8'];
 
         // Resize all textures in 2D array
         for (let a = 0; a < resource.textures.length; a++) {
             for (let b = 0; b < resource.textures[a].length; b++) {
-                this._allocateTextureStorage(resource.textures[a][b], formats[a]);
+                this._allocateTextureStorage(resource.textures[a][b], resource.formats[a]);
             }
         }
 

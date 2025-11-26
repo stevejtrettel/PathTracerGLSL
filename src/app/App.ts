@@ -1,18 +1,18 @@
-// app/FlexibleApp.ts
+// app/App.ts
 // Main orchestrator for the new architecture
 
 import { SimpleCompiler } from '../compiler/SimpleCompiler.js';
-import { FlexibleEngine } from '../engine/FlexibleEngine.js';
-import { FlexibleRenderCoordinator, type ProgressInfo } from './FlexibleRenderCoordinator.js';
+import { Engine } from '../engine/Engine.js';
+import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
 import { ParameterStore } from './ParameterStore.js';
 import { EventBus } from './EventBus.js';
 import { saveHDRFile, savePNGFile } from './utils/file-export.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
-import type { FlexibleAppConfig, RenderProgress, StrategyPreset } from './types.js';
+import type { AppConfig, RenderProgress, StrategyPreset } from './types.js';
 import type { Extension } from './types.js';
 
 /**
- * FlexibleApp - High-level orchestration for the new architecture
+ * App - High-level orchestration for the new architecture
  *
  * Key responsibilities:
  * - Own Compiler, Engine, and RenderCoordinator
@@ -28,11 +28,11 @@ import type { Extension } from './types.js';
  * - Camera as parameters (no recompilation for camera changes)
  * - Parameter persistence across renderer switches
  */
-export class FlexibleApp {
+export class App {
     // Core components
     private compiler: ICompiler;
-    private engine: FlexibleEngine;
-    private coordinator: FlexibleRenderCoordinator;
+    private engine: Engine;
+    private coordinator: RenderCoordinator;
     private parameterStore: ParameterStore;
     private eventBus: EventBus;
     private gl: WebGL2RenderingContext;
@@ -74,12 +74,12 @@ export class FlexibleApp {
 
         // Create core components
         this.compiler = new SimpleCompiler();
-        this.engine = new FlexibleEngine(gl);
+        this.engine = new Engine(gl);
         this.eventBus = new EventBus();
         this.parameterStore = new ParameterStore();
 
         // Create coordinator with EventBus for render events
-        this.coordinator = new FlexibleRenderCoordinator(this.engine, this.eventBus);
+        this.coordinator = new RenderCoordinator(this.engine, this.eventBus);
 
         // Wire ParameterStore changes to engine, EventBus, and accumulation reset
         this.parameterStore.onChange = (changes) => {
@@ -131,7 +131,7 @@ export class FlexibleApp {
             }
         };
 
-        console.log('FlexibleApp created');
+        console.log('App created');
     }
 
     // ============================================================================
@@ -143,7 +143,7 @@ export class FlexibleApp {
      *
      * Compiles all strategy combinations upfront for fast switching.
      */
-    async initialize(config: FlexibleAppConfig): Promise<void> {
+    async initialize(config: AppConfig): Promise<void> {
         const { scene, strategies, initialParameters } = config;
 
         if (strategies.length === 0) {
@@ -151,7 +151,7 @@ export class FlexibleApp {
         }
 
         this.scene = scene;
-        console.log(`Initializing FlexibleApp with scene: ${scene.id}`);
+        console.log(`Initializing App with scene: ${scene.id}`);
 
         // Compile all strategies
         const compiledRenderers: CompiledRenderer[] = [];
@@ -182,7 +182,7 @@ export class FlexibleApp {
             await this.engine.loadEnvironmentHDR(config.environmentHDR);
         }
 
-        console.log(`FlexibleApp initialized with ${compiledRenderers.length} renderers`);
+        console.log(`App initialized with ${compiledRenderers.length} renderers`);
         console.log(`  Available renderers: ${this.getAvailableRendererIds().join(', ')}`);
     }
 
@@ -995,144 +995,6 @@ export class FlexibleApp {
     }
 
     // ============================================================================
-    // Keyboard Controls
-    // ============================================================================
-
-    /**
-     * Setup keyboard controls
-     *
-     * - 1-9: Switch renderers
-     * - r/R: Reset accumulation
-     * - Space: Toggle rendering
-     * - \: Pause/resume
-     * - p/P: Start production render (prompts for samples)
-     * - Escape: Stop rendering
-     * - x/X: Export screenshot (placeholder)
-     */
-    setupKeyboardControls(): void {
-        window.addEventListener('keydown', (e) => {
-            // Skip keyboard shortcuts when user is typing in input fields
-            const target = e.target as HTMLElement;
-            const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-            if (isTyping) {
-                return; // Let the input handle the keypress
-            }
-
-            // Don't handle if locked in production (except escape)
-            if (this.isLocked() && e.key !== 'Escape') {
-                console.warn('Locked in production mode - press Escape to stop');
-                return;
-            }
-
-            const rendererIds = this.getAvailableRendererIds();
-
-            // 1-9: Switch renderers
-            if (e.key >= '1' && e.key <= '9') {
-                const index = parseInt(e.key) - 1;
-                if (index < rendererIds.length) {
-                    this.selectRenderer(rendererIds[index]);
-                }
-            }
-
-            // r/R: Reset accumulation
-            else if (e.key === 'r' || e.key === 'R') {
-                this.clearAccumulation();
-            }
-
-            // Space: Toggle rendering
-            else if (e.key === ' ') {
-                e.preventDefault();
-                if (this.isActive()) {
-                    this.stop();
-                } else {
-                    this.start();
-                }
-            }
-
-            // \: Pause/resume
-            else if (e.key === '\\') {
-                if (this.isPaused()) {
-                    this.resume();
-                } else {
-                    this.pause();
-                }
-            }
-
-            // p/P: Production render
-            else if (e.key === 'p' || e.key === 'P') {
-                e.preventDefault();
-                const samplesStr = prompt('Target samples?', '1000');
-                if (samplesStr) {
-                    const samples = parseInt(samplesStr);
-                    if (samples > 0) {
-                        this.renderProduction(samples).then(() => {
-                            console.log('Production render complete!');
-                        }).catch(err => {
-                            if (err.name === 'RenderStopped') {
-                                console.log('Production render stopped');
-                            } else {
-                                console.error('Production render failed:', err);
-                            }
-                        });
-                    }
-                }
-            }
-
-            // Escape: Stop rendering
-            else if (e.key === 'Escape') {
-                this.stop();
-            }
-
-            // x: Export PNG screenshot
-            else if (e.key === 'x') {
-                e.preventDefault();
-                this.exportPNG();
-            }
-
-            // X (shift+x): Export HDR
-            else if (e.key === 'X') {
-                e.preventDefault();
-                this.exportHDR();
-            }
-
-            // a/A: Export all AOVs (if available)
-            else if (e.key === 'a' || e.key === 'A') {
-                e.preventDefault();
-                this.exportAllAOVs();
-            }
-
-            // j/J: Quick save session
-            else if (e.key === 'j' || e.key === 'J') {
-                e.preventDefault();
-                this.quickSave();
-            }
-
-            // o/O: Open/load session from file
-            else if (e.key === 'o' || e.key === 'O') {
-                e.preventDefault();
-                this.loadSessionFromFile();
-            }
-
-            // m/M: Cycle display mode (for AOV renderers)
-            else if (e.key === 'm' || e.key === 'M') {
-                e.preventDefault();
-                this.cycleDisplayMode();
-            }
-        });
-
-        console.log('Keyboard controls enabled:');
-        console.log('  1-9: Switch renderers');
-        console.log('  r: Reset accumulation');
-        console.log('  Space: Toggle rendering');
-        console.log('  \\: Pause/resume');
-        console.log('  p: Production render');
-        console.log('  Escape: Stop');
-        console.log('  x: Export PNG, X: Export HDR, a: Export AOVs');
-        console.log('  j: Save session, o: Load session');
-        console.log('  m: Cycle display mode (AOVs)');
-    }
-
-    // ============================================================================
     // Extensions
     // ============================================================================
 
@@ -1233,6 +1095,6 @@ export class FlexibleApp {
         this.renderers.clear();
         this.strategies.clear();
 
-        console.log('FlexibleApp disposed');
+        console.log('App disposed');
     }
 }

@@ -1,15 +1,15 @@
 // app/index.ts
-// Public exports for the new app architecture
+// Public exports for the app architecture
 
-export { FlexibleApp } from './FlexibleApp.js';
+export { App } from './App.js';
 
 export {
-    FlexibleRenderCoordinator,
+    RenderCoordinator,
     type RenderMode,
     type RenderState,
     type ProgressInfo,
     type ProductionGoal
-} from './FlexibleRenderCoordinator.js';
+} from './RenderCoordinator.js';
 
 export {
     TiledRenderer,
@@ -20,7 +20,7 @@ export {
 
 export {
     STRATEGY_PRESETS,
-    type FlexibleAppConfig,
+    type AppConfig,
     type StrategyPreset,
     type RenderProgress,
     type RenderStrategy,
