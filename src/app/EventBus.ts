@@ -1,6 +1,6 @@
 // app/EventBus.ts
 
-type EventHandler = (data?: any) => void;
+import type { EventHandler } from './types.js';
 
 /**
  * EventBus - Simple pub/sub for loose coupling between components
@@ -10,7 +10,7 @@ type EventHandler = (data?: any) => void;
  * - render.progress - ProgressInfo
  * - parameter.changed - ParameterChanges
  * - accumulation.reset - { reason: string }
- * - recipe.switched - { recipeId: string }
+ * - renderer.switched - { rendererId: string }
  * - session.saved, session.loaded
  * - extension.installed - { name: string, version: string }
  */
@@ -98,4 +98,3 @@ class EventBus {
 }
 
 export { EventBus };
-export type { EventHandler };

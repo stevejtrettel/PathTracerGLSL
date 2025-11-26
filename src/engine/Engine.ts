@@ -8,13 +8,15 @@ import { TextureRegistry } from './TextureRegistry.js';
 import { TextureFactory } from './utils/TextureFactory.js';
 import { HDRLoader } from './loaders/hdr-loader.js';
 import { buildEnvironmentSampler } from './loaders/build-environment-sampler.js';
+import { setUniformValue } from './utils/shader-uniform-utils.js';
 import {
     validateHDRResponse,
     validateHDRBuffer,
     validateHDRData,
     validateTextureCreation,
     validateCompiledRenderer,
-    ConsoleReporter
+    ConsoleReporter,
+    DiagnosticBag
 } from '../errors/index.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 import type { ParameterChanges } from '../app/types.js';
@@ -647,61 +649,42 @@ export class Engine {
 
         // Fetch
         const res = await fetch(path);
-
-        // Validate response
-        const responseResult = validateHDRResponse(res, path);
-        if (responseResult.hasErrors()) {
-            console.error(new ConsoleReporter().formatBag(responseResult));
-            throw new Error(`Failed to load HDR from '${path}'. See console for details.`);
-        }
+        throwIfValidationFails(
+            validateHDRResponse(res, path),
+            `Failed to load HDR from '${path}'.`
+        );
 
         // Get buffer
         const buffer = await res.arrayBuffer();
-
-        // Validate buffer
-        const bufferResult = validateHDRBuffer(buffer, path);
-        if (bufferResult.hasErrors()) {
-            console.error(new ConsoleReporter().formatBag(bufferResult));
-            throw new Error(`Invalid HDR file '${path}'. See console for details.`);
-        }
-        // Show warnings if any
-        if (bufferResult.hasWarnings()) {
-            console.warn(new ConsoleReporter().formatBag(bufferResult));
-        }
+        throwIfValidationFails(
+            validateHDRBuffer(buffer, path),
+            `Invalid HDR file '${path}'.`
+        );
 
         // Parse
         let hdr;
         try {
             hdr = HDRLoader.parse(buffer);
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error(`\n❌ HDR parsing failed:\n`);
-            console.error(`  • ${error.message || String(error)}`);
+            console.error(`  • ${message}`);
             throw new Error(`Failed to parse HDR file '${path}'. File may be corrupted.`);
         }
 
         const { width, height, data } = hdr;
-
-        // Validate parsed data
-        const dataResult = validateHDRData(width, height, data.length, path);
-        if (dataResult.hasErrors()) {
-            console.error(new ConsoleReporter().formatBag(dataResult));
-            throw new Error(`Invalid HDR data in '${path}'. See console for details.`);
-        }
-        // Show data warnings if any
-        if (dataResult.hasWarnings()) {
-            console.warn(new ConsoleReporter().formatBag(dataResult));
-        }
+        throwIfValidationFails(
+            validateHDRData(width, height, data.length, path),
+            `Invalid HDR data in '${path}'.`
+        );
 
         // Create texture
         const tf = new TextureFactory(this.gl);
         const envTex = tf.createRGB32F(data, width, height);
-
-        // Validate texture creation
-        const textureResult = validateTextureCreation(envTex, width, height, this.gl);
-        if (textureResult.hasErrors()) {
-            console.error(new ConsoleReporter().formatBag(textureResult));
-            throw new Error(`Failed to create texture for '${path}'. See console for details.`);
-        }
+        throwIfValidationFails(
+            validateTextureCreation(envTex, width, height, this.gl),
+            `Failed to create texture for '${path}'.`
+        );
 
         this.textureRegistry.register('env_map', envTex);
 
@@ -944,41 +927,8 @@ export class Engine {
                 const value = binding.compute(paramValues);
 
                 // Set uniform based on type
-                this._setUniformValue(location, value, binding.type);
+                setUniformValue(this.gl, location, value, binding.type);
             }
-        }
-    }
-
-    /**
-     * Set a uniform value based on type
-     */
-    private _setUniformValue(location: WebGLUniformLocation, value: any, type: string): void {
-        const gl = this.gl;
-
-        switch (type) {
-            case 'int':
-                gl.uniform1i(location, value);
-                break;
-            case 'float':
-                gl.uniform1f(location, value);
-                break;
-            case 'vec2':
-                gl.uniform2f(location, value[0], value[1]);
-                break;
-            case 'vec3':
-                gl.uniform3f(location, value[0], value[1], value[2]);
-                break;
-            case 'vec4':
-                gl.uniform4f(location, value[0], value[1], value[2], value[3]);
-                break;
-            case 'mat3':
-                gl.uniformMatrix3fv(location, false, value);
-                break;
-            case 'mat4':
-                gl.uniformMatrix4fv(location, false, value);
-                break;
-            default:
-                console.warn(`Unknown uniform type: ${type}`);
         }
     }
 
@@ -1011,25 +961,20 @@ export class Engine {
     }
 }
 
-// ============ DEFERRED FEATURES (TODOs) ============
-//
-// 1. READ OPERATIONS (readRadiance, readRGB)
-//    - Need to decide which framebuffer to read from
-//    - Add methods to read HDR (rgba32f) and LDR (rgba8) data
-//    - Important for production rendering and export
-//
-// 2. HDR ENVIRONMENT LOADING
-//    - TextureRegistry for global textures
-//    - HDR parsing and CDF building for importance sampling
-//    - Binding environment textures to shaders
-//    - May belong in separate TextureManager or content loading system
-//
-// 3. VALIDATION
-//    - Implement full validateCompiledRenderer()
-//    - Implement full validatePipeline()
-//    - Check shader/framebuffer/texture ID consistency
-//
-// 4. CLEAR ACCUMULATION BUFFERS
-//    - Add ResourceManager.clearBuffer(rendererId, bufferId)
-//    - Call from clearAccumulation() to actually clear GPU buffers
-//
+// ============ HELPERS ============
+
+const reporter = new ConsoleReporter();
+
+/**
+ * Check validation result and throw if errors found.
+ * Logs warnings if present.
+ */
+function throwIfValidationFails(result: DiagnosticBag, errorMessage: string): void {
+    if (result.hasErrors()) {
+        console.error(reporter.formatBag(result));
+        throw new Error(`${errorMessage} See console for details.`);
+    }
+    if (result.hasWarnings()) {
+        console.warn(reporter.formatBag(result));
+    }
+}

@@ -1,6 +1,7 @@
 // app/extensions/StatsPanel.ts
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
+import type { Extension } from '../types.js';
 
 /**
  * StatsPanel - Simple rendering statistics overlay
@@ -14,7 +15,7 @@ import type { EventBus } from '../EventBus.js';
  *
  * Toggle visibility with 'i' key (info)
  */
-export class StatsPanel {
+export class StatsPanel implements Extension {
     name = 'stats-panel';
     version = '1.0.0';
     description = 'Rendering statistics overlay';

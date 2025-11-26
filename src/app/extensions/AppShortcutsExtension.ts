@@ -2,6 +2,7 @@
 
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
+import type { Extension } from '../types.js';
 
 /**
  * AppShortcutsExtension - Application keyboard shortcuts
@@ -23,7 +24,7 @@ import type { EventBus } from '../EventBus.js';
  * Note: This is for application commands, separate from KeyboardControls
  * which handles 6DOF camera navigation.
  */
-export class AppShortcutsExtension {
+export class AppShortcutsExtension implements Extension {
     name = 'app-shortcuts';
     version = '1.0.0';
     description = 'Application keyboard shortcuts';

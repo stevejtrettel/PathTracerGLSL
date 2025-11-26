@@ -1,6 +1,7 @@
 // app/extensions/KeyboardControls.ts
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
+import type { Extension } from '../types.js';
 
 type Vec3 = [number, number, number];
 
@@ -25,7 +26,7 @@ type Vec3 = [number, number, number];
  * Note: This is for 6DOF camera navigation, separate from App's
  * application shortcuts (1-9 for renderers, r for reset, etc.)
  */
-export class KeyboardControls {
+export class KeyboardControls implements Extension {
     name = 'keyboard-controls';
     version = '1.0.0';
     description = '6DOF keyboard camera navigation';

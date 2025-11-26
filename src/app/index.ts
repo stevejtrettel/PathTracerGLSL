@@ -33,4 +33,11 @@ export { EventBus } from './EventBus.js';
 export type { Extension, EventHandler } from './types.js';
 
 // Extensions
-export { OrbitControls, TouchOrbitControls, ParameterPanelExtension } from './extensions/index.js';
+export {
+    OrbitControls,
+    TouchOrbitControls,
+    ParameterPanelExtension,
+    KeyboardControls,
+    AppShortcutsExtension,
+    StatsPanel
+} from './extensions/index.js';
