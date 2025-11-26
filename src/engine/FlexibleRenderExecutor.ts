@@ -25,11 +25,11 @@ export class FlexibleRenderExecutor {
     // Compiled shader programs (shader id → WebGLProgram)
     private programs: Map<string, WebGLProgram>;
 
-    // Current active pipeline
-    private activePipeline: RenderPipeline | null = null;
-
     // GPU profiler (optional)
     private profiler: GPUProfiler | null = null;
+
+    // Cached draw buffers per pass (passId → drawBuffers array)
+    private drawBuffersCache: Map<string, number[]> = new Map();
 
     constructor(gl: WebGL2RenderingContext, resourceManager: FlexibleResourceManager) {
         this.gl = gl;
@@ -67,9 +67,18 @@ export class FlexibleRenderExecutor {
 
     /**
      * Set active pipeline
+     *
+     * Caches draw buffer configurations for MRT passes.
      */
     setActivePipeline(pipeline: RenderPipeline): void {
-        this.activePipeline = pipeline;
+        // Cache draw buffers for MRT passes
+        this.drawBuffersCache.clear();
+        for (const pass of pipeline.passes) {
+            const outputs = Array.isArray(pass.output) ? pass.output : [pass.output];
+            if (outputs.length > 1) {
+                this.drawBuffersCache.set(pass.id, this._computeDrawBuffers(outputs));
+            }
+        }
     }
 
     /**
@@ -104,9 +113,15 @@ export class FlexibleRenderExecutor {
         const canvas = gl.canvas as HTMLCanvasElement;
         gl.viewport(0, 0, canvas.width, canvas.height);
 
-        // Set up draw buffers if MRT
+        // Set up draw buffers if MRT (use cached values)
         if (outputs.length > 1) {
-            this._setupDrawBuffers(outputs);
+            const cached = this.drawBuffersCache.get(pass.id);
+            if (cached) {
+                gl.drawBuffers(cached);
+            } else {
+                // Fallback: compute on the fly if not cached
+                gl.drawBuffers(this._computeDrawBuffers(outputs));
+            }
         }
 
         // Clear if requested (clears all attachments)
@@ -188,7 +203,7 @@ export class FlexibleRenderExecutor {
         }
 
         this.programs.clear();
-        this.activePipeline = null;
+        this.drawBuffersCache.clear();
     }
 
     // ============ PRIVATE METHODS ============
@@ -295,13 +310,14 @@ export class FlexibleRenderExecutor {
     }
 
     /**
-     * Set up draw buffers for MRT
+     * Compute draw buffers array for MRT
      *
-     * Parses output IDs to extract attachment locations and sets gl.drawBuffers()
+     * Parses output IDs to extract attachment locations.
      *
      * @param outputs - Array of output buffer IDs (e.g., ['buffer:0', 'buffer:1', 'buffer:2'])
+     * @returns Array of GL draw buffer constants
      */
-    private _setupDrawBuffers(outputs: string[]): void {
+    private _computeDrawBuffers(outputs: string[]): number[] {
         const gl = this.gl;
 
         // Parse attachment indices from output strings
@@ -325,9 +341,6 @@ export class FlexibleRenderExecutor {
 
         // Sort and create draw buffers array
         const sortedAttachments = [...attachments].sort((a, b) => a - b);
-        const drawBuffers = sortedAttachments.map(a => gl.COLOR_ATTACHMENT0 + a);
-
-        // Set draw buffers
-        gl.drawBuffers(drawBuffers);
+        return sortedAttachments.map(a => gl.COLOR_ATTACHMENT0 + a);
     }
 }

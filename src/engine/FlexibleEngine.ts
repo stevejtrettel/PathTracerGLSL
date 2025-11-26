@@ -22,7 +22,7 @@ import type { UniformBinding } from './types.js';
 /**
  * Engine state
  */
-type EngineState = 'ready' | 'running';
+type EngineState = 'ready' | 'running' | 'error';
 
 /**
  * Engine uniforms (provided by Engine, not user parameters)
@@ -142,6 +142,7 @@ export class FlexibleEngine {
         try {
             this.renderExecutor.loadShaders(renderer.shaders);
         } catch (error: any) {
+            this.state = 'error';
             throw new Error(`Failed to compile shaders for '${id}': ${error.message}`);
         }
 
@@ -380,6 +381,13 @@ export class FlexibleEngine {
      */
     isRunning(): boolean {
         return this.state === 'running';
+    }
+
+    /**
+     * Check if in error state
+     */
+    isError(): boolean {
+        return this.state === 'error';
     }
 
     /**
