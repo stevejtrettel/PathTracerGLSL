@@ -1,108 +1,138 @@
 // engine/ParameterManager.ts
-import type { ModuleDescriptor, UniformBinding } from './types.js';
-import type { ParameterChanges } from '../app/types.js';
+import type { UniformBinding } from './types.js';
 import { setUniformValue, uniformValuesEqual } from './utils/shader-uniform-utils.js';
 
 /**
- * ParameterManager - Manages parameter-to-uniform bindings
+ * ParameterManager - Manages parameter-to-uniform bindings for multi-program renderers
  *
  * Responsibilities:
- * - Build uniform bindings from module descriptors
- * - Update GPU uniforms when parameters change
+ * - Cache uniform locations for all shader programs
+ * - Set uniforms per-shader during pass execution
  * - Cache uniform values to skip redundant GPU calls
  * - Track performance statistics
+ *
+ * Usage:
+ * 1. Call initialize() with all programs and bindings when switching renderers
+ * 2. Call setUniformsForShader() before each pass execution
  */
 class ParameterManager {
     private gl: WebGL2RenderingContext;
-    private program: WebGLProgram | null = null;
 
-    // Binding metadata
-    private uniformBindings = new Map<string, UniformBinding>();
+    // Multi-program storage
+    private programs = new Map<string, WebGLProgram>();
+    private bindings: UniformBinding[] = [];
+
+    // Location cache: uniformName → (shaderId → location)
+    // Allows quick lookup of where each uniform exists
+    private uniformLocations = new Map<string, Map<string, WebGLUniformLocation>>();
+
+    // Reverse lookup: parameterPath → Set<UniformBinding>
+    // Allows finding which uniforms are affected by a parameter change
     private parameterToBindings = new Map<string, Set<UniformBinding>>();
 
-    // Caches
-    private parameterCache = new Map<string, any>();
+    // Value cache for change detection (uniform values are same across shaders)
     private uniformValueCache = new Map<string, any>();
-    private uniformLocations = new Map<string, WebGLUniformLocation>();
 
     // Statistics
     private updateStats = { total: 0, skipped: 0 };
-    private frameCount = 0;
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
     }
 
     /**
-     * Initialize with shader program and modules
+     * Initialize with all shader programs and uniform bindings
+     *
+     * Call this when switching renderers.
+     *
+     * @param programs - Map of shaderId → WebGLProgram
+     * @param bindings - Array of uniform bindings from CompiledRenderer
      */
-    initialize(program: WebGLProgram, modules: ModuleDescriptor[]): void {
-        this.program = program;
+    initialize(
+        programs: Map<string, WebGLProgram>,
+        bindings: UniformBinding[]
+    ): void {
+        this.programs = programs;
+        this.bindings = bindings;
 
-        this.buildUniformBindings(modules);
-        this.cacheUniformLocations();
+        // Build reverse lookup
+        this._buildParameterToBindings();
 
-        // Clear caches for fresh start
-        this.parameterCache.clear();
+        // Cache uniform locations for all programs
+        this._cacheAllUniformLocations();
+
+        // Clear value cache for fresh start
         this.uniformValueCache.clear();
         this.updateStats = { total: 0, skipped: 0 };
-        this.frameCount = 0;
     }
 
     /**
-     * Update uniforms from parameter changes
+     * Set uniforms for a specific shader/pass
+     *
+     * Call this before drawing each pass. Only sets uniforms that exist
+     * in the specified shader, skipping unchanged values.
+     *
+     * @param shaderId - The shader to set uniforms for
+     * @param parameters - All parameter values (engine.* and custom)
      */
-    updateUniforms(changes: ParameterChanges): void {
-        if (!this.program) return;
+    setUniformsForShader(shaderId: string, parameters: Record<string, any>): void {
+        const program = this.programs.get(shaderId);
+        if (!program) return;
 
-        this.gl.useProgram(this.program);
+        this.gl.useProgram(program);
 
-        // Update parameter cache
-        for (const change of changes.changes) {
-            this.parameterCache.set(change.path, change.newValue);
-        }
+        for (const binding of this.bindings) {
+            // Get location for this shader
+            const locationsByShader = this.uniformLocations.get(binding.uniform);
+            const location = locationsByShader?.get(shaderId);
 
-        // Find affected uniform bindings
-        const affectedBindings = new Set<UniformBinding>();
-        for (const change of changes.changes) {
-            const bindings = this.parameterToBindings.get(change.path);
-            if (bindings) {
-                bindings.forEach(binding => affectedBindings.add(binding));
-            }
-        }
+            // Skip if this shader doesn't use this uniform
+            if (!location) continue;
 
-        // Update each affected uniform
-        for (const binding of affectedBindings) {
+            // Gather parameter values for this binding
             const paramValues: Record<string, any> = {};
             for (const paramPath of binding.parameters) {
-                paramValues[paramPath] = this.parameterCache.get(paramPath);
+                paramValues[paramPath] = parameters[paramPath];
             }
 
-            const uniformValue = binding.compute(paramValues);
+            // Compute uniform value
+            const value = binding.compute(paramValues);
 
-            // Skip if value unchanged (cache hit)
-            const cachedValue = this.uniformValueCache.get(binding.uniform);
-            if (uniformValuesEqual(cachedValue, uniformValue, binding.type)) {
+            // Check cache - skip if unchanged
+            const cacheKey = `${shaderId}:${binding.uniform}`;
+            const cachedValue = this.uniformValueCache.get(cacheKey);
+            if (uniformValuesEqual(cachedValue, value, binding.type)) {
                 this.updateStats.skipped++;
                 continue;
             }
 
-            // Update cache and GPU
-            this.uniformValueCache.set(binding.uniform, uniformValue);
-            const location = this.uniformLocations.get(binding.uniform);
-            if (location) {
-                setUniformValue(this.gl, location, uniformValue, binding.type);
-                this.updateStats.total++;
-            }
+            // Update cache and set uniform
+            this.uniformValueCache.set(cacheKey, value);
+            setUniformValue(this.gl, location, value, binding.type);
+            this.updateStats.total++;
         }
-
-        this.logStatsIfNeeded();
     }
 
     /**
-     * Clear uniform cache
+     * Clear uniform value cache
+     *
+     * Call this when accumulation is reset or parameters change significantly.
      */
-    clearUniformCache(): void {
+    clearCache(): void {
+        this.uniformValueCache.clear();
+        this.updateStats = { total: 0, skipped: 0 };
+    }
+
+    /**
+     * Reset manager state
+     *
+     * Call this when switching renderers or cleaning up.
+     */
+    reset(): void {
+        this.programs.clear();
+        this.bindings = [];
+        this.uniformLocations.clear();
+        this.parameterToBindings.clear();
         this.uniformValueCache.clear();
         this.updateStats = { total: 0, skipped: 0 };
     }
@@ -111,61 +141,75 @@ class ParameterManager {
      * Get cache statistics
      */
     getCacheStats(): { total: number; skipped: number; skipRate: number } {
-        const total = this.updateStats.total + this.updateStats.skipped;
+        const totalOps = this.updateStats.total + this.updateStats.skipped;
         return {
             total: this.updateStats.total,
             skipped: this.updateStats.skipped,
-            skipRate: total > 0 ? this.updateStats.skipped / total : 0
+            skipRate: totalOps > 0 ? this.updateStats.skipped / totalOps : 0
         };
+    }
+
+    /**
+     * Get which parameters affect which uniforms (for debugging)
+     */
+    getParameterBindings(): Map<string, string[]> {
+        const result = new Map<string, string[]>();
+        for (const [param, bindings] of this.parameterToBindings) {
+            result.set(param, Array.from(bindings).map(b => b.uniform));
+        }
+        return result;
     }
 
     // ============================================================================
     // Private: Initialization
     // ============================================================================
 
-    private buildUniformBindings(modules: ModuleDescriptor[]): void {
-        this.uniformBindings.clear();
+    /**
+     * Build reverse lookup from parameter paths to bindings
+     */
+    private _buildParameterToBindings(): void {
         this.parameterToBindings.clear();
 
-        for (const module of modules) {
-            for (const binding of module.uniformBindings || []) {
-                this.uniformBindings.set(binding.uniform, binding);
-
-                for (const paramPath of binding.parameters) {
-                    if (!this.parameterToBindings.has(paramPath)) {
-                        this.parameterToBindings.set(paramPath, new Set());
-                    }
-                    this.parameterToBindings.get(paramPath)!.add(binding);
+        for (const binding of this.bindings) {
+            for (const paramPath of binding.parameters) {
+                if (!this.parameterToBindings.has(paramPath)) {
+                    this.parameterToBindings.set(paramPath, new Set());
                 }
+                this.parameterToBindings.get(paramPath)!.add(binding);
             }
         }
     }
 
-    private cacheUniformLocations(): void {
-        if (!this.program) return;
-
+    /**
+     * Cache uniform locations for all bindings in all programs
+     */
+    private _cacheAllUniformLocations(): void {
         this.uniformLocations.clear();
 
-        for (const uniformName of this.uniformBindings.keys()) {
-            const location = this.gl.getUniformLocation(this.program, uniformName);
-            if (location) {
-                this.uniformLocations.set(uniformName, location);
+        // Track which uniforms are found in at least one shader
+        const uniformFoundInShader = new Set<string>();
+
+        for (const binding of this.bindings) {
+            const locationsByShader = new Map<string, WebGLUniformLocation>();
+
+            for (const [shaderId, program] of this.programs) {
+                const location = this.gl.getUniformLocation(program, binding.uniform);
+                if (location) {
+                    locationsByShader.set(shaderId, location);
+                    uniformFoundInShader.add(binding.uniform);
+                }
             }
+
+            this.uniformLocations.set(binding.uniform, locationsByShader);
         }
-    }
 
-    // ============================================================================
-    // Private: Statistics
-    // ============================================================================
-
-    private logStatsIfNeeded(): void {
-        this.frameCount++;
-
-        if (this.frameCount % 60 === 0) {
-            const total = this.updateStats.total + this.updateStats.skipped;
-            if (total > 0) {
-                const skipRate = (this.updateStats.skipped / total * 100).toFixed(1);
-                console.log(`Uniform cache: ${skipRate}% skipped (${this.updateStats.skipped}/${total})`);
+        // Warn about uniforms not found in ANY shader
+        for (const binding of this.bindings) {
+            if (!uniformFoundInShader.has(binding.uniform)) {
+                console.warn(
+                    `Uniform '${binding.uniform}' not found in any shader ` +
+                    `(may be optimized out or misspelled)`
+                );
             }
         }
     }

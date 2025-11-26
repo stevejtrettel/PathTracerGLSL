@@ -3,6 +3,7 @@
 import type { RenderPipeline, RenderPass, ShaderProgram } from '../compiler/types.js';
 import type { ResourceManager } from './ResourceManager.js';
 import type { GPUProfiler } from './GPUProfiler.js';
+import type { ParameterManager } from './ParameterManager.js';
 
 /**
  * RenderExecutor
@@ -14,6 +15,7 @@ import type { GPUProfiler } from './GPUProfiler.js';
  * - Compile GLSL shaders into WebGL programs
  * - Execute individual render passes (bind framebuffer, textures, draw)
  * - Execute complete pipelines (iterate passes + post-frame swaps)
+ * - Coordinate with ParameterManager for uniform setting
  * - Handle shader compilation errors
  *
  * Uses fullscreen triangle technique (no VAO needed, gl.drawArrays with 3 vertices)
@@ -21,6 +23,7 @@ import type { GPUProfiler } from './GPUProfiler.js';
 export class RenderExecutor {
     private gl: WebGL2RenderingContext;
     private resourceManager: ResourceManager;
+    private parameterManager: ParameterManager | null = null;
 
     // Compiled shader programs (shader id → WebGLProgram)
     private programs: Map<string, WebGLProgram>;
@@ -35,6 +38,13 @@ export class RenderExecutor {
         this.gl = gl;
         this.resourceManager = resourceManager;
         this.programs = new Map();
+    }
+
+    /**
+     * Set ParameterManager for uniform handling
+     */
+    setParameterManager(parameterManager: ParameterManager): void {
+        this.parameterManager = parameterManager;
     }
 
     /**
@@ -90,10 +100,14 @@ export class RenderExecutor {
      * 3. Set up draw buffers (for MRT)
      * 4. Clear if needed
      * 5. Use shader program
-     * 6. Bind input textures
-     * 7. Draw fullscreen triangle
+     * 6. Set uniforms via ParameterManager
+     * 7. Bind input textures
+     * 8. Draw fullscreen triangle
+     *
+     * @param pass - The render pass to execute
+     * @param parameters - All parameter values for uniform computation
      */
-    executePass(pass: RenderPass): void {
+    executePass(pass: RenderPass, parameters: Record<string, any>): void {
         const gl = this.gl;
 
         // Get shader program
@@ -132,6 +146,11 @@ export class RenderExecutor {
         // Use shader program
         gl.useProgram(program);
 
+        // Set uniforms via ParameterManager
+        if (this.parameterManager) {
+            this.parameterManager.setUniformsForShader(pass.shader, parameters);
+        }
+
         // Bind input textures
         if (pass.inputs?.textures) {
             this._bindTextures(program, pass.inputs.textures);
@@ -145,10 +164,13 @@ export class RenderExecutor {
      * Execute complete render pipeline
      *
      * Steps:
-     * 1. Execute all passes in order
+     * 1. Execute all passes in order (with uniform setting per-pass)
      * 2. Execute post-frame operations (swaps)
+     *
+     * @param pipeline - The render pipeline to execute
+     * @param parameters - All parameter values for uniform computation
      */
-    executePipeline(pipeline: RenderPipeline): void {
+    executePipeline(pipeline: RenderPipeline, parameters: Record<string, any>): void {
         // Update profiler (poll for results from previous frame)
         if (this.profiler) {
             this.profiler.update();
@@ -163,11 +185,11 @@ export class RenderExecutor {
 
             // Handle execution type
             if (pass.execution.type === 'once') {
-                this.executePass(pass);
+                this.executePass(pass, parameters);
             } else if (pass.execution.type === 'loop') {
                 const iterations = pass.execution.iterations || 1;
                 for (let i = 0; i < iterations; i++) {
-                    this.executePass(pass);
+                    this.executePass(pass, parameters);
                 }
             }
 
