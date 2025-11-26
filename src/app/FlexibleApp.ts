@@ -1,15 +1,15 @@
-// app-new/FlexibleApp.ts
+// app/FlexibleApp.ts
 // Main orchestrator for the new architecture
 
 import { SimpleCompiler } from '../compiler/SimpleCompiler.js';
-import { FlexibleEngine } from '../engine-new/FlexibleEngine.js';
+import { FlexibleEngine } from '../engine/FlexibleEngine.js';
 import { FlexibleRenderCoordinator, type ProgressInfo } from './FlexibleRenderCoordinator.js';
-import { ParameterStore } from '../app/ParameterStore.js';
-import { EventBus } from '../app/EventBus.js';
-import { saveHDRFile, savePNGFile } from '../app/utils/file-export.js';
+import { ParameterStore } from './ParameterStore.js';
+import { EventBus } from './EventBus.js';
+import { saveHDRFile, savePNGFile } from './utils/file-export.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
 import type { FlexibleAppConfig, RenderProgress, StrategyPreset } from './types.js';
-import type { Extension } from '../app/types.js';
+import type { Extension } from './types.js';
 
 /**
  * FlexibleApp - High-level orchestration for the new architecture
@@ -453,6 +453,36 @@ export class FlexibleApp {
     }
 
     /**
+     * Cycle through display modes for AOV renderers
+     * Works with debug.displayMode or renderer.displayMode parameters
+     */
+    cycleDisplayMode(): void {
+        // Try different display mode parameter names
+        const modeParams = ['debug.displayMode', 'renderer.displayMode'];
+        const renderer = this.engine.getActiveRenderer();
+
+        for (const param of modeParams) {
+            // Check if this parameter exists in renderer metadata
+            const metadata = renderer?.parameters?.[param];
+            if (metadata) {
+                // Get current value (may be undefined if never set, use default)
+                const current = this.getParameter(param) ?? metadata.default ?? 0;
+                const max = metadata.range?.[1] ?? 2;
+
+                const next = ((current as number) + 1) % (max + 1);
+                this.setParameter(param, next);
+
+                // Show mode name if available
+                const modeName = metadata.options?.[next] ?? `Mode ${next}`;
+                console.log(`Display mode: ${modeName} (${next})`);
+                return;
+            }
+        }
+
+        console.log('No display mode parameter found for current renderer');
+    }
+
+    /**
      * Get current sample count
      */
     getSampleCount(): number {
@@ -485,6 +515,72 @@ export class FlexibleApp {
      */
     getRenderState(): 'rendering' | 'paused' | 'complete' | 'stopped' {
         return this.coordinator.getState();
+    }
+
+    // ============================================================================
+    // Stats & Profiling
+    // ============================================================================
+
+    /**
+     * Unified stats object combining all render statistics
+     */
+    getStats(): {
+        samples: number;
+        fps: number;
+        elapsedMs: number;
+        resolution: [number, number];
+        mode: 'interactive' | 'production';
+        state: 'rendering' | 'paused' | 'complete' | 'stopped';
+        rendererId: string | null;
+        profilingEnabled: boolean;
+        gpuTimings: Record<string, number> | null;
+    } {
+        const gpuTimingsMap = this.engine.isProfilingEnabled()
+            ? this.engine.getAllPassTimings()
+            : null;
+
+        // Convert Map to plain object for easier consumption
+        let gpuTimings: Record<string, number> | null = null;
+        if (gpuTimingsMap) {
+            gpuTimings = {};
+            for (const [key, value] of gpuTimingsMap) {
+                gpuTimings[key] = value;
+            }
+        }
+
+        return {
+            samples: this.getSampleCount(),
+            fps: this.getFPS(),
+            elapsedMs: this.getElapsedTime(),
+            resolution: this.getCanvasSize(),
+            mode: this.getRenderMode(),
+            state: this.getRenderState(),
+            rendererId: this.activeRendererId,
+            profilingEnabled: this.engine.isProfilingEnabled(),
+            gpuTimings
+        };
+    }
+
+    /**
+     * Enable GPU profiling
+     * @returns true if supported, false otherwise
+     */
+    enableProfiling(): boolean {
+        return this.engine.enableProfiling();
+    }
+
+    /**
+     * Disable GPU profiling
+     */
+    disableProfiling(): void {
+        this.engine.disableProfiling();
+    }
+
+    /**
+     * Check if GPU profiling is enabled
+     */
+    isProfilingEnabled(): boolean {
+        return this.engine.isProfilingEnabled();
     }
 
     // ============================================================================
@@ -1016,6 +1112,12 @@ export class FlexibleApp {
                 e.preventDefault();
                 this.loadSessionFromFile();
             }
+
+            // m/M: Cycle display mode (for AOV renderers)
+            else if (e.key === 'm' || e.key === 'M') {
+                e.preventDefault();
+                this.cycleDisplayMode();
+            }
         });
 
         console.log('Keyboard controls enabled:');
@@ -1027,6 +1129,7 @@ export class FlexibleApp {
         console.log('  Escape: Stop');
         console.log('  x: Export PNG, X: Export HDR, a: Export AOVs');
         console.log('  j: Save session, o: Load session');
+        console.log('  m: Cycle display mode (AOVs)');
     }
 
     // ============================================================================

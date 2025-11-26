@@ -1,4 +1,4 @@
-// app-new/index.ts
+// app/index.ts
 // Public exports for the new app architecture
 
 export { FlexibleApp } from './FlexibleApp.js';
@@ -30,8 +30,8 @@ export {
 } from './types.js';
 
 // Re-export EventBus and Extension for external use
-export { EventBus } from '../app/EventBus.js';
-export type { Extension, EventHandler } from '../app/types.js';
+export { EventBus } from './EventBus.js';
+export type { Extension, EventHandler } from './types.js';
 
 // Extensions
 export { OrbitControls, TouchOrbitControls, ParameterPanelExtension } from './extensions/index.js';

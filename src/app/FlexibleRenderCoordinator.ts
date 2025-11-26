@@ -1,7 +1,7 @@
-// app-new/FlexibleRenderCoordinator.ts
+// app/FlexibleRenderCoordinator.ts
 // Manages rendering execution for FlexibleEngine
 
-import type { FlexibleEngine } from '../engine-new/FlexibleEngine.js';
+import type { FlexibleEngine } from '../engine/FlexibleEngine.js';
 
 /**
  * Render mode

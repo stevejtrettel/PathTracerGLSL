@@ -1,5 +1,0 @@
-#!/usr/bin/env node
-import fs from 'fs';
-const content = "import type { ModuleDescriptor } from \"../../engine/types\";\n\nexport const directTransport: ModuleDescriptor = {\n    id: { kind: 'transport', name: 'direct', version: '1.0.0' },\n    fragment: {\n        functions: `\n            vec3 transport_trace(Ray ray) {\n                Hit hit;\n                if (!scene_intersect(ray, hit)) {\n                    // Use environment instead of black\n                    return environment_radiance(ray.direction);\n                }\n                \n                vec3 wo = -ray.direction;  // Toward camera\n                vec3 wi = vec3(0.0);       // Placeholder\n                \n                return interaction_surface_shade(wi, wo, hit);\n            }\n        `\n    },\n    // exports: ['transport_trace']  // Disabled: using GLSL compiler validation instead\n};\n";
-fs.writeFileSync('/home/user/PathTracerGLSL/src/optics/transport/direct-transport.ts', content);
-console.log('✓ Reverted test changes');

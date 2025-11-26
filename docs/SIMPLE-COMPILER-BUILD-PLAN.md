@@ -11,7 +11,7 @@
 
 ### Step 0.1: Create folder structure
 - Create `src/compiler/` (for SimpleCompiler now, real Compiler later)
-- Create `src/engine-new/` (will replace src/engine/ later)
+- Create `src/engine/` (will replace src/engine/ later)
 
 ### Step 0.2: Define core types in `src/compiler/types.ts`
 - `SceneDescription` (minimal - just an id/name for now)
@@ -71,7 +71,7 @@
 ## Phase 2: FlexibleResourceManager (2-3 hours)
 **Goal**: Dynamically create and manage GPU resources from `RenderPipeline` specification
 
-### Step 2.1: Create `src/engine-new/FlexibleResourceManager.ts` skeleton
+### Step 2.1: Create `src/engine/FlexibleResourceManager.ts` skeleton
 ```typescript
 class FlexibleResourceManager {
   private gl: WebGL2RenderingContext;
@@ -120,7 +120,7 @@ class FlexibleResourceManager {
 ## Phase 3: FlexibleRenderExecutor (2-3 hours)
 **Goal**: Generic pass execution engine that reads `RenderPipeline` and executes it
 
-### Step 3.1: Create `src/engine-new/FlexibleRenderExecutor.ts` skeleton
+### Step 3.1: Create `src/engine/FlexibleRenderExecutor.ts` skeleton
 ```typescript
 class FlexibleRenderExecutor {
   private gl: WebGL2RenderingContext;
@@ -167,7 +167,7 @@ class FlexibleRenderExecutor {
 ## Phase 4: FlexibleEngine Integration (1-2 hours)
 **Goal**: Wire together Compiler → Engine flow with multi-renderer support
 
-### Step 4.1: Create `src/engine-new/FlexibleEngine.ts`
+### Step 4.1: Create `src/engine/FlexibleEngine.ts`
 ```typescript
 class FlexibleEngine {
   private gl: WebGL2RenderingContext;
@@ -215,7 +215,7 @@ class FlexibleEngine {
 ### Step 5.1: Create test file `examples/test-simple-compiler.ts`
 ```typescript
 import { SimpleCompiler } from '../src/compiler/SimpleCompiler';
-import { FlexibleEngine } from '../src/engine-new/FlexibleEngine';
+import { FlexibleEngine } from '../src/engine/FlexibleEngine';
 
 // Create scene and strategy
 const scene = { id: 'test-scene' };

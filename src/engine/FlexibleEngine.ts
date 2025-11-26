@@ -1,13 +1,13 @@
-// engine-new/FlexibleEngine.ts
+// engine/FlexibleEngine.ts
 
 import { FlexibleResourceManager } from './FlexibleResourceManager.js';
 import { FlexibleRenderExecutor } from './FlexibleRenderExecutor.js';
-import { ParameterManager } from '../engine/ParameterManager.js';
+import { ParameterManager } from './ParameterManager.js';
 import { GPUProfiler } from './GPUProfiler.js';
-import { TextureRegistry } from '../engine/TextureRegistry.js';
-import { TextureFactory } from '../engine/utils/TextureFactory.js';
-import { HDRLoader } from '../engine/loaders/hdr-loader.js';
-import { buildEnvironmentSampler } from '../engine/loaders/build-environment-sampler.js';
+import { TextureRegistry } from './TextureRegistry.js';
+import { TextureFactory } from './utils/TextureFactory.js';
+import { HDRLoader } from './loaders/hdr-loader.js';
+import { buildEnvironmentSampler } from './loaders/build-environment-sampler.js';
 import {
     validateHDRResponse,
     validateHDRBuffer,
@@ -17,7 +17,7 @@ import {
 // import { validateCompiledRenderer } from '../errors/compiler/validation.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 import type { ParameterChanges } from '../app/types.js';
-import type { UniformBinding } from '../engine/types.js';
+import type { UniformBinding } from './types.js';
 
 /**
  * Engine state
@@ -209,6 +209,10 @@ export class FlexibleEngine {
         }
 
         this.activeRendererId = id;
+
+        // Reset profiler to clear stale timing data from previous renderer
+        this.profiler.reset();
+
         console.log(`Switched to renderer '${id}'`);
     }
 
@@ -381,6 +385,14 @@ export class FlexibleEngine {
      */
     getActiveRendererId(): string | null {
         return this.activeRendererId;
+    }
+
+    /**
+     * Get the active renderer object (for accessing metadata like parameters)
+     */
+    getActiveRenderer(): CompiledRenderer | null {
+        if (!this.activeRendererId) return null;
+        return this.renderers.get(this.activeRendererId) || null;
     }
 
     /**

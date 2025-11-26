@@ -1,13 +1,13 @@
 // app/extensions/KeyboardControls.ts
-import type { Extension } from '../types';
-import { buildFrame } from '../../optics/camera/utils/buildFrame';
-import { AnimationLoop } from '../utils/AnimationLoop';
-import { EventManager } from '../utils/EventManager';
+import type { FlexibleApp } from '../FlexibleApp.js';
+import type { EventBus } from '../EventBus.js';
+
+type Vec3 = [number, number, number];
 
 /**
- * KeyboardControls - 6DOF camera controls
+ * KeyboardControls - 6DOF camera navigation
  *
- * Translation (arrow keys + ' /)
+ * Translation (arrow keys + '/)
  *   ↑ - forward    ↓ - backward
  *   ← - left       → - right
  *   ' - up         / - down
@@ -20,62 +20,125 @@ import { EventManager } from '../utils/EventManager';
  * Modifiers
  *   Shift - boost (3x speed)
  *   Ctrl  - slow (0.3x speed)
- *   R     - stabilize (align with world up)
+ *   G     - stabilize (align with world up)
+ *
+ * Note: This is for 6DOF camera navigation, separate from FlexibleApp's
+ * application shortcuts (1-9 for renderers, r for reset, etc.)
  */
-class KeyboardControls implements Extension {
-    name = 'keyboard-control';
+export class KeyboardControls {
+    name = 'keyboard-controls';
     version = '1.0.0';
-    description = '6DOF keyboard camera controls';
+    description = '6DOF keyboard camera navigation';
 
-    private app: any;
-    private bus: any;
+    private app!: FlexibleApp;
+    private bus!: EventBus;
 
     // Camera state
-    private position: [number, number, number] = [0, 0, 5];
-    private frame: Frame;
+    private position: Vec3 = [0, 0, 8];
+    private frame: Frame = new Frame([1, 0, 0], [0, 1, 0], [0, 0, 1]);
 
     // Input state
     private pressed = new Set<string>();
 
     // Settings
-    private moveSpeed = 1.0;
-    private rotSpeed = Math.PI / 10;
+    private moveSpeed = 2.0;
+    private rotSpeed = Math.PI / 8;
     private boostFactor = 3.0;
     private slowFactor = 0.3;
 
-    // Utilities
-    private loop = new AnimationLoop();
-    private events = new EventManager();
+    // Animation loop
+    private animationId: number | null = null;
+    private lastTime = 0;
 
-    install(app: any, bus: any): void {
+    install(app: FlexibleApp, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
 
-        app.registerService('camera', this);
-
+        // Initialize from current parameters
         this.initializeFromParameters();
 
-        this.events.add(window, 'keydown', this.onKeyDown);
-        this.events.add(window, 'keyup', this.onKeyUp);
+        // Event listeners
+        window.addEventListener('keydown', this.onKeyDown);
+        window.addEventListener('keyup', this.onKeyUp);
+        window.addEventListener('blur', this.onBlur);
 
-        this.loop.start((dt) => this.update(dt));
+        // Start update loop
+        this.lastTime = performance.now();
+        this.startLoop();
+
+        console.log('KeyboardControls installed:');
+        console.log('  Arrows/\'/ : Move');
+        console.log('  WASD/QE   : Rotate');
+        console.log('  Shift     : Boost');
+        console.log('  Ctrl      : Slow');
+        console.log('  G         : Stabilize');
     }
 
     uninstall(): void {
-        this.loop.stop();
-        this.events.removeAll();
+        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('keyup', this.onKeyUp);
+        window.removeEventListener('blur', this.onBlur);
+        this.stopLoop();
     }
 
     // ============================================================================
     // Public API
     // ============================================================================
 
-    getPosition(): [number, number, number] {
+    getPosition(): Vec3 {
         return [...this.position];
     }
 
-    getFrame(): Float32Array {
-        return this.frame.toFloat32Array();
+    setPosition(pos: Vec3): void {
+        this.position = [...pos];
+        this.updateParameters();
+    }
+
+    getTarget(): Vec3 {
+        // Target is position + forward direction
+        return [
+            this.position[0] + this.frame.forward[0],
+            this.position[1] + this.frame.forward[1],
+            this.position[2] + this.frame.forward[2]
+        ];
+    }
+
+    /**
+     * Look at a specific point
+     */
+    lookAt(target: Vec3): void {
+        const dir = vec3Normalize([
+            target[0] - this.position[0],
+            target[1] - this.position[1],
+            target[2] - this.position[2]
+        ]);
+
+        // Build frame from direction
+        this.frame.forward = dir;
+        this.frame.stabilize();
+        this.frame.orthonormalize();
+        this.updateParameters();
+    }
+
+    // ============================================================================
+    // Serialization for session save/restore
+    // ============================================================================
+
+    saveState(): { position: Vec3; frame: number[] } {
+        return {
+            position: [...this.position],
+            frame: Array.from(this.frame.toFloat32Array())
+        };
+    }
+
+    restoreState(state: { position: Vec3; frame: number[] }): void {
+        if (state.position) {
+            this.position = [...state.position];
+        }
+        if (state.frame) {
+            this.frame = Frame.fromFloat32Array(new Float32Array(state.frame));
+        }
+        this.updateParameters();
     }
 
     // ============================================================================
@@ -83,34 +146,47 @@ class KeyboardControls implements Extension {
     // ============================================================================
 
     private initializeFromParameters(): void {
-        const pos = this.app.parameterStore.get('camera.position');
-        if (pos) {
+        const pos = this.app.getParameter('camera.position');
+        if (pos && Array.isArray(pos)) {
             this.position = [pos[0], pos[1], pos[2]];
         }
 
-        const target = this.app.parameterStore.get('camera.target');
-        if (target) {
-            const frameArray = buildFrame(this.position, target);
-            this.frame = Frame.fromFloat32Array(frameArray);
-            this.app.parameterStore.set('camera.frame', frameArray);
-        } else {
-            this.frame = new Frame(
-                [1, 0, 0],
-                [0, 1, 0],
-                [0, 0, 1]
-            );
+        const target = this.app.getParameter('camera.target');
+        if (target && Array.isArray(target)) {
+            this.lookAt(target);
         }
     }
 
     // ============================================================================
-    // Private: Update Loop
+    // Private: Animation Loop
     // ============================================================================
 
+    private startLoop(): void {
+        const update = (now: number) => {
+            const dt = (now - this.lastTime) / 1000; // Convert to seconds
+            this.lastTime = now;
+
+            this.update(dt);
+            this.animationId = requestAnimationFrame(update);
+        };
+
+        this.animationId = requestAnimationFrame(update);
+    }
+
+    private stopLoop(): void {
+        if (this.animationId !== null) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+    }
+
     private update(dt: number): void {
+        // Clamp dt to avoid huge jumps
         if (dt <= 0 || dt > 0.1) return;
 
         let changed = false;
 
+        // Speed modifiers
         let moveSpeed = this.moveSpeed;
         let rotSpeed = this.rotSpeed;
 
@@ -123,19 +199,22 @@ class KeyboardControls implements Extension {
             rotSpeed *= 0.5;
         }
 
+        // Movement
         const movement = this.getMovementInput();
         if (movement) {
             this.moveLocal(movement, moveSpeed * dt);
             changed = true;
         }
 
+        // Rotation
         const rotation = this.getRotationInput();
         if (rotation) {
             this.rotateLocal(rotation, rotSpeed * dt);
             changed = true;
         }
 
-        if (this.pressed.has('KeyR')) {
+        // Stabilize (G key)
+        if (this.pressed.has('KeyG')) {
             this.frame.stabilize();
             changed = true;
         }
@@ -153,10 +232,15 @@ class KeyboardControls implements Extension {
     private getMovementInput(): Vec3 | null {
         const move: Vec3 = [0, 0, 0];
 
-        if (this.pressed.has('ArrowUp')) move[2] -= 1;
-        if (this.pressed.has('ArrowDown')) move[2] += 1;
-        if (this.pressed.has('ArrowRight')) move[0] += 1;
-        if (this.pressed.has('ArrowLeft')) move[0] -= 1;
+        // Forward/backward (arrows or numpad)
+        if (this.pressed.has('ArrowUp') || this.pressed.has('Numpad8')) move[2] -= 1;
+        if (this.pressed.has('ArrowDown') || this.pressed.has('Numpad2')) move[2] += 1;
+
+        // Left/right
+        if (this.pressed.has('ArrowRight') || this.pressed.has('Numpad6')) move[0] += 1;
+        if (this.pressed.has('ArrowLeft') || this.pressed.has('Numpad4')) move[0] -= 1;
+
+        // Up/down (' and / keys)
         if (this.pressed.has('Quote')) move[1] += 1;
         if (this.pressed.has('Slash')) move[1] -= 1;
 
@@ -166,12 +250,17 @@ class KeyboardControls implements Extension {
     private getRotationInput(): Vec3 | null {
         const rot: Vec3 = [0, 0, 0];
 
-        if (this.pressed.has('KeyW')) rot[0] -= 1;
-        if (this.pressed.has('KeyS')) rot[0] += 1;
-        if (this.pressed.has('KeyA')) rot[1] -= 1;
-        if (this.pressed.has('KeyD')) rot[1] += 1;
-        if (this.pressed.has('KeyQ')) rot[2] += 1;
-        if (this.pressed.has('KeyE')) rot[2] -= 1;
+        // Pitch (W/S)
+        if (this.pressed.has('KeyW')) rot[0] -= 1;  // Pitch up
+        if (this.pressed.has('KeyS')) rot[0] += 1;  // Pitch down
+
+        // Yaw (A/D)
+        if (this.pressed.has('KeyA')) rot[1] -= 1;  // Yaw left
+        if (this.pressed.has('KeyD')) rot[1] += 1;  // Yaw right
+
+        // Roll (Q/E)
+        if (this.pressed.has('KeyQ')) rot[2] += 1;  // Roll left
+        if (this.pressed.has('KeyE')) rot[2] -= 1;  // Roll right
 
         return vec3IsZero(rot) ? null : vec3Normalize(rot);
     }
@@ -197,11 +286,21 @@ class KeyboardControls implements Extension {
     }
 
     private updateParameters(): void {
-        this.app.parameterStore.set('camera.position', [...this.position]);
-        this.app.parameterStore.set('camera.frame', this.frame.toFloat32Array());
+        // Update camera position
+        this.app.setParameter('camera.position', [...this.position]);
 
+        // Compute target from position + forward
+        const target: Vec3 = [
+            this.position[0] + this.frame.forward[0] * 5,
+            this.position[1] + this.frame.forward[1] * 5,
+            this.position[2] + this.frame.forward[2] * 5
+        ];
+        this.app.setParameter('camera.target', target);
+
+        // Emit event for other systems
         this.bus.emit('camera.moved', {
             position: this.position,
+            target,
             frame: this.frame.toFloat32Array()
         });
     }
@@ -211,19 +310,28 @@ class KeyboardControls implements Extension {
     // ============================================================================
 
     private onKeyDown = (e: KeyboardEvent): void => {
+        // Skip if typing in input
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+            return;
+        }
+
         this.pressed.add(e.code);
     };
 
     private onKeyUp = (e: KeyboardEvent): void => {
         this.pressed.delete(e.code);
     };
+
+    private onBlur = (): void => {
+        // Clear all pressed keys when window loses focus
+        this.pressed.clear();
+    };
 }
 
 // ============================================================================
-// Frame Helper Class
+// Frame Helper Class - 3D rotation frame
 // ============================================================================
-
-type Vec3 = [number, number, number];
 
 class Frame {
     right: Vec3;
@@ -324,5 +432,3 @@ function rotateVector(v: Vec3, axis: Vec3, angle: number): Vec3 {
         v[2] * c + cross[2] * s + axis[2] * dot * t
     ];
 }
-
-export { KeyboardControls };

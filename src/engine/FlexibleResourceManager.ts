@@ -1,4 +1,4 @@
-// engine-new/FlexibleResourceManager.ts
+// engine/FlexibleResourceManager.ts
 
 import type { RenderPipeline, FramebufferConfig, SwapInstruction } from '../compiler/types.js';
 

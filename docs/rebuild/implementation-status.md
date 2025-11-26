@@ -31,7 +31,7 @@ This document tracks what's been implemented in the new architecture versus what
 - ✅ Tone mapping (gamma correction)
 - ✅ Export targets (hdr, ldr)
 
-#### FlexibleResourceManager (`src/engine-new/FlexibleResourceManager.ts`)
+#### FlexibleResourceManager (`src/engine/FlexibleResourceManager.ts`)
 - ✅ Dynamic framebuffer creation from `FramebufferConfig`
 - ✅ Screen/texture/double_buffer types
 - ✅ Format support: rgba32f, rgba16f, rgba8, r32f
@@ -43,7 +43,7 @@ This document tracks what's been implemented in the new architecture versus what
 - ✅ Context loss handling
 - ✅ Proper error messages
 
-#### FlexibleRenderExecutor (`src/engine-new/FlexibleRenderExecutor.ts`)
+#### FlexibleRenderExecutor (`src/engine/FlexibleRenderExecutor.ts`)
 - ✅ Shader compilation with error reporting
 - ✅ Shader program linking
 - ✅ Individual pass execution
@@ -54,7 +54,7 @@ This document tracks what's been implemented in the new architecture versus what
 - ✅ Fullscreen triangle drawing (no VAO)
 - ✅ Clear control (per-pass)
 
-#### FlexibleEngine (`src/engine-new/FlexibleEngine.ts`)
+#### FlexibleEngine (`src/engine/FlexibleEngine.ts`)
 - ✅ Renderer loading (`loadRenderer`, `loadRenderers`)
 - ✅ Renderer selection (`selectRenderer`)
 - ✅ Frame rendering (`renderFrame`)
