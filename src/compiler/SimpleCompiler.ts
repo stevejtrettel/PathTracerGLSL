@@ -208,7 +208,7 @@ void main() {
      */
     private _generatePathtracerRenderer(
         scene: SceneDescription,
-        _strategy: RenderStrategy
+        strategy: RenderStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
@@ -815,7 +815,7 @@ void main() {
      */
     private _generatePathtracerAOVsRenderer(
         scene: SceneDescription,
-        _strategy: RenderStrategy
+        strategy: RenderStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
