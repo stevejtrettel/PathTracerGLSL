@@ -111,9 +111,9 @@ export interface RenderPass {
      * Input resources (textures, etc.)
      *
      * For MRT framebuffers, use ':N' syntax to specify attachment:
-     * - 'u_previous': 'accumulation-previous' → reads attachment 0
-     * - 'u_albedo': 'accumulation-previous:1' → reads attachment 1
-     * - 'u_normal': 'accumulation-previous:2' → reads attachment 2
+     * - 'u_previous': 'accumulation_previous' → reads attachment 0
+     * - 'u_albedo': 'accumulation_previous:1' → reads attachment 1
+     * - 'u_normal': 'accumulation_previous:2' → reads attachment 2
      */
     inputs?: {
         textures?: Record<string, string>;  // uniform name → texture id (with optional :N)
@@ -123,10 +123,10 @@ export interface RenderPass {
      * Output framebuffer id(s)
      *
      * Single output:
-     * - output: 'accumulation-current' → writes to attachment 0
+     * - output: 'accumulation_current' → writes to attachment 0
      *
      * Multiple Render Targets (MRT) - use array with ':N' syntax:
-     * - output: ['accumulation-current:0', 'accumulation-current:1', 'accumulation-current:2']
+     * - output: ['accumulation_current:0', 'accumulation_current:1', 'accumulation_current:2']
      *
      * For MRT, fragment shader must declare multiple outputs:
      * layout(location = 0) out vec4 o_radiance;

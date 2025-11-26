@@ -111,8 +111,8 @@ export class FlexibleResourceManager {
      *
      * Examples:
      * - getFramebuffer('screen') → null (default framebuffer)
-     * - getFramebuffer('accumulation-current') → current ping-pong buffer
-     * - getFramebuffer('accumulation-previous') → previous ping-pong buffer
+     * - getFramebuffer('accumulation_current') → current ping-pong buffer
+     * - getFramebuffer('accumulation_previous') → previous ping-pong buffer
      * - getFramebuffer('myTexture') → single framebuffer
      */
     getFramebuffer(id: string): WebGLFramebuffer | null {
@@ -137,8 +137,8 @@ export class FlexibleResourceManager {
      * Get texture by id (resolves current/previous for double_buffer, :N for MRT)
      *
      * Examples:
-     * - 'accumulation-current' → attachment 0, current buffer
-     * - 'accumulation-previous:1' → attachment 1, previous buffer
+     * - 'accumulation_current' → attachment 0, current buffer
+     * - 'accumulation_previous:1' → attachment 1, previous buffer
      * - 'myTexture:2' → attachment 2
      */
     getTexture(id: string): WebGLTexture {
@@ -575,9 +575,9 @@ export class FlexibleResourceManager {
      *
      * Examples:
      * - 'accumulation' → { baseId: 'accumulation', qualifier: null, attachment: 0 }
-     * - 'accumulation-current' → { baseId: 'accumulation', qualifier: 'current', attachment: 0 }
-     * - 'accumulation-previous' → { baseId: 'accumulation', qualifier: 'previous', attachment: 0 }
-     * - 'accumulation-current:1' → { baseId: 'accumulation', qualifier: 'current', attachment: 1 }
+     * - 'accumulation_current' → { baseId: 'accumulation', qualifier: 'current', attachment: 0 }
+     * - 'accumulation_previous' → { baseId: 'accumulation', qualifier: 'previous', attachment: 0 }
+     * - 'accumulation_current:1' → { baseId: 'accumulation', qualifier: 'current', attachment: 1 }
      * - 'myBuffer:2' → { baseId: 'myBuffer', qualifier: null, attachment: 2 }
      */
     private _parseId(id: string): {
@@ -599,12 +599,12 @@ export class FlexibleResourceManager {
             }
         }
 
-        // Parse -current/-previous suffix: 'accumulation-current' → qualifier='current'
-        const parts = rest.split('-');
+        // Parse _current/_previous suffix: 'accumulation_current' → qualifier='current'
+        const parts = rest.split('_');
         const lastPart = parts[parts.length - 1];
 
         if (lastPart === 'current' || lastPart === 'previous') {
-            const baseId = parts.slice(0, -1).join('-');
+            const baseId = parts.slice(0, -1).join('_');
             return { baseId, qualifier: lastPart, attachment };
         }
 
