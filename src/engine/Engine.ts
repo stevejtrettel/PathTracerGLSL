@@ -422,6 +422,9 @@ export class Engine {
         // Clear all framebuffers (accumulation, etc.)
         this.resourceManager.clearAllBuffers();
 
+        // Clear uniform value cache so frameIndex/sampleCount uniforms update correctly
+        this.parameterManager.clearCache();
+
         console.log(`Accumulation cleared for renderer '${this.activeRendererId}'`);
     }
 
