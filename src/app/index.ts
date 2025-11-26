@@ -23,7 +23,6 @@ export {
     type FlexibleAppConfig,
     type StrategyPreset,
     type RenderProgress,
-    type ExportFormat,
     type RenderStrategy,
     type SceneDescription,
     type CompiledRenderer

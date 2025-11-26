@@ -86,9 +86,8 @@ interface UniformBinding {
  * Parameter metadata for UI generation and validation
  *
  * Defines how module parameters behave and how they should be displayed.
- * This is a subset of the full metadata used by the App layer.
  */
-interface ParameterMetadata {
+export interface ParameterMetadata {
     // Required
     type: 'float' | 'int' | 'bool' | 'vec2' | 'vec3' | 'vec4' | 'color';
     default: any;
@@ -97,6 +96,7 @@ interface ParameterMetadata {
     range?: [number, number];
     step?: number;
     values?: number[];
+    options?: string[];  // Named options for discrete int values
 
     // UI hints
     name?: string;
