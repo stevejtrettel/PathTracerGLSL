@@ -47,32 +47,6 @@ this.parameterManager.initialize(program, fakeModules);
 
 ---
 
-### ResourceManager Format Normalization
-
-**Location:** `src/engine/ResourceManager.ts`
-
-**Problem:**
-Format array normalization happens in multiple places:
-```typescript
-const formats = Array.isArray(config.format)
-    ? config.format
-    : [config.format || 'rgba8'];
-```
-
-**Solution:**
-Store normalized format array in `FramebufferResource` at creation time:
-```typescript
-interface FramebufferResource {
-    config: FramebufferConfig;
-    formats: string[];  // Always normalized array
-    // ...
-}
-```
-
-**Priority:** Low - works fine, just minor code quality improvement.
-
----
-
 ## Completed
 
 - [x] Move keyboard controls from App to AppShortcutsExtension
@@ -87,3 +61,4 @@ interface FramebufferResource {
 - [x] Add GLSL module type declarations (src/glsl.d.ts)
 - [x] Add uniform location warnings (with TODO to use DiagnosticBag later)
 - [x] CompiledRenderer validation (structure, references, duplicates)
+- [x] ResourceManager format normalization (store once, use everywhere)
