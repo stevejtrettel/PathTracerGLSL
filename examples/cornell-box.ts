@@ -25,7 +25,8 @@ import {
     OrbitControls,
     TouchOrbitControls,
     ParameterPanelExtension,
-    StatsPanel
+    StatsPanel,
+    AppShortcutsExtension
 } from '../src/app/extensions/index.js';
 
 async function main() {
@@ -58,9 +59,7 @@ async function main() {
     app.use(new TouchOrbitControls());
     app.use(new ParameterPanelExtension());
     app.use(new StatsPanel());
-
-    // Setup keyboard shortcuts
-    app.setupKeyboardControls();
+    app.use(new AppShortcutsExtension());
 
     // Enable GPU profiling for stats
     app.enableProfiling();

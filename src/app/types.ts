@@ -148,14 +148,14 @@ export type EventHandler = (data?: any) => void;
  * Complete session data for save/restore
  *
  * Captures all state needed to recreate a rendering session:
- * active recipe, parameters, camera, accumulation, and tile jobs.
+ * active renderer, parameters, camera, accumulation, and tile jobs.
  */
 export interface SessionData {
     version: string;
     timestamp: number;
 
     // Core state
-    activeRecipe: string;
+    activeRendererId: string;
     parameters: Record<string, any>;
 
     // Render state

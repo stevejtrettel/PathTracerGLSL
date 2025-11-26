@@ -1,8 +1,8 @@
 // app/extensions/KeyboardControls.ts
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
-
-type Vec3 = [number, number, number];
+import type { Extension } from '../types.js';
+import { vec3Normalize, vec3Cross, vec3IsZero, vec3Rotate, type Vec3 } from '../../math/vector3.js';
 
 /**
  * KeyboardControls - 6DOF camera navigation
@@ -25,7 +25,7 @@ type Vec3 = [number, number, number];
  * Note: This is for 6DOF camera navigation, separate from App's
  * application shortcuts (1-9 for renderers, r for reset, etc.)
  */
-export class KeyboardControls {
+export class KeyboardControls implements Extension {
     name = 'keyboard-controls';
     version = '1.0.0';
     description = '6DOF keyboard camera navigation';
@@ -369,18 +369,18 @@ class Frame {
     }
 
     rotatePitch(angle: number): void {
-        this.up = rotateVector(this.up, this.right, angle);
-        this.forward = rotateVector(this.forward, this.right, angle);
+        this.up = vec3Rotate(this.up, this.right, angle);
+        this.forward = vec3Rotate(this.forward, this.right, angle);
     }
 
     rotateYaw(angle: number): void {
-        this.right = rotateVector(this.right, this.up, angle);
-        this.forward = rotateVector(this.forward, this.up, angle);
+        this.right = vec3Rotate(this.right, this.up, angle);
+        this.forward = vec3Rotate(this.forward, this.up, angle);
     }
 
     rotateRoll(angle: number): void {
-        this.right = rotateVector(this.right, this.forward, angle);
-        this.up = rotateVector(this.up, this.forward, angle);
+        this.right = vec3Rotate(this.right, this.forward, angle);
+        this.up = vec3Rotate(this.up, this.forward, angle);
     }
 
     orthonormalize(): void {
@@ -394,41 +394,4 @@ class Frame {
         this.right = vec3Normalize(vec3Cross(this.forward, worldUp));
         this.up = vec3Cross(this.right, this.forward);
     }
-}
-
-// ============================================================================
-// Vector Math Helpers
-// ============================================================================
-
-function vec3Normalize(v: Vec3): Vec3 {
-    const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-    if (len === 0) return [0, 0, 1];
-    return [v[0] / len, v[1] / len, v[2] / len];
-}
-
-function vec3Cross(a: Vec3, b: Vec3): Vec3 {
-    return [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0]
-    ];
-}
-
-function vec3IsZero(v: Vec3): boolean {
-    return v[0] === 0 && v[1] === 0 && v[2] === 0;
-}
-
-function rotateVector(v: Vec3, axis: Vec3, angle: number): Vec3 {
-    const c = Math.cos(angle);
-    const s = Math.sin(angle);
-    const t = 1 - c;
-
-    const dot = v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2];
-    const cross = vec3Cross(axis, v);
-
-    return [
-        v[0] * c + cross[0] * s + axis[0] * dot * t,
-        v[1] * c + cross[1] * s + axis[1] * dot * t,
-        v[2] * c + cross[2] * s + axis[2] * dot * t
-    ];
 }

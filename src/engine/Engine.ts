@@ -14,28 +14,15 @@ import {
     validateHDRData,
     validateTextureCreation,
     validateCompiledRenderer,
-    ConsoleReporter
+    ConsoleReporter,
+    DiagnosticBag
 } from '../errors/index.js';
 import type { CompiledRenderer } from '../compiler/types.js';
-import type { ParameterChanges } from '../app/types.js';
-import type { UniformBinding } from './types.js';
 
 /**
  * Engine state
  */
 type EngineState = 'ready' | 'running' | 'error';
-
-/**
- * Engine uniforms (provided by Engine, not user parameters)
- */
-interface EngineUniforms {
-    resolution: [number, number];
-    imageSize: [number, number];
-    frameIndex: number;
-    time: number;
-    sampleCount: number;
-    pixelOffset: [number, number];
-}
 
 /**
  * Rectangle region for reading pixel data
@@ -89,10 +76,6 @@ export class Engine {
     private pixelOffset: [number, number] = [0, 0];
     private imageSize: [number, number] = [0, 0];
 
-    // Engine uniform locations (cached per shader per renderer)
-    // Structure: rendererId → shaderId → uniformName → location
-    private uniformLocations = new Map<string, Map<string, Map<string, WebGLUniformLocation>>>();
-
     // Custom parameter storage (for renderer-specific parameters like displayMode)
     private customParameters = new Map<string, any>();
 
@@ -107,6 +90,9 @@ export class Engine {
         // Initialize GPU profiler
         this.profiler = new GPUProfiler(gl);
         this.renderExecutor.setProfiler(this.profiler);
+
+        // Wire up ParameterManager to RenderExecutor
+        this.renderExecutor.setParameterManager(this.parameterManager);
 
         // Handle context loss
         gl.canvas.addEventListener('webglcontextlost', (e) => {
@@ -148,13 +134,6 @@ export class Engine {
 
         // Load GPU resources
         this.resourceManager.loadRenderer(id, renderer.pipeline);
-
-        // Cache uniform locations for all shaders
-        this._cacheRendererUniformLocations(id, renderer);
-
-        // Initialize parameter system
-        // TODO: Need to get active program for parameter manager
-        // For now, we'll defer parameter initialization until selectRenderer
 
         // Store renderer
         this.renderers.set(id, renderer);
@@ -200,16 +179,17 @@ export class Engine {
         // Set active pipeline in executor
         this.renderExecutor.setActivePipeline(renderer.pipeline);
 
-        // Initialize parameter manager with first shader's program
-        // TODO: This is a simplification - need to handle multiple programs
-        const firstShaderId = renderer.pipeline.passes[0]?.shader;
-        if (firstShaderId) {
-            const program = this.renderExecutor.getProgram(firstShaderId);
+        // Build programs map from all shaders
+        const programs = new Map<string, WebGLProgram>();
+        for (const [shaderId] of renderer.shaders) {
+            const program = this.renderExecutor.getProgram(shaderId);
             if (program) {
-                // Initialize with uniform bindings from renderer
-                this._initializeParameterManager(program, renderer.uniforms);
+                programs.set(shaderId, program);
             }
         }
+
+        // Initialize ParameterManager with all programs and bindings
+        this.parameterManager.initialize(programs, renderer.uniforms);
 
         this.activeRendererId = id;
 
@@ -239,7 +219,20 @@ export class Engine {
         // Update time
         this._time = (performance.now() - this.startTime) / 1000;
 
-        // Get canvas dimensions
+        // Build all parameters (engine + custom)
+        const parameters = this._buildParameters(sampleCount);
+
+        // Execute pipeline (RenderExecutor handles uniforms per-pass via ParameterManager)
+        this.renderExecutor.executePipeline(renderer.pipeline, parameters);
+
+        // Increment sample count
+        this.sampleCounts.set(this.activeRendererId, sampleCount + 1);
+    }
+
+    /**
+     * Build all parameters for uniform computation
+     */
+    private _buildParameters(sampleCount: number): Record<string, any> {
         const width = this.gl.canvas.width;
         const height = this.gl.canvas.height;
 
@@ -248,27 +241,22 @@ export class Engine {
             ? this.imageSize
             : [width, height];
 
-        // Engine uniforms to set
-        const engineUniforms: EngineUniforms = {
-            resolution: [width, height],
-            imageSize: imgSize,
-            frameIndex: sampleCount,
-            time: this._time,
-            sampleCount: sampleCount,
-            pixelOffset: this.pixelOffset
+        // Start with engine parameters
+        const parameters: Record<string, any> = {
+            'engine.resolution': [width, height],
+            'engine.imageSize': imgSize,
+            'engine.frameIndex': sampleCount,
+            'engine.time': this._time,
+            'engine.sampleCount': sampleCount,
+            'engine.pixelOffset': this.pixelOffset
         };
 
-        // Set engine uniforms for all shaders in pipeline
-        this._setEngineUniforms(this.activeRendererId, renderer, engineUniforms);
+        // Add custom parameters
+        for (const [name, value] of this.customParameters) {
+            parameters[name] = value;
+        }
 
-        // Set custom uniforms from UniformBinding
-        this._setCustomUniforms(this.activeRendererId, renderer, engineUniforms);
-
-        // Execute pipeline
-        this.renderExecutor.executePipeline(renderer.pipeline);
-
-        // Increment sample count
-        this.sampleCounts.set(this.activeRendererId, sampleCount + 1);
+        return parameters;
     }
 
     // ============ PARAMETERS ============
@@ -308,15 +296,6 @@ export class Engine {
             result[key] = value;
         }
         return result;
-    }
-
-    /**
-     * Update shader uniforms from parameter changes
-     */
-    updateParameters(changes: ParameterChanges): void {
-        if (this.state === 'running') {
-            this.parameterManager.updateUniforms(changes);
-        }
     }
 
     // ============ PROFILING ============
@@ -442,6 +421,9 @@ export class Engine {
 
         // Clear all framebuffers (accumulation, etc.)
         this.resourceManager.clearAllBuffers();
+
+        // Clear uniform value cache so frameIndex/sampleCount uniforms update correctly
+        this.parameterManager.clearCache();
 
         console.log(`Accumulation cleared for renderer '${this.activeRendererId}'`);
     }
@@ -647,61 +629,42 @@ export class Engine {
 
         // Fetch
         const res = await fetch(path);
-
-        // Validate response
-        const responseResult = validateHDRResponse(res, path);
-        if (responseResult.hasErrors()) {
-            console.error(new ConsoleReporter().formatBag(responseResult));
-            throw new Error(`Failed to load HDR from '${path}'. See console for details.`);
-        }
+        throwIfValidationFails(
+            validateHDRResponse(res, path),
+            `Failed to load HDR from '${path}'.`
+        );
 
         // Get buffer
         const buffer = await res.arrayBuffer();
-
-        // Validate buffer
-        const bufferResult = validateHDRBuffer(buffer, path);
-        if (bufferResult.hasErrors()) {
-            console.error(new ConsoleReporter().formatBag(bufferResult));
-            throw new Error(`Invalid HDR file '${path}'. See console for details.`);
-        }
-        // Show warnings if any
-        if (bufferResult.hasWarnings()) {
-            console.warn(new ConsoleReporter().formatBag(bufferResult));
-        }
+        throwIfValidationFails(
+            validateHDRBuffer(buffer, path),
+            `Invalid HDR file '${path}'.`
+        );
 
         // Parse
         let hdr;
         try {
             hdr = HDRLoader.parse(buffer);
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error(`\n❌ HDR parsing failed:\n`);
-            console.error(`  • ${error.message || String(error)}`);
+            console.error(`  • ${message}`);
             throw new Error(`Failed to parse HDR file '${path}'. File may be corrupted.`);
         }
 
         const { width, height, data } = hdr;
-
-        // Validate parsed data
-        const dataResult = validateHDRData(width, height, data.length, path);
-        if (dataResult.hasErrors()) {
-            console.error(new ConsoleReporter().formatBag(dataResult));
-            throw new Error(`Invalid HDR data in '${path}'. See console for details.`);
-        }
-        // Show data warnings if any
-        if (dataResult.hasWarnings()) {
-            console.warn(new ConsoleReporter().formatBag(dataResult));
-        }
+        throwIfValidationFails(
+            validateHDRData(width, height, data.length, path),
+            `Invalid HDR data in '${path}'.`
+        );
 
         // Create texture
         const tf = new TextureFactory(this.gl);
         const envTex = tf.createRGB32F(data, width, height);
-
-        // Validate texture creation
-        const textureResult = validateTextureCreation(envTex, width, height, this.gl);
-        if (textureResult.hasErrors()) {
-            console.error(new ConsoleReporter().formatBag(textureResult));
-            throw new Error(`Failed to create texture for '${path}'. See console for details.`);
-        }
+        throwIfValidationFails(
+            validateTextureCreation(envTex, width, height, this.gl),
+            `Failed to create texture for '${path}'.`
+        );
 
         this.textureRegistry.register('env_map', envTex);
 
@@ -767,9 +730,10 @@ export class Engine {
         this.renderExecutor.cleanup();
         this.resourceManager.cleanup();
         this.textureRegistry.dispose();
+        this.parameterManager.reset();
         this.renderers.clear();
         this.sampleCounts.clear();
-        this.uniformLocations.clear();
+        this.customParameters.clear();
         this.activeRendererId = null;
         this.state = 'ready';
     }
@@ -782,212 +746,6 @@ export class Engine {
     }
 
     // ============ PRIVATE METHODS ============
-
-    /**
-     * Cache uniform locations for all shaders in a renderer
-     */
-    private _cacheRendererUniformLocations(rendererId: string, renderer: CompiledRenderer): void {
-        const rendererLocations = new Map<string, Map<string, WebGLUniformLocation>>();
-
-        for (const [shaderId, _shaderProgram] of renderer.shaders) {
-            const program = this.renderExecutor.getProgram(shaderId);
-            if (!program) continue;
-
-            const shaderLocations = new Map<string, WebGLUniformLocation>();
-
-            // Cache locations for engine uniforms
-            const engineUniformNames = [
-                'u_resolution',
-                'u_imageSize',
-                'u_frameIndex',
-                'u_time',
-                'u_sampleCount',
-                'u_pixelOffset'
-            ];
-
-            for (const uniformName of engineUniformNames) {
-                const location = this.gl.getUniformLocation(program, uniformName);
-                if (location) {
-                    shaderLocations.set(uniformName, location);
-                }
-            }
-
-            // Cache locations for custom uniforms from UniformBinding
-            for (const binding of renderer.uniforms) {
-                const location = this.gl.getUniformLocation(program, binding.uniform);
-                if (location) {
-                    shaderLocations.set(binding.uniform, location);
-                } else {
-                    // TODO: Could collect in DiagnosticBag for batch reporting
-                    console.warn(`Uniform '${binding.uniform}' not found in shader '${shaderId}' (may be optimized out)`);
-                }
-            }
-
-            rendererLocations.set(shaderId, shaderLocations);
-        }
-
-        this.uniformLocations.set(rendererId, rendererLocations);
-    }
-
-    /**
-     * Set engine uniforms for all shaders in active renderer
-     */
-    private _setEngineUniforms(
-        rendererId: string,
-        renderer: CompiledRenderer,
-        uniforms: EngineUniforms
-    ): void {
-        const rendererLocations = this.uniformLocations.get(rendererId);
-        if (!rendererLocations) return;
-
-        // Set uniforms for each shader used in the pipeline
-        for (const pass of renderer.pipeline.passes) {
-            const program = this.renderExecutor.getProgram(pass.shader);
-            if (!program) continue;
-
-            const locations = rendererLocations.get(pass.shader);
-            if (!locations) continue;
-
-            // Use program
-            this.gl.useProgram(program);
-
-            // Set each uniform (using camelCase: u_variableName convention)
-            const loc_resolution = locations.get('u_resolution');
-            if (loc_resolution) {
-                this.gl.uniform2f(loc_resolution, uniforms.resolution[0], uniforms.resolution[1]);
-            }
-
-            const loc_imageSize = locations.get('u_imageSize');
-            if (loc_imageSize) {
-                this.gl.uniform2f(loc_imageSize, uniforms.imageSize[0], uniforms.imageSize[1]);
-            }
-
-            const loc_frameIndex = locations.get('u_frameIndex');
-            if (loc_frameIndex) {
-                this.gl.uniform1i(loc_frameIndex, uniforms.frameIndex);
-            }
-
-            const loc_time = locations.get('u_time');
-            if (loc_time) {
-                this.gl.uniform1f(loc_time, uniforms.time);
-            }
-
-            const loc_sampleCount = locations.get('u_sampleCount');
-            if (loc_sampleCount) {
-                this.gl.uniform1i(loc_sampleCount, uniforms.sampleCount);
-            }
-
-            const loc_pixelOffset = locations.get('u_pixelOffset');
-            if (loc_pixelOffset) {
-                this.gl.uniform2f(loc_pixelOffset, uniforms.pixelOffset[0], uniforms.pixelOffset[1]);
-            }
-        }
-    }
-
-    /**
-     * Set custom uniforms from UniformBinding for all shaders in active renderer
-     */
-    private _setCustomUniforms(
-        rendererId: string,
-        renderer: CompiledRenderer,
-        engineUniforms: EngineUniforms
-    ): void {
-        const rendererLocations = this.uniformLocations.get(rendererId);
-        if (!rendererLocations) return;
-
-        // Build parameter map (engine + custom)
-        const parameters: Record<string, any> = {
-            'engine.resolution': engineUniforms.resolution,
-            'engine.imageSize': engineUniforms.imageSize,
-            'engine.frameIndex': engineUniforms.frameIndex,
-            'engine.time': engineUniforms.time,
-            'engine.sampleCount': engineUniforms.sampleCount,
-            'engine.pixelOffset': engineUniforms.pixelOffset
-        };
-
-        // Add custom parameters
-        for (const [name, value] of this.customParameters) {
-            parameters[name] = value;
-        }
-
-        // Set uniforms for each shader used in the pipeline
-        for (const pass of renderer.pipeline.passes) {
-            const program = this.renderExecutor.getProgram(pass.shader);
-            if (!program) continue;
-
-            const locations = rendererLocations.get(pass.shader);
-            if (!locations) continue;
-
-            // Use program
-            this.gl.useProgram(program);
-
-            // Process each uniform binding
-            for (const binding of renderer.uniforms) {
-                const location = locations.get(binding.uniform);
-                if (!location) continue;
-
-                // Collect parameter values needed for this binding
-                const paramValues: Record<string, any> = {};
-                for (const paramPath of binding.parameters) {
-                    paramValues[paramPath] = parameters[paramPath];
-                }
-
-                // Compute uniform value
-                const value = binding.compute(paramValues);
-
-                // Set uniform based on type
-                this._setUniformValue(location, value, binding.type);
-            }
-        }
-    }
-
-    /**
-     * Set a uniform value based on type
-     */
-    private _setUniformValue(location: WebGLUniformLocation, value: any, type: string): void {
-        const gl = this.gl;
-
-        switch (type) {
-            case 'int':
-                gl.uniform1i(location, value);
-                break;
-            case 'float':
-                gl.uniform1f(location, value);
-                break;
-            case 'vec2':
-                gl.uniform2f(location, value[0], value[1]);
-                break;
-            case 'vec3':
-                gl.uniform3f(location, value[0], value[1], value[2]);
-                break;
-            case 'vec4':
-                gl.uniform4f(location, value[0], value[1], value[2], value[3]);
-                break;
-            case 'mat3':
-                gl.uniformMatrix3fv(location, false, value);
-                break;
-            case 'mat4':
-                gl.uniformMatrix4fv(location, false, value);
-                break;
-            default:
-                console.warn(`Unknown uniform type: ${type}`);
-        }
-    }
-
-    /**
-     * Initialize parameter manager with uniform bindings
-     */
-    private _initializeParameterManager(program: WebGLProgram, uniforms: UniformBinding[]): void {
-        // Create fake modules array for parameter manager
-        // TODO: Update ParameterManager to accept UniformBinding[] directly
-        const fakeModules = [{
-            id: { kind: 'test' as const, name: 'compiled', version: '1.0.0' },
-            fragment: { functions: '' },
-            uniformBindings: uniforms
-        }];
-
-        this.parameterManager.initialize(program, fakeModules);
-    }
 
     /**
      * Handle WebGL context loss
@@ -1003,25 +761,20 @@ export class Engine {
     }
 }
 
-// ============ DEFERRED FEATURES (TODOs) ============
-//
-// 1. READ OPERATIONS (readRadiance, readRGB)
-//    - Need to decide which framebuffer to read from
-//    - Add methods to read HDR (rgba32f) and LDR (rgba8) data
-//    - Important for production rendering and export
-//
-// 2. HDR ENVIRONMENT LOADING
-//    - TextureRegistry for global textures
-//    - HDR parsing and CDF building for importance sampling
-//    - Binding environment textures to shaders
-//    - May belong in separate TextureManager or content loading system
-//
-// 3. VALIDATION
-//    - Implement full validateCompiledRenderer()
-//    - Implement full validatePipeline()
-//    - Check shader/framebuffer/texture ID consistency
-//
-// 4. CLEAR ACCUMULATION BUFFERS
-//    - Add ResourceManager.clearBuffer(rendererId, bufferId)
-//    - Call from clearAccumulation() to actually clear GPU buffers
-//
+// ============ HELPERS ============
+
+const reporter = new ConsoleReporter();
+
+/**
+ * Check validation result and throw if errors found.
+ * Logs warnings if present.
+ */
+function throwIfValidationFails(result: DiagnosticBag, errorMessage: string): void {
+    if (result.hasErrors()) {
+        console.error(reporter.formatBag(result));
+        throw new Error(`${errorMessage} See console for details.`);
+    }
+    if (result.hasWarnings()) {
+        console.warn(reporter.formatBag(result));
+    }
+}

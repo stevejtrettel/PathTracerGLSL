@@ -9,7 +9,7 @@ import type { ParameterChanges } from './types';
  * - Notify listeners when parameters change
  * - Batch updates to reduce notifications
  * - Serialize/restore for session management
- * - Handle recipe switching (resend all parameters)
+ * - Handle renderer switching (resend all parameters)
  * - Lock/unlock for production renders
  */
 class ParameterStore {
@@ -116,7 +116,7 @@ class ParameterStore {
     }
 
     /**
-     * Force re-send all parameters (for recipe switching)
+     * Force re-send all parameters (for renderer switching)
      */
     resendAll(): void {
         if (!this._onChange || this.parameters.size === 0) return;

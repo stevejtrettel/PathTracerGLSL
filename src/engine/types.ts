@@ -109,89 +109,8 @@ export interface ParameterMetadata {
 }
 
 /**
- * Module validation result
- */
-export interface ValidationResult {
-    valid: boolean;
-    errors: string[];
-    warnings?: string[];
-}
-
-/**
- * Compiled shader program ready for execution
- */
-export interface CompiledProgram {
-    id: string;
-    program: WebGLProgram;
-    vertexSource: string;
-    fragmentSource: string;
-}
-
-/**
  * Engine execution state
  */
 export type EngineState = 'ready' | 'running';
-
-/**
- * Engine-provided shader uniforms
- */
-export interface EngineUniforms {
-    resolution: [number, number];
-    imageSize: [number, number];
-    frameIndex: number;
-    time: number;
-    sampleCount: number;
-    pixelOffset: [number, number];
-}
-
-/**
- * Complete rendering recipe
- *
- * A recipe defines a complete rendering configuration by composing
- * modules for world representation, optical simulation, and output.
- */
-export interface Recipe {
-    id: string;
-    name: string;
-    description?: string;
-
-    world: {
-        ambient: ModuleDescriptor;
-        environment: ModuleDescriptor;
-        scene: ModuleDescriptor;
-        lighting: ModuleDescriptor;
-    };
-
-    optics: {
-        camera: ModuleDescriptor;
-        interaction: ModuleDescriptor;
-        transport: ModuleDescriptor;
-        accumulator: ModuleDescriptor;
-        developer: ModuleDescriptor;
-    };
-
-    parameters?: Record<string, any>;
-
-    config?: {
-        targetSamples?: number;
-        renderMode?: 'interactive' | 'progressive' | 'production';
-    };
-}
-
-/**
- * Result of shader compilation
- * Discriminated union for success or failure with diagnostics
- */
-export type CompilationResult =
-    | {
-        success: true;
-        mainProgram: WebGLProgram;
-        displayProgram: WebGLProgram;
-        compositeProgram: WebGLProgram;
-    }
-    | {
-        success: false;
-        diagnostics: import('../errors/index.js').DiagnosticBag;
-    };
 
 export { MODULE_ORDER };
