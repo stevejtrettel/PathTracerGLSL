@@ -180,9 +180,14 @@ function validateExports(
     bag: DiagnosticBag
 ): void {
     for (const [exportName, target] of Object.entries(exports)) {
-        if (!framebufferIds.has(target.bufferId)) {
+        // Parse buffer reference to extract base buffer ID
+        // Export targets may use _current/_previous qualifiers (e.g., 'accumulation_current')
+        const { bufferId: baseBufferId } = parseBufferRef(target.bufferId);
+
+        if (!framebufferIds.has(baseBufferId)) {
             bag.error('export-invalid-buffer',
                 `Export '${exportName}' references unknown buffer '${target.bufferId}'`)
+                .suggest(`Available framebuffers: ${[...framebufferIds].join(', ')}`)
                 .add();
         }
     }
@@ -213,29 +218,42 @@ function validateUniforms(
 }
 
 /**
- * Parse buffer reference with optional attachment suffix
+ * Parse buffer reference with optional qualifiers and attachment suffix
  *
- * Examples:
- * - 'accumulation' → { bufferId: 'accumulation', attachment: undefined }
- * - 'accumulation:1' → { bufferId: 'accumulation', attachment: 1 }
+ * Handles:
+ * - Base name: 'accumulation' → bufferId: 'accumulation'
+ * - With attachment: 'accumulation:1' → bufferId: 'accumulation', attachment: 1
+ * - With qualifier: 'accumulation_current' → bufferId: 'accumulation'
+ * - Combined: 'accumulation_current:1' → bufferId: 'accumulation', attachment: 1
+ *
+ * Qualifiers (_current, _previous) are used for double_buffer framebuffers
+ * and should resolve to the base buffer ID for validation purposes.
  */
 function parseBufferRef(ref: string): { bufferId: string; attachment?: number } {
+    // Step 1: Parse attachment suffix first (e.g., ':2')
+    let rest = ref;
+    let attachment: number | undefined;
+
     const colonIndex = ref.lastIndexOf(':');
-
-    if (colonIndex === -1) {
-        return { bufferId: ref };
+    if (colonIndex !== -1) {
+        const possibleAttachment = ref.slice(colonIndex + 1);
+        const attachmentNum = parseInt(possibleAttachment, 10);
+        if (!isNaN(attachmentNum)) {
+            attachment = attachmentNum;
+            rest = ref.slice(0, colonIndex);
+        }
     }
 
-    const possibleAttachment = ref.slice(colonIndex + 1);
-    const attachmentNum = parseInt(possibleAttachment, 10);
+    // Step 2: Parse _current/_previous qualifier suffix
+    const parts = rest.split('_');
+    const lastPart = parts[parts.length - 1];
 
-    if (!isNaN(attachmentNum)) {
-        return {
-            bufferId: ref.slice(0, colonIndex),
-            attachment: attachmentNum
-        };
+    if (lastPart === 'current' || lastPart === 'previous') {
+        // Strip qualifier to get base buffer ID
+        const baseId = parts.slice(0, -1).join('_');
+        return { bufferId: baseId, attachment };
     }
 
-    // Not a number after colon, treat whole thing as buffer ID
-    return { bufferId: ref };
+    // No qualifier, use rest as buffer ID
+    return { bufferId: rest, attachment };
 }
