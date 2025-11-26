@@ -191,7 +191,7 @@ export type CompilationResult =
     }
     | {
         success: false;
-        diagnostics: import('../errors/types.js').ShaderDiagnostics;
+        diagnostics: import('../errors/index.js').DiagnosticBag;
     };
 
 export { MODULE_ORDER };

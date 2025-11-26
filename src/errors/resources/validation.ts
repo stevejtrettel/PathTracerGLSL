@@ -1,11 +1,11 @@
 // errors/resources/validation.ts
 
-import type { ValidationResult } from '../../engine/types';
+import { DiagnosticBag } from '../core/DiagnosticBag.js';
 
 /**
  * HDR file validation configuration
  */
-interface HDRValidationConfig {
+export interface HDRValidationConfig {
     maxWidth?: number;      // Default: 8192
     maxHeight?: number;     // Default: 8192
     minWidth?: number;      // Default: 16
@@ -26,26 +26,28 @@ const DEFAULT_HDR_CONFIG: Required<HDRValidationConfig> = {
  */
 export function validateHDRResponse(
     response: Response,
-    path: string
-): ValidationResult {
-    const errors: string[] = [];
+    path: string,
+    bag?: DiagnosticBag
+): DiagnosticBag {
+    const diagnostics = bag ?? new DiagnosticBag('hdr-loader');
 
     if (!response.ok) {
         if (response.status === 404) {
-            errors.push(`HDR file not found: ${path}`);
+            diagnostics.error('hdr-not-found', `HDR file not found: ${path}`)
+                .suggest(`Check that the file exists at: ${path}`)
+                .add();
         } else if (response.status === 403) {
-            errors.push(`Permission denied loading HDR file: ${path}`);
+            diagnostics.error('hdr-permission-denied', `Permission denied loading HDR file: ${path}`)
+                .suggest('Check file permissions or CORS settings')
+                .add();
         } else {
-            errors.push(
-                `Failed to load HDR file '${path}': ${response.status} ${response.statusText}`
-            );
+            diagnostics.error('hdr-fetch-failed',
+                `Failed to load HDR file '${path}': ${response.status} ${response.statusText}`)
+                .add();
         }
     }
 
-    return {
-        valid: errors.length === 0,
-        errors
-    };
+    return diagnostics;
 }
 
 /**
@@ -54,24 +56,25 @@ export function validateHDRResponse(
 export function validateHDRBuffer(
     buffer: ArrayBuffer,
     path: string,
-    config?: HDRValidationConfig
-): ValidationResult {
-    const errors: string[] = [];
-    const warnings: string[] = [];
+    config?: HDRValidationConfig,
+    bag?: DiagnosticBag
+): DiagnosticBag {
+    const diagnostics = bag ?? new DiagnosticBag('hdr-loader');
     const cfg = { ...DEFAULT_HDR_CONFIG, ...config };
 
     // Check for empty buffer
     if (buffer.byteLength === 0) {
-        errors.push(`HDR file is empty: ${path}`);
-        return { valid: false, errors };
+        diagnostics.error('hdr-empty', `HDR file is empty: ${path}`).add();
+        return diagnostics;
     }
 
     // Check file size
     const sizeMB = buffer.byteLength / (1024 * 1024);
     if (sizeMB > cfg.maxFileSizeMB) {
-        errors.push(
-            `HDR file too large: ${sizeMB.toFixed(1)}MB exceeds limit of ${cfg.maxFileSizeMB}MB`
-        );
+        diagnostics.error('hdr-too-large',
+            `HDR file too large: ${sizeMB.toFixed(1)}MB exceeds limit of ${cfg.maxFileSizeMB}MB`)
+            .suggest(`Use a smaller HDR file or increase maxFileSizeMB limit`)
+            .add();
     }
 
     // Check for minimal HDR header signature
@@ -79,17 +82,13 @@ export function validateHDRBuffer(
     const headerStart = String.fromCharCode(...Array.from(bytes.slice(0, 11)));
 
     if (!headerStart.startsWith('#?RADIANCE') && !headerStart.startsWith('#?RGBE')) {
-        warnings.push(
-            `HDR file '${path}' does not have standard Radiance header. ` +
-            `This may cause parsing errors.`
-        );
+        diagnostics.warning('hdr-invalid-header',
+            `HDR file '${path}' does not have standard Radiance header`)
+            .suggest('This may cause parsing errors. Ensure file is in RGBE/HDR format.')
+            .add();
     }
 
-    return {
-        valid: errors.length === 0,
-        errors,
-        warnings
-    };
+    return diagnostics;
 }
 
 /**
@@ -99,64 +98,58 @@ export function validateHDRData(
     width: number,
     height: number,
     dataLength: number,
-    path: string,
-    config?: HDRValidationConfig
-): ValidationResult {
-    const errors: string[] = [];
-    const warnings: string[] = [];
+    _path: string,
+    config?: HDRValidationConfig,
+    bag?: DiagnosticBag
+): DiagnosticBag {
+    const diagnostics = bag ?? new DiagnosticBag('hdr-loader');
     const cfg = { ...DEFAULT_HDR_CONFIG, ...config };
 
     // Validate dimensions
     if (width <= 0 || height <= 0) {
-        errors.push(`Invalid HDR dimensions: ${width}x${height}`);
+        diagnostics.error('hdr-invalid-dimensions', `Invalid HDR dimensions: ${width}x${height}`)
+            .add();
     }
 
     if (width < cfg.minWidth || height < cfg.minHeight) {
-        errors.push(
-            `HDR dimensions too small: ${width}x${height} ` +
-            `(minimum: ${cfg.minWidth}x${cfg.minHeight})`
-        );
+        diagnostics.error('hdr-too-small',
+            `HDR dimensions too small: ${width}x${height} (minimum: ${cfg.minWidth}x${cfg.minHeight})`)
+            .add();
     }
 
     if (width > cfg.maxWidth || height > cfg.maxHeight) {
-        errors.push(
-            `HDR dimensions too large: ${width}x${height} ` +
-            `(maximum: ${cfg.maxWidth}x${cfg.maxHeight})`
-        );
+        diagnostics.error('hdr-too-large-dimensions',
+            `HDR dimensions too large: ${width}x${height} (maximum: ${cfg.maxWidth}x${cfg.maxHeight})`)
+            .add();
     }
 
     // Validate power-of-two (recommended for some GPUs)
     const isPowerOfTwo = (n: number) => n > 0 && (n & (n - 1)) === 0;
     if (!isPowerOfTwo(width) || !isPowerOfTwo(height)) {
-        warnings.push(
-            `HDR dimensions ${width}x${height} are not power-of-two. ` +
-            `This may cause performance issues on some GPUs.`
-        );
+        diagnostics.warning('hdr-non-pot',
+            `HDR dimensions ${width}x${height} are not power-of-two`)
+            .suggest('This may cause performance issues on some GPUs.')
+            .add();
     }
 
     // Validate data size (RGB = 3 floats per pixel)
     const expectedLength = width * height * 3;
     if (dataLength !== expectedLength) {
-        errors.push(
-            `HDR data size mismatch: expected ${expectedLength} floats ` +
-            `(${width}x${height}x3), got ${dataLength}`
-        );
+        diagnostics.error('hdr-data-mismatch',
+            `HDR data size mismatch: expected ${expectedLength} floats (${width}x${height}x3), got ${dataLength}`)
+            .add();
     }
 
     // Check for reasonable aspect ratio
     const aspectRatio = width / height;
     if (aspectRatio > 4 || aspectRatio < 0.25) {
-        warnings.push(
-            `Unusual HDR aspect ratio: ${aspectRatio.toFixed(2)}:1. ` +
-            `Environment maps are typically 2:1 (equirectangular).`
-        );
+        diagnostics.warning('hdr-unusual-aspect',
+            `Unusual HDR aspect ratio: ${aspectRatio.toFixed(2)}:1`)
+            .suggest('Environment maps are typically 2:1 (equirectangular).')
+            .add();
     }
 
-    return {
-        valid: errors.length === 0,
-        errors,
-        warnings
-    };
+    return diagnostics;
 }
 
 /**
@@ -166,34 +159,37 @@ export function validateTextureCreation(
     texture: WebGLTexture | null,
     width: number,
     height: number,
-    gl: WebGL2RenderingContext
-): ValidationResult {
-    const errors: string[] = [];
+    gl: WebGL2RenderingContext,
+    bag?: DiagnosticBag
+): DiagnosticBag {
+    const diagnostics = bag ?? new DiagnosticBag('hdr-loader');
 
     if (!texture) {
-        errors.push('Failed to create WebGL texture');
-        return { valid: false, errors };
+        diagnostics.error('texture-create-failed', 'Failed to create WebGL texture')
+            .suggest('GPU may be out of memory or context may be lost')
+            .add();
+        return diagnostics;
     }
 
     // Check WebGL errors
     const error = gl.getError();
     if (error !== gl.NO_ERROR) {
         const errorName = getGLErrorName(error, gl);
-        errors.push(`WebGL error during texture creation: ${errorName} (0x${error.toString(16)})`);
+        diagnostics.error('texture-gl-error',
+            `WebGL error during texture creation: ${errorName} (0x${error.toString(16)})`)
+            .add();
     }
 
     // Check against WebGL limits
     const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
     if (width > maxTextureSize || height > maxTextureSize) {
-        errors.push(
-            `Texture size ${width}x${height} exceeds GPU limit ${maxTextureSize}x${maxTextureSize}`
-        );
+        diagnostics.error('texture-exceeds-limit',
+            `Texture size ${width}x${height} exceeds GPU limit ${maxTextureSize}x${maxTextureSize}`)
+            .suggest(`Use a smaller HDR file (max ${maxTextureSize}px)`)
+            .add();
     }
 
-    return {
-        valid: errors.length === 0,
-        errors
-    };
+    return diagnostics;
 }
 
 /**
@@ -215,37 +211,28 @@ export function validateHDRLoad(
     gl: WebGL2RenderingContext,
     path: string,
     config?: HDRValidationConfig
-): ValidationResult {
-    const allErrors: string[] = [];
-    const allWarnings: string[] = [];
+): DiagnosticBag {
+    const diagnostics = new DiagnosticBag('hdr-loader');
 
     // Step 1: Validate response
-    const responseResult = validateHDRResponse(response, path);
-    allErrors.push(...responseResult.errors);
+    validateHDRResponse(response, path, diagnostics);
 
-    // Step 2: Validate buffer
-    const bufferResult = validateHDRBuffer(buffer, path, config);
-    allErrors.push(...bufferResult.errors);
-    if (bufferResult.warnings) {
-        allWarnings.push(...bufferResult.warnings);
+    // Step 2: Validate buffer (only if response was OK)
+    if (!diagnostics.hasErrors()) {
+        validateHDRBuffer(buffer, path, config, diagnostics);
     }
 
-    // Step 3: Validate parsed data
-    const dataResult = validateHDRData(width, height, dataLength, path, config);
-    allErrors.push(...dataResult.errors);
-    if (dataResult.warnings) {
-        allWarnings.push(...dataResult.warnings);
+    // Step 3: Validate parsed data (only if buffer was valid)
+    if (!diagnostics.hasErrors()) {
+        validateHDRData(width, height, dataLength, path, config, diagnostics);
     }
 
-    // Step 4: Validate texture
-    const textureResult = validateTextureCreation(texture, width, height, gl);
-    allErrors.push(...textureResult.errors);
+    // Step 4: Validate texture (only if data was valid)
+    if (!diagnostics.hasErrors()) {
+        validateTextureCreation(texture, width, height, gl, diagnostics);
+    }
 
-    return {
-        valid: allErrors.length === 0,
-        errors: allErrors,
-        warnings: allWarnings.length > 0 ? allWarnings : undefined
-    };
+    return diagnostics;
 }
 
 // ============================================================================

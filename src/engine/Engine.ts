@@ -12,8 +12,9 @@ import {
     validateHDRResponse,
     validateHDRBuffer,
     validateHDRData,
-    validateTextureCreation
-} from '../errors/resources/validation.js';
+    validateTextureCreation,
+    ConsoleReporter
+} from '../errors/index.js';
 // import { validateCompiledRenderer } from '../errors/compiler/validation.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 import type { ParameterChanges } from '../app/types.js';
@@ -650,9 +651,8 @@ export class Engine {
 
         // Validate response
         const responseResult = validateHDRResponse(res, path);
-        if (!responseResult.valid) {
-            console.error(`\n❌ HDR loading failed:\n`);
-            responseResult.errors.forEach(err => console.error(`  • ${err}`));
+        if (responseResult.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(responseResult));
             throw new Error(`Failed to load HDR from '${path}'. See console for details.`);
         }
 
@@ -661,16 +661,13 @@ export class Engine {
 
         // Validate buffer
         const bufferResult = validateHDRBuffer(buffer, path);
-        if (!bufferResult.valid) {
-            console.error(`\n❌ Invalid HDR file:\n`);
-            bufferResult.errors.forEach(err => console.error(`  • ${err}`));
+        if (bufferResult.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(bufferResult));
             throw new Error(`Invalid HDR file '${path}'. See console for details.`);
         }
-
         // Show warnings if any
-        if (bufferResult.warnings && bufferResult.warnings.length > 0) {
-            console.warn(`\n⚠️  HDR file warnings:`);
-            bufferResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+        if (bufferResult.hasWarnings()) {
+            console.warn(new ConsoleReporter().formatBag(bufferResult));
         }
 
         // Parse
@@ -687,16 +684,13 @@ export class Engine {
 
         // Validate parsed data
         const dataResult = validateHDRData(width, height, data.length, path);
-        if (!dataResult.valid) {
-            console.error(`\n❌ Invalid HDR data:\n`);
-            dataResult.errors.forEach(err => console.error(`  • ${err}`));
+        if (dataResult.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(dataResult));
             throw new Error(`Invalid HDR data in '${path}'. See console for details.`);
         }
-
         // Show data warnings if any
-        if (dataResult.warnings && dataResult.warnings.length > 0) {
-            console.warn(`\n⚠️  HDR data warnings:`);
-            dataResult.warnings.forEach(warn => console.warn(`  • ${warn}`));
+        if (dataResult.hasWarnings()) {
+            console.warn(new ConsoleReporter().formatBag(dataResult));
         }
 
         // Create texture
@@ -705,9 +699,8 @@ export class Engine {
 
         // Validate texture creation
         const textureResult = validateTextureCreation(envTex, width, height, this.gl);
-        if (!textureResult.valid) {
-            console.error(`\n❌ Texture creation failed:\n`);
-            textureResult.errors.forEach(err => console.error(`  • ${err}`));
+        if (textureResult.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(textureResult));
             throw new Error(`Failed to create texture for '${path}'. See console for details.`);
         }
 
