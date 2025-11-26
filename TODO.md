@@ -93,24 +93,6 @@ The `CompiledRenderer` objects from `SimpleCompiler` are already well-formed. Va
 
 ---
 
-## Low Priority
-
-### Uniform Location Warning
-
-**Location:** `src/engine/Engine.ts:~790`
-
-**Idea:** Add warning when a UniformBinding references a uniform that doesn't exist in the shader. Currently fails silently (location is null, uniform is skipped).
-
-```typescript
-if (!location) {
-    console.warn(`Uniform '${binding.uniform}' not found in shader '${shaderId}'`);
-}
-```
-
-**Priority:** Low - helpful for debugging but not critical.
-
----
-
 ## Completed
 
 - [x] Move keyboard controls from App to AppShortcutsExtension
@@ -123,3 +105,4 @@ if (!location) {
 - [x] Rename formatters/ to reporters/
 - [x] Fix all 29 TypeScript errors
 - [x] Add GLSL module type declarations (src/glsl.d.ts)
+- [x] Add uniform location warnings (with TODO to use DiagnosticBag later)

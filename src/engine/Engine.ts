@@ -818,6 +818,9 @@ export class Engine {
                 const location = this.gl.getUniformLocation(program, binding.uniform);
                 if (location) {
                     shaderLocations.set(binding.uniform, location);
+                } else {
+                    // TODO: Could collect in DiagnosticBag for batch reporting
+                    console.warn(`Uniform '${binding.uniform}' not found in shader '${shaderId}' (may be optimized out)`);
                 }
             }
 
