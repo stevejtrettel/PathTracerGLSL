@@ -16,3 +16,6 @@ export {
     validateHDRLoad,
     type HDRValidationConfig
 } from './resources/validation.js';
+
+// Compiler validation (CompiledRenderer structure)
+export { validateCompiledRenderer } from './compiler/index.js';

@@ -73,26 +73,6 @@ interface FramebufferResource {
 
 ---
 
-## Medium Priority
-
-### CompiledRenderer Validation
-
-**Status:** Ready to implement using DiagnosticBag
-
-The `CompiledRenderer` objects from `SimpleCompiler` are already well-formed. Validation would check:
-
-1. All shader IDs in passes exist in `shaders` Map
-2. All framebuffer IDs in passes exist in pipeline.framebuffers
-3. All texture bindings reference valid buffers
-4. Export targets reference valid buffers and attachments
-5. Uniform bindings have valid types
-
-**Location:** Create `src/errors/compiler/validation.ts`
-
-**Implement when:** Before building real compiler, to catch mistakes early.
-
----
-
 ## Completed
 
 - [x] Move keyboard controls from App to AppShortcutsExtension
@@ -106,3 +86,4 @@ The `CompiledRenderer` objects from `SimpleCompiler` are already well-formed. Va
 - [x] Fix all 29 TypeScript errors
 - [x] Add GLSL module type declarations (src/glsl.d.ts)
 - [x] Add uniform location warnings (with TODO to use DiagnosticBag later)
+- [x] CompiledRenderer validation (structure, references, duplicates)

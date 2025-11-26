@@ -13,9 +13,9 @@ import {
     validateHDRBuffer,
     validateHDRData,
     validateTextureCreation,
+    validateCompiledRenderer,
     ConsoleReporter
 } from '../errors/index.js';
-// import { validateCompiledRenderer } from '../errors/compiler/validation.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 import type { ParameterChanges } from '../app/types.js';
 import type { UniformBinding } from './types.js';
@@ -128,16 +128,15 @@ export class Engine {
 
         console.log(`Loading renderer '${id}'...`);
 
-        // FUTURE: Add validation for CompiledRenderer structure
-        // - Verify all referenced shaders exist in shaders map
-        // - Verify all framebuffer references in passes are valid
-        // - Verify pipeline structure is well-formed
-        // const validation = validateCompiledRenderer(renderer);
-        // if (!validation.valid) {
-        //     console.error(`❌ Renderer validation failed for '${id}':`);
-        //     validation.errors.forEach(err => console.error(`  • ${err}`));
-        //     throw new Error(`Renderer validation failed for '${id}'. See console for details.`);
-        // }
+        // Validate CompiledRenderer structure
+        const validation = validateCompiledRenderer(renderer);
+        if (validation.hasErrors()) {
+            console.error(new ConsoleReporter().formatBag(validation));
+            throw new Error(`Renderer validation failed for '${id}'. See console for details.`);
+        }
+        if (validation.hasWarnings()) {
+            console.warn(new ConsoleReporter().formatBag(validation));
+        }
 
         // Load shaders
         try {
