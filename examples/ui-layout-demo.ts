@@ -124,10 +124,13 @@ function setupLayoutSwitching(layout: AppLayout, onLayoutChange?: () => void): v
             layout.setMode(newMode);
             console.log(`Layout: ${newMode}`);
 
-            // Trigger resize after layout change (after CSS reflows)
+            // Trigger resize after layout change
+            // Use double-rAF to ensure CSS has fully applied
             if (onLayoutChange) {
                 requestAnimationFrame(() => {
-                    onLayoutChange();
+                    requestAnimationFrame(() => {
+                        onLayoutChange();
+                    });
                 });
             }
         }
