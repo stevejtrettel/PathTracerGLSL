@@ -1,60 +1,108 @@
+/**
+ * UI Theme - Design Tokens
+ *
+ * All UI components reference these variables for consistent styling.
+ * Override these to customize the theme.
+ */
+
 :root {
-    /* Colors */
-    --cr-bg-primary: #1a1a1a;
-    --cr-bg-secondary: #252525;
-    --cr-bg-hover: #333333;
-    --cr-bg-active: #404040;
+    /* ========================================
+       Colors - Glassmorphism Dark Theme
+       ======================================== */
 
-    --cr-text-primary: #e0e0e0;
-    --cr-text-secondary: #aaaaaa;
-    --cr-text-accent: #4da6ff;
+    /* Backgrounds */
+    --ui-bg-primary: rgba(30, 30, 30, 0.95);
+    --ui-bg-secondary: rgba(45, 45, 45, 0.95);
+    --ui-bg-tertiary: rgba(60, 60, 60, 0.92);
+    --ui-bg-hover: rgba(75, 75, 75, 0.95);
+    --ui-bg-active: rgba(90, 90, 90, 0.95);
 
-    --cr-border: #333333;
-    --cr-accent: #0077ff;
+    /* Glass effect backgrounds */
+    --ui-glass-bg: rgba(60, 60, 60, 0.92);
+    --ui-glass-border: rgba(255, 255, 255, 0.15);
 
-    /* Spacing */
-    --cr-space-xs: 4px;
-    --cr-space-s: 8px;
-    --cr-space-m: 12px;
+    /* Text */
+    --ui-text-primary: rgba(255, 255, 255, 0.95);
+    --ui-text-secondary: rgba(255, 255, 255, 0.7);
+    --ui-text-muted: rgba(255, 255, 255, 0.5);
+    --ui-text-disabled: rgba(255, 255, 255, 0.3);
 
-    /* Typography */
-    --cr-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --cr-font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-    --cr-font-size-s: 11px;
-    --cr-font-size-m: 12px;
+    /* Accent */
+    --ui-accent: rgba(74, 158, 255, 1);
+    --ui-accent-hover: rgba(94, 178, 255, 1);
+    --ui-accent-active: rgba(54, 138, 255, 1);
+    --ui-accent-muted: rgba(74, 158, 255, 0.6);
 
-    /* Layout */
-    --cr-sidebar-width: 300px;
-    --cr-header-height: 40px;
-    --cr-row-height: 28px;
-}
+    /* Borders */
+    --ui-border: rgba(255, 255, 255, 0.1);
+    --ui-border-hover: rgba(255, 255, 255, 0.2);
+    --ui-border-focus: rgba(74, 158, 255, 0.5);
 
-.cr-ui {
-    font-family: var(--cr-font-family);
-    font-size: var(--cr-font-size-m);
-    color: var(--cr-text-primary);
-    box-sizing: border-box;
-}
+    /* Status */
+    --ui-success: rgba(76, 175, 80, 1);
+    --ui-warning: rgba(255, 193, 7, 1);
+    --ui-danger: rgba(244, 67, 54, 1);
 
-.cr-ui * {
-    box-sizing: border-box;
-}
+    /* ========================================
+       Spacing
+       ======================================== */
+    --ui-space-xs: 4px;
+    --ui-space-sm: 8px;
+    --ui-space-md: 12px;
+    --ui-space-lg: 16px;
+    --ui-space-xl: 20px;
+    --ui-space-2xl: 24px;
 
-/* Scrollbar */
-.cr-scroll::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
+    /* ========================================
+       Typography
+       ======================================== */
+    --ui-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --ui-font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Consolas', monospace;
 
-.cr-scroll::-webkit-scrollbar-track {
-    background: var(--cr-bg-primary);
-}
+    --ui-font-size-xs: 10px;
+    --ui-font-size-sm: 11px;
+    --ui-font-size-md: 13px;
+    --ui-font-size-lg: 15px;
+    --ui-font-size-xl: 18px;
 
-.cr-scroll::-webkit-scrollbar-thumb {
-    background: var(--cr-bg-hover);
-    border-radius: 4px;
-}
+    --ui-font-weight-normal: 400;
+    --ui-font-weight-medium: 500;
+    --ui-font-weight-bold: 600;
 
-.cr-scroll::-webkit-scrollbar-thumb:hover {
-    background: var(--cr-bg-active);
+    --ui-line-height: 1.5;
+
+    /* ========================================
+       Effects
+       ======================================== */
+    --ui-blur: blur(20px) saturate(180%);
+    --ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --ui-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --ui-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+    /* ========================================
+       Border Radius
+       ======================================== */
+    --ui-radius-sm: 4px;
+    --ui-radius-md: 6px;
+    --ui-radius-lg: 8px;
+    --ui-radius-xl: 12px;
+
+    /* ========================================
+       Transitions
+       ======================================== */
+    --ui-transition-fast: 0.1s ease;
+    --ui-transition-normal: 0.2s ease;
+    --ui-transition-slow: 0.3s ease;
+    --ui-transition-bounce: 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+
+    /* ========================================
+       Z-Index Scale
+       ======================================== */
+    --ui-z-dropdown: 1000;
+    --ui-z-sticky: 1020;
+    --ui-z-fixed: 1030;
+    --ui-z-modal-backdrop: 1040;
+    --ui-z-modal: 1050;
+    --ui-z-popover: 1060;
+    --ui-z-tooltip: 1070;
 }

@@ -1,63 +1,102 @@
-import { Container } from './Container.js';
-import { Input } from '../inputs/Input.js';
+/**
+ * Folder - Collapsible group container
+ *
+ * Features:
+ * - Click header to expand/collapse
+ * - Animated icon
+ * - Nestable
+ */
+import { Container } from '../core/Container.js';
+import { UIComponent } from '../core/UIComponent.js';
+
+export interface FolderOptions {
+    /** Start in open state (default: true) */
+    startOpen?: boolean;
+}
 
 export class Folder extends Container {
-    private content: HTMLDivElement;
-    private header: HTMLDivElement;
-    private isOpen: boolean = true;
+    private header: HTMLElement;
+    private icon: HTMLElement;
+    private content: HTMLElement;
+    private _isOpen: boolean;
 
-    constructor(title: string) {
-        super('div', 'cr-folder');
+    constructor(title: string, options: FolderOptions = {}) {
+        super('div', 'ui-folder');
 
-        // Header
+        this._isOpen = options.startOpen ?? true;
+
+        // Header (clickable)
         this.header = document.createElement('div');
-        this.header.className = 'cr-folder-header.js';
+        this.header.className = 'ui-folder-header';
 
-        // Icon
-        const icon = document.createElement('span');
-        icon.className = 'cr-folder-icon.js';
-        icon.textContent = '▼.js';
+        this.icon = document.createElement('span');
+        this.icon.className = 'ui-folder-icon';
+        this.icon.textContent = '▶';
 
-        const label = document.createElement('span');
-        label.textContent = title;
+        const titleEl = document.createElement('span');
+        titleEl.className = 'ui-folder-title';
+        titleEl.textContent = title;
 
-        this.header.appendChild(icon);
-        this.header.appendChild(label);
-        this.domElement.appendChild(this.header);
+        this.header.appendChild(this.icon);
+        this.header.appendChild(titleEl);
 
-        // Content
+        this.header.addEventListener('click', () => this.toggle());
+
+        // Content area
         this.content = document.createElement('div');
-        this.content.className = 'cr-folder-content.js';
+        this.content.className = 'ui-folder-content';
+
+        this.domElement.appendChild(this.header);
         this.domElement.appendChild(this.content);
 
-        // Toggle logic
-        this.header.addEventListener('click', () => {
-            this.isOpen = !this.isOpen;
-            this.content.style.display = this.isOpen ? 'block' : 'none.js';
-            if (this.isOpen) {
-                icon.classList.remove('closed');
-            } else {
-                icon.classList.add('closed');
-            }
-        });
+        // Apply initial state
+        this.updateDisplay();
     }
 
-    add(component: Container | Input): void {
-        if (component instanceof Container) {
-            component.domElement.style.display = 'block.js';
-            this.content.appendChild(component.domElement);
-        } else {
-            component.mount(this.content);
+    protected attachChild(child: UIComponent): void {
+        child.mount(this.content);
+    }
+
+    /**
+     * Check if folder is open
+     */
+    get isOpen(): boolean {
+        return this._isOpen;
+    }
+
+    /**
+     * Toggle open/closed state
+     */
+    toggle(): this {
+        this._isOpen = !this._isOpen;
+        this.updateDisplay();
+        return this;
+    }
+
+    /**
+     * Open the folder
+     */
+    open(): this {
+        if (!this._isOpen) {
+            this._isOpen = true;
+            this.updateDisplay();
         }
+        return this;
     }
 
-    open(): void {
-        this.isOpen = true;
-        this.content.style.display = 'block.js';
+    /**
+     * Close the folder
+     */
+    close(): this {
+        if (this._isOpen) {
+            this._isOpen = false;
+            this.updateDisplay();
+        }
+        return this;
     }
 
-    close(): void {
-        this.isOpen = false;
-        this.content.style.display = 'none.js';
+    private updateDisplay(): void {
+        this.domElement.classList.toggle('ui-folder--open', this._isOpen);
+        this.content.style.display = this._isOpen ? '' : 'none';
     }
 }
