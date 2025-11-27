@@ -8,6 +8,7 @@
  * - Slide-in/out animation with Tab key toggle
  * - Grouped by module type, sorted by MODULE_ORDER
  * - Throttled updates for smooth performance
+ * - Integrates with AppLayout when available (region-right)
  */
 import type { Extension, ParameterMetadata } from '../types.js';
 import type { App } from '../App.js';
@@ -19,35 +20,12 @@ import { Panel, Folder } from '../ui/index.js';
 import { WidgetFactory } from '../ui/WidgetFactory.js';
 import type { UIComponent } from '../ui/index.js';
 
-// Extension-specific styles for slide animation
+// Styles for the parameter panel system
+// Supports both layout-integrated and standalone modes
 const PANEL_STYLES = `
-.param-panel-wrapper {
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: 340px;
-    transform: translateX(100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-    z-index: 9999;
-}
-
-.param-panel-wrapper.open {
-    transform: translateX(0);
-}
-
-.param-panel-wrapper .ui-panel {
-    height: 100%;
-    border-radius: 0;
-    border-right: none;
-    border-top: none;
-    border-bottom: none;
-}
-
-.param-panel-wrapper .ui-panel-content {
-    max-height: calc(100vh - 80px);
-}
-
+/* ============================================
+   Toggle Chevron (always visible)
+   ============================================ */
 .param-chevron {
     position: fixed;
     top: 20px;
@@ -86,6 +64,67 @@ const PANEL_STYLES = `
     transform: rotate(180deg);
 }
 
+/* ============================================
+   Panel styling (layout-integrated mode)
+   ============================================ */
+#region-right .ui-panel.param-panel {
+    height: 100%;
+    border-radius: 0;
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+}
+
+#region-right .ui-panel.param-panel .ui-panel-content {
+    max-height: calc(100vh - 80px);
+}
+
+/* Region slide animation (layout mode) */
+#region-right.param-panel-region {
+    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+#region-right.param-panel-region:not(.open) {
+    transform: translateX(100%);
+}
+
+#region-right.param-panel-region.open {
+    transform: translateX(0);
+}
+
+/* ============================================
+   Standalone mode (no layout)
+   ============================================ */
+.param-panel-standalone {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 340px;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    z-index: 9999;
+}
+
+.param-panel-standalone.open {
+    transform: translateX(0);
+}
+
+.param-panel-standalone .ui-panel {
+    height: 100%;
+    border-radius: 0;
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+}
+
+.param-panel-standalone .ui-panel-content {
+    max-height: calc(100vh - 80px);
+}
+
+/* ============================================
+   Empty state
+   ============================================ */
 .param-empty {
     padding: 40px 20px;
     text-align: center;
@@ -96,16 +135,20 @@ const PANEL_STYLES = `
 
 export class ParameterPanelExtension implements Extension {
     name = 'parameter-panel';
-    version = '2.0.0';
-    description = 'Auto-generated parameter controls panel';
+    version = '3.0.0';
+    description = 'Auto-generated parameter controls panel with layout integration';
 
     private app!: App;
-    private wrapper!: HTMLElement;
     private panel!: Panel;
     private chevron!: HTMLElement;
     private folders: Map<string, Folder> = new Map();
     private widgets: UIComponent[] = [];
     private isOpen = false;
+
+    // Mode tracking
+    private useLayout = false;
+    private region: HTMLElement | null = null;
+    private standaloneWrapper: HTMLElement | null = null;
 
     // Update throttling
     private updateQueue = new Map<string, unknown>();
@@ -118,13 +161,17 @@ export class ParameterPanelExtension implements Extension {
     install(app: App, _bus: EventBus): void {
         this.app = app;
 
+        // Determine if layout is available
+        this.useLayout = app.hasLayout();
+
         this.injectStyles();
         this.createChevron();
         this.createPanel();
         this.populatePanel();
         this.attachKeyboardShortcut();
 
-        console.log('Parameter Panel installed (Tab to toggle)');
+        const modeStr = this.useLayout ? 'layout-integrated' : 'standalone';
+        console.log(`Parameter Panel installed (Tab to toggle) [${modeStr}]`);
     }
 
     uninstall(): void {
@@ -147,8 +194,13 @@ export class ParameterPanelExtension implements Extension {
 
         // Remove DOM elements
         this.panel?.dispose();
-        this.wrapper?.remove();
         this.chevron?.remove();
+
+        // Cleanup based on mode
+        if (this.useLayout && this.region) {
+            this.region.classList.remove('param-panel-region', 'open');
+        }
+        this.standaloneWrapper?.remove();
 
         // Remove styles
         document.getElementById('param-panel-styles')?.remove();
@@ -181,16 +233,22 @@ export class ParameterPanelExtension implements Extension {
     }
 
     private createPanel(): void {
-        // Wrapper for slide animation
-        this.wrapper = document.createElement('div');
-        this.wrapper.className = 'param-panel-wrapper';
-
         // Create panel using UI component
-        this.panel = new Panel({ title: 'Parameters' });
+        this.panel = new Panel({ title: 'Parameters', className: 'param-panel' });
         this.panel.setSubtitle('Press Tab to toggle');
-        this.panel.mount(this.wrapper);
 
-        document.body.appendChild(this.wrapper);
+        if (this.useLayout) {
+            // Layout-integrated mode: mount to region-right
+            this.region = this.app.getRegion('region-right');
+            this.region.classList.add('param-panel-region');
+            this.panel.mount(this.region);
+        } else {
+            // Standalone mode: create wrapper and append to body
+            this.standaloneWrapper = document.createElement('div');
+            this.standaloneWrapper.className = 'param-panel-standalone';
+            this.panel.mount(this.standaloneWrapper);
+            document.body.appendChild(this.standaloneWrapper);
+        }
     }
 
     private populatePanel(): void {
@@ -309,8 +367,16 @@ export class ParameterPanelExtension implements Extension {
 
     private toggle(): void {
         this.isOpen = !this.isOpen;
-        this.wrapper.classList.toggle('open', this.isOpen);
+
+        // Update chevron state
         this.chevron.classList.toggle('open', this.isOpen);
+
+        // Toggle panel visibility based on mode
+        if (this.useLayout && this.region) {
+            this.region.classList.toggle('open', this.isOpen);
+        } else if (this.standaloneWrapper) {
+            this.standaloneWrapper.classList.toggle('open', this.isOpen);
+        }
     }
 
     /**
@@ -331,14 +397,23 @@ export class ParameterPanelExtension implements Extension {
         }
     }
 
+    /**
+     * Check if the panel is currently open
+     */
+    isVisible(): boolean {
+        return this.isOpen;
+    }
+
     private attachKeyboardShortcut(): void {
         this.keydownHandler = (e: KeyboardEvent) => {
             if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-                // Allow Tab in form fields within the param panel itself
+                // Allow Tab in form fields within the panel itself
                 const target = e.target as HTMLElement;
-                const inParamPanel = target.closest('.param-panel-wrapper');
+                const inPanel = target.closest('.param-panel') ||
+                               target.closest('.param-panel-standalone') ||
+                               target.closest('#region-right');
 
-                if (!inParamPanel) {
+                if (!inPanel) {
                     e.preventDefault();
                     e.stopPropagation();
                     this.toggle();

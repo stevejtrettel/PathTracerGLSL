@@ -5,7 +5,7 @@ The layout system provides flexible page arrangements for different use cases. I
 ## Design Principles
 
 1. **CSS-Driven**: Layouts are controlled via CSS using `data-layout` attribute
-2. **Standalone**: Works independently of App, Engine, or any rendering system
+2. **Standalone**: Works independently or integrates with App
 3. **Region-Based**: Creates and manages named DOM regions
 4. **Configurable**: CSS custom properties control dimensions
 
@@ -280,21 +280,23 @@ async function setup() {
     const canvas = document.createElement('canvas');
     layout.getCanvasContainer().appendChild(canvas);
 
-    // 3. Create app with canvas
+    // 3. Create app with canvas and connect layout
     const app = new App(canvas);
+    app.setLayout(layout);  // Connect layout to app
+
     await app.initialize({
         scene: { id: 'my-scene', name: 'My Scene' },
         strategies: [STRATEGY_PRESETS['pathtracer-full'].strategy]
     });
 
-    // 4. Create UI
+    // 4. Create UI (can use app.getRegion() now)
     const panel = new Panel({ title: 'Controls' });
     panel.add(new Slider(1.0, {
         label: 'Exposure',
         min: 0, max: 5,
         onChange: (v) => app.setParameter('exposure', v)
     }));
-    panel.mount(layout.getRegion('region-right'));
+    panel.mount(app.getRegion('region-right'));
 
     // 5. Handle resize
     window.addEventListener('resize', () => {
@@ -304,6 +306,56 @@ async function setup() {
 
     // 6. Start
     app.start();
+}
+```
+
+## Integration with App
+
+When using the layout with App, connect them using `setLayout()`:
+
+```typescript
+const layout = new AppLayout(document.body, { mode: 'fullscreen' });
+const app = new App(canvas);
+app.setLayout(layout);
+```
+
+This enables:
+- Extensions to access layout regions via `app.getRegion()`
+- Layout mode switching via `app.setLayoutMode()`
+- Automatic layout disposal when app is disposed
+
+### App Layout API
+
+```typescript
+// Connect layout
+app.setLayout(layout: AppLayout): void;
+
+// Access layout
+app.getLayout(): AppLayout | null;
+app.hasLayout(): boolean;
+
+// Convenience methods
+app.setLayoutMode(mode: LayoutMode): void;
+app.getLayoutMode(): LayoutMode | null;
+app.getRegion(name: RegionName): HTMLElement;
+app.getCanvasContainer(): HTMLElement;
+```
+
+### Extensions and Layout
+
+Extensions that support layout (like `ParameterPanelExtension`) will:
+1. Check if layout is available via `app.hasLayout()`
+2. Mount to appropriate regions if available
+3. Fall back to standalone mode if no layout
+
+```typescript
+// Extension checks for layout
+if (app.hasLayout()) {
+    // Mount to layout region
+    panel.mount(app.getRegion('region-right'));
+} else {
+    // Fall back to standalone positioning
+    document.body.appendChild(wrapper);
 }
 ```
 

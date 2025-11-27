@@ -8,6 +8,7 @@ import { ParameterStore } from './ParameterStore.js';
 import { EventBus } from './EventBus.js';
 import { ExportManager } from './ExportManager.js';
 import { SessionManager } from './SessionManager.js';
+import { AppLayout, type LayoutMode, type RegionName } from './layout/index.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
 import type { AppConfig, RenderProgress, StrategyPreset } from './types.js';
 import type { Extension } from './types.js';
@@ -48,6 +49,9 @@ export class App {
 
     // Extensions
     private extensions: Map<string, Extension> = new Map();
+
+    // Layout (optional - can be set after construction)
+    private layout: AppLayout | null = null;
 
     constructor(canvas: HTMLCanvasElement) {
         // Setup canvas
@@ -908,6 +912,87 @@ export class App {
     }
 
     // ============================================================================
+    // Layout
+    // ============================================================================
+
+    /**
+     * Set the layout manager
+     *
+     * Connects an AppLayout instance to the App for coordinated UI management.
+     * Extensions can then use getLayout() to access layout regions.
+     *
+     * @param layout - The AppLayout instance to use
+     */
+    setLayout(layout: AppLayout): void {
+        this.layout = layout;
+        console.log(`Layout set: mode=${layout.mode}`);
+    }
+
+    /**
+     * Get the layout manager
+     *
+     * Returns null if no layout has been set.
+     */
+    getLayout(): AppLayout | null {
+        return this.layout;
+    }
+
+    /**
+     * Check if a layout is configured
+     */
+    hasLayout(): boolean {
+        return this.layout !== null;
+    }
+
+    /**
+     * Set the layout mode
+     *
+     * Convenience method for switching layout modes.
+     * @throws Error if no layout is configured
+     */
+    setLayoutMode(mode: LayoutMode): void {
+        if (!this.layout) {
+            throw new Error('No layout configured. Call setLayout() first.');
+        }
+        this.layout.setMode(mode);
+        console.log(`Layout mode changed to: ${mode}`);
+    }
+
+    /**
+     * Get the current layout mode
+     *
+     * @returns The current mode, or null if no layout configured
+     */
+    getLayoutMode(): LayoutMode | null {
+        return this.layout?.mode ?? null;
+    }
+
+    /**
+     * Get a layout region by name
+     *
+     * Convenience method for accessing layout regions.
+     * @throws Error if no layout is configured
+     */
+    getRegion(name: RegionName): HTMLElement {
+        if (!this.layout) {
+            throw new Error('No layout configured. Call setLayout() first.');
+        }
+        return this.layout.getRegion(name);
+    }
+
+    /**
+     * Get the canvas container from the layout
+     *
+     * @throws Error if no layout is configured
+     */
+    getCanvasContainer(): HTMLElement {
+        if (!this.layout) {
+            throw new Error('No layout configured. Call setLayout() first.');
+        }
+        return this.layout.getCanvasContainer();
+    }
+
+    // ============================================================================
     // Cleanup
     // ============================================================================
 
@@ -926,6 +1011,10 @@ export class App {
 
         // Clear event bus
         this.eventBus.removeAllListeners();
+
+        // Dispose layout
+        this.layout?.dispose();
+        this.layout = null;
 
         // Dispose engine
         this.engine.dispose();
