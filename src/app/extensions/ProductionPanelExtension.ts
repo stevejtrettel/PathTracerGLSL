@@ -6,6 +6,7 @@
  * Features:
  * - Progress bar with sample count and percentage
  * - ETA calculation
+ * - Tile grid visualization for tiled renders
  * - Pause/Resume, Cancel buttons
  * - Export PNG/HDR buttons on completion
  * - Auto-shows during production renders, auto-hides when returning to interactive
@@ -16,11 +17,12 @@
 import { UIExtension } from './UIExtension.js';
 import type { RegionName } from '../layout/index.js';
 import type { ProgressInfo } from '../RenderCoordinator.js';
+import type { TiledJobProgressInfo } from '../TiledRenderer.js';
 import { formatTime } from '../utils/format.js';
 
 export class ProductionPanelExtension extends UIExtension {
     name = 'production-panel';
-    version = '2.0.0';
+    version = '2.1.0';
     description = 'Production render progress and controls';
 
     protected readonly region: RegionName = 'region-statusbar';
@@ -28,6 +30,10 @@ export class ProductionPanelExtension extends UIExtension {
     private barFill: HTMLDivElement | null = null;
     private statsContainer: HTMLDivElement | null = null;
     private controlsContainer: HTMLDivElement | null = null;
+    private tileGridContainer: HTMLDivElement | null = null;
+
+    // Track tiled job state
+    private tiledJob: TiledJobProgressInfo | null = null;
 
     constructor() {
         super({ startHidden: true });
@@ -40,6 +46,11 @@ export class ProductionPanelExtension extends UIExtension {
     protected createRoot(): HTMLElement {
         const panel = document.createElement('div');
         panel.className = 'production-panel';
+
+        // Tile grid section (only shown for tiled renders)
+        this.tileGridContainer = document.createElement('div');
+        this.tileGridContainer.className = 'production-panel-tiles hidden';
+        panel.appendChild(this.tileGridContainer);
 
         // Progress section
         const progress = document.createElement('div');
@@ -77,6 +88,10 @@ export class ProductionPanelExtension extends UIExtension {
         // Progress updates (only during production)
         this.on('render.progress', this.onProgress);
 
+        // Tiled job events
+        this.on('tiledJob.progress', this.onTiledJobProgress);
+        this.on('tiledJob.complete', this.onTiledJobComplete);
+
         console.log(`ProductionPanel installed [${this.useLayout ? 'layout' : 'standalone'}]`);
     }
 
@@ -109,9 +124,36 @@ export class ProductionPanelExtension extends UIExtension {
         // Only update during production mode
         if (info.mode !== 'production') return;
 
-        this.updateProgressBar(info);
+        // Skip progress bar updates during tiled job (we use tile progress instead)
+        if (!this.tiledJob) {
+            this.updateProgressBar(info);
+        }
         this.updateStats(info);
         this.updateControls(info);
+    };
+
+    private onTiledJobProgress = (info: TiledJobProgressInfo): void => {
+        this.tiledJob = info;
+
+        // Show panel if not already visible
+        if (!this.isVisible) {
+            this.show();
+        }
+
+        // Update tile grid
+        this.updateTileGrid(info);
+
+        // Update progress bar based on tile progress
+        if (this.barFill) {
+            const percent = (info.completedTiles / info.totalTiles) * 100;
+            this.barFill.style.width = `${percent}%`;
+        }
+    };
+
+    private onTiledJobComplete = (): void => {
+        if (this.barFill) {
+            this.barFill.classList.add('complete');
+        }
     };
 
     // ============================================================================
@@ -129,6 +171,11 @@ export class ProductionPanelExtension extends UIExtension {
         if (this.controlsContainer) {
             this.controlsContainer.innerHTML = '';
         }
+        if (this.tileGridContainer) {
+            this.tileGridContainer.innerHTML = '';
+            this.tileGridContainer.classList.add('hidden');
+        }
+        this.tiledJob = null;
     }
 
     private updateProgressBar(info: ProgressInfo): void {
@@ -238,6 +285,53 @@ export class ProductionPanelExtension extends UIExtension {
                 this.hide();
                 break;
         }
+    }
+
+    // ============================================================================
+    // Tile Grid
+    // ============================================================================
+
+    private updateTileGrid(info: TiledJobProgressInfo): void {
+        if (!this.tileGridContainer) return;
+
+        const { grid, completedPositions, currentTile } = info;
+        const completedSet = new Set(completedPositions.map(([x, y]) => `${x},${y}`));
+
+        // Build the grid HTML
+        let html = `<div class="tile-grid-header">
+            <span class="tile-grid-title">Tiles</span>
+            <span class="tile-grid-count">${info.completedTiles} / ${info.totalTiles}</span>
+        </div>`;
+
+        html += '<div class="tile-grid" style="' +
+            `grid-template-columns: repeat(${grid.tilesX}, 1fr);` +
+            `grid-template-rows: repeat(${grid.tilesY}, 1fr);">`;
+
+        for (let y = 0; y < grid.tilesY; y++) {
+            for (let x = 0; x < grid.tilesX; x++) {
+                const key = `${x},${y}`;
+                const isComplete = completedSet.has(key);
+                const isCurrent = currentTile && currentTile.x === x && currentTile.y === y;
+
+                let className = 'tile-cell';
+                let content = '';
+
+                if (isComplete) {
+                    className += ' complete';
+                    content = '✓';
+                } else if (isCurrent) {
+                    className += ' current';
+                    content = '▶';
+                }
+
+                html += `<div class="${className}" title="Tile [${x}, ${y}]">${content}</div>`;
+            }
+        }
+
+        html += '</div>';
+
+        this.tileGridContainer.innerHTML = html;
+        this.tileGridContainer.classList.remove('hidden');
     }
 
     // ============================================================================
