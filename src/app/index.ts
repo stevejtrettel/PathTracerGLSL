@@ -38,6 +38,7 @@ export {
     OrbitControls,
     TouchOrbitControls,
     ParameterPanelExtension,
+    ProductionPanelExtension,
     KeyboardControls,
     AppShortcutsExtension,
     StatsPanel
