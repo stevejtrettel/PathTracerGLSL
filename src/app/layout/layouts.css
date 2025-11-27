@@ -73,18 +73,18 @@
 
 [data-layout="fullscreen"] #region-left {
     position: fixed;
-    top: 0;
+    top: var(--layout-toolbar-height, 48px);
     left: 0;
-    height: 100vh;
+    height: calc(100vh - var(--layout-toolbar-height, 48px));
     width: var(--layout-sidebar-width, 340px);
     z-index: 1000;
 }
 
 [data-layout="fullscreen"] #region-right {
     position: fixed;
-    top: 0;
+    top: var(--layout-toolbar-height, 48px);
     right: 0;
-    height: 100vh;
+    height: calc(100vh - var(--layout-toolbar-height, 48px));
     width: var(--layout-sidebar-width, 340px);
     z-index: 1000;
 }
@@ -94,6 +94,7 @@
     top: 0;
     left: 0;
     right: 0;
+    height: var(--layout-toolbar-height, 48px);
     z-index: 1001;
 }
 

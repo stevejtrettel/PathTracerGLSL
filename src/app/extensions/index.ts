@@ -8,3 +8,4 @@ export { ProductionPanelExtension } from './ProductionPanelExtension.js';
 export { KeyboardControls } from './KeyboardControls.js';
 export { AppShortcutsExtension } from './AppShortcutsExtension.js';
 export { StatsPanel } from './StatsPanel.js';
+export { RenderControlsExtension } from './RenderControlsExtension.js';
