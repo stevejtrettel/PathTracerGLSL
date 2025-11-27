@@ -1,0 +1,371 @@
+/**
+ * Extension Styles
+ *
+ * CSS for App extensions that need UI elements.
+ * Uses theme variables for consistency.
+ */
+
+/* ============================================
+   PARAMETER PANEL EXTENSION
+   ============================================ */
+
+/* Panel styling when in layout region */
+#region-right .ui-panel.param-panel {
+    height: 100%;
+    border-radius: 0;
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+}
+
+#region-right .ui-panel.param-panel .ui-panel-content {
+    max-height: calc(100vh - 80px);
+}
+
+/* Region slide animation (layout mode) */
+#region-right.param-panel-region {
+    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+#region-right.param-panel-region:not(.open) {
+    transform: translateX(100%);
+}
+
+#region-right.param-panel-region.open {
+    transform: translateX(0);
+}
+
+/* Standalone mode (no layout) */
+.param-panel-standalone {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 340px;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    z-index: 9999;
+}
+
+.param-panel-standalone.open {
+    transform: translateX(0);
+}
+
+.param-panel-standalone .ui-panel {
+    height: 100%;
+    border-radius: 0;
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+}
+
+.param-panel-standalone .ui-panel-content {
+    max-height: calc(100vh - 80px);
+}
+
+/* Empty state */
+.param-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--ui-text-muted);
+    font-size: var(--ui-font-size-md);
+}
+
+/* ============================================
+   PRODUCTION PANEL EXTENSION
+   ============================================ */
+
+.production-panel {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-md);
+    padding: var(--ui-space-sm) var(--ui-space-lg);
+    background: var(--ui-bg-primary);
+    backdrop-filter: var(--ui-blur);
+    -webkit-backdrop-filter: var(--ui-blur);
+    border-top: 1px solid var(--ui-border);
+    font-family: var(--ui-font-family);
+    font-size: var(--ui-font-size-md);
+    color: var(--ui-text-primary);
+    transition: transform var(--ui-transition-slow), opacity var(--ui-transition-slow);
+}
+
+.production-panel.hidden {
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.production-panel.standalone {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+}
+
+.production-panel-progress {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-md);
+    min-width: 200px;
+}
+
+.production-panel-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--ui-border);
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 100px;
+}
+
+.production-panel-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--ui-accent), var(--ui-accent-hover));
+    border-radius: 3px;
+    transition: width var(--ui-transition-normal);
+}
+
+.production-panel-bar-fill.complete {
+    background: linear-gradient(90deg, var(--ui-success), #66bb6a);
+}
+
+.production-panel-stats {
+    display: flex;
+    gap: var(--ui-space-lg);
+    font-size: var(--ui-font-size-sm);
+    color: var(--ui-text-secondary);
+    white-space: nowrap;
+}
+
+.production-panel-stat {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-xs);
+}
+
+.production-panel-stat-value {
+    color: var(--ui-text-primary);
+    font-weight: var(--ui-font-weight-medium);
+}
+
+.production-panel-controls {
+    display: flex;
+    gap: var(--ui-space-sm);
+}
+
+/* Production panel buttons */
+.production-panel-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--ui-border-hover);
+    border-radius: var(--ui-radius-sm);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--ui-text-primary);
+    font-size: var(--ui-font-size-sm);
+    cursor: pointer;
+    transition: all var(--ui-transition-fast);
+}
+
+.production-panel-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.production-panel-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.production-panel-btn.primary {
+    background: rgba(74, 158, 255, 0.2);
+    border-color: rgba(74, 158, 255, 0.4);
+}
+
+.production-panel-btn.primary:hover {
+    background: rgba(74, 158, 255, 0.3);
+    border-color: rgba(74, 158, 255, 0.5);
+}
+
+.production-panel-btn.danger {
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.3);
+}
+
+.production-panel-btn.danger:hover {
+    background: rgba(244, 67, 54, 0.25);
+    border-color: rgba(244, 67, 54, 0.4);
+}
+
+.production-panel-btn.success {
+    background: rgba(76, 175, 80, 0.2);
+    border-color: rgba(76, 175, 80, 0.4);
+}
+
+.production-panel-btn.success:hover {
+    background: rgba(76, 175, 80, 0.3);
+    border-color: rgba(76, 175, 80, 0.5);
+}
+
+/* ============================================
+   STATS PANEL EXTENSION
+   ============================================ */
+
+.stats-panel {
+    background: rgba(0, 0, 0, 0.75);
+    color: var(--ui-text-primary);
+    padding: var(--ui-space-md) 14px;
+    font-family: var(--ui-font-mono);
+    font-size: var(--ui-font-size-sm);
+    line-height: 1.5;
+    border-radius: var(--ui-radius-sm);
+    pointer-events: none;
+    user-select: none;
+    min-width: 160px;
+}
+
+/* Stats panel in layout mode - positioned in region-left */
+#region-left .stats-panel {
+    margin: var(--ui-space-md);
+}
+
+/* Stats panel standalone mode */
+.stats-panel.standalone {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+}
+
+.stats-panel-state {
+    font-weight: var(--ui-font-weight-medium);
+    margin-bottom: var(--ui-space-xs);
+}
+
+.stats-panel-state.paused {
+    color: var(--ui-warning);
+}
+
+.stats-panel-state.production {
+    color: var(--ui-accent);
+}
+
+.stats-panel-divider {
+    color: var(--ui-text-disabled);
+    margin: var(--ui-space-xs) 0;
+}
+
+/* ============================================
+   RENDER CONTROLS EXTENSION (Toolbar)
+   ============================================ */
+
+.render-controls-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 100%;
+    padding: 0 var(--ui-space-lg);
+    background: var(--ui-bg-primary);
+    backdrop-filter: var(--ui-blur);
+    -webkit-backdrop-filter: var(--ui-blur);
+    border-bottom: 1px solid var(--ui-border);
+    font-family: var(--ui-font-family);
+    font-size: var(--ui-font-size-md);
+    color: var(--ui-text-primary);
+}
+
+.render-controls-toolbar.standalone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    z-index: 1001;
+}
+
+.render-controls-title {
+    font-size: var(--ui-font-size-lg);
+    font-weight: var(--ui-font-weight-bold);
+    color: var(--ui-text-primary);
+    letter-spacing: -0.02em;
+}
+
+.render-controls-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-md);
+}
+
+.render-controls-label {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-sm);
+    font-size: var(--ui-font-size-sm);
+    color: var(--ui-text-secondary);
+}
+
+.render-controls-input {
+    width: 80px;
+    padding: var(--ui-space-xs) var(--ui-space-sm);
+    background: var(--ui-bg-secondary);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text-primary);
+    font-family: var(--ui-font-mono);
+    font-size: var(--ui-font-size-sm);
+    text-align: right;
+}
+
+.render-controls-input:focus {
+    outline: none;
+    border-color: var(--ui-border-focus);
+}
+
+.render-controls-input::-webkit-inner-spin-button,
+.render-controls-input::-webkit-outer-spin-button {
+    opacity: 1;
+}
+
+.render-controls-btn {
+    padding: var(--ui-space-sm) var(--ui-space-lg);
+    border: 1px solid var(--ui-border-hover);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-bg-secondary);
+    color: var(--ui-text-primary);
+    font-family: var(--ui-font-family);
+    font-size: var(--ui-font-size-sm);
+    font-weight: var(--ui-font-weight-medium);
+    cursor: pointer;
+    transition: all var(--ui-transition-fast);
+}
+
+.render-controls-btn:hover:not(:disabled) {
+    background: var(--ui-bg-hover);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.render-controls-btn:active:not(:disabled) {
+    background: var(--ui-bg-active);
+}
+
+.render-controls-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.render-controls-btn.primary {
+    background: var(--ui-accent);
+    border-color: var(--ui-accent);
+    color: white;
+}
+
+.render-controls-btn.primary:hover:not(:disabled) {
+    background: var(--ui-accent-hover);
+    border-color: var(--ui-accent-hover);
+}
+
+.render-controls-btn.primary:disabled {
+    background: var(--ui-accent-muted);
+    border-color: var(--ui-accent-muted);
+}

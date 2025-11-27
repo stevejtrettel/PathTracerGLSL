@@ -8,8 +8,9 @@ import { ParameterStore } from './ParameterStore.js';
 import { EventBus } from './EventBus.js';
 import { ExportManager } from './ExportManager.js';
 import { SessionManager } from './SessionManager.js';
+import { AppLayout, type LayoutMode, type RegionName } from './layout/index.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
-import type { AppConfig, RenderProgress, StrategyPreset } from './types.js';
+import type { AppConfig, RenderProgress, StrategyPreset, CreateAppOptions } from './types.js';
 import type { Extension } from './types.js';
 
 /**
@@ -48,6 +49,9 @@ export class App {
 
     // Extensions
     private extensions: Map<string, Extension> = new Map();
+
+    // Layout (optional - can be set after construction)
+    private layout: AppLayout | null = null;
 
     constructor(canvas: HTMLCanvasElement) {
         // Setup canvas
@@ -124,6 +128,56 @@ export class App {
         };
 
         console.log('App created');
+    }
+
+    // ============================================================================
+    // Factory Method
+    // ============================================================================
+
+    /**
+     * Create an App with integrated layout (recommended)
+     *
+     * This is the simplest way to create an App. It:
+     * 1. Creates the layout system with specified mode
+     * 2. Creates a canvas in the layout's canvas container
+     * 3. Creates the App with the canvas
+     * 4. Connects the layout to the App
+     *
+     * @param container - The root element (usually document.body)
+     * @param options - Layout configuration options
+     * @returns A fully configured App instance
+     *
+     * @example
+     * ```typescript
+     * const app = App.create(document.body, { layout: 'fullscreen' });
+     * await app.initialize({ scene, strategies });
+     * app.start();
+     * ```
+     */
+    static create(
+        container: HTMLElement = document.body,
+        options: CreateAppOptions = {}
+    ): App {
+        const layoutMode = options.layout ?? 'fullscreen';
+
+        // Create layout
+        const layout = new AppLayout(container, {
+            mode: layoutMode,
+            variables: options.layoutVariables
+        });
+
+        // Create canvas in layout's canvas container
+        const canvas = document.createElement('canvas');
+        layout.getCanvasContainer().appendChild(canvas);
+
+        // Create app with canvas
+        const app = new App(canvas);
+
+        // Connect layout to app
+        app.setLayout(layout);
+
+        console.log(`App created with layout: ${layoutMode}`);
+        return app;
     }
 
     // ============================================================================
@@ -908,6 +962,87 @@ export class App {
     }
 
     // ============================================================================
+    // Layout
+    // ============================================================================
+
+    /**
+     * Set the layout manager
+     *
+     * Connects an AppLayout instance to the App for coordinated UI management.
+     * Extensions can then use getLayout() to access layout regions.
+     *
+     * @param layout - The AppLayout instance to use
+     */
+    setLayout(layout: AppLayout): void {
+        this.layout = layout;
+        console.log(`Layout set: mode=${layout.mode}`);
+    }
+
+    /**
+     * Get the layout manager
+     *
+     * Returns null if no layout has been set.
+     */
+    getLayout(): AppLayout | null {
+        return this.layout;
+    }
+
+    /**
+     * Check if a layout is configured
+     */
+    hasLayout(): boolean {
+        return this.layout !== null;
+    }
+
+    /**
+     * Set the layout mode
+     *
+     * Convenience method for switching layout modes.
+     * @throws Error if no layout is configured
+     */
+    setLayoutMode(mode: LayoutMode): void {
+        if (!this.layout) {
+            throw new Error('No layout configured. Call setLayout() first.');
+        }
+        this.layout.setMode(mode);
+        console.log(`Layout mode changed to: ${mode}`);
+    }
+
+    /**
+     * Get the current layout mode
+     *
+     * @returns The current mode, or null if no layout configured
+     */
+    getLayoutMode(): LayoutMode | null {
+        return this.layout?.mode ?? null;
+    }
+
+    /**
+     * Get a layout region by name
+     *
+     * Convenience method for accessing layout regions.
+     * @throws Error if no layout is configured
+     */
+    getRegion(name: RegionName): HTMLElement {
+        if (!this.layout) {
+            throw new Error('No layout configured. Call setLayout() first.');
+        }
+        return this.layout.getRegion(name);
+    }
+
+    /**
+     * Get the canvas container from the layout
+     *
+     * @throws Error if no layout is configured
+     */
+    getCanvasContainer(): HTMLElement {
+        if (!this.layout) {
+            throw new Error('No layout configured. Call setLayout() first.');
+        }
+        return this.layout.getCanvasContainer();
+    }
+
+    // ============================================================================
     // Cleanup
     // ============================================================================
 
@@ -926,6 +1061,10 @@ export class App {
 
         // Clear event bus
         this.eventBus.removeAllListeners();
+
+        // Dispose layout
+        this.layout?.dispose();
+        this.layout = null;
 
         // Dispose engine
         this.engine.dispose();

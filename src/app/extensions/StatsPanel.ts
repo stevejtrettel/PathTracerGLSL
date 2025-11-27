@@ -1,10 +1,5 @@
-// app/extensions/StatsPanel.ts
-import type { App } from '../App.js';
-import type { EventBus } from '../EventBus.js';
-import type { Extension } from '../types.js';
-
 /**
- * StatsPanel - Simple rendering statistics overlay
+ * StatsPanel - Rendering statistics overlay
  *
  * Displays:
  * - Samples and samples/sec
@@ -13,20 +8,31 @@ import type { Extension } from '../types.js';
  * - GPU pass timings (if profiling enabled)
  * - Render state indicators
  *
- * Toggle visibility with 'i' key (info)
+ * Toggle visibility with 'i' key (info).
+ * Mounts to region-left if layout available, otherwise fixed to top-left.
+ * Styles are defined in ui/styles/extensions.css
  */
+import type { App } from '../App.js';
+import type { EventBus } from '../EventBus.js';
+import type { Extension } from '../types.js';
+
+// Ensure UI styles (including extensions.css) are loaded
+import '../ui/index.js';
+
 export class StatsPanel implements Extension {
     name = 'stats-panel';
-    version = '1.0.0';
+    version = '2.0.0';
     description = 'Rendering statistics overlay';
 
     private app!: App;
     private panel: HTMLDivElement | null = null;
     private visible = true;
     private updateInterval: number | null = null;
+    private useLayout = false;
 
     install(app: App, _bus: EventBus): void {
         this.app = app;
+        this.useLayout = app.hasLayout();
 
         this.createPanel();
         this.startUpdating();
@@ -34,7 +40,8 @@ export class StatsPanel implements Extension {
         // Toggle with 'i' key
         window.addEventListener('keydown', this.onKeyDown);
 
-        console.log('StatsPanel installed (press i to toggle)');
+        const modeStr = this.useLayout ? 'layout-integrated' : 'standalone';
+        console.log(`StatsPanel installed (press i to toggle) [${modeStr}]`);
     }
 
     uninstall(): void {
@@ -74,25 +81,17 @@ export class StatsPanel implements Extension {
 
     private createPanel(): void {
         this.panel = document.createElement('div');
-        this.panel.id = 'stats-panel';
-        this.panel.style.cssText = `
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.75);
-            color: #fff;
-            padding: 10px 14px;
-            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.5;
-            border-radius: 4px;
-            z-index: 1000;
-            pointer-events: none;
-            user-select: none;
-            min-width: 160px;
-        `;
+        this.panel.className = 'stats-panel';
 
-        document.body.appendChild(this.panel);
+        if (this.useLayout) {
+            // Layout mode: mount to region-left
+            const regionLeft = this.app.getRegion('region-left');
+            regionLeft.appendChild(this.panel);
+        } else {
+            // Standalone mode: fixed position
+            this.panel.classList.add('standalone');
+            document.body.appendChild(this.panel);
+        }
     }
 
     private startUpdating(): void {
@@ -117,9 +116,9 @@ export class StatsPanel implements Extension {
 
         // State indicator
         if (stats.state === 'paused') {
-            lines.push('<span style="color: #ffa500;">PAUSED</span>');
+            lines.push('<span class="stats-panel-state paused">PAUSED</span>');
         } else if (stats.mode === 'production') {
-            lines.push('<span style="color: #4a9eff;">PRODUCTION</span>');
+            lines.push('<span class="stats-panel-state production">PRODUCTION</span>');
         }
 
         // Core stats
@@ -136,7 +135,7 @@ export class StatsPanel implements Extension {
 
         // GPU timings (if profiling enabled)
         if (stats.profilingEnabled && stats.gpuTimings) {
-            lines.push('<span style="color: #888;">─────────────</span>');
+            lines.push('<span class="stats-panel-divider">─────────────</span>');
             lines.push('<b>GPU Timings:</b>');
 
             let totalGpu = 0;

@@ -30,6 +30,16 @@ export interface AppConfig {
 }
 
 /**
+ * Options for App.create() factory method
+ */
+export interface CreateAppOptions {
+    /** Layout mode (default: 'fullscreen') */
+    layout?: 'fullscreen' | 'centered' | 'editor' | 'split';
+    /** CSS variables for layout customization */
+    layoutVariables?: Record<string, string>;
+}
+
+/**
  * Render progress information
  */
 export interface RenderProgress {

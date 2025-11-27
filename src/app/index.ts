@@ -21,6 +21,7 @@ export {
 export {
     STRATEGY_PRESETS,
     type AppConfig,
+    type CreateAppOptions,
     type StrategyPreset,
     type RenderProgress,
     type RenderStrategy,
@@ -37,6 +38,7 @@ export {
     OrbitControls,
     TouchOrbitControls,
     ParameterPanelExtension,
+    ProductionPanelExtension,
     KeyboardControls,
     AppShortcutsExtension,
     StatsPanel

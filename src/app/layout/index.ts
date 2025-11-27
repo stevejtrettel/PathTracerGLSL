@@ -41,7 +41,6 @@
 
 export {
     AppLayout,
-    createLayout,
     type LayoutMode,
     type LayoutOptions,
     type RegionName

@@ -5,7 +5,7 @@ The layout system provides flexible page arrangements for different use cases. I
 ## Design Principles
 
 1. **CSS-Driven**: Layouts are controlled via CSS using `data-layout` attribute
-2. **Standalone**: Works independently of App, Engine, or any rendering system
+2. **Standalone**: Works independently or integrates with App
 3. **Region-Based**: Creates and manages named DOM regions
 4. **Configurable**: CSS custom properties control dimensions
 
@@ -19,6 +19,27 @@ src/app/layout/
 ```
 
 ## Quick Start
+
+The simplest way to use the layout system is through `App.create()`:
+
+```typescript
+import { App } from './app/index.js';
+
+// Create app with integrated layout (recommended)
+const app = App.create(document.body, { layout: 'fullscreen' });
+
+await app.initialize({ scene, strategies });
+app.start();
+```
+
+This automatically:
+1. Creates the layout with all regions
+2. Creates a canvas in the canvas container
+3. Connects everything together
+
+### Manual Setup (Advanced)
+
+For more control, you can create the layout separately:
 
 ```typescript
 import { AppLayout } from './app/layout/index.js';
@@ -39,8 +60,9 @@ const rightPanel = layout.getRegion('region-right');
 const canvas = document.createElement('canvas');
 canvasContainer.appendChild(canvas);
 
-// Add UI to regions
-myPanel.mount(rightPanel);
+// Create app and connect layout
+const app = new App(canvas);
+app.setLayout(layout);
 ```
 
 ## Layout Modes
@@ -263,49 +285,87 @@ panel.mount(layout.getRegion('region-right'));
 ## Example: Complete Setup
 
 ```typescript
-import { AppLayout } from './app/layout/index.js';
-import { Panel, Folder, Slider, Button } from './app/ui/index.js';
 import { App, STRATEGY_PRESETS } from './app/index.js';
+import { Panel, Slider } from './app/ui/index.js';
 
 async function setup() {
-    // 1. Create layout
-    const layout = new AppLayout(document.body, {
-        mode: 'fullscreen',
-        variables: {
-            '--layout-sidebar-width': '340px'
-        }
-    });
+    // 1. Create app with layout (handles canvas creation)
+    const app = App.create(document.body, { layout: 'fullscreen' });
 
-    // 2. Create canvas
-    const canvas = document.createElement('canvas');
-    layout.getCanvasContainer().appendChild(canvas);
-
-    // 3. Create app with canvas
-    const app = new App(canvas);
+    // 2. Initialize with scene and strategies
     await app.initialize({
         scene: { id: 'my-scene', name: 'My Scene' },
         strategies: [STRATEGY_PRESETS['pathtracer-full'].strategy]
     });
 
-    // 4. Create UI
+    // 3. Create UI
     const panel = new Panel({ title: 'Controls' });
     panel.add(new Slider(1.0, {
         label: 'Exposure',
         min: 0, max: 5,
         onChange: (v) => app.setParameter('exposure', v)
     }));
-    panel.mount(layout.getRegion('region-right'));
+    panel.mount(app.getRegion('region-right'));
 
-    // 5. Handle resize
+    // 4. Handle resize
+    const layout = app.getLayout()!;
     window.addEventListener('resize', () => {
         const { width, height } = layout.getCanvasSize();
         app.resize(width, height);
     });
 
-    // 6. Start
+    // 5. Start
     app.start();
 }
 ```
+
+## Integration with App
+
+### Factory Method (Recommended)
+
+Use `App.create()` for the simplest setup:
+
+```typescript
+const app = App.create(document.body, {
+    layout: 'fullscreen',
+    layoutVariables: {
+        '--layout-sidebar-width': '400px'
+    }
+});
+```
+
+### CreateAppOptions
+
+```typescript
+interface CreateAppOptions {
+    layout?: 'fullscreen' | 'centered' | 'editor' | 'split';
+    layoutVariables?: Record<string, string>;
+}
+```
+
+### App Layout API
+
+```typescript
+// Factory method (recommended)
+App.create(container: HTMLElement, options?: CreateAppOptions): App;
+
+// Access layout
+app.getLayout(): AppLayout | null;
+app.hasLayout(): boolean;
+
+// Layout control
+app.setLayoutMode(mode: LayoutMode): void;
+app.getLayoutMode(): LayoutMode | null;
+app.getRegion(name: RegionName): HTMLElement;
+app.getCanvasContainer(): HTMLElement;
+
+// Manual connection (advanced)
+app.setLayout(layout: AppLayout): void;
+```
+
+### Extensions and Layout
+
+Extensions like `ParameterPanelExtension` automatically use layout regions when available, falling back to standalone positioning if not.
 
 ## Responsive Behavior
 

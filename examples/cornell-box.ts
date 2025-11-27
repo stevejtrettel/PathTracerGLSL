@@ -10,11 +10,16 @@
  * - Sphere position and radius
  * - Light size and intensity
  *
+ * UI Components:
+ * - Toolbar: Render button and sample count (top)
+ * - Stats Panel: FPS, samples, resolution (top-left)
+ * - Parameter Panel: Uniforms (right sidebar, Tab to toggle)
+ * - Production Panel: Progress bar during renders (bottom)
+ *
  * Keyboard shortcuts:
  * - 1/2/3: Switch renderers
  * - r: Reset accumulation
  * - Space: Toggle rendering
- * - p: Production render
  * - i: Toggle stats
  * - Tab: Toggle parameter panel
  * - x/X: Export PNG/HDR
@@ -25,6 +30,8 @@ import {
     OrbitControls,
     TouchOrbitControls,
     ParameterPanelExtension,
+    ProductionPanelExtension,
+    RenderControlsExtension,
     StatsPanel,
     AppShortcutsExtension
 } from '../src/app/extensions/index.js';
@@ -32,15 +39,8 @@ import {
 async function main() {
     console.log('=== Cornell Box Example ===');
 
-    // Create canvas
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-    if (!canvas) {
-        console.error('Canvas not found');
-        return;
-    }
-
-    // Create app
-    const app = new App(canvas);
+    // Create app with layout system
+    const app = App.create(document.body, { layout: 'fullscreen' });
 
     // Initialize with our strategies
     await app.initialize({
@@ -57,14 +57,16 @@ async function main() {
     // Install extensions
     app.use(new OrbitControls());
     app.use(new TouchOrbitControls());
-    app.use(new ParameterPanelExtension());
-    app.use(new StatsPanel());
-    app.use(new AppShortcutsExtension());
+    app.use(new StatsPanel());              // Top-left: render stats
+    app.use(new ParameterPanelExtension()); // Right sidebar: parameters (Tab to toggle)
+    app.use(new ProductionPanelExtension()); // Bottom: progress during production renders
+    app.use(new RenderControlsExtension()); // Top toolbar: render button
+    app.use(new AppShortcutsExtension());   // Keyboard shortcuts
 
     // Enable GPU profiling for stats
     app.enableProfiling();
 
-    // Start rendering
+    // Start interactive rendering
     app.start();
 
     // Expose for debugging
@@ -74,6 +76,7 @@ async function main() {
     console.log('  1: Full Path Tracer (GI)');
     console.log('  2: Direct Lighting');
     console.log('  3: Debug (albedo/distance/steps)');
+    console.log('Click "Render" in toolbar to start production render');
 }
 
 // Run on load

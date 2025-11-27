@@ -1,5 +1,79 @@
 # TODO - Path Tracer GLSL
 
+## Low Priority
+
+### Layout-Aware Extension Base Class
+
+**Location:** `src/app/extensions/`
+
+**Problem:**
+Extensions that need to use the layout system (ParameterPanelExtension, ProductionPanelExtension, StatsPanel) all have the same pattern:
+```typescript
+private useLayout = false;
+private region: HTMLElement | null = null;
+
+install(app: App, bus: EventBus): void {
+    this.useLayout = app.hasLayout();
+    if (this.useLayout) {
+        this.region = app.getRegion('region-right');
+        // mount to region
+    } else {
+        // standalone fallback
+    }
+}
+```
+
+**Solution:**
+Consider creating a base class or mixin for layout-aware extensions:
+```typescript
+abstract class LayoutAwareExtension implements Extension {
+    protected useLayout = false;
+    protected mountTarget: HTMLElement | null = null;
+
+    abstract get preferredRegion(): RegionName;
+
+    install(app: App, bus: EventBus): void {
+        this.useLayout = app.hasLayout();
+        this.mountTarget = this.useLayout
+            ? app.getRegion(this.preferredRegion)
+            : this.createStandaloneWrapper();
+        this.onInstall(app, bus);
+    }
+
+    protected abstract onInstall(app: App, bus: EventBus): void;
+    protected abstract createStandaloneWrapper(): HTMLElement;
+}
+```
+
+**When to implement:** When adding more layout-aware extensions. Currently only 3 extensions use this pattern, so abstraction may be premature.
+
+---
+
+### WidgetFactory Type Expansion
+
+**Location:** `src/app/ui/WidgetFactory.ts`
+
+**Current supported types:** `float`, `int`, `bool`, `color`, `vec2`, `vec3`, `vec4`
+
+**Future types to consider:**
+- `string` → `TextInput` (already exists in UI components)
+- `file` → File picker for HDR loading
+- `enum` → Explicit enum type (vs `int` with `values`)
+
+**When to implement:** When parameter metadata requires these types.
+
+---
+
+### CSS Variable Documentation
+
+**Naming conventions used:**
+- `--layout-*` - Layout dimensions (canvas width, sidebar width, etc.)
+- `--ui-*` - UI component styling (colors, spacing, typography, etc.)
+
+See `src/app/ui/styles/theme.css` for all UI variables and `src/app/layout/layouts.css` for layout variables.
+
+---
+
 ## High Priority
 
 ### ParameterManager Cleanup
