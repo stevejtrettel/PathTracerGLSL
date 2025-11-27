@@ -15,132 +15,18 @@ import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import { MODULE_ORDER } from '../../engine/types.js';
 
-// Import UI components
+// Import UI components (styles loaded via ui/index.js which imports components.css → extensions.css)
 import { Panel, Folder } from '../ui/index.js';
 import { WidgetFactory } from '../ui/WidgetFactory.js';
 import type { UIComponent } from '../ui/index.js';
 
-// Styles for the parameter panel system
-// Supports both layout-integrated and standalone modes
-const PANEL_STYLES = `
-/* ============================================
-   Toggle Chevron (always visible)
-   ============================================ */
-.param-chevron {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    width: 32px;
-    height: 32px;
-    background: rgba(60, 60, 60, 0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 9998;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-.param-chevron:hover {
-    background: rgba(75, 75, 75, 0.95);
-    border-color: rgba(255, 255, 255, 0.25);
-    transform: scale(1.05);
-}
-
-.param-chevron::after {
-    content: '‹';
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 20px;
-    font-weight: 300;
-    transition: transform 0.2s ease;
-}
-
-.param-chevron.open::after {
-    transform: rotate(180deg);
-}
-
-/* ============================================
-   Panel styling (layout-integrated mode)
-   ============================================ */
-#region-right .ui-panel.param-panel {
-    height: 100%;
-    border-radius: 0;
-    border-right: none;
-    border-top: none;
-    border-bottom: none;
-}
-
-#region-right .ui-panel.param-panel .ui-panel-content {
-    max-height: calc(100vh - 80px);
-}
-
-/* Region slide animation (layout mode) */
-#region-right.param-panel-region {
-    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-
-#region-right.param-panel-region:not(.open) {
-    transform: translateX(100%);
-}
-
-#region-right.param-panel-region.open {
-    transform: translateX(0);
-}
-
-/* ============================================
-   Standalone mode (no layout)
-   ============================================ */
-.param-panel-standalone {
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: 340px;
-    transform: translateX(100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-    z-index: 9999;
-}
-
-.param-panel-standalone.open {
-    transform: translateX(0);
-}
-
-.param-panel-standalone .ui-panel {
-    height: 100%;
-    border-radius: 0;
-    border-right: none;
-    border-top: none;
-    border-bottom: none;
-}
-
-.param-panel-standalone .ui-panel-content {
-    max-height: calc(100vh - 80px);
-}
-
-/* ============================================
-   Empty state
-   ============================================ */
-.param-empty {
-    padding: 40px 20px;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 13px;
-}
-`;
-
 export class ParameterPanelExtension implements Extension {
     name = 'parameter-panel';
-    version = '3.0.0';
+    version = '4.0.0';
     description = 'Auto-generated parameter controls panel with layout integration';
 
     private app!: App;
     private panel!: Panel;
-    private chevron!: HTMLElement;
     private folders: Map<string, Folder> = new Map();
     private widgets: UIComponent[] = [];
     private isOpen = false;
@@ -164,8 +50,6 @@ export class ParameterPanelExtension implements Extension {
         // Determine if layout is available
         this.useLayout = app.hasLayout();
 
-        this.injectStyles();
-        this.createChevron();
         this.createPanel();
         this.populatePanel();
         this.attachKeyboardShortcut();
@@ -194,16 +78,12 @@ export class ParameterPanelExtension implements Extension {
 
         // Remove DOM elements
         this.panel?.dispose();
-        this.chevron?.remove();
 
         // Cleanup based on mode
         if (this.useLayout && this.region) {
             this.region.classList.remove('param-panel-region', 'open');
         }
         this.standaloneWrapper?.remove();
-
-        // Remove styles
-        document.getElementById('param-panel-styles')?.remove();
 
         // Clear timer
         if (this.throttleTimer !== null) {
@@ -214,23 +94,6 @@ export class ParameterPanelExtension implements Extension {
     // ============================================================================
     // Setup
     // ============================================================================
-
-    private injectStyles(): void {
-        if (document.getElementById('param-panel-styles')) return;
-
-        const style = document.createElement('style');
-        style.id = 'param-panel-styles';
-        style.textContent = PANEL_STYLES;
-        document.head.appendChild(style);
-    }
-
-    private createChevron(): void {
-        this.chevron = document.createElement('div');
-        this.chevron.className = 'param-chevron';
-        this.chevron.title = 'Toggle Parameters (Tab)';
-        this.chevron.onclick = () => this.toggle();
-        document.body.appendChild(this.chevron);
-    }
 
     private createPanel(): void {
         // Create panel using UI component
@@ -367,9 +230,6 @@ export class ParameterPanelExtension implements Extension {
 
     private toggle(): void {
         this.isOpen = !this.isOpen;
-
-        // Update chevron state
-        this.chevron.classList.toggle('open', this.isOpen);
 
         // Toggle panel visibility based on mode
         if (this.useLayout && this.region) {

@@ -184,13 +184,3 @@ export class AppLayout {
         delete this.root.dataset.layout;
     }
 }
-
-/**
- * Create an AppLayout instance with common defaults
- */
-export function createLayout(
-    mode: LayoutMode = 'fullscreen',
-    options: Omit<LayoutOptions, 'mode'> = {}
-): AppLayout {
-    return new AppLayout(document.body, { ...options, mode });
-}

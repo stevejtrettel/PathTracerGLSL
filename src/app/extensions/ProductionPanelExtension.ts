@@ -11,144 +11,15 @@
  * - Auto-shows during production renders, auto-hides when done
  *
  * Mounts to region-statusbar if layout available, otherwise fixed to bottom.
+ * Styles are defined in ui/styles/extensions.css
  */
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import type { Extension } from '../types.js';
 import type { ProgressInfo } from '../RenderCoordinator.js';
 
-const PANEL_STYLES = `
-.production-panel {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 16px;
-    background: rgba(30, 30, 30, 0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.9);
-    transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.production-panel.hidden {
-    transform: translateY(100%);
-    opacity: 0;
-    pointer-events: none;
-}
-
-.production-panel.standalone {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 1001;
-}
-
-.production-panel-progress {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 200px;
-}
-
-.production-panel-bar {
-    flex: 1;
-    height: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-    overflow: hidden;
-    min-width: 100px;
-}
-
-.production-panel-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #4a9eff, #6bb3ff);
-    border-radius: 3px;
-    transition: width 0.2s ease;
-}
-
-.production-panel-bar-fill.complete {
-    background: linear-gradient(90deg, #4caf50, #66bb6a);
-}
-
-.production-panel-stats {
-    display: flex;
-    gap: 16px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
-    white-space: nowrap;
-}
-
-.production-panel-stat {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.production-panel-stat-value {
-    color: rgba(255, 255, 255, 0.95);
-    font-weight: 500;
-}
-
-.production-panel-controls {
-    display: flex;
-    gap: 8px;
-}
-
-.production-panel-btn {
-    padding: 6px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.production-panel-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.3);
-}
-
-.production-panel-btn:active {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-.production-panel-btn.primary {
-    background: rgba(74, 158, 255, 0.2);
-    border-color: rgba(74, 158, 255, 0.4);
-}
-
-.production-panel-btn.primary:hover {
-    background: rgba(74, 158, 255, 0.3);
-    border-color: rgba(74, 158, 255, 0.5);
-}
-
-.production-panel-btn.danger {
-    background: rgba(244, 67, 54, 0.15);
-    border-color: rgba(244, 67, 54, 0.3);
-}
-
-.production-panel-btn.danger:hover {
-    background: rgba(244, 67, 54, 0.25);
-    border-color: rgba(244, 67, 54, 0.4);
-}
-
-.production-panel-btn.success {
-    background: rgba(76, 175, 80, 0.2);
-    border-color: rgba(76, 175, 80, 0.4);
-}
-
-.production-panel-btn.success:hover {
-    background: rgba(76, 175, 80, 0.3);
-    border-color: rgba(76, 175, 80, 0.5);
-}
-`;
+// Ensure UI styles (including extensions.css) are loaded
+import '../ui/index.js';
 
 export class ProductionPanelExtension implements Extension {
     name = 'production-panel';
@@ -173,7 +44,6 @@ export class ProductionPanelExtension implements Extension {
         this.app = app;
         this.bus = bus;
 
-        this.injectStyles();
         this.createPanel();
         this.attachEventListeners();
 
@@ -183,7 +53,6 @@ export class ProductionPanelExtension implements Extension {
     uninstall(): void {
         this.detachEventListeners();
         this.panel?.remove();
-        document.getElementById('production-panel-styles')?.remove();
     }
 
     // ============================================================================
@@ -207,15 +76,6 @@ export class ProductionPanelExtension implements Extension {
     // ============================================================================
     // Private: Setup
     // ============================================================================
-
-    private injectStyles(): void {
-        if (document.getElementById('production-panel-styles')) return;
-
-        const style = document.createElement('style');
-        style.id = 'production-panel-styles';
-        style.textContent = PANEL_STYLES;
-        document.head.appendChild(style);
-    }
 
     private createPanel(): void {
         this.panel = document.createElement('div');
