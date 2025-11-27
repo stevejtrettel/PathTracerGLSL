@@ -5,14 +5,8 @@ import { RenderExecutor } from './RenderExecutor.js';
 import { ParameterManager } from './ParameterManager.js';
 import { GPUProfiler } from './GPUProfiler.js';
 import { TextureRegistry } from './TextureRegistry.js';
-import { TextureFactory } from './utils/TextureFactory.js';
-import { HDRLoader } from './loaders/hdr-loader.js';
-import { buildEnvironmentSampler } from './loaders/build-environment-sampler.js';
+import { HDREnvironmentLoader } from './HDREnvironmentLoader.js';
 import {
-    validateHDRResponse,
-    validateHDRBuffer,
-    validateHDRData,
-    validateTextureCreation,
     validateCompiledRenderer,
     ConsoleReporter,
     DiagnosticBag
@@ -57,6 +51,7 @@ export class Engine {
     private parameterManager: ParameterManager;
     private profiler: GPUProfiler;
     private textureRegistry: TextureRegistry;
+    private hdrLoader: HDREnvironmentLoader;
 
     // Renderer storage
     private renderers = new Map<string, CompiledRenderer>();
@@ -85,6 +80,7 @@ export class Engine {
         this.renderExecutor = new RenderExecutor(gl, this.resourceManager);
         this.parameterManager = new ParameterManager(gl);
         this.textureRegistry = new TextureRegistry(gl, 1);  // Reserve unit 0 for accumulator
+        this.hdrLoader = new HDREnvironmentLoader(gl, this.textureRegistry);
         this.startTime = performance.now();
 
         // Initialize GPU profiler
@@ -625,65 +621,20 @@ export class Engine {
      * @param path - Path to the .hdr file
      */
     async loadEnvironmentHDR(path: string): Promise<void> {
-        console.log(`Loading HDR environment: ${path}`);
-
-        // Fetch
-        const res = await fetch(path);
-        throwIfValidationFails(
-            validateHDRResponse(res, path),
-            `Failed to load HDR from '${path}'.`
-        );
-
-        // Get buffer
-        const buffer = await res.arrayBuffer();
-        throwIfValidationFails(
-            validateHDRBuffer(buffer, path),
-            `Invalid HDR file '${path}'.`
-        );
-
-        // Parse
-        let hdr;
-        try {
-            hdr = HDRLoader.parse(buffer);
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error);
-            console.error(`\n❌ HDR parsing failed:\n`);
-            console.error(`  • ${message}`);
-            throw new Error(`Failed to parse HDR file '${path}'. File may be corrupted.`);
-        }
-
-        const { width, height, data } = hdr;
-        throwIfValidationFails(
-            validateHDRData(width, height, data.length, path),
-            `Invalid HDR data in '${path}'.`
-        );
-
-        // Create texture
-        const tf = new TextureFactory(this.gl);
-        const envTex = tf.createRGB32F(data, width, height);
-        throwIfValidationFails(
-            validateTextureCreation(envTex, width, height, this.gl),
-            `Failed to create texture for '${path}'.`
-        );
-
-        this.textureRegistry.register('env_map', envTex);
-
-        // Build CDF textures for importance sampling
-        const built = buildEnvironmentSampler(
-            this.gl,
-            this.textureRegistry,
-            data,
-            width,
-            height,
-            { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' }
-        );
+        // Use HDREnvironmentLoader to load and create textures
+        const envData = await this.hdrLoader.loadEnvironmentHDR(path);
 
         // Bind to all renderer programs
         for (const [_rendererId, renderer] of this.renderers.entries()) {
-            this._bindEnvironmentTexturesToRenderer(renderer, width, height, built.totalWeight);
+            this._bindEnvironmentTexturesToRenderer(
+                renderer,
+                envData.width,
+                envData.height,
+                envData.totalWeight
+            );
         }
 
-        console.log(`✅ HDR loaded: ${width}×${height} (CDFs built), bound to ${this.renderers.size} renderer(s)`);
+        console.log(`✅ Environment bound to ${this.renderers.size} renderer(s)`);
     }
 
     /**
@@ -758,23 +709,5 @@ export class Engine {
         // - Cache renderer compilation results
         // - Recreate all WebGL resources after context restore
         // - Resume rendering if it was in progress
-    }
-}
-
-// ============ HELPERS ============
-
-const reporter = new ConsoleReporter();
-
-/**
- * Check validation result and throw if errors found.
- * Logs warnings if present.
- */
-function throwIfValidationFails(result: DiagnosticBag, errorMessage: string): void {
-    if (result.hasErrors()) {
-        console.error(reporter.formatBag(result));
-        throw new Error(`${errorMessage} See console for details.`);
-    }
-    if (result.hasWarnings()) {
-        console.warn(reporter.formatBag(result));
     }
 }

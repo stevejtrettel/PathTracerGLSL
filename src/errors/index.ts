@@ -19,3 +19,6 @@ export {
 
 // Compiler validation (CompiledRenderer structure)
 export { validateCompiledRenderer } from './compiler/index.js';
+
+// Typed error hierarchy
+export * from './RenderErrors.js';
