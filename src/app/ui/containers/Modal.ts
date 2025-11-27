@@ -1,81 +1,143 @@
-import { Container } from './Container.js';
-import { Input } from '../inputs/Input.js';
+/**
+ * Modal - Centered dialog with backdrop
+ *
+ * Features:
+ * - Centered content
+ * - Click backdrop to close (optional)
+ * - Blocks interaction with content behind
+ */
+import { Container } from '../core/Container.js';
+import { UIComponent } from '../core/UIComponent.js';
 
 export interface ModalOptions {
+    /** Modal width in pixels */
     width?: number;
-    height?: number;
+    /** Maximum height in pixels */
+    maxHeight?: number;
+    /** Close when clicking backdrop (default: true) */
     closeOnBackdrop?: boolean;
+    /** Show close button (default: true) */
+    closable?: boolean;
+    /** Called when modal is closed */
+    onClose?: () => void;
 }
 
 export class Modal extends Container {
-    private backdrop: HTMLDivElement;
-    private modalContent: HTMLDivElement;
-    private contentArea: HTMLDivElement;
-    private titleBar: HTMLDivElement;
+    private backdrop: HTMLElement;
+    private dialog: HTMLElement;
+    private titleBar: HTMLElement;
+    private titleText: HTMLElement;
+    private content: HTMLElement;
+    private onCloseCallback?: () => void;
 
     constructor(title: string, options: ModalOptions = {}) {
-        super('div', 'cr-modal-container');
+        super('div', 'ui-modal');
 
-        const width = options.width ?? 600;
-        const height = options.height ?? 400;
+        const width = options.width ?? 500;
+        const maxHeight = options.maxHeight ?? 600;
+
+        this.onCloseCallback = options.onClose;
 
         // Backdrop
         this.backdrop = document.createElement('div');
-        this.backdrop.className = 'cr-modal-backdrop.js';
+        this.backdrop.className = 'ui-modal-backdrop';
+
         if (options.closeOnBackdrop !== false) {
             this.backdrop.addEventListener('click', () => this.close());
         }
-        this.domElement.appendChild(this.backdrop);
 
-        // Modal content
-        this.modalContent = document.createElement('div');
-        this.modalContent.className = 'cr-modal-content.js';
-        this.modalContent.style.width = `${width}px`;
-        this.modalContent.style.maxHeight = `${height}px`;
-        this.modalContent.addEventListener('click', (e) => e.stopPropagation());
-        this.domElement.appendChild(this.modalContent);
+        // Dialog container
+        this.dialog = document.createElement('div');
+        this.dialog.className = 'ui-modal-dialog';
+        this.dialog.style.width = `${width}px`;
+        this.dialog.style.maxHeight = `${maxHeight}px`;
+
+        // Prevent backdrop click when clicking dialog
+        this.dialog.addEventListener('click', (e) => e.stopPropagation());
 
         // Title bar
         this.titleBar = document.createElement('div');
-        this.titleBar.className = 'cr-modal-title.js';
+        this.titleBar.className = 'ui-modal-titlebar';
 
-        const titleText = document.createElement('span');
-        titleText.textContent = title;
-        this.titleBar.appendChild(titleText);
+        this.titleText = document.createElement('span');
+        this.titleText.className = 'ui-modal-title';
+        this.titleText.textContent = title;
+        this.titleBar.appendChild(this.titleText);
 
         // Close button
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'cr-modal-close.js';
-        closeBtn.textContent = '×.js';
-        closeBtn.addEventListener('click', () => this.close());
-        this.titleBar.appendChild(closeBtn);
-
-        this.modalContent.appendChild(this.titleBar);
+        if (options.closable !== false) {
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'ui-modal-close';
+            closeBtn.textContent = '×';
+            closeBtn.addEventListener('click', () => this.close());
+            this.titleBar.appendChild(closeBtn);
+        }
 
         // Content area
-        this.contentArea = document.createElement('div');
-        this.contentArea.className = 'cr-modal-body.js';
-        this.modalContent.appendChild(this.contentArea);
+        this.content = document.createElement('div');
+        this.content.className = 'ui-modal-content';
+
+        this.dialog.appendChild(this.titleBar);
+        this.dialog.appendChild(this.content);
+
+        this.domElement.appendChild(this.backdrop);
+        this.domElement.appendChild(this.dialog);
     }
 
-    add(component: Container | Input): void {
-        if (component instanceof Container) {
-            component.domElement.style.display = 'block.js';
-            this.contentArea.appendChild(component.domElement);
-        } else {
-            component.mount(this.contentArea);
-        }
+    protected attachChild(child: UIComponent): void {
+        child.mount(this.content);
     }
 
-    open(): void {
+    /**
+     * Show the modal
+     */
+    show(): this {
         if (!this.domElement.parentElement) {
             document.body.appendChild(this.domElement);
         }
-        this.domElement.style.display = 'flex.js';
+        this.domElement.style.display = '';
+        // Prevent body scroll while modal is open
+        document.body.style.overflow = 'hidden';
+        return this;
     }
 
-    close(): void {
-        this.domElement.style.display = 'none.js';
-        this.unmount();
+    /**
+     * Hide the modal
+     */
+    hide(): this {
+        this.domElement.style.display = 'none';
+        document.body.style.overflow = '';
+        return this;
+    }
+
+    /**
+     * Close and dispose the modal
+     */
+    close(): this {
+        document.body.style.overflow = '';
+        this.onCloseCallback?.();
+        this.dispose();
+        return this;
+    }
+
+    /**
+     * Set modal title
+     */
+    setTitle(title: string): this {
+        this.titleText.textContent = title;
+        return this;
+    }
+
+    /**
+     * Add a footer section (useful for buttons)
+     */
+    addFooter(): HTMLElement {
+        let footer = this.dialog.querySelector('.ui-modal-footer') as HTMLElement;
+        if (!footer) {
+            footer = document.createElement('div');
+            footer.className = 'ui-modal-footer';
+            this.dialog.appendChild(footer);
+        }
+        return footer;
     }
 }

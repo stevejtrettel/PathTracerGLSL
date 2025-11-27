@@ -1,43 +1,125 @@
-// app/extensions/ParameterPanelExtension.ts
-// Parameter panel UI extension for App
-
+/**
+ * ParameterPanelExtension
+ *
+ * Auto-generated parameter panel using the UI component system.
+ *
+ * Features:
+ * - Auto-generates widgets from renderer parameter metadata
+ * - Slide-in/out animation with Tab key toggle
+ * - Grouped by module type, sorted by MODULE_ORDER
+ * - Throttled updates for smooth performance
+ */
 import type { Extension, ParameterMetadata } from '../types.js';
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import { MODULE_ORDER } from '../../engine/types.js';
-import parameterPanelStyles from './styles/parameter-panel.css?inline';
 
-/**
- * ParameterPanelExtension
- *
- * Beautiful glassmorphism parameter panel with:
- * - Auto-generated widgets from metadata
- * - Smooth slide-in/out animation
- * - Tab key toggle + chevron indicator
- * - Grouped by module type, sorted by MODULE_ORDER
- * - Throttled updates for smooth performance
- */
+// Import UI components
+import { Panel, Folder } from '../ui/index.js';
+import { WidgetFactory } from '../ui/WidgetFactory.js';
+import type { UIComponent } from '../ui/index.js';
+
+// Extension-specific styles for slide animation
+const PANEL_STYLES = `
+.param-panel-wrapper {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 340px;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    z-index: 9999;
+}
+
+.param-panel-wrapper.open {
+    transform: translateX(0);
+}
+
+.param-panel-wrapper .ui-panel {
+    height: 100%;
+    border-radius: 0;
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+}
+
+.param-panel-wrapper .ui-panel-content {
+    max-height: calc(100vh - 80px);
+}
+
+.param-chevron {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 32px;
+    height: 32px;
+    background: rgba(60, 60, 60, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 9998;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.param-chevron:hover {
+    background: rgba(75, 75, 75, 0.95);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: scale(1.05);
+}
+
+.param-chevron::after {
+    content: '‹';
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 20px;
+    font-weight: 300;
+    transition: transform 0.2s ease;
+}
+
+.param-chevron.open::after {
+    transform: rotate(180deg);
+}
+
+.param-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+}
+`;
+
 export class ParameterPanelExtension implements Extension {
     name = 'parameter-panel';
-    version = '1.0.0';
+    version = '2.0.0';
     description = 'Auto-generated parameter controls panel';
 
     private app!: App;
-    private panel!: HTMLElement;
+    private wrapper!: HTMLElement;
+    private panel!: Panel;
     private chevron!: HTMLElement;
+    private folders: Map<string, Folder> = new Map();
+    private widgets: UIComponent[] = [];
     private isOpen = false;
-    private width = 340;
 
     // Update throttling
-    private updateQueue = new Map<string, any>();
+    private updateQueue = new Map<string, unknown>();
     private throttleTimer: number | null = null;
     private readonly THROTTLE_MS = 16; // ~60fps
+
+    // Keyboard handler reference for cleanup
+    private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
     install(app: App, _bus: EventBus): void {
         this.app = app;
 
         this.injectStyles();
-        this.createChevronIndicator();
+        this.createChevron();
         this.createPanel();
         this.populatePanel();
         this.attachKeyboardShortcut();
@@ -46,38 +128,51 @@ export class ParameterPanelExtension implements Extension {
     }
 
     uninstall(): void {
-        this.panel?.remove();
+        // Remove keyboard listener
+        if (this.keydownHandler) {
+            window.removeEventListener('keydown', this.keydownHandler, true);
+        }
+
+        // Dispose all widgets
+        for (const widget of this.widgets) {
+            widget.dispose();
+        }
+        this.widgets = [];
+
+        // Dispose folders
+        for (const folder of this.folders.values()) {
+            folder.dispose();
+        }
+        this.folders.clear();
+
+        // Remove DOM elements
+        this.panel?.dispose();
+        this.wrapper?.remove();
         this.chevron?.remove();
 
-        // Remove injected styles
-        const style = document.getElementById('parameter-panel-styles');
-        style?.remove();
+        // Remove styles
+        document.getElementById('param-panel-styles')?.remove();
 
+        // Clear timer
         if (this.throttleTimer !== null) {
             clearTimeout(this.throttleTimer);
         }
     }
 
     // ============================================================================
-    // Styles
+    // Setup
     // ============================================================================
 
     private injectStyles(): void {
-        // Check if styles already exist
-        if (document.getElementById('parameter-panel-styles')) return;
+        if (document.getElementById('param-panel-styles')) return;
 
         const style = document.createElement('style');
-        style.id = 'parameter-panel-styles';
-        style.textContent = parameterPanelStyles;
-
+        style.id = 'param-panel-styles';
+        style.textContent = PANEL_STYLES;
         document.head.appendChild(style);
     }
 
-    // ============================================================================
-    // UI Creation
-    // ============================================================================
-
-    private createChevronIndicator(): void {
+    private createChevron(): void {
         this.chevron = document.createElement('div');
         this.chevron.className = 'param-chevron';
         this.chevron.title = 'Toggle Parameters (Tab)';
@@ -86,26 +181,16 @@ export class ParameterPanelExtension implements Extension {
     }
 
     private createPanel(): void {
-        this.panel = document.createElement('div');
-        this.panel.className = 'param-panel';
+        // Wrapper for slide animation
+        this.wrapper = document.createElement('div');
+        this.wrapper.className = 'param-panel-wrapper';
 
-        // Header
-        const header = document.createElement('div');
-        header.className = 'param-panel-header';
+        // Create panel using UI component
+        this.panel = new Panel({ title: 'Parameters' });
+        this.panel.setSubtitle('Press Tab to toggle');
+        this.panel.mount(this.wrapper);
 
-        const title = document.createElement('h2');
-        title.className = 'param-panel-title';
-        title.textContent = 'Parameters';
-
-        const subtitle = document.createElement('p');
-        subtitle.className = 'param-panel-subtitle';
-        subtitle.textContent = 'Press Tab to toggle';
-
-        header.appendChild(title);
-        header.appendChild(subtitle);
-        this.panel.appendChild(header);
-
-        document.body.appendChild(this.panel);
+        document.body.appendChild(this.wrapper);
     }
 
     private populatePanel(): void {
@@ -116,7 +201,7 @@ export class ParameterPanelExtension implements Extension {
             const empty = document.createElement('div');
             empty.className = 'param-empty';
             empty.textContent = 'No parameters available for current renderer';
-            this.panel.appendChild(empty);
+            this.panel.domElement.querySelector('.ui-panel-content')?.appendChild(empty);
             return;
         }
 
@@ -126,14 +211,28 @@ export class ParameterPanelExtension implements Extension {
         // Sort groups by MODULE_ORDER
         const sortedGroups = this.sortGroups(groups);
 
-        // Create UI for each group
+        // Create folders for each group
         for (const [groupName, params] of sortedGroups) {
-            const groupElement = this.createGroup(groupName, params);
-            this.panel.appendChild(groupElement);
+            const folder = new Folder(`${groupName} (${params.length})`);
+
+            for (const { path, meta } of params) {
+                const widget = this.createWidgetForParam(path, meta);
+                folder.add(widget);
+                this.widgets.push(widget);
+            }
+
+            this.panel.add(folder);
+            this.folders.set(groupName, folder);
         }
     }
 
-    private groupParameters(metadata: Map<string, ParameterMetadata>): Map<string, Array<{ path: string; meta: ParameterMetadata }>> {
+    // ============================================================================
+    // Parameter Grouping
+    // ============================================================================
+
+    private groupParameters(
+        metadata: Map<string, ParameterMetadata>
+    ): Map<string, Array<{ path: string; meta: ParameterMetadata }>> {
         const groups = new Map<string, Array<{ path: string; meta: ParameterMetadata }>>();
 
         for (const [path, meta] of metadata) {
@@ -147,7 +246,9 @@ export class ParameterPanelExtension implements Extension {
         return groups;
     }
 
-    private sortGroups(groups: Map<string, any[]>): Map<string, any[]> {
+    private sortGroups(
+        groups: Map<string, Array<{ path: string; meta: ParameterMetadata }>>
+    ): Map<string, Array<{ path: string; meta: ParameterMetadata }>> {
         // Create ordering from MODULE_ORDER
         const order = new Map<string, number>();
         MODULE_ORDER.forEach((kind, index) => {
@@ -165,281 +266,24 @@ export class ParameterPanelExtension implements Extension {
         return new Map(sorted);
     }
 
-    private createGroup(name: string, params: Array<{ path: string; meta: ParameterMetadata }>): HTMLElement {
-        const details = document.createElement('details');
-        details.className = 'param-group';
-
-        const summary = document.createElement('summary');
-        summary.textContent = `${name} (${params.length})`;
-
-        const content = document.createElement('div');
-        content.className = 'param-group-content';
-
-        for (const { path, meta } of params) {
-            const widget = this.createWidget(path, meta);
-            content.appendChild(widget);
-        }
-
-        details.appendChild(summary);
-        details.appendChild(content);
-
-        return details;
-    }
-
     // ============================================================================
-    // Widget Builders
+    // Widget Creation
     // ============================================================================
 
-    private createWidget(path: string, meta: ParameterMetadata): HTMLElement {
-        const container = document.createElement('div');
-        container.className = 'param-row';
-
-        // Label
-        const label = this.createLabel(meta);
-        container.appendChild(label);
-
-        // Widget based on type
-        let widget: HTMLElement;
-
-        if (meta.type === 'float' && meta.range) {
-            widget = this.createSlider(path, meta, label);
-        } else if (meta.type === 'float' || meta.type === 'int') {
-            widget = this.createNumberInput(path, meta);
-        } else if (meta.type === 'bool') {
-            widget = this.createCheckbox(path, meta);
-        } else if (meta.type === 'vec2' || meta.type === 'vec3' || meta.type === 'vec4') {
-            widget = this.createVectorInput(path, meta);
-        } else if (meta.type === 'color') {
-            widget = this.createColorPicker(path, meta);
-        } else if (meta.type === 'int' && meta.values) {
-            widget = this.createDropdown(path, meta);
-        } else {
-            widget = this.createNumberInput(path, meta);
-        }
-
-        container.appendChild(widget);
-
-        return container;
-    }
-
-    private createLabel(meta: ParameterMetadata): HTMLElement {
-        const label = document.createElement('div');
-        label.className = 'param-label';
-
-        const labelText = document.createElement('div');
-        labelText.className = 'param-label-text';
-        labelText.textContent = meta.name || '';
-
-        // Add reset indicator if triggers reset
-        if (meta.triggersReset !== false) {
-            const resetIcon = document.createElement('span');
-            resetIcon.className = 'param-reset-indicator';
-            resetIcon.textContent = '⟲';
-            resetIcon.title = 'Changing this resets accumulation';
-            labelText.appendChild(resetIcon);
-        }
-
-        label.appendChild(labelText);
-
-        return label;
-    }
-
-    private createSlider(path: string, meta: ParameterMetadata, label: HTMLElement): HTMLElement {
-        const container = document.createElement('div');
-        container.className = 'param-slider-container';
-
-        const slider = document.createElement('input');
-        slider.type = 'range';
-        slider.className = 'param-slider';
-        slider.min = String(meta.range![0]);
-        slider.max = String(meta.range![1]);
-        slider.step = String(meta.step || (meta.range![1] - meta.range![0]) / 100);
-
-        const currentValue = this.app.getParameter(path);
-        slider.value = String(currentValue ?? meta.default);
-
-        // Value display
-        const valueDisplay = document.createElement('div');
-        valueDisplay.className = 'param-value-display';
-        const updateDisplay = (val: number) => {
-            const formatted = meta.type === 'int' ? val.toFixed(0) : val.toFixed(2);
-            valueDisplay.textContent = meta.unit ? `${formatted} ${meta.unit}` : formatted;
-        };
-        updateDisplay(parseFloat(slider.value));
-
-        // Append value display to label
-        label.appendChild(valueDisplay);
-
-        slider.oninput = () => {
-            const value = meta.type === 'int' ? parseInt(slider.value) : parseFloat(slider.value);
-            updateDisplay(value);
-            this.queueUpdate(path, value);
-        };
-
-        container.appendChild(slider);
-
-        return container;
-    }
-
-    private createNumberInput(path: string, meta: ParameterMetadata): HTMLElement {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.className = 'param-number';
-
-        if (meta.range) {
-            input.min = String(meta.range[0]);
-            input.max = String(meta.range[1]);
-        }
-        if (meta.step) {
-            input.step = String(meta.step);
-        }
-
-        const currentValue = this.app.getParameter(path);
-        input.value = String(currentValue ?? meta.default);
-
-        input.oninput = () => {
-            const value = meta.type === 'int' ? parseInt(input.value) : parseFloat(input.value);
-            if (!isNaN(value)) {
-                this.queueUpdate(path, value);
-            }
-        };
-
-        return input;
-    }
-
-    private createCheckbox(path: string, meta: ParameterMetadata): HTMLElement {
-        const container = document.createElement('div');
-        container.className = 'param-checkbox-container';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'param-checkbox';
-
-        const currentValue = this.app.getParameter(path);
-        checkbox.checked = currentValue ?? meta.default;
-
-        checkbox.onchange = () => {
-            this.queueUpdate(path, checkbox.checked);
-        };
-
-        const label = document.createElement('span');
-        label.textContent = meta.name || path;
-
-        container.appendChild(checkbox);
-        container.appendChild(label);
-
-        return container;
-    }
-
-    private createVectorInput(path: string, meta: ParameterMetadata): HTMLElement {
-        const container = document.createElement('div');
-        container.className = 'param-vector';
-
-        const components = meta.type === 'vec2' ? 2 : meta.type === 'vec3' ? 3 : 4;
-        const labels = ['X', 'Y', 'Z', 'W'];
-
-        const currentValue = this.app.getParameter(path) || meta.default;
-        const inputs: HTMLInputElement[] = [];
-
-        for (let i = 0; i < components; i++) {
-            const componentDiv = document.createElement('div');
-            componentDiv.className = 'param-vector-component';
-
-            const componentLabel = document.createElement('span');
-            componentLabel.className = 'param-vector-label';
-            componentLabel.textContent = labels[i];
-
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.step = '0.01';
-            input.value = String(currentValue[i] ?? 0);
-
-            inputs.push(input);
-
-            input.oninput = () => {
-                const values = inputs.map(inp => parseFloat(inp.value));
-                if (values.every(v => !isNaN(v))) {
-                    this.queueUpdate(path, values);
-                }
-            };
-
-            componentDiv.appendChild(componentLabel);
-            componentDiv.appendChild(input);
-            container.appendChild(componentDiv);
-        }
-
-        return container;
-    }
-
-    private createColorPicker(path: string, meta: ParameterMetadata): HTMLElement {
-        const container = document.createElement('div');
-        container.className = 'param-color-container';
-
-        const currentValue = this.app.getParameter(path) || meta.default;
-
-        // Color swatch
-        const swatch = document.createElement('div');
-        swatch.className = 'param-color-swatch';
-
-        // Hidden color picker
-        const picker = document.createElement('input');
-        picker.type = 'color';
-        picker.className = 'param-color-picker';
-
-        // RGB display
-        const rgbDisplay = document.createElement('div');
-        rgbDisplay.className = 'param-color-rgb';
-
-        const updateColor = (rgb: number[]) => {
-            const hex = this.rgbToHex(rgb);
-            swatch.style.background = hex;
-            picker.value = hex;
-            rgbDisplay.textContent = `RGB(${rgb.map(v => v.toFixed(2)).join(', ')})`;
-        };
-
-        updateColor(currentValue);
-
-        swatch.onclick = () => picker.click();
-
-        picker.oninput = () => {
-            const rgb = this.hexToRgb(picker.value);
-            updateColor(rgb);
-            this.queueUpdate(path, rgb);
-        };
-
-        container.appendChild(swatch);
-        container.appendChild(picker);
-        container.appendChild(rgbDisplay);
-
-        return container;
-    }
-
-    private createDropdown(path: string, meta: ParameterMetadata): HTMLElement {
-        const select = document.createElement('select');
-        select.className = 'param-dropdown';
-
+    private createWidgetForParam(path: string, meta: ParameterMetadata): UIComponent {
         const currentValue = this.app.getParameter(path) ?? meta.default;
 
-        for (const value of meta.values!) {
-            const option = document.createElement('option');
-            option.value = String(value);
-            option.textContent = String(value);
-            option.selected = value === currentValue;
-            select.appendChild(option);
-        }
-
-        select.onchange = () => {
-            this.queueUpdate(path, parseInt(select.value));
-        };
-
-        return select;
+        return WidgetFactory.create(meta, {
+            value: currentValue,
+            onChange: (value) => this.queueUpdate(path, value)
+        });
     }
 
     // ============================================================================
     // Update Management
     // ============================================================================
 
-    private queueUpdate(path: string, value: any): void {
+    private queueUpdate(path: string, value: unknown): void {
         this.updateQueue.set(path, value);
 
         if (this.throttleTimer !== null) {
@@ -465,14 +309,8 @@ export class ParameterPanelExtension implements Extension {
 
     private toggle(): void {
         this.isOpen = !this.isOpen;
-
-        if (this.isOpen) {
-            this.panel.classList.add('open');
-            this.chevron.classList.add('open');
-        } else {
-            this.panel.classList.remove('open');
-            this.chevron.classList.remove('open');
-        }
+        this.wrapper.classList.toggle('open', this.isOpen);
+        this.chevron.classList.toggle('open', this.isOpen);
     }
 
     /**
@@ -494,38 +332,21 @@ export class ParameterPanelExtension implements Extension {
     }
 
     private attachKeyboardShortcut(): void {
-        // Use capture phase to intercept Tab before browser's focus cycling
-        window.addEventListener('keydown', (e) => {
+        this.keydownHandler = (e: KeyboardEvent) => {
             if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
                 // Allow Tab in form fields within the param panel itself
                 const target = e.target as HTMLElement;
-                const inParamPanel = target.closest('.param-panel');
+                const inParamPanel = target.closest('.param-panel-wrapper');
 
                 if (!inParamPanel) {
-                    // Outside param panel - toggle it
                     e.preventDefault();
                     e.stopPropagation();
                     this.toggle();
                 }
             }
-        }, { capture: true });
-    }
+        };
 
-    // ============================================================================
-    // Utilities
-    // ============================================================================
-
-    private rgbToHex(rgb: number[]): string {
-        const r = Math.round(rgb[0] * 255);
-        const g = Math.round(rgb[1] * 255);
-        const b = Math.round(rgb[2] * 255);
-        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    }
-
-    private hexToRgb(hex: string): number[] {
-        const r = parseInt(hex.slice(1, 3), 16) / 255;
-        const g = parseInt(hex.slice(3, 5), 16) / 255;
-        const b = parseInt(hex.slice(5, 7), 16) / 255;
-        return [r, g, b];
+        // Use capture phase to intercept Tab before browser's focus cycling
+        window.addEventListener('keydown', this.keydownHandler, { capture: true });
     }
 }

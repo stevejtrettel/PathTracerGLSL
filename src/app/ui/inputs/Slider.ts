@@ -1,70 +1,94 @@
-import { Input } from './Input.js';
+/**
+ * Slider - Range input for numeric values
+ *
+ * Features:
+ * - Label with value display
+ * - Configurable min/max/step
+ * - Smooth dragging
+ */
+import { Input, type InputOptions } from '../core/Input.js';
 
-export interface SliderOptions {
+export interface SliderOptions extends InputOptions<number> {
     min?: number;
     max?: number;
     step?: number;
-    label?: string;
-    onChange?: (value: number) => void;
+    /** Number of decimal places to show (default: auto based on step) */
+    precision?: number;
 }
 
 export class Slider extends Input<number> {
-    private input: HTMLInputElement;
+    private slider: HTMLInputElement;
     private valueDisplay: HTMLSpanElement;
+    private precision: number;
 
     constructor(initialValue: number, options: SliderOptions = {}) {
-        super('div', 'cr-slider');
-        this.onChange = options.onChange;
+        super(initialValue, options, 'div', 'ui-slider');
 
         const min = options.min ?? 0;
-        const max = options.max ?? 100;
-        const step = options.step ?? 1;
+        const max = options.max ?? 1;
+        const step = options.step ?? (max - min) / 100;
 
-        // Label
+        // Auto-calculate precision from step if not specified
+        this.precision = options.precision ?? this.calculatePrecision(step);
+
+        // Label row (label + value display)
+        const labelRow = document.createElement('div');
+        labelRow.className = 'ui-slider-label-row';
+
         if (options.label) {
-            const label = document.createElement('label');
-            label.className = 'cr-slider-label.js';
-            label.textContent = options.label;
-            this.domElement.appendChild(label);
+            const labelEl = document.createElement('span');
+            labelEl.className = 'ui-slider-label';
+            labelEl.textContent = options.label;
+            labelRow.appendChild(labelEl);
         }
 
-        // Input Container
-        const container = document.createElement('div');
-        container.className = 'cr-slider-container.js';
-        this.domElement.appendChild(container);
-
-        // Range Input
-        this.input = document.createElement('input');
-        this.input.type = 'range.js';
-        this.input.min = min.toString();
-        this.input.max = max.toString();
-        this.input.step = step.toString();
-        this.input.value = initialValue.toString();
-        this.input.className = 'cr-slider-input.js';
-        container.appendChild(this.input);
-
-        // Value Display
         this.valueDisplay = document.createElement('span');
-        this.valueDisplay.textContent = initialValue.toFixed(2);
-        this.valueDisplay.className = 'cr-slider-value.js';
-        container.appendChild(this.valueDisplay);
+        this.valueDisplay.className = 'ui-slider-value';
+        labelRow.appendChild(this.valueDisplay);
 
-        // Event Listeners
-        this.input.addEventListener('input', () => {
-            const value = parseFloat(this.input.value);
-            this.valueDisplay.textContent = value.toFixed(2);
-            if (this.onChange) {
-                this.onChange(value);
-            }
+        this.domElement.appendChild(labelRow);
+
+        // Slider input
+        this.slider = document.createElement('input');
+        this.slider.type = 'range';
+        this.slider.className = 'ui-slider-input';
+        this.slider.min = String(min);
+        this.slider.max = String(max);
+        this.slider.step = String(step);
+        this.slider.value = String(initialValue);
+
+        this.slider.addEventListener('input', () => {
+            const value = parseFloat(this.slider.value);
+            this.emitChange(value);
+            this.updateValueDisplay();
         });
+
+        this.domElement.appendChild(this.slider);
+        this.updateDisplay();
     }
 
-    setValue(value: number): void {
-        this.input.value = value.toString();
-        this.valueDisplay.textContent = value.toFixed(2);
+    protected updateDisplay(): void {
+        this.slider.value = String(this._value);
+        this.updateValueDisplay();
     }
 
-    getValue(): number {
-        return parseFloat(this.input.value);
+    private updateValueDisplay(): void {
+        this.valueDisplay.textContent = this._value.toFixed(this.precision);
+    }
+
+    private calculatePrecision(step: number): number {
+        if (step >= 1) return 0;
+        const str = step.toString();
+        const decimal = str.indexOf('.');
+        return decimal === -1 ? 0 : str.length - decimal - 1;
+    }
+
+    /**
+     * Update the range bounds
+     */
+    setRange(min: number, max: number): this {
+        this.slider.min = String(min);
+        this.slider.max = String(max);
+        return this;
     }
 }
