@@ -11,12 +11,23 @@
  */
 
 /* ============================================
+   GLOBAL RESET (applied when layout is active)
+   ============================================ */
+
+[data-layout],
+[data-layout] *,
+[data-layout] *::before,
+[data-layout] *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ============================================
    BASE STYLES
    ============================================ */
 
 [data-layout] {
-    margin: 0;
-    padding: 0;
     overflow: hidden;
     background: #0a0a0a;
     min-height: 100vh;
