@@ -8,78 +8,37 @@
  * - ETA calculation
  * - Pause/Resume, Cancel buttons
  * - Export PNG/HDR buttons on completion
- * - Auto-shows during production renders, auto-hides when done
+ * - Auto-shows during production renders, auto-hides when returning to interactive
  *
  * Mounts to region-statusbar if layout available, otherwise fixed to bottom.
  * Styles are defined in ui/styles/extensions.css
  */
-import type { App } from '../App.js';
-import type { EventBus } from '../EventBus.js';
-import type { Extension } from '../types.js';
+import { UIExtension } from './UIExtension.js';
+import type { RegionName } from '../layout/index.js';
 import type { ProgressInfo } from '../RenderCoordinator.js';
 
-// Ensure UI styles (including extensions.css) are loaded
-import '../ui/index.js';
-
-export class ProductionPanelExtension implements Extension {
+export class ProductionPanelExtension extends UIExtension {
     name = 'production-panel';
-    version = '1.0.0';
+    version = '2.0.0';
     description = 'Production render progress and controls';
 
-    private app!: App;
-    private bus!: EventBus;
-    private panel: HTMLDivElement | null = null;
+    protected readonly region: RegionName = 'region-statusbar';
+
     private barFill: HTMLDivElement | null = null;
     private statsContainer: HTMLDivElement | null = null;
     private controlsContainer: HTMLDivElement | null = null;
 
-    private isVisible = false;
-    private isComplete = false;
-    private startTime = 0;
-
-    // Event handler references for cleanup
-    private progressHandler: ((info: ProgressInfo) => void) | null = null;
-
-    install(app: App, bus: EventBus): void {
-        this.app = app;
-        this.bus = bus;
-
-        this.createPanel();
-        this.attachEventListeners();
-
-        console.log('ProductionPanel installed');
-    }
-
-    uninstall(): void {
-        this.detachEventListeners();
-        this.panel?.remove();
+    constructor() {
+        super({ startHidden: true });
     }
 
     // ============================================================================
-    // Public API
+    // UIExtension Implementation
     // ============================================================================
 
-    show(): void {
-        if (this.panel && !this.isVisible) {
-            this.panel.classList.remove('hidden');
-            this.isVisible = true;
-        }
-    }
-
-    hide(): void {
-        if (this.panel && this.isVisible) {
-            this.panel.classList.add('hidden');
-            this.isVisible = false;
-        }
-    }
-
-    // ============================================================================
-    // Private: Setup
-    // ============================================================================
-
-    private createPanel(): void {
-        this.panel = document.createElement('div');
-        this.panel.className = 'production-panel hidden';
+    protected createRoot(): HTMLElement {
+        const panel = document.createElement('div');
+        panel.className = 'production-panel';
 
         // Progress section
         const progress = document.createElement('div');
@@ -102,71 +61,85 @@ export class ProductionPanelExtension implements Extension {
         this.controlsContainer = document.createElement('div');
         this.controlsContainer.className = 'production-panel-controls';
 
-        this.panel.appendChild(progress);
-        this.panel.appendChild(this.controlsContainer);
+        panel.appendChild(progress);
+        panel.appendChild(this.controlsContainer);
 
-        // Mount to layout region or body
-        if (this.app.hasLayout()) {
-            const statusbar = this.app.getRegion('region-statusbar');
-            statusbar.appendChild(this.panel);
-        } else {
-            this.panel.classList.add('standalone');
-            document.body.appendChild(this.panel);
-        }
+        return panel;
     }
 
-    private attachEventListeners(): void {
-        this.progressHandler = (info: ProgressInfo) => this.onProgress(info);
-        this.bus.on('render.progress', this.progressHandler);
-    }
+    protected setup(): void {
+        // Mode transitions
+        this.on('render.started', this.onRenderStarted);
+        this.on('render.complete', this.onRenderComplete);
+        this.on('render.stopped', this.onRenderStopped);
 
-    private detachEventListeners(): void {
-        if (this.progressHandler) {
-            this.bus.off('render.progress', this.progressHandler);
-        }
+        // Progress updates (only during production)
+        this.on('render.progress', this.onProgress);
+
+        console.log(`ProductionPanel installed [${this.useLayout ? 'layout' : 'standalone'}]`);
     }
 
     // ============================================================================
-    // Private: Progress Handling
+    // Event Handlers
     // ============================================================================
 
-    private onProgress(info: ProgressInfo): void {
-        // Only show during production mode
-        if (info.mode !== 'production') {
-            if (this.isVisible) {
-                this.hide();
-                this.isComplete = false;
-            }
-            return;
-        }
-
-        // Show panel if not visible
-        if (!this.isVisible) {
+    private onRenderStarted = (data: { mode: string; targetSamples?: number }): void => {
+        if (data.mode === 'production') {
+            this.resetProgress();
             this.show();
-            this.startTime = Date.now() - info.elapsedTime;
-            this.isComplete = false;
         }
+    };
 
-        // Update progress bar
-        const percent = info.percentComplete ?? 0;
+    private onRenderComplete = (): void => {
+        // Keep visible to show completion state and export buttons
+        // Will be hidden when user clicks "Close" or starts new render
         if (this.barFill) {
-            this.barFill.style.width = `${percent}%`;
-            if (info.state === 'complete') {
-                this.barFill.classList.add('complete');
-            } else {
-                this.barFill.classList.remove('complete');
-            }
+            this.barFill.classList.add('complete');
         }
+    };
 
-        // Update stats
+    private onRenderStopped = (): void => {
+        // Hide when render is cancelled/stopped
+        this.hide();
+        this.resetProgress();
+    };
+
+    private onProgress = (info: ProgressInfo): void => {
+        // Only update during production mode
+        if (info.mode !== 'production') return;
+
+        this.updateProgressBar(info);
         this.updateStats(info);
-
-        // Update controls
         this.updateControls(info);
+    };
 
-        // Track completion
-        if (info.state === 'complete' && !this.isComplete) {
-            this.isComplete = true;
+    // ============================================================================
+    // UI Updates
+    // ============================================================================
+
+    private resetProgress(): void {
+        if (this.barFill) {
+            this.barFill.style.width = '0%';
+            this.barFill.classList.remove('complete');
+        }
+        if (this.statsContainer) {
+            this.statsContainer.innerHTML = '';
+        }
+        if (this.controlsContainer) {
+            this.controlsContainer.innerHTML = '';
+        }
+    }
+
+    private updateProgressBar(info: ProgressInfo): void {
+        if (!this.barFill) return;
+
+        const percent = info.percentComplete ?? 0;
+        this.barFill.style.width = `${percent}%`;
+
+        if (info.state === 'complete') {
+            this.barFill.classList.add('complete');
+        } else {
+            this.barFill.classList.remove('complete');
         }
     }
 
@@ -219,16 +192,13 @@ export class ProductionPanelExtension implements Extension {
         const buttons: string[] = [];
 
         if (info.state === 'complete') {
-            // Export buttons
             buttons.push(this.createButton('Export PNG', 'exportPNG', 'success'));
             buttons.push(this.createButton('Export HDR', 'exportHDR', 'success'));
             buttons.push(this.createButton('Close', 'close', ''));
         } else if (info.state === 'paused') {
-            // Resume/Cancel
             buttons.push(this.createButton('Resume', 'resume', 'primary'));
             buttons.push(this.createButton('Cancel', 'cancel', 'danger'));
         } else {
-            // Pause/Cancel
             buttons.push(this.createButton('Pause', 'pause', ''));
             buttons.push(this.createButton('Cancel', 'cancel', 'danger'));
         }
@@ -256,7 +226,6 @@ export class ProductionPanelExtension implements Extension {
                 break;
             case 'cancel':
                 this.app.stop();
-                this.hide();
                 break;
             case 'exportPNG':
                 this.app.exportPNG();
@@ -271,7 +240,7 @@ export class ProductionPanelExtension implements Extension {
     }
 
     // ============================================================================
-    // Private: Utilities
+    // Utilities
     // ============================================================================
 
     private calculateETA(info: ProgressInfo): string | null {

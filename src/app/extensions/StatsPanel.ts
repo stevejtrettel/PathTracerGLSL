@@ -12,90 +12,67 @@
  * Mounts to region-left if layout available, otherwise fixed to top-left.
  * Styles are defined in ui/styles/extensions.css
  */
-import type { App } from '../App.js';
-import type { EventBus } from '../EventBus.js';
-import type { Extension } from '../types.js';
+import { UIExtension } from './UIExtension.js';
+import type { RegionName } from '../layout/index.js';
 
-// Ensure UI styles (including extensions.css) are loaded
-import '../ui/index.js';
-
-export class StatsPanel implements Extension {
+export class StatsPanel extends UIExtension {
     name = 'stats-panel';
-    version = '2.0.0';
+    version = '3.0.0';
     description = 'Rendering statistics overlay';
 
-    private app!: App;
-    private panel: HTMLDivElement | null = null;
-    private visible = true;
+    protected readonly region: RegionName = 'region-left';
+
     private updateInterval: number | null = null;
-    private useLayout = false;
+    private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
-    install(app: App, _bus: EventBus): void {
-        this.app = app;
-        this.useLayout = app.hasLayout();
+    // ============================================================================
+    // UIExtension Implementation
+    // ============================================================================
 
-        this.createPanel();
+    protected createRoot(): HTMLElement {
+        const panel = document.createElement('div');
+        panel.className = 'stats-panel';
+        return panel;
+    }
+
+    protected setup(): void {
         this.startUpdating();
+        this.attachKeyboardShortcut();
 
-        // Toggle with 'i' key
-        window.addEventListener('keydown', this.onKeyDown);
+        // Hide during production mode (info shown in ProductionPanel)
+        this.on('render.started', this.onRenderStarted);
+        this.on('render.complete', this.onRenderEnded);
+        this.on('render.stopped', this.onRenderEnded);
 
-        const modeStr = this.useLayout ? 'layout-integrated' : 'standalone';
-        console.log(`StatsPanel installed (press i to toggle) [${modeStr}]`);
+        console.log(`StatsPanel installed (press i to toggle) [${this.useLayout ? 'layout' : 'standalone'}]`);
     }
 
-    uninstall(): void {
-        window.removeEventListener('keydown', this.onKeyDown);
+    protected cleanup(): void {
         this.stopUpdating();
-        if (this.panel) {
-            this.panel.remove();
-            this.panel = null;
+        if (this.keydownHandler) {
+            window.removeEventListener('keydown', this.keydownHandler);
         }
     }
 
     // ============================================================================
-    // Public API
+    // Mode Handling
     // ============================================================================
 
-    show(): void {
-        this.visible = true;
-        if (this.panel) this.panel.style.display = 'block';
-    }
-
-    hide(): void {
-        this.visible = false;
-        if (this.panel) this.panel.style.display = 'none';
-    }
-
-    toggle(): void {
-        if (this.visible) {
+    private onRenderStarted = (data: { mode: string }): void => {
+        if (data.mode === 'production') {
             this.hide();
-        } else {
-            this.show();
         }
-    }
+    };
+
+    private onRenderEnded = (): void => {
+        this.show();
+    };
 
     // ============================================================================
-    // Private: UI
+    // Update Loop
     // ============================================================================
-
-    private createPanel(): void {
-        this.panel = document.createElement('div');
-        this.panel.className = 'stats-panel';
-
-        if (this.useLayout) {
-            // Layout mode: mount to region-left
-            const regionLeft = this.app.getRegion('region-left');
-            regionLeft.appendChild(this.panel);
-        } else {
-            // Standalone mode: fixed position
-            this.panel.classList.add('standalone');
-            document.body.appendChild(this.panel);
-        }
-    }
 
     private startUpdating(): void {
-        // Update at 10 Hz (every 100ms)
         this.updateInterval = window.setInterval(() => {
             this.updateDisplay();
         }, 100);
@@ -109,7 +86,7 @@ export class StatsPanel implements Extension {
     }
 
     private updateDisplay(): void {
-        if (!this.panel || !this.visible) return;
+        if (!this.isVisible) return;
 
         const stats = this.app.getStats();
         const lines: string[] = [];
@@ -147,7 +124,7 @@ export class StatsPanel implements Extension {
             lines.push(`  <b>Total:</b> ${totalGpu.toFixed(2)}ms`);
         }
 
-        this.panel.innerHTML = lines.join('<br>');
+        this.root.innerHTML = lines.join('<br>');
     }
 
     private formatTime(ms: number): string {
@@ -166,20 +143,22 @@ export class StatsPanel implements Extension {
     }
 
     // ============================================================================
-    // Private: Event Handlers
+    // Keyboard Shortcut
     // ============================================================================
 
-    private onKeyDown = (e: KeyboardEvent): void => {
-        // Skip if typing in input
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-            return;
-        }
+    private attachKeyboardShortcut(): void {
+        this.keydownHandler = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+                return;
+            }
 
-        // Toggle with 'i' key
-        if (e.key === 'i' || e.key === 'I') {
-            e.preventDefault();
-            this.toggle();
-        }
-    };
+            if (e.key === 'i' || e.key === 'I') {
+                e.preventDefault();
+                this.toggle();
+            }
+        };
+
+        window.addEventListener('keydown', this.keydownHandler);
+    }
 }
