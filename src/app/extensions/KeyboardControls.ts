@@ -3,6 +3,7 @@ import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import type { Extension } from '../types.js';
 import { vec3Normalize, vec3Cross, vec3IsZero, vec3Rotate, type Vec3 } from '../../math/vector3.js';
+import { isTypingInInput } from '../utils/dom.js';
 
 /**
  * KeyboardControls - 6DOF camera navigation
@@ -310,12 +311,7 @@ export class KeyboardControls implements Extension {
     // ============================================================================
 
     private onKeyDown = (e: KeyboardEvent): void => {
-        // Skip if typing in input
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-            return;
-        }
-
+        if (isTypingInInput(e)) return;
         this.pressed.add(e.code);
     };
 

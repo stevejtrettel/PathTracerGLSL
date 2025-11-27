@@ -14,6 +14,8 @@
  */
 import { UIExtension } from './UIExtension.js';
 import type { RegionName } from '../layout/index.js';
+import { formatTime } from '../utils/format.js';
+import { isTypingInInput } from '../utils/dom.js';
 
 export class StatsPanel extends UIExtension {
     name = 'stats-panel';
@@ -102,7 +104,7 @@ export class StatsPanel extends UIExtension {
         lines.push(`<b>Samples:</b> ${stats.samples.toLocaleString()}`);
         lines.push(`<b>FPS:</b> ${stats.fps.toFixed(1)}`);
         lines.push(`<b>Resolution:</b> ${stats.resolution[0]}×${stats.resolution[1]}`);
-        lines.push(`<b>Time:</b> ${this.formatTime(stats.elapsedMs)}`);
+        lines.push(`<b>Time:</b> ${formatTime(stats.elapsedMs)}`);
 
         // Renderer
         if (stats.rendererId) {
@@ -127,31 +129,13 @@ export class StatsPanel extends UIExtension {
         this.root.innerHTML = lines.join('<br>');
     }
 
-    private formatTime(ms: number): string {
-        const seconds = ms / 1000;
-        if (seconds < 60) {
-            return `${seconds.toFixed(1)}s`;
-        } else if (seconds < 3600) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins}m ${secs}s`;
-        } else {
-            const hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            return `${hours}h ${mins}m`;
-        }
-    }
-
     // ============================================================================
     // Keyboard Shortcut
     // ============================================================================
 
     private attachKeyboardShortcut(): void {
         this.keydownHandler = (e: KeyboardEvent) => {
-            const target = e.target as HTMLElement;
-            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-                return;
-            }
+            if (isTypingInInput(e)) return;
 
             if (e.key === 'i' || e.key === 'I') {
                 e.preventDefault();

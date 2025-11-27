@@ -3,6 +3,7 @@
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import type { Extension } from '../types.js';
+import { isTypingInInput } from '../utils/dom.js';
 
 /**
  * AppShortcutsExtension - Application keyboard shortcuts
@@ -59,12 +60,7 @@ export class AppShortcutsExtension implements Extension {
     }
 
     private handleKeyDown(e: KeyboardEvent): void {
-        // Skip keyboard shortcuts when user is typing in input fields
-        const target = e.target as HTMLElement;
-        const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-        if (isTyping) {
-            return;
-        }
+        if (isTypingInInput(e)) return;
 
         // Don't handle if locked in production (except escape)
         if (this.app.isLocked() && e.key !== 'Escape') {

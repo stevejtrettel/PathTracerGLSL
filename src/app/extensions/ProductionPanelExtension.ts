@@ -16,6 +16,7 @@
 import { UIExtension } from './UIExtension.js';
 import type { RegionName } from '../layout/index.js';
 import type { ProgressInfo } from '../RenderCoordinator.js';
+import { formatTime } from '../utils/format.js';
 
 export class ProductionPanelExtension extends UIExtension {
     name = 'production-panel';
@@ -168,7 +169,7 @@ export class ProductionPanelExtension extends UIExtension {
         }
 
         // Elapsed time
-        stats.push(this.createStat('Elapsed', this.formatTime(info.elapsedTime)));
+        stats.push(this.createStat('Elapsed', formatTime(info.elapsedTime)));
 
         // State indicator
         if (info.state === 'paused') {
@@ -253,22 +254,6 @@ export class ProductionPanelExtension extends UIExtension {
 
         if (!isFinite(remainingMs) || remainingMs < 0) return null;
 
-        return this.formatTime(remainingMs);
-    }
-
-    private formatTime(ms: number): string {
-        const seconds = Math.floor(ms / 1000);
-
-        if (seconds < 60) {
-            return `${seconds}s`;
-        } else if (seconds < 3600) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}m ${secs}s`;
-        } else {
-            const hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            return `${hours}h ${mins}m`;
-        }
+        return formatTime(remainingMs);
     }
 }
