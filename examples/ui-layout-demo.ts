@@ -112,7 +112,7 @@ function createStandaloneDemo(container: HTMLElement): Panel {
 // Demo: Layout Modes
 // ============================================================================
 
-function setupLayoutSwitching(layout: AppLayout): void {
+function setupLayoutSwitching(layout: AppLayout, onLayoutChange?: () => void): void {
     const modes: LayoutMode[] = ['fullscreen', 'centered', 'split'];
     let currentIndex = 0;
 
@@ -123,6 +123,13 @@ function setupLayoutSwitching(layout: AppLayout): void {
             const newMode = modes[currentIndex];
             layout.setMode(newMode);
             console.log(`Layout: ${newMode}`);
+
+            // Trigger resize after layout change (after CSS reflows)
+            if (onLayoutChange) {
+                requestAnimationFrame(() => {
+                    onLayoutChange();
+                });
+            }
         }
     });
 
@@ -144,9 +151,6 @@ async function main() {
             '--layout-sidebar-width': '340px'
         }
     });
-
-    // Setup layout switching
-    setupLayoutSwitching(layout);
 
     // Create canvas in the canvas container region
     const canvas = document.createElement('canvas');
@@ -184,6 +188,9 @@ async function main() {
             app.resize(width, height);
         }
     };
+
+    // Setup layout switching (with resize callback)
+    setupLayoutSwitching(layout, handleResize);
 
     window.addEventListener('resize', handleResize);
     // Initial resize
