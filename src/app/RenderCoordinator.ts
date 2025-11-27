@@ -1,6 +1,7 @@
 // app/RenderCoordinator.ts
 // Manages rendering execution for Engine
 
+import { RenderStoppedError } from '../errors/RenderErrors.js';
 import type { Engine } from '../engine/Engine.js';
 
 /**
@@ -339,10 +340,7 @@ export class RenderCoordinator {
 
         // Reject production promise if running
         if (this.productionReject) {
-            // FUTURE: Create proper RenderStoppedError class extends Error
-            const error = new Error('Production render stopped');
-            error.name = 'RenderStopped';
-            this.productionReject(error);
+            this.productionReject(new RenderStoppedError());
             this.clearProductionPromise();
         }
 
