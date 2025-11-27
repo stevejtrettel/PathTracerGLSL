@@ -10,7 +10,7 @@ import { ExportManager } from './ExportManager.js';
 import { SessionManager } from './SessionManager.js';
 import { AppLayout, type LayoutMode, type RegionName } from './layout/index.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
-import type { AppConfig, RenderProgress, StrategyPreset } from './types.js';
+import type { AppConfig, RenderProgress, StrategyPreset, CreateAppOptions } from './types.js';
 import type { Extension } from './types.js';
 
 /**
@@ -128,6 +128,56 @@ export class App {
         };
 
         console.log('App created');
+    }
+
+    // ============================================================================
+    // Factory Method
+    // ============================================================================
+
+    /**
+     * Create an App with integrated layout (recommended)
+     *
+     * This is the simplest way to create an App. It:
+     * 1. Creates the layout system with specified mode
+     * 2. Creates a canvas in the layout's canvas container
+     * 3. Creates the App with the canvas
+     * 4. Connects the layout to the App
+     *
+     * @param container - The root element (usually document.body)
+     * @param options - Layout configuration options
+     * @returns A fully configured App instance
+     *
+     * @example
+     * ```typescript
+     * const app = App.create(document.body, { layout: 'fullscreen' });
+     * await app.initialize({ scene, strategies });
+     * app.start();
+     * ```
+     */
+    static create(
+        container: HTMLElement = document.body,
+        options: CreateAppOptions = {}
+    ): App {
+        const layoutMode = options.layout ?? 'fullscreen';
+
+        // Create layout
+        const layout = new AppLayout(container, {
+            mode: layoutMode,
+            variables: options.layoutVariables
+        });
+
+        // Create canvas in layout's canvas container
+        const canvas = document.createElement('canvas');
+        layout.getCanvasContainer().appendChild(canvas);
+
+        // Create app with canvas
+        const app = new App(canvas);
+
+        // Connect layout to app
+        app.setLayout(layout);
+
+        console.log(`App created with layout: ${layoutMode}`);
+        return app;
     }
 
     // ============================================================================
