@@ -7,8 +7,8 @@ Guide to the extension system: creating modular, optional features.
 Extensions add functionality to the app without modifying core code. They are:
 - **Modular** - Plug-and-play architecture
 - **Optional** - Enable/disable as needed
-- **Decoupled** - Communicate via EventBus and ParameterStore
-- **Lifecycle-aware** - Initialize, update, dispose
+- **Decoupled** - Communicate via EventBus
+- **Lifecycle-aware** - Install, setup, cleanup, uninstall
 
 ---
 
@@ -17,474 +17,327 @@ Extensions add functionality to the app without modifying core code. They are:
 ```typescript
 interface Extension {
     name: string;
-    initialize?(context: ExtensionContext): void;
-    update?(delta: number): void;
-    dispose?(): void;
-}
+    version?: string;
+    description?: string;
+    dependencies?: string[];
 
-interface ExtensionContext {
-    app: App;
-    canvas: HTMLCanvasElement;
-    engine: Engine;
-    bus: EventBus;
+    install(app: App, bus: EventBus): void;
+    uninstall?(): void;
+    saveState?(): any;
+    restoreState?(state: any): void;
 }
 ```
 
 **Methods**:
-- `initialize` - Called once during app initialization
-- `update` - Called every frame with delta time (seconds)
-- `dispose` - Called when app is disposed
+- `install` - Called when extension is added to app
+- `uninstall` - Called when extension is removed
+- `saveState` / `restoreState` - Session persistence
+
+---
+
+## UIExtension Base Class
+
+For extensions that render UI, extend `UIExtension` for consistent behavior:
+
+```typescript
+import { UIExtension } from './UIExtension.js';
+import type { RegionName } from '../layout/index.js';
+
+class MyPanel extends UIExtension {
+    name = 'my-panel';
+    protected readonly region: RegionName = 'region-right';
+
+    protected createRoot(): HTMLElement {
+        const div = document.createElement('div');
+        div.className = 'my-panel';
+        div.innerHTML = '<h2>My Panel</h2>';
+        return div;
+    }
+
+    protected setup(): void {
+        // Subscribe to events, add listeners
+        this.on('render.progress', (info) => {
+            this.updateDisplay(info);
+        });
+    }
+
+    protected cleanup(): void {
+        // Optional: cleanup before uninstall
+    }
+
+    private updateDisplay(info: any): void {
+        // Update UI
+    }
+}
+```
+
+### UIExtension Features
+
+**Region Mounting:**
+- If app has layout, mounts to specified region
+- Falls back to standalone (appends to body with positioning)
+
+**Visibility Helpers:**
+```typescript
+this.show();        // Remove 'hidden' class
+this.hide();        // Add 'hidden' class
+this.toggle();      // Toggle visibility
+this.isVisible;     // Check current state
+```
+
+**Event Subscription:**
+```typescript
+// Auto-cleaned up on uninstall
+protected setup(): void {
+    this.on('render.started', this.onRenderStarted);
+    this.on('render.stopped', this.onRenderStopped);
+}
+```
+
+**Configuration:**
+```typescript
+constructor() {
+    super({
+        startHidden: true  // Start with 'hidden' class
+    });
+}
+```
 
 ---
 
 ## Available Extensions
 
-### Control Extensions
-
-#### OrbitControls
-
-Mouse-based orbit camera control.
-
-**Features**:
-- Left drag: Rotate around target
-- Right drag: Pan
-- Scroll: Zoom in/out
-- Auto-damping
-
-**Usage**:
-```typescript
-import { OrbitControls } from './src/app/extensions/OrbitControls';
-
-app.addExtension(new OrbitControls(canvas));
-```
-
-**Parameters Updated**:
-- `camera.position`
-- `camera.target`
-
-#### TouchOrbitControls
-
-Touch-based orbit camera control.
-
-**Features**:
-- One finger: Rotate
-- Two fingers: Pan and zoom
-- Momentum and damping
-
-**Usage**:
-```typescript
-import { TouchOrbitControls } from './src/app/extensions/TouchOrbitControls';
-
-app.addExtension(new TouchOrbitControls(canvas));
-```
-
-#### KeyboardControls
-
-Keyboard navigation.
-
-**Features**:
-- WASD: Move camera
-- Arrow keys: Rotate
-- Q/E: Up/down
-- Shift: Move faster
-
-**Usage**:
-```typescript
-import { KeyboardControls } from './src/app/extensions/KeyboardControls';
-
-app.addExtension(new KeyboardControls());
-```
-
 ### UI Extensions
 
-#### ParameterPanelExtension
+| Extension | Region | Description |
+|-----------|--------|-------------|
+| `ProductionPanelExtension` | region-statusbar | Production render progress |
+| `StatsPanel` | region-left | FPS, samples, render state |
+| `RenderControlsExtension` | region-toolbar | Render button, sample input |
+| `ParameterPanelExtension` | region-right | Parameter editing panel |
 
-Automatic UI controls for all parameters.
+### Control Extensions
 
-**Features**:
-- Auto-generates controls from metadata
-- Groups by `group` field
-- Respects ranges, steps, units
-- Live updates
+| Extension | Description |
+|-----------|-------------|
+| `OrbitControls` | Mouse orbit camera |
+| `TouchOrbitControls` | Touch orbit camera |
+| `KeyboardControls` | WASD camera movement |
+| `AppShortcutsExtension` | App-level keyboard shortcuts |
 
-**Usage**:
-```typescript
-import { ParameterPanelExtension } from './src/app/extensions/ParameterPanelExtension';
+---
 
-app.addExtension(new ParameterPanelExtension());
+## ProductionPanelExtension
+
+Shows production render progress at the bottom of the screen.
+
+**Location:** `src/app/extensions/ProductionPanelExtension.ts`
+
+**Features:**
+- Progress bar with percentage
+- Sample count, elapsed time, ETA
+- Tile grid visualization (for tiled renders)
+- Pause/Resume/Cancel buttons
+- Export PNG/HDR buttons on completion
+
+**Events Listened:**
+- `render.started` - Show panel (production mode only)
+- `render.progress` - Update stats
+- `render.complete` - Show export buttons
+- `render.stopped` - Hide panel
+- `tiledJob.progress` - Update tile grid
+
+**Tile Grid:**
+```
+┌───┬───┬───┬───┐
+│ ✓ │ ✓ │ ✓ │ ✓ │  ✓ = complete
+├───┼───┼───┼───┤
+│ ✓ │ ✓ │ ▶ │   │  ▶ = current (pulsing)
+├───┼───┼───┼───┤
+│   │   │   │   │    = pending
+└───┴───┴───┴───┘
 ```
 
-**Dependencies**: Tweakpane (or similar UI library)
+---
 
-#### StatsPanelExtension
+## StatsPanel
 
-FPS and performance monitoring.
+Displays render statistics overlay.
 
-**Features**:
-- FPS counter
-- Frame time graph
+**Location:** `src/app/extensions/StatsPanel.ts`
+
+**Features:**
 - Sample count
-- GPU memory (if available)
+- FPS
+- Elapsed time
+- Render state (rendering/paused/production)
+- Toggle with 'S' key
+- Auto-hides during production renders
 
-**Usage**:
+**Usage:**
 ```typescript
-import { StatsPanelExtension } from './src/app/extensions/StatsPanelExtension';
-
-app.addExtension(new StatsPanelExtension());
+app.use(new StatsPanel());
 ```
 
-### Export Extensions
+---
 
-#### ScreenshotExtension
+## RenderControlsExtension
 
-Capture LDR screenshots (PNG/JPEG).
+Toolbar with render controls.
 
-**Features**:
-- Keyboard shortcut (default: 'S')
-- Automatic filename with timestamp
-- Configurable format and quality
+**Location:** `src/app/extensions/RenderControlsExtension.ts`
 
-**Usage**:
-```typescript
-import { ScreenshotExtension } from './src/app/extensions/ScreenshotExtension';
+**Features:**
+- Scene title display
+- Target sample count input
+- "Render" button to start production
+- Disabled during active production render
 
-app.addExtension(new ScreenshotExtension({
-    key: 'KeyS',
-    format: 'png'
-}));
-```
+---
 
-**Events Emitted**:
-- `screenshot:captured` - When screenshot is taken
+## ParameterPanelExtension
 
-#### HDRExportExtension
+Slide-out panel for parameter editing.
 
-Export HDR radiance (EXR format).
+**Location:** `src/app/extensions/ParameterPanelExtension.ts`
 
-**Features**:
-- Captures floating-point radiance
-- OpenEXR format export
-- Preserves full dynamic range
-
-**Usage**:
-```typescript
-import { HDRExportExtension } from './src/app/extensions/HDRExportExtension';
-
-app.addExtension(new HDRExportExtension({
-    key: 'KeyH'
-}));
-```
-
-#### ProductionRenderExtension
-
-High-quality offline rendering.
-
-**Features**:
-- Render to target sample count
-- Progress reporting
-- Tile-based rendering for large images
-- Auto-export when complete
-
-**Usage**:
-```typescript
-import { ProductionRenderExtension } from './src/app/extensions/ProductionRenderExtension';
-
-app.addExtension(new ProductionRenderExtension({
-    targetSamples: 1000,
-    tileSize: 512,
-    outputSize: [4000, 4000]
-}));
-```
+**Features:**
+- Auto-generates controls from parameter metadata
+- Groups parameters by category
+- Sliders, inputs, color pickers
+- Toggle with 'Tab' key
+- Closes and disables during production mode
 
 ---
 
 ## Creating Custom Extensions
 
-### Basic Extension
+### Minimal Extension
 
 ```typescript
-class MyExtension implements Extension {
-    name = 'my-extension';
-    private app: App;
-    private bus: EventBus;
+import type { Extension } from '../types.js';
+import type { App } from '../App.js';
+import type { EventBus } from '../EventBus.js';
 
-    initialize(context: ExtensionContext) {
-        this.app = context.app;
-        this.bus = context.bus;
+class MinimalExtension implements Extension {
+    name = 'minimal';
+    private bus!: EventBus;
 
-        // Subscribe to events
-        this.bus.on('parameters:changed', this.onParamsChanged.bind(this));
-
-        console.log('MyExtension initialized');
+    install(app: App, bus: EventBus): void {
+        this.bus = bus;
+        console.log('Installed');
     }
 
-    update(delta: number) {
-        // Called every frame
-        // delta = time since last frame (seconds)
-    }
-
-    dispose() {
-        // Clean up
-        console.log('MyExtension disposed');
-    }
-
-    private onParamsChanged(changes: ParameterChanges) {
-        console.log('Parameters changed:', changes);
+    uninstall(): void {
+        console.log('Uninstalled');
     }
 }
 
-// Use it
-app.addExtension(new MyExtension());
+app.use(new MinimalExtension());
 ```
 
-### Extension with Options
+### Extension with UI (using UIExtension)
 
 ```typescript
-interface MyExtensionOptions {
-    enabled?: boolean;
-    updateInterval?: number;
-}
+import { UIExtension } from './UIExtension.js';
 
-class ConfigurableExtension implements Extension {
-    name = 'configurable-extension';
-    private options: Required<MyExtensionOptions>;
+class CustomPanel extends UIExtension {
+    name = 'custom-panel';
+    protected readonly region = 'region-left';
 
-    constructor(options: MyExtensionOptions = {}) {
-        this.options = {
-            enabled: true,
-            updateInterval: 1.0,
-            ...options
-        };
+    protected createRoot(): HTMLElement {
+        const root = document.createElement('div');
+        root.className = 'custom-panel';
+        root.innerHTML = `
+            <h3>Custom Panel</h3>
+            <div class="content"></div>
+        `;
+        return root;
     }
 
-    initialize(context: ExtensionContext) {
-        if (!this.options.enabled) return;
+    protected setup(): void {
+        this.on('render.progress', this.onProgress);
+    }
 
+    private onProgress = (info: any): void => {
+        const content = this.root.querySelector('.content');
+        if (content) {
+            content.textContent = `Samples: ${info.samples}`;
+        }
+    };
+}
+
+app.use(new CustomPanel());
+```
+
+### Extension with State Persistence
+
+```typescript
+class StatefulExtension implements Extension {
+    name = 'stateful';
+    private value = 0;
+
+    install(app: App, bus: EventBus): void {
         // Setup
     }
 
-    update(delta: number) {
-        if (!this.options.enabled) return;
-
-        // Update logic
-    }
-}
-
-// Use it
-app.addExtension(new ConfigurableExtension({
-    enabled: true,
-    updateInterval: 0.5
-}));
-```
-
-### Extension with UI
-
-```typescript
-class UIExtension implements Extension {
-    name = 'ui-extension';
-    private container: HTMLElement;
-
-    initialize(context: ExtensionContext) {
-        // Create UI
-        this.container = document.createElement('div');
-        this.container.className = 'my-extension-ui';
-        document.body.appendChild(this.container);
-
-        // Add controls
-        const button = document.createElement('button');
-        button.textContent = 'Click Me';
-        button.onclick = () => this.onClick(context);
-        this.container.appendChild(button);
+    saveState(): any {
+        return { value: this.value };
     }
 
-    dispose() {
-        // Remove UI
-        if (this.container && this.container.parentNode) {
-            this.container.parentNode.removeChild(this.container);
-        }
-    }
-
-    private onClick(context: ExtensionContext) {
-        // Handle click
-        context.app.setParameter('someParam', newValue);
+    restoreState(state: any): void {
+        this.value = state.value ?? 0;
     }
 }
 ```
 
 ---
 
-## Extension Patterns
+## Event Patterns
 
-### Listening to Events
-
-```typescript
-initialize(context: ExtensionContext) {
-    // Parameter changes
-    context.bus.on('parameters:changed', (changes) => {
-        // React to parameter updates
-    });
-
-    // Recipe changes
-    context.bus.on('recipe:changed', (recipeId) => {
-        // React to recipe switch
-    });
-
-    // Frame events
-    context.bus.on('render:frame', ({ time, delta }) => {
-        // React to each frame
-    });
-}
-```
-
-### Emitting Custom Events
+### Listening to Render Events
 
 ```typescript
-class EventEmittingExtension implements Extension {
-    name = 'event-emitter';
-    private bus: EventBus;
-
-    initialize(context: ExtensionContext) {
-        this.bus = context.bus;
-    }
-
-    update(delta: number) {
-        // Emit custom event
-        this.bus.emit('my-extension:tick', { delta });
-    }
-}
-
-// Other code can listen
-app.on('my-extension:tick', ({ delta }) => {
-    console.log('Tick:', delta);
-});
-```
-
-### Updating Parameters
-
-```typescript
-class ParameterUpdatingExtension implements Extension {
-    name = 'param-updater';
-    private app: App;
-
-    initialize(context: ExtensionContext) {
-        this.app = context.app;
-    }
-
-    update(delta: number) {
-        // Read parameter
-        const currentFov = this.app.getParameter('camera.fov');
-
-        // Update parameter
-        this.app.setParameter('camera.fov', currentFov + delta * 10);
-
-        // Or update multiple
-        this.app.setParameters({
-            'camera.fov': newFov,
-            'light.intensity': newIntensity
-        });
-    }
-}
-```
-
-### Accessing Engine
-
-```typescript
-class EngineAccessingExtension implements Extension {
-    name = 'engine-accessor';
-    private engine: Engine;
-
-    initialize(context: ExtensionContext) {
-        this.engine = context.engine;
-
-        // Access engine state
-        const recipes = this.engine.getAvailableRecipes();
-        const activeRecipe = this.engine.getActiveRecipeId();
-        const sampleCount = this.engine.sampleCount;
-
-        // Trigger engine actions
-        this.engine.clearAccumulation();
-        this.engine.selectRecipe('albedo');
-    }
-}
-```
-
----
-
-## Advanced Examples
-
-### Auto-Rotate Extension
-
-```typescript
-class AutoRotateExtension implements Extension {
-    name = 'auto-rotate';
-    private app: App;
-    private enabled = false;
-    private speed = 0.1;
-
-    initialize(context: ExtensionContext) {
-        this.app = context.app;
-
-        // Keyboard toggle
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'r') {
-                this.enabled = !this.enabled;
-                console.log(`Auto-rotate: ${this.enabled ? 'ON' : 'OFF'}`);
-            }
-        });
-    }
-
-    update(delta: number) {
-        if (!this.enabled) return;
-
-        // Get current camera position
-        const pos = this.app.getParameter('camera.position');
-        const target = this.app.getParameter('camera.target');
-
-        // Rotate around target
-        const radius = Math.sqrt(
-            Math.pow(pos[0] - target[0], 2) +
-            Math.pow(pos[2] - target[2], 2)
-        );
-
-        const angle = Math.atan2(pos[2] - target[2], pos[0] - target[0]);
-        const newAngle = angle + this.speed * delta;
-
-        const newPos = [
-            target[0] + radius * Math.cos(newAngle),
-            pos[1],
-            target[2] + radius * Math.sin(newAngle)
-        ];
-
-        this.app.setParameter('camera.position', newPos);
-    }
-}
-```
-
-### Performance Monitor Extension
-
-```typescript
-class PerformanceMonitorExtension implements Extension {
-    name = 'performance-monitor';
-    private frameTimes: number[] = [];
-    private maxSamples = 60;
-
-    update(delta: number) {
-        // Record frame time
-        this.frameTimes.push(delta * 1000);  // Convert to ms
-        if (this.frameTimes.length > this.maxSamples) {
-            this.frameTimes.shift();
+protected setup(): void {
+    // Mode changes
+    this.on('render.started', (data) => {
+        if (data.mode === 'production') {
+            this.onProductionStart(data.targetSamples);
         }
+    });
 
-        // Compute stats every second
-        if (this.frameTimes.length === this.maxSamples) {
-            const avg = this.frameTimes.reduce((a, b) => a + b) / this.frameTimes.length;
-            const fps = 1000 / avg;
-            const min = Math.min(...this.frameTimes);
-            const max = Math.max(...this.frameTimes);
+    this.on('render.stopped', () => {
+        this.onProductionEnd();
+    });
 
-            console.log(`FPS: ${fps.toFixed(1)} | Avg: ${avg.toFixed(2)}ms | Min: ${min.toFixed(2)}ms | Max: ${max.toFixed(2)}ms`);
-        }
-    }
+    // Progress updates
+    this.on('render.progress', (info) => {
+        this.updateProgress(info.samples, info.percentComplete);
+    });
+}
+```
+
+### Listening to Parameter Changes
+
+```typescript
+protected setup(): void {
+    this.on('parameter.changed', (change) => {
+        console.log(`${change.path}: ${change.oldValue} → ${change.newValue}`);
+    });
+}
+```
+
+### Listening to Tile Events
+
+```typescript
+protected setup(): void {
+    this.on('tiledJob.progress', (info) => {
+        this.updateTileGrid(info.completedPositions, info.currentTile);
+    });
+
+    this.on('tile.complete', (info) => {
+        console.log(`Tile [${info.tileX}, ${info.tileY}] done`);
+    });
 }
 ```
 
@@ -493,67 +346,137 @@ class PerformanceMonitorExtension implements Extension {
 ## Extension Lifecycle
 
 ```
-App.initialize()
+app.use(extension)
   ↓
-For each extension:
-  extension.initialize(context)
+extension.install(app, bus)
   ↓
-App.start()
+[extension is active]
   ↓
-Loop:
-  For each extension:
-    extension.update(delta)
+app.unuse('extension-name')
   ↓
-App.dispose()
-  ↓
-For each extension:
-  extension.dispose()
+extension.uninstall()
 ```
+
+For UIExtension:
+
+```
+install(app, bus)
+  ↓
+createRoot()        → Create DOM element
+  ↓
+mount()             → Add to region or body
+  ↓
+setup()             → Subscribe to events
+  ↓
+[extension is active]
+  ↓
+uninstall()
+  ↓
+cleanup()           → Custom cleanup
+  ↓
+unsubscribe events  → Auto-cleanup
+  ↓
+remove from DOM
+```
+
+---
+
+## Available Events
+
+### Render Events
+
+| Event | Data | Description |
+|-------|------|-------------|
+| `render.started` | `{ mode, targetSamples? }` | Render begins |
+| `render.progress` | `ProgressInfo` | Per-frame update |
+| `render.complete` | `{ samples, elapsedTime }` | Production complete |
+| `render.stopped` | - | Render cancelled |
+| `render.paused` | - | Render paused |
+| `render.resumed` | - | Render resumed |
+| `render.locked` | - | Parameters locked |
+| `render.unlocked` | - | Parameters unlocked |
+
+### Tile Events
+
+| Event | Data | Description |
+|-------|------|-------------|
+| `tiledJob.progress` | `TiledJobProgressInfo` | Tile job progress |
+| `tiledJob.complete` | `{ jobId, totalTiles, elapsedSeconds }` | Job complete |
+| `tile.start` | `TileProgressInfo` | Tile begins |
+| `tile.complete` | `TileProgressInfo` | Tile done |
+
+### Other Events
+
+| Event | Data | Description |
+|-------|------|-------------|
+| `parameter.changed` | `{ path, oldValue, newValue }` | Parameter updated |
+| `renderer.switched` | `{ rendererId }` | Active renderer changed |
+| `accumulation.reset` | `{ reason }` | Accumulation cleared |
+| `extension.installed` | `{ name, version }` | Extension added |
+| `extension.uninstalled` | `{ name }` | Extension removed |
 
 ---
 
 ## Best Practices
 
-1. **Use events for communication** - Don't directly call other extensions
-2. **Clean up in dispose** - Remove event listeners, DOM elements, etc.
-3. **Handle missing context** - Check if app/engine/bus exist
-4. **Be efficient in update** - Called every frame (60fps)
-5. **Validate parameters** - Check bounds before setting
-6. **Provide options** - Make extensions configurable
-7. **Document dependencies** - If using external libraries
-8. **Emit custom events** - Let other code react to your extension
+1. **Extend UIExtension for UI** - Consistent lifecycle, automatic cleanup
+2. **Use `this.on()` for events** - Auto-unsubscribe on uninstall
+3. **Check `isVisible` before updates** - Skip work when hidden
+4. **Respond to mode changes** - Disable/hide during production mode
+5. **Clean up in `cleanup()`** - Remove timers, listeners not managed by `on()`
+6. **Use semantic class names** - `.production-panel`, `.stats-panel`
+7. **Follow CSS conventions** - Use theme variables from `theme.css`
 
 ---
 
-## Debugging Extensions
+## CSS Conventions
 
-```typescript
-class DebugExtension implements Extension {
-    name = 'debug';
+Extensions should use CSS classes with extension-specific prefixes:
 
-    initialize(context: ExtensionContext) {
-        // Log all events
-        const originalEmit = context.bus.emit.bind(context.bus);
-        context.bus.emit = (event: string, data?: any) => {
-            console.log(`Event: ${event}`, data);
-            return originalEmit(event, data);
-        };
-    }
+```css
+/* Good: scoped to extension */
+.stats-panel { ... }
+.stats-panel-state { ... }
+.production-panel-tiles { ... }
 
-    update(delta: number) {
-        // Log slow frames
-        if (delta > 0.033) {  // Slower than 30fps
-            console.warn(`Slow frame: ${(delta * 1000).toFixed(2)}ms`);
-        }
-    }
+/* Bad: generic names that could conflict */
+.panel { ... }
+.container { ... }
+```
+
+Use theme variables:
+```css
+.my-panel {
+    background: var(--ui-bg-primary);
+    color: var(--ui-text-primary);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-md);
+    padding: var(--ui-space-md);
 }
+```
+
+---
+
+## File Structure
+
+```
+src/app/extensions/
+├── UIExtension.ts              # Base class for UI extensions
+├── ProductionPanelExtension.ts # Production progress
+├── StatsPanel.ts               # Stats overlay
+├── RenderControlsExtension.ts  # Toolbar
+├── ParameterPanelExtension.ts  # Parameter panel
+├── OrbitControls.ts            # Mouse orbit
+├── TouchOrbitControls.ts       # Touch orbit
+├── KeyboardControls.ts         # Keyboard movement
+├── AppShortcutsExtension.ts    # App shortcuts
+└── index.ts                    # Exports
 ```
 
 ---
 
 ## Next Steps
 
-- [Parameter System](parameter-system.md) - Working with parameters
+- [Production Rendering](../../../DESIGN-production-rendering.md) - Tiled rendering system
 - [Event Bus](event-bus.md) - Event system details
-- [Engine API](../engine/api-reference.md) - Engine access
-- [App README](README.md) - App layer overview
+- [Parameter System](parameter-system.md) - Parameter management
