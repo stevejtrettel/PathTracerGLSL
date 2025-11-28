@@ -10,7 +10,7 @@ import { ExportManager } from './ExportManager.js';
 import { SessionManager } from './SessionManager.js';
 import { AppLayout, type LayoutMode, type RegionName } from './layout/index.js';
 import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
-import type { AppConfig, RenderProgress, StrategyPreset, CreateAppOptions } from './types.js';
+import type { AppConfig, StrategyPreset, CreateAppOptions } from './types.js';
 import type { Extension } from './types.js';
 
 /**
@@ -52,6 +52,8 @@ export class App {
 
     // Layout (optional - can be set after construction)
     private layout: AppLayout | null = null;
+    private previousLayoutMode: LayoutMode | null = null;
+    private productionLayoutMode: LayoutMode = 'centered';
 
     constructor(canvas: HTMLCanvasElement) {
         // Setup canvas
@@ -126,6 +128,28 @@ export class App {
             // Emit progress event
             this.eventBus.emit('render.progress', info);
         };
+
+        // Wire up automatic layout switching
+        this.eventBus.on('render.started', (data: { mode: string }) => {
+            if (data.mode === 'production' && this.layout) {
+                // Save current mode if we haven't already (handling potential restarts)
+                if (!this.previousLayoutMode) {
+                    this.previousLayoutMode = this.layout.mode;
+                }
+
+                // Switch to production layout
+                if (this.layout.mode !== this.productionLayoutMode) {
+                    this.setLayoutMode(this.productionLayoutMode);
+                    console.log(`Auto-switched layout to '${this.productionLayoutMode}' for production`);
+                }
+            }
+        });
+
+        this.eventBus.on('render.stopped', () => {
+            this.restoreLayout();
+        });
+
+
 
         console.log('App created');
     }
@@ -393,6 +417,10 @@ export class App {
         return this.coordinator.isPaused();
     }
 
+    private previousLayoutMode: LayoutMode | null = null;
+    private previousResolution: [number, number] | null = null;
+    private productionLayoutMode: LayoutMode = 'centered';
+
     /**
      * Check if in locked production mode
      */
@@ -405,6 +433,11 @@ export class App {
     // ============================================================================
 
     /**
+     * Get an installed extension by name
+     */
+
+
+    /**
      * Start production rendering (goal-driven, locked)
      *
      * Resets accumulation before starting.
@@ -412,12 +445,27 @@ export class App {
      * Returns Promise that resolves when target samples reached.
      */
     async renderProduction(targetSamples: number, options?: {
+        width?: number;
+        height?: number;
         autoSave?: boolean;
         autoExportPNG?: boolean;
         autoExportHDR?: boolean;
+        autoExportAllAOVs?: boolean;
     }): Promise<void> {
         // Lock parameters during production
         this.parameterStore.lock();
+
+        // Handle resolution change
+        const originalWidth = this.gl.canvas.width;
+        const originalHeight = this.gl.canvas.height;
+
+        if (options?.width && options?.height) {
+            if (options.width !== originalWidth || options.height !== originalHeight) {
+                console.log(`Resizing for production: ${options.width}x${options.height}`);
+                this.previousResolution = [originalWidth, originalHeight];
+                this.resize(options.width, options.height);
+            }
+        }
 
         // Reset accumulation before production
         this.coordinator.resetAccumulation('production_start');
@@ -443,11 +491,19 @@ export class App {
                 console.log('Auto-exporting HDR...');
                 await this.exportHDR();
             }
+            if (options?.autoExportAllAOVs) {
+                console.log('Auto-exporting all AOVs...');
+                await this.exportAllAOVs();
+            }
             if (options?.autoSave) {
                 console.log('Auto-saving session...');
                 this.quickSave();
             }
         } finally {
+            // NOTE: We do NOT restore resolution or layout here.
+            // We want the user to see the result.
+            // Restoration happens when they click "Close" (triggers render.stopped).
+
             // Always unlock parameters when done (success or error)
             this.parameterStore.unlock();
         }
@@ -728,7 +784,11 @@ export class App {
         rendererId?: string | null;
         extensions?: Record<string, any>;
     }): void {
-        this.sessionManager.restoreSession(session);
+        this.sessionManager.restoreSession({
+            parameters: session.parameters,
+            rendererId: session.rendererId ?? null,
+            extensions: session.extensions ?? {}
+        });
     }
 
     /**
@@ -1006,6 +1066,28 @@ export class App {
         }
         this.layout.setMode(mode);
         console.log(`Layout mode changed to: ${mode}`);
+    }
+
+    /**
+     * Restore the layout mode and resolution that was active before production render
+     */
+    private restoreLayout(): void {
+        // Restore layout
+        if (this.previousLayoutMode && this.layout) {
+            if (this.layout.mode !== this.previousLayoutMode) {
+                this.setLayoutMode(this.previousLayoutMode);
+                console.log(`Restored layout to '${this.previousLayoutMode}'`);
+            }
+            this.previousLayoutMode = null;
+        }
+
+        // Restore resolution
+        if (this.previousResolution) {
+            const [width, height] = this.previousResolution;
+            console.log(`Restoring resolution: ${width}x${height}`);
+            this.resize(width, height);
+            this.previousResolution = null;
+        }
     }
 
     /**

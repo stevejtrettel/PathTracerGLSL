@@ -48,6 +48,14 @@ export class OrbitControls implements Extension {
     private minDistance = 0.1;
     private maxDistance = 100;
 
+    // Touch state
+    private touchState = {
+        touching: false,
+        lastX: 0,
+        lastY: 0,
+        distance: 0 // For pinch zoom
+    };
+
     install(app: App, bus: EventBus): void {
         this.app = app;
         this.bus = bus;
@@ -66,7 +74,15 @@ export class OrbitControls implements Extension {
         this.events.add(this.canvas, 'mouseleave', this.onMouseUp);
         this.events.add(this.canvas, 'wheel', this.onWheel);
 
-        console.log('OrbitControls extension installed');
+        // Touch events
+        this.events.add(this.canvas, 'touchstart', this.onTouchStart);
+        this.events.add(this.canvas, 'touchmove', this.onTouchMove);
+        this.events.add(this.canvas, 'touchend', this.onTouchEnd);
+
+        // Prevent default touch actions
+        this.canvas.style.touchAction = 'none';
+
+        console.log('OrbitControls extension installed (Mouse + Touch)');
     }
 
     uninstall(): void {
@@ -189,7 +205,7 @@ export class OrbitControls implements Extension {
     }
 
     // ============================================================================
-    // Private: Event Handlers
+    // Private: Mouse Event Handlers
     // ============================================================================
 
     private onMouseDown = (e: MouseEvent): void => {
@@ -206,13 +222,7 @@ export class OrbitControls implements Extension {
         const deltaX = e.clientX - this.lastMouseX;
         const deltaY = e.clientY - this.lastMouseY;
 
-        this.azimuth -= deltaX * this.orbitSpeed;
-        this.elevation += deltaY * this.orbitSpeed;
-
-        // Clamp elevation to prevent flipping
-        this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
-
-        this.updateCamera();
+        this.handleOrbit(deltaX, deltaY);
 
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
@@ -227,17 +237,89 @@ export class OrbitControls implements Extension {
 
         // Zoom in/out based on scroll direction
         const delta = e.deltaY > 0 ? 1 : -1;
-        this.distance *= (1 + delta * this.zoomSpeed);
-
-        // Clamp distance
-        this.distance = Math.max(this.minDistance, Math.min(this.maxDistance, this.distance));
-
-        this.updateCamera();
+        this.handleZoom(delta);
     };
 
     // ============================================================================
-    // Private: Camera Math
+    // Private: Touch Event Handlers
     // ============================================================================
+
+    private onTouchStart = (e: TouchEvent): void => {
+        e.preventDefault();
+
+        if (e.touches.length === 1) {
+            // Single finger - start orbiting
+            this.touchState.touching = true;
+            this.touchState.lastX = e.touches[0].clientX;
+            this.touchState.lastY = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+            // Two fingers - start zooming
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            this.touchState.distance = Math.sqrt(dx * dx + dy * dy);
+        }
+    };
+
+    private onTouchMove = (e: TouchEvent): void => {
+        e.preventDefault();
+
+        if (e.touches.length === 1 && this.touchState.touching) {
+            // Single finger: orbit camera
+            const x = e.touches[0].clientX;
+            const y = e.touches[0].clientY;
+
+            const deltaX = x - this.touchState.lastX;
+            const deltaY = y - this.touchState.lastY;
+
+            this.handleOrbit(deltaX, deltaY);
+
+            this.touchState.lastX = x;
+            this.touchState.lastY = y;
+
+        } else if (e.touches.length === 2) {
+            // Two fingers: zoom camera
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Calculate delta for zoom (inverted relative to wheel)
+            // If distance increases, we zoom in (decrease distance)
+            const delta = this.touchState.distance - distance;
+
+            // Scale delta to be reasonable
+            this.handleZoom(delta * 0.05);
+
+            this.touchState.distance = distance;
+        }
+    };
+
+    private onTouchEnd = (e: TouchEvent): void => {
+        e.preventDefault();
+        if (e.touches.length === 0) {
+            this.touchState.touching = false;
+        }
+    };
+
+    // ============================================================================
+    // Private: Camera Logic
+    // ============================================================================
+
+    private handleOrbit(deltaX: number, deltaY: number): void {
+        this.azimuth -= deltaX * this.orbitSpeed;
+        this.elevation += deltaY * this.orbitSpeed;
+
+        // Clamp elevation to prevent flipping
+        this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
+
+        this.updateCamera();
+    }
+
+    private handleZoom(delta: number): void {
+        this.distance *= (1 + delta * this.zoomSpeed);
+        // Clamp distance
+        this.distance = Math.max(this.minDistance, Math.min(this.maxDistance, this.distance));
+        this.updateCamera();
+    }
 
     private updateCamera(): void {
         if (!this.app || !this.bus) return;

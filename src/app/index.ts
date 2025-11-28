@@ -38,7 +38,7 @@ export type { Extension, EventHandler } from './types.js';
 // Extensions
 export {
     OrbitControls,
-    TouchOrbitControls,
+
     ParameterPanelExtension,
     ProductionPanelExtension,
     KeyboardControls,

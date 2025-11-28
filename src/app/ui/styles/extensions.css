@@ -29,6 +29,7 @@
 
 #region-right.param-panel-region:not(.open) {
     transform: translateX(100%);
+    /* Ensure it's hidden on load without animation if possible */
 }
 
 #region-right.param-panel-region.open {
@@ -102,6 +103,26 @@
     left: 0;
     right: 0;
     z-index: 1001;
+}
+
+/* Prominent style for centered layout */
+[data-layout="centered"] .production-panel {
+    background: rgba(0, 0, 0, 0.85);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding: var(--ui-space-md) var(--ui-space-xl);
+    transform: scale(1.05);
+    transform-origin: bottom center;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+}
+
+[data-layout="centered"] .production-panel-bar {
+    height: 12px;
+    /* Thicker progress bar */
+}
+
+[data-layout="centered"] .production-panel-stats {
+    font-size: var(--ui-font-size-md);
+    /* Larger text */
 }
 
 .production-panel-progress {
@@ -276,8 +297,15 @@
 }
 
 @keyframes tile-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
 }
 
 /* ============================================

@@ -3,7 +3,6 @@
 
 export { UIExtension, type UIExtensionConfig } from './UIExtension.js';
 export { OrbitControls } from './OrbitControls.js';
-export { TouchOrbitControls } from './TouchOrbitControls.js';
 export { ParameterPanelExtension } from './ParameterPanelExtension.js';
 export { ProductionPanelExtension } from './ProductionPanelExtension.js';
 export { KeyboardControls } from './KeyboardControls.js';

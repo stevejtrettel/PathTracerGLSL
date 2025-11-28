@@ -282,6 +282,8 @@ export class ProductionPanelExtension extends UIExtension {
                 this.app.exportHDR();
                 break;
             case 'close':
+                // Close triggers stop, which triggers layout/resolution restore
+                this.app.stop();
                 this.hide();
                 break;
         }

@@ -54,11 +54,11 @@
     pointer-events: none;
 }
 
-#region-left > *,
-#region-right > *,
-#region-toolbar > *,
-#region-statusbar > *,
-#region-overlay > * {
+#region-left>*,
+#region-right>*,
+#region-toolbar>*,
+#region-statusbar>*,
+#region-overlay>* {
     pointer-events: auto;
 }
 
@@ -84,18 +84,18 @@
 
 [data-layout="fullscreen"] #region-left {
     position: fixed;
-    top: var(--layout-toolbar-height, 48px);
+    top: var(--layout-toolbar-height, 0px);
     left: 0;
-    height: calc(100vh - var(--layout-toolbar-height, 48px));
+    height: calc(100vh - var(--layout-toolbar-height, 0px));
     width: var(--layout-sidebar-width, 340px);
     z-index: 1000;
 }
 
 [data-layout="fullscreen"] #region-right {
     position: fixed;
-    top: var(--layout-toolbar-height, 48px);
+    top: var(--layout-toolbar-height, 0px);
     right: 0;
-    height: calc(100vh - var(--layout-toolbar-height, 48px));
+    height: calc(100vh - var(--layout-toolbar-height, 0px));
     width: var(--layout-sidebar-width, 340px);
     z-index: 1000;
 }
@@ -105,7 +105,7 @@
     top: 0;
     left: 0;
     right: 0;
-    height: var(--layout-toolbar-height, 48px);
+    height: var(--layout-toolbar-height, 0px);
     z-index: 1001;
 }
 
@@ -176,9 +176,23 @@
     z-index: 100;
 }
 
-[data-layout="centered"] #region-toolbar,
-[data-layout="centered"] #region-statusbar {
+[data-layout="centered"] #region-toolbar {
     display: none;
+}
+
+/* Statusbar is visible in centered mode for production info */
+[data-layout="centered"] #region-statusbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    pointer-events: none;
+    /* Let clicks pass through if empty */
+}
+
+[data-layout="centered"] #region-statusbar>* {
+    pointer-events: auto;
 }
 
 /* ============================================

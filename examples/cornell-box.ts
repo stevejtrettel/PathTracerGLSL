@@ -28,7 +28,6 @@
 import { App, STRATEGY_PRESETS } from '../src/app/index.js';
 import {
     OrbitControls,
-    TouchOrbitControls,
     ParameterPanelExtension,
     ProductionPanelExtension,
     RenderControlsExtension,
@@ -56,7 +55,6 @@ async function main() {
 
     // Install extensions
     app.use(new OrbitControls());
-    app.use(new TouchOrbitControls());
     app.use(new StatsPanel());              // Top-left: render stats
     app.use(new ParameterPanelExtension()); // Right sidebar: parameters (Tab to toggle)
     app.use(new ProductionPanelExtension()); // Bottom: progress during production renders

@@ -160,20 +160,13 @@ export class AppShortcutsExtension implements Extension {
     }
 
     private startProductionRender(): void {
-        const samplesStr = prompt('Target samples?', '1000');
-        if (samplesStr) {
-            const samples = parseInt(samplesStr);
-            if (samples > 0) {
-                this.app.renderProduction(samples).then(() => {
-                    console.log('Production render complete!');
-                }).catch(err => {
-                    if (err.name === 'RenderStopped') {
-                        console.log('Production render stopped');
-                    } else {
-                        console.error('Production render failed:', err);
-                    }
-                });
-            }
+        // Try to find the RenderControls extension which handles the UI
+        const renderControls = this.app.getExtension('render-controls');
+        if (renderControls && 'showProductionDialog' in renderControls) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (renderControls as any).showProductionDialog();
+        } else {
+            console.warn('RenderControls extension not found or incompatible. Cannot start production render UI.');
         }
     }
 }
