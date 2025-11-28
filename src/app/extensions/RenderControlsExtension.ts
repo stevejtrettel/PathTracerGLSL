@@ -34,6 +34,74 @@ export class RenderControlsExtension extends UIExtension {
 
     protected setup(): void {
         console.log('RenderControls (Production Setup) installed');
+        this.on('render.complete', this.onRenderComplete);
+    }
+
+    private onRenderComplete = (): void => {
+        console.log('RenderControlsExtension: render.complete event received');
+        // Small delay to ensure exports finish
+        setTimeout(() => {
+            console.log('RenderControlsExtension: showing completion dialog');
+            this.showCompletionDialog();
+        }, 100);
+    };
+
+    private showCompletionDialog(): void {
+        console.log('RenderControlsExtension: creating completion dialog');
+        const modal = new Modal('Render Complete', { width: 400 });
+
+        // Extend options
+        let extendSamples = 500;
+        modal.add(new NumberInput(extendSamples, {
+            label: 'Additional Samples',
+            min: 100,
+            max: 10000,
+            step: 100,
+            integer: true,
+            onChange: (v) => { extendSamples = v; }
+        }));
+
+        const footer = modal.addFooter();
+
+        // Return to Interactive (Primary action now that render is done)
+        new Button('Return to Interactive', () => {
+            console.log('Return to Interactive clicked');
+            modal.close();
+            this.app.stop(); // Triggers layout/resolution restore and unlock
+            // Restart interactive rendering
+            setTimeout(() => {
+                // Ensure we're not paused before starting
+                this.app.resume();
+                this.app.start();
+                console.log('Restarted interactive rendering');
+            }, 50);
+        }, { variant: 'primary' }).mount(footer);
+
+        // Extend Render
+        new Button('Extend Render', () => {
+            console.log('Extend Render clicked');
+            modal.close();
+            if (extendSamples > 0) {
+                this.app.extendProduction(extendSamples)
+                    .then(() => {
+                        console.log('Extended render complete, showing dialog again');
+                        // Show dialog again after extension completes
+                        // Use a delay to ensure state is settled
+                        setTimeout(() => {
+                            this.showCompletionDialog();
+                        }, 100);
+                    })
+                    .catch(err => {
+                        console.error('Extended render failed:', err);
+                        // Still return to interactive on error
+                        this.app.stop();
+                        setTimeout(() => this.app.start(), 50);
+                    });
+            }
+        }).mount(footer);
+
+        console.log('RenderControlsExtension: showing modal');
+        modal.show();
     }
 
     /**
@@ -105,7 +173,7 @@ export class RenderControlsExtension extends UIExtension {
                     autoExportAllAOVs: true,
                     autoSave: true
                 }).then(() => {
-                    console.log('Production render complete!');
+                    // Completion dialog will be triggered by render.complete event
                 }).catch(err => {
                     if (err.name === 'RenderStopped') {
                         console.log('Production render stopped');

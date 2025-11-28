@@ -130,23 +130,27 @@ export class App {
         };
 
         // Wire up automatic layout switching
+        // Production render events
         this.eventBus.on('render.started', (data: { mode: string }) => {
             if (data.mode === 'production' && this.layout) {
-                // Save current mode if we haven't already (handling potential restarts)
+                // Only save previous layout if we're not already in production mode
+                // This prevents extended renders from overwriting the original layout
                 if (!this.previousLayoutMode) {
                     this.previousLayoutMode = this.layout.mode;
+                    console.log(`Saved previous layout: ${this.previousLayoutMode}`);
                 }
-
-                // Switch to production layout
-                if (this.layout.mode !== this.productionLayoutMode) {
-                    this.setLayoutMode(this.productionLayoutMode);
-                    console.log(`Auto-switched layout to '${this.productionLayoutMode}' for production`);
-                }
+                this.setLayoutMode(this.productionLayoutMode);
+                console.log(`Switched to '${this.productionLayoutMode}' layout for production`);
             }
         });
 
         this.eventBus.on('render.stopped', () => {
             this.restoreLayout();
+            // Ensure parameters are unlocked when stopping production
+            if (this.parameterStore.isLocked()) {
+                this.parameterStore.unlock();
+                console.log('Unlocked parameters on render stop');
+            }
         });
 
 
