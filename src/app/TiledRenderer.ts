@@ -2,6 +2,7 @@
 // Production rendering with tiled output for App
 
 import type { App } from './App.js';
+import type { EventBus } from './EventBus.js';
 import { saveHDRFile, savePNGFile } from './utils/file-export.js';
 
 /**
@@ -54,6 +55,48 @@ export interface TileJob {
     state: 'running' | 'paused' | 'complete';
 }
 
+// ============================================================================
+// Tile Events
+// ============================================================================
+
+/**
+ * Progress info for a single tile
+ */
+export interface TileProgressInfo {
+    /** Tile grid position (0-indexed) */
+    tileX: number;
+    tileY: number;
+    /** Tile index in the grid (row-major order) */
+    tileIndex: number;
+    /** Total number of tiles */
+    totalTiles: number;
+    /** Grid dimensions */
+    grid: TileGrid;
+}
+
+/**
+ * Tiled job progress info
+ */
+export interface TiledJobProgressInfo {
+    /** Job ID */
+    jobId: string;
+    /** Grid configuration */
+    grid: TileGrid;
+    /** Target image size */
+    targetWidth: number;
+    targetHeight: number;
+    /** Samples per tile */
+    samplesPerTile: number;
+    /** Number of completed tiles */
+    completedTiles: number;
+    /** Total tiles */
+    totalTiles: number;
+    /** List of completed tile positions */
+    completedPositions: [number, number][];
+    /** Current tile being rendered (null if none) */
+    currentTile: { x: number; y: number } | null;
+}
+
 /**
  * TiledRenderer - Production rendering with tiled output
  *
@@ -77,10 +120,13 @@ export interface TileJob {
  */
 export class TiledRenderer {
     private app: App;
+    private bus: EventBus;
     private currentJob: TileJob | null = null;
+    private currentTilePosition: { x: number; y: number } | null = null;
 
-    constructor(app: App) {
+    constructor(app: App, bus: EventBus) {
         this.app = app;
+        this.bus = bus;
     }
 
     /**
@@ -133,6 +179,9 @@ export class TiledRenderer {
             startTime: Date.now(),
             state: 'running'
         };
+
+        // Emit job start event
+        this.emitJobProgress();
 
         // Save session before starting (for resume capability)
         const session = this.app.saveSession();
@@ -212,6 +261,8 @@ export class TiledRenderer {
                 // Check if job was stopped
                 if (!this.currentJob || this.currentJob.state !== 'running') {
                     console.log('Tile job stopped');
+                    this.currentTilePosition = null;
+                    this.emitJobProgress();
                     return;
                 }
 
@@ -225,16 +276,27 @@ export class TiledRenderer {
                 const tileNum = ty * grid.tilesX + tx + 1;
                 console.log(`\n[${tileNum}/${totalTiles}] Rendering tile [${tx}, ${ty}]`);
 
+                // Emit tile start event
+                this.currentTilePosition = { x: tx, y: ty };
+                this.emitTileStart(tx, ty, tileNum - 1, totalTiles, grid);
+                this.emitJobProgress();
+
                 try {
                     await this.renderTile(tx, ty);
 
                     this.currentJob.completedTiles.push([tx, ty]);
                     this.currentJob.completedTileCount++;
 
+                    // Emit tile complete event
+                    this.emitTileComplete(tx, ty, tileNum - 1, totalTiles, grid);
+                    this.emitJobProgress();
+
                 } catch (error: any) {
                     if (error.name === 'RenderStopped') {
                         console.log(`Tile [${tx}, ${ty}] stopped`);
                         this.currentJob.state = 'paused';
+                        this.currentTilePosition = null;
+                        this.emitJobProgress();
                         return;
                     } else {
                         console.error(`Tile [${tx}, ${ty}] failed:`, error);
@@ -244,6 +306,7 @@ export class TiledRenderer {
             }
         }
 
+        this.currentTilePosition = null;
         this.completeJob();
     }
 
@@ -282,6 +345,14 @@ export class TiledRenderer {
         console.log(`Total tiles: ${totalTiles}`);
         console.log(`Total time: ${(elapsed / 60).toFixed(1)} minutes`);
         console.log(`Avg per tile: ${(elapsed / totalTiles).toFixed(1)}s`);
+
+        // Emit final progress
+        this.emitJobProgress();
+        this.bus.emit('tiledJob.complete', {
+            jobId: this.currentJob.jobId,
+            totalTiles,
+            elapsedSeconds: elapsed
+        });
 
         // Cleanup: restore normal rendering state
         this.app.clearPixelOffset();
@@ -349,5 +420,52 @@ export class TiledRenderer {
         a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    // ============================================================================
+    // Private: Event Emission
+    // ============================================================================
+
+    private emitTileStart(tx: number, ty: number, tileIndex: number, totalTiles: number, grid: TileGrid): void {
+        const info: TileProgressInfo = {
+            tileX: tx,
+            tileY: ty,
+            tileIndex,
+            totalTiles,
+            grid
+        };
+        this.bus.emit('tile.start', info);
+    }
+
+    private emitTileComplete(tx: number, ty: number, tileIndex: number, totalTiles: number, grid: TileGrid): void {
+        const info: TileProgressInfo = {
+            tileX: tx,
+            tileY: ty,
+            tileIndex,
+            totalTiles,
+            grid
+        };
+        this.bus.emit('tile.complete', info);
+    }
+
+    private emitJobProgress(): void {
+        if (!this.currentJob) return;
+
+        const { config, grid, completedTiles, completedTileCount, jobId } = this.currentJob;
+        const totalTiles = grid.tilesX * grid.tilesY;
+
+        const info: TiledJobProgressInfo = {
+            jobId,
+            grid,
+            targetWidth: config.targetWidth,
+            targetHeight: config.targetHeight,
+            samplesPerTile: config.samplesPerTile,
+            completedTiles: completedTileCount,
+            totalTiles,
+            completedPositions: [...completedTiles],
+            currentTile: this.currentTilePosition
+        };
+
+        this.bus.emit('tiledJob.progress', info);
     }
 }

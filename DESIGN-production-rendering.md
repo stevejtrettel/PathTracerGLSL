@@ -1,491 +1,467 @@
-# Production Rendering System - Design Document
+# Production Rendering System
 
-## Overview
+## Implementation Status
 
-This document describes the design for a comprehensive production rendering system. The goal is to provide a complete workflow for high-quality offline renders, separate from the interactive preview mode.
+This document describes the production rendering system for high-resolution tiled renders.
 
-**Two distinct concerns:**
-
-1. **Render Settings** - UI for configuring production render parameters before starting
-2. **Production Display** - Dedicated view during rendering with progress visualization
-
----
-
-## User Workflow
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Interactive │────▶│ Configuring │────▶│  Rendering  │────▶│  Complete   │
-│    Mode     │     │   (Modal)   │     │   (Layout)  │     │  (Export)   │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-       ▲                   │                   │                   │
-       └───────────────────┴───────────────────┴───────────────────┘
-                              cancel / return to interactive
-```
-
-1. **Interactive Mode**: User explores scene, adjusts parameters, previews in real-time
-2. **Configuring**: User opens render settings modal, configures resolution/samples/tiling
-3. **Rendering**: Layout switches to production display, shows progress and preview
-4. **Complete**: Render finished, export options available, can return to interactive
-
----
-
-## Part 1: Render Settings
-
-### Purpose
-
-A modal dialog where the user configures all production render parameters before starting.
-
-### UI Mockup
-
-```
-┌─────────────────────────────────────────────────┐
-│  Production Render Settings                [×]  │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  Resolution                                     │
-│  ┌───────────────────────────────────────────┐  │
-│  │ ○ Canvas size (1920 × 1080)               │  │
-│  │ ○ Preset: [1080p ▼] [4K ▼] [8K ▼]         │  │
-│  │ ○ Custom: [____] × [____]                 │  │
-│  └───────────────────────────────────────────┘  │
-│                                                 │
-│  Quality                                        │
-│  Samples: [==========|==========] 1024          │
-│  (or presets: Draft 256 | Preview 512 |         │
-│   Production 2048 | High 4096)                  │
-│                                                 │
-│  Tiling                                         │
-│  [×] Enable tiled rendering                     │
-│      Tile size: [256 ▼] × [256 ▼]              │
-│      (Recommended for resolutions > 4K)         │
-│                                                 │
-│  ───────────────────────────────────────────    │
-│                                                 │
-│  Estimated time: ~5 min (based on current FPS)  │
-│  Output size: 1920×1080, ~6MB PNG               │
-│                                                 │
-│                [Cancel]    [Start Render]       │
-└─────────────────────────────────────────────────┘
-```
-
-### Data Structure
-
-```typescript
-interface ProductionRenderSettings {
-    // Resolution
-    resolutionMode: 'canvas' | 'preset' | 'custom';
-    preset?: '720p' | '1080p' | '2k' | '4k' | '8k';
-    customWidth?: number;
-    customHeight?: number;
-
-    // Computed final resolution
-    readonly width: number;
-    readonly height: number;
-
-    // Sampling
-    targetSamples: number;
-
-    // Tiling
-    tilingEnabled: boolean;
-    tileWidth: number;
-    tileHeight: number;
-
-    // Computed tile info
-    readonly tileGrid: [number, number];  // e.g., [4, 3] = 12 tiles
-    readonly totalTiles: number;
-}
-```
-
-### Resolution Presets
-
-| Preset | Resolution | Aspect Ratio |
-|--------|------------|--------------|
-| 720p   | 1280×720   | 16:9         |
-| 1080p  | 1920×1080  | 16:9         |
-| 2K     | 2560×1440  | 16:9         |
-| 4K     | 3840×2160  | 16:9         |
-| 8K     | 7680×4320  | 16:9         |
-
-### Implementation Considerations
-
-- **Where settings live**: Could be a standalone `RenderSettingsModal` component, or part of a `ProductionRenderExtension`
-- **Persistence**: Should settings persist in localStorage between sessions?
-- **Validation**: Warn if resolution is very large without tiling enabled
-- **Time estimation**: Based on current render FPS and sample count
-
----
-
-## Part 2: Production Display Mode
-
-### Purpose
-
-A dedicated layout mode during production rendering that provides:
-- Visual preview of the render in progress
-- Tile progress visualization (for tiled renders)
-- Detailed statistics and ETA
-- Render controls (pause/resume/cancel)
-- Export options on completion
-
-### Layout: `data-layout="production"`
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ region-toolbar                                                      │
-│ "Production Render: cornell-box"           [Pause] [Cancel]         │
-├─────────────────────────────────────┬───────────────────────────────┤
-│                                     │ region-right                  │
-│  canvas-container                   │                               │
-│  ┌─────────────────────────────┐   │ ┌───────────────────────────┐ │
-│  │                             │   │ │ Progress                  │ │
-│  │                             │   │ │ ████████████░░░░░░ 67%    │ │
-│  │    Render Preview           │   │ │                           │ │
-│  │    (scaled to fit)          │   │ │ Samples: 687 / 1024      │ │
-│  │                             │   │ │ Time: 5m 12s              │ │
-│  │                             │   │ │ ETA: 2m 34s               │ │
-│  └─────────────────────────────┘   │ │ Rate: 2.3 samples/sec     │ │
-│                                     │ └───────────────────────────┘ │
-│  Tile Grid (if tiling enabled)     │                               │
-│  ┌───┬───┬───┬───┐                 │ ┌───────────────────────────┐ │
-│  │ ✓ │ ✓ │ ✓ │ ✓ │                 │ │ Tiles                     │ │
-│  ├───┼───┼───┼───┤                 │ │ ████████████░░░░ 12/16    │ │
-│  │ ✓ │ ✓ │ ✓ │ ▶ │  ← current     │ │                           │ │
-│  ├───┼───┼───┼───┤                 │ │ Current: Tile 8 (2,1)     │ │
-│  │ ✓ │ ✓ │ ░ │ ░ │                 │ │ Tile samples: 450/1024    │ │
-│  ├───┼───┼───┼───┤                 │ └───────────────────────────┘ │
-│  │ ░ │ ░ │ ░ │ ░ │                 │                               │
-│  └───┴───┴───┴───┘                 │ ┌───────────────────────────┐ │
-│                                     │ │ On Complete:              │ │
-│                                     │ │ [Export PNG] [Export HDR] │ │
-│                                     │ │ [Return to Interactive]   │ │
-│                                     │ └───────────────────────────┘ │
-├─────────────────────────────────────┴───────────────────────────────┤
-│ region-statusbar                                                    │
-│ [████████████████████░░░░░░░░░░] 67% | 687/1024 samples | ETA 2:34  │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Preview Rendering
-
-**Options:**
-
-1. **Scaled display of full buffer**: Render at full resolution, display scaled down
-   - Pro: See actual pixels
-   - Con: Memory intensive for large renders
-
-2. **Separate preview buffer**: Maintain a small preview texture updated periodically
-   - Pro: Fast, low memory
-   - Con: Not pixel-accurate
-
-3. **Progressive display**: Show tiles as they complete
-   - Pro: Visual feedback of progress
-   - Con: May look choppy
-
-**Recommendation**: For tiled rendering, show completed tiles at full resolution in their grid positions. For non-tiled, scale the live buffer to fit.
-
-### Tile Progress Visualization
-
-**Tile States:**
-- `pending` (░) - Not started
-- `rendering` (▶) - Currently rendering
-- `complete` (✓) - Finished
-
-**Data Structure:**
-
-```typescript
-interface TileState {
-    index: number;
-    gridPosition: [number, number];  // [col, row]
-    pixelBounds: { x: number, y: number, width: number, height: number };
-    state: 'pending' | 'rendering' | 'complete';
-    samples: number;
-}
-
-interface TileProgress {
-    grid: [number, number];           // [cols, rows]
-    tiles: TileState[];
-    currentTileIndex: number | null;
-    completedCount: number;
-    totalTiles: number;
-}
-```
-
-### Render Controls During Production
-
-| Control | Behavior |
-|---------|----------|
-| **Pause** | Stop accumulating samples, keep current state |
-| **Resume** | Continue from where paused |
-| **Cancel** | Abort render, return to interactive (confirm dialog?) |
-| **Export** | Available on completion, or mid-render for current state |
-
----
-
-## Part 3: Current System Analysis
-
-### What Exists
+### What's Done
 
 | Component | Location | Status |
 |-----------|----------|--------|
-| Layout system | `src/app/layout/` | ✅ Ready (need to add 'production' mode) |
-| Modal component | `src/app/ui/containers/Modal.ts` | ✅ Exists |
-| Form inputs | `src/app/ui/inputs/` | ✅ Complete |
-| Progress events | `EventBus` → `render.progress` | ✅ Exists (needs tile info) |
-| Tiled rendering | `App.setPixelOffset()`, `setImageSize()` | ✅ Engine supports |
-| Export | `App.exportPNG()`, `exportHDR()` | ✅ Exists |
-| Pause/Resume | `App.pause()`, `resume()` | ✅ Exists |
+| UIExtension base class | `src/app/extensions/UIExtension.ts` | Complete |
+| TiledRenderer with events | `src/app/TiledRenderer.ts` | Complete |
+| Tile progress visualization | `src/app/extensions/ProductionPanelExtension.ts` | Complete |
+| Tile grid CSS | `src/app/ui/styles/extensions.css` | Complete |
+| Shared utilities | `src/app/utils/format.ts`, `dom.ts` | Complete |
+| Layout system | `src/app/layout/` | Complete |
+| Production mode events | `EventBus` | Complete |
 
-### What Needs to Be Added
+### What's Left to Optimize
 
 | Component | Description | Priority |
 |-----------|-------------|----------|
-| `ProductionRenderSettings` | Data structure for render config | High |
-| `RenderSettingsModal` | UI for configuring render | High |
-| `production` layout mode | CSS for production display | High |
-| `ProductionDisplayExtension` | Main production mode UI | High |
-| Tile progress tracking | Engine → UI tile state | Medium |
-| Preview rendering | Scaled preview during render | Medium |
-| State machine | App state: interactive/configuring/rendering/complete | Medium |
+| Settings Modal | UI for configuring render before starting | High |
+| Low-res preview | Thumbnail of completed tiles | Medium |
 | Time estimation | ETA based on render rate | Low |
+| Settings persistence | localStorage for render settings | Low |
 
 ---
 
-## Part 4: Extension Coordination
+## Architecture
 
-### How Extensions Respond to Production Mode
+### Three-Layer Architecture
 
-Extensions need to know when production mode starts/ends:
-
-```typescript
-// Option A: EventBus events
-bus.on('production.start', (settings: ProductionRenderSettings) => { ... });
-bus.on('production.complete', () => { ... });
-bus.on('production.cancel', () => { ... });
-
-// Option B: App state query
-if (app.getState() === 'production') { ... }
-
-// Option C: Mode change event
-bus.on('mode.change', (mode: 'interactive' | 'production') => { ... });
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         App Layer                           │
+│  - App (orchestration)                                      │
+│  - TiledRenderer (tiled job management)                     │
+│  - Extensions (UI components)                               │
+│  - EventBus (event coordination)                            │
+├─────────────────────────────────────────────────────────────┤
+│                        Engine Layer                         │
+│  - Engine (GPU execution)                                   │
+│  - RenderCoordinator (render loop, production mode)         │
+├─────────────────────────────────────────────────────────────┤
+│                       Compiler Layer                        │
+│  - SimpleCompiler (code generation)                         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Extension Behavior by Mode
+### Render Mode System
 
-| Extension | Interactive Mode | Production Mode |
-|-----------|-----------------|-----------------|
-| `ParameterPanelExtension` | Normal (Tab toggle) | Hidden or disabled |
-| `StatsPanel` | Top-left overlay | Hidden (info in production panel) |
-| `RenderControlsExtension` | Toolbar with "Render" button | Hidden (controls in production panel) |
-| `OrbitControls` | Active | Disabled (camera locked) |
-| `ProductionDisplayExtension` | Hidden/inactive | Active, takes over layout |
+The system uses `RenderCoordinator` to manage render modes:
+
+```typescript
+type RenderMode = 'interactive' | 'production';
+type RenderState = 'rendering' | 'paused' | 'complete' | 'stopped';
+```
+
+**Events emitted by RenderCoordinator:**
+- `render.started` - Render begins (includes `mode` and `targetSamples`)
+- `render.progress` - Per-frame progress update
+- `render.complete` - Production render reached target
+- `render.stopped` - Render cancelled
+- `render.locked` / `render.unlocked` - Parameter locking state
 
 ---
 
-## Part 5: State Machine
+## Tiled Rendering
 
-### Application States
+### Overview
+
+For high-resolution renders (4K+), the image is split into tiles. Each tile is rendered separately and saved to disk, avoiding memory limits.
+
+### TiledRenderer
+
+Location: `src/app/TiledRenderer.ts`
 
 ```typescript
-type AppMode = 'interactive' | 'configuring' | 'production' | 'complete';
+const bus = app.getEventBus();
+const tiled = new TiledRenderer(app, bus);
 
-interface AppState {
-    mode: AppMode;
-
-    // Only when mode === 'production' or 'complete'
-    productionSettings?: ProductionRenderSettings;
-    productionProgress?: ProductionProgress;
-}
+await tiled.startJob({
+    targetWidth: 4096,
+    targetHeight: 2048,
+    targetTileSize: 512,
+    samplesPerTile: 1000,
+    format: 'hdr'  // 'hdr' | 'png' | 'both'
+});
 ```
 
-### State Transitions
+**Features:**
+- Calculates optimal tile grid to divide evenly
+- Renders tiles row-by-row
+- Saves each tile immediately after completion
+- Supports pause/resume
+- Emits progress events for UI
 
-```
-                    ┌──────────────────────────────────────┐
-                    ▼                                      │
-┌─────────────┐  openSettings()  ┌─────────────┐          │
-│ interactive │─────────────────▶│ configuring │          │
-└─────────────┘                  └─────────────┘          │
-       ▲                               │                  │
-       │                    startRender()                 │
-       │                               ▼                  │
-       │                         ┌───────────┐            │
-       │ cancel()                │production │───────────▶│
-       └─────────────────────────┴───────────┘  complete  │
-                                       │                  │
-                                cancel()                  │
-                                       │                  │
-                                       └──────────────────┘
-```
+### Tile Events
 
-### Where State Lives
+TiledRenderer emits these events through EventBus:
 
-**Option A: In App**
 ```typescript
-class App {
-    private _mode: AppMode = 'interactive';
-
-    get mode(): AppMode { return this._mode; }
-
-    openRenderSettings(): void { ... }
-    startProduction(settings: ProductionRenderSettings): void { ... }
-    cancelProduction(): void { ... }
-}
-```
-
-**Option B: In separate RenderSession**
-```typescript
-class RenderSession {
-    readonly settings: ProductionRenderSettings;
-    readonly progress: ProductionProgress;
-
-    start(): Promise<void>;
-    pause(): void;
-    resume(): void;
-    cancel(): void;
+// Job-level progress
+interface TiledJobProgressInfo {
+    jobId: string;
+    grid: TileGrid;
+    targetWidth: number;
+    targetHeight: number;
+    samplesPerTile: number;
+    completedTiles: number;
+    totalTiles: number;
+    completedPositions: [number, number][];
+    currentTile: { x: number; y: number } | null;
 }
 
-// App creates sessions
-const session = app.createRenderSession(settings);
-await session.start();
-```
+bus.on('tiledJob.progress', (info: TiledJobProgressInfo) => {
+    console.log(`${info.completedTiles}/${info.totalTiles} tiles done`);
+});
 
-**Recommendation**: Option B provides cleaner separation. A RenderSession encapsulates everything about one production render.
+bus.on('tiledJob.complete', (data) => {
+    console.log(`Job ${data.jobId} complete in ${data.elapsedSeconds}s`);
+});
 
----
-
-## Part 6: Engine Integration
-
-### Current Tiled Rendering API
-
-```typescript
-// Set the region of the full image this render covers
-app.setPixelOffset(tileX * tileWidth, tileY * tileHeight);
-app.setImageSize(fullWidth, fullHeight);
-
-// Render to the tile-sized canvas
-// ... rendering happens ...
-
-// Read pixels and composite into full image buffer
-```
-
-### Needed: Tile Progress Events
-
-```typescript
-interface TileProgressEvent {
-    type: 'tile.start' | 'tile.progress' | 'tile.complete';
+// Individual tile events
+interface TileProgressInfo {
+    tileX: number;
+    tileY: number;
     tileIndex: number;
-    gridPosition: [number, number];
-    samples: number;
-    targetSamples: number;
+    totalTiles: number;
+    grid: TileGrid;
 }
 
-bus.on('tile.start', (e: TileProgressEvent) => { ... });
-bus.on('tile.progress', (e: TileProgressEvent) => { ... });
-bus.on('tile.complete', (e: TileProgressEvent) => { ... });
+bus.on('tile.start', (info: TileProgressInfo) => { ... });
+bus.on('tile.complete', (info: TileProgressInfo) => { ... });
 ```
 
-### Full Image Buffer Management
-
-For tiled rendering, need an offscreen buffer to composite tiles:
+### Tile Grid Configuration
 
 ```typescript
-class TiledRenderBuffer {
-    private buffer: ImageData | Float32Array;  // HDR support
+interface TileJobConfig {
+    targetWidth: number;      // Full image width
+    targetHeight: number;     // Full image height
+    targetTileSize: number;   // Preferred tile size (adjusted to divide evenly)
+    samplesPerTile: number;   // Samples to render per tile
+    format: 'hdr' | 'png' | 'both';
+}
 
-    constructor(width: number, height: number, hdr: boolean);
-
-    writeTile(x: number, y: number, data: ImageData): void;
-    getFullImage(): ImageData;
-    exportPNG(): Blob;
-    exportHDR(): Blob;
+interface TileGrid {
+    tilesX: number;      // Number of columns
+    tilesY: number;      // Number of rows
+    tileWidth: number;   // Actual tile width
+    tileHeight: number;  // Actual tile height
 }
 ```
 
 ---
 
-## Part 7: Implementation Phases
+## UI Extensions
 
-### Phase 1: Foundation
-- [ ] Add `production` layout mode CSS
-- [ ] Create `ProductionRenderSettings` type
-- [ ] Add App state machine (mode property)
-- [ ] Add mode change events to EventBus
+### UIExtension Base Class
 
-### Phase 2: Settings Modal
-- [ ] Create `RenderSettingsModal` using existing Modal + inputs
-- [ ] Resolution presets and custom input
-- [ ] Sample count with presets
-- [ ] Tiling toggle and size config
-- [ ] Time/size estimation
+Location: `src/app/extensions/UIExtension.ts`
 
-### Phase 3: Production Display
-- [ ] Create `ProductionDisplayExtension`
-- [ ] Production layout regions (preview + info panel)
-- [ ] Progress visualization (overall + per-tile)
-- [ ] Render controls (pause/resume/cancel)
-- [ ] Export UI on completion
+All UI extensions extend this base class for consistent behavior:
 
-### Phase 4: Tiled Rendering Integration
-- [ ] Tile progress events from engine
-- [ ] Tile grid visualization
-- [ ] `TiledRenderBuffer` for compositing
-- [ ] Preview of completed tiles
+```typescript
+abstract class UIExtension implements Extension {
+    abstract readonly name: string;
+    protected abstract readonly region: RegionName;
 
-### Phase 5: Polish
-- [ ] Time estimation algorithm
-- [ ] Persist settings to localStorage
-- [ ] Keyboard shortcuts for production mode
-- [ ] Animation/transitions between modes
+    // Lifecycle
+    protected abstract createRoot(): HTMLElement;
+    protected abstract setup(): void;
+    protected cleanup(): void {}
+
+    // Visibility
+    show(): void;
+    hide(): void;
+    toggle(): void;
+    get isVisible(): boolean;
+
+    // Event helpers (auto-cleanup on uninstall)
+    protected on(event: string, handler: (data?: any) => void): void;
+}
+```
+
+**Features:**
+- Mounts to layout region if available, otherwise standalone
+- Automatic event subscription cleanup
+- Show/hide/toggle visibility helpers
+- Consistent install/uninstall lifecycle
+
+### ProductionPanelExtension
+
+Location: `src/app/extensions/ProductionPanelExtension.ts`
+
+Shows production render progress at the bottom of the screen.
+
+**Features:**
+- Progress bar with percentage
+- Sample count, elapsed time, ETA
+- Tile grid visualization (for tiled renders)
+- Pause/Resume/Cancel buttons
+- Export PNG/HDR buttons on completion
+
+**Tile Grid Visualization:**
+```
+┌───┬───┬───┬───┐
+│ ✓ │ ✓ │ ✓ │ ✓ │  ✓ = complete (green)
+├───┼───┼───┼───┤
+│ ✓ │ ✓ │ ▶ │   │  ▶ = current (blue, pulsing)
+├───┼───┼───┼───┤
+│   │   │   │   │    = pending (gray)
+└───┴───┴───┴───┘
+```
+
+**Events Listened:**
+- `render.started` - Show panel for production mode
+- `render.progress` - Update stats and progress bar
+- `render.complete` - Show export buttons
+- `render.stopped` - Hide panel
+- `tiledJob.progress` - Update tile grid
+
+### StatsPanel
+
+Location: `src/app/extensions/StatsPanel.ts`
+
+Displays render statistics overlay (top-left).
+
+**Features:**
+- Sample count
+- FPS
+- Elapsed time
+- Render state indicator
+- Toggle with 'S' key
+- Auto-hides during production renders
+
+### RenderControlsExtension
+
+Location: `src/app/extensions/RenderControlsExtension.ts`
+
+Toolbar with render controls.
+
+**Features:**
+- Scene title
+- Sample count input
+- "Render" button to start production
+- Disabled during production mode
+
+### ParameterPanelExtension
+
+Location: `src/app/extensions/ParameterPanelExtension.ts`
+
+Slide-out panel for parameter editing.
+
+**Features:**
+- Auto-generates controls from metadata
+- Groups parameters by category
+- Toggle with 'Tab' key
+- Hidden/disabled during production mode
 
 ---
 
-## Open Questions
+## Shared Utilities
 
-1. **Preview strategy**: Should we render a separate low-res preview, or just scale the full buffer?
+### formatTime
 
-2. **Tile compositing**: WebGL offscreen buffer, or CPU-side ImageData?
+Location: `src/app/utils/format.ts`
 
-3. **Memory management**: For 8K renders, how do we handle memory limits?
+```typescript
+import { formatTime } from './utils/format.js';
 
-4. **Cancel confirmation**: Require confirmation to cancel mid-render?
+formatTime(5000);    // "5s"
+formatTime(125000);  // "2m 5s"
+formatTime(3700000); // "1h 1m"
+```
 
-5. **Background rendering**: Could the render continue if user switches tabs? (Service Worker?)
+### isTypingInInput
 
-6. **Batch rendering**: Future support for rendering multiple frames/cameras?
+Location: `src/app/utils/dom.ts`
+
+```typescript
+import { isTypingInInput } from './utils/dom.js';
+
+document.addEventListener('keydown', (e) => {
+    if (isTypingInInput(e)) return;  // Skip if user is typing
+    // Handle keyboard shortcuts...
+});
+```
 
 ---
 
-## File Structure (Proposed)
+## CSS Structure
+
+### Extension Styles
+
+Location: `src/app/ui/styles/extensions.css`
+
+**Production Panel:**
+- `.production-panel` - Main container
+- `.production-panel-progress` - Progress bar section
+- `.production-panel-stats` - Statistics display
+- `.production-panel-controls` - Button container
+- `.production-panel-tiles` - Tile grid section
+
+**Tile Grid:**
+- `.tile-grid` - CSS grid container
+- `.tile-cell` - Individual tile cell
+- `.tile-cell.complete` - Completed tile (green + checkmark)
+- `.tile-cell.current` - Current tile (blue + pulsing animation)
+- `.tile-grid-header` - "Tiles" label and count
+
+---
+
+## Usage Example
+
+### Starting a Tiled Production Render
+
+```typescript
+import { App, TiledRenderer } from './src/app/index.js';
+
+// Create app
+const app = App.create(document.body, { layout: 'fullscreen' });
+await app.initialize({ scene, strategies });
+app.start();
+
+// Install extensions
+app.use(new ProductionPanelExtension());
+app.use(new StatsPanel());
+
+// Start tiled render
+const bus = app.getEventBus();
+const tiled = new TiledRenderer(app, bus);
+
+await tiled.startJob({
+    targetWidth: 8192,
+    targetHeight: 4096,
+    targetTileSize: 1024,
+    samplesPerTile: 2000,
+    format: 'both'
+});
+// Tiles are saved automatically as they complete
+// ProductionPanelExtension shows progress with tile grid
+```
+
+### Listening to Progress
+
+```typescript
+const bus = app.getEventBus();
+
+// Overall job progress
+bus.on('tiledJob.progress', (info) => {
+    console.log(`Tiles: ${info.completedTiles}/${info.totalTiles}`);
+    if (info.currentTile) {
+        console.log(`Rendering tile [${info.currentTile.x}, ${info.currentTile.y}]`);
+    }
+});
+
+// Individual tile events
+bus.on('tile.complete', (info) => {
+    console.log(`Tile [${info.tileX}, ${info.tileY}] done`);
+});
+
+// Job completion
+bus.on('tiledJob.complete', (data) => {
+    console.log(`All ${data.totalTiles} tiles rendered in ${data.elapsedSeconds}s`);
+});
+```
+
+---
+
+## What's Not Implemented Yet
+
+### Settings Modal
+
+A modal dialog for configuring render settings before starting:
+- Resolution presets (1080p, 4K, 8K) or custom
+- Sample count presets (Draft, Preview, Production)
+- Tiling options (enable/disable, tile size)
+- Time/size estimation
+
+**Proposed location:** `src/app/ui/containers/RenderSettingsModal.ts`
+
+### Low-Resolution Preview
+
+During tiled rendering, show a small preview of completed tiles:
+- Downscale completed tiles to fit in preview area
+- Update as each tile completes
+- Helps verify render is proceeding correctly
+
+**Proposed approach:** Store small thumbnail per tile, composite into preview canvas.
+
+### Time Estimation
+
+Calculate ETA based on:
+- Average time per tile (from completed tiles)
+- Remaining tiles
+- Account for variance in render time
+
+**Implementation note:** Already have `formatTime()` utility, just need the calculation logic.
+
+---
+
+## File Structure
 
 ```
 src/app/
-├── production/
-│   ├── index.ts
-│   ├── ProductionRenderSettings.ts    # Data types
-│   ├── RenderSession.ts               # State machine for one render
-│   ├── TiledRenderBuffer.ts           # Tile compositing
-│   └── ProductionDisplayExtension.ts  # Main UI extension
-├── ui/
-│   └── containers/
-│       └── RenderSettingsModal.ts     # Settings modal
-└── layout/
-    └── layouts.css                    # Add [data-layout="production"]
+├── extensions/
+│   ├── UIExtension.ts           # Base class for UI extensions
+│   ├── ProductionPanelExtension.ts  # Production progress UI
+│   ├── StatsPanel.ts            # Stats overlay
+│   ├── RenderControlsExtension.ts   # Toolbar
+│   ├── ParameterPanelExtension.ts   # Parameter panel
+│   ├── KeyboardControls.ts      # Keyboard shortcuts
+│   ├── AppShortcutsExtension.ts # App-level shortcuts
+│   └── index.ts                 # Extension exports
+├── utils/
+│   ├── format.ts                # formatTime()
+│   └── dom.ts                   # isTypingInInput()
+├── ui/styles/
+│   └── extensions.css           # Extension styling
+├── TiledRenderer.ts             # Tiled rendering logic
+├── RenderCoordinator.ts         # Render loop & mode management
+├── App.ts                       # Main orchestrator
+└── index.ts                     # Public exports
 ```
+
+---
+
+## Event Reference
+
+### Render Events (from RenderCoordinator)
+
+| Event | Data | Description |
+|-------|------|-------------|
+| `render.started` | `{ mode, targetSamples? }` | Render begins |
+| `render.progress` | `ProgressInfo` | Per-frame update |
+| `render.complete` | `{ samples, elapsedTime }` | Target reached |
+| `render.stopped` | - | Render cancelled |
+| `render.paused` | - | Render paused |
+| `render.resumed` | - | Render resumed |
+| `render.locked` | - | Parameters locked |
+| `render.unlocked` | - | Parameters unlocked |
+
+### Tile Events (from TiledRenderer)
+
+| Event | Data | Description |
+|-------|------|-------------|
+| `tiledJob.progress` | `TiledJobProgressInfo` | Job-level progress |
+| `tiledJob.complete` | `{ jobId, totalTiles, elapsedSeconds }` | All tiles done |
+| `tile.start` | `TileProgressInfo` | Tile begins |
+| `tile.complete` | `TileProgressInfo` | Tile finished |
 
 ---
 
 ## Summary
 
-The production rendering system consists of:
+The production rendering system provides:
 
-1. **Settings Modal**: Configure resolution, samples, tiling before render
-2. **Production Layout Mode**: Dedicated view during rendering
-3. **RenderSession**: State machine managing one production render
-4. **Tile Progress**: Track and visualize tile-by-tile progress
-5. **Extension Coordination**: Other extensions respond to mode changes
+1. **Tiled Rendering** - Split large images into manageable tiles
+2. **Event-Driven UI** - Extensions respond to render events automatically
+3. **Visual Progress** - Tile grid with checkmarks and current tile highlight
+4. **Auto-Save** - Tiles saved immediately as they complete
+5. **Pause/Resume** - Control render execution
 
-The existing infrastructure (layout system, UI components, engine tiling support) provides a solid foundation. The main work is:
-- Adding a new layout mode
-- Building the settings modal
-- Creating the production display extension
-- Connecting tile progress from engine to UI
+The core infrastructure is complete. Remaining work is UI polish (settings modal, preview, estimation).

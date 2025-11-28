@@ -6,80 +6,51 @@
  * Features:
  * - Progress bar with sample count and percentage
  * - ETA calculation
+ * - Tile grid visualization for tiled renders
  * - Pause/Resume, Cancel buttons
  * - Export PNG/HDR buttons on completion
- * - Auto-shows during production renders, auto-hides when done
+ * - Auto-shows during production renders, auto-hides when returning to interactive
  *
  * Mounts to region-statusbar if layout available, otherwise fixed to bottom.
  * Styles are defined in ui/styles/extensions.css
  */
-import type { App } from '../App.js';
-import type { EventBus } from '../EventBus.js';
-import type { Extension } from '../types.js';
+import { UIExtension } from './UIExtension.js';
+import type { RegionName } from '../layout/index.js';
 import type { ProgressInfo } from '../RenderCoordinator.js';
+import type { TiledJobProgressInfo } from '../TiledRenderer.js';
+import { formatTime } from '../utils/format.js';
 
-// Ensure UI styles (including extensions.css) are loaded
-import '../ui/index.js';
-
-export class ProductionPanelExtension implements Extension {
+export class ProductionPanelExtension extends UIExtension {
     name = 'production-panel';
-    version = '1.0.0';
+    version = '2.1.0';
     description = 'Production render progress and controls';
 
-    private app!: App;
-    private bus!: EventBus;
-    private panel: HTMLDivElement | null = null;
+    protected readonly region: RegionName = 'region-statusbar';
+
     private barFill: HTMLDivElement | null = null;
     private statsContainer: HTMLDivElement | null = null;
     private controlsContainer: HTMLDivElement | null = null;
+    private tileGridContainer: HTMLDivElement | null = null;
 
-    private isVisible = false;
-    private isComplete = false;
-    private startTime = 0;
+    // Track tiled job state
+    private tiledJob: TiledJobProgressInfo | null = null;
 
-    // Event handler references for cleanup
-    private progressHandler: ((info: ProgressInfo) => void) | null = null;
-
-    install(app: App, bus: EventBus): void {
-        this.app = app;
-        this.bus = bus;
-
-        this.createPanel();
-        this.attachEventListeners();
-
-        console.log('ProductionPanel installed');
-    }
-
-    uninstall(): void {
-        this.detachEventListeners();
-        this.panel?.remove();
+    constructor() {
+        super({ startHidden: true });
     }
 
     // ============================================================================
-    // Public API
+    // UIExtension Implementation
     // ============================================================================
 
-    show(): void {
-        if (this.panel && !this.isVisible) {
-            this.panel.classList.remove('hidden');
-            this.isVisible = true;
-        }
-    }
+    protected createRoot(): HTMLElement {
+        const panel = document.createElement('div');
+        panel.className = 'production-panel';
 
-    hide(): void {
-        if (this.panel && this.isVisible) {
-            this.panel.classList.add('hidden');
-            this.isVisible = false;
-        }
-    }
-
-    // ============================================================================
-    // Private: Setup
-    // ============================================================================
-
-    private createPanel(): void {
-        this.panel = document.createElement('div');
-        this.panel.className = 'production-panel hidden';
+        // Tile grid section (only shown for tiled renders)
+        this.tileGridContainer = document.createElement('div');
+        this.tileGridContainer.className = 'production-panel-tiles hidden';
+        panel.appendChild(this.tileGridContainer);
 
         // Progress section
         const progress = document.createElement('div');
@@ -102,71 +73,121 @@ export class ProductionPanelExtension implements Extension {
         this.controlsContainer = document.createElement('div');
         this.controlsContainer.className = 'production-panel-controls';
 
-        this.panel.appendChild(progress);
-        this.panel.appendChild(this.controlsContainer);
+        panel.appendChild(progress);
+        panel.appendChild(this.controlsContainer);
 
-        // Mount to layout region or body
-        if (this.app.hasLayout()) {
-            const statusbar = this.app.getRegion('region-statusbar');
-            statusbar.appendChild(this.panel);
-        } else {
-            this.panel.classList.add('standalone');
-            document.body.appendChild(this.panel);
-        }
+        return panel;
     }
 
-    private attachEventListeners(): void {
-        this.progressHandler = (info: ProgressInfo) => this.onProgress(info);
-        this.bus.on('render.progress', this.progressHandler);
-    }
+    protected setup(): void {
+        // Mode transitions
+        this.on('render.started', this.onRenderStarted);
+        this.on('render.complete', this.onRenderComplete);
+        this.on('render.stopped', this.onRenderStopped);
 
-    private detachEventListeners(): void {
-        if (this.progressHandler) {
-            this.bus.off('render.progress', this.progressHandler);
-        }
+        // Progress updates (only during production)
+        this.on('render.progress', this.onProgress);
+
+        // Tiled job events
+        this.on('tiledJob.progress', this.onTiledJobProgress);
+        this.on('tiledJob.complete', this.onTiledJobComplete);
+
+        console.log(`ProductionPanel installed [${this.useLayout ? 'layout' : 'standalone'}]`);
     }
 
     // ============================================================================
-    // Private: Progress Handling
+    // Event Handlers
     // ============================================================================
 
-    private onProgress(info: ProgressInfo): void {
-        // Only show during production mode
-        if (info.mode !== 'production') {
-            if (this.isVisible) {
-                this.hide();
-                this.isComplete = false;
-            }
-            return;
+    private onRenderStarted = (data: { mode: string; targetSamples?: number }): void => {
+        if (data.mode === 'production') {
+            this.resetProgress();
+            this.show();
         }
+    };
 
-        // Show panel if not visible
+    private onRenderComplete = (): void => {
+        // Keep visible to show completion state and export buttons
+        // Will be hidden when user clicks "Close" or starts new render
+        if (this.barFill) {
+            this.barFill.classList.add('complete');
+        }
+    };
+
+    private onRenderStopped = (): void => {
+        // Hide when render is cancelled/stopped
+        this.hide();
+        this.resetProgress();
+    };
+
+    private onProgress = (info: ProgressInfo): void => {
+        // Only update during production mode
+        if (info.mode !== 'production') return;
+
+        // Skip progress bar updates during tiled job (we use tile progress instead)
+        if (!this.tiledJob) {
+            this.updateProgressBar(info);
+        }
+        this.updateStats(info);
+        this.updateControls(info);
+    };
+
+    private onTiledJobProgress = (info: TiledJobProgressInfo): void => {
+        this.tiledJob = info;
+
+        // Show panel if not already visible
         if (!this.isVisible) {
             this.show();
-            this.startTime = Date.now() - info.elapsedTime;
-            this.isComplete = false;
         }
 
-        // Update progress bar
-        const percent = info.percentComplete ?? 0;
+        // Update tile grid
+        this.updateTileGrid(info);
+
+        // Update progress bar based on tile progress
         if (this.barFill) {
+            const percent = (info.completedTiles / info.totalTiles) * 100;
             this.barFill.style.width = `${percent}%`;
-            if (info.state === 'complete') {
-                this.barFill.classList.add('complete');
-            } else {
-                this.barFill.classList.remove('complete');
-            }
         }
+    };
 
-        // Update stats
-        this.updateStats(info);
+    private onTiledJobComplete = (): void => {
+        if (this.barFill) {
+            this.barFill.classList.add('complete');
+        }
+    };
 
-        // Update controls
-        this.updateControls(info);
+    // ============================================================================
+    // UI Updates
+    // ============================================================================
 
-        // Track completion
-        if (info.state === 'complete' && !this.isComplete) {
-            this.isComplete = true;
+    private resetProgress(): void {
+        if (this.barFill) {
+            this.barFill.style.width = '0%';
+            this.barFill.classList.remove('complete');
+        }
+        if (this.statsContainer) {
+            this.statsContainer.innerHTML = '';
+        }
+        if (this.controlsContainer) {
+            this.controlsContainer.innerHTML = '';
+        }
+        if (this.tileGridContainer) {
+            this.tileGridContainer.innerHTML = '';
+            this.tileGridContainer.classList.add('hidden');
+        }
+        this.tiledJob = null;
+    }
+
+    private updateProgressBar(info: ProgressInfo): void {
+        if (!this.barFill) return;
+
+        const percent = info.percentComplete ?? 0;
+        this.barFill.style.width = `${percent}%`;
+
+        if (info.state === 'complete') {
+            this.barFill.classList.add('complete');
+        } else {
+            this.barFill.classList.remove('complete');
         }
     }
 
@@ -195,7 +216,7 @@ export class ProductionPanelExtension implements Extension {
         }
 
         // Elapsed time
-        stats.push(this.createStat('Elapsed', this.formatTime(info.elapsedTime)));
+        stats.push(this.createStat('Elapsed', formatTime(info.elapsedTime)));
 
         // State indicator
         if (info.state === 'paused') {
@@ -219,16 +240,13 @@ export class ProductionPanelExtension implements Extension {
         const buttons: string[] = [];
 
         if (info.state === 'complete') {
-            // Export buttons
             buttons.push(this.createButton('Export PNG', 'exportPNG', 'success'));
             buttons.push(this.createButton('Export HDR', 'exportHDR', 'success'));
             buttons.push(this.createButton('Close', 'close', ''));
         } else if (info.state === 'paused') {
-            // Resume/Cancel
             buttons.push(this.createButton('Resume', 'resume', 'primary'));
             buttons.push(this.createButton('Cancel', 'cancel', 'danger'));
         } else {
-            // Pause/Cancel
             buttons.push(this.createButton('Pause', 'pause', ''));
             buttons.push(this.createButton('Cancel', 'cancel', 'danger'));
         }
@@ -256,7 +274,6 @@ export class ProductionPanelExtension implements Extension {
                 break;
             case 'cancel':
                 this.app.stop();
-                this.hide();
                 break;
             case 'exportPNG':
                 this.app.exportPNG();
@@ -271,7 +288,54 @@ export class ProductionPanelExtension implements Extension {
     }
 
     // ============================================================================
-    // Private: Utilities
+    // Tile Grid
+    // ============================================================================
+
+    private updateTileGrid(info: TiledJobProgressInfo): void {
+        if (!this.tileGridContainer) return;
+
+        const { grid, completedPositions, currentTile } = info;
+        const completedSet = new Set(completedPositions.map(([x, y]) => `${x},${y}`));
+
+        // Build the grid HTML
+        let html = `<div class="tile-grid-header">
+            <span class="tile-grid-title">Tiles</span>
+            <span class="tile-grid-count">${info.completedTiles} / ${info.totalTiles}</span>
+        </div>`;
+
+        html += '<div class="tile-grid" style="' +
+            `grid-template-columns: repeat(${grid.tilesX}, 1fr);` +
+            `grid-template-rows: repeat(${grid.tilesY}, 1fr);">`;
+
+        for (let y = 0; y < grid.tilesY; y++) {
+            for (let x = 0; x < grid.tilesX; x++) {
+                const key = `${x},${y}`;
+                const isComplete = completedSet.has(key);
+                const isCurrent = currentTile && currentTile.x === x && currentTile.y === y;
+
+                let className = 'tile-cell';
+                let content = '';
+
+                if (isComplete) {
+                    className += ' complete';
+                    content = '✓';
+                } else if (isCurrent) {
+                    className += ' current';
+                    content = '▶';
+                }
+
+                html += `<div class="${className}" title="Tile [${x}, ${y}]">${content}</div>`;
+            }
+        }
+
+        html += '</div>';
+
+        this.tileGridContainer.innerHTML = html;
+        this.tileGridContainer.classList.remove('hidden');
+    }
+
+    // ============================================================================
+    // Utilities
     // ============================================================================
 
     private calculateETA(info: ProgressInfo): string | null {
@@ -284,22 +348,6 @@ export class ProductionPanelExtension implements Extension {
 
         if (!isFinite(remainingMs) || remainingMs < 0) return null;
 
-        return this.formatTime(remainingMs);
-    }
-
-    private formatTime(ms: number): string {
-        const seconds = Math.floor(ms / 1000);
-
-        if (seconds < 60) {
-            return `${seconds}s`;
-        } else if (seconds < 3600) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}m ${secs}s`;
-        } else {
-            const hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            return `${hours}h ${mins}m`;
-        }
+        return formatTime(remainingMs);
     }
 }

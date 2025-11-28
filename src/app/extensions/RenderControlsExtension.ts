@@ -3,57 +3,37 @@
  *
  * Provides UI controls for triggering production renders.
  *
- * Phase 1: Simple toolbar with render button and sample count input.
- * Future: Could open a modal for full render settings (resolution, tiles, etc.)
+ * Features:
+ * - Toolbar with app title and render button
+ * - Sample count input
+ * - Button state changes during production (disabled + "Rendering...")
  *
  * Mounts to region-toolbar if layout available, otherwise fixed to top.
  * Styles are defined in ui/styles/extensions.css
  */
-import type { App } from '../App.js';
-import type { EventBus } from '../EventBus.js';
-import type { Extension } from '../types.js';
+import { UIExtension } from './UIExtension.js';
+import type { RegionName } from '../layout/index.js';
 
-// Ensure UI styles (including extensions.css) are loaded
-import '../ui/index.js';
-
-export class RenderControlsExtension implements Extension {
+export class RenderControlsExtension extends UIExtension {
     name = 'render-controls';
-    version = '1.0.0';
+    version = '2.0.0';
     description = 'Production render controls toolbar';
 
-    private app!: App;
-    private toolbar: HTMLDivElement | null = null;
+    protected readonly region: RegionName = 'region-toolbar';
+
     private renderButton: HTMLButtonElement | null = null;
     private samplesInput: HTMLInputElement | null = null;
-    private useLayout = false;
 
-    // Default render settings
     private defaultSamples = 1024;
-
-    install(app: App, _bus: EventBus): void {
-        this.app = app;
-        this.useLayout = app.hasLayout();
-
-        this.createToolbar();
-
-        const modeStr = this.useLayout ? 'layout-integrated' : 'standalone';
-        console.log(`RenderControls installed [${modeStr}]`);
-    }
-
-    uninstall(): void {
-        this.toolbar?.remove();
-        this.toolbar = null;
-        this.renderButton = null;
-        this.samplesInput = null;
-    }
+    private isRendering = false;
 
     // ============================================================================
-    // Private: Setup
+    // UIExtension Implementation
     // ============================================================================
 
-    private createToolbar(): void {
-        this.toolbar = document.createElement('div');
-        this.toolbar.className = 'render-controls-toolbar';
+    protected createRoot(): HTMLElement {
+        const toolbar = document.createElement('div');
+        toolbar.className = 'render-controls-toolbar';
 
         // App title/logo area (left)
         const titleArea = document.createElement('div');
@@ -88,16 +68,45 @@ export class RenderControlsExtension implements Extension {
         controlsArea.appendChild(samplesLabel);
         controlsArea.appendChild(this.renderButton);
 
-        this.toolbar.appendChild(titleArea);
-        this.toolbar.appendChild(controlsArea);
+        toolbar.appendChild(titleArea);
+        toolbar.appendChild(controlsArea);
 
-        // Mount
-        if (this.useLayout) {
-            const toolbarRegion = this.app.getRegion('region-toolbar');
-            toolbarRegion.appendChild(this.toolbar);
-        } else {
-            this.toolbar.classList.add('standalone');
-            document.body.appendChild(this.toolbar);
+        return toolbar;
+    }
+
+    protected setup(): void {
+        // Listen to mode changes
+        this.on('render.started', this.onRenderStarted);
+        this.on('render.complete', this.onRenderEnded);
+        this.on('render.stopped', this.onRenderEnded);
+
+        console.log(`RenderControls installed [${this.useLayout ? 'layout' : 'standalone'}]`);
+    }
+
+    // ============================================================================
+    // Event Handlers
+    // ============================================================================
+
+    private onRenderStarted = (data: { mode: string }): void => {
+        if (data.mode === 'production') {
+            this.setRenderingState(true);
+        }
+    };
+
+    private onRenderEnded = (): void => {
+        this.setRenderingState(false);
+    };
+
+    private setRenderingState(rendering: boolean): void {
+        this.isRendering = rendering;
+
+        if (this.renderButton) {
+            this.renderButton.disabled = rendering;
+            this.renderButton.textContent = rendering ? 'Rendering...' : 'Render';
+        }
+
+        if (this.samplesInput) {
+            this.samplesInput.disabled = rendering;
         }
     }
 
@@ -106,13 +115,9 @@ export class RenderControlsExtension implements Extension {
     // ============================================================================
 
     private async startRender(): Promise<void> {
-        if (!this.samplesInput || !this.renderButton) return;
+        if (!this.samplesInput || !this.renderButton || this.isRendering) return;
 
         const targetSamples = parseInt(this.samplesInput.value, 10) || this.defaultSamples;
-
-        // Disable button during render
-        this.renderButton.disabled = true;
-        this.renderButton.textContent = 'Rendering...';
 
         try {
             console.log(`Starting production render: ${targetSamples} samples`);
@@ -120,12 +125,6 @@ export class RenderControlsExtension implements Extension {
             console.log('Production render complete');
         } catch (error) {
             console.error('Render failed:', error);
-        } finally {
-            // Re-enable button
-            if (this.renderButton) {
-                this.renderButton.disabled = false;
-                this.renderButton.textContent = 'Render';
-            }
         }
     }
 
@@ -133,25 +132,19 @@ export class RenderControlsExtension implements Extension {
     // Public API
     // ============================================================================
 
-    /**
-     * Get current sample count setting
-     */
+    /** Get current sample count setting */
     getSampleCount(): number {
         return parseInt(this.samplesInput?.value || String(this.defaultSamples), 10);
     }
 
-    /**
-     * Set sample count
-     */
+    /** Set sample count */
     setSampleCount(samples: number): void {
         if (this.samplesInput) {
             this.samplesInput.value = String(samples);
         }
     }
 
-    /**
-     * Programmatically trigger a render
-     */
+    /** Programmatically trigger a render */
     async triggerRender(samples?: number): Promise<void> {
         if (samples !== undefined) {
             this.setSampleCount(samples);

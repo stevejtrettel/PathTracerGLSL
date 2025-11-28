@@ -8,63 +8,92 @@
  * - Slide-in/out animation with Tab key toggle
  * - Grouped by module type, sorted by MODULE_ORDER
  * - Throttled updates for smooth performance
- * - Integrates with AppLayout when available (region-right)
+ * - Disables during production mode (params are locked anyway)
+ *
+ * Mounts to region-right if layout available, otherwise creates standalone wrapper.
  */
-import type { Extension, ParameterMetadata } from '../types.js';
-import type { App } from '../App.js';
-import type { EventBus } from '../EventBus.js';
+import { UIExtension } from './UIExtension.js';
+import type { RegionName } from '../layout/index.js';
+import type { ParameterMetadata } from '../types.js';
 import { MODULE_ORDER } from '../../engine/types.js';
-
-// Import UI components (styles loaded via ui/index.js which imports components.css → extensions.css)
 import { Panel, Folder } from '../ui/index.js';
 import { WidgetFactory } from '../ui/WidgetFactory.js';
 import type { UIComponent } from '../ui/index.js';
 
-export class ParameterPanelExtension implements Extension {
+export class ParameterPanelExtension extends UIExtension {
     name = 'parameter-panel';
-    version = '4.0.0';
-    description = 'Auto-generated parameter controls panel with layout integration';
+    version = '5.0.0';
+    description = 'Auto-generated parameter controls panel';
 
-    private app!: App;
+    protected readonly region: RegionName = 'region-right';
+
     private panel!: Panel;
     private folders: Map<string, Folder> = new Map();
     private widgets: UIComponent[] = [];
     private isOpen = false;
 
-    // Mode tracking
-    private useLayout = false;
-    private region: HTMLElement | null = null;
-    private standaloneWrapper: HTMLElement | null = null;
+    // The container that receives 'open' class (region or standalone wrapper)
+    private toggleContainer: HTMLElement | null = null;
 
     // Update throttling
     private updateQueue = new Map<string, unknown>();
     private throttleTimer: number | null = null;
-    private readonly THROTTLE_MS = 16; // ~60fps
+    private readonly THROTTLE_MS = 16;
 
-    // Keyboard handler reference for cleanup
+    // Keyboard handler
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
-    install(app: App, _bus: EventBus): void {
-        this.app = app;
+    // ============================================================================
+    // UIExtension Implementation
+    // ============================================================================
 
-        // Determine if layout is available
-        this.useLayout = app.hasLayout();
+    protected createRoot(): HTMLElement {
+        this.panel = new Panel({ title: 'Parameters', className: 'param-panel' });
+        this.panel.setSubtitle('Press Tab to toggle');
+        return this.panel.domElement;
+    }
 
-        this.createPanel();
+    protected mount(): void {
+        if (this.useLayout) {
+            // Layout mode: mount to region, add special class to region for animation
+            const region = this.app.getRegion(this.region);
+            region.classList.add('param-panel-region');
+            region.appendChild(this.root);
+            this.toggleContainer = region;
+        } else {
+            // Standalone mode: create wrapper
+            const wrapper = document.createElement('div');
+            wrapper.className = 'param-panel-standalone';
+            wrapper.appendChild(this.root);
+            document.body.appendChild(wrapper);
+            this.toggleContainer = wrapper;
+        }
+    }
+
+    protected setup(): void {
         this.populatePanel();
         this.attachKeyboardShortcut();
 
-        const modeStr = this.useLayout ? 'layout-integrated' : 'standalone';
-        console.log(`Parameter Panel installed (Tab to toggle) [${modeStr}]`);
+        // Disable during production mode
+        this.on('render.started', this.onRenderStarted);
+        this.on('render.complete', this.onRenderEnded);
+        this.on('render.stopped', this.onRenderEnded);
+
+        console.log(`ParameterPanel installed (Tab to toggle) [${this.useLayout ? 'layout' : 'standalone'}]`);
     }
 
-    uninstall(): void {
+    protected cleanup(): void {
         // Remove keyboard listener
         if (this.keydownHandler) {
             window.removeEventListener('keydown', this.keydownHandler, true);
         }
 
-        // Dispose all widgets
+        // Clear timer
+        if (this.throttleTimer !== null) {
+            clearTimeout(this.throttleTimer);
+        }
+
+        // Dispose widgets
         for (const widget of this.widgets) {
             widget.dispose();
         }
@@ -76,48 +105,75 @@ export class ParameterPanelExtension implements Extension {
         }
         this.folders.clear();
 
-        // Remove DOM elements
+        // Dispose panel
         this.panel?.dispose();
 
-        // Cleanup based on mode
-        if (this.useLayout && this.region) {
-            this.region.classList.remove('param-panel-region', 'open');
-        }
-        this.standaloneWrapper?.remove();
-
-        // Clear timer
-        if (this.throttleTimer !== null) {
-            clearTimeout(this.throttleTimer);
-        }
-    }
-
-    // ============================================================================
-    // Setup
-    // ============================================================================
-
-    private createPanel(): void {
-        // Create panel using UI component
-        this.panel = new Panel({ title: 'Parameters', className: 'param-panel' });
-        this.panel.setSubtitle('Press Tab to toggle');
-
+        // Cleanup region class
         if (this.useLayout) {
-            // Layout-integrated mode: mount to region-right
-            this.region = this.app.getRegion('region-right');
-            this.region.classList.add('param-panel-region');
-            this.panel.mount(this.region);
-        } else {
-            // Standalone mode: create wrapper and append to body
-            this.standaloneWrapper = document.createElement('div');
-            this.standaloneWrapper.className = 'param-panel-standalone';
-            this.panel.mount(this.standaloneWrapper);
-            document.body.appendChild(this.standaloneWrapper);
+            const region = this.app.getRegion(this.region);
+            region.classList.remove('param-panel-region', 'open');
+        }
+
+        // Remove standalone wrapper
+        if (!this.useLayout && this.toggleContainer) {
+            this.toggleContainer.remove();
         }
     }
+
+    // ============================================================================
+    // Mode Handling
+    // ============================================================================
+
+    private onRenderStarted = (data: { mode: string }): void => {
+        if (data.mode === 'production') {
+            this.close();
+            this.setDisabled(true);
+        }
+    };
+
+    private onRenderEnded = (): void => {
+        this.setDisabled(false);
+    };
+
+    private setDisabled(disabled: boolean): void {
+        this.root.style.pointerEvents = disabled ? 'none' : '';
+        this.root.style.opacity = disabled ? '0.5' : '';
+    }
+
+    // ============================================================================
+    // Toggle (custom - uses 'open' class on container)
+    // ============================================================================
+
+    toggle(): void {
+        this.isOpen = !this.isOpen;
+        this.toggleContainer?.classList.toggle('open', this.isOpen);
+    }
+
+    open(): void {
+        if (!this.isOpen) {
+            this.isOpen = true;
+            this.toggleContainer?.classList.add('open');
+        }
+    }
+
+    close(): void {
+        if (this.isOpen) {
+            this.isOpen = false;
+            this.toggleContainer?.classList.remove('open');
+        }
+    }
+
+    get isVisible(): boolean {
+        return this.isOpen;
+    }
+
+    // ============================================================================
+    // Panel Population
+    // ============================================================================
 
     private populatePanel(): void {
         const metadata = this.app.getParameterMetadata();
 
-        // Show empty state if no parameters
         if (metadata.size === 0) {
             const empty = document.createElement('div');
             empty.className = 'param-empty';
@@ -126,13 +182,9 @@ export class ParameterPanelExtension implements Extension {
             return;
         }
 
-        // Group parameters by group name
         const groups = this.groupParameters(metadata);
-
-        // Sort groups by MODULE_ORDER
         const sortedGroups = this.sortGroups(groups);
 
-        // Create folders for each group
         for (const [groupName, params] of sortedGroups) {
             const folder = new Folder(`${groupName} (${params.length})`);
 
@@ -146,10 +198,6 @@ export class ParameterPanelExtension implements Extension {
             this.folders.set(groupName, folder);
         }
     }
-
-    // ============================================================================
-    // Parameter Grouping
-    // ============================================================================
 
     private groupParameters(
         metadata: Map<string, ParameterMetadata>
@@ -170,14 +218,12 @@ export class ParameterPanelExtension implements Extension {
     private sortGroups(
         groups: Map<string, Array<{ path: string; meta: ParameterMetadata }>>
     ): Map<string, Array<{ path: string; meta: ParameterMetadata }>> {
-        // Create ordering from MODULE_ORDER
         const order = new Map<string, number>();
         MODULE_ORDER.forEach((kind, index) => {
             const groupName = kind.charAt(0).toUpperCase() + kind.slice(1);
             order.set(groupName, index);
         });
 
-        // Sort groups
         const sorted = Array.from(groups.entries()).sort((a, b) => {
             const orderA = order.get(a[0]) ?? 999;
             const orderB = order.get(b[0]) ?? 999;
@@ -186,10 +232,6 @@ export class ParameterPanelExtension implements Extension {
 
         return new Map(sorted);
     }
-
-    // ============================================================================
-    // Widget Creation
-    // ============================================================================
 
     private createWidgetForParam(path: string, meta: ParameterMetadata): UIComponent {
         const currentValue = this.app.getParameter(path) ?? meta.default;
@@ -201,14 +243,14 @@ export class ParameterPanelExtension implements Extension {
     }
 
     // ============================================================================
-    // Update Management
+    // Update Throttling
     // ============================================================================
 
     private queueUpdate(path: string, value: unknown): void {
         this.updateQueue.set(path, value);
 
         if (this.throttleTimer !== null) {
-            return; // Already scheduled
+            return;
         }
 
         this.throttleTimer = window.setTimeout(() => {
@@ -225,49 +267,12 @@ export class ParameterPanelExtension implements Extension {
     }
 
     // ============================================================================
-    // Toggle
+    // Keyboard Shortcut
     // ============================================================================
-
-    private toggle(): void {
-        this.isOpen = !this.isOpen;
-
-        // Toggle panel visibility based on mode
-        if (this.useLayout && this.region) {
-            this.region.classList.toggle('open', this.isOpen);
-        } else if (this.standaloneWrapper) {
-            this.standaloneWrapper.classList.toggle('open', this.isOpen);
-        }
-    }
-
-    /**
-     * Programmatically open the panel
-     */
-    open(): void {
-        if (!this.isOpen) {
-            this.toggle();
-        }
-    }
-
-    /**
-     * Programmatically close the panel
-     */
-    close(): void {
-        if (this.isOpen) {
-            this.toggle();
-        }
-    }
-
-    /**
-     * Check if the panel is currently open
-     */
-    isVisible(): boolean {
-        return this.isOpen;
-    }
 
     private attachKeyboardShortcut(): void {
         this.keydownHandler = (e: KeyboardEvent) => {
             if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-                // Allow Tab in form fields within the panel itself
                 const target = e.target as HTMLElement;
                 const inPanel = target.closest('.param-panel') ||
                                target.closest('.param-panel-standalone') ||
@@ -281,7 +286,6 @@ export class ParameterPanelExtension implements Extension {
             }
         };
 
-        // Use capture phase to intercept Tab before browser's focus cycling
         window.addEventListener('keydown', this.keydownHandler, { capture: true });
     }
 }

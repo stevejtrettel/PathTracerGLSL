@@ -15,7 +15,9 @@ export {
     TiledRenderer,
     type TileJobConfig,
     type TileGrid,
-    type TileJob
+    type TileJob,
+    type TileProgressInfo,
+    type TiledJobProgressInfo
 } from './TiledRenderer.js';
 
 export {
