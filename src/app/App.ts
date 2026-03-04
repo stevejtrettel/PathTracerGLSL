@@ -5,15 +5,15 @@ import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
 import { ParameterStore } from './ParameterStore.js';
 import { EventBus } from './EventBus.js';
-import { ExportManager } from './ExportManager.js';
-import { SessionManager, type SessionData } from './SessionManager.js';
-import { ProductionRenderManager } from './ProductionRenderManager.js';
 import { RendererManager } from './RendererManager.js';
 import { AppLayout, type LayoutMode, type RegionName } from './layout/index.js';
 import type { ICompiler, CompiledRenderer, SceneDescription } from '../compiler/types.js';
-import type { AppConfig, StrategyPreset, CreateAppOptions } from './types.js';
+import type { AppConfig, StrategyPreset, CreateAppOptions, SessionData } from './types.js';
+import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
 import { AppEvents } from './events.js';
+import { saveHDRFile, savePNGFile } from './utils/file-export.js';
+import { ExportError, SessionError } from '../errors/RenderErrors.js';
 
 export class App {
     private compiler: ICompiler;
@@ -21,13 +21,13 @@ export class App {
     private coordinator: RenderCoordinator;
     private parameterStore: ParameterStore;
     private eventBus: EventBus;
-    private exportManager: ExportManager;
-    private sessionManager: SessionManager;
-    private productionManager!: ProductionRenderManager;
     private rendererManager!: RendererManager;
     private gl: WebGL2RenderingContext;
     private extensions: Map<string, Extension> = new Map();
     private layout: AppLayout | null = null;
+    private previousLayoutMode: LayoutMode | null = null;
+    private previousResolution: [number, number] | null = null;
+    private productionLayoutMode: LayoutMode = 'centered';
 
     constructor(canvas: HTMLCanvasElement) {
         canvas.width = canvas.clientWidth || window.innerWidth;
@@ -53,23 +53,12 @@ export class App {
         this.parameterStore = new ParameterStore();
         this.coordinator = new RenderCoordinator(this.engine, this.eventBus);
 
-        this.exportManager = new ExportManager(this.engine, this.coordinator);
         this.rendererManager = new RendererManager({
             compiler: this.compiler,
             engine: this.engine,
             parameterStore: this.parameterStore,
             eventBus: this.eventBus,
         });
-        this.sessionManager = new SessionManager(
-            this.parameterStore,
-            this.eventBus,
-            this.extensions,
-            () => this.rendererManager.getActiveRendererId(),
-            (id: string) => this.rendererManager.selectRenderer(id),
-            () => this.coordinator.getProductionGoal(),
-            undefined  // TileJob getter — set externally via setTileJobGetter()
-        );
-
         // Wire ParameterStore changes to engine, EventBus, and accumulation reset
         this.parameterStore.onChange = (changes) => {
             for (const change of changes.changes) {
@@ -100,18 +89,26 @@ export class App {
             this.eventBus.emit(AppEvents.RENDER_PROGRESS, info);
         };
 
-        this.productionManager = new ProductionRenderManager({
-            coordinator: this.coordinator,
-            parameterStore: this.parameterStore,
-            eventBus: this.eventBus,
-            gl: this.gl,
-            getLayout: () => this.layout,
-            setLayoutMode: (mode) => this.setLayoutMode(mode),
-            resize: (w, h) => this.resize(w, h),
-            exportPNG: (f) => this.exportPNG(f),
-            exportHDR: (f) => this.exportHDR(f),
-            exportAllAOVs: () => this.exportAllAOVs(),
-            quickSave: () => this.quickSave(),
+        // Production render lifecycle: auto-switch layout on start, restore on stop
+        this.eventBus.on(AppEvents.RENDER_STARTED, (data: { mode: string }) => {
+            if (data.mode === 'production') {
+                if (this.layout) {
+                    if (!this.previousLayoutMode) {
+                        this.previousLayoutMode = this.layout.mode;
+                        console.log(`Saved previous layout: ${this.previousLayoutMode}`);
+                    }
+                    this.setLayoutMode(this.productionLayoutMode);
+                    console.log(`Switched to '${this.productionLayoutMode}' layout for production`);
+                }
+            }
+        });
+
+        this.eventBus.on(AppEvents.RENDER_STOPPED, () => {
+            this._restoreProductionLayout();
+            if (this.parameterStore.isLocked()) {
+                this.parameterStore.unlock();
+                console.log('Unlocked parameters on render stop');
+            }
         });
 
         console.log('App created');
@@ -197,11 +194,79 @@ export class App {
         autoExportHDR?: boolean;
         autoExportAllAOVs?: boolean;
     }): Promise<void> {
-        return this.productionManager.renderProduction(targetSamples, options);
+        this.parameterStore.lock();
+
+        const canvas = this.gl.canvas as HTMLCanvasElement;
+        const originalWidth = canvas.width;
+        const originalHeight = canvas.height;
+
+        if (options?.width && options?.height) {
+            if (options.width !== originalWidth || options.height !== originalHeight) {
+                console.log(`Resizing for production: ${options.width}x${options.height}`);
+                this.previousResolution = [originalWidth, originalHeight];
+                this.resize(options.width, options.height);
+            }
+        }
+
+        this.coordinator.resetAccumulation('production_start');
+
+        try {
+            await this.coordinator.startProduction({
+                targetSamples,
+                onProgress: (info) => {
+                    if (info.samples % 100 === 0) {
+                        const pct = info.percentComplete?.toFixed(1) || '0.0';
+                        console.log(`Production: ${info.samples}/${targetSamples} (${pct}%)`);
+                    }
+                }
+            });
+
+            if (options?.autoExportPNG) { console.log('Auto-exporting PNG...'); this.exportPNG(); }
+            if (options?.autoExportHDR) { console.log('Auto-exporting HDR...'); this.exportHDR(); }
+            if (options?.autoExportAllAOVs) { console.log('Auto-exporting all AOVs...'); this.exportAllAOVs(); }
+            if (options?.autoSave) { console.log('Auto-saving session...'); this.quickSave(); }
+        } finally {
+            this.parameterStore.unlock();
+        }
     }
 
     async extendProduction(additionalSamples: number): Promise<void> {
-        return this.productionManager.extendProduction(additionalSamples);
+        const currentSamples = this.coordinator.getSampleCount();
+        const newTarget = currentSamples + additionalSamples;
+
+        console.log(`Extending production: +${additionalSamples} (${currentSamples} → ${newTarget})`);
+
+        const wasLocked = this.parameterStore.isLocked();
+        if (!wasLocked) {
+            this.parameterStore.lock();
+        }
+
+        try {
+            await this.coordinator.startProduction({
+                targetSamples: newTarget
+            });
+        } finally {
+            if (!wasLocked) {
+                this.parameterStore.unlock();
+            }
+        }
+    }
+
+    private _restoreProductionLayout(): void {
+        if (this.previousLayoutMode && this.layout) {
+            if (this.layout.mode !== this.previousLayoutMode) {
+                this.setLayoutMode(this.previousLayoutMode);
+                console.log(`Restored layout to '${this.previousLayoutMode}'`);
+            }
+            this.previousLayoutMode = null;
+        }
+
+        if (this.previousResolution) {
+            const [width, height] = this.previousResolution;
+            console.log(`Restoring resolution: ${width}x${height}`);
+            this.resize(width, height);
+            this.previousResolution = null;
+        }
     }
 
     // -- Rendering: Utilities --
@@ -285,12 +350,130 @@ export class App {
     getParameterMetadata(): Map<string, import('../app/types.js').ParameterMetadata> { return this.rendererManager.getParameterMetadata(); }
     areParametersLocked(): boolean { return this.parameterStore.isLocked(); }
 
-    // -- Session Management --
+    // -- Session --
 
-    saveSession(): SessionData { return this.sessionManager.saveSession(); }
-    restoreSession(session: SessionData): SessionData { return this.sessionManager.restoreSession(session); }
-    quickSave(): void { this.sessionManager.quickSave(); }
-    loadSessionFromFile(): void { this.sessionManager.loadSessionFromFile(); }
+    saveSession(): SessionData {
+        try {
+            const session = this._buildSessionState();
+            this.eventBus.emit(AppEvents.SESSION_SAVED, session);
+            return session;
+        } catch (error) {
+            throw new SessionError('Failed to save session', { error });
+        }
+    }
+
+    restoreSession(session: SessionData): SessionData {
+        try {
+            if (!session || typeof session !== 'object') {
+                throw new SessionError('Invalid session data: expected object', { session });
+            }
+
+            if (session.parameters) {
+                this.parameterStore.restore(session.parameters);
+            }
+
+            if (session.rendererId) {
+                this.rendererManager.selectRenderer(session.rendererId);
+            }
+
+            if (session.extensions) {
+                for (const [name, state] of Object.entries(session.extensions)) {
+                    const ext = this.extensions.get(name);
+                    if (ext?.restoreState) {
+                        ext.restoreState(state);
+                    }
+                }
+            }
+
+            console.log('Session restored');
+            this.eventBus.emit(AppEvents.SESSION_LOADED, session);
+            return session;
+        } catch (error) {
+            if (error instanceof SessionError) throw error;
+            throw new SessionError('Failed to restore session', { error });
+        }
+    }
+
+    quickSave(): void {
+        try {
+            const session = this.saveSession();
+            const filename = this._generateSessionFilename();
+
+            const json = JSON.stringify(session, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            console.log(`Session saved: ${filename}`);
+        } catch (error) {
+            throw new SessionError('Failed to quick save session', { error });
+        }
+    }
+
+    loadSessionFromFile(): void {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const session = JSON.parse(text);
+                this.restoreSession(session);
+                console.log(`Session loaded from: ${file.name}`);
+            } catch (error) {
+                if (error instanceof SessionError) throw error;
+                throw new SessionError('Failed to load session from file', {
+                    filename: file.name,
+                    error
+                });
+            }
+        };
+
+        input.click();
+    }
+
+    private _buildSessionState(): SessionData {
+        const extensionStates: Record<string, any> = {};
+        for (const [name, ext] of this.extensions) {
+            if (ext.saveState) {
+                extensionStates[name] = ext.saveState();
+            }
+        }
+
+        const session: SessionData = {
+            version: SESSION_VERSION,
+            timestamp: Date.now(),
+            parameters: this.parameterStore.serialize(),
+            rendererId: this.rendererManager.getActiveRendererId(),
+            extensions: extensionStates
+        };
+
+        const productionGoal = this.coordinator.getProductionGoal();
+        if (productionGoal) {
+            session.productionGoal = productionGoal;
+        }
+
+        return session;
+    }
+
+    private _generateSessionFilename(): string {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return `session_${year}${month}${day}_${hours}${minutes}${seconds}.json`;
+    }
 
     // -- Resize --
 
@@ -314,14 +497,122 @@ export class App {
 
     // -- Export --
 
-    getAvailableExports(): string[] { return this.exportManager.getAvailableExports(); }
-    readExport(name: string): Float32Array | Uint8Array { return this.exportManager.readExport(name); }
-    getCanvasSize(): [number, number] { return this.exportManager.getCanvasSize(); }
+    getAvailableExports(): string[] { return this.engine.getExportNames(); }
+    readExport(name: string): Float32Array | Uint8Array { return this.engine.readExport(name); }
+    getCanvasSize(): [number, number] { return this.engine.getCanvasSize(); }
     getCanvas(): HTMLCanvasElement { return this.gl.canvas as HTMLCanvasElement; }
-    exportPNG(filename?: string): void { this.exportManager.exportPNG(filename); }
-    exportHDR(filename?: string): void { this.exportManager.exportHDR(filename); }
-    exportAOV(aovName: string, filename?: string): void { this.exportManager.exportAOV(aovName, filename); }
-    exportAllAOVs(): void { this.exportManager.exportAllAOVs(); }
+
+    exportPNG(filename?: string): void {
+        const exports = this.getAvailableExports();
+        if (!exports.includes('ldr')) {
+            throw new ExportError('LDR export not available for current renderer', {
+                availableExports: exports
+            });
+        }
+
+        try {
+            const [width, height] = this.getCanvasSize();
+            const pixels = this.readExport('ldr') as Uint8Array;
+            const name = filename || this._generateExportFilename('screenshot', 'png');
+            savePNGFile(pixels, width, height, name);
+            console.log(`Exported PNG: ${name}`);
+        } catch (error) {
+            if (error instanceof ExportError) throw error;
+            throw new ExportError('Failed to export PNG', { error });
+        }
+    }
+
+    exportHDR(filename?: string): void {
+        const exports = this.getAvailableExports();
+        if (!exports.includes('hdr')) {
+            throw new ExportError('HDR export not available for current renderer', {
+                availableExports: exports
+            });
+        }
+
+        try {
+            const [width, height] = this.getCanvasSize();
+            const pixels = this.readExport('hdr') as Float32Array;
+            const name = filename || this._generateExportFilename('radiance', 'hdr');
+            saveHDRFile(pixels, width, height, name);
+            console.log(`Exported HDR: ${name}`);
+        } catch (error) {
+            if (error instanceof ExportError) throw error;
+            throw new ExportError('Failed to export HDR', { error });
+        }
+    }
+
+    exportAOV(aovName: string, filename?: string): void {
+        const exports = this.getAvailableExports();
+        if (!exports.includes(aovName)) {
+            throw new ExportError(`AOV '${aovName}' not available`, {
+                requestedAOV: aovName,
+                availableExports: exports
+            });
+        }
+
+        try {
+            const [width, height] = this.getCanvasSize();
+            const pixels = this.readExport(aovName);
+            const name = filename || this._generateExportFilename(aovName, 'hdr');
+
+            if (pixels instanceof Float32Array) {
+                saveHDRFile(pixels, width, height, name);
+                console.log(`Exported AOV (HDR): ${name}`);
+            } else {
+                const pngName = filename || this._generateExportFilename(aovName, 'png');
+                savePNGFile(pixels, width, height, pngName);
+                console.log(`Exported AOV (PNG): ${pngName}`);
+            }
+        } catch (error) {
+            if (error instanceof ExportError) throw error;
+            throw new ExportError(`Failed to export AOV '${aovName}'`, { aovName, error });
+        }
+    }
+
+    exportAllAOVs(): void {
+        const exports = this.getAvailableExports();
+        const aovs = exports.filter(e => e !== 'hdr' && e !== 'ldr');
+
+        if (aovs.length === 0) {
+            throw new ExportError('No AOVs available for export', {
+                availableExports: exports
+            });
+        }
+
+        console.log(`Exporting ${aovs.length} AOVs...`);
+        const errors: Array<{ aov: string; error: any }> = [];
+
+        for (const aov of aovs) {
+            try {
+                this.exportAOV(aov);
+            } catch (error) {
+                errors.push({ aov, error });
+                console.error(`Failed to export AOV '${aov}':`, error);
+            }
+        }
+
+        if (errors.length > 0) {
+            throw new ExportError(`Failed to export ${errors.length} of ${aovs.length} AOVs`, {
+                errors,
+                totalAOVs: aovs.length,
+                failedAOVs: errors.length
+            });
+        }
+
+        console.log('AOV export complete');
+    }
+
+    private _generateExportFilename(prefix: string, extension: string): string {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const spp = this.coordinator.getSampleCount();
+        return `${prefix}_${year}${month}${day}_${hours}${minutes}_${spp}spp.${extension}`;
+    }
 
     // -- Extensions --
 

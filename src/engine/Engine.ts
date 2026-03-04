@@ -8,8 +8,7 @@ import { TextureRegistry } from './TextureRegistry.js';
 import { HDREnvironmentLoader } from './HDREnvironmentLoader.js';
 import {
     validateCompiledRenderer,
-    ConsoleReporter,
-    DiagnosticBag
+    ConsoleReporter
 } from '../errors/index.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 

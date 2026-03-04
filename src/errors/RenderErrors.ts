@@ -5,10 +5,12 @@
  * Base class for all render-related errors
  */
 export class RenderError extends Error {
-    constructor(message: string, public details?: any) {
+    details?: unknown;
+
+    constructor(message: string, details?: unknown) {
         super(message);
+        this.details = details;
         this.name = 'RenderError';
-        // Maintain proper prototype chain
         Object.setPrototypeOf(this, RenderError.prototype);
     }
 }

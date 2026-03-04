@@ -20,5 +20,14 @@ export {
 // Compiler validation (CompiledRenderer structure)
 export { validateCompiledRenderer } from './compiler/index.js';
 
-// Typed error hierarchy
-export * from './RenderErrors.js';
+// Typed error hierarchy (explicit to avoid name collision with core/CompilationError)
+export {
+    RenderError,
+    CompilationError as RenderCompilationError,
+    ResourceError,
+    ParameterError,
+    ExportError,
+    SessionError,
+    RenderStoppedError,
+    EnvironmentLoadError
+} from './RenderErrors.js';

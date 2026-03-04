@@ -11,7 +11,7 @@ import {
     validateHDRData,
     validateTextureCreation,
     ConsoleReporter,
-    DiagnosticBag,
+    type DiagnosticBag,
     EnvironmentLoadError
 } from '../errors/index.js';
 
@@ -43,11 +43,13 @@ export interface HDREnvironmentData {
  */
 export class HDREnvironmentLoader {
     private reporter = new ConsoleReporter();
+    private gl: WebGL2RenderingContext;
+    private textureRegistry: TextureRegistry;
 
-    constructor(
-        private gl: WebGL2RenderingContext,
-        private textureRegistry: TextureRegistry
-    ) {}
+    constructor(gl: WebGL2RenderingContext, textureRegistry: TextureRegistry) {
+        this.gl = gl;
+        this.textureRegistry = textureRegistry;
+    }
 
     /**
      * Load HDR environment map and build sampling CDFs

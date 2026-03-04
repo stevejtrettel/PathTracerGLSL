@@ -1,5 +1,7 @@
 // app/types.ts
 
+import type { TileJob } from './TiledRenderer.js';
+
 // Re-export compiler types that are used by app consumers
 export type {
     RenderStrategy,
@@ -153,4 +155,32 @@ export interface Extension {
  */
 export type EventHandler = (data?: any) => void;
 
-// SessionData is defined in and exported from SessionManager.ts
+/**
+ * Session data structure
+ *
+ * Captures enough state to re-queue work on restore:
+ * - Parameters + renderer: restore the scene setup
+ * - productionGoal: re-start a production render
+ * - tileJob: resume a tiled render (skip completed tiles)
+ *
+ * Does NOT capture GPU state (accumulation buffers, sample counts).
+ * Restoring always re-renders from scratch, but tiled jobs skip
+ * tiles whose output was already saved to disk.
+ */
+export interface SessionData {
+    version: string;
+    timestamp: number;
+
+    // Core (always present)
+    parameters: Record<string, any>;
+    rendererId: string | null;
+    extensions: Record<string, any>;
+
+    // Production job (if one was active)
+    productionGoal?: { targetSamples: number };
+
+    // Tiled job (if one was active)
+    tileJob?: TileJob;
+}
+
+export const SESSION_VERSION = '1.0.0';
