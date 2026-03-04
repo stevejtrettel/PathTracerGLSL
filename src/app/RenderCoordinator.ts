@@ -1,22 +1,12 @@
-// app/RenderCoordinator.ts
-// Manages rendering execution for Engine
+// app/RenderCoordinator.ts — Manages render loop execution, pause/resume, FPS tracking
 
 import { RenderStoppedError } from '../errors/RenderErrors.js';
 import type { Engine } from '../engine/Engine.js';
+import { AppEvents, ParamPrefix } from './events.js';
 
-/**
- * Render mode
- */
 export type RenderMode = 'interactive' | 'production';
-
-/**
- * Render state
- */
 export type RenderState = 'rendering' | 'paused' | 'complete' | 'stopped';
 
-/**
- * Progress information reported during rendering
- */
 export interface ProgressInfo {
     mode: RenderMode;
     state: RenderState;
@@ -24,64 +14,40 @@ export interface ProgressInfo {
     samples: number;
     elapsedTime: number;
     fps: number;
-
-    // Production-only fields
-    targetSamples?: number;
-    percentComplete?: number;
+    targetSamples?: number;     // production only
+    percentComplete?: number;   // production only
 }
 
-/**
- * Production render goal specification
- */
 export interface ProductionGoal {
     targetSamples: number;
     onProgress?: (info: ProgressInfo) => void;
     onComplete?: () => void;
 }
 
-/**
- * Event emitter interface (optional dependency)
- *
- * If provided, coordinator will emit events for render state changes.
- */
 export interface EventEmitter {
     emit(event: string, data?: any): void;
 }
 
-/**
- * RenderCoordinator - Manages rendering execution
- *
- * Two modes:
- * - Interactive: Continuous rendering, unlocked, can be interrupted
- * - Production: Goal-driven rendering, locked, returns Promise
- *
- * Both modes support pause/resume.
- * Production mode returns a Promise that resolves on completion.
- */
 export class RenderCoordinator {
     private engine: Engine;
     private eventEmitter?: EventEmitter;
 
-    // State
     private mode: RenderMode = 'interactive';
     private state: RenderState = 'stopped';
     private animationId?: number;
     private startTime = 0;
 
-    // Production
     private goal: ProductionGoal | null = null;
     private productionResolve?: () => void;
     private productionReject?: (reason: Error) => void;
 
-    // FPS tracking
     private lastFrameTime = 0;
     private fpsHistory: number[] = [];
 
-    // Reset rules (which parameters trigger accumulation reset)
-    private resetPrefixes = ['camera.', 'scene.', 'material.', 'light.'];
-    private noResetPrefixes = ['developer.', 'debug.', 'renderer.displayMode'];
+    // Which parameter prefixes trigger accumulation reset
+    private resetPrefixes: string[] = [ParamPrefix.CAMERA, ParamPrefix.SCENE, ParamPrefix.MATERIAL, ParamPrefix.LIGHT];
+    private noResetPrefixes: string[] = [ParamPrefix.DEVELOPER, ParamPrefix.DEBUG, ParamPrefix.RENDERER_DISPLAY_MODE];
 
-    // Progress callback
     public onProgress?: (info: ProgressInfo) => void;
 
     constructor(engine: Engine, eventEmitter?: EventEmitter) {
@@ -89,26 +55,14 @@ export class RenderCoordinator {
         this.eventEmitter = eventEmitter;
     }
 
-    // ============================================================================
-    // Public API
-    // ============================================================================
+    // -- Public API --
 
-    /**
-     * Start interactive rendering (continuous, unlocked)
-     */
     startInteractive(): void {
-        // Production cannot be interrupted
         if (this.mode === 'production' && this.isRunning()) {
-            throw new Error(
-                'Cannot start interactive mode during production render. ' +
-                'Stop the production render first with stop().'
-            );
+            throw new Error('Cannot start interactive mode during production render. Stop first with stop().');
         }
 
-        // Stop any existing rendering
-        if (this.isRunning()) {
-            this.stopInternal(false);
-        }
+        if (this.isRunning()) this.stopInternal(false);
 
         this.mode = 'interactive';
         this.state = 'rendering';
@@ -117,30 +71,17 @@ export class RenderCoordinator {
         this.lastFrameTime = this.startTime;
         this.fpsHistory = [];
 
-        console.log('Started interactive rendering');
-        this.emit('render.started', { mode: 'interactive' });
+        this.emit(AppEvents.RENDER_STARTED, { mode: 'interactive' });
         this.runLoop();
     }
 
-    /**
-     * Start production rendering (goal-driven, locked)
-     *
-     * Returns a Promise that resolves when target samples reached,
-     * or rejects if stopped early.
-     */
+    // Returns Promise that resolves when target samples reached, or rejects if stopped
     startProduction(goal: ProductionGoal): Promise<void> {
-        // Production cannot interrupt itself
         if (this.mode === 'production' && this.isRunning()) {
-            throw new Error(
-                'Production render already in progress. ' +
-                'Stop it first with stop() to start a new one.'
-            );
+            throw new Error('Production render already in progress. Stop first with stop().');
         }
 
-        // Stop any interactive rendering
-        if (this.isRunning()) {
-            this.stopInternal(false);
-        }
+        if (this.isRunning()) this.stopInternal(false);
 
         this.mode = 'production';
         this.state = 'rendering';
@@ -150,8 +91,8 @@ export class RenderCoordinator {
         this.fpsHistory = [];
 
         console.log(`Started production render: ${goal.targetSamples} samples`);
-        this.emit('render.started', { mode: 'production', targetSamples: goal.targetSamples });
-        this.emit('render.locked');
+        this.emit(AppEvents.RENDER_STARTED, { mode: 'production', targetSamples: goal.targetSamples });
+        this.emit(AppEvents.RENDER_LOCKED);
 
         return new Promise<void>((resolve, reject) => {
             this.productionResolve = resolve;
@@ -160,177 +101,82 @@ export class RenderCoordinator {
         });
     }
 
-    /**
-     * Pause rendering (works for both modes)
-     */
     pause(): void {
         if (this.state !== 'rendering') return;
-
         this.state = 'paused';
-
         if (this.animationId !== undefined) {
             cancelAnimationFrame(this.animationId);
             this.animationId = undefined;
         }
-
-        this.emit('render.paused');
-        console.log('Rendering paused');
+        this.emit(AppEvents.RENDER_PAUSED);
     }
 
-    /**
-     * Resume paused rendering
-     */
     resume(): void {
         if (this.state !== 'paused') return;
-
         this.state = 'rendering';
         this.lastFrameTime = performance.now();
-
-        this.emit('render.resumed');
-        console.log('Rendering resumed');
+        this.emit(AppEvents.RENDER_RESUMED);
         this.runLoop();
     }
 
-    /**
-     * Stop rendering completely (universal kill switch)
-     */
-    stop(): void {
-        this.stopInternal(true);
-    }
+    stop(): void { this.stopInternal(true); }
 
-    /**
-     * Reset accumulation (clear samples, restart timing)
-     */
     resetAccumulation(reason: string = 'manual'): void {
         this.engine.clearAccumulation();
         this.startTime = performance.now();
-
-        this.emit('accumulation.reset', { reason });
-        console.log(`Accumulation reset: ${reason}`);
+        this.emit(AppEvents.ACCUMULATION_RESET, { reason });
     }
 
-    // ============================================================================
-    // State Queries
-    // ============================================================================
+    // -- State Queries --
 
-    /**
-     * Check if actively rendering (not paused, not stopped)
-     */
-    isRunning(): boolean {
-        return this.state === 'rendering';
+    isRunning(): boolean { return this.state === 'rendering'; }
+    isPaused(): boolean { return this.state === 'paused'; }
+    isLocked(): boolean { return this.mode === 'production' && (this.state === 'rendering' || this.state === 'paused'); }
+    isAccumulating(): boolean { return this.engine.getSampleCount() > 1; }
+    getMode(): RenderMode { return this.mode; }
+    getState(): RenderState { return this.state; }
+    getSampleCount(): number { return this.engine.getSampleCount(); }
+    getElapsedTime(): number { return performance.now() - this.startTime; }
+
+    getProductionGoal(): { targetSamples: number } | undefined {
+        if (this.mode === 'production' && this.goal) {
+            return { targetSamples: this.goal.targetSamples };
+        }
+        return undefined;
     }
 
-    /**
-     * Check if paused
-     */
-    isPaused(): boolean {
-        return this.state === 'paused';
-    }
-
-    /**
-     * Check if in locked production mode
-     */
-    isLocked(): boolean {
-        return this.mode === 'production' && (this.state === 'rendering' || this.state === 'paused');
-    }
-
-    /**
-     * Check if accumulating samples (more than 1 sample)
-     */
-    isAccumulating(): boolean {
-        return this.engine.getSampleCount() > 1;
-    }
-
-    /**
-     * Get current render mode
-     */
-    getMode(): RenderMode {
-        return this.mode;
-    }
-
-    /**
-     * Get current render state
-     */
-    getState(): RenderState {
-        return this.state;
-    }
-
-    /**
-     * Get current sample count
-     */
-    getSampleCount(): number {
-        return this.engine.getSampleCount();
-    }
-
-    /**
-     * Get elapsed time since render started (ms)
-     */
-    getElapsedTime(): number {
-        return performance.now() - this.startTime;
-    }
-
-    /**
-     * Get current FPS (averaged over recent frames)
-     */
     getFPS(): number {
         if (this.fpsHistory.length === 0) return 0;
         return this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
     }
 
-    // ============================================================================
-    // Parameter Reset Logic
-    // ============================================================================
+    // -- Parameter Reset Logic --
 
-    /**
-     * Check if a parameter change should trigger accumulation reset
-     */
     shouldResetForParameter(path: string): boolean {
-        // Check no-reset list first (higher priority)
         for (const prefix of this.noResetPrefixes) {
-            if (path.startsWith(prefix)) {
-                return false;
-            }
+            if (path.startsWith(prefix)) return false;
         }
-
-        // Check reset list
         for (const prefix of this.resetPrefixes) {
-            if (path.startsWith(prefix)) {
-                return true;
-            }
+            if (path.startsWith(prefix)) return true;
         }
-
-        // Conservative default: reset for unknown parameters
         console.warn(`Unknown parameter prefix: ${path}, resetting accumulation`);
         return true;
     }
 
-    /**
-     * Add a prefix to the reset list
-     */
     addResetPrefix(prefix: string): void {
-        if (!this.resetPrefixes.includes(prefix)) {
-            this.resetPrefixes.push(prefix);
-        }
+        if (!this.resetPrefixes.includes(prefix)) this.resetPrefixes.push(prefix);
     }
 
-    /**
-     * Add a prefix to the no-reset list
-     */
     addNoResetPrefix(prefix: string): void {
-        if (!this.noResetPrefixes.includes(prefix)) {
-            this.noResetPrefixes.push(prefix);
-        }
+        if (!this.noResetPrefixes.includes(prefix)) this.noResetPrefixes.push(prefix);
     }
 
-    // ============================================================================
-    // Private Implementation
-    // ============================================================================
+    // -- Private --
 
     private stopInternal(emitEvents: boolean): void {
         if (this.state === 'stopped') return;
 
         const wasProduction = this.mode === 'production';
-
         this.state = 'stopped';
 
         if (this.animationId !== undefined) {
@@ -338,7 +184,6 @@ export class RenderCoordinator {
             this.animationId = undefined;
         }
 
-        // Reject production promise if running
         if (this.productionReject) {
             this.productionReject(new RenderStoppedError());
             this.clearProductionPromise();
@@ -347,11 +192,8 @@ export class RenderCoordinator {
         this.goal = null;
 
         if (emitEvents) {
-            this.emit('render.stopped');
-            if (wasProduction) {
-                this.emit('render.unlocked');
-            }
-            console.log('Rendering stopped');
+            this.emit(AppEvents.RENDER_STOPPED);
+            if (wasProduction) this.emit(AppEvents.RENDER_UNLOCKED);
         }
     }
 
@@ -359,22 +201,15 @@ export class RenderCoordinator {
         const loop = () => {
             if (this.state !== 'rendering') return;
 
-            // Render frame
             this.engine.renderFrame();
-
-            // Update FPS
             this.updateFPS();
-
-            // Report progress
             this.reportProgress();
 
-            // Production mode: check if goal met
             if (this.mode === 'production' && this.checkGoalMet()) {
                 this.complete();
                 return;
             }
 
-            // Schedule next frame
             this.animationId = requestAnimationFrame(loop);
         };
 
@@ -387,11 +222,8 @@ export class RenderCoordinator {
         this.lastFrameTime = now;
 
         if (delta > 0) {
-            const fps = 1000 / delta;
-            this.fpsHistory.push(fps);
-            if (this.fpsHistory.length > 60) {
-                this.fpsHistory.shift();
-            }
+            this.fpsHistory.push(1000 / delta);
+            if (this.fpsHistory.length > 60) this.fpsHistory.shift();
         }
     }
 
@@ -407,20 +239,16 @@ export class RenderCoordinator {
         console.log(`Production complete: ${samples} samples in ${(elapsed / 1000).toFixed(1)}s`);
 
         this.state = 'complete';
-
-        // Call goal's onComplete callback
         this.goal?.onComplete?.();
 
-        // Resolve production promise
         if (this.productionResolve) {
             this.productionResolve();
             this.clearProductionPromise();
         }
 
         this.goal = null;
-
-        this.emit('render.complete', { samples, elapsedTime: elapsed });
-        this.emit('render.unlocked');
+        this.emit(AppEvents.RENDER_COMPLETE, { samples, elapsedTime: elapsed });
+        this.emit(AppEvents.RENDER_UNLOCKED);
     }
 
     private clearProductionPromise(): void {
@@ -430,13 +258,7 @@ export class RenderCoordinator {
 
     private reportProgress(): void {
         const info = this.buildProgressInfo();
-
-        // Call goal's progress callback (production mode)
-        if (this.mode === 'production' && this.goal?.onProgress) {
-            this.goal.onProgress(info);
-        }
-
-        // Call general progress callback
+        if (this.mode === 'production' && this.goal?.onProgress) this.goal.onProgress(info);
         this.onProgress?.(info);
     }
 
@@ -453,7 +275,6 @@ export class RenderCoordinator {
             fps: this.getFPS()
         };
 
-        // Add production-specific fields
         if (this.mode === 'production' && this.goal) {
             info.targetSamples = this.goal.targetSamples;
             info.percentComplete = (samples / this.goal.targetSamples) * 100;

@@ -31,9 +31,13 @@ export {
     type CompiledRenderer
 } from './types.js';
 
-// Re-export EventBus and Extension for external use
+// Re-export EventBus, Extension, and SessionData for external use
 export { EventBus } from './EventBus.js';
 export type { Extension, EventHandler } from './types.js';
+export type { SessionData } from './SessionManager.js';
+
+// Event constants and parameter prefixes
+export { AppEvents, ParamPrefix, type AppEventName } from './events.js';
 
 // Extensions
 export {

@@ -19,6 +19,7 @@ import type { RegionName } from '../layout/index.js';
 import type { ProgressInfo } from '../RenderCoordinator.js';
 import type { TiledJobProgressInfo } from '../TiledRenderer.js';
 import { formatTime } from '../utils/format.js';
+import { AppEvents } from '../events.js';
 
 export class ProductionPanelExtension extends UIExtension {
     name = 'production-panel';
@@ -81,16 +82,16 @@ export class ProductionPanelExtension extends UIExtension {
 
     protected setup(): void {
         // Mode transitions
-        this.on('render.started', this.onRenderStarted);
-        this.on('render.complete', this.onRenderComplete);
-        this.on('render.stopped', this.onRenderStopped);
+        this.on(AppEvents.RENDER_STARTED, this.onRenderStarted);
+        this.on(AppEvents.RENDER_COMPLETE, this.onRenderComplete);
+        this.on(AppEvents.RENDER_STOPPED, this.onRenderStopped);
 
         // Progress updates (only during production)
-        this.on('render.progress', this.onProgress);
+        this.on(AppEvents.RENDER_PROGRESS, this.onProgress);
 
         // Tiled job events
-        this.on('tiledJob.progress', this.onTiledJobProgress);
-        this.on('tiledJob.complete', this.onTiledJobComplete);
+        this.on(AppEvents.TILED_JOB_PROGRESS, this.onTiledJobProgress);
+        this.on(AppEvents.TILED_JOB_COMPLETE, this.onTiledJobComplete);
 
         console.log(`ProductionPanel installed [${this.useLayout ? 'layout' : 'standalone'}]`);
     }

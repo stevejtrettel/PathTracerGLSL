@@ -15,6 +15,7 @@
 import { UIExtension } from './UIExtension.js';
 import type { RegionName } from '../layout/index.js';
 import { Modal, NumberInput, Button, Dropdown } from '../ui/index.js';
+import { AppEvents } from '../events.js';
 
 export class RenderControlsExtension extends UIExtension {
     name = 'render-controls';
@@ -34,7 +35,8 @@ export class RenderControlsExtension extends UIExtension {
 
     protected setup(): void {
         console.log('RenderControls (Production Setup) installed');
-        this.on('render.complete', this.onRenderComplete);
+        this.on(AppEvents.RENDER_COMPLETE, this.onRenderComplete);
+        this.on(AppEvents.PRODUCTION_DIALOG_REQUESTED, () => this.showProductionDialog());
     }
 
     private onRenderComplete = (): void => {

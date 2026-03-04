@@ -16,6 +16,7 @@ import { UIExtension } from './UIExtension.js';
 import type { RegionName } from '../layout/index.js';
 import { formatTime } from '../utils/format.js';
 import { isTypingInInput } from '../utils/dom.js';
+import { AppEvents } from '../events.js';
 
 export class StatsPanel extends UIExtension {
     name = 'stats-panel';
@@ -42,9 +43,9 @@ export class StatsPanel extends UIExtension {
         this.attachKeyboardShortcut();
 
         // Hide during production mode (info shown in ProductionPanel)
-        this.on('render.started', this.onRenderStarted);
-        this.on('render.complete', this.onRenderEnded);
-        this.on('render.stopped', this.onRenderEnded);
+        this.on(AppEvents.RENDER_STARTED, this.onRenderStarted);
+        this.on(AppEvents.RENDER_COMPLETE, this.onRenderEnded);
+        this.on(AppEvents.RENDER_STOPPED, this.onRenderEnded);
 
         console.log(`StatsPanel installed (press i to toggle) [${this.useLayout ? 'layout' : 'standalone'}]`);
     }

@@ -1,5 +1,4 @@
 // app/types.ts
-import type { TileJob } from './TiledRenderer';
 
 // Re-export compiler types that are used by app consumers
 export type {
@@ -142,11 +141,11 @@ export interface Extension {
     description?: string;
     dependencies?: string[];
 
-    install(app: any, bus: any): void;
+    install(app: import('./App.js').App, bus: import('./EventBus.js').EventBus): void;
     uninstall?(): void;
 
-    saveState?(): any;
-    restoreState?(state: any): void;
+    saveState?(): unknown;
+    restoreState?(state: unknown): void;
 }
 
 /**
@@ -154,46 +153,4 @@ export interface Extension {
  */
 export type EventHandler = (data?: any) => void;
 
-/**
- * Complete session data for save/restore
- *
- * Captures all state needed to recreate a rendering session:
- * active renderer, parameters, camera, accumulation, and tile jobs.
- */
-export interface SessionData {
-    version: string;
-    timestamp: number;
-
-    // Core state
-    activeRendererId: string;
-    parameters: Record<string, any>;
-
-    // Render state
-    renderMode: 'interactive' | 'production';
-    sampleCount: number;
-
-    // Production mode state (optional)
-    productionGoal?: {
-        targetSamples: number;
-    };
-
-    // Camera state
-    camera: {
-        position: [number, number, number];
-        target?: [number, number, number];
-        frame?: number[];
-        fov?: number;
-    };
-
-    // Extension states
-    extensions: Record<string, any>;
-
-    // Tiled rendering state
-    tileJob?: TileJob;
-
-    // Optional metadata
-    metadata?: {
-        title?: string;
-        description?: string;
-    };
-}
+// SessionData is defined in and exported from SessionManager.ts

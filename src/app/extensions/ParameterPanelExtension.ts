@@ -6,7 +6,7 @@
  * Features:
  * - Auto-generates widgets from renderer parameter metadata
  * - Slide-in/out animation with Tab key toggle
- * - Grouped by module type, sorted by MODULE_ORDER
+ * - Grouped by module type, sorted by rendering pipeline order
  * - Throttled updates for smooth performance
  * - Disables during production mode (params are locked anyway)
  *
@@ -15,10 +15,10 @@
 import { UIExtension } from './UIExtension.js';
 import type { RegionName } from '../layout/index.js';
 import type { ParameterMetadata } from '../types.js';
-import { MODULE_ORDER } from '../../engine/types.js';
 import { Panel, Folder } from '../ui/index.js';
 import { WidgetFactory } from '../ui/WidgetFactory.js';
 import type { UIComponent } from '../ui/index.js';
+import { AppEvents } from '../events.js';
 
 export class ParameterPanelExtension extends UIExtension {
     name = 'parameter-panel';
@@ -75,9 +75,9 @@ export class ParameterPanelExtension extends UIExtension {
         this.attachKeyboardShortcut();
 
         // Disable during production mode
-        this.on('render.started', this.onRenderStarted);
-        this.on('render.complete', this.onRenderEnded);
-        this.on('render.stopped', this.onRenderEnded);
+        this.on(AppEvents.RENDER_STARTED, this.onRenderStarted);
+        this.on(AppEvents.RENDER_COMPLETE, this.onRenderEnded);
+        this.on(AppEvents.RENDER_STOPPED, this.onRenderEnded);
 
         console.log(`ParameterPanel installed (Tab to toggle) [${this.useLayout ? 'layout' : 'standalone'}]`);
     }
@@ -218,10 +218,14 @@ export class ParameterPanelExtension extends UIExtension {
     private sortGroups(
         groups: Map<string, Array<{ path: string; meta: ParameterMetadata }>>
     ): Map<string, Array<{ path: string; meta: ParameterMetadata }>> {
+        // Group display order (matches module compilation order)
+        const GROUP_ORDER = [
+            'Ambient', 'Scene', 'Environment', 'Lighting',
+            'Camera', 'Interaction', 'Transport', 'Accumulator', 'Developer'
+        ];
         const order = new Map<string, number>();
-        MODULE_ORDER.forEach((kind, index) => {
-            const groupName = kind.charAt(0).toUpperCase() + kind.slice(1);
-            order.set(groupName, index);
+        GROUP_ORDER.forEach((name, index) => {
+            order.set(name, index);
         });
 
         const sorted = Array.from(groups.entries()).sort((a, b) => {

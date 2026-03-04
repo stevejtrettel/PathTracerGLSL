@@ -4,6 +4,7 @@ import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import type { Extension } from '../types.js';
 import { isTypingInInput } from '../utils/dom.js';
+import { AppEvents } from '../events.js';
 
 /**
  * AppShortcutsExtension - Application keyboard shortcuts
@@ -31,10 +32,12 @@ export class AppShortcutsExtension implements Extension {
     description = 'Application keyboard shortcuts';
 
     private app!: App;
+    private bus!: EventBus;
     private boundHandler: ((e: KeyboardEvent) => void) | null = null;
 
-    install(app: App, _bus: EventBus): void {
+    install(app: App, bus: EventBus): void {
         this.app = app;
+        this.bus = bus;
 
         this.boundHandler = this.handleKeyDown.bind(this);
         window.addEventListener('keydown', this.boundHandler);
@@ -160,13 +163,6 @@ export class AppShortcutsExtension implements Extension {
     }
 
     private startProductionRender(): void {
-        // Try to find the RenderControls extension which handles the UI
-        const renderControls = this.app.getExtension('render-controls');
-        if (renderControls && 'showProductionDialog' in renderControls) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (renderControls as any).showProductionDialog();
-        } else {
-            console.warn('RenderControls extension not found or incompatible. Cannot start production render UI.');
-        }
+        this.bus.emit(AppEvents.PRODUCTION_DIALOG_REQUESTED);
     }
 }

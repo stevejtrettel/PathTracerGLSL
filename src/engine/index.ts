@@ -7,8 +7,6 @@ export { ParameterManager } from './ParameterManager.js';
 
 // Type exports
 export type {
-    ModuleKind,
-    ModuleDescriptor,
     UniformType,
     UniformBinding,
     ParameterMetadata,

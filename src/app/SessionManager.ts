@@ -5,21 +5,44 @@ import { SessionError } from '../errors/RenderErrors.js';
 import type { ParameterStore } from './ParameterStore.js';
 import type { EventBus } from './EventBus.js';
 import type { Extension } from './types.js';
+import type { TileJob } from './TiledRenderer.js';
+import { AppEvents } from './events.js';
 
 /**
  * Session data structure
+ *
+ * Captures enough state to re-queue work on restore:
+ * - Parameters + renderer: restore the scene setup
+ * - productionGoal: re-start a production render
+ * - tileJob: resume a tiled render (skip completed tiles)
+ *
+ * Does NOT capture GPU state (accumulation buffers, sample counts).
+ * Restoring always re-renders from scratch, but tiled jobs skip
+ * tiles whose output was already saved to disk.
  */
 export interface SessionData {
+    version: string;
+    timestamp: number;
+
+    // Core (always present)
     parameters: Record<string, any>;
     rendererId: string | null;
     extensions: Record<string, any>;
+
+    // Production job (if one was active)
+    productionGoal?: { targetSamples: number };
+
+    // Tiled job (if one was active)
+    tileJob?: TileJob;
 }
+
+const SESSION_VERSION = '1.0.0';
 
 /**
  * SessionManager handles session save/restore operations
  *
  * Responsibilities:
- * - Save current session state (parameters, renderer, extensions)
+ * - Save current session state (parameters, renderer, extensions, jobs)
  * - Restore session state from saved data
  * - Quick save/load via file downloads
  * - Manage extension state persistence
@@ -30,7 +53,9 @@ export class SessionManager {
         private eventBus: EventBus,
         private extensions: Map<string, Extension>,
         private getActiveRendererId: () => string | null,
-        private setActiveRendererId: (id: string) => void
+        private setActiveRendererId: (id: string) => void,
+        private getProductionGoal?: () => { targetSamples: number } | undefined,
+        private getTileJob?: () => TileJob | undefined
     ) {}
 
     /**
@@ -45,11 +70,27 @@ export class SessionManager {
             }
         }
 
-        return {
+        const session: SessionData = {
+            version: SESSION_VERSION,
+            timestamp: Date.now(),
             parameters: this.parameterStore.serialize(),
             rendererId: this.getActiveRendererId(),
             extensions: extensionStates
         };
+
+        // Include active production goal if present
+        const productionGoal = this.getProductionGoal?.();
+        if (productionGoal) {
+            session.productionGoal = productionGoal;
+        }
+
+        // Include active tile job if present
+        const tileJob = this.getTileJob?.();
+        if (tileJob) {
+            session.tileJob = tileJob;
+        }
+
+        return session;
     }
 
     /**
@@ -61,7 +102,7 @@ export class SessionManager {
     saveSession(): SessionData {
         try {
             const session = this._buildSessionState();
-            this.eventBus.emit('session.saved', session);
+            this.eventBus.emit(AppEvents.SESSION_SAVED, session);
             return session;
         } catch (error) {
             throw new SessionError('Failed to save session', { error });
@@ -72,8 +113,10 @@ export class SessionManager {
      * Restore session state
      *
      * Restores parameters, renderer selection, and extension states.
+     * Returns the restored session so callers can check for
+     * productionGoal or tileJob and re-queue work.
      */
-    restoreSession(session: SessionData): void {
+    restoreSession(session: SessionData): SessionData {
         try {
             // Validate session structure
             if (!session || typeof session !== 'object') {
@@ -101,7 +144,8 @@ export class SessionManager {
             }
 
             console.log('Session restored');
-            this.eventBus.emit('session.loaded', session);
+            this.eventBus.emit(AppEvents.SESSION_LOADED, session);
+            return session;
         } catch (error) {
             if (error instanceof SessionError) {
                 throw error;

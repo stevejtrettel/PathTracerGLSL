@@ -1,24 +1,14 @@
-// app/extensions/OrbitControls.ts
-// Mouse-based orbit camera controls for App
+// app/extensions/OrbitControls.ts — Mouse/touch orbit camera controls
+//
+// Controls: Left drag = orbit, Wheel = zoom, Touch = orbit + pinch zoom
+// Updates: camera.position, camera.target
 
 import type { Extension } from '../types.js';
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import { EventManager } from '../utils/EventManager.js';
+import { AppEvents } from '../events.js';
 
-/**
- * OrbitControls - Mouse-based orbit camera controls
- *
- * Controls:
- * - Left drag: Orbit around target
- * - Mouse wheel: Zoom in/out
- *
- * Camera maintains a fixed target point and moves on a sphere around it.
- *
- * Updates parameters:
- * - camera.position: Current camera position [x, y, z]
- * - camera.target: Look-at target [x, y, z]
- */
 export class OrbitControls implements Extension {
     name = 'orbit-camera';
     version = '1.0.0';
@@ -53,7 +43,7 @@ export class OrbitControls implements Extension {
         touching: false,
         lastX: 0,
         lastY: 0,
-        distance: 0 // For pinch zoom
+        distance: 0
     };
 
     install(app: App, bus: EventBus): void {
@@ -61,28 +51,19 @@ export class OrbitControls implements Extension {
         this.bus = bus;
 
         this.canvas = app.getCanvas();
-        if (!this.canvas) {
-            throw new Error('OrbitControls: No canvas found');
-        }
+        if (!this.canvas) throw new Error('OrbitControls: No canvas found');
 
         this.initializeFromParameters();
 
-        // Mouse events
         this.events.add(this.canvas, 'mousedown', this.onMouseDown);
         this.events.add(this.canvas, 'mousemove', this.onMouseMove);
         this.events.add(this.canvas, 'mouseup', this.onMouseUp);
         this.events.add(this.canvas, 'mouseleave', this.onMouseUp);
         this.events.add(this.canvas, 'wheel', this.onWheel);
-
-        // Touch events
         this.events.add(this.canvas, 'touchstart', this.onTouchStart);
         this.events.add(this.canvas, 'touchmove', this.onTouchMove);
         this.events.add(this.canvas, 'touchend', this.onTouchEnd);
-
-        // Prevent default touch actions
         this.canvas.style.touchAction = 'none';
-
-        console.log('OrbitControls extension installed (Mouse + Touch)');
     }
 
     uninstall(): void {
@@ -92,73 +73,33 @@ export class OrbitControls implements Extension {
         this.canvas = null;
     }
 
-    // ============================================================================
-    // Public API
-    // ============================================================================
+    // -- Public API --
 
-    /**
-     * Get current camera position
-     */
-    getPosition(): [number, number, number] {
-        return this.sphericalToCartesian();
-    }
+    getPosition(): [number, number, number] { return this.sphericalToCartesian(); }
+    getTarget(): [number, number, number] { return [...this.target]; }
+    setOrbitSpeed(speed: number): void { this.orbitSpeed = speed; }
+    setZoomSpeed(speed: number): void { this.zoomSpeed = speed; }
 
-    /**
-     * Get current camera target
-     */
-    getTarget(): [number, number, number] {
-        return [...this.target];
-    }
-
-    /**
-     * Set camera distance from target
-     */
     setDistance(distance: number): void {
         this.distance = Math.max(this.minDistance, Math.min(this.maxDistance, distance));
         this.updateCamera();
     }
 
-    /**
-     * Set camera target (look-at point)
-     */
     setTarget(target: [number, number, number]): void {
         this.target = [...target];
         this.updateCamera();
     }
 
-    /**
-     * Set azimuth angle (horizontal rotation)
-     */
     setAzimuth(azimuth: number): void {
         this.azimuth = azimuth;
         this.updateCamera();
     }
 
-    /**
-     * Set elevation angle (vertical rotation)
-     */
     setElevation(elevation: number): void {
         this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, elevation));
         this.updateCamera();
     }
 
-    /**
-     * Configure orbit speed
-     */
-    setOrbitSpeed(speed: number): void {
-        this.orbitSpeed = speed;
-    }
-
-    /**
-     * Configure zoom speed
-     */
-    setZoomSpeed(speed: number): void {
-        this.zoomSpeed = speed;
-    }
-
-    /**
-     * Save state for session persistence
-     */
     saveState(): any {
         return {
             distance: this.distance,
@@ -168,9 +109,6 @@ export class OrbitControls implements Extension {
         };
     }
 
-    /**
-     * Restore state from session
-     */
     restoreState(state: any): void {
         if (state.distance !== undefined) this.distance = state.distance;
         if (state.azimuth !== undefined) this.azimuth = state.azimuth;
@@ -179,38 +117,24 @@ export class OrbitControls implements Extension {
         this.updateCamera();
     }
 
-    // ============================================================================
-    // Private: Initialization
-    // ============================================================================
+    // -- Initialization --
 
     private initializeFromParameters(): void {
         if (!this.app) return;
 
-        // Read target
         const target = this.app.getParameter('camera.target');
-        if (target) {
-            this.target = [target[0], target[1], target[2]];
-        }
+        if (target) this.target = [target[0], target[1], target[2]];
 
-        // Read position and convert to spherical
         const pos = this.app.getParameter('camera.position');
-        if (pos) {
-            this.cartesianToSpherical(pos);
-        }
+        if (pos) this.cartesianToSpherical(pos);
 
-        // Set initial target parameter if not set
-        if (!target) {
-            this.app.setParameter('camera.target', this.target);
-        }
+        if (!target) this.app.setParameter('camera.target', this.target);
     }
 
-    // ============================================================================
-    // Private: Mouse Event Handlers
-    // ============================================================================
+    // -- Mouse Handlers --
 
     private onMouseDown = (e: MouseEvent): void => {
-        if (e.button !== 0) return;  // Only left button
-
+        if (e.button !== 0) return;
         this.isDragging = true;
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
@@ -218,42 +142,27 @@ export class OrbitControls implements Extension {
 
     private onMouseMove = (e: MouseEvent): void => {
         if (!this.isDragging) return;
-
-        const deltaX = e.clientX - this.lastMouseX;
-        const deltaY = e.clientY - this.lastMouseY;
-
-        this.handleOrbit(deltaX, deltaY);
-
+        this.handleOrbit(e.clientX - this.lastMouseX, e.clientY - this.lastMouseY);
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
     };
 
-    private onMouseUp = (): void => {
-        this.isDragging = false;
-    };
+    private onMouseUp = (): void => { this.isDragging = false; };
 
     private onWheel = (e: WheelEvent): void => {
         e.preventDefault();
-
-        // Zoom in/out based on scroll direction
-        const delta = e.deltaY > 0 ? 1 : -1;
-        this.handleZoom(delta);
+        this.handleZoom(e.deltaY > 0 ? 1 : -1);
     };
 
-    // ============================================================================
-    // Private: Touch Event Handlers
-    // ============================================================================
+    // -- Touch Handlers --
 
     private onTouchStart = (e: TouchEvent): void => {
         e.preventDefault();
-
         if (e.touches.length === 1) {
-            // Single finger - start orbiting
             this.touchState.touching = true;
             this.touchState.lastX = e.touches[0].clientX;
             this.touchState.lastY = e.touches[0].clientY;
         } else if (e.touches.length === 2) {
-            // Two fingers - start zooming
             const dx = e.touches[0].clientX - e.touches[1].clientX;
             const dy = e.touches[0].clientY - e.touches[1].clientY;
             this.touchState.distance = Math.sqrt(dx * dx + dy * dy);
@@ -264,59 +173,36 @@ export class OrbitControls implements Extension {
         e.preventDefault();
 
         if (e.touches.length === 1 && this.touchState.touching) {
-            // Single finger: orbit camera
             const x = e.touches[0].clientX;
             const y = e.touches[0].clientY;
-
-            const deltaX = x - this.touchState.lastX;
-            const deltaY = y - this.touchState.lastY;
-
-            this.handleOrbit(deltaX, deltaY);
-
+            this.handleOrbit(x - this.touchState.lastX, y - this.touchState.lastY);
             this.touchState.lastX = x;
             this.touchState.lastY = y;
-
         } else if (e.touches.length === 2) {
-            // Two fingers: zoom camera
             const dx = e.touches[0].clientX - e.touches[1].clientX;
             const dy = e.touches[0].clientY - e.touches[1].clientY;
             const distance = Math.sqrt(dx * dx + dy * dy);
-
-            // Calculate delta for zoom (inverted relative to wheel)
-            // If distance increases, we zoom in (decrease distance)
-            const delta = this.touchState.distance - distance;
-
-            // Scale delta to be reasonable
-            this.handleZoom(delta * 0.05);
-
+            this.handleZoom((this.touchState.distance - distance) * 0.05);
             this.touchState.distance = distance;
         }
     };
 
     private onTouchEnd = (e: TouchEvent): void => {
         e.preventDefault();
-        if (e.touches.length === 0) {
-            this.touchState.touching = false;
-        }
+        if (e.touches.length === 0) this.touchState.touching = false;
     };
 
-    // ============================================================================
-    // Private: Camera Logic
-    // ============================================================================
+    // -- Camera Logic --
 
     private handleOrbit(deltaX: number, deltaY: number): void {
         this.azimuth -= deltaX * this.orbitSpeed;
         this.elevation += deltaY * this.orbitSpeed;
-
-        // Clamp elevation to prevent flipping
         this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
-
         this.updateCamera();
     }
 
     private handleZoom(delta: number): void {
         this.distance *= (1 + delta * this.zoomSpeed);
-        // Clamp distance
         this.distance = Math.max(this.minDistance, Math.min(this.maxDistance, this.distance));
         this.updateCamera();
     }
@@ -325,35 +211,22 @@ export class OrbitControls implements Extension {
         if (!this.app || !this.bus) return;
 
         const newPos = this.sphericalToCartesian();
-
-        // Update parameters (triggers accumulation reset via ParameterStore)
         this.app.setParameter('camera.position', newPos);
         this.app.setParameter('camera.target', this.target);
-
-        // Emit camera event for other extensions
-        this.bus.emit('camera.moved', {
-            position: newPos,
-            target: this.target
-        });
+        this.bus.emit(AppEvents.CAMERA_MOVED, { position: newPos, target: this.target });
     }
 
     private sphericalToCartesian(): [number, number, number] {
-        // Convert spherical coordinates (distance, azimuth, elevation) to Cartesian
-        // azimuth: rotation around Y axis
-        // elevation: angle from horizontal plane
         const x = this.target[0] + this.distance * Math.cos(this.elevation) * Math.sin(this.azimuth);
         const y = this.target[1] + this.distance * Math.sin(this.elevation);
         const z = this.target[2] + this.distance * Math.cos(this.elevation) * Math.cos(this.azimuth);
-
         return [x, y, z];
     }
 
     private cartesianToSpherical(pos: number[]): void {
-        // Convert Cartesian position to spherical coordinates relative to target
         const dx = pos[0] - this.target[0];
         const dy = pos[1] - this.target[1];
         const dz = pos[2] - this.target[2];
-
         this.distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
         this.azimuth = Math.atan2(dx, dz);
         this.elevation = Math.asin(dy / this.distance);

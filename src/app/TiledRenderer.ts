@@ -4,6 +4,7 @@
 import type { App } from './App.js';
 import type { EventBus } from './EventBus.js';
 import { saveHDRFile, savePNGFile } from './utils/file-export.js';
+import { AppEvents } from './events.js';
 
 /**
  * Configuration for a tiled render job
@@ -348,7 +349,7 @@ export class TiledRenderer {
 
         // Emit final progress
         this.emitJobProgress();
-        this.bus.emit('tiledJob.complete', {
+        this.bus.emit(AppEvents.TILED_JOB_COMPLETE, {
             jobId: this.currentJob.jobId,
             totalTiles,
             elapsedSeconds: elapsed
@@ -434,7 +435,7 @@ export class TiledRenderer {
             totalTiles,
             grid
         };
-        this.bus.emit('tile.start', info);
+        this.bus.emit(AppEvents.TILE_START, info);
     }
 
     private emitTileComplete(tx: number, ty: number, tileIndex: number, totalTiles: number, grid: TileGrid): void {
@@ -445,7 +446,7 @@ export class TiledRenderer {
             totalTiles,
             grid
         };
-        this.bus.emit('tile.complete', info);
+        this.bus.emit(AppEvents.TILE_COMPLETE, info);
     }
 
     private emitJobProgress(): void {
@@ -466,6 +467,6 @@ export class TiledRenderer {
             currentTile: this.currentTilePosition
         };
 
-        this.bus.emit('tiledJob.progress', info);
+        this.bus.emit(AppEvents.TILED_JOB_PROGRESS, info);
     }
 }
