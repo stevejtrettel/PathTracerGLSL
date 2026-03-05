@@ -1,6 +1,6 @@
 // app/App.ts — Main orchestrator, facade over internal managers
 
-import { SimpleCompiler } from '../compiler/SimpleCompiler.js';
+import { Compiler } from '../compiler/Compiler.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
 import { ParameterStore } from './ParameterStore.js';
@@ -46,7 +46,7 @@ export class App {
         }
 
         this.gl = gl;
-        this.compiler = new SimpleCompiler();
+        this.compiler = new Compiler();
         this.engine = new Engine(gl);
         this.eventBus = new EventBus();
         this.parameterStore = new ParameterStore();

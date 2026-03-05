@@ -2,38 +2,138 @@
 
 import type { UniformBinding, ParameterMetadata } from '../engine/types.js';
 
-/**
- * Scene description (minimal for SimpleCompiler)
- *
- * In the real Compiler, this will contain full geometry, materials, lights, etc.
- * For now, just an identifier to distinguish different scenes.
- */
+// ============================================================================
+// Scene Description
+// ============================================================================
+
 export interface SceneDescription {
     id: string;
     name?: string;
+    ambientSpace: AmbientSpaceDescription;
+    objects: ObjectDescription[];
+    materials: Map<string, MaterialDescription>;
+    lights: LightDescription[];
 }
 
-/**
- * Render strategy specification (minimal for SimpleCompiler)
- *
- * Describes which rendering algorithms to use.
- * For SimpleCompiler: 'debug', 'pathtracer', or 'pathtracer-aovs'
- * For real Compiler: full algorithm specifications
- */
-export interface RenderStrategy {
-    id: 'debug' | 'pathtracer' | 'pathtracer-aovs' | string;
-    algorithms?: {
-        transport?: string;
-        sampling?: string;
-        accumulation?: string;
-    };
-    settings?: {
-        maxBounces?: number;
-        samplesPerFrame?: number;
-        debugOutput?: 'albedo' | 'normal' | 'depth' | 'uv';
-        defaultOutput?: 'albedo' | 'normal' | 'depth' | 'uv';
-    };
+export interface AmbientSpaceDescription {
+    type: 'euclidean' | 'hyperbolic' | 'spherical';
+    parameters?: { curvature?: number };
 }
+
+// --- Objects ---
+
+export type ObjectDescription = SDFObject | AnalyticObject | MeshObject;
+
+export interface SDFObject {
+    kind: 'sdf';
+    sdf: StandardSDF | CustomSDF;
+    material: string;
+    transform?: Transform;
+}
+
+export interface AnalyticObject {
+    kind: 'analytic';
+    shape: StandardAnalytic;
+    material: string;
+    transform?: Transform;
+}
+
+export interface MeshObject {
+    kind: 'mesh';
+    data: Float32Array;
+    material: string;
+    transform?: Transform;
+}
+
+export interface StandardSDF {
+    type: 'sphere' | 'plane' | 'box' | 'torus' | 'capsule';
+    parameters: Record<string, number | number[]>;
+}
+
+export interface CustomSDF {
+    type: 'custom';
+    glsl: string;
+    imports?: string[];
+}
+
+export interface StandardAnalytic {
+    type: 'sphere' | 'plane';
+    parameters: Record<string, number | number[]>;
+}
+
+export interface Transform {
+    position?: number[];
+    rotation?: number[];
+    scale?: number | number[];
+}
+
+// --- Materials ---
+
+export type MaterialProperty = number | number[] | string;
+
+export type MaterialModel = 'lambert' | 'disney' | 'dielectric' | 'emissive';
+
+export interface MaterialDescription {
+    model: MaterialModel;
+    albedo?: MaterialProperty;
+    roughness?: MaterialProperty;
+    metallic?: MaterialProperty;
+    ior?: MaterialProperty;
+    emission?: MaterialProperty;
+}
+
+// --- Lights ---
+
+export type LightDescription = PointLight | DirectionalLight;
+
+export interface PointLight {
+    kind: 'point';
+    position: number[];
+    intensity: number;
+    color?: number[];
+}
+
+export interface DirectionalLight {
+    kind: 'directional';
+    direction: number[];
+    intensity: number;
+    color?: number[];
+}
+
+// ============================================================================
+// Render Strategy
+// ============================================================================
+
+export interface RenderStrategy {
+    id: string;
+    transport: TransportDescription;
+    camera: CameraDescription;
+    accumulation: AccumulationDescription;
+    display: DisplayDescription;
+}
+
+export interface TransportDescription {
+    maxBounces: number;
+    directLighting: 'none' | 'nee' | 'mis';
+    russianRoulette: { enabled: boolean; startDepth: number };
+    samplesPerFrame: number;
+}
+
+export type CameraDescription =
+    | { type: 'pinhole'; fov: number }
+    | { type: 'thinlens'; fov: number; aperture: number; focusDistance: number }
+    | { type: 'orthographic'; scale: number };
+
+export type AccumulationDescription =
+    | { type: 'average' }
+    | { type: 'exponential'; alpha: number }
+    | { type: 'variance' };
+
+export type DisplayDescription =
+    | { type: 'reinhard'; exposure?: number }
+    | { type: 'aces'; exposure?: number }
+    | { type: 'filmic'; exposure?: number }
+    | { type: 'none' };
 
 /**
  * GLSL shader program (vertex + fragment)

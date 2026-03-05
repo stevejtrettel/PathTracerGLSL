@@ -1,6 +1,6 @@
 // compiler/index.ts
 
-export { SimpleCompiler } from './SimpleCompiler.js';
+export { Compiler } from './Compiler.js';
 export type {
     ICompiler,
     SceneDescription,

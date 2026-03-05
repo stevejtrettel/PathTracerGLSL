@@ -11,6 +11,17 @@ import type {
 
 import type { UniformBinding } from '../engine/types.js';
 
+// SimpleCompiler's legacy strategy shape — used internally only
+interface SimpleStrategy {
+    id: string;
+    settings?: {
+        maxBounces?: number;
+        samplesPerFrame?: number;
+        debugOutput?: 'albedo' | 'normal' | 'depth' | 'uv';
+        defaultOutput?: 'albedo' | 'normal' | 'depth' | 'uv';
+    };
+}
+
 /**
  * SimpleCompiler - Hardcoded renderer generator for architecture validation
  *
@@ -29,25 +40,26 @@ export class SimpleCompiler implements ICompiler {
      * Compile scene + strategy into executable renderer
      */
     compile(scene: SceneDescription, strategy: RenderStrategy): CompiledRenderer {
-        // Route to appropriate generator based on strategy
-        switch (strategy.id) {
+        // Cast to legacy shape — SimpleCompiler only reads .id and .settings
+        const s = strategy as unknown as SimpleStrategy;
+        switch (s.id) {
             case 'debug':
-                return this._generateDebugRenderer(scene, strategy);
+                return this._generateDebugRenderer(scene, s);
 
             case 'pathtracer':
-                return this._generatePathtracerRenderer(scene, strategy);
+                return this._generatePathtracerRenderer(scene, s);
 
             case 'pathtracer-aovs':
-                return this._generatePathtracerAOVsRenderer(scene, strategy);
+                return this._generatePathtracerAOVsRenderer(scene, s);
 
             case 'pathtracer-full':
-                return this._generatePathtracerFullRenderer(scene, strategy);
+                return this._generatePathtracerFullRenderer(scene, s);
 
             case 'debug-aovs':
-                return this._generateDebugAOVsRenderer(scene, strategy);
+                return this._generateDebugAOVsRenderer(scene, s);
 
             default:
-                throw new Error(`Unknown strategy: ${strategy.id}`);
+                throw new Error(`Unknown strategy: ${s.id}`);
         }
     }
 
@@ -63,7 +75,7 @@ export class SimpleCompiler implements ICompiler {
      */
     private _generateDebugRenderer(
         scene: SceneDescription,
-        strategy: RenderStrategy
+        strategy: SimpleStrategy
     ): CompiledRenderer {
         // Create shaders map
         const shaders = new Map<string, ShaderProgram>();
@@ -167,7 +179,7 @@ void main() {
     /**
      * Get debug visualization GLSL code based on strategy settings
      */
-    private _getDebugVisualization(strategy: RenderStrategy): string {
+    private _getDebugVisualization(strategy: SimpleStrategy): string {
         const debugOutput = strategy.settings?.debugOutput || 'uv';
 
         switch (debugOutput) {
@@ -208,7 +220,7 @@ void main() {
      */
     private _generatePathtracerRenderer(
         scene: SceneDescription,
-        strategy: RenderStrategy
+        strategy: SimpleStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
@@ -815,7 +827,7 @@ void main() {
      */
     private _generatePathtracerAOVsRenderer(
         scene: SceneDescription,
-        strategy: RenderStrategy
+        strategy: SimpleStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
@@ -1360,7 +1372,7 @@ void main() {
      */
     private _generatePathtracerFullRenderer(
         scene: SceneDescription,
-        strategy: RenderStrategy
+        strategy: SimpleStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
         const maxBounces = strategy.settings?.maxBounces ?? 8;
@@ -1973,7 +1985,7 @@ void main() {
      */
     private _generateDebugAOVsRenderer(
         scene: SceneDescription,
-        strategy: RenderStrategy
+        strategy: SimpleStrategy
     ): CompiledRenderer {
         const shaders = new Map<string, ShaderProgram>();
 
