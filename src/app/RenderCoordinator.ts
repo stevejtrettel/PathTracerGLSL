@@ -43,6 +43,8 @@ export class RenderCoordinator {
 
     private lastFrameTime = 0;
     private fpsHistory: number[] = [];
+    private lastProgressTime = 0;
+    private progressIntervalMs = 100; // Report progress at most ~10x/sec
 
     // Which parameter prefixes trigger accumulation reset
     private resetPrefixes: string[] = [ParamPrefix.CAMERA, ParamPrefix.SCENE, ParamPrefix.MATERIAL, ParamPrefix.LIGHT];
@@ -257,6 +259,10 @@ export class RenderCoordinator {
     }
 
     private reportProgress(): void {
+        const now = performance.now();
+        if (now - this.lastProgressTime < this.progressIntervalMs) return;
+        this.lastProgressTime = now;
+
         const info = this.buildProgressInfo();
         if (this.mode === 'production' && this.goal?.onProgress) this.goal.onProgress(info);
         this.onProgress?.(info);

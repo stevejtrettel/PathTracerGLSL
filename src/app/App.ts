@@ -14,6 +14,7 @@ import type { Extension } from './types.js';
 import { AppEvents } from './events.js';
 import { saveHDRFile, savePNGFile } from './utils/file-export.js';
 import { ExportError, SessionError } from '../errors/RenderErrors.js';
+import { ProductionOrchestrator, type ProductionOptions } from './ProductionOrchestrator.js';
 
 export class App {
     private compiler: ICompiler;
@@ -25,9 +26,7 @@ export class App {
     private gl: WebGL2RenderingContext;
     private extensions: Map<string, Extension> = new Map();
     private layout: AppLayout | null = null;
-    private previousLayoutMode: LayoutMode | null = null;
-    private previousResolution: [number, number] | null = null;
-    private productionLayoutMode: LayoutMode = 'centered';
+    private production: ProductionOrchestrator;
 
     constructor(canvas: HTMLCanvasElement) {
         canvas.width = canvas.clientWidth || window.innerWidth;
@@ -89,27 +88,9 @@ export class App {
             this.eventBus.emit(AppEvents.RENDER_PROGRESS, info);
         };
 
-        // Production render lifecycle: auto-switch layout on start, restore on stop
-        this.eventBus.on(AppEvents.RENDER_STARTED, (data: { mode: string }) => {
-            if (data.mode === 'production') {
-                if (this.layout) {
-                    if (!this.previousLayoutMode) {
-                        this.previousLayoutMode = this.layout.mode;
-                        console.log(`Saved previous layout: ${this.previousLayoutMode}`);
-                    }
-                    this.setLayoutMode(this.productionLayoutMode);
-                    console.log(`Switched to '${this.productionLayoutMode}' layout for production`);
-                }
-            }
-        });
-
-        this.eventBus.on(AppEvents.RENDER_STOPPED, () => {
-            this._restoreProductionLayout();
-            if (this.parameterStore.isLocked()) {
-                this.parameterStore.unlock();
-                console.log('Unlocked parameters on render stop');
-            }
-        });
+        this.production = new ProductionOrchestrator(
+            this, this.coordinator, this.parameterStore, this.eventBus
+        );
 
         console.log('App created');
     }
@@ -186,87 +167,12 @@ export class App {
 
     // -- Rendering: Production --
 
-    async renderProduction(targetSamples: number, options?: {
-        width?: number;
-        height?: number;
-        autoSave?: boolean;
-        autoExportPNG?: boolean;
-        autoExportHDR?: boolean;
-        autoExportAllAOVs?: boolean;
-    }): Promise<void> {
-        this.parameterStore.lock();
-
-        const canvas = this.gl.canvas as HTMLCanvasElement;
-        const originalWidth = canvas.width;
-        const originalHeight = canvas.height;
-
-        if (options?.width && options?.height) {
-            if (options.width !== originalWidth || options.height !== originalHeight) {
-                console.log(`Resizing for production: ${options.width}x${options.height}`);
-                this.previousResolution = [originalWidth, originalHeight];
-                this.resize(options.width, options.height);
-            }
-        }
-
-        this.coordinator.resetAccumulation('production_start');
-
-        try {
-            await this.coordinator.startProduction({
-                targetSamples,
-                onProgress: (info) => {
-                    if (info.samples % 100 === 0) {
-                        const pct = info.percentComplete?.toFixed(1) || '0.0';
-                        console.log(`Production: ${info.samples}/${targetSamples} (${pct}%)`);
-                    }
-                }
-            });
-
-            if (options?.autoExportPNG) { console.log('Auto-exporting PNG...'); this.exportPNG(); }
-            if (options?.autoExportHDR) { console.log('Auto-exporting HDR...'); this.exportHDR(); }
-            if (options?.autoExportAllAOVs) { console.log('Auto-exporting all AOVs...'); this.exportAllAOVs(); }
-            if (options?.autoSave) { console.log('Auto-saving session...'); this.quickSave(); }
-        } finally {
-            this.parameterStore.unlock();
-        }
+    async renderProduction(targetSamples: number, options?: ProductionOptions): Promise<void> {
+        return this.production.renderProduction(targetSamples, options);
     }
 
     async extendProduction(additionalSamples: number): Promise<void> {
-        const currentSamples = this.coordinator.getSampleCount();
-        const newTarget = currentSamples + additionalSamples;
-
-        console.log(`Extending production: +${additionalSamples} (${currentSamples} → ${newTarget})`);
-
-        const wasLocked = this.parameterStore.isLocked();
-        if (!wasLocked) {
-            this.parameterStore.lock();
-        }
-
-        try {
-            await this.coordinator.startProduction({
-                targetSamples: newTarget
-            });
-        } finally {
-            if (!wasLocked) {
-                this.parameterStore.unlock();
-            }
-        }
-    }
-
-    private _restoreProductionLayout(): void {
-        if (this.previousLayoutMode && this.layout) {
-            if (this.layout.mode !== this.previousLayoutMode) {
-                this.setLayoutMode(this.previousLayoutMode);
-                console.log(`Restored layout to '${this.previousLayoutMode}'`);
-            }
-            this.previousLayoutMode = null;
-        }
-
-        if (this.previousResolution) {
-            const [width, height] = this.previousResolution;
-            console.log(`Restoring resolution: ${width}x${height}`);
-            this.resize(width, height);
-            this.previousResolution = null;
-        }
+        return this.production.extendProduction(additionalSamples);
     }
 
     // -- Rendering: Utilities --
@@ -312,9 +218,8 @@ export class App {
         profilingEnabled: boolean;
         gpuTimings: Record<string, number> | null;
     } {
-        const gpuTimingsMap = this.engine.isProfilingEnabled()
-            ? this.engine.getAllPassTimings()
-            : null;
+        const profiling = this.engine.isProfilingEnabled();
+        const gpuTimingsMap = profiling ? this.engine.getAllPassTimings() : null;
 
         let gpuTimings: Record<string, number> | null = null;
         if (gpuTimingsMap) {
@@ -332,7 +237,7 @@ export class App {
             mode: this.getRenderMode(),
             state: this.getRenderState(),
             rendererId: this.rendererManager.getActiveRendererId(),
-            profilingEnabled: this.engine.isProfilingEnabled(),
+            profilingEnabled: profiling,
             gpuTimings
         };
     }

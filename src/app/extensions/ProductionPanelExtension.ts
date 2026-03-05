@@ -35,6 +35,8 @@ export class ProductionPanelExtension extends UIExtension {
 
     // Track tiled job state
     private tiledJob: TiledJobProgressInfo | null = null;
+    // Track render state so controls only rebuild on state transitions
+    private lastControlsState: string | null = null;
 
     constructor() {
         super({ startHidden: true });
@@ -130,7 +132,12 @@ export class ProductionPanelExtension extends UIExtension {
             this.updateProgressBar(info);
         }
         this.updateStats(info);
-        this.updateControls(info);
+
+        // Only rebuild controls when render state changes (not every progress tick)
+        if (info.state !== this.lastControlsState) {
+            this.lastControlsState = info.state;
+            this.updateControls(info);
+        }
     };
 
     private onTiledJobProgress = (info: TiledJobProgressInfo): void => {
@@ -177,6 +184,7 @@ export class ProductionPanelExtension extends UIExtension {
             this.tileGridContainer.classList.add('hidden');
         }
         this.tiledJob = null;
+        this.lastControlsState = null;
     }
 
     private updateProgressBar(info: ProgressInfo): void {
