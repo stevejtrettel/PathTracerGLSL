@@ -2,7 +2,7 @@
 
 import { RenderStoppedError } from '../errors/RenderErrors.js';
 import type { Engine } from '../engine/Engine.js';
-import { AppEvents, ParamPrefix } from './events.js';
+import { AppEvents } from './events.js';
 
 export type RenderMode = 'interactive' | 'production';
 export type RenderState = 'rendering' | 'paused' | 'complete' | 'stopped';
@@ -45,10 +45,6 @@ export class RenderCoordinator {
     private fpsHistory: number[] = [];
     private lastProgressTime = 0;
     private progressIntervalMs = 100; // Report progress at most ~10x/sec
-
-    // Which parameter prefixes trigger accumulation reset
-    private resetPrefixes: string[] = [ParamPrefix.CAMERA, ParamPrefix.SCENE, ParamPrefix.MATERIAL, ParamPrefix.LIGHT];
-    private noResetPrefixes: string[] = [ParamPrefix.DEVELOPER, ParamPrefix.DEBUG, ParamPrefix.RENDERER_DISPLAY_MODE];
 
     public onProgress?: (info: ProgressInfo) => void;
 
@@ -94,7 +90,6 @@ export class RenderCoordinator {
 
         console.log(`Started production render: ${goal.targetSamples} samples`);
         this.emit(AppEvents.RENDER_STARTED, { mode: 'production', targetSamples: goal.targetSamples });
-        this.emit(AppEvents.RENDER_LOCKED);
 
         return new Promise<void>((resolve, reject) => {
             this.productionResolve = resolve;
@@ -133,7 +128,6 @@ export class RenderCoordinator {
 
     isRunning(): boolean { return this.state === 'rendering'; }
     isPaused(): boolean { return this.state === 'paused'; }
-    isLocked(): boolean { return this.mode === 'production' && (this.state === 'rendering' || this.state === 'paused'); }
     isAccumulating(): boolean { return this.engine.getSampleCount() > 1; }
     getMode(): RenderMode { return this.mode; }
     getState(): RenderState { return this.state; }
@@ -152,33 +146,11 @@ export class RenderCoordinator {
         return this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
     }
 
-    // -- Parameter Reset Logic --
-
-    shouldResetForParameter(path: string): boolean {
-        for (const prefix of this.noResetPrefixes) {
-            if (path.startsWith(prefix)) return false;
-        }
-        for (const prefix of this.resetPrefixes) {
-            if (path.startsWith(prefix)) return true;
-        }
-        console.warn(`Unknown parameter prefix: ${path}, resetting accumulation`);
-        return true;
-    }
-
-    addResetPrefix(prefix: string): void {
-        if (!this.resetPrefixes.includes(prefix)) this.resetPrefixes.push(prefix);
-    }
-
-    addNoResetPrefix(prefix: string): void {
-        if (!this.noResetPrefixes.includes(prefix)) this.noResetPrefixes.push(prefix);
-    }
-
     // -- Private --
 
     private stopInternal(emitEvents: boolean): void {
         if (this.state === 'stopped') return;
 
-        const wasProduction = this.mode === 'production';
         this.state = 'stopped';
 
         if (this.animationId !== undefined) {
@@ -195,7 +167,6 @@ export class RenderCoordinator {
 
         if (emitEvents) {
             this.emit(AppEvents.RENDER_STOPPED);
-            if (wasProduction) this.emit(AppEvents.RENDER_UNLOCKED);
         }
     }
 
@@ -250,7 +221,6 @@ export class RenderCoordinator {
 
         this.goal = null;
         this.emit(AppEvents.RENDER_COMPLETE, { samples, elapsedTime: elapsed });
-        this.emit(AppEvents.RENDER_UNLOCKED);
     }
 
     private clearProductionPromise(): void {

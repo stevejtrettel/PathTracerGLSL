@@ -11,7 +11,7 @@ import type { ICompiler, CompiledRenderer, SceneDescription } from '../compiler/
 import type { AppConfig, StrategyPreset, CreateAppOptions, SessionData } from './types.js';
 import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
-import { AppEvents } from './events.js';
+import { AppEvents, shouldResetAccumulation } from './events.js';
 import { saveHDRFile, savePNGFile } from './utils/file-export.js';
 import { ExportError, SessionError } from '../errors/RenderErrors.js';
 import { ProductionOrchestrator, type ProductionOptions } from './ProductionOrchestrator.js';
@@ -68,7 +68,7 @@ export class App {
                 const isRendering = this.coordinator.isRunning() || this.coordinator.isPaused();
 
                 if (!isResend && isRendering) {
-                    if (this.coordinator.shouldResetForParameter(change.path)) {
+                    if (shouldResetAccumulation(change.path)) {
                         this.coordinator.resetAccumulation(`parameter: ${change.path}`);
                     }
                 }
@@ -163,7 +163,7 @@ export class App {
     resume(): void { this.coordinator.resume(); }
     isActive(): boolean { return this.coordinator.isRunning(); }
     isPaused(): boolean { return this.coordinator.isPaused(); }
-    isLocked(): boolean { return this.coordinator.isLocked(); }
+    isLocked(): boolean { return this.parameterStore.isLocked(); }
 
     // -- Rendering: Production --
 
@@ -253,7 +253,7 @@ export class App {
     getParameter(path: string): any { return this.parameterStore.get(path); }
     getAllParameters(): Record<string, any> { return this.parameterStore.serialize(); }
     getParameterMetadata(): Map<string, import('../app/types.js').ParameterMetadata> { return this.rendererManager.getParameterMetadata(); }
-    areParametersLocked(): boolean { return this.parameterStore.isLocked(); }
+
 
     // -- Session --
 

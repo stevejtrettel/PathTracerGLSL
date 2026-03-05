@@ -13,8 +13,6 @@ export const AppEvents = {
     RENDER_PAUSED:      'render.paused',
     RENDER_RESUMED:     'render.resumed',
     RENDER_PROGRESS:    'render.progress',
-    RENDER_LOCKED:      'render.locked',
-    RENDER_UNLOCKED:    'render.unlocked',
 
     // Accumulation
     ACCUMULATION_RESET: 'accumulation.reset',
@@ -60,3 +58,26 @@ export const ParamPrefix = {
     DEBUG:     'debug.',
     RENDERER_DISPLAY_MODE: 'renderer.displayMode',
 } as const;
+
+/**
+ * Determines whether a parameter change should reset accumulation.
+ *
+ * Camera, scene, material, and light parameters cause a reset.
+ * Developer, debug, and display mode parameters do not.
+ * Unknown prefixes reset to be safe.
+ */
+export function shouldResetAccumulation(path: string): boolean {
+    if (path.startsWith(ParamPrefix.DEVELOPER) ||
+        path.startsWith(ParamPrefix.DEBUG) ||
+        path.startsWith(ParamPrefix.RENDERER_DISPLAY_MODE)) {
+        return false;
+    }
+    if (path.startsWith(ParamPrefix.CAMERA) ||
+        path.startsWith(ParamPrefix.SCENE) ||
+        path.startsWith(ParamPrefix.MATERIAL) ||
+        path.startsWith(ParamPrefix.LIGHT)) {
+        return true;
+    }
+    console.warn(`Unknown parameter prefix: ${path}, resetting accumulation`);
+    return true;
+}
