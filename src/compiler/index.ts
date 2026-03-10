@@ -12,5 +12,5 @@ export type {
     RenderPass,
     SwapInstruction,
     SourceMap,
-    SourceLocation
+    SourceBlockMapping
 } from './types.js';

@@ -1,7 +1,11 @@
 // compiler/generate/ShaderBuilder.ts
 
 import type { ShaderProgram } from '../types.js';
-import type { RenderPlan, PlannedSDFObject, PlannedMaterial, PlannedLight } from '../plan/types.js';
+import { isGlslExpression } from '../types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedUniform } from '../plan/types.js';
+import type { ShaderBlock, BlockMapping } from './ShaderIR.js';
+import { assembleBlocks } from './ShaderIR.js';
+import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 
 // Import GLSL library files
 import structsGLSL from './glsl/structs.glsl?raw';
@@ -12,104 +16,160 @@ import sdfPrimitivesGLSL from './glsl/sdf_primitives.glsl?raw';
 import raymarchGLSL from './glsl/raymarch.glsl?raw';
 import lambertGLSL from './glsl/lambert.glsl?raw';
 import tonemapReinhardGLSL from './glsl/tonemap_reinhard.glsl?raw';
-import compositeGLSL from './glsl/composite.glsl?raw';
 
-const FULLSCREEN_VERTEX = `#version 300 es
-void main() {
-    float x = float((gl_VertexID & 1) << 2) - 1.0;
-    float y = float((gl_VertexID & 2) << 1) - 1.0;
-    gl_Position = vec4(x, y, 0.0, 1.0);
+// Import GLSL templates
+import fullscreenVertGLSL from './glsl/fullscreen.vert.glsl?raw';
+import cameraPinholeGLSL from './glsl/camera_pinhole.glsl?raw';
+import pathTraceGLSL from './glsl/path_trace.glsl?raw';
+import mainAccumulateGLSL from './glsl/main_accumulate.glsl?raw';
+
+export interface ShaderBuildResult {
+    shaders: Map<string, ShaderProgram>;
+    sourceMaps: Map<string, BlockMapping[]>;
 }
-`;
 
-export function buildShaders(plan: RenderPlan, rendererId: string): Map<string, ShaderProgram> {
+export function buildShaders(plan: RenderPlan, rendererId: string, bag: DiagnosticBag): ShaderBuildResult {
     const shaders = new Map<string, ShaderProgram>();
+    const sourceMaps = new Map<string, BlockMapping[]>();
 
-    shaders.set(`${rendererId}-main`, {
-        vertex: FULLSCREEN_VERTEX,
-        fragment: buildPathtracerFragment(plan),
+    // Vertex shader (shared)
+    const vertexAssembled = assembleBlocks([
+        { origin: 'generated:version', source: '#version 300 es' },
+        { origin: 'glsl/fullscreen.vert.glsl', source: fullscreenVertGLSL },
+    ]);
+
+    // Pathtracer fragment
+    const ptAssembled = assembleBlocks(buildPathtracerBlocks(plan, bag));
+    const mainShaderId = `${rendererId}-main`;
+    shaders.set(mainShaderId, {
+        vertex: vertexAssembled.source,
+        fragment: ptAssembled.source,
     });
+    sourceMaps.set(mainShaderId, ptAssembled.blockMap);
 
-    shaders.set(`${rendererId}-display`, {
-        vertex: FULLSCREEN_VERTEX,
-        fragment: buildDisplayFragment(),
+    // Display fragment
+    const displayAssembled = assembleBlocks(buildDisplayBlocks());
+    const displayShaderId = `${rendererId}-display`;
+    shaders.set(displayShaderId, {
+        vertex: vertexAssembled.source,
+        fragment: displayAssembled.source,
     });
+    sourceMaps.set(displayShaderId, displayAssembled.blockMap);
 
-    shaders.set(`${rendererId}-composite`, {
-        vertex: FULLSCREEN_VERTEX,
-        fragment: buildCompositeFragment(),
-    });
-
-    return shaders;
+    return { shaders, sourceMaps };
 }
 
 // ============================================================================
-// Pathtracer Fragment Shader
+// Pathtracer Fragment Shader (block assembly)
 // ============================================================================
 
-function buildPathtracerFragment(plan: RenderPlan): string {
-    const sections: string[] = [];
+function buildPathtracerBlocks(plan: RenderPlan, bag: DiagnosticBag): ShaderBlock[] {
+    const blocks: ShaderBlock[] = [];
+    const program = plan.program;
 
-    // Header
-    sections.push(`#version 300 es
-precision highp float;
-precision highp int;
+    blocks.push({ origin: 'generated:header', source: buildHeader(program) });
+    blocks.push({ origin: 'generated:uniforms', source: buildUniformDeclarations(plan.uniforms) });
 
-out vec4 fragColor;
-`);
+    // Core library (always)
+    blocks.push({ origin: 'glsl/structs.glsl', source: structsGLSL });
+    blocks.push({ origin: 'glsl/rng.glsl', source: rngGLSL });
+    blocks.push({ origin: 'glsl/math.glsl', source: mathGLSL });
+    blocks.push({ origin: 'glsl/euclidean.glsl', source: euclideanGLSL });
 
-    // Uniforms
-    sections.push(buildUniformDeclarations(plan));
-
-    // Library includes
-    sections.push(structsGLSL);
-    sections.push(rngGLSL);
-    sections.push(mathGLSL);
-    sections.push(euclideanGLSL);
-    sections.push(sdfPrimitivesGLSL);
-
-    // Generated scene SDF
-    sections.push(generateSDFDispatch(plan.objects));
-
-    // Raymarch infrastructure (depends on scene_sdf)
-    sections.push(raymarchGLSL);
-
-    // Generated material properties
-    sections.push(generateMaterialLookup(plan.materials));
-
-    // BRDF
-    if (plan.brdfModels.has('lambert')) {
-        sections.push(lambertGLSL);
+    // Intersection — driven by program.intersection
+    if (program.intersection.method === 'raymarch') {
+        blocks.push({ origin: 'glsl/sdf_primitives.glsl', source: sdfPrimitivesGLSL });
+        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects) });
+        blocks.push({ origin: 'glsl/raymarch.glsl', source: raymarchGLSL });
     }
 
-    // Generated light sampling (NEE)
-    if (plan.emitNEE) {
-        sections.push(generateLightSampling(plan.lights));
+    // Materials — driven by program.materials
+    blocks.push({ origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials) });
+    for (const model of program.materials.models) {
+        if (model === 'lambert') blocks.push({ origin: 'glsl/lambert.glsl', source: lambertGLSL });
     }
 
-    // Camera
-    sections.push(generateCamera(plan));
+    // Lighting — driven by program.lighting
+    if (program.lighting !== null) {
+        blocks.push({ origin: 'generated:light-sampling', source: generateLightSampling(plan.lights) });
+    }
 
-    // Path trace loop
-    sections.push(generatePathTraceLoop(plan));
+    // Camera — driven by program.camera
+    blocks.push({ origin: cameraOrigin(program), source: buildCamera(program, bag) });
 
-    // Main function
-    sections.push(generateMain(plan));
+    // Transport — driven by program.transport
+    blocks.push({ origin: 'glsl/path_trace.glsl', source: pathTraceGLSL });
 
-    return sections.join('\n');
+    // Accumulation — driven by program.accumulation
+    blocks.push({ origin: accumulationOrigin(program), source: buildAccumulation(program, bag) });
+
+    return blocks;
+}
+
+function cameraOrigin(program: ProgramDescription): string {
+    if (program.camera.type === 'pinhole') return 'glsl/camera_pinhole.glsl';
+    return `generated:camera-${program.camera.type}`;
+}
+
+function accumulationOrigin(program: ProgramDescription): string {
+    if (program.accumulation.type === 'average') return 'glsl/main_accumulate.glsl';
+    return `generated:main-${program.accumulation.type}`;
 }
 
 // ============================================================================
-// Uniform declarations
+// Display Fragment Shader (block assembly)
 // ============================================================================
 
-function buildUniformDeclarations(plan: RenderPlan): string {
+function buildDisplayBlocks(): ShaderBlock[] {
+    return [
+        { origin: 'generated:display-header', source: FRAGMENT_PREAMBLE + '\n\nout vec4 fragColor;' },
+        { origin: 'glsl/tonemap_reinhard.glsl', source: tonemapReinhardGLSL },
+    ];
+}
+
+// ============================================================================
+// Header with #defines
+// ============================================================================
+
+const FRAGMENT_PREAMBLE = '#version 300 es\nprecision highp float;\nprecision highp int;';
+
+function buildHeader(program: ProgramDescription): string {
+    const lines: string[] = [];
+    lines.push(FRAGMENT_PREAMBLE);
+    lines.push('');
+    lines.push(`out vec4 fragColor;`);
+    lines.push('');
+
+    // Transport defines
+    lines.push(`#define MAX_BOUNCES ${program.transport.maxBounces}`);
+
+    if (program.lighting !== null) {
+        lines.push(`#define ENABLE_NEE`);
+    }
+
+    if (program.transport.russianRoulette) {
+        lines.push(`#define ENABLE_RUSSIAN_ROULETTE`);
+        lines.push(`#define RR_START_DEPTH ${program.transport.russianRoulette.startDepth}`);
+    }
+
+    // Camera defines
+    if (program.camera.type === 'pinhole') {
+        lines.push(`#define TAN_FOV ${formatFloat(Math.tan(program.camera.fov * 0.5))}`);
+    }
+
+    return lines.join('\n');
+}
+
+// ============================================================================
+// Uniform declarations (generated from plan)
+// ============================================================================
+
+function buildUniformDeclarations(uniforms: PlannedUniform[]): string {
     const lines: string[] = [];
     lines.push('// Uniforms');
 
-    for (const u of plan.uniforms) {
-        const glslType = u.type === 'sampler2D' ? 'sampler2D' : u.type;
-        lines.push(`uniform ${glslType} ${u.name};`);
+    for (const u of uniforms) {
+        lines.push(`uniform ${u.type} ${u.name};`);
     }
 
     // Previous accumulation texture (always needed for progressive rendering)
@@ -119,7 +179,31 @@ function buildUniformDeclarations(plan: RenderPlan): string {
 }
 
 // ============================================================================
-// Generated SDF dispatch
+// Camera (template selection)
+// ============================================================================
+
+function buildCamera(program: ProgramDescription, bag: DiagnosticBag): string {
+    if (program.camera.type === 'pinhole') {
+        return cameraPinholeGLSL;
+    }
+    bag.error('invalid-setting', `Camera type '${(program.camera as any).type}' not yet supported`).add();
+    return '// unsupported camera';
+}
+
+// ============================================================================
+// Accumulation / main function (template selection)
+// ============================================================================
+
+function buildAccumulation(program: ProgramDescription, bag: DiagnosticBag): string {
+    if (program.accumulation.type === 'average') {
+        return mainAccumulateGLSL;
+    }
+    bag.error('invalid-setting', `Accumulation type '${(program.accumulation as any).type}' not yet supported`).add();
+    return '// unsupported accumulation';
+}
+
+// ============================================================================
+// Generated SDF dispatch (per-scene codegen)
 // ============================================================================
 
 function generateSDFDispatch(objects: PlannedSDFObject[]): string {
@@ -129,6 +213,9 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
     // Per-object wrapper functions
     for (const obj of objects) {
         lines.push(`float sdf_object_${obj.index}(vec3 p) {`);
+        if (obj.translation) {
+            lines.push(`    p = p - ${formatVec3(obj.translation)};`);
+        }
         lines.push(`    return ${generateSDFCall(obj)};`);
         lines.push(`}`);
         lines.push('');
@@ -147,6 +234,18 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
 
     lines.push(`    return d;`);
     lines.push(`}`);
+    lines.push('');
+
+    // Distance-only variant for normal estimation and shadow rays
+    lines.push('float scene_sdf_dist(vec3 p) {');
+    lines.push('    float d = 1e20;');
+
+    for (const obj of objects) {
+        lines.push(`    d = min(d, sdf_object_${obj.index}(p));`);
+    }
+
+    lines.push('    return d;');
+    lines.push('}');
 
     return lines.join('\n');
 }
@@ -175,7 +274,7 @@ function generateSDFCall(obj: PlannedSDFObject): string {
 }
 
 // ============================================================================
-// Generated material lookup
+// Generated material lookup (per-scene codegen)
 // ============================================================================
 
 function generateMaterialLookup(materials: PlannedMaterial[]): string {
@@ -188,28 +287,29 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
     lines.push('    props.emission_strength = 0.0;');
     lines.push('    props.roughness = 1.0;');
 
-    for (const mat of materials) {
-        lines.push(`    if (id == ${mat.id}) {`);
+    for (let i = 0; i < materials.length; i++) {
+        const mat = materials[i];
+        const cond = i === 0 ? 'if' : 'else if';
+        lines.push(`    ${cond} (id == ${mat.id}) {`);
 
-        if (typeof mat.albedo === 'string') {
-            lines.push(`        props.albedo = ${mat.albedo};`);
+        if (isGlslExpression(mat.albedo)) {
+            lines.push(`        props.albedo = ${mat.albedo.source};`);
         } else {
             lines.push(`        props.albedo = ${formatVec3(mat.albedo)};`);
         }
 
-        if (typeof mat.emission === 'string') {
-            lines.push(`        props.emission = ${mat.emission};`);
+        if (isGlslExpression(mat.emission)) {
+            lines.push(`        props.emission = ${mat.emission.source};`);
         } else {
-            const em = mat.emission as number[];
-            const hasEmission = em[0] > 0 || em[1] > 0 || em[2] > 0;
+            const hasEmission = mat.emission[0] > 0 || mat.emission[1] > 0 || mat.emission[2] > 0;
             if (hasEmission) {
-                lines.push(`        props.emission = ${formatVec3(em)};`);
+                lines.push(`        props.emission = ${formatVec3(mat.emission)};`);
                 lines.push(`        props.emission_strength = 1.0;`);
             }
         }
 
-        if (typeof mat.roughness === 'string') {
-            lines.push(`        props.roughness = ${mat.roughness};`);
+        if (isGlslExpression(mat.roughness)) {
+            lines.push(`        props.roughness = ${mat.roughness.source};`);
         } else {
             lines.push(`        props.roughness = ${formatFloat(mat.roughness)};`);
         }
@@ -223,7 +323,7 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
 }
 
 // ============================================================================
-// Generated light sampling
+// Generated light sampling (per-scene codegen)
 // ============================================================================
 
 function generateLightSampling(lights: PlannedLight[]): string {
@@ -239,7 +339,6 @@ function generateLightSampling(lights: PlannedLight[]): string {
         return lines.join('\n');
     }
 
-    // For single light, no selection needed
     if (lights.length === 1) {
         const light = lights[0];
         lines.push('LightSample lighting_sample(Point p) {');
@@ -259,7 +358,6 @@ function generateLightSampling(lights: PlannedLight[]): string {
         lines.push('    return ls;');
         lines.push('}');
     } else {
-        // Multiple lights — uniform random selection
         lines.push('LightSample lighting_sample(Point p) {');
         lines.push('    LightSample ls;');
         lines.push(`    float light_choice = random() * ${formatFloat(lights.length)};`);
@@ -291,188 +389,15 @@ function generateLightSampling(lights: PlannedLight[]): string {
 }
 
 // ============================================================================
-// Camera generation
-// ============================================================================
-
-function generateCamera(plan: RenderPlan): string {
-    const cam = plan.features.strategy.camera;
-    const lines: string[] = [];
-    lines.push('// Generated camera');
-
-    if (cam.type === 'pinhole') {
-        const tanFov = formatFloat(Math.tan(cam.fov * 0.5));
-        lines.push(`Ray camera_generateRay(vec2 pixel, vec2 xi) {`);
-        lines.push(`    vec2 jittered_pixel = pixel + (xi - 0.5);`);
-        lines.push(`    vec2 ndc = (2.0 * jittered_pixel / u_imageSize) - 1.0;`);
-        lines.push(`    float aspect = u_imageSize.x / u_imageSize.y;`);
-        lines.push(`    ndc.x *= aspect;`);
-        lines.push('');
-        lines.push(`    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);`);
-        lines.push(`    vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));`);
-        lines.push(`    vec3 up = cross(right, forward);`);
-        lines.push('');
-        lines.push(`    float tan_fov = ${tanFov};`);
-        lines.push(`    vec3 dir = normalize(forward + ndc.x * tan_fov * right + ndc.y * tan_fov * up);`);
-        lines.push('');
-        lines.push(`    Ray ray;`);
-        lines.push(`    ray.origin = u_cameraPosition;`);
-        lines.push(`    ray.direction = dir;`);
-        lines.push(`    ray.tmin = 0.001;`);
-        lines.push(`    ray.tmax = 1000.0;`);
-        lines.push(`    return ray;`);
-        lines.push(`}`);
-    } else {
-        throw new Error(`ShaderBuilder: camera type '${cam.type}' not yet supported`);
-    }
-
-    return lines.join('\n');
-}
-
-// ============================================================================
-// Path trace loop
-// ============================================================================
-
-function generatePathTraceLoop(plan: RenderPlan): string {
-    const lines: string[] = [];
-    lines.push('// Generated path trace loop');
-    lines.push(`Radiance transport_trace(Ray ray) {`);
-    lines.push(`    vec3 throughput = vec3(1.0);`);
-    lines.push(`    vec3 radiance = vec3(0.0);`);
-    lines.push(`    Ray current_ray = ray;`);
-    lines.push('');
-    lines.push(`    for (int bounce = 0; bounce < ${plan.maxBounces}; bounce++) {`);
-    lines.push(`        Hit hit;`);
-    lines.push(`        if (!scene_intersect(current_ray, hit)) {`);
-    // Sky gradient
-    lines.push(`            float sky_t = 0.5 * (current_ray.direction.y + 1.0);`);
-    lines.push(`            vec3 sky = mix(vec3(0.5, 0.6, 0.8), vec3(0.2, 0.3, 0.6), sky_t);`);
-    lines.push(`            radiance += throughput * sky;`);
-    lines.push(`            break;`);
-    lines.push(`        }`);
-    lines.push('');
-    lines.push(`        hit.frame = ambient_frame(hit.p, hit.n);`);
-    lines.push('');
-
-    // Emission check
-    lines.push(`        Spectrum emitted = interaction_surface_emit(hit);`);
-    lines.push(`        radiance += throughput * emitted;`);
-    lines.push('');
-
-    // NEE (direct lighting)
-    if (plan.emitNEE) {
-        lines.push(`        // Next Event Estimation`);
-        lines.push(`        LightSample ls = lighting_sample(hit.p);`);
-        lines.push(`        if (ls.pdf > 0.0) {`);
-        lines.push(`            Ray shadow_ray;`);
-        lines.push(`            shadow_ray.origin = hit.p + hit.n * EPSILON;`);
-        lines.push(`            shadow_ray.direction = ls.wi;`);
-        lines.push(`            shadow_ray.tmin = EPSILON;`);
-        lines.push(`            shadow_ray.tmax = ls.distance - EPSILON;`);
-        lines.push(`            if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {`);
-        lines.push(`                vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit);`);
-        lines.push(`                radiance += throughput * ls.radiance * f / ls.pdf;`);
-        lines.push(`            }`);
-        lines.push(`        }`);
-        lines.push('');
-    }
-
-    // Russian roulette
-    if (plan.emitRussianRoulette) {
-        lines.push(`        // Russian roulette`);
-        lines.push(`        if (bounce >= ${plan.russianRouletteStartDepth}) {`);
-        lines.push(`            float p_survive = min(0.95, luminance(throughput));`);
-        lines.push(`            if (random() > p_survive) break;`);
-        lines.push(`            throughput /= p_survive;`);
-        lines.push(`        }`);
-        lines.push('');
-    }
-
-    // BRDF sampling for next bounce
-    lines.push(`        // BRDF sampling`);
-    lines.push(`        float pdf;`);
-    lines.push(`        Direction wi = interaction_surface_scatter(-current_ray.direction, hit, pdf);`);
-    lines.push(`        if (pdf <= 0.0001) break;`);
-    lines.push('');
-    lines.push(`        Spectrum f = interaction_surface_shade(wi, -current_ray.direction, hit);`);
-    lines.push(`        float cos_theta = max(0.0, ambient_dot(wi, hit.n, hit.p));`);
-    lines.push(`        if (cos_theta <= 0.0001) break;`);
-    lines.push(`        throughput *= f / pdf;`);
-    lines.push('');
-    lines.push(`        current_ray.origin = ambient_geodesic(hit.p, hit.n, EPSILON);`);
-    lines.push(`        current_ray.direction = wi;`);
-    lines.push(`        current_ray.tmin = EPSILON;`);
-    lines.push(`        current_ray.tmax = 1000.0;`);
-    lines.push(`    }`);
-    lines.push('');
-    lines.push(`    return radiance;`);
-    lines.push(`}`);
-
-    return lines.join('\n');
-}
-
-// ============================================================================
-// Main function
-// ============================================================================
-
-function generateMain(plan: RenderPlan): string {
-    const lines: string[] = [];
-    lines.push('// Main');
-    lines.push('void main() {');
-    lines.push('    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;');
-    lines.push('    hash_init(uvec2(gl_FragCoord.xy), uint(u_frameIndex));');
-    lines.push('');
-    lines.push('    vec2 xi = random2();');
-    lines.push('    Ray ray = camera_generateRay(pixel, xi);');
-    lines.push('    vec3 color = transport_trace(ray);');
-    lines.push('');
-
-    // Accumulation
-    if (plan.features.strategy.accumulation.type === 'average') {
-        lines.push('    if (u_sampleCount == 0) {');
-        lines.push('        fragColor = vec4(color, 1.0);');
-        lines.push('    } else {');
-        lines.push('        ivec2 coord = ivec2(gl_FragCoord.xy);');
-        lines.push('        vec3 previous = texelFetch(u_previous, coord, 0).rgb;');
-        lines.push('        float n = float(u_sampleCount);');
-        lines.push('        float new_weight = 1.0 / (n + 1.0);');
-        lines.push('        fragColor = vec4(mix(previous, color, new_weight), 1.0);');
-        lines.push('    }');
-    }
-
-    lines.push('}');
-    return lines.join('\n');
-}
-
-// ============================================================================
-// Display and composite fragment shaders
-// ============================================================================
-
-function buildDisplayFragment(): string {
-    return `#version 300 es
-precision highp float;
-
-out vec4 fragColor;
-
-${tonemapReinhardGLSL}
-`;
-}
-
-function buildCompositeFragment(): string {
-    return `#version 300 es
-precision highp float;
-
-out vec4 fragColor;
-
-${compositeGLSL}
-`;
-}
-
-// ============================================================================
 // GLSL formatting helpers
 // ============================================================================
 
 function formatFloat(v: number): string {
+    if (!Number.isFinite(v)) {
+        throw new Error(`ShaderBuilder: cannot format non-finite number: ${v}`);
+    }
     const s = v.toString();
+    if (s.includes('e') || s.includes('E')) return v.toExponential();
     return s.includes('.') ? s : s + '.0';
 }
 

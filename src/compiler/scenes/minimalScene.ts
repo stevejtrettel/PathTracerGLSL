@@ -19,10 +19,10 @@ export const minimalScene: SceneDescription = {
             material: 'sphere',
         },
     ],
-    materials: new Map([
-        ['ground', { model: 'lambert', albedo: [0.6, 0.6, 0.6] }],
-        ['sphere', { model: 'lambert', albedo: [0.9, 0.2, 0.2] }],
-    ]),
+    materials: {
+        ground: { model: 'lambert', albedo: [0.6, 0.6, 0.6] },
+        sphere: { model: 'lambert', albedo: [0.9, 0.2, 0.2] },
+    },
     lights: [
         { kind: 'point', position: [3, 4, 2], intensity: 30.0, color: [1.0, 1.0, 1.0] },
     ],

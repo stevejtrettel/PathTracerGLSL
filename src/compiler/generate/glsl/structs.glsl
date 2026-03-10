@@ -23,7 +23,6 @@ struct Frame {
 struct Hit {
     float t;
     Point p;
-    Direction n;
     Frame frame;
     int material_to;
     int material_from;

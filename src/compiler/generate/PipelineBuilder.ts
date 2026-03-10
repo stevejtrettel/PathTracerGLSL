@@ -4,38 +4,33 @@ import type { RenderPipeline, CompiledRenderer } from '../types.js';
 import type { RenderPlan } from '../plan/types.js';
 import type { UniformBinding, ParameterMetadata } from '../../engine/types.js';
 
-export function buildPipeline(rendererId: string): RenderPipeline {
+export function buildPipeline(rendererId: string, plan: RenderPlan): RenderPipeline {
+    const planned = plan.pipeline;
+
+    // Map pass roles to shader IDs
+    const roleToShader: Record<string, string> = {
+        'pathtracer': `${rendererId}-main`,
+        'display': `${rendererId}-display`,
+    };
+
     return {
-        framebuffers: [
-            { id: 'accumulation', type: 'double_buffer', format: 'rgba32f' },
-            { id: 'rgb', type: 'texture', format: 'rgba8' },
-            { id: 'screen', type: 'screen' },
-        ],
-        passes: [
-            {
-                id: 'main-pass',
-                shader: `${rendererId}-main`,
-                inputs: { textures: { 'u_previous': 'accumulation_previous' } },
-                output: 'accumulation_current',
-                execution: { type: 'once' },
-            },
-            {
-                id: 'display-pass',
-                shader: `${rendererId}-display`,
-                inputs: { textures: { 'u_radiance': 'accumulation_current' } },
-                output: 'rgb',
-                execution: { type: 'once' },
-            },
-            {
-                id: 'composite-pass',
-                shader: `${rendererId}-composite`,
-                inputs: { textures: { 'u_rgb': 'rgb' } },
-                output: 'screen',
-                execution: { type: 'once' },
-            },
-        ],
+        framebuffers: planned.framebuffers.map(fb => ({
+            id: fb.id,
+            type: fb.type,
+            format: fb.format,
+        })),
+        passes: planned.passes.map(pass => ({
+            id: `${pass.role}-pass`,
+            shader: roleToShader[pass.role] ?? `${rendererId}-${pass.role}`,
+            inputs: { textures: pass.inputs },
+            output: pass.output,
+            execution: { type: 'once' as const },
+        })),
         postFrame: {
-            swaps: [{ type: 'swap', buffers: ['accumulation'] }],
+            swaps: planned.swaps.map(s => ({
+                type: 'swap' as const,
+                buffers: s.buffers,
+            })),
         },
     };
 }
@@ -55,28 +50,33 @@ export function buildUniforms(plan: RenderPlan): UniformBinding[] {
     return bindings;
 }
 
-export function buildParameters(_plan: RenderPlan): Record<string, ParameterMetadata> {
-    return {
-        'camera.position': {
+export function buildParameters(plan: RenderPlan): Record<string, ParameterMetadata> {
+    const params: Record<string, ParameterMetadata> = {};
+
+    // Camera parameters based on type
+    const cam = plan.program.camera;
+    if (cam.type === 'pinhole') {
+        params['camera.position'] = {
             type: 'vec3',
             default: [0, 0, 8],
             name: 'Position',
             group: 'Camera',
             triggersReset: true,
-        },
-        'camera.target': {
+        };
+        params['camera.target'] = {
             type: 'vec3',
             default: [0, 0, 0],
             name: 'Target',
             group: 'Camera',
             triggersReset: true,
-        },
-    };
+        };
+    }
+
+    return params;
 }
 
 export function buildExportTargets(): CompiledRenderer['exportTargets'] {
     return {
         'hdr': { bufferId: 'accumulation_current', format: 'float' },
-        'ldr': { bufferId: 'rgb', format: 'byte' },
     };
 }

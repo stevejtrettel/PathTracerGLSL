@@ -15,6 +15,9 @@ import { AppEvents, shouldResetAccumulation } from './events.js';
 import { saveHDRFile, savePNGFile } from './utils/file-export.js';
 import { ExportError, SessionError } from '../errors/RenderErrors.js';
 import { ProductionOrchestrator, type ProductionOptions } from './ProductionOrchestrator.js';
+import { ErrorOverlay } from './ui/ErrorOverlay.js';
+import { CompilationError } from '../errors/core/DiagnosticBag.js';
+import { DiagnosticBag } from '../errors/core/DiagnosticBag.js';
 
 export class App {
     private compiler: ICompiler;
@@ -27,6 +30,7 @@ export class App {
     private extensions: Map<string, Extension> = new Map();
     private layout: AppLayout | null = null;
     private production: ProductionOrchestrator;
+    private errorOverlay: ErrorOverlay;
 
     constructor(canvas: HTMLCanvasElement) {
         canvas.width = canvas.clientWidth || window.innerWidth;
@@ -92,6 +96,8 @@ export class App {
             this, this.coordinator, this.parameterStore, this.eventBus
         );
 
+        this.errorOverlay = new ErrorOverlay(document.body);
+
         console.log('App created');
     }
 
@@ -120,7 +126,22 @@ export class App {
 
     // Compile all strategies and optionally load environment HDR
     async initialize(config: AppConfig): Promise<void> {
-        await this.rendererManager.initialize(config);
+        try {
+            await this.rendererManager.initialize(config);
+        } catch (error: any) {
+            // Extract DiagnosticBag from CompilationError or mapped shader errors
+            let bag: DiagnosticBag | undefined;
+            if (error instanceof CompilationError) {
+                bag = error.diagnostics;
+            } else if (error?.__diagnostics) {
+                bag = error.__diagnostics;
+            }
+
+            if (bag) {
+                this.errorOverlay.show(bag);
+            }
+            throw error;
+        }
 
         if (config.environmentHDR) {
             try {
@@ -593,6 +614,7 @@ export class App {
         }
         this.extensions.clear();
         this.eventBus.removeAllListeners();
+        this.errorOverlay.dispose();
         this.layout?.dispose();
         this.layout = null;
         this.engine.dispose();

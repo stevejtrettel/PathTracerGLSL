@@ -1,14 +1,16 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, MaterialModel } from '../types.js';
+import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, MaterialModel, Vec3, MaterialProperty, GlslExpression } from '../types.js';
+import { isGlslExpression } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
-import type { RenderPlan, PlannedSDFObject, PlannedMaterial, PlannedLight, PlannedUniform } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedMaterial, PlannedLight, PlannedUniform, ProgramDescription, PlannedPipeline } from './types.js';
 
 export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): RenderPlan {
-    // --- Assign material IDs ---
+    // --- Assign material IDs (sorted for deterministic ordering) ---
     const materials: PlannedMaterial[] = [];
     let materialIndex = 0;
-    for (const [name, mat] of scene.materials) {
+    const sortedMaterials = Object.entries(scene.materials).sort(([a], [b]) => a.localeCompare(b));
+    for (const [name, mat] of sortedMaterials) {
         materials.push({
             id: materialIndex++,
             name,
@@ -33,16 +35,20 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         const sdfObj = obj as SDFObject;
         const sdf = sdfObj.sdf as StandardSDF;
 
-        const matId = materialIdMap.get(sdfObj.material);
-        if (matId === undefined) {
-            throw new Error(`Planner: object references unknown material '${sdfObj.material}'`);
-        }
+        // Material reference already validated by Validator
+        const matId = materialIdMap.get(sdfObj.material)!;
+
+        // Fold center parameter into translation to avoid double-offset.
+        // The generated per-object wrapper handles all positioning via translation,
+        // and the SDF call is always origin-centered.
+        const { parameters, translation } = resolveSDFPositioning(sdf, sdfObj.transform?.position);
 
         objects.push({
             index: objectIndex++,
             materialId: matId,
             sdfType: sdf.type,
-            parameters: sdf.parameters,
+            parameters,
+            translation,
         });
     }
 
@@ -56,56 +62,173 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 kind: 'point',
                 position: light.position,
                 intensity: light.intensity,
-                color: light.color ?? [1.0, 1.0, 1.0],
+                color: light.color ?? [1.0, 1.0, 1.0] as Vec3,
             });
         }
     }
 
-    // --- Decide what code to emit ---
-    const brdfModels = new Set<MaterialModel>(features.materials.models);
-    const emitNEE = strategy.transport.directLighting !== 'none' && features.lighting.totalLightCount > 0;
-    const emitRussianRoulette = strategy.transport.russianRoulette.enabled;
-    const russianRouletteStartDepth = strategy.transport.russianRoulette.startDepth;
-    const maxBounces = strategy.transport.maxBounces;
-    const unrollSDFDispatch = objects.length <= 8;
-
-    // --- Uniforms ---
-    const uniforms: PlannedUniform[] = [
-        { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },
-        { name: 'u_sampleCount', type: 'int', parameterPath: 'engine.sampleCount' },
-        { name: 'u_frameIndex', type: 'int', parameterPath: 'engine.frameIndex' },
-        { name: 'u_time', type: 'float', parameterPath: 'engine.time' },
-        { name: 'u_pixelOffset', type: 'vec2', parameterPath: 'engine.pixelOffset', default: [0, 0] },
-        { name: 'u_imageSize', type: 'vec2', parameterPath: 'engine.imageSize' },
-        { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: [0, 0, 8] },
-        { name: 'u_cameraTarget', type: 'vec3', parameterPath: 'camera.target', default: [0, 0, 0] },
-    ];
+    // --- Build program description ---
+    const program = planProgram(features, strategy);
+    const pipeline = planPipeline(program);
+    const uniforms = planUniforms(program);
 
     return {
         features,
         objects,
         materials,
         lights,
-        brdfModels,
-        emitNEE,
-        emitRussianRoulette,
-        russianRouletteStartDepth,
-        maxBounces,
-        unrollSDFDispatch,
+        program,
+        pipeline,
         uniforms,
     };
 }
 
-function resolveColorProperty(value: number | number[] | string | undefined, fallback: number[]): number[] | string {
+// ============================================================================
+// Program description — what the generated program does
+// ============================================================================
+
+function planProgram(features: SceneFeatures, strategy: RenderStrategy): ProgramDescription {
+    const brdfModels: MaterialModel[] = [];
+    if (features.materials.hasLambert) brdfModels.push('lambert');
+    if (features.materials.hasDisney) brdfModels.push('disney');
+    if (features.materials.hasDielectric) brdfModels.push('dielectric');
+    if (features.materials.hasEmissive) brdfModels.push('emissive');
+
+    const hasLights = features.lighting.totalLightCount > 0;
+    const wantsNEE = strategy.transport.directLighting !== 'none' && hasLights;
+
+    return {
+        intersection: { method: 'raymarch' },
+        materials: { models: brdfModels },
+        lighting: wantsNEE ? { method: 'nee' } : null,
+        camera: strategy.camera.type === 'pinhole'
+            ? { type: 'pinhole', fov: strategy.camera.fov }
+            : { type: 'pinhole', fov: Math.PI / 4 }, // fallback, validator catches unsupported
+        transport: {
+            type: 'pathtracer',
+            maxBounces: strategy.transport.maxBounces,
+            russianRoulette: strategy.transport.russianRoulette.enabled
+                ? { startDepth: strategy.transport.russianRoulette.startDepth }
+                : null,
+        },
+        accumulation: strategy.accumulation.type === 'exponential'
+            ? { type: 'exponential', alpha: strategy.accumulation.alpha }
+            : { type: strategy.accumulation.type },
+        tonemap: strategy.display.type === 'none'
+            ? { type: 'none' }
+            : { type: strategy.display.type, exposure: strategy.display.exposure },
+    };
+}
+
+// ============================================================================
+// Uniforms — derived from program description
+// ============================================================================
+
+function planUniforms(program: ProgramDescription): PlannedUniform[] {
+    const uniforms: PlannedUniform[] = [];
+
+    // Core uniforms are shared across all passes (pathtracer + display).
+    // The ParameterManager sets them per-shader, so display-pass uniforms
+    // like u_resolution work without needing separate bindings.
+    uniforms.push(
+        { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },
+        { name: 'u_time', type: 'float', parameterPath: 'engine.time' },
+        { name: 'u_frameIndex', type: 'int', parameterPath: 'engine.frameIndex' },
+    );
+
+    // Camera
+    if (program.camera.type === 'pinhole') {
+        uniforms.push(
+            { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: [0, 0, 8] },
+            { name: 'u_cameraTarget', type: 'vec3', parameterPath: 'camera.target', default: [0, 0, 0] },
+            { name: 'u_imageSize', type: 'vec2', parameterPath: 'engine.imageSize' },
+        );
+    }
+
+    // Accumulation
+    if (program.accumulation.type === 'average') {
+        uniforms.push(
+            { name: 'u_sampleCount', type: 'int', parameterPath: 'engine.sampleCount' },
+            { name: 'u_pixelOffset', type: 'vec2', parameterPath: 'engine.pixelOffset', default: [0, 0] },
+        );
+    }
+
+    return uniforms;
+}
+
+// ============================================================================
+// Pipeline — derived from program description
+// ============================================================================
+
+function planPipeline(program: ProgramDescription): PlannedPipeline {
+    // Currently all accumulation/tonemap types use the same 2-pass pipeline topology.
+    // This will become conditional as more types are added (e.g., variance accumulation
+    // may need additional framebuffers for moment tracking).
+    void program;
+
+    return {
+        framebuffers: [
+            { id: 'accumulation', type: 'double_buffer', format: 'rgba32f' },
+            { id: 'screen', type: 'screen' },
+        ],
+        passes: [
+            {
+                role: 'pathtracer',
+                inputs: { 'u_previous': 'accumulation_previous' },
+                output: 'accumulation_current',
+            },
+            {
+                role: 'display',
+                inputs: { 'u_radiance': 'accumulation_current' },
+                output: 'screen',
+            },
+        ],
+        swaps: [{ buffers: ['accumulation'] }],
+    };
+}
+
+/**
+ * Fold any 'center' parameter from the SDF primitive into the translation vector.
+ * This ensures the generated per-object wrapper handles all positioning, and the
+ * SDF call is always origin-centered — preventing double-offset when both
+ * parameters.center and transform.position are set.
+ */
+function resolveSDFPositioning(
+    sdf: StandardSDF,
+    transformPosition: Vec3 | undefined,
+): { parameters: Record<string, number | number[]>; translation?: Vec3 } {
+    const center = sdf.parameters.center as number[] | undefined;
+
+    // Planes use normal+offset, not center — pass through unchanged
+    if (!center || sdf.type === 'plane') {
+        return {
+            parameters: sdf.parameters,
+            translation: transformPosition,
+        };
+    }
+
+    // Merge center into translation, zero out center in parameters
+    const tx = (transformPosition?.[0] ?? 0) + center[0];
+    const ty = (transformPosition?.[1] ?? 0) + center[1];
+    const tz = (transformPosition?.[2] ?? 0) + center[2];
+
+    const parameters = { ...sdf.parameters, center: [0, 0, 0] };
+    const translation: Vec3 = [tx, ty, tz];
+
+    return { parameters, translation };
+}
+
+function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression {
     if (value === undefined) return fallback;
-    if (typeof value === 'string') return value;
-    if (typeof value === 'number') return [value, value, value];
+    if (isGlslExpression(value)) return value;
+    if (typeof value === 'number') return [value, value, value] as Vec3;
     return value;
 }
 
-function resolveScalarProperty(value: number | number[] | string | undefined, fallback: number): number | string {
+function resolveScalarProperty(value: MaterialProperty | undefined, fallback: number): number | GlslExpression {
     if (value === undefined) return fallback;
-    if (typeof value === 'string') return value;
+    if (isGlslExpression(value)) return value;
     if (typeof value === 'number') return value;
+    // Vec3 passed for a scalar property — take first component (silent truncation)
     return value[0];
 }

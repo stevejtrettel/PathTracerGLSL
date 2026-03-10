@@ -3,14 +3,13 @@
 // Provides: interaction_surface_shade(), interaction_surface_scatter(), interaction_surface_pdf(), interaction_surface_emit()
 // Depends on: MaterialProperties, ambient_dot(), random2(), Frame
 
-Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit) {
-    MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
-    float cos_theta = max(0.0, ambient_dot(wi, hit.n, hit.p));
+Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
+    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
     Spectrum brdf = props.albedo / PI;
     return brdf * cos_theta;
 }
 
-Direction interaction_surface_scatter(Direction wo, Hit hit, out float pdf) {
+Direction interaction_surface_scatter(Direction wo, Hit hit, MaterialProperties props, out float pdf) {
     vec2 xi = random2();
 
     float cos_theta = sqrt(xi.y);
@@ -32,12 +31,11 @@ Direction interaction_surface_scatter(Direction wo, Hit hit, out float pdf) {
     return wi;
 }
 
-float interaction_surface_pdf(Direction wi, Direction wo, Hit hit) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.n, hit.p));
+float interaction_surface_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
+    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
     return cos_theta / PI;
 }
 
-Spectrum interaction_surface_emit(Hit hit) {
-    MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+Spectrum interaction_surface_emit(MaterialProperties props) {
     return props.emission * props.emission_strength;
 }

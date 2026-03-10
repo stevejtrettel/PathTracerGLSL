@@ -323,8 +323,10 @@ export class CompilationError extends Error {
     readonly diagnostics: DiagnosticBag;
 
     constructor(diagnostics: DiagnosticBag) {
+        const errors = diagnostics.getErrors();
+        const details = errors.map(e => `  - ${e.message}`).join('\n');
         const summary = diagnostics.getSummary();
-        super(`Compilation failed: ${summary}`);
+        super(`Compilation failed (${summary}):\n${details}`);
         this.name = 'CompilationError';
         this.diagnostics = diagnostics;
     }

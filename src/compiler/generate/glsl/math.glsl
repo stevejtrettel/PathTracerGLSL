@@ -15,6 +15,7 @@ void build_basis(vec3 n, out vec3 t, out vec3 b) {
     b = cross(n, t);
 }
 
+// Local shading space convention: Z-up (normal direction). cos_theta = local_dir.z
 vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
-    return local_dir.x * t + local_dir.y * n + local_dir.z * b;
+    return local_dir.x * t + local_dir.y * b + local_dir.z * n;
 }

@@ -1,15 +1,16 @@
 /**
- * Minimal Scene Example
+ * Cornell Box Example
  *
  * Demonstrates the real Compiler pipeline:
- * - Sphere on ground plane
+ * - Cornell box with colored walls
+ * - Tall box + sphere
  * - Lambert materials
  * - Point light with NEE
  * - Progressive accumulation
  */
 
 import { App } from '../src/app/index.js';
-import { minimalScene, minimalStrategy, directOnlyStrategy } from '../src/compiler/scenes/minimalScene.js';
+import { cornellBox, cornellStrategy } from '../src/compiler/scenes/cornellBox.js';
 import {
     OrbitControls,
     ParameterPanelExtension,
@@ -20,13 +21,17 @@ import {
 } from '../src/app/extensions/index.js';
 
 async function main() {
-    console.log('=== Minimal Scene (Real Compiler) ===');
+    console.log('=== Cornell Box ===');
 
     const app = App.create(document.body, { layout: 'fullscreen' });
 
     await app.initialize({
-        scene: minimalScene,
-        strategies: [minimalStrategy, directOnlyStrategy]
+        scene: cornellBox,
+        strategies: [cornellStrategy],
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
     });
 
     console.log('Renderers:', app.getAvailableRendererIds());

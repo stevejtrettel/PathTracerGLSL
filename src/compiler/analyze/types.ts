@@ -1,7 +1,5 @@
 // compiler/analyze/types.ts
 
-import type { MaterialModel, TransportDescription, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
-
 export type AmbientSpaceType = 'euclidean' | 'hyperbolic' | 'spherical';
 
 export interface SceneFeatures {
@@ -16,9 +14,10 @@ export interface SceneFeatures {
     };
 
     materials: {
-        models: Set<MaterialModel>;
+        hasLambert: boolean;
+        hasDisney: boolean;
+        hasDielectric: boolean;
         hasEmissive: boolean;
-        hasDielectrics: boolean;
         hasProcedural: boolean;
     };
 
@@ -26,13 +25,5 @@ export interface SceneFeatures {
         pointLightCount: number;
         directionalLightCount: number;
         totalLightCount: number;
-        needsMIS: boolean;
-    };
-
-    strategy: {
-        transport: TransportDescription;
-        camera: CameraDescription;
-        accumulation: AccumulationDescription;
-        display: DisplayDescription;
     };
 }

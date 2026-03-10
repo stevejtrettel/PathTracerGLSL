@@ -3,6 +3,14 @@
 import type { UniformBinding, ParameterMetadata } from '../engine/types.js';
 
 // ============================================================================
+// Utility types
+// ============================================================================
+
+export type Vec2 = [number, number];
+export type Vec3 = [number, number, number];
+export type Vec4 = [number, number, number, number];
+
+// ============================================================================
 // Scene Description
 // ============================================================================
 
@@ -11,7 +19,7 @@ export interface SceneDescription {
     name?: string;
     ambientSpace: AmbientSpaceDescription;
     objects: ObjectDescription[];
-    materials: Map<string, MaterialDescription>;
+    materials: Record<string, MaterialDescription>;
     lights: LightDescription[];
 }
 
@@ -62,14 +70,23 @@ export interface StandardAnalytic {
 }
 
 export interface Transform {
-    position?: number[];
-    rotation?: number[];
-    scale?: number | number[];
+    position?: Vec3;
+    rotation?: Vec3;
+    scale?: number | Vec3;
 }
 
 // --- Materials ---
 
-export type MaterialProperty = number | number[] | string;
+export interface GlslExpression {
+    kind: 'glsl';
+    source: string;
+}
+
+export type MaterialProperty = number | Vec3 | GlslExpression;
+
+export function isGlslExpression(v: unknown): v is GlslExpression {
+    return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';
+}
 
 export type MaterialModel = 'lambert' | 'disney' | 'dielectric' | 'emissive';
 
@@ -88,16 +105,16 @@ export type LightDescription = PointLight | DirectionalLight;
 
 export interface PointLight {
     kind: 'point';
-    position: number[];
+    position: Vec3;
     intensity: number;
-    color?: number[];
+    color?: Vec3;
 }
 
 export interface DirectionalLight {
     kind: 'directional';
-    direction: number[];
+    direction: Vec3;
     intensity: number;
-    color?: number[];
+    color?: Vec3;
 }
 
 // ============================================================================
@@ -144,6 +161,11 @@ export interface ShaderProgram {
 }
 
 /**
+ * Texture format for framebuffer attachments
+ */
+export type FramebufferFormat = 'rgba32f' | 'rgba16f' | 'rgba8' | 'r32f';
+
+/**
  * Framebuffer configuration
  *
  * Defines a GPU framebuffer and its associated texture(s)
@@ -177,8 +199,7 @@ export interface FramebufferConfig {
      * - rgba8: 8-bit RGBA (LDR display)
      * - r32f: 32-bit float single channel
      */
-    format?: 'rgba32f' | 'rgba16f' | 'rgba8' | 'r32f'
-           | ('rgba32f' | 'rgba16f' | 'rgba8' | 'r32f')[];
+    format?: FramebufferFormat | FramebufferFormat[];
 }
 
 /**
@@ -277,34 +298,32 @@ export interface RenderPipeline {
 }
 
 /**
- * Source map for error reporting
- *
- * Maps generated GLSL back to source templates for better error messages.
- * Minimal for SimpleCompiler, comprehensive for real Compiler.
+ * Block-level source map for error reporting.
+ * Maps line ranges in assembled GLSL back to source blocks.
  */
 export interface SourceMap {
     /** Which shader this source map is for */
     shaderId: string;
 
-    /**
-     * Line mappings: generated line → source info
-     * Maps each line in generated GLSL to its origin
-     */
-    lineMappings?: Map<number, SourceLocation>;
+    /** Ordered block mappings covering all lines */
+    blocks: SourceBlockMapping[];
+
+    /** Full assembled GLSL source for error context display */
+    assembledSource?: string;
 }
 
 /**
- * Source location for error mapping
+ * A line range in assembled GLSL mapped to its source block.
  */
-export interface SourceLocation {
-    /** Source file/template name */
-    source: string;
+export interface SourceBlockMapping {
+    /** Origin label: 'glsl/structs.glsl' or 'generated:sdf-dispatch' */
+    origin: string;
 
-    /** Line in source file */
-    line: number;
+    /** First line in assembled output (1-based) */
+    startLine: number;
 
-    /** Optional: which component/module generated this */
-    component?: string;
+    /** Last line in assembled output (1-based, inclusive) */
+    endLine: number;
 }
 
 /**

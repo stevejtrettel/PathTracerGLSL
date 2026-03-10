@@ -1,7 +1,63 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
+
+// ============================================================================
+// Program Description — what the generated program does
+// ============================================================================
+
+/**
+ * Describes the structure and capabilities of the GPU program to generate.
+ * The Planner builds this from scene features + render strategy.
+ * The Generator reads it to decide what code to produce.
+ */
+export interface ProgramDescription {
+    intersection: IntersectionDesc;
+    materials: MaterialsDesc;
+    lighting: LightingDesc | null;
+    camera: CameraDesc;
+    transport: TransportDesc;
+    accumulation: AccumulationDesc;
+    tonemap: TonemapDesc;
+}
+
+export type IntersectionDesc =
+    | { method: 'raymarch' };
+
+export interface MaterialsDesc {
+    models: MaterialModel[];
+}
+
+export type LightingDesc =
+    | { method: 'nee' };
+
+export type CameraDesc =
+    | { type: 'pinhole'; fov: number };
+
+export type TransportDesc =
+    | { type: 'pathtracer'; maxBounces: number; russianRoulette: { startDepth: number } | null };
+
+export type AccumulationDesc =
+    | { type: 'average' }
+    | { type: 'exponential'; alpha: number }
+    | { type: 'variance' };
+
+export type TonemapDesc =
+    | { type: 'reinhard'; exposure?: number }
+    | { type: 'aces'; exposure?: number }
+    | { type: 'filmic'; exposure?: number }
+    | { type: 'none' };
+
+// ============================================================================
+// Planned Pipeline — how the GPU program executes
+// ============================================================================
+
+export interface PlannedPipeline {
+    framebuffers: Array<{ id: string; type: 'screen' | 'double_buffer' | 'texture'; format?: FramebufferFormat }>;
+    passes: Array<{ role: string; inputs: Record<string, string>; output: string }>;
+    swaps: Array<{ buffers: string[] }>;
+}
 
 /**
  * Resolved SDF object for code generation.
@@ -12,6 +68,7 @@ export interface PlannedSDFObject {
     materialId: number;
     sdfType: 'sphere' | 'plane' | 'box' | 'torus' | 'capsule';
     parameters: Record<string, number | number[]>;
+    translation?: Vec3;
 }
 
 /**
@@ -22,9 +79,9 @@ export interface PlannedMaterial {
     id: number;
     name: string;
     model: MaterialModel;
-    albedo: number[] | string;
-    emission: number[] | string;
-    roughness: number | string;
+    albedo: Vec3 | GlslExpression;
+    emission: Vec3 | GlslExpression;
+    roughness: number | GlslExpression;
 }
 
 /**
@@ -33,10 +90,10 @@ export interface PlannedMaterial {
 export interface PlannedLight {
     id: number;
     kind: 'point' | 'directional';
-    position?: number[];
-    direction?: number[];
+    position?: Vec3;
+    direction?: Vec3;
     intensity: number;
-    color: number[];
+    color: Vec3;
 }
 
 /**
@@ -46,7 +103,7 @@ export interface PlannedUniform {
     name: string;
     type: 'float' | 'int' | 'vec2' | 'vec3' | 'vec4' | 'mat4' | 'sampler2D';
     parameterPath: string;
-    default?: any;
+    default?: number | number[];
 }
 
 /**
@@ -55,26 +112,17 @@ export interface PlannedUniform {
 export interface RenderPlan {
     features: SceneFeatures;
 
+    /** Resolved scene data for code generators */
     objects: PlannedSDFObject[];
     materials: PlannedMaterial[];
     lights: PlannedLight[];
 
-    /** Which BRDF models to include */
-    brdfModels: Set<MaterialModel>;
+    /** What the generated program does */
+    program: ProgramDescription;
 
-    /** Whether to emit NEE (next event estimation) code */
-    emitNEE: boolean;
+    /** How the GPU program executes */
+    pipeline: PlannedPipeline;
 
-    /** Whether to emit Russian roulette code */
-    emitRussianRoulette: boolean;
-    russianRouletteStartDepth: number;
-
-    /** Max path bounces */
-    maxBounces: number;
-
-    /** Whether to unroll SDF dispatch (vs loop) */
-    unrollSDFDispatch: boolean;
-
-    /** Uniforms the shader needs */
+    /** Uniforms derived from program description */
     uniforms: PlannedUniform[];
 }

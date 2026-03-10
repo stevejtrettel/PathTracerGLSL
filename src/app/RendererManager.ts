@@ -1,13 +1,16 @@
 // app/RendererManager.ts
 // Manages compiled renderers: compilation, switching, and metadata
 
-import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy } from '../compiler/types.js';
+import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy, SourceMap } from '../compiler/types.js';
 import type { Engine } from '../engine/Engine.js';
 import type { ParameterStore } from './ParameterStore.js';
 import type { EventBus } from './EventBus.js';
 import type { AppConfig, StrategyPreset } from './types.js';
 import type { ParameterMetadata } from './types.js';
 import { AppEvents } from './events.js';
+import { CompilationError } from '../errors/core/DiagnosticBag.js';
+import { ConsoleReporter } from '../errors/reporters/index.js';
+import { mapEngineShaderError } from '../compiler/generate/ShaderErrorMapper.js';
 
 export interface RendererManagerDeps {
     compiler: ICompiler;
@@ -61,18 +64,37 @@ export class RendererManager {
         console.log(`Initializing renderers for scene: ${scene.id}`);
 
         // Compile all strategies
+        const reporter = new ConsoleReporter();
         const compiledRenderers: CompiledRenderer[] = [];
 
         for (const strategy of strategies) {
             console.log(`  Compiling strategy: ${strategy.id}`);
-            const renderer = this.compiler.compile(scene, strategy);
-            compiledRenderers.push(renderer);
-            this.strategies.set(strategy.id, strategy);
-            this.renderers.set(renderer.id, renderer);
+            try {
+                const renderer = this.compiler.compile(scene, strategy);
+                compiledRenderers.push(renderer);
+                this.strategies.set(strategy.id, strategy);
+                this.renderers.set(renderer.id, renderer);
+            } catch (error) {
+                if (error instanceof CompilationError) {
+                    console.error(reporter.formatBag(error.diagnostics));
+                }
+                throw error;
+            }
         }
 
         // Load all renderers into engine
-        this.engine.loadRenderers(compiledRenderers);
+        try {
+            this.engine.loadRenderers(compiledRenderers);
+        } catch (error: any) {
+            // Try to map shader compilation errors through source maps
+            const allSourceMaps = this.collectSourceMaps(compiledRenderers);
+            const mapped = mapEngineShaderError(error?.message ?? '', allSourceMaps);
+            if (mapped) {
+                console.error(reporter.formatBag(mapped));
+                (error as any).__diagnostics = mapped;
+            }
+            throw error;
+        }
 
         // Select first renderer
         const firstRenderer = compiledRenderers[0];
@@ -193,6 +215,21 @@ export class RendererManager {
         }
 
         return result;
+    }
+
+    /**
+     * Collect all source maps from compiled renderers into a single map
+     */
+    private collectSourceMaps(renderers: CompiledRenderer[]): Map<string, SourceMap> {
+        const all = new Map<string, SourceMap>();
+        for (const renderer of renderers) {
+            if (renderer.sourceMaps) {
+                for (const [id, sm] of renderer.sourceMaps) {
+                    all.set(id, sm);
+                }
+            }
+        }
+        return all;
     }
 
     /**

@@ -1,18 +1,20 @@
 // Raymarching Scene Infrastructure
 // Provides: scene_normal(), scene_intersect(), scene_intersect_any()
-// Depends on: scene_sdf() (generated), ambient_geodesic()
+// Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
 
-#define MAX_MARCH_STEPS 256
+#ifndef MAX_MARCH_STEPS
+#define MAX_MARCH_STEPS 128
+#endif
 #define MARCH_EPSILON 0.0001
+#define NORMAL_EPSILON 0.001
 
 vec3 scene_normal(vec3 p) {
-    int dummy_mat;
-    vec2 e = vec2(0.001, 0.0);
+    vec2 e = vec2(NORMAL_EPSILON, 0.0);
 
     vec3 n = vec3(
-        scene_sdf(p + e.xyy, dummy_mat) - scene_sdf(p - e.xyy, dummy_mat),
-        scene_sdf(p + e.yxy, dummy_mat) - scene_sdf(p - e.yxy, dummy_mat),
-        scene_sdf(p + e.yyx, dummy_mat) - scene_sdf(p - e.yyx, dummy_mat)
+        scene_sdf_dist(p + e.xyy) - scene_sdf_dist(p - e.xyy),
+        scene_sdf_dist(p + e.yxy) - scene_sdf_dist(p - e.yxy),
+        scene_sdf_dist(p + e.yyx) - scene_sdf_dist(p - e.yyx)
     );
 
     return normalize(n);
@@ -29,7 +31,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
         if (dist < MARCH_EPSILON) {
             hit.t = t;
             hit.p = p;
-            hit.n = scene_normal(p);
+            hit.frame = ambient_frame(p, scene_normal(p));
             hit.material_to = material;
             hit.material_from = 0;
             hit.uv = vec2(p.x * 0.1, p.z * 0.1);
@@ -48,21 +50,21 @@ bool scene_intersect(Ray ray, out Hit hit) {
 
 bool scene_intersect_any(Ray ray, float max_distance) {
     float t = ray.tmin;
-    int material = 0;
+    float limit = min(ray.tmax, max_distance);
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
-        float dist = scene_sdf(p, material);
+        float dist = scene_sdf_dist(p);
 
         if (dist < MARCH_EPSILON) {
             return true;
         }
 
-        if (t > min(ray.tmax, max_distance)) {
+        if (t > limit) {
             break;
         }
 
-        t += 0.95 * dist;
+        t += dist;
     }
 
     return false;
