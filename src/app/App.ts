@@ -69,12 +69,11 @@ export class App {
 
                 // Skip resends (oldValue === newValue) from renderer switch
                 const isResend = change.oldValue === change.newValue;
-                const isRendering = this.coordinator.isRunning() || this.coordinator.isPaused();
 
-                if (!isResend && isRendering) {
-                    if (this._triggersReset(change.path)) {
-                        this.coordinator.resetAccumulation(`parameter: ${change.path}`);
-                    }
+                // Reset (or, if stopped/complete, mark dirty for the next start) so a
+                // camera/param change never ghosts new samples into the old image (#4).
+                if (!isResend && this._triggersReset(change.path)) {
+                    this.coordinator.requestAccumulationReset(`parameter: ${change.path}`);
                 }
 
                 if (!isResend) {
@@ -93,7 +92,7 @@ export class App {
         };
 
         this.production = new ProductionOrchestrator(
-            this, this.coordinator, this.parameterStore, this.eventBus
+            this, this.coordinator, this.parameterStore
         );
 
         this.errorOverlay = new ErrorOverlay(document.body);
@@ -215,8 +214,16 @@ export class App {
 
     // -- Rendering: Interactive --
 
-    start(): void { this.coordinator.startInteractive(); }
-    stop(): void { this.coordinator.stop(); }
+    start(): void {
+        // Leaving any production session (no-op if idle) restores layout/resolution
+        // first, so the interactive loop runs at the restored size.
+        this.production.exitProduction();
+        this.coordinator.startInteractive();
+    }
+    stop(): void {
+        this.coordinator.stop();
+        this.production.exitProduction();
+    }
     pause(): void { this.coordinator.pause(); }
     resume(): void { this.coordinator.resume(); }
     isActive(): boolean { return this.coordinator.isRunning(); }

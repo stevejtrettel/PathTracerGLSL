@@ -6,9 +6,7 @@
 import type { App } from './App.js';
 import type { RenderCoordinator, ProgressInfo } from './RenderCoordinator.js';
 import type { ParameterStore } from './ParameterStore.js';
-import type { EventBus } from './EventBus.js';
 import type { LayoutMode } from './layout/index.js';
-import { AppEvents } from './events.js';
 
 export interface ProductionOptions {
     width?: number;
@@ -19,12 +17,24 @@ export interface ProductionOptions {
     autoExportAllAOVs?: boolean;
 }
 
+/**
+ * Production session phase.
+ * - idle:    no production; nothing saved.
+ * - active:  render in progress; params locked, production layout+resolution
+ *            applied, profiling suspended.
+ * - settled: render finished (complete or stopped) but still showing the
+ *            production view; params unlocked and profiling restored, but the
+ *            layout+resolution stay so the result can be viewed / manually
+ *            exported until the user leaves via exitProduction().
+ */
+type ProductionPhase = 'idle' | 'active' | 'settled';
+
 export class ProductionOrchestrator {
     private app: App;
     private coordinator: RenderCoordinator;
     private parameterStore: ParameterStore;
-    private eventBus: EventBus;
 
+    private phase: ProductionPhase = 'idle';
     private previousLayoutMode: LayoutMode | null = null;
     private previousResolution: [number, number] | null = null;
     private profilingWasEnabled: boolean = false;
@@ -34,57 +44,14 @@ export class ProductionOrchestrator {
         app: App,
         coordinator: RenderCoordinator,
         parameterStore: ParameterStore,
-        eventBus: EventBus,
     ) {
         this.app = app;
         this.coordinator = coordinator;
         this.parameterStore = parameterStore;
-        this.eventBus = eventBus;
-
-        // Production layout lifecycle: switch on start, restore on stop
-        this.eventBus.on(AppEvents.RENDER_STARTED, (data: { mode: string }) => {
-            if (data.mode === 'production') {
-                if (this.app.hasLayout()) {
-                    if (!this.previousLayoutMode) {
-                        this.previousLayoutMode = this.app.getLayoutMode();
-                        console.log(`Saved previous layout: ${this.previousLayoutMode}`);
-                    }
-                    this.app.setLayoutMode(this.productionLayoutMode);
-                    console.log(`Switched to '${this.productionLayoutMode}' layout for production`);
-                }
-            }
-        });
-
-        this.eventBus.on(AppEvents.RENDER_STOPPED, () => {
-            this.restoreProductionLayout();
-            if (this.parameterStore.isLocked()) {
-                this.parameterStore.unlock();
-                console.log('Unlocked parameters on render stop');
-            }
-        });
     }
 
     async renderProduction(targetSamples: number, options?: ProductionOptions): Promise<void> {
-        this.parameterStore.lock();
-
-        const [originalWidth, originalHeight] = this.app.getCanvasSize();
-
-        if (options?.width && options?.height) {
-            if (options.width !== originalWidth || options.height !== originalHeight) {
-                console.log(`Resizing for production: ${options.width}x${options.height}`);
-                this.previousResolution = [originalWidth, originalHeight];
-                this.app.resize(options.width, options.height);
-            }
-        }
-
-        // Suspend GPU profiling during production — readPixels sync kills pipelining
-        this.profilingWasEnabled = this.app.isProfilingEnabled();
-        if (this.profilingWasEnabled) {
-            this.app.disableProfiling();
-        }
-
-        this.coordinator.resetAccumulation('production_start');
-
+        this.beginProduction(options);
         try {
             await this.coordinator.startProduction({
                 targetSamples,
@@ -96,54 +63,105 @@ export class ProductionOrchestrator {
                 }
             });
 
+            // Auto-export runs here — still at target resolution, before exitProduction
+            // ever restores — so a completed render is always saved before it can be
+            // discarded on return to interactive.
             if (options?.autoExportPNG) { console.log('Auto-exporting PNG...'); this.app.exportPNG(); }
             if (options?.autoExportHDR) { console.log('Auto-exporting HDR...'); this.app.exportHDR(); }
             if (options?.autoExportAllAOVs) { console.log('Auto-exporting all AOVs...'); this.app.exportAllAOVs(); }
             if (options?.autoSave) { console.log('Auto-saving session...'); this.app.quickSave(); }
         } finally {
-            this.parameterStore.unlock();
-            if (this.profilingWasEnabled) {
-                this.app.enableProfiling();
-            }
+            // Render settled (completed or stopped): unlock + restore profiling, but
+            // keep the production view (layout/resolution) for viewing/export.
+            this.settleProduction();
         }
     }
 
     async extendProduction(additionalSamples: number): Promise<void> {
-        const currentSamples = this.coordinator.getSampleCount();
-        const newTarget = currentSamples + additionalSamples;
-
-        console.log(`Extending production: +${additionalSamples} (${currentSamples} → ${newTarget})`);
-
-        const wasLocked = this.parameterStore.isLocked();
-        if (!wasLocked) {
-            this.parameterStore.lock();
+        if (this.phase === 'idle') {
+            throw new Error('No production render to extend');
         }
 
+        const currentSamples = this.coordinator.getSampleCount();
+        const newTarget = currentSamples + additionalSamples;
+        console.log(`Extending production: +${additionalSamples} (${currentSamples} → ${newTarget})`);
+
+        // Re-enter active from the settled view: re-lock, but keep the already-saved
+        // prior state and current resolution (no resize, no accumulation reset — the
+        // coordinator resets only if the camera moved, via its dirty flag).
+        this.parameterStore.lock();
+        this.phase = 'active';
         try {
-            await this.coordinator.startProduction({
-                targetSamples: newTarget
-            });
+            await this.coordinator.startProduction({ targetSamples: newTarget });
         } finally {
-            if (!wasLocked) {
-                this.parameterStore.unlock();
-            }
+            this.settleProduction();
         }
     }
 
-    private restoreProductionLayout(): void {
+    /**
+     * Restore the interactive view when leaving a production session. Idempotent —
+     * a no-op when idle, so App.start()/stop() can call it unconditionally.
+     */
+    exitProduction(): void {
+        if (this.phase === 'idle') return;
+
+        // Ensure params/profiling are restored even if we abort straight from 'active'.
+        this.settleProduction();
+
         if (this.previousLayoutMode && this.app.hasLayout()) {
             if (this.app.getLayoutMode() !== this.previousLayoutMode) {
                 this.app.setLayoutMode(this.previousLayoutMode);
                 console.log(`Restored layout to '${this.previousLayoutMode}'`);
             }
-            this.previousLayoutMode = null;
         }
-
         if (this.previousResolution) {
             const [width, height] = this.previousResolution;
             console.log(`Restoring resolution: ${width}x${height}`);
             this.app.resize(width, height);
-            this.previousResolution = null;
         }
+
+        this.previousLayoutMode = null;
+        this.previousResolution = null;
+        this.phase = 'idle';
+    }
+
+    private beginProduction(options?: ProductionOptions): void {
+        if (this.phase !== 'idle') {
+            throw new Error('A production render is already in progress');
+        }
+
+        // Save prior state for exitProduction to restore.
+        this.previousLayoutMode = this.app.getLayoutMode();
+        this.profilingWasEnabled = this.app.isProfilingEnabled();
+
+        // Apply the production view.
+        this.parameterStore.lock();
+        if (this.app.hasLayout()) {
+            this.app.setLayoutMode(this.productionLayoutMode);
+        }
+        if (options?.width && options?.height) {
+            const [originalWidth, originalHeight] = this.app.getCanvasSize();
+            if (options.width !== originalWidth || options.height !== originalHeight) {
+                console.log(`Resizing for production: ${options.width}x${options.height}`);
+                this.previousResolution = [originalWidth, originalHeight];
+                this.app.resize(options.width, options.height);
+            }
+        }
+        // Suspend GPU profiling during production — readPixels sync kills pipelining.
+        if (this.profilingWasEnabled) {
+            this.app.disableProfiling();
+        }
+
+        this.coordinator.resetAccumulation('production_start');
+        this.phase = 'active';
+    }
+
+    private settleProduction(): void {
+        if (this.phase !== 'active') return;
+        this.parameterStore.unlock();
+        if (this.profilingWasEnabled) {
+            this.app.enableProfiling();
+        }
+        this.phase = 'settled';
     }
 }

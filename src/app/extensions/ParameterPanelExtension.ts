@@ -79,8 +79,25 @@ export class ParameterPanelExtension extends UIExtension {
         this.on(AppEvents.RENDER_COMPLETE, this.onRenderEnded);
         this.on(AppEvents.RENDER_STOPPED, this.onRenderEnded);
 
+        // Rebuild for the new renderer's parameters on switch/recompile (#7c).
+        this.on(AppEvents.RENDERER_SWITCHED, this.repopulate);
+
         console.log(`ParameterPanel installed (Tab to toggle) [${this.useLayout ? 'layout' : 'standalone'}]`);
     }
+
+    /**
+     * Rebuild the panel for the active renderer's parameters. Disposes the current
+     * widgets/folders (keeping the panel shell) and re-runs populatePanel().
+     */
+    private repopulate = (): void => {
+        for (const widget of this.widgets) widget.dispose();
+        this.widgets = [];
+        for (const folder of this.folders.values()) folder.dispose();
+        this.folders.clear();
+        // Drop the "no parameters" placeholder if it was showing.
+        this.panel.domElement.querySelectorAll('.param-empty').forEach(el => el.remove());
+        this.populatePanel();
+    };
 
     protected cleanup(): void {
         // Remove keyboard listener

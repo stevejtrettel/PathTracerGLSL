@@ -41,6 +41,12 @@ export class RenderCoordinator {
     private productionResolve?: () => void;
     private productionReject?: (reason: Error) => void;
 
+    // Deferred accumulation reset: a triggersReset parameter change (e.g. camera
+    // orbit) while stopped/complete sets this instead of clearing the buffer now,
+    // so a frozen/completed image survives for export. Consumed at the next render
+    // start, so the next render begins fresh — no ghosting of the old viewpoint.
+    private accumulationDirty = false;
+
     private lastFrameTime = 0;
     private fpsHistory: number[] = [];
     private lastProgressTime = 0;
@@ -60,7 +66,12 @@ export class RenderCoordinator {
             throw new Error('Cannot start interactive mode during production render. Stop first with stop().');
         }
 
-        if (this.isRunning()) this.stopInternal(false);
+        // Settle any non-stopped render before switching. For a paused/complete
+        // production this rejects the pending promise, so renderProduction's
+        // finally runs and params unlock (#2). Emits RENDER_STOPPED so the UI
+        // panels react; layout/resolution restore is handled explicitly by
+        // App.start → ProductionOrchestrator.exitProduction, not this event.
+        if (this.state !== 'stopped') this.stopInternal(true);
 
         this.mode = 'interactive';
         this.state = 'rendering';
@@ -68,6 +79,7 @@ export class RenderCoordinator {
         this.startTime = performance.now();
         this.lastFrameTime = this.startTime;
         this.fpsHistory = [];
+        this.consumeDirtyReset();
 
         this.emit(AppEvents.RENDER_STARTED, { mode: 'interactive' });
         this.runLoop();
@@ -79,7 +91,10 @@ export class RenderCoordinator {
             throw new Error('Production render already in progress. Stop first with stop().');
         }
 
-        if (this.isRunning()) this.stopInternal(false);
+        // Settle any non-stopped render before switching. false = no RENDER_STOPPED
+        // (a fresh/extended production sets up its own view via beginProduction, and
+        // a spurious STOPPED would just flicker the production panel).
+        if (this.state !== 'stopped') this.stopInternal(false);
 
         this.mode = 'production';
         this.state = 'rendering';
@@ -87,6 +102,7 @@ export class RenderCoordinator {
         this.startTime = performance.now();
         this.lastFrameTime = this.startTime;
         this.fpsHistory = [];
+        this.consumeDirtyReset();
 
         console.log(`Started production render: ${goal.targetSamples} samples`);
         this.emit(AppEvents.RENDER_STARTED, { mode: 'production', targetSamples: goal.targetSamples });
@@ -112,6 +128,7 @@ export class RenderCoordinator {
         if (this.state !== 'paused') return;
         this.state = 'rendering';
         this.lastFrameTime = performance.now();
+        this.consumeDirtyReset();
         this.emit(AppEvents.RENDER_RESUMED);
         this.runLoop();
     }
@@ -121,7 +138,27 @@ export class RenderCoordinator {
     resetAccumulation(reason: string = 'manual'): void {
         this.engine.clearAccumulation();
         this.startTime = performance.now();
+        this.accumulationDirty = false;
         this.emit(AppEvents.ACCUMULATION_RESET, { reason });
+    }
+
+    /**
+     * Reset accumulation now if rendering/paused, else defer to the next render
+     * start. Use for parameter/camera changes that invalidate the image but must
+     * not wipe a frozen or completed buffer that may still be exported (#4).
+     */
+    requestAccumulationReset(reason: string = 'manual'): void {
+        if (this.isRunning() || this.isPaused()) {
+            this.resetAccumulation(reason);
+        } else {
+            this.accumulationDirty = true;
+        }
+    }
+
+    private consumeDirtyReset(): void {
+        if (this.accumulationDirty) {
+            this.resetAccumulation('deferred parameter change');
+        }
     }
 
     // -- State Queries --
@@ -212,6 +249,10 @@ export class RenderCoordinator {
         console.log(`Production complete: ${samples} samples in ${(elapsed / 1000).toFixed(1)}s`);
 
         this.state = 'complete';
+        // Force a final progress tick (state='complete', 100%) while goal is still
+        // set — the throttle would otherwise drop it and the production panel would
+        // never rebuild into its complete/export UI (#7b).
+        this.reportProgress(true);
         this.goal?.onComplete?.();
 
         if (this.productionResolve) {
@@ -228,9 +269,9 @@ export class RenderCoordinator {
         this.productionReject = undefined;
     }
 
-    private reportProgress(): void {
+    private reportProgress(force: boolean = false): void {
         const now = performance.now();
-        if (now - this.lastProgressTime < this.progressIntervalMs) return;
+        if (!force && now - this.lastProgressTime < this.progressIntervalMs) return;
         this.lastProgressTime = now;
 
         const info = this.buildProgressInfo();
