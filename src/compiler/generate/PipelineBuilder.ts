@@ -77,6 +77,9 @@ export function buildParameters(plan: RenderPlan): Record<string, ParameterMetad
 
 export function buildExportTargets(): CompiledRenderer['exportTargets'] {
     return {
-        'hdr': { bufferId: 'accumulation_current', format: 'float' },
+        // 'previous', not 'current': exports run after renderFrame(), and the postFrame
+        // swap has already flipped the ping-pong index — post-swap, the freshly written
+        // frame lives in 'accumulation_previous'. Reading 'current' exports frame N-1.
+        'hdr': { bufferId: 'accumulation_previous', format: 'float' },
     };
 }

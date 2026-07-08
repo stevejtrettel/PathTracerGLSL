@@ -27,6 +27,8 @@ Currently supports: `float`, `int`, `bool`, `color`, `vec2`, `vec3`, `vec4`. Cou
 
 ## Completed
 
+- [x] Fixed six output-corrupting bugs from docs/fable-review.md (July 2026): RNG values ≥ 1.0 NaN-poisoning pixels (rng.glsl, also fixes multi-light selection fallthrough); tiled-render RNG seeding with local instead of global pixel (main_accumulate.glsl); HDR export reading one frame stale post-swap (PipelineBuilder.ts); Rec.601→Rec.709 luminance (math.glsl); ResourceManager.cleanup() throwing on the 2D texture array (dispose was broken); EventBus.emit skipping listeners when once() unsubscribes mid-dispatch. Tests + typecheck pass.
+
 - [x] Move keyboard controls from App to AppShortcutsExtension
 - [x] Add 'error' state to Engine
 - [x] Cache draw buffer setup in RenderExecutor

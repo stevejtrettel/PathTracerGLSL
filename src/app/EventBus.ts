@@ -62,7 +62,9 @@ class EventBus {
         const handlers = this.listeners.get(event);
         if (!handlers) return;
 
-        for (const handler of handlers) {
+        // Iterate a snapshot: once() handlers unsubscribe during dispatch, and splicing
+        // the live array mid-iteration silently skips the listener that shifts into place.
+        for (const handler of [...handlers]) {
             try {
                 handler(data);
             } catch (error) {

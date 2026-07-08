@@ -6,7 +6,9 @@
 #define EPSILON 0.001
 
 float luminance(vec3 c) {
-    return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
+    // belongs to gamma-encoded SD video, not linear radiance.
+    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {

@@ -234,9 +234,12 @@ export class ResourceManager {
                     if (fb) gl.deleteFramebuffer(fb);
                 }
 
-                // Delete textures
-                for (const tex of resource.textures) {
-                    if (tex) gl.deleteTexture(tex);
+                // Delete textures — textures is WebGLTexture[][] ([attachment][bufferIndex]),
+                // so this must be a nested loop (passing the inner array to deleteTexture throws)
+                for (const attachmentTextures of resource.textures) {
+                    for (const tex of attachmentTextures) {
+                        if (tex) gl.deleteTexture(tex);
+                    }
                 }
             }
         }

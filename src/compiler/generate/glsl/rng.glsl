@@ -24,7 +24,10 @@ uint rng_u32() {
 }
 
 float random() {
-    return float(rng_u32()) / 4294967295.0;
+    // Top 24 bits scaled by 2^-24: exactly representable, guaranteed in [0, 1).
+    // (Dividing the full u32 by 2^32-1 rounds values near the top UP to >= 1.0,
+    // which NaN-poisons sqrt(1-xi) in cosine sampling and overruns CDF selection.)
+    return float(rng_u32() >> 8) * (1.0 / 16777216.0);
 }
 
 vec2 random2() {
