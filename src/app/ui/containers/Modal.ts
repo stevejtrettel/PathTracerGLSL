@@ -128,6 +128,14 @@ export class Modal extends Container {
         return this;
     }
 
+    dispose(): void {
+        // Restore body scroll even if disposed directly (e.g. via a parent
+        // container) without going through close()/hide() — otherwise
+        // `body { overflow: hidden }` leaks and the page can't scroll.
+        document.body.style.overflow = '';
+        super.dispose();
+    }
+
     /**
      * Add a footer section (useful for buttons)
      */

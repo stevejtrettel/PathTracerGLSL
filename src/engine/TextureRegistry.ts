@@ -15,10 +15,23 @@ export class TextureRegistry {
     private textures = new Map<string, WebGLTexture>();
     private units = new Map<string, number>();
     private nextUnit: number;
+    private readonly reservedUnits: number;
 
     constructor(gl: WebGL2RenderingContext, reservedUnits: number = 1) {
         this.gl = gl;
+        this.reservedUnits = reservedUnits;
         this.nextUnit = reservedUnits;
+    }
+
+    /**
+     * Drop all registrations after a context loss. The WebGLTexture handles are
+     * dead and their source data isn't retained here, so callers must re-load
+     * (e.g. re-load the HDR environment) to repopulate the registry.
+     */
+    handleContextLoss(): void {
+        this.textures.clear();
+        this.units.clear();
+        this.nextUnit = this.reservedUnits;
     }
 
     /**

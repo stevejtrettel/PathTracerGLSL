@@ -20,11 +20,15 @@ export interface NumberInputOptions extends InputOptions<number> {
 export class NumberInput extends Input<number> {
     private input: HTMLInputElement;
     private integer: boolean;
+    private min?: number;
+    private max?: number;
 
     constructor(initialValue: number, options: NumberInputOptions = {}) {
         super(initialValue, options, 'div', 'ui-number-input');
 
         this.integer = options.integer ?? false;
+        this.min = options.min;
+        this.max = options.max;
 
         // Label
         if (options.label) {
@@ -55,7 +59,9 @@ export class NumberInput extends Input<number> {
                 : parseFloat(this.input.value);
 
             if (!isNaN(parsed)) {
-                this.emitChange(parsed);
+                // Clamp to bounds: the HTML min/max attributes don't stop typing
+                // out-of-range values, so downstream would otherwise see them.
+                this.emitChange(this.clamp(parsed));
             }
         });
 
@@ -75,12 +81,18 @@ export class NumberInput extends Input<number> {
         return this.integer ? value.toFixed(0) : String(value);
     }
 
+    private clamp(value: number): number {
+        if (this.min !== undefined && value < this.min) return this.min;
+        if (this.max !== undefined && value > this.max) return this.max;
+        return value;
+    }
+
     /**
      * Update the bounds
      */
     setBounds(min?: number, max?: number): this {
-        if (min !== undefined) this.input.min = String(min);
-        if (max !== undefined) this.input.max = String(max);
+        if (min !== undefined) { this.input.min = String(min); this.min = min; }
+        if (max !== undefined) { this.input.max = String(max); this.max = max; }
         return this;
     }
 }

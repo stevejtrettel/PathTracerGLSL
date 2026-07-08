@@ -60,8 +60,17 @@ export class ResourceManager {
 
         this.renderers = new Map();
 
-        // Validate required extensions (critical for HDR rendering)
-        const ext = gl.getExtension('EXT_color_buffer_float');
+        this.enableRequiredExtensions();
+    }
+
+    /**
+     * Enable the extensions required for float-buffer HDR rendering. Must be
+     * (re-)called after a context restore — extension state resets on loss, and
+     * without EXT_color_buffer_float the RGBA32F/16F framebuffers come back
+     * INCOMPLETE_ATTACHMENT.
+     */
+    enableRequiredExtensions(): void {
+        const ext = this.gl.getExtension('EXT_color_buffer_float');
         if (!ext) {
             throw new Error('EXT_color_buffer_float extension required for HDR rendering');
         }

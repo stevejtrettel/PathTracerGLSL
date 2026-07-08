@@ -77,10 +77,14 @@ export class Slider extends Input<number> {
     }
 
     private calculatePrecision(step: number): number {
+        if (!isFinite(step) || step <= 0) return 2;
         if (step >= 1) return 0;
-        const str = step.toString();
-        const decimal = str.indexOf('.');
-        return decimal === -1 ? 0 : str.length - decimal - 1;
+        // Derive decimals from the step's magnitude and cap them. Reading the
+        // digits off step.toString() breaks on float-error steps like
+        // (0.7 - 0) / 100 = 0.006999999999999999, which would yield 18 decimals
+        // and render "0.350000000000000000".
+        const decimals = Math.ceil(-Math.log10(step));
+        return Math.min(Math.max(decimals, 0), 6);
     }
 
     /**

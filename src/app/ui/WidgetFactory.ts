@@ -61,7 +61,20 @@ export function createWidget(meta: ParameterMetadata, options: WidgetFactoryOpti
         }
 
         case 'int': {
-            // Dropdown for enumerated values
+            // Named options → labeled dropdown (options[value] = display label),
+            // so discrete ints (e.g. a display-mode selector) show names not numbers.
+            if (meta.options) {
+                const values = meta.values
+                    ?? (meta.range
+                        ? Array.from({ length: meta.range[1] - meta.range[0] + 1 }, (_, i) => meta.range![0] + i)
+                        : meta.options.map((_, i) => i));
+                return new Dropdown(value as number, {
+                    label,
+                    options: values.map(v => ({ label: meta.options![v] ?? String(v), value: v })),
+                    onChange: onChange as (v: number) => void
+                });
+            }
+            // Dropdown for enumerated numeric values
             if (meta.values) {
                 return new Dropdown(value as number, {
                     label,

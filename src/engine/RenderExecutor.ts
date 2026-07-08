@@ -254,6 +254,17 @@ export class RenderExecutor {
     }
 
     /**
+     * Invalidate cached GPU handles after a context loss.
+     *
+     * The WebGLProgram handles are already dead (the context is gone), so just
+     * drop them — no deleteProgram. loadShaders rebuilds them on restore.
+     */
+    invalidate(): void {
+        this.programs.clear();
+        this.drawBuffersCache.clear();
+    }
+
+    /**
      * Clean up all programs
      */
     cleanup(): void {

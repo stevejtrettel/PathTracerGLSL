@@ -1,11 +1,13 @@
 // Main function with progressive accumulation
-// Requires: u_pixelOffset, u_frameIndex, u_sampleCount, u_previous
+// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
     // Seed with the GLOBAL pixel (tile offset included) — seeding with the local
     // gl_FragCoord replays the identical RNG stream in every tile of a tiled render.
-    hash_init(uvec2(pixel), uint(u_frameIndex));
+    // sampleCount decorrelates samples within a render; resetSalt (bumped per
+    // accumulation reset) decorrelates across resets (§2.11).
+    rng_init(uvec2(pixel), uint(u_sampleCount), uint(u_resetSalt));
 
     vec2 xi = random2();
     Ray ray = camera_generateRay(pixel, xi);

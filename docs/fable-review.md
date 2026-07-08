@@ -54,8 +54,8 @@ The Validator should warn on each.
 **C8 — The Planner can't emit diagnostics.**
 `plan()` has no `DiagnosticBag` parameter (`Compiler.ts:22`), so its known silent behaviors — Vec3-to-scalar truncation in `resolveScalarProperty` (`Planner.ts:234`, the comment admits it), dropped material properties — have no channel to warn through. Pass the bag to all four phases.
 
-**C9 — RNG quality: counter-add sequences are shifted copies.**
-`rng_u32()` = `mix32(rng_seed + rng_counter)` (`rng.glsl:21-24`) means two pixels whose seeds differ by *d* generate identical values offset by *d* counter steps. With hashed seeds collisions are rare, but the construction is weaker than it needs to be. Standard fix: advance state instead of hashing seed+counter (e.g. PCG: `state = state * 747796405u + 2891336453u` then output-hash).
+**C9 — RNG quality: counter-add sequences are shifted copies.** **[RESOLVED BY DESIGN — contracts §2.11]**
+`rng_u32()` = `mix32(rng_seed + rng_counter)` (`rng.glsl:21-24`) means two pixels whose seeds differ by *d* generate identical values offset by *d* counter steps. Superseded: §2.11 pins a counter-based `pcg` hash (Jarzynski–Olano `pcg4d`, dimension-indexed) — no additive-shift equivalence — chosen over a stateful PCG advance precisely to keep the §2.9 QMC door a drop-in. **[IMPLEMENTED]** — `rng.glsl` rewritten to `pcg4d` + `rng_init(pixel, sampleCount, resetSalt)`. Verified live: Cornell box converges correctly (unbiased sampler) and frame-0 noise decorrelates across resets.
 
 **Minor:**
 - `luminance()` uses Rec.601 coefficients on linear-light RGB (should be 0.2126/0.7152/0.0722 — affects RR survival slightly).
@@ -89,13 +89,13 @@ Ranked; the top four matter before the compiler grows.
 
 6. ~~**ParameterManager caches computed values by reference**~~ **[FIXED — batch 2c]** — a `compute` returning a parameter array by identity plus in-place mutation (standard camera-controller pattern) meant the uniform never re-uploaded. *Fixed:* array/typed-array values are now snapshotted (`.slice()`) into the cache so a later in-place mutation can't alias the cached value.
 
-7. **Lifecycle/robustness cluster** *(3 of 4 FIXED — batch 2c; context-loss restore still open):* context loss still has no restore path (subsystem maps left inconsistent; `loadRenderer` then early-returns and `selectRenderer` throws) — **open**. ~~`TextureRegistry.register` leaks a unit per re-registration~~ *fixed:* re-registering a name now reuses its existing unit. ~~`createR32F` sets LINEAR filtering without checking `OES_texture_float_linear`~~ *fixed:* R32F CDF/PDF tables now use NEAREST (correct for lookup, no extension needed). ~~`HDRLoader.decompressRLE` infinite-loops on a corrupt file~~ *fixed:* the inner loop now bounds-checks `offset` and rejects zero-length literal runs, so it always terminates.
+7. **Lifecycle/robustness cluster** *(all 4 FIXED — batch 2c + context-loss batch):* ~~context loss has no restore path~~ **[FIXED]** — `Engine` now handles `webglcontextlost`/`restored`: on loss it drops the dead GPU handles (programs/framebuffers/textures/uniform-locations) but keeps the `CompiledRenderer` data and no-ops `renderFrame` so a running loop survives; on restore it rebuilds every renderer from that data, re-enables `EXT_color_buffer_float` (extension state resets on loss — else the float FBOs come back incomplete), re-selects the previously-active renderer, and resumes. Verified live via `WEBGL_lose_context` (loss→restore→rendering resumes, 0 errors). Env textures aren't rebuilt (source data not retained) — documented, reload via `loadEnvironmentHDR()`. ~~`TextureRegistry.register` leaks a unit per re-registration~~ *fixed:* re-registering a name now reuses its existing unit. ~~`createR32F` sets LINEAR filtering without checking `OES_texture_float_linear`~~ *fixed:* R32F CDF/PDF tables now use NEAREST (correct for lookup, no extension needed). ~~`HDRLoader.decompressRLE` infinite-loops on a corrupt file~~ *fixed:* the inner loop now bounds-checks `offset` and rejects zero-length literal runs, so it always terminates.
 
 8. **Design: the env-map path is the one genuine violation of the blind-executor contract** — the engine hardcodes `u_envMap`/`u_envCDF*` names and a unit-0 reservation. The clean shape is a generic "external texture" concept referenced through `pass.inputs.textures` (e.g. `'u_envMap': 'extern:env_map'`) with scalars flowing through normal `UniformBinding`s. That deletes the special-case code and fixes #2 and the load-order issue as side effects — and it's really the same question as the feature-local-uniforms discussion.
 
 9. **Performance:** `getUniformLocation` is called per texture per pass per frame (cache it — the machinery already exists in `ParameterManager`); `binding.compute()` and a fresh params object run for every binding every frame even when nothing changed (a dirty-set keyed by the existing `parameterToBindings` map skips both).
 
-Also noted: `engine.frameIndex` and `engine.sampleCount` are the same number — if `frameIndex` is ever meant to be a non-resetting global counter (useful so a cleared accumulation doesn't replay the identical RNG sequence), it needs its own counter; decide before generated GLSL depends on the accidental equality.
+Also noted: `engine.frameIndex` and `engine.sampleCount` are the same number. **[RESOLVED BY DESIGN — contracts §2.11]** — decided: `frameIndex` is *dropped*, not split. The seed varies along two axes — `sampleCount` (within-render, also the accumulation weight) and a new monotonic `resetSalt` (bumped per accumulation reset, kills replay + frozen-motion-noise). **[IMPLEMENTED]** — `engine.frameIndex` removed; `engine.resetSalt` added (bumped in `clearAccumulation`); `u_frameIndex`→`u_resetSalt` in the Planner; `main_accumulate.glsl` seeds `rng_init(pixel, u_sampleCount, u_resetSalt)`. Verified live.
 
 ---
 
@@ -121,13 +121,14 @@ Also noted: `engine.frameIndex` and `engine.sampleCount` are the same number —
 
 ## UI Layer
 
-**Top items:**
-- **Modal leaks `body.overflow: hidden`** if disposed without `close()` (no `dispose()` override).
-- **Z-index tiers are inverted** — Windows start at z=10000 and float above Modal (1050) and the compile-error overlay (1100), so a tool window can hide fatal compile errors.
-- **NumberInput never clamps typed values** to min/max (typing 999 into a max-100 field emits 999).
-- **Slider auto-precision explodes** on float-imprecise steps (`(0.7-0)/100` → displays `0.350000000000000000`).
-
-**Medium:** window drag has no viewport clamping or pointer capture (release outside the browser leaves it stuck dragging); `WidgetFactory` ignores `meta.options` so discrete int parameters show raw numbers; ColorPicker silently drops alpha.
+**All FIXED — batch UI (widget-library correctness; Modal/NumberInput reachable and verified live, the rest verified by typecheck/reasoning):**
+- ~~**Modal leaks `body.overflow: hidden`** if disposed without `close()`~~ — *fixed:* `dispose()` override restores `body.overflow`.
+- ~~**Z-index tiers are inverted**~~ — *fixed:* Windows now share a bounded band from `WINDOW_Z_BASE = 100` via a compact stack (`raise()`), always below `--ui-z-modal` (1050) and the error overlay (1100). (`Window` is a library component, not yet instantiated by any extension.)
+- ~~**NumberInput never clamps typed values**~~ — *fixed:* emitted value is clamped to min/max. Verified live (999→100, −40→0, 73→73).
+- ~~**Slider auto-precision explodes**~~ — *fixed:* precision derived from `-log10(step)` and capped at 6. Verified live (0.007 step → "0.350", not 18 digits).
+- ~~window drag has no viewport clamping or pointer capture~~ — *fixed:* pointer events + `setPointerCapture` (no stuck dragging) and viewport-clamped position.
+- ~~`WidgetFactory` ignores `meta.options`~~ — *fixed:* named options build a labeled `Dropdown` for discrete ints.
+- ~~ColorPicker silently drops alpha~~ — *fixed:* preserves a 4th (alpha) component across edits.
 
 **Doc drift** is minimal — mainly the ui-components doc presenting NumberInput min/max as enforced, and the docs tree omitting ErrorOverlay.
 

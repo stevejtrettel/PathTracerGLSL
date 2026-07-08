@@ -133,7 +133,8 @@ function planUniforms(program: ProgramDescription): PlannedUniform[] {
     uniforms.push(
         { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },
         { name: 'u_time', type: 'float', parameterPath: 'engine.time' },
-        { name: 'u_frameIndex', type: 'int', parameterPath: 'engine.frameIndex' },
+        // RNG salt: bumped per accumulation reset so the seed doesn't replay (§2.11).
+        { name: 'u_resetSalt', type: 'int', parameterPath: 'engine.resetSalt' },
     );
 
     // Camera

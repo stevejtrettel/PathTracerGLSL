@@ -12,7 +12,7 @@ import {
 } from '../errors/index.js';
 import type { CompiledRenderer } from '../compiler/types.js';
 
-type EngineState = 'ready' | 'running' | 'error';
+type EngineState = 'ready' | 'running' | 'error' | 'context-lost';
 
 interface Rectangle {
     x: number;
@@ -39,6 +39,10 @@ export class Engine {
     private pixelOffset: [number, number] = [0, 0];
     private imageSize: [number, number] = [0, 0];
     private customParameters = new Map<string, any>();
+    private lostActiveRendererId: string | null = null;
+    // Monotonic RNG salt, bumped on every accumulation reset so the seed doesn't
+    // replay after a reset (kills frozen-motion noise + reset-replay). See §2.11.
+    private resetSalt = 0;
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
@@ -54,8 +58,11 @@ export class Engine {
         this.renderExecutor.setParameterManager(this.parameterManager);
 
         gl.canvas.addEventListener('webglcontextlost', (e) => {
-            e.preventDefault();
+            e.preventDefault();  // required for 'webglcontextrestored' to fire
             this._handleContextLoss();
+        });
+        gl.canvas.addEventListener('webglcontextrestored', () => {
+            this._handleContextRestored();
         });
     }
 
@@ -169,6 +176,9 @@ export class Engine {
     // -- Rendering --
 
     renderFrame(): void {
+        // No-op while the GPU context is lost so a running render loop survives to
+        // resume after restore, instead of throwing and tearing the loop down.
+        if (this.state === 'context-lost') return;
         if (this.state !== 'running') throw new Error(`Cannot render in state: ${this.state}`);
         if (!this.activeRendererId) throw new Error('No active renderer');
 
@@ -191,9 +201,9 @@ export class Engine {
         const parameters: Record<string, any> = {
             'engine.resolution': [width, height],
             'engine.imageSize': imgSize,
-            'engine.frameIndex': sampleCount,
             'engine.time': this._time,
             'engine.sampleCount': sampleCount,
+            'engine.resetSalt': this.resetSalt,
             'engine.pixelOffset': this.pixelOffset
         };
 
@@ -251,6 +261,8 @@ export class Engine {
     clearAccumulation(): void {
         if (!this.activeRendererId) return;
         this.sampleCounts.set(this.activeRendererId, 0);
+        // New RNG salt so the reset render doesn't replay the identical stream (§2.11).
+        this.resetSalt++;
         this.resourceManager.clearAllBuffers();
         this.parameterManager.clearCache();
     }
@@ -394,8 +406,59 @@ export class Engine {
     }
 
     private _handleContextLoss(): void {
-        console.error('WebGL context lost - rendering stopped');
-        this.state = 'ready';
+        console.warn('WebGL context lost — GPU resources invalidated; will rebuild on restore');
+
+        // Remember what was active so we can re-select after the rebuild.
+        this.lostActiveRendererId = this.activeRendererId;
+        this.state = 'context-lost';
+
+        // Every GPU handle (programs, framebuffers, textures, uniform locations) is
+        // now dead. Drop them all. The CompiledRenderer data in `this.renderers` is
+        // pure data and survives — it's what we rebuild from on restore.
+        this.renderExecutor.invalidate();
         this.resourceManager.handleContextLoss();
+        this.textureRegistry.handleContextLoss();
+        this.parameterManager.reset();
+        this.activeRendererId = null;
+    }
+
+    private _handleContextRestored(): void {
+        console.log('WebGL context restored — rebuilding GPU resources');
+
+        // Rebuild every renderer from its retained CompiledRenderer. loadRenderer
+        // recompiles shaders and recreates framebuffers/textures; clear the data
+        // map first so it re-populates cleanly (fresh, zeroed accumulation).
+        const renderers = Array.from(this.renderers.values());
+        this.renderers.clear();
+        this.sampleCounts.clear();
+
+        try {
+            // Extension state resets on context loss — re-enable before rebuilding
+            // float framebuffers, or they come back INCOMPLETE_ATTACHMENT.
+            this.resourceManager.enableRequiredExtensions();
+
+            for (const renderer of renderers) {
+                this.loadRenderer(renderer.id, renderer);
+            }
+
+            const toSelect = this.lostActiveRendererId && this.renderers.has(this.lostActiveRendererId)
+                ? this.lostActiveRendererId
+                : renderers[0]?.id;
+
+            if (toSelect) {
+                this.selectRenderer(toSelect);
+                this.state = 'running';
+            } else {
+                this.state = 'ready';
+            }
+        } catch (error) {
+            console.error('Failed to rebuild after context restore:', error);
+            this.state = 'error';
+        }
+
+        this.lostActiveRendererId = null;
+
+        // Note: environment textures are NOT rebuilt — their source (HDR) data
+        // isn't retained here. Reload via loadEnvironmentHDR() to restore it.
     }
 }

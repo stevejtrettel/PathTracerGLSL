@@ -27,7 +27,12 @@ export interface WindowOptions {
     onClose?: () => void;
 }
 
-let windowZIndex = 10000;
+// Windows share a compact z-index band starting here — above the canvas/panels
+// but below --ui-z-modal (1050) and the error overlay (1100), so a floating
+// window can never cover a modal or a fatal compile-error overlay. raise()
+// keeps the band compact and bounded (no unbounded ++counter).
+const WINDOW_Z_BASE = 100;
+const windowStack: Window[] = [];
 
 export class Window extends Container {
     private titleBar: HTMLElement;
@@ -38,8 +43,8 @@ export class Window extends Container {
     private onCloseCallback?: () => void;
 
     // Bound handlers for cleanup
-    private boundMouseMove: (e: MouseEvent) => void;
-    private boundMouseUp: () => void;
+    private boundPointerMove: (e: PointerEvent) => void;
+    private boundPointerUp: (e: PointerEvent) => void;
 
     constructor(title: string, options: WindowOptions = {}) {
         super('div', 'ui-window');
@@ -56,7 +61,6 @@ export class Window extends Container {
         this.domElement.style.top = `${y}px`;
         this.domElement.style.width = `${width}px`;
         this.domElement.style.minHeight = `${height}px`;
-        this.domElement.style.zIndex = String(++windowZIndex);
 
         // Title bar
         this.titleBar = document.createElement('div');
@@ -92,11 +96,14 @@ export class Window extends Container {
         }
 
         // Bring to front on click
-        this.domElement.addEventListener('mousedown', () => this.bringToFront());
+        this.domElement.addEventListener('pointerdown', () => this.bringToFront());
 
         // Bind handlers
-        this.boundMouseMove = this.onMouseMove.bind(this);
-        this.boundMouseUp = this.onMouseUp.bind(this);
+        this.boundPointerMove = this.onPointerMove.bind(this);
+        this.boundPointerUp = this.onPointerUp.bind(this);
+
+        // Register in the window stack and assign an initial z-index.
+        this.raise();
     }
 
     protected attachChild(child: UIComponent): void {
@@ -133,11 +140,24 @@ export class Window extends Container {
     }
 
     /**
-     * Bring window to front
+     * Bring window to front (within the window band, still below modals/overlay)
      */
     bringToFront(): this {
-        this.domElement.style.zIndex = String(++windowZIndex);
+        this.raise();
         return this;
+    }
+
+    /**
+     * Move this window to the top of the stack and re-assign compact z-indices
+     * so the band stays bounded within [WINDOW_Z_BASE, WINDOW_Z_BASE + count).
+     */
+    private raise(): void {
+        const existing = windowStack.indexOf(this);
+        if (existing !== -1) windowStack.splice(existing, 1);
+        windowStack.push(this);
+        windowStack.forEach((win, i) => {
+            win.domElement.style.zIndex = String(WINDOW_Z_BASE + i);
+        });
     }
 
     /**
@@ -149,39 +169,47 @@ export class Window extends Container {
     }
 
     private setupDragging(): void {
-        this.titleBar.addEventListener('mousedown', (e) => {
+        this.titleBar.addEventListener('pointerdown', (e) => {
             if ((e.target as HTMLElement).classList.contains('ui-window-close')) {
                 return;
             }
             this.isDragging = true;
             this.dragOffset.x = e.clientX - this.domElement.offsetLeft;
             this.dragOffset.y = e.clientY - this.domElement.offsetTop;
+            // Capture the pointer so move/up keep firing even when the cursor
+            // leaves the titlebar or the browser window — no more stuck dragging.
+            this.titleBar.setPointerCapture(e.pointerId);
             e.preventDefault();
-
-            document.addEventListener('mousemove', this.boundMouseMove);
-            document.addEventListener('mouseup', this.boundMouseUp);
         });
+        this.titleBar.addEventListener('pointermove', this.boundPointerMove);
+        this.titleBar.addEventListener('pointerup', this.boundPointerUp);
+        this.titleBar.addEventListener('lostpointercapture', this.boundPointerUp);
     }
 
-    private onMouseMove(e: MouseEvent): void {
+    private onPointerMove(e: PointerEvent): void {
         if (!this.isDragging) return;
 
-        const x = e.clientX - this.dragOffset.x;
-        const y = e.clientY - this.dragOffset.y;
+        // Clamp so the window stays within the viewport (titlebar always reachable).
+        const maxX = Math.max(0, window.innerWidth - this.domElement.offsetWidth);
+        const maxY = Math.max(0, window.innerHeight - this.domElement.offsetHeight);
+        const x = Math.min(Math.max(e.clientX - this.dragOffset.x, 0), maxX);
+        const y = Math.min(Math.max(e.clientY - this.dragOffset.y, 0), maxY);
 
         this.domElement.style.left = `${x}px`;
         this.domElement.style.top = `${y}px`;
     }
 
-    private onMouseUp(): void {
+    private onPointerUp(e: PointerEvent): void {
+        if (!this.isDragging) return;
         this.isDragging = false;
-        document.removeEventListener('mousemove', this.boundMouseMove);
-        document.removeEventListener('mouseup', this.boundMouseUp);
+        if (this.titleBar.hasPointerCapture(e.pointerId)) {
+            this.titleBar.releasePointerCapture(e.pointerId);
+        }
     }
 
     dispose(): void {
-        document.removeEventListener('mousemove', this.boundMouseMove);
-        document.removeEventListener('mouseup', this.boundMouseUp);
+        const i = windowStack.indexOf(this);
+        if (i !== -1) windowStack.splice(i, 1);
         super.dispose();
     }
 }

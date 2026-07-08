@@ -43,6 +43,9 @@ export class ColorPicker extends Input<number[]> {
 
         this.picker.addEventListener('input', () => {
             const rgb = this.hexToRgb(this.picker.value);
+            // The native color input is RGB-only; preserve an existing alpha
+            // channel instead of dropping it from an [r,g,b,a] value.
+            if (this._value.length > 3) rgb.push(this._value[3]);
             this.emitChange(rgb);
             this.updateDisplay();
         });

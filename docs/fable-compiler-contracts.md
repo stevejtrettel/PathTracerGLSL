@@ -145,6 +145,70 @@ Any numeric property anywhere in the scene/strategy (material fields, light inte
 
 Samplers take their primary random numbers as explicit arguments (`vec2 xi`), matching the archive optics contract. Models needing additional dimensions may draw from the global RNG stream, documented per model. This keeps the door open for stratification/QMC control at the transport level without forcing it now.
 
+### 2.10 Resource contributions — PINNED (resolved in design discussion, July 2026)
+
+§2.8 pins the *authoring surface* (`Value<T>`: a property is a constant or a `{param}` reference). This section pins the *planning architecture* underneath it — how a feature's uniforms, textures, and parameter metadata reach the `CompiledRenderer` — and extends `Value<T>` to the one thing it doesn't cover: textures. The two are **layered, not merged**: the `{param}` scan is authoring; contributions are planning.
+
+**Each feature planner returns a `FeatureContribution`.** The features are camera, accumulation, display, transport, materials, lighting, environment.
+
+```typescript
+interface FeatureContribution {
+    blocks:     ShaderBlock[];
+    defines:    Record<string, string>;
+    uniforms:   PlannedUniform[];     // feature-declared uniforms + their bindings
+    parameters: ParameterMetadata[];  // UI/metadata for {param}-driven uniforms
+    textures:   PlannedTexture[];     // external resources this feature's shader needs
+    // transport & accumulation additionally contribute passes/buffers — see §7.1;
+    // TransportContribution is a FeatureContribution with those two fields added.
+}
+```
+
+**(1) The `{param}` scan runs inside each feature planner, over that feature's own inputs.** The materials planner scans material properties; the camera planner scans `strategy.camera` fields; each emits uniforms/parameters into *its own* contribution. Constants bake (§2.8 — enabling specialization); only `{param}` references become uniforms. The Planner concatenates every contribution and **dedupes by uniform name**: identical duplicates merge (this is how two materials sharing `glass.roughness` → one `u_glass_roughness`, §2.8), conflicting duplicates (same name, different type/path) are a Validator error. Textures dedupe by name the same way. The concatenated list is the **single `PlannedResource` truth** — the Generator emits *every* uniform declaration from it, **including the display pass's**, so no GLSL template declares its own uniform. This closes the "template-owned uniform" hole and makes declared-vs-wired validation structural. *Engine builtins* (`engine.resolution`, `engine.frameIndex`, `engine.pixelOffset`, `engine.imageSize`, `engine.time`, `engine.sampleCount`) are **not** `FeatureContribution` uniforms — they are engine-injected each frame per the existing convention and stand outside this list.
+
+**(2) The executor is the sole texture-unit authority.** Per pass, `RenderExecutor` binds all texture inputs — framebuffer refs and `extern:` refs alike — to units 0, 1, 2… in declaration order, setting the sampler uniform each time. `TextureRegistry`'s fixed-unit reservation and one-shot bind-at-load are **deleted**; it becomes a dumb `name → WebGLTexture` store. `Engine._bindEnvironmentTexturesToRenderer` is **deleted**. Environment scalars (`u_envSize`, `u_envTotalWeight`) become ordinary `UniformBinding`s on parameter paths (`env.size`, `env.totalWeight`) that the app sets when the HDR loads. While touching `_bindTextures`, cache `getUniformLocation` per `(program, name)` — the cheap half of engine #9, free in passing. This single authority is what fixes the latent texture-unit collision (review engine #2).
+
+**(3) External textures: scene declares, engine provisions, both validate their half.** The environment is scene data: `scene.environment: { type: 'hdri' | 'constant' | 'none', … }`. The environment feature planner derives the extern textures its shader needs — an `hdri` environment yields `extern:env_map`, `extern:env_cdf_cond`, `extern:env_cdf_marg`; a `constant` environment yields **no** texture (a uniform env color + a block); `none` yields neither. The **Validator** checks, at compile time, that every `extern:` reference in the planned pipeline traces to a scene declaration. The **engine's** half is runtime-only (loading is async): at bind time an `extern:` key missing from the registry is a hard, *named* engine error, never a silent unit-0 sample. `extern:` is a **reserved prefix** in the buffer-id namespace, alongside `_current`/`_previous`. This fits the *locked* compiler↔engine contract with no type change — `pass.inputs.textures` is already `Record<string,string>`.
+
+**Proving cases, in order.** (a) **fov** — `Value<number>` on `strategy.camera.fov`; the `TAN_FOV` `#define` mechanism dies (a constant bakes to a literal, a `{param}` emits `u_tanFov` with `compute: tan(fov/2)`) — proves strategy-side scalars + computed bindings. (b) **`MaterialProperty` gains `{param}`**, `albedo` first — proves scene-side scalars through the materials contribution. (c) **environment-as-scene-data** with `extern:env_map` (`hdri`) and `constant` as the trivial variant — proves textures end-to-end and retires the hardcoded sky (review C3).
+
+**Ordering.** Do this **before** the transport-generator split (§7.1), not interleaved: `TransportContribution` *is* a `FeatureContribution`, so the split consumes this refactor as its input shape — doing it after means doing it twice. Sequence: **(i)** the contributions refactor as a *pure TS restructure* with **snapshot-identical generated GLSL asserted before/after** (it moves declarations, changes nothing semantic — a golden-file diff makes it cheap to verify); **(ii)** proving cases (a)/(b)/(c) on top; **(iii)** the remaining §10.1 items with the transport split still last. This absorbs §10.1 items 4 (environment) and 8 (`Value<T>`) into one coherent block.
+
+### 2.11 Sample stream — PINNED (resolved in design discussion, July 2026)
+
+The RNG is a **counter-based hash**, not a stateful sequence, **indexed by an explicit dimension** — chosen so the §2.9 stratification/QMC door is a drop-in, not a rewrite (Owen-scrambled Sobol / blue-noise are inherently `sample(index, dimension)` lookups; a stateful generator gives a sequence, not an addressable field). This supersedes the vertical slice's `rng.glsl` (`mix32(seed + counter)` — the shifted-copy construction flagged in review C9) and **eliminates the `frameIndex == sampleCount` coincidence**.
+
+**Generator + seed (normative).** Canonical hash is the Jarzynski–Olano GPU `pcg` family:
+
+```glsl
+uvec4 pcg4d(uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y*v.w; v.y += v.z*v.x; v.z += v.x*v.y; v.w += v.y*v.z;
+    v ^= v >> 16u;
+    v.x += v.y*v.w; v.y += v.z*v.x; v.z += v.x*v.y; v.w += v.y*v.z;
+    return v;
+}
+uint rng_base;   // per (pixel, sample, reset) seed
+uint rng_dim;    // dimension / draw index
+
+void rng_init(uvec2 pixel, uint sampleCount, uint resetSalt) {
+    rng_base = pcg4d(uvec4(pixel, sampleCount, resetSalt)).x;
+    rng_dim  = 0u;
+}
+uint  rng_u32() { return pcg4d(uvec4(rng_base, rng_dim++, 0u, 0u)).x; }
+float random()  { return float(rng_u32() >> 8) * (1.0 / 16777216.0); }  // [0,1) — the C1 discipline
+```
+
+**Two seed axes, two counters (this is the `frameIndex` resolution).** The seed varies along exactly two independent axes, and each is one counter with one job:
+
+- `sampleCount` — decorrelates samples *within* a converging render, and still drives the accumulation weight `1/(N+1)`. It is literally "which sample is this," used consistently for both. Resets to 0 on accumulation reset.
+- `resetSalt` — a monotonic counter the engine increments on **every accumulation reset**. It changes the seed exactly when the old construction would have replayed, so re-converging a reset image explores fresh paths and interactive motion (reset each frame → `sampleCount` stuck at 0) gets lively noise instead of a frozen pattern.
+
+The engine **drops the `frameIndex` builtin** (it was `== sampleCount`); `engine.sampleCount` stays and `engine.resetSalt` is added. Tiled rendering seeds on the *global* pixel (review C6), so tiles decorrelate at equal `(sampleCount, resetSalt)`.
+
+**Dimension convention — indexed now, layout deferred.** `rng_dim` is the dimension index, advanced per draw; §2.9's explicit `vec2 xi` means the *transport loop*, not the sampler, owns which draw feeds which decision. Today the layout is sequential (draw order). The QMC swap is then localized: assign a *fixed* dimension layout (camera + early bounces get low, stable dimensions; deep bounces pad with the hash) and replace `pcg4d(base, dim…)` with `sobol(sampleIndex, dim)` + per-dimension Owen scramble. We pin the *indexed* shape now (the expensive-to-retrofit part) and defer the fixed layout to when QMC is actually built — the minimal thing that keeps the §2.9 door open.
+
+**Deferred: fixed-seed reproducibility.** `resetSalt` as a plain reset counter is already deterministic across identical action sequences while never replaying within a session. A pin-the-salt "reproducible render" mode is a trivial future add and is *not* required by the §11 harness — furnace, cross-strategy convergence, and pdf-histogram all check converged quantities that are seed-independent.
+
 ---
 
 ## 3. Contract 1 — Interaction (surface and medium unified)
@@ -479,6 +543,8 @@ interface TransportContribution {
 }
 ```
 
+This is a `FeatureContribution` (§2.10) with `passes`/`buffers` added — transport is one of the seven feature planners, and its uniforms/textures/parameters flow through the same concatenate-and-dedupe planning path. Per §2.10's ordering pin, the contributions refactor lands *before* the transport-generator split, so this interface is the split's input shape, not a parallel invention.
+
 **The easy path is single-pass:** the first several integrators (PT, PT+NEE, PT+MIS, all volume variants) each contribute one pass and reuse the progressive-accumulation pipeline archetype. **The door stays open:** the contribution shape natively expresses multi-pass integrators (typed intermediate buffers, `rotate` history, MRT are already executable by the Engine per the pipeline contract). Heavy multi-pass techniques are out of scope (§1), but nothing here forecloses a two-pass experiment.
 
 ### 7.2 Transport state and the event loop
@@ -581,12 +647,14 @@ Priority-ordered; overlaps with [fable-review.md](fable-review.md) noted.
 1. **Interaction interface** — `lambert.glsl`'s `interaction_surface_shade/scatter/pdf/emit` → the §3.2 shape: sample-returns-weight, bare-f eval, explicit `xi`, flags. Mechanical for Lambert (`sample.weight = albedo`).
 2. **Hit struct** — `material_to/material_from` ints → `region_from/region_to` + `material_of()` table. The current per-object material tracking in `scene_sdf` becomes region tracking (trivial while every object is one region).
 3. **LightSample semantics** — current folded-1/d², pdf=1 point lights → §6.1 conventions with `LIGHT_DELTA`; `random()·N` selection → CDF selection (also fixes the uninitialized-sample edge case flagged in the review).
-4. **Environment** — delete the hardcoded sky in `path_trace.glsl` (review C3); `environment` becomes scene data + a registry light.
+4. **Environment** — delete the hardcoded sky in `path_trace.glsl` (review C3); `environment` becomes scene data + a registry light. **(Absorbed into the §2.10 resource-contributions block — see ordering below.)**
 5. **Shadow query** — `scene_intersect_any` remains as the compiled fast path behind the `shadow_transmittance` contract.
 6. **Spectral discipline** — sweep library GLSL for raw radiometric `vec3` literals; introduce `spectrum_*` helpers; route generated constants through the formatter. (Replaces `luminance()` for RR per review note on Rec.601.)
 7. **Stepper** — introduce `GeodesicState` + Euclidean stepper; rewrite `raymarch.glsl`'s loop against it (compiler may specialize back).
-8. **`Value<T>`** — extend `MaterialProperty` and light/SDF parameters with the `{param}` variant; Planner emits uniforms/bindings/metadata (also resolves the fov-as-#define and baked-light-intensity issues from the review).
+8. **`Value<T>`** — extend `MaterialProperty` and light/SDF parameters with the `{param}` variant; Planner emits uniforms/bindings/metadata (also resolves the fov-as-#define and baked-light-intensity issues from the review). **(Absorbed into the §2.10 resource-contributions block — see ordering below.)**
 9. **Transport generator** — split `path_trace.glsl` into generator-assembled blocks; `#ifdef`s become plan-driven block selection. Do this *last*, once 1–5 give it clean inputs.
+
+**Ordering refinement (§2.10 resource-contributions block).** Items 4 and 8 are absorbed into one coherent block that lands as a unit: (i) the pure contributions refactor (feature planners return `FeatureContribution`s; snapshot-identical generated GLSL asserted before/after), (ii) proving cases fov / `MaterialProperty` `{param}` / environment-as-scene-data, then the remaining items. Because `TransportContribution` (§7.1) *is* a `FeatureContribution`, this block precedes the item-9 transport split, which consumes it as its input shape.
 
 ### 10.2 Deliberately open
 
