@@ -10,6 +10,17 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell + pathtr
   },
   "id": "pathtracer-cornell",
   "parameters": {
+    "camera.fov": {
+      "default": 0.8,
+      "group": "Camera",
+      "name": "FOV",
+      "range": [
+        0.3,
+        1.5,
+      ],
+      "triggersReset": true,
+      "type": "float",
+    },
     "camera.position": {
       "default": [
         0,
@@ -144,11 +155,11 @@ precision highp int;
 
 out vec4 fragColor;
 
+#define TAN_FOV u_tanFov
 #define MAX_BOUNCES 10
 #define ENABLE_NEE
 #define ENABLE_RUSSIAN_ROULETTE
 #define RR_START_DEPTH 3
-#define TAN_FOV 0.4227932187381618
 // Uniforms
 uniform vec2 u_resolution;
 uniform float u_time;
@@ -156,6 +167,7 @@ uniform int u_resetSalt;
 uniform vec3 u_cameraPosition;
 uniform vec3 u_cameraTarget;
 uniform vec2 u_imageSize;
+uniform float u_tanFov;
 uniform int u_sampleCount;
 uniform vec2 u_pixelOffset;
 uniform sampler2D u_previous;
@@ -673,74 +685,74 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 21,
+        "endLine": 22,
         "origin": "generated:uniforms",
         "startLine": 12,
       },
       {
-        "endLine": 67,
+        "endLine": 68,
         "origin": "glsl/structs.glsl",
-        "startLine": 22,
+        "startLine": 23,
       },
       {
-        "endLine": 108,
+        "endLine": 109,
         "origin": "glsl/rng.glsl",
-        "startLine": 68,
+        "startLine": 69,
       },
       {
-        "endLine": 132,
+        "endLine": 133,
         "origin": "glsl/math.glsl",
-        "startLine": 109,
+        "startLine": 110,
       },
       {
-        "endLine": 156,
+        "endLine": 157,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 133,
+        "startLine": 134,
       },
       {
-        "endLine": 173,
+        "endLine": 174,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 157,
+        "startLine": 158,
       },
       {
-        "endLine": 243,
+        "endLine": 244,
         "origin": "generated:sdf-dispatch",
-        "startLine": 174,
+        "startLine": 175,
       },
       {
-        "endLine": 315,
+        "endLine": 316,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 244,
+        "startLine": 245,
       },
       {
-        "endLine": 336,
+        "endLine": 337,
         "origin": "generated:material-lookup",
-        "startLine": 316,
+        "startLine": 317,
       },
       {
-        "endLine": 378,
+        "endLine": 379,
         "origin": "glsl/lambert.glsl",
-        "startLine": 337,
+        "startLine": 338,
       },
       {
-        "endLine": 389,
+        "endLine": 390,
         "origin": "generated:light-sampling",
-        "startLine": 379,
+        "startLine": 380,
       },
       {
-        "endLine": 412,
+        "endLine": 413,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 390,
+        "startLine": 391,
       },
       {
-        "endLine": 477,
+        "endLine": 478,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 413,
+        "startLine": 414,
       },
       {
-        "endLine": 503,
+        "endLine": 504,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 478,
+        "startLine": 479,
       },
     ],
   },
@@ -786,6 +798,13 @@ void main() {
       ],
       "type": "vec2",
       "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "camera.fov",
+      ],
+      "type": "float",
+      "uniform": "u_tanFov",
     },
     {
       "parameters": [
@@ -949,9 +968,9 @@ precision highp int;
 
 out vec4 fragColor;
 
+#define TAN_FOV 0.4227932187381618
 #define MAX_BOUNCES 1
 #define ENABLE_NEE
-#define TAN_FOV 0.4227932187381618
 // Uniforms
 uniform vec2 u_resolution;
 uniform float u_time;
@@ -1705,11 +1724,11 @@ precision highp int;
 
 out vec4 fragColor;
 
+#define TAN_FOV 0.4227932187381618
 #define MAX_BOUNCES 8
 #define ENABLE_NEE
 #define ENABLE_RUSSIAN_ROULETTE
 #define RR_START_DEPTH 3
-#define TAN_FOV 0.4227932187381618
 // Uniforms
 uniform vec2 u_resolution;
 uniform float u_time;

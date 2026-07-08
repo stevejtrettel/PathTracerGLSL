@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 
 // ============================================================================
@@ -33,7 +33,7 @@ export type LightingDesc =
     | { method: 'nee' };
 
 export type CameraDesc =
-    | { type: 'pinhole'; fov: number };
+    | { type: 'pinhole'; fov: Value<number> };
 
 export type TransportDesc =
     | { type: 'pathtracer'; maxBounces: number; russianRoulette: { startDepth: number } | null };
@@ -104,6 +104,12 @@ export interface PlannedUniform {
     type: 'float' | 'int' | 'vec2' | 'vec3' | 'vec4' | 'mat4' | 'sampler2D';
     parameterPath: string;
     default?: number | number[];
+    /**
+     * Optional transform from parameter values to the uniform value — used when the
+     * uniform is a *function* of a parameter, e.g. u_tanFov = tan(camera.fov / 2).
+     * When absent, the uniform value is `params[parameterPath] ?? default`.
+     */
+    compute?: (params: Record<string, unknown>) => number | number[];
 }
 
 /**

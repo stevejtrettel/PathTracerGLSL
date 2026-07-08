@@ -43,7 +43,8 @@ export function buildUniforms(uniforms: PlannedUniform[]): UniformBinding[] {
             uniform: u.name,
             parameters: [u.parameterPath],
             type: u.type as UniformBinding['type'],
-            compute: (params) => params[u.parameterPath] ?? u.default,
+            // A uniform may be a transform of its parameter (e.g. u_tanFov = tan(fov/2)).
+            compute: u.compute ?? ((params) => params[u.parameterPath] ?? u.default),
         });
     }
 

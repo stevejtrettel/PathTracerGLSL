@@ -1,17 +1,22 @@
 // compiler/generate/features/camera.ts
-// Camera: the ray-generation snippet + its uniforms and UI parameters.
-// (The TAN_FOV define stays in ShaderBuilder.buildHeader for step i-a; it moves
-// here as a uniform in proving case (a) — see docs/impl-plan-2.10-contributions.md.)
+// Camera: the ray-generation snippet + its uniforms, defines, and UI parameters.
+//
+// fov is a Value<number> (§2.8): a constant bakes to `#define TAN_FOV <literal>`;
+// a { param } becomes the `u_tanFov` uniform (value = tan(fov/2)) with a live slider,
+// aliased via `#define TAN_FOV u_tanFov` so camera_pinhole.glsl is unchanged either way.
 
+import { isValueParam } from '../../types.js';
 import type { RenderPlan, ProgramDescription } from '../../plan/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
+import { formatFloat } from './glsl-format.js';
 
 import cameraPinholeGLSL from '../glsl/camera_pinhole.glsl?raw';
 
 export function contributeCamera(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
     const program = plan.program;
-    return {
+
+    const contribution: FeatureContribution = {
         ...emptyContribution(),
         blocks: [{ origin: cameraOrigin(program), source: buildCameraSource(program, bag) }],
         uniforms: [
@@ -24,6 +29,34 @@ export function contributeCamera(plan: RenderPlan, bag: DiagnosticBag): FeatureC
             'camera.target': { type: 'vec3', default: [0, 0, 0], name: 'Target', group: 'Camera', triggersReset: true },
         },
     };
+
+    if (program.camera.type === 'pinhole') {
+        const fov = program.camera.fov;
+        if (isValueParam(fov)) {
+            const path = fov.param;
+            const def = fov.default ?? 0.8;
+            contribution.defines['TAN_FOV'] = 'u_tanFov';
+            contribution.uniforms.push({
+                name: 'u_tanFov',
+                type: 'float',
+                parameterPath: path,
+                default: Math.tan(def / 2),
+                compute: (params) => Math.tan(((params[path] as number) ?? def) / 2),
+            });
+            contribution.parameters[path] = {
+                type: 'float',
+                default: def,
+                name: 'FOV',
+                group: 'Camera',
+                triggersReset: true,
+                ...(fov.min !== undefined && fov.max !== undefined ? { range: [fov.min, fov.max] } : {}),
+            };
+        } else {
+            contribution.defines['TAN_FOV'] = formatFloat(Math.tan(fov / 2));
+        }
+    }
+
+    return contribution;
 }
 
 function cameraOrigin(program: ProgramDescription): string {

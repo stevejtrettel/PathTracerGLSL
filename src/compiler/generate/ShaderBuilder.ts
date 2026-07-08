@@ -1,11 +1,10 @@
 // compiler/generate/ShaderBuilder.ts
 
 import type { ShaderProgram } from '../types.js';
-import type { RenderPlan, ProgramDescription, PlannedUniform } from '../plan/types.js';
+import type { PlannedUniform } from '../plan/types.js';
 import type { ShaderBlock, BlockMapping } from './ShaderIR.js';
 import { assembleBlocks } from './ShaderIR.js';
 import type { MergedContributions } from './features/merge.js';
-import { formatFloat } from './features/glsl-format.js';
 
 // GLSL owned by the Generator itself (not a swappable feature)
 import fullscreenVertGLSL from './glsl/fullscreen.vert.glsl?raw';
@@ -16,7 +15,7 @@ export interface ShaderBuildResult {
     sourceMaps: Map<string, BlockMapping[]>;
 }
 
-export function buildShaders(plan: RenderPlan, merged: MergedContributions, rendererId: string): ShaderBuildResult {
+export function buildShaders(merged: MergedContributions, rendererId: string): ShaderBuildResult {
     const shaders = new Map<string, ShaderProgram>();
     const sourceMaps = new Map<string, BlockMapping[]>();
 
@@ -27,7 +26,7 @@ export function buildShaders(plan: RenderPlan, merged: MergedContributions, rend
     ]);
 
     // Pathtracer fragment — from the feature contributions merged in section order (§2.10)
-    const ptAssembled = assembleBlocks(buildPathtracerBlocks(plan.program, merged));
+    const ptAssembled = assembleBlocks(buildPathtracerBlocks(merged));
     const mainShaderId = `${rendererId}-main`;
     shaders.set(mainShaderId, {
         vertex: vertexAssembled.source,
@@ -51,9 +50,9 @@ export function buildShaders(plan: RenderPlan, merged: MergedContributions, rend
 // Pathtracer Fragment Shader (block assembly)
 // ============================================================================
 
-function buildPathtracerBlocks(program: ProgramDescription, merged: MergedContributions): ShaderBlock[] {
+function buildPathtracerBlocks(merged: MergedContributions): ShaderBlock[] {
     return [
-        { origin: 'generated:header', source: buildHeader(program) },
+        { origin: 'generated:header', source: buildHeader(merged.defines) },
         { origin: 'generated:uniforms', source: buildUniformDeclarations(merged.uniforms) },
         ...merged.blocks,
     ];
@@ -76,28 +75,16 @@ function buildDisplayBlocks(): ShaderBlock[] {
 
 const FRAGMENT_PREAMBLE = '#version 300 es\nprecision highp float;\nprecision highp int;';
 
-function buildHeader(program: ProgramDescription): string {
+function buildHeader(defines: Record<string, string>): string {
     const lines: string[] = [];
     lines.push(FRAGMENT_PREAMBLE);
     lines.push('');
     lines.push(`out vec4 fragColor;`);
     lines.push('');
 
-    // Transport defines
-    lines.push(`#define MAX_BOUNCES ${program.transport.maxBounces}`);
-
-    if (program.lighting !== null) {
-        lines.push(`#define ENABLE_NEE`);
-    }
-
-    if (program.transport.russianRoulette) {
-        lines.push(`#define ENABLE_RUSSIAN_ROULETTE`);
-        lines.push(`#define RR_START_DEPTH ${program.transport.russianRoulette.startDepth}`);
-    }
-
-    // Camera defines
-    if (program.camera.type === 'pinhole') {
-        lines.push(`#define TAN_FOV ${formatFloat(Math.tan(program.camera.fov * 0.5))}`);
+    // #defines contributed by features (§2.10). A flag define has an empty value.
+    for (const [name, value] of Object.entries(defines)) {
+        lines.push(value === '' ? `#define ${name}` : `#define ${name} ${value}`);
     }
 
     return lines.join('\n');

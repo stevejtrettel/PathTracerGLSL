@@ -75,6 +75,27 @@ export interface Transform {
     scale?: number | Vec3;
 }
 
+// --- Value<T>: constant or uniform-driven parameter (contracts §2.8) ---
+
+/**
+ * A property that is either a constant `T` (baked into the shader) or a reference
+ * to a live parameter (`{ param }`) that the compiler turns into a uniform +
+ * ParameterMetadata. Any numeric property may be a `Value<T>`.
+ */
+export type Value<T> = T | ValueParam<T>;
+
+export interface ValueParam<T> {
+    /** Parameter path, e.g. 'camera.fov'. The uniform is named from this. */
+    param: string;
+    default?: T;
+    min?: number;
+    max?: number;
+}
+
+export function isValueParam<T>(v: Value<T>): v is ValueParam<T> {
+    return typeof v === 'object' && v !== null && !Array.isArray(v) && 'param' in v;
+}
+
 // --- Materials ---
 
 export interface GlslExpression {
@@ -137,8 +158,8 @@ export interface TransportDescription {
 }
 
 export type CameraDescription =
-    | { type: 'pinhole'; fov: number }
-    | { type: 'thinlens'; fov: number; aperture: number; focusDistance: number }
+    | { type: 'pinhole'; fov: Value<number> }
+    | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
     | { type: 'orthographic'; scale: number };
 
 export type AccumulationDescription =

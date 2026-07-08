@@ -75,7 +75,7 @@ export const cornellStrategy: RenderStrategy = {
         russianRoulette: { enabled: true, startDepth: 3 },
         samplesPerFrame: 1,
     },
-    camera: { type: 'pinhole', fov: 0.8 },
+    camera: { type: 'pinhole', fov: { param: 'camera.fov', default: 0.8, min: 0.3, max: 1.5 } },
     accumulation: { type: 'average' },
     display: { type: 'reinhard' },
 };
