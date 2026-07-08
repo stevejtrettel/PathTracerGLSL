@@ -26,6 +26,8 @@ export const minimalScene: SceneDescription = {
     lights: [
         { kind: 'point', position: [3, 4, 2], intensity: 30.0, color: [1.0, 1.0, 1.0] },
     ],
+    // Constant sky — a live uniform color (§2.10 proving case c, analytic variant)
+    environment: { type: 'constant', color: [0.1, 0.2, 0.45], intensity: 1.0 },
 };
 
 export const minimalStrategy: RenderStrategy = {

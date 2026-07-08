@@ -68,7 +68,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     }
 
     // --- Build program description ---
-    const program = planProgram(features, strategy);
+    const program = planProgram(features, scene, strategy);
     const pipeline = planPipeline(program);
 
     return {
@@ -85,7 +85,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, strategy: RenderStrategy): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): ProgramDescription {
     const brdfModels: MaterialModel[] = [];
     if (features.materials.hasLambert) brdfModels.push('lambert');
     if (features.materials.hasDisney) brdfModels.push('disney');
@@ -115,6 +115,7 @@ function planProgram(features: SceneFeatures, strategy: RenderStrategy): Program
         tonemap: strategy.display.type === 'none'
             ? { type: 'none' }
             : { type: strategy.display.type, exposure: strategy.display.exposure },
+        environment: scene.environment ?? { type: 'none' },
     };
 }
 

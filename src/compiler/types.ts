@@ -21,12 +21,28 @@ export interface SceneDescription {
     objects: ObjectDescription[];
     materials: Record<string, MaterialDescription>;
     lights: LightDescription[];
+    /** What a ray sees when it hits nothing. Defaults to `none` (black). */
+    environment?: EnvironmentDescription;
 }
 
 export interface AmbientSpaceDescription {
     type: 'euclidean' | 'hyperbolic' | 'spherical';
     parameters?: { curvature?: number };
 }
+
+// --- Environment (what a missed ray sees) ---
+//
+// Two families (see docs): ANALYTIC (`none`, `constant`) — closed-form radiance,
+// no texture/CDF; and TABULATED (`procedural`, `image`) — radiance from an equirect
+// table + a CDF built from it for importance sampling. A procedural sky is a recipe
+// for a table (evaluate the formula, uniforms optionally live); for a fixed render it
+// freezes into an image. Only the analytic pair is implemented so far.
+
+export type EnvironmentDescription =
+    | { type: 'none' }
+    | { type: 'constant'; color: Vec3; intensity?: number }
+    | { type: 'procedural'; glsl: GlslExpression }   // tabulated — not yet implemented
+    | { type: 'image'; url: string };                // tabulated — not yet implemented
 
 // --- Objects ---
 

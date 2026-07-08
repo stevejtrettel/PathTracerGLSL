@@ -10,6 +10,7 @@ import { contributeIntersection } from './intersection.js';
 import { contributeMaterials } from './materials.js';
 import { contributeLighting } from './lighting.js';
 import { contributeCamera } from './camera.js';
+import { contributeEnvironment } from './environment.js';
 import { contributeTransport } from './transport.js';
 import { contributeAccumulation } from './accumulation.js';
 
@@ -21,8 +22,10 @@ export type { MergedContributions } from './merge.js';
  *
  * The array order is the fragment-shader section order — GLSL requires
  * declare-before-use, so this ordering is load-bearing (core → intersection →
- * materials → lighting → camera → transport → accumulation). The display shader
- * is assembled separately (ShaderBuilder), so `display` is not collected here.
+ * materials → lighting → camera → environment → transport → accumulation).
+ * `environment` must precede `transport` (path_trace calls `environment_radiance`).
+ * The display shader is assembled separately (ShaderBuilder), so `display` is not
+ * collected here.
  */
 export function collectFeatures(plan: RenderPlan, bag: DiagnosticBag): MergedContributions {
     return mergeContributions(
@@ -32,6 +35,7 @@ export function collectFeatures(plan: RenderPlan, bag: DiagnosticBag): MergedCon
             contributeMaterials(plan),
             contributeLighting(plan),
             contributeCamera(plan, bag),
+            contributeEnvironment(plan, bag),
             contributeTransport(plan),
             contributeAccumulation(plan, bag),
         ],

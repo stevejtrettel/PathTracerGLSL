@@ -578,8 +578,12 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
     return ray;
 }
 
+// Environment radiance
+vec3 environment_radiance(vec3 dir) {
+    return vec3(0.0);
+}
 // Path trace loop
-// Requires: MAX_BOUNCES (define)
+// Requires: MAX_BOUNCES (define), environment_radiance()
 // Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
 
 Radiance transport_trace(Ray ray) {
@@ -590,9 +594,7 @@ Radiance transport_trace(Ray ray) {
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
         if (!scene_intersect(current_ray, hit)) {
-            float sky_t = 0.5 * (current_ray.direction.y + 1.0);
-            vec3 sky = mix(vec3(0.5, 0.6, 0.8), vec3(0.2, 0.3, 0.6), sky_t);
-            radiance += throughput * sky;
+            radiance += throughput * environment_radiance(current_ray.direction);
             break;
         }
 
@@ -761,14 +763,19 @@ void main() {
         "startLine": 396,
       },
       {
-        "endLine": 483,
-        "origin": "glsl/path_trace.glsl",
+        "endLine": 422,
+        "origin": "generated:environment",
         "startLine": 419,
       },
       {
-        "endLine": 509,
+        "endLine": 485,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 423,
+      },
+      {
+        "endLine": 511,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 484,
+        "startLine": 486,
       },
     ],
   },
@@ -878,6 +885,28 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > minimal + direct
       "name": "Target",
       "triggersReset": true,
       "type": "vec3",
+    },
+    "environment.color": {
+      "default": [
+        0.1,
+        0.2,
+        0.45,
+      ],
+      "group": "Environment",
+      "name": "Sky color",
+      "triggersReset": true,
+      "type": "color",
+    },
+    "environment.intensity": {
+      "default": 1,
+      "group": "Environment",
+      "name": "Sky intensity",
+      "range": [
+        0,
+        5,
+      ],
+      "triggersReset": true,
+      "type": "float",
     },
   },
   "pipeline": {
@@ -1001,6 +1030,8 @@ uniform int u_resetSalt;
 uniform vec3 u_cameraPosition;
 uniform vec3 u_cameraTarget;
 uniform vec2 u_imageSize;
+uniform vec3 u_environment_color;
+uniform float u_environment_intensity;
 uniform int u_sampleCount;
 uniform vec2 u_pixelOffset;
 uniform sampler2D u_previous;
@@ -1348,8 +1379,12 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
     return ray;
 }
 
+// Environment radiance
+vec3 environment_radiance(vec3 dir) {
+    return u_environment_color * u_environment_intensity;
+}
 // Path trace loop
-// Requires: MAX_BOUNCES (define)
+// Requires: MAX_BOUNCES (define), environment_radiance()
 // Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
 
 Radiance transport_trace(Ray ray) {
@@ -1360,9 +1395,7 @@ Radiance transport_trace(Ray ray) {
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
         if (!scene_intersect(current_ray, hit)) {
-            float sky_t = 0.5 * (current_ray.direction.y + 1.0);
-            vec3 sky = mix(vec3(0.5, 0.6, 0.8), vec3(0.2, 0.3, 0.6), sky_t);
-            radiance += throughput * sky;
+            radiance += throughput * environment_radiance(current_ray.direction);
             break;
         }
 
@@ -1471,74 +1504,79 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 19,
+        "endLine": 21,
         "origin": "generated:uniforms",
         "startLine": 10,
       },
       {
-        "endLine": 65,
+        "endLine": 67,
         "origin": "glsl/structs.glsl",
-        "startLine": 20,
+        "startLine": 22,
       },
       {
-        "endLine": 106,
+        "endLine": 108,
         "origin": "glsl/rng.glsl",
-        "startLine": 66,
+        "startLine": 68,
       },
       {
-        "endLine": 130,
+        "endLine": 132,
         "origin": "glsl/math.glsl",
-        "startLine": 107,
+        "startLine": 109,
       },
       {
-        "endLine": 154,
+        "endLine": 156,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 131,
+        "startLine": 133,
       },
       {
-        "endLine": 171,
+        "endLine": 173,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 155,
+        "startLine": 157,
       },
       {
-        "endLine": 198,
+        "endLine": 200,
         "origin": "generated:sdf-dispatch",
-        "startLine": 172,
+        "startLine": 174,
       },
       {
-        "endLine": 270,
+        "endLine": 272,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 199,
+        "startLine": 201,
       },
       {
-        "endLine": 287,
+        "endLine": 289,
         "origin": "generated:material-lookup",
-        "startLine": 271,
+        "startLine": 273,
       },
       {
-        "endLine": 329,
+        "endLine": 331,
         "origin": "glsl/lambert.glsl",
-        "startLine": 288,
+        "startLine": 290,
       },
       {
-        "endLine": 340,
+        "endLine": 342,
         "origin": "generated:light-sampling",
-        "startLine": 330,
+        "startLine": 332,
       },
       {
-        "endLine": 363,
+        "endLine": 365,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 341,
+        "startLine": 343,
       },
       {
-        "endLine": 428,
+        "endLine": 369,
+        "origin": "generated:environment",
+        "startLine": 366,
+      },
+      {
+        "endLine": 432,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 364,
+        "startLine": 370,
       },
       {
-        "endLine": 454,
+        "endLine": 458,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 429,
+        "startLine": 433,
       },
     ],
   },
@@ -1584,6 +1622,20 @@ void main() {
       ],
       "type": "vec2",
       "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "environment.color",
+      ],
+      "type": "vec3",
+      "uniform": "u_environment_color",
+    },
+    {
+      "parameters": [
+        "environment.intensity",
+      ],
+      "type": "float",
+      "uniform": "u_environment_intensity",
     },
     {
       "parameters": [
@@ -1634,6 +1686,28 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > minimal + pathtr
       "name": "Target",
       "triggersReset": true,
       "type": "vec3",
+    },
+    "environment.color": {
+      "default": [
+        0.1,
+        0.2,
+        0.45,
+      ],
+      "group": "Environment",
+      "name": "Sky color",
+      "triggersReset": true,
+      "type": "color",
+    },
+    "environment.intensity": {
+      "default": 1,
+      "group": "Environment",
+      "name": "Sky intensity",
+      "range": [
+        0,
+        5,
+      ],
+      "triggersReset": true,
+      "type": "float",
     },
   },
   "pipeline": {
@@ -1759,6 +1833,8 @@ uniform int u_resetSalt;
 uniform vec3 u_cameraPosition;
 uniform vec3 u_cameraTarget;
 uniform vec2 u_imageSize;
+uniform vec3 u_environment_color;
+uniform float u_environment_intensity;
 uniform int u_sampleCount;
 uniform vec2 u_pixelOffset;
 uniform sampler2D u_previous;
@@ -2106,8 +2182,12 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
     return ray;
 }
 
+// Environment radiance
+vec3 environment_radiance(vec3 dir) {
+    return u_environment_color * u_environment_intensity;
+}
 // Path trace loop
-// Requires: MAX_BOUNCES (define)
+// Requires: MAX_BOUNCES (define), environment_radiance()
 // Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
 
 Radiance transport_trace(Ray ray) {
@@ -2118,9 +2198,7 @@ Radiance transport_trace(Ray ray) {
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
         if (!scene_intersect(current_ray, hit)) {
-            float sky_t = 0.5 * (current_ray.direction.y + 1.0);
-            vec3 sky = mix(vec3(0.5, 0.6, 0.8), vec3(0.2, 0.3, 0.6), sky_t);
-            radiance += throughput * sky;
+            radiance += throughput * environment_radiance(current_ray.direction);
             break;
         }
 
@@ -2229,74 +2307,79 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 21,
+        "endLine": 23,
         "origin": "generated:uniforms",
         "startLine": 12,
       },
       {
-        "endLine": 67,
+        "endLine": 69,
         "origin": "glsl/structs.glsl",
-        "startLine": 22,
+        "startLine": 24,
       },
       {
-        "endLine": 108,
+        "endLine": 110,
         "origin": "glsl/rng.glsl",
-        "startLine": 68,
+        "startLine": 70,
       },
       {
-        "endLine": 132,
+        "endLine": 134,
         "origin": "glsl/math.glsl",
-        "startLine": 109,
+        "startLine": 111,
       },
       {
-        "endLine": 156,
+        "endLine": 158,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 133,
+        "startLine": 135,
       },
       {
-        "endLine": 173,
+        "endLine": 175,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 157,
+        "startLine": 159,
       },
       {
-        "endLine": 200,
+        "endLine": 202,
         "origin": "generated:sdf-dispatch",
-        "startLine": 174,
+        "startLine": 176,
       },
       {
-        "endLine": 272,
+        "endLine": 274,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 201,
+        "startLine": 203,
       },
       {
-        "endLine": 289,
+        "endLine": 291,
         "origin": "generated:material-lookup",
-        "startLine": 273,
+        "startLine": 275,
       },
       {
-        "endLine": 331,
+        "endLine": 333,
         "origin": "glsl/lambert.glsl",
-        "startLine": 290,
+        "startLine": 292,
       },
       {
-        "endLine": 342,
+        "endLine": 344,
         "origin": "generated:light-sampling",
-        "startLine": 332,
+        "startLine": 334,
       },
       {
-        "endLine": 365,
+        "endLine": 367,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 343,
+        "startLine": 345,
       },
       {
-        "endLine": 430,
+        "endLine": 371,
+        "origin": "generated:environment",
+        "startLine": 368,
+      },
+      {
+        "endLine": 434,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 366,
+        "startLine": 372,
       },
       {
-        "endLine": 456,
+        "endLine": 460,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 431,
+        "startLine": 435,
       },
     ],
   },
@@ -2342,6 +2425,20 @@ void main() {
       ],
       "type": "vec2",
       "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "environment.color",
+      ],
+      "type": "vec3",
+      "uniform": "u_environment_color",
+    },
+    {
+      "parameters": [
+        "environment.intensity",
+      ],
+      "type": "float",
+      "uniform": "u_environment_intensity",
     },
     {
       "parameters": [

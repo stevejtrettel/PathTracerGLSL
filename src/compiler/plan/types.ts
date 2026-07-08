@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value, ValueParam } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value, ValueParam, EnvironmentDescription } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 
 // ============================================================================
@@ -20,6 +20,7 @@ export interface ProgramDescription {
     transport: TransportDesc;
     accumulation: AccumulationDesc;
     tonemap: TonemapDesc;
+    environment: EnvironmentDescription;
 }
 
 export type IntersectionDesc =

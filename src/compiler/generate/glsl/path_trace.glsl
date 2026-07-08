@@ -1,5 +1,5 @@
 // Path trace loop
-// Requires: MAX_BOUNCES (define)
+// Requires: MAX_BOUNCES (define), environment_radiance()
 // Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
 
 Radiance transport_trace(Ray ray) {
@@ -10,9 +10,7 @@ Radiance transport_trace(Ray ray) {
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
         if (!scene_intersect(current_ray, hit)) {
-            float sky_t = 0.5 * (current_ray.direction.y + 1.0);
-            vec3 sky = mix(vec3(0.5, 0.6, 0.8), vec3(0.2, 0.3, 0.6), sky_t);
-            radiance += throughput * sky;
+            radiance += throughput * environment_radiance(current_ray.direction);
             break;
         }
 
