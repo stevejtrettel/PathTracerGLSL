@@ -33,7 +33,13 @@ export class TextureRegistry {
 
         this.textures.set(name, texture);
 
-        const unit = requestedUnit ?? this.nextUnit++;
+        // Reuse the unit already assigned to this name when re-registering (e.g.
+        // reloading an HDR). Only a genuinely new name consumes a fresh unit —
+        // otherwise every re-registration leaks one of the ~32 available units.
+        let unit = requestedUnit ?? this.units.get(name);
+        if (unit === undefined) {
+            unit = this.nextUnit++;
+        }
         this.units.set(name, unit);
     }
 

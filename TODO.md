@@ -1,17 +1,19 @@
 # TODO — PathTracerGLSL
 
-## Next Major Milestone: Build the Real Compiler
+## Next Major Milestone: Build the Real Compiler (on the contracts)
 
-Replace `SimpleCompiler` (hardcoded GLSL strings) with a compiler that generates shaders from scene descriptions and rendering strategies.
+A minimal vertical slice exists ("step zero" — Lambert/SDF/point-light only). The real compiler — volumes, swappable material and transport models, multi-region objects, the full design — is the work ahead. Path: migrate the slice to the pinned GLSL contracts, then grow features (dielectric, volumes, area lights, MIS) on top.
 
-See [compiler-engine-contract.md](docs/compiler-engine-contract.md) for the locked architectural contract.
+- Roadmap: [docs/fable-compiler-contracts.md](docs/fable-compiler-contracts.md) §10.1, in order — item 1 is reshaping `lambert.glsl` to the interaction contract
+- Code to transcribe: [docs/fable-reference-implementations.md](docs/fable-reference-implementations.md)
+- Correctness tests: [docs/fable-validation-scenes.md](docs/fable-validation-scenes.md)
+- Known bugs: [docs/fable-review.md](docs/fable-review.md) (six fixed, rest open)
 
-### Open Design Questions
-- Scene description format — how to specify geometry, materials, lights
-- Algorithm selection — how `RenderStrategy` references rendering algorithms
-- Code generation approach — GLSL templates vs string building vs hybrid
-- Multi-material SDF compilation — how to compose multiple objects with different materials
-- Source maps — mapping generated GLSL back to source for error reporting
+(The former open design questions — scene format, codegen approach, multi-material compilation, source maps — are all answered in the contracts doc or already built.)
+
+### Cleanup
+- Remove or replace legacy `STRATEGY_PRESETS` in `src/app/types.ts` — SimpleCompiler-era strategies cast `as any`; they don't validate against the real compiler's `RenderStrategy`
+- Design discussion queued: scene authoring language (builder API / DSL above `SceneDescription`) — see contracts §10.2
 
 ---
 
@@ -26,6 +28,14 @@ Currently supports: `float`, `int`, `bool`, `color`, `vec2`, `vec3`, `vec4`. Cou
 ---
 
 ## Completed
+
+- [x] Removed two compiler conventions leaked into the locked App layer (batch 2d, July 2026): reset-on-parameter-change now reads the compiler's `triggersReset` metadata (`App._triggersReset`), falling back to path-prefix heuristic only for params without metadata; `RendererManager` owns a `strategyToRenderer` map (from compiled renderer ids) so `selectRendererByStrategy` no longer re-derives `${strategyId}-${sceneId}`. Typecheck + 44 tests pass.
+
+- [x] Fixed the reachable engine leaks/crashers (batch 2c, July 2026): engine #6 (ParameterManager cached uniform values by reference — array snapshots into the cache now); engine #7 partial — `TextureRegistry.register` unit leak on re-registration (reuse existing unit), `createR32F` LINEAR-without-extension (NEAREST for CDF/PDF tables), `HDRLoader.decompressRLE` infinite-loop on corrupt/truncated files (bounds + zero-length-run guards). Still open in #7: context-loss restore path. Typecheck + 44 tests pass.
+
+- [x] Atomic recompile / "keep the last-good renderer" (batch 2 follow-up, July 2026): `RendererManager.recompile()` now compiles all strategies, then GPU-validates every new shader via `Engine.validateRenderers` → `RenderExecutor.validateShaders` (throwaway programs, no framebuffers — peak GPU memory stays 1×), and only then does the destructive swap. A bad-GLSL recompile throws during validation before anything is unloaded, so the previously-working renderers keep rendering. Also reordered `Engine.loadRenderer` to run structural validation before the unload. Typecheck + 44 tests pass.
+
+- [x] Fixed four more bugs from docs/fable-review.md (batch 2, July 2026): app #5 (tiled grid math — edge tiles overran the image; now fixed-stride tiles with edge clamping via `TiledRenderer.tileRect`); engine #3 (reload/unload path — `loadRenderer` replaces instead of skipping, `unloadRenderer` added on Engine/RenderExecutor/ResourceManager, `loadShaders` deletes-before-overwrite, plus `RendererManager.recompile()`/`App.recompile()` dev-loop entry points); app #8-partial (ErrorOverlay reachable outside `initialize` — factored `App._showErrorOverlay` + `RendererManager.attachShaderDiagnostics`); engine #4 (resize resets all renderers' sample counts). Typecheck + 44 tests pass.
 
 - [x] Fixed six output-corrupting bugs from docs/fable-review.md (July 2026): RNG values ≥ 1.0 NaN-poisoning pixels (rng.glsl, also fixes multi-light selection fallthrough); tiled-render RNG seeding with local instead of global pixel (main_accumulate.glsl); HDR export reading one frame stale post-swap (PipelineBuilder.ts); Rec.601→Rec.709 luminance (math.glsl); ResourceManager.cleanup() throwing on the 2D texture array (dispose was broken); EventBus.emit skipping listeners when once() unsubscribes mid-dispatch. Tests + typecheck pass.
 

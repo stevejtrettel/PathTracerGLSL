@@ -67,10 +67,49 @@ export class RenderExecutor {
                     shader.fragment,
                     id
                 );
+                // Delete any existing program at this id before overwriting (GPU leak otherwise)
+                const existing = this.programs.get(id);
+                if (existing) this.gl.deleteProgram(existing);
                 this.programs.set(id, program);
             } catch (error) {
                 // Re-throw with shader id for better error messages
                 throw new Error(`Failed to compile shader '${id}': ${error}`);
+            }
+        }
+    }
+
+    /**
+     * Check that every shader compiles and links on the GPU, without installing
+     * anything. Each program is built to a throwaway and deleted immediately, so
+     * this holds at most one program at a time and allocates no framebuffers or
+     * textures — cheap enough to run before a destructive renderer swap to prove
+     * the new shaders are good while the current renderer is still loaded.
+     *
+     * Throws on the first failure with the same message shape as loadShaders, so
+     * the error maps back through source maps (see mapEngineShaderError).
+     */
+    validateShaders(shaders: Map<string, ShaderProgram>): void {
+        for (const [id, shader] of shaders) {
+            let program: WebGLProgram | undefined;
+            try {
+                program = this._compileAndLinkProgram(shader.vertex, shader.fragment, id);
+            } catch (error) {
+                throw new Error(`Failed to compile shader '${id}': ${error}`);
+            } finally {
+                if (program) this.gl.deleteProgram(program);
+            }
+        }
+    }
+
+    /**
+     * Unload compiled programs by shader id, freeing their GPU resources.
+     */
+    unloadShaders(shaderIds: Iterable<string>): void {
+        for (const id of shaderIds) {
+            const program = this.programs.get(id);
+            if (program) {
+                this.gl.deleteProgram(program);
+                this.programs.delete(id);
             }
         }
     }

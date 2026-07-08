@@ -106,8 +106,15 @@ class ParameterManager {
                 continue;
             }
 
-            // Update cache and set uniform
-            this.uniformValueCache.set(cacheKey, value);
+            // Update cache and set uniform. Snapshot array values: a binding whose
+            // compute() returns a reused array mutated in place (the standard
+            // camera-controller pattern) would otherwise alias the cache, so the
+            // `a === b` fast-path in uniformValuesEqual sees "no change" and the
+            // uniform never re-uploads.
+            const cached = (Array.isArray(value) || ArrayBuffer.isView(value))
+                ? (value as number[]).slice()
+                : value;
+            this.uniformValueCache.set(cacheKey, cached);
             setUniformValue(this.gl, location, value, binding.type);
             this.updateStats.total++;
         }

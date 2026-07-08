@@ -1,6 +1,8 @@
 # PathTracerGLSL: Compiler Architecture Plan
 
-**Status:** In progress  
+> **HISTORICAL (July 2026):** this plan was executed — the vertical slice it specifies is built ([compiler-system.md](compiler-system.md)). Forward design is now governed by [fable-compiler-contracts.md](fable-compiler-contracts.md), which supersedes the type sketches below where they differ. Kept as the record of the original handoff.
+
+**Status:** Superseded  
 **Scope:** Design of the Compiler layer — the missing piece between the locked Engine/App and actual rendering
 
 ---

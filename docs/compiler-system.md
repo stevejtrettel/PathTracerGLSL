@@ -413,7 +413,7 @@ The accumulation buffer is a `double_buffer` with `rgba32f` format — two textu
 Pipeline builder also produces:
 - **UniformBinding[]** — connects parameter store paths to shader uniforms with a compute function
 - **ParameterMetadata** — camera position/target with defaults, groups, and `triggersReset: true`
-- **ExportTargets** — `hdr` export reads from `accumulation_current` as float data
+- **ExportTargets** — `hdr` export reads from `accumulation_previous` as float data (post-frame swap semantics: after the swap, the freshly written frame lives in `previous`)
 
 ## GLSL Architecture
 

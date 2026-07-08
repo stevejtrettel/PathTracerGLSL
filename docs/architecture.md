@@ -1,6 +1,8 @@
 # PathTracerGLSL Architecture
 
-**Last Updated**: March 2026
+**Last Updated**: July 2026
+
+> **Note:** for the Compiler layer, the authoritative current documentation is [compiler-system.md](compiler-system.md) (as built) and [fable-compiler-contracts.md](fable-compiler-contracts.md) (design going forward). This document is the system-wide overview.
 
 This document provides a comprehensive technical overview of the PathTracerGLSL architecture, data flow, design decisions, and implementation details.
 
@@ -30,7 +32,7 @@ PathTracerGLSL is a data-driven WebGL2 path tracer with a three-layer architectu
 │                        APP LAYER                        │
 │         High-level orchestration & interaction          │
 │  App (facade), RendererManager,                │
-│  ProductionRenderManager, RenderCoordinator,           │
+│  ProductionOrchestrator, RenderCoordinator,           │
 │  ParameterStore, EventBus, TiledRenderer, Extensions   │
 └─────────────────────────────────────────────────────────┘
                            │
@@ -50,8 +52,8 @@ PathTracerGLSL is a data-driven WebGL2 path tracer with a three-layer architectu
 ┌─────────────────────────────────────────────────────────┐
 │                    COMPILER LAYER                       │
 │         Code generation & pipeline specification        │
-│  SimpleCompiler: SceneDescription + RenderStrategy     │
-│  → CompiledRenderer (shaders + pipeline + uniforms)    │
+│  Compiler (Analyze → Validate → Plan → Generate):      │
+│  SceneDescription + RenderStrategy → CompiledRenderer  │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -194,9 +196,11 @@ interface CompiledRenderer {
 }
 ```
 
-### Current Implementation: SimpleCompiler
+### Previous Implementation: SimpleCompiler (superseded — now in `reference/`)
 
-The current compiler is a temporary validation tool that generates hardcoded GLSL for five strategies:
+> The real Compiler replaced this; see [compiler-system.md](compiler-system.md). Kept for historical context:
+
+The SimpleCompiler was a temporary validation tool that generated hardcoded GLSL for five strategies:
 - `debug`: UV visualization
 - `pathtracer`: Progressive accumulation with ping-pong buffers
 - `pathtracer-aovs`: Path tracing with Multiple Render Targets (MRT)
@@ -260,17 +264,15 @@ private _generateDebugRenderer(scene: SceneDescription, strategy: RenderStrategy
 }
 ```
 
-### Future: Real Compiler
+### The Compiler Vertical Slice (built — "step zero", not yet the real compiler)
 
-The real compiler will:
-1. Parse `SceneDescription` to extract geometry, materials, lights
-2. Generate GLSL modules for each component
-3. Compose modules into complete shaders based on `RenderStrategy`
-4. Build source maps for error reporting
-5. Optimize uniform bindings
-6. Validate completeness before returning
+What exists in `src/compiler/` is a genuine but *minimal* Analyze → Validate → Plan → Generate pipeline:
+1. Analyzes `SceneDescription` for features (geometry kinds, material models, lights)
+2. Validates scene + strategy against current capabilities (DiagnosticBag, all errors at once)
+3. Plans concrete codegen data (material IDs, SDF objects, lights, uniforms, pipeline)
+4. Generates GLSL by assembling library/template/generated blocks with source maps
 
-Will be built in Phase 7 after architecture validation is complete.
+It handles only the minimal case (Lambert, SDF primitives, point lights). Full slice documentation: [compiler-system.md](compiler-system.md). **The real compiler** — volumes, swappable BSDFs/transports, multi-region objects, curved spaces — is designed but unbuilt; it is governed by [fable-compiler-contracts.md](fable-compiler-contracts.md).
 
 ---
 
@@ -617,7 +619,7 @@ getParameterMetadata(): Map<string, ParameterMetadata>
 3. Engine clears accumulation
 4. EventBus emits `renderer.switched`
 
-### Component: ProductionRenderManager
+### Component: ProductionOrchestrator
 
 Manages the production render lifecycle — everything beyond just "render N samples".
 
@@ -954,9 +956,9 @@ Next frame renders with new renderer
 ```
 User: await app.renderProduction(1000, { autoExportPNG: true })
   ↓
-App delegates to ProductionRenderManager.renderProduction()
+App delegates to ProductionOrchestrator.renderProduction()
   ↓
-ProductionRenderManager:
+ProductionOrchestrator:
   1. Switch layout to 'centered' (save previous)
   2. Resize canvas if custom resolution requested
   3. parameterStore.lock()
@@ -980,7 +982,7 @@ RenderCoordinator.startProduction():
       → If yes: resolve Promise, emit RENDER_COMPLETE + RENDER_UNLOCKED
       → If no: continue
   ↓
-Promise resolves → ProductionRenderManager continues
+Promise resolves → ProductionOrchestrator continues
   ↓
 Auto-export (if requested):
   - exportPNG(), exportHDR(), exportAllAOVs()
@@ -1273,21 +1275,15 @@ Different use cases require different behaviors. Clean separation makes both cas
 
 ## Current Status
 
-The **App** and **Engine** layers are complete and production-ready. The **Compiler** layer is a placeholder (`SimpleCompiler`) with hardcoded GLSL for 5 strategies. The next major milestone is building the real Compiler.
+The **App** and **Engine** layers are complete. The **Compiler** layer holds a minimal vertical slice ("step zero"): a working Analyze → Validate → Plan → Generate pipeline for the smallest useful case — Euclidean space, SDF sphere/plane/box, Lambert, point lights + NEE, pinhole camera, average accumulation, Reinhard. `SceneDescription` is a real format (ambientSpace, objects, materials, lights), narrow in what it accepts.
 
-See [TODO.md](../TODO.md) for active tasks and priorities.
-
-### What's Not Built Yet
-
-**The Real Compiler**: `SimpleCompiler` fakes compilation with hardcoded shader strings. The real compiler needs to accept scene descriptions (geometry, materials, lights) and rendering strategies (algorithms, settings), then generate GLSL by composing algorithm fragments. See [compiler-engine-contract.md](compiler-engine-contract.md) for the locked architectural contract.
-
-**Scene Description Format**: `SceneDescription` is currently just `{ id: string, name?: string }`. The real format needs to describe objects, materials, and lights.
+**The real compiler is the work ahead.** Its design is complete ([fable-compiler-contracts.md](fable-compiler-contracts.md)); the build path is that document's §10.1 roadmap — migrate the slice to the contracts, then grow features. See [TODO.md](../TODO.md).
 
 ### Known Technical Debt
 
-- `SessionManager` constructor takes 7 positional arguments (should be an options object)
+- Legacy `STRATEGY_PRESETS` in `src/app/types.ts` predate the real compiler and don't validate (`as any` casts) — pending removal
 - Some `any` types remain in ParameterStore callbacks and EventBus handlers
-- `SimpleCompiler` is the largest file in the codebase (~2000 lines of hardcoded GLSL)
+- Known bugs across all layers are catalogued in [fable-review.md](fable-review.md) (six fixed July 2026; rest open)
 
 ## Source File Map
 
@@ -1296,14 +1292,12 @@ src/
 ├── app/                           # App layer (complete)
 │   ├── App.ts                     # Thin facade (~400 lines), delegates to managers
 │   ├── RendererManager.ts         # Compilation, loading, switching renderers
-│   ├── ProductionRenderManager.ts # Production render lifecycle (layout, export)
+│   ├── ProductionOrchestrator.ts # Production render lifecycle (layout, export)
 │   ├── RenderCoordinator.ts       # Render loop, modes, progress tracking
 │   ├── ParameterStore.ts          # Centralized parameter state, lock/unlock
 │   ├── EventBus.ts                # Pub/sub event system
 │   ├── events.ts                  # AppEvents constants, ParamPrefix constants
-│   ├── ExportManager.ts           # PNG, HDR, AOV export
-│   ├── SessionManager.ts          # Save/restore session state
-│   ├── TiledRenderer.ts           # High-res tiled rendering
+│   ├── TiledRenderer.ts           # High-res tiled rendering (export/session logic lives in App.ts + utils/)
 │   ├── types.ts                   # Extension interface, AppConfig, presets
 │   ├── extensions/                # OrbitControls, StatsPanel, ParameterPanel, etc.
 │   ├── layout/                    # Layout system (fullscreen, centered, editor, split)
@@ -1322,9 +1316,15 @@ src/
 │   ├── loaders/                   # HDR file loading
 │   └── utils/                     # Texture factory, shader utils
 │
-├── compiler/                      # Compiler layer (placeholder)
-│   ├── SimpleCompiler.ts          # Hardcoded GLSL, to be replaced
-│   └── types.ts                   # CompiledRenderer, RenderPipeline, etc.
+├── compiler/                      # Compiler layer (vertical slice — "step zero"; real compiler unbuilt)
+│   ├── Compiler.ts                # Entry point: Analyze → Validate → Plan → Generate
+│   ├── analyze/                   # Analyzer + Validator + SceneFeatures
+│   ├── plan/                      # Planner + RenderPlan types
+│   ├── generate/                  # Generator, ShaderBuilder, PipelineBuilder, ShaderIR,
+│   │   └── glsl/                  #   ShaderErrorMapper; GLSL library/template blocks
+│   ├── scenes/                    # Test scenes (minimalScene, cornellBox)
+│   ├── __tests__/                 # vitest suite
+│   └── types.ts                   # SceneDescription, RenderStrategy, CompiledRenderer, etc.
 │
 ├── errors/                        # Error system (complete)
 │   ├── core/                      # Diagnostic, DiagnosticBag, codes
@@ -1338,7 +1338,7 @@ src/
 │
 └── glsl.d.ts                      # TypeScript declarations for GLSL imports
 
-reference/                         # Standalone GLSL algorithm library (future compiler input)
+reference/                         # Old implementation kept as source material (incl. SimpleCompiler.ts — not compiled)
 ├── optics/                        # Camera, BRDF, transport, tonemapping, accumulation
 └── world/                         # Scene SDF, environment, lighting, ambient geometry
 ```

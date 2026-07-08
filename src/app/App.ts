@@ -72,7 +72,7 @@ export class App {
                 const isRendering = this.coordinator.isRunning() || this.coordinator.isPaused();
 
                 if (!isResend && isRendering) {
-                    if (shouldResetAccumulation(change.path)) {
+                    if (this._triggersReset(change.path)) {
                         this.coordinator.resetAccumulation(`parameter: ${change.path}`);
                     }
                 }
@@ -129,17 +129,7 @@ export class App {
         try {
             await this.rendererManager.initialize(config);
         } catch (error: any) {
-            // Extract DiagnosticBag from CompilationError or mapped shader errors
-            let bag: DiagnosticBag | undefined;
-            if (error instanceof CompilationError) {
-                bag = error.diagnostics;
-            } else if (error?.__diagnostics) {
-                bag = error.__diagnostics;
-            }
-
-            if (bag) {
-                this.errorOverlay.show(bag);
-            }
+            this._showErrorOverlay(error);
             throw error;
         }
 
@@ -159,6 +149,53 @@ export class App {
         presets: Record<string, StrategyPreset> = {}
     ): Promise<void> {
         await this.rendererManager.initializeWithPresets(scene, presetIds, presets);
+    }
+
+    /**
+     * Recompile the scene and hot-swap the renderers (compiler dev loop).
+     *
+     * On compile/shader failure, the ErrorOverlay is shown and the error is
+     * rethrown. See {@link RendererManager.recompile} for the recovery semantics.
+     *
+     * @param scene - Optional replacement scene; defaults to the current scene.
+     */
+    recompile(scene?: SceneDescription): void {
+        try {
+            this.rendererManager.recompile(scene);
+        } catch (error: any) {
+            this._showErrorOverlay(error);
+            throw error;
+        }
+    }
+
+    /**
+     * Whether a parameter change should reset accumulation. Prefers the compiler's
+     * per-parameter `triggersReset` metadata (authoritative for parameters the
+     * active renderer emits); falls back to the path-prefix heuristic only for
+     * parameters without metadata (engine builtins, display/debug toggles).
+     */
+    private _triggersReset(path: string): boolean {
+        const meta = this.rendererManager.getParameterMetadata().get(path);
+        if (meta?.triggersReset !== undefined) {
+            return meta.triggersReset;
+        }
+        return shouldResetAccumulation(path);
+    }
+
+    /**
+     * Extract a DiagnosticBag from a compilation or mapped shader error and show
+     * it in the full-screen overlay. No-op if the error carries no diagnostics.
+     */
+    private _showErrorOverlay(error: any): void {
+        let bag: DiagnosticBag | undefined;
+        if (error instanceof CompilationError) {
+            bag = error.diagnostics;
+        } else if (error?.__diagnostics) {
+            bag = error.__diagnostics;
+        }
+        if (bag) {
+            this.errorOverlay.show(bag);
+        }
     }
 
     // -- Content Loading --

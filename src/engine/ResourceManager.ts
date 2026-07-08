@@ -222,30 +222,44 @@ export class ResourceManager {
     }
 
     /**
-     * Clean up all GPU resources
+     * Unload a single renderer's GPU resources (framebuffers + textures)
+     *
+     * No-op if the renderer isn't loaded. Clears the active pointer if it
+     * referred to this renderer.
      */
-    cleanup(): void {
+    unloadRenderer(rendererId: string): void {
+        const resources = this.renderers.get(rendererId);
+        if (!resources) return;
+
         const gl = this.gl;
+        for (const resource of resources.values()) {
+            // Delete framebuffers
+            for (const fb of resource.framebuffers) {
+                if (fb) gl.deleteFramebuffer(fb);
+            }
 
-        for (const resources of this.renderers.values()) {
-            for (const resource of resources.values()) {
-                // Delete framebuffers
-                for (const fb of resource.framebuffers) {
-                    if (fb) gl.deleteFramebuffer(fb);
-                }
-
-                // Delete textures — textures is WebGLTexture[][] ([attachment][bufferIndex]),
-                // so this must be a nested loop (passing the inner array to deleteTexture throws)
-                for (const attachmentTextures of resource.textures) {
-                    for (const tex of attachmentTextures) {
-                        if (tex) gl.deleteTexture(tex);
-                    }
+            // Delete textures — textures is WebGLTexture[][] ([attachment][bufferIndex]),
+            // so this must be a nested loop (passing the inner array to deleteTexture throws)
+            for (const attachmentTextures of resource.textures) {
+                for (const tex of attachmentTextures) {
+                    if (tex) gl.deleteTexture(tex);
                 }
             }
         }
 
-        this.renderers.clear();
-        this.activeRenderer = null;
+        this.renderers.delete(rendererId);
+        if (this.activeRenderer === rendererId) {
+            this.activeRenderer = null;
+        }
+    }
+
+    /**
+     * Clean up all GPU resources
+     */
+    cleanup(): void {
+        for (const rendererId of [...this.renderers.keys()]) {
+            this.unloadRenderer(rendererId);
+        }
     }
 
     /**

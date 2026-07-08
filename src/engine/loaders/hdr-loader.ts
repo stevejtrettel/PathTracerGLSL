@@ -109,21 +109,33 @@ export class HDRLoader {
                 let ptrEnd = (channel + 1) * width;
 
                 while (ptr < ptrEnd) {
+                    // Bounds guard: a truncated file would otherwise read undefined
+                    // (count → NaN, ptr never advances) and spin forever.
+                    if (offset >= bytes.length) {
+                        throw new Error('Corrupt HDR: RLE data ended mid-scanline');
+                    }
                     const byte1 = bytes[offset++];
 
                     if (byte1 > 128) {
-                        // Run of same value
+                        // Run of same value (count is 1..127 — always advances ptr)
                         const count = byte1 - 128;
                         const value = bytes[offset++];
 
-                        for (let i = 0; i < count; i++) {
+                        for (let i = 0; i < count && ptr < ptrEnd; i++) {
                             scanlineBuffer[ptr++] = value;
                         }
                     } else {
-                        // Literal values
+                        // Literal values. A zero-length literal advances neither ptr
+                        // nor makes progress toward ptrEnd — reject it as corrupt so
+                        // the loop is guaranteed to terminate.
                         const count = byte1;
-
-                        for (let i = 0; i < count; i++) {
+                        if (count === 0) {
+                            throw new Error('Corrupt HDR: zero-length RLE literal run');
+                        }
+                        for (let i = 0; i < count && ptr < ptrEnd; i++) {
+                            if (offset >= bytes.length) {
+                                throw new Error('Corrupt HDR: RLE data ended mid-scanline');
+                            }
                             scanlineBuffer[ptr++] = bytes[offset++];
                         }
                     }

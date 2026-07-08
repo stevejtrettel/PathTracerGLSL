@@ -38,6 +38,9 @@ export class RendererManager {
     private scene: SceneDescription | null = null;
     private strategies: Map<string, RenderStrategy> = new Map();
     private renderers: Map<string, CompiledRenderer> = new Map();
+    // strategyId → rendererId, taken from the compiled renderer's own id so the
+    // `${strategyId}-${sceneId}` convention lives only in the compiler.
+    private strategyToRenderer: Map<string, string> = new Map();
     private activeRendererId: string | null = null;
 
     constructor(deps: RendererManagerDeps) {
@@ -74,6 +77,7 @@ export class RendererManager {
                 compiledRenderers.push(renderer);
                 this.strategies.set(strategy.id, strategy);
                 this.renderers.set(renderer.id, renderer);
+                this.strategyToRenderer.set(strategy.id, renderer.id);
             } catch (error) {
                 if (error instanceof CompilationError) {
                     console.error(reporter.formatBag(error.diagnostics));
@@ -86,13 +90,7 @@ export class RendererManager {
         try {
             this.engine.loadRenderers(compiledRenderers);
         } catch (error: any) {
-            // Try to map shader compilation errors through source maps
-            const allSourceMaps = this.collectSourceMaps(compiledRenderers);
-            const mapped = mapEngineShaderError(error?.message ?? '', allSourceMaps);
-            if (mapped) {
-                console.error(reporter.formatBag(mapped));
-                (error as any).__diagnostics = mapped;
-            }
+            this.attachShaderDiagnostics(error, compiledRenderers, reporter);
             throw error;
         }
 
@@ -127,6 +125,87 @@ export class RendererManager {
         });
 
         await this.initialize({ scene, strategies });
+    }
+
+    /**
+     * Recompile the scene and hot-swap every strategy's renderer in place.
+     *
+     * This is the compiler dev-loop entry point: after changing the scene (or a
+     * property that is baked at compile time), call this to regenerate shaders
+     * without a page reload. The engine replaces each renderer's programs and GPU
+     * resources; the previously-active renderer is re-selected, parameters are
+     * re-sent, and accumulation is reset.
+     *
+     * The swap is atomic: nothing existing is destroyed until every new renderer
+     * has been fully compiled and GPU-validated, so a failure at any point leaves
+     * the currently-loaded renderers untouched and still rendering. Errors
+     * propagate to the caller (App routes them to the ErrorOverlay):
+     * - A `CompilationError` (bad scene/strategy) is thrown during compilation.
+     * - A shader-compile error (only possible when `scene` introduces new GLSL)
+     *   is thrown during validation, with a mapped `DiagnosticBag` on
+     *   `__diagnostics`. Validation builds throwaway programs only — no new
+     *   framebuffers — so peak GPU memory stays at 1×.
+     *
+     * @param scene - Optional replacement scene; defaults to the current scene.
+     */
+    recompile(scene?: SceneDescription): void {
+        const target = scene ?? this.scene;
+        if (!target) {
+            throw new Error('Cannot recompile before initialize()');
+        }
+
+        const reporter = new ConsoleReporter();
+        const previouslyActive = this.activeRendererId;
+
+        // Phase 1 — compile every strategy (TS → shader source + pipeline spec).
+        // No GPU state is touched, so a CompilationError here leaves the loaded
+        // renderers intact.
+        const compiled: Array<{ strategyId: string; renderer: CompiledRenderer }> = [];
+        for (const [strategyId, strategy] of this.strategies) {
+            try {
+                compiled.push({ strategyId, renderer: this.compiler.compile(target, strategy) });
+            } catch (error) {
+                if (error instanceof CompilationError) {
+                    console.error(reporter.formatBag(error.diagnostics));
+                }
+                throw error;
+            }
+        }
+
+        // Phase 2 — validate all new shaders compile on the GPU while the current
+        // renderers are still loaded. This is the atomic-commit boundary: if any
+        // shader is bad we throw here, before a single destructive change, so the
+        // previously-working renderers keep rendering. Uses throwaway programs, so
+        // no framebuffers are allocated and peak memory stays at 1×.
+        const newRenderers = compiled.map(c => c.renderer);
+        try {
+            this.engine.validateRenderers(newRenderers);
+        } catch (error: any) {
+            this.attachShaderDiagnostics(error, newRenderers, reporter);
+            throw error;
+        }
+
+        // Phase 3 — commit: replace programs/resources in the engine. Every new
+        // shader is known to compile, so this no longer fails partway.
+        this.scene = target;
+        for (const { strategyId, renderer } of compiled) {
+            this.engine.loadRenderer(renderer.id, renderer);
+            this.renderers.set(renderer.id, renderer);
+            this.strategyToRenderer.set(strategyId, renderer.id);
+        }
+
+        // Re-select the previously-active renderer (loadRenderer clears the active
+        // pointer when it replaces the active one).
+        const toSelect = previouslyActive && this.renderers.has(previouslyActive)
+            ? previouslyActive
+            : compiled[0].renderer.id;
+        this.engine.selectRenderer(toSelect);
+        this.activeRendererId = toSelect;
+        this.parameterStore.resendAll();
+        this.engine.clearAccumulation();
+
+        console.log(`Recompiled ${compiled.length} renderer(s)`);
+        this.eventBus.emit(AppEvents.RENDERER_SWITCHED, { rendererId: toSelect });
     }
 
     /**
@@ -165,13 +244,11 @@ export class RendererManager {
      * Select renderer by strategy ID (convenience)
      */
     selectRendererByStrategy(strategyId: string): void {
-        if (!this.scene) {
-            console.warn('Renderers not initialized');
+        const rendererId = this.strategyToRenderer.get(strategyId);
+        if (!rendererId) {
+            console.warn(`No renderer for strategy: ${strategyId}`);
             return;
         }
-
-        // Renderer ID format: {strategy}-{scene}
-        const rendererId = `${strategyId}-${this.scene.id}`;
         this.selectRenderer(rendererId);
     }
 
@@ -218,6 +295,24 @@ export class RendererManager {
     }
 
     /**
+     * Map an engine shader-compile error back through the renderers' source maps
+     * and attach the resulting DiagnosticBag to the error as `__diagnostics`
+     * (which App reads to show the ErrorOverlay). No-op if the error can't be mapped.
+     */
+    private attachShaderDiagnostics(
+        error: any,
+        renderers: CompiledRenderer[],
+        reporter: ConsoleReporter
+    ): void {
+        const allSourceMaps = this.collectSourceMaps(renderers);
+        const mapped = mapEngineShaderError(error?.message ?? '', allSourceMaps);
+        if (mapped) {
+            console.error(reporter.formatBag(mapped));
+            error.__diagnostics = mapped;
+        }
+    }
+
+    /**
      * Collect all source maps from compiled renderers into a single map
      */
     private collectSourceMaps(renderers: CompiledRenderer[]): Map<string, SourceMap> {
@@ -238,6 +333,7 @@ export class RendererManager {
     dispose(): void {
         this.renderers.clear();
         this.strategies.clear();
+        this.strategyToRenderer.clear();
         this.activeRendererId = null;
         this.scene = null;
     }

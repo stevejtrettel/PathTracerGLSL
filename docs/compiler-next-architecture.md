@@ -1,5 +1,7 @@
 # Compiler Architecture: Next Steps
 
+> **STATUS (July 2026):** partially superseded. §2 (Shader IR) and §7 (error wiring) are **built**; §4's Option B (generated per-material dispatch) is **adopted** into [fable-compiler-contracts.md](fable-compiler-contracts.md) §3.3, which now governs all GLSL-contract questions. Still-live TS-side ideas: §1 (scene/strategy compilation split), §3 (uniform/resource unification), §6 (pipeline flexibility — evolved into the contracts' pipeline-archetype direction).
+
 Design notes for evolving the compiler beyond the current vertical slice. These changes are interconnected — the IR, uniform unification, and scene/strategy split are three facets of making the compiler's internal model richer so it can validate and optimize before emitting strings.
 
 ## 1. Scene/Strategy Split

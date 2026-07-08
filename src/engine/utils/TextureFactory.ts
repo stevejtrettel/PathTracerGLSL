@@ -42,8 +42,13 @@ export class TextureFactory {
             data
         );
 
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+        // NEAREST, not LINEAR: these are CDF/PDF lookup tables, so exact texel
+        // fetches are what the samplers want (interpolating between CDF entries
+        // would bias inverse-CDF sampling). NEAREST also needs no float-linear
+        // extension — LINEAR on an R32F texture without OES_texture_float_linear
+        // makes it incomplete and samples as 0 on some devices.
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
 

@@ -62,13 +62,10 @@ export class Engine {
     // -- Loading --
 
     loadRenderer(id: string, renderer: CompiledRenderer): void {
-        if (this.renderers.has(id)) {
-            console.log(`Renderer '${id}' already loaded, skipping`);
-            return;
-        }
-
         console.log(`Loading renderer '${id}'...`);
 
+        // Validate structure BEFORE any destructive state change, so a replace
+        // that fails validation leaves the existing renderer intact.
         const validation = validateCompiledRenderer(renderer);
         if (validation.hasErrors()) {
             console.error(new ConsoleReporter().formatBag(validation));
@@ -76,6 +73,14 @@ export class Engine {
         }
         if (validation.hasWarnings()) {
             console.warn(new ConsoleReporter().formatBag(validation));
+        }
+
+        if (this.renderers.has(id)) {
+            // Replace: a recompile of the same id must take effect, not be skipped.
+            // (Leaves activeRendererId null if we're replacing the active renderer —
+            // the caller re-selects.)
+            console.log(`Renderer '${id}' already loaded — replacing`);
+            this.unloadRenderer(id);
         }
 
         try {
@@ -90,6 +95,40 @@ export class Engine {
         this.sampleCounts.set(id, 0);
 
         console.log(`Renderer '${id}' loaded successfully`);
+    }
+
+    /**
+     * Unload a renderer, freeing its shaders and GPU resources.
+     *
+     * No-op if not loaded. If the unloaded renderer was active, clears the
+     * active pointer — the caller must select another renderer before rendering.
+     */
+    unloadRenderer(id: string): void {
+        const renderer = this.renderers.get(id);
+        if (!renderer) return;
+
+        this.renderExecutor.unloadShaders(renderer.shaders.keys());
+        this.resourceManager.unloadRenderer(id);
+        this.renderers.delete(id);
+        this.sampleCounts.delete(id);
+
+        if (this.activeRendererId === id) {
+            this.activeRendererId = null;
+        }
+
+        console.log(`Renderer '${id}' unloaded`);
+    }
+
+    /**
+     * Check that every renderer's shaders compile on the GPU, without loading
+     * them. Throws on the first failure (message maps through source maps). No
+     * GPU resources are allocated or freed and no existing renderer is touched —
+     * safe to call before a destructive recompile/swap to keep peak memory at 1×.
+     */
+    validateRenderers(renderers: CompiledRenderer[]): void {
+        for (const renderer of renderers) {
+            this.renderExecutor.validateShaders(renderer.shaders);
+        }
     }
 
     loadRenderers(renderers: CompiledRenderer[]): void {
@@ -218,6 +257,13 @@ export class Engine {
 
     resize(width: number, height: number): void {
         this.resourceManager.resize(width, height);
+        // ResourceManager.resize() reallocates (invalidates) every renderer's
+        // accumulation textures, not just the active one. Reset all sample counts
+        // to match — otherwise switching to a non-active renderer later blends fresh
+        // samples into a stale/zeroed buffer at high N and darkens. (fable-review Engine #4)
+        for (const id of this.sampleCounts.keys()) {
+            this.sampleCounts.set(id, 0);
+        }
     }
 
     getCanvasSize(): [number, number] {

@@ -30,10 +30,20 @@ export interface TileGrid {
     tilesX: number;
     /** Number of tiles in Y direction */
     tilesY: number;
-    /** Actual width of each tile */
+    /** Nominal tile width (the stride between tiles); edge tiles are clamped smaller */
     tileWidth: number;
-    /** Actual height of each tile */
+    /** Nominal tile height (the stride between tiles); edge tiles are clamped smaller */
     tileHeight: number;
+}
+
+/**
+ * Pixel rectangle covered by a single tile
+ */
+interface TileRect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
 }
 
 /**
@@ -131,23 +141,41 @@ export class TiledRenderer {
     }
 
     /**
-     * Calculate evenly-dividing tile grid
+     * Calculate the tile grid for a target image
      *
-     * Tiles are sized to divide the target dimensions evenly,
-     * ensuring no partial pixels at edges.
+     * Tiles use the requested size as a fixed stride; the tiles on the right and
+     * bottom edges are clamped to the image bounds (see {@link tileRect}). This
+     * guarantees the tiles exactly cover the image with no overrun — unlike
+     * rounding the stride up, which can push edge tiles past the target size
+     * (e.g. 1030px / ceil(1030/512)=3 → 344px stride → 3×344=1032 ≠ 1030).
      */
     calculateGrid(config: TileJobConfig): TileGrid {
         const { targetWidth, targetHeight, targetTileSize } = config;
 
-        // Calculate number of tiles in each direction
         const tilesX = Math.ceil(targetWidth / targetTileSize);
         const tilesY = Math.ceil(targetHeight / targetTileSize);
 
-        // Calculate actual tile size (may be smaller than target to divide evenly)
-        const tileWidth = Math.ceil(targetWidth / tilesX);
-        const tileHeight = Math.ceil(targetHeight / tilesY);
+        return {
+            tilesX,
+            tilesY,
+            tileWidth: targetTileSize,
+            tileHeight: targetTileSize,
+        };
+    }
 
-        return { tilesX, tilesY, tileWidth, tileHeight };
+    /**
+     * Pixel rectangle covered by tile (tx, ty), clamped to the image at the edges.
+     */
+    private tileRect(tx: number, ty: number): TileRect {
+        const { grid, config } = this.currentJob!;
+        const x = tx * grid.tileWidth;
+        const y = ty * grid.tileHeight;
+        return {
+            x,
+            y,
+            width: Math.min(grid.tileWidth, config.targetWidth - x),
+            height: Math.min(grid.tileHeight, config.targetHeight - y),
+        };
     }
 
     /**
@@ -314,24 +342,25 @@ export class TiledRenderer {
     private async renderTile(tx: number, ty: number): Promise<void> {
         if (!this.currentJob) return;
 
-        const { grid, config } = this.currentJob;
+        const { config } = this.currentJob;
+        const rect = this.tileRect(tx, ty);
 
         // Setup tile geometry:
-        // 1. Resize framebuffer to tile size
-        this.app.resize(grid.tileWidth, grid.tileHeight);
+        // 1. Resize framebuffer to this tile's (clamped) size
+        this.app.resize(rect.width, rect.height);
 
         // 2. Set full image size (for correct aspect ratio/sampling)
         this.app.setImageSize(config.targetWidth, config.targetHeight);
 
         // 3. Set pixel offset (where this tile starts in full image)
-        this.app.setPixelOffset(tx * grid.tileWidth, ty * grid.tileHeight);
+        this.app.setPixelOffset(rect.x, rect.y);
 
         // Render using production mode
         // (automatically resets accumulation, locks params, renders to target)
         await this.app.renderProduction(config.samplesPerTile);
 
         // Save tile
-        await this.saveTile(tx, ty);
+        await this.saveTile(tx, ty, rect);
     }
 
     private completeJob(): void {
@@ -371,10 +400,10 @@ export class TiledRenderer {
     // Private: File Operations
     // ============================================================================
 
-    private async saveTile(tx: number, ty: number): Promise<void> {
+    private async saveTile(tx: number, ty: number, rect: TileRect): Promise<void> {
         if (!this.currentJob) return;
 
-        const { config, grid, jobId } = this.currentJob;
+        const { config, jobId } = this.currentJob;
         const filename = `${jobId}_tile_${String(tx).padStart(2, '0')}_${String(ty).padStart(2, '0')}_${config.samplesPerTile}spp`;
 
         // Check which exports are available
@@ -383,7 +412,7 @@ export class TiledRenderer {
         if (config.format === 'hdr' || config.format === 'both') {
             if (exports.includes('hdr')) {
                 const radiance = this.app.readExport('hdr') as Float32Array;
-                saveHDRFile(radiance, grid.tileWidth, grid.tileHeight, `${filename}.hdr`);
+                saveHDRFile(radiance, rect.width, rect.height, `${filename}.hdr`);
             } else {
                 console.warn('HDR export not available for current renderer');
             }
@@ -392,7 +421,7 @@ export class TiledRenderer {
         if (config.format === 'png' || config.format === 'both') {
             if (exports.includes('ldr')) {
                 const rgb = this.app.readExport('ldr') as Uint8Array;
-                savePNGFile(rgb, grid.tileWidth, grid.tileHeight, `${filename}.png`);
+                savePNGFile(rgb, rect.width, rect.height, `${filename}.png`);
             } else {
                 console.warn('LDR export not available for current renderer');
             }
