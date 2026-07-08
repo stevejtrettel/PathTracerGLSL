@@ -103,7 +103,7 @@ export interface GlslExpression {
     source: string;
 }
 
-export type MaterialProperty = number | Vec3 | GlslExpression;
+export type MaterialProperty = number | Vec3 | GlslExpression | ValueParam<number | Vec3>;
 
 export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';

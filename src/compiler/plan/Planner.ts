@@ -1,7 +1,7 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, MaterialModel, Vec3, MaterialProperty, GlslExpression } from '../types.js';
-import { isGlslExpression } from '../types.js';
+import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam } from '../types.js';
+import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import type { RenderPlan, PlannedSDFObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
 
@@ -180,16 +180,18 @@ function resolveSDFPositioning(
     return { parameters, translation };
 }
 
-function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression {
+function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> {
     if (value === undefined) return fallback;
     if (isGlslExpression(value)) return value;
+    if (isValueParam(value)) return value as ValueParam<Vec3>;  // preserve — emitted as a uniform (§2.8)
     if (typeof value === 'number') return [value, value, value] as Vec3;
     return value;
 }
 
-function resolveScalarProperty(value: MaterialProperty | undefined, fallback: number): number | GlslExpression {
+function resolveScalarProperty(value: MaterialProperty | undefined, fallback: number): number | GlslExpression | ValueParam<number> {
     if (value === undefined) return fallback;
     if (isGlslExpression(value)) return value;
+    if (isValueParam(value)) return value as ValueParam<number>;  // preserve — emitted as a uniform (§2.8)
     if (typeof value === 'number') return value;
     // Vec3 passed for a scalar property — take first component (silent truncation)
     return value[0];

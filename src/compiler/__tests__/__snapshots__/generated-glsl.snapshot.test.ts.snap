@@ -43,6 +43,17 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell + pathtr
       "triggersReset": true,
       "type": "vec3",
     },
+    "clay.albedo": {
+      "default": [
+        0.8,
+        0.4,
+        0.2,
+      ],
+      "group": "clay",
+      "name": "Albedo",
+      "triggersReset": true,
+      "type": "color",
+    },
   },
   "pipeline": {
     "framebuffers": [
@@ -164,6 +175,7 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform int u_resetSalt;
+uniform vec3 u_clay_albedo;
 uniform vec3 u_cameraPosition;
 uniform vec3 u_cameraTarget;
 uniform vec2 u_imageSize;
@@ -363,21 +375,21 @@ float scene_sdf(vec3 p, out int material) {
     float d_obj;
     material = 0;
     d_obj = sdf_object_0(p);
-    if (d_obj < d) { d = d_obj; material = 2; }
+    if (d_obj < d) { d = d_obj; material = 3; }
     d_obj = sdf_object_1(p);
-    if (d_obj < d) { d = d_obj; material = 2; }
+    if (d_obj < d) { d = d_obj; material = 3; }
     d_obj = sdf_object_2(p);
-    if (d_obj < d) { d = d_obj; material = 2; }
+    if (d_obj < d) { d = d_obj; material = 3; }
     d_obj = sdf_object_3(p);
-    if (d_obj < d) { d = d_obj; material = 1; }
+    if (d_obj < d) { d = d_obj; material = 2; }
     d_obj = sdf_object_4(p);
-    if (d_obj < d) { d = d_obj; material = 0; }
+    if (d_obj < d) { d = d_obj; material = 1; }
     d_obj = sdf_object_5(p);
-    if (d_obj < d) { d = d_obj; material = 2; }
+    if (d_obj < d) { d = d_obj; material = 3; }
     d_obj = sdf_object_6(p);
-    if (d_obj < d) { d = d_obj; material = 2; }
+    if (d_obj < d) { d = d_obj; material = 3; }
     d_obj = sdf_object_7(p);
-    if (d_obj < d) { d = d_obj; material = 2; }
+    if (d_obj < d) { d = d_obj; material = 0; }
     return d;
 }
 
@@ -473,14 +485,18 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
     props.emission_strength = 0.0;
     props.roughness = 1.0;
     if (id == 0) {
-        props.albedo = vec3(0.12, 0.45, 0.15);
+        props.albedo = u_clay_albedo;
         props.roughness = 1.0;
     }
     else if (id == 1) {
-        props.albedo = vec3(0.65, 0.05, 0.05);
+        props.albedo = vec3(0.12, 0.45, 0.15);
         props.roughness = 1.0;
     }
     else if (id == 2) {
+        props.albedo = vec3(0.65, 0.05, 0.05);
+        props.roughness = 1.0;
+    }
+    else if (id == 3) {
         props.albedo = vec3(0.73, 0.73, 0.73);
         props.roughness = 1.0;
     }
@@ -685,74 +701,74 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 22,
+        "endLine": 23,
         "origin": "generated:uniforms",
         "startLine": 12,
       },
       {
-        "endLine": 68,
+        "endLine": 69,
         "origin": "glsl/structs.glsl",
-        "startLine": 23,
+        "startLine": 24,
       },
       {
-        "endLine": 109,
+        "endLine": 110,
         "origin": "glsl/rng.glsl",
-        "startLine": 69,
+        "startLine": 70,
       },
       {
-        "endLine": 133,
+        "endLine": 134,
         "origin": "glsl/math.glsl",
-        "startLine": 110,
+        "startLine": 111,
       },
       {
-        "endLine": 157,
+        "endLine": 158,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 134,
+        "startLine": 135,
       },
       {
-        "endLine": 174,
+        "endLine": 175,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 158,
+        "startLine": 159,
       },
       {
-        "endLine": 244,
+        "endLine": 245,
         "origin": "generated:sdf-dispatch",
-        "startLine": 175,
+        "startLine": 176,
       },
       {
-        "endLine": 316,
+        "endLine": 317,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 245,
+        "startLine": 246,
       },
       {
-        "endLine": 337,
+        "endLine": 342,
         "origin": "generated:material-lookup",
-        "startLine": 317,
+        "startLine": 318,
       },
       {
-        "endLine": 379,
+        "endLine": 384,
         "origin": "glsl/lambert.glsl",
-        "startLine": 338,
+        "startLine": 343,
       },
       {
-        "endLine": 390,
+        "endLine": 395,
         "origin": "generated:light-sampling",
-        "startLine": 380,
+        "startLine": 385,
       },
       {
-        "endLine": 413,
+        "endLine": 418,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 391,
+        "startLine": 396,
       },
       {
-        "endLine": 478,
+        "endLine": 483,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 414,
+        "startLine": 419,
       },
       {
-        "endLine": 504,
+        "endLine": 509,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 479,
+        "startLine": 484,
       },
     ],
   },
@@ -777,6 +793,13 @@ void main() {
       ],
       "type": "int",
       "uniform": "u_resetSalt",
+    },
+    {
+      "parameters": [
+        "clay.albedo",
+      ],
+      "type": "vec3",
+      "uniform": "u_clay_albedo",
     },
     {
       "parameters": [

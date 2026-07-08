@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value, ValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 
 // ============================================================================
@@ -79,9 +79,9 @@ export interface PlannedMaterial {
     id: number;
     name: string;
     model: MaterialModel;
-    albedo: Vec3 | GlslExpression;
-    emission: Vec3 | GlslExpression;
-    roughness: number | GlslExpression;
+    albedo: Vec3 | GlslExpression | ValueParam<Vec3>;
+    emission: Vec3 | GlslExpression | ValueParam<Vec3>;
+    roughness: number | GlslExpression | ValueParam<number>;
 }
 
 /**

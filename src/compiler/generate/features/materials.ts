@@ -1,8 +1,11 @@
 // compiler/generate/features/materials.ts
 // Material models: fixed BRDF snippets + the per-scene material-property lookup.
+// A material property that is a { param } (§2.8) becomes a uniform named from its
+// parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
-import { isGlslExpression } from '../../types.js';
-import type { RenderPlan, PlannedMaterial } from '../../plan/types.js';
+import { isGlslExpression, isValueParam, type Vec3, type ValueParam } from '../../types.js';
+import type { RenderPlan, PlannedMaterial, PlannedUniform } from '../../plan/types.js';
+import type { ParameterMetadata } from '../../../engine/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatVec3 } from './glsl-format.js';
@@ -18,7 +21,57 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         if (model === 'lambert') blocks.push({ origin: 'glsl/lambert.glsl', source: lambertGLSL });
     }
 
-    return { ...emptyContribution(), blocks };
+    // Scan every material's properties for { param } references → live uniforms.
+    const uniforms: PlannedUniform[] = [];
+    const parameters: Record<string, ParameterMetadata> = {};
+    const seen = new Set<string>();
+    for (const mat of plan.materials) {
+        addParamUniform(mat.albedo, 'vec3', 'color', uniforms, parameters, seen);
+        addParamUniform(mat.emission, 'vec3', 'color', uniforms, parameters, seen);
+        addParamUniform(mat.roughness, 'float', 'float', uniforms, parameters, seen);
+    }
+
+    return { ...emptyContribution(), blocks, uniforms, parameters };
+}
+
+/** Uniform name from a parameter path: 'clay.albedo' → 'u_clay_albedo'. */
+function paramToUniform(path: string): string {
+    return 'u_' + path.replace(/\./g, '_');
+}
+
+function addParamUniform(
+    prop: Vec3 | number | { source: string } | ValueParam<Vec3 | number>,
+    glslType: 'vec3' | 'float',
+    metaType: 'color' | 'float',
+    uniforms: PlannedUniform[],
+    parameters: Record<string, ParameterMetadata>,
+    seen: Set<string>,
+): void {
+    if (!isValueParam(prop)) return;
+    const path = prop.param;
+    if (seen.has(path)) return; // materials may share one driven parameter (§2.8)
+    seen.add(path);
+
+    uniforms.push({
+        name: paramToUniform(path),
+        type: glslType,
+        parameterPath: path,
+        default: prop.default as number | number[] | undefined,
+    });
+
+    const seg = path.split('.');
+    parameters[path] = {
+        type: metaType,
+        default: prop.default,
+        name: capitalize(seg[seg.length - 1]),
+        group: seg.length > 1 ? seg[0] : undefined,
+        triggersReset: true,
+        ...(prop.min !== undefined && prop.max !== undefined ? { range: [prop.min, prop.max] } : {}),
+    };
+}
+
+function capitalize(s: string): string {
+    return s.length ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
 // ============================================================================
@@ -40,13 +93,20 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
         const cond = i === 0 ? 'if' : 'else if';
         lines.push(`    ${cond} (id == ${mat.id}) {`);
 
-        if (isGlslExpression(mat.albedo)) {
+        // albedo
+        if (isValueParam(mat.albedo)) {
+            lines.push(`        props.albedo = ${paramToUniform(mat.albedo.param)};`);
+        } else if (isGlslExpression(mat.albedo)) {
             lines.push(`        props.albedo = ${mat.albedo.source};`);
         } else {
             lines.push(`        props.albedo = ${formatVec3(mat.albedo)};`);
         }
 
-        if (isGlslExpression(mat.emission)) {
+        // emission (+ strength)
+        if (isValueParam(mat.emission)) {
+            lines.push(`        props.emission = ${paramToUniform(mat.emission.param)};`);
+            lines.push(`        props.emission_strength = 1.0;`);
+        } else if (isGlslExpression(mat.emission)) {
             lines.push(`        props.emission = ${mat.emission.source};`);
         } else {
             const hasEmission = mat.emission[0] > 0 || mat.emission[1] > 0 || mat.emission[2] > 0;
@@ -56,7 +116,10 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
             }
         }
 
-        if (isGlslExpression(mat.roughness)) {
+        // roughness
+        if (isValueParam(mat.roughness)) {
+            lines.push(`        props.roughness = ${paramToUniform(mat.roughness.param)};`);
+        } else if (isGlslExpression(mat.roughness)) {
             lines.push(`        props.roughness = ${mat.roughness.source};`);
         } else {
             lines.push(`        props.roughness = ${formatFloat(mat.roughness)};`);
