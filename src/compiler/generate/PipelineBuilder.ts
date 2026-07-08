@@ -1,8 +1,8 @@
 // compiler/generate/PipelineBuilder.ts
 
 import type { RenderPipeline, CompiledRenderer } from '../types.js';
-import type { RenderPlan } from '../plan/types.js';
-import type { UniformBinding, ParameterMetadata } from '../../engine/types.js';
+import type { RenderPlan, PlannedUniform } from '../plan/types.js';
+import type { UniformBinding } from '../../engine/types.js';
 
 export function buildPipeline(rendererId: string, plan: RenderPlan): RenderPipeline {
     const planned = plan.pipeline;
@@ -35,10 +35,10 @@ export function buildPipeline(rendererId: string, plan: RenderPlan): RenderPipel
     };
 }
 
-export function buildUniforms(plan: RenderPlan): UniformBinding[] {
+export function buildUniforms(uniforms: PlannedUniform[]): UniformBinding[] {
     const bindings: UniformBinding[] = [];
 
-    for (const u of plan.uniforms) {
+    for (const u of uniforms) {
         bindings.push({
             uniform: u.name,
             parameters: [u.parameterPath],
@@ -48,31 +48,6 @@ export function buildUniforms(plan: RenderPlan): UniformBinding[] {
     }
 
     return bindings;
-}
-
-export function buildParameters(plan: RenderPlan): Record<string, ParameterMetadata> {
-    const params: Record<string, ParameterMetadata> = {};
-
-    // Camera parameters based on type
-    const cam = plan.program.camera;
-    if (cam.type === 'pinhole') {
-        params['camera.position'] = {
-            type: 'vec3',
-            default: [0, 0, 8],
-            name: 'Position',
-            group: 'Camera',
-            triggersReset: true,
-        };
-        params['camera.target'] = {
-            type: 'vec3',
-            default: [0, 0, 0],
-            name: 'Target',
-            group: 'Camera',
-            triggersReset: true,
-        };
-    }
-
-    return params;
 }
 
 export function buildExportTargets(): CompiledRenderer['exportTargets'] {

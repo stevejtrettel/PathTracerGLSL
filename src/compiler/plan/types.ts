@@ -122,7 +122,4 @@ export interface RenderPlan {
 
     /** How the GPU program executes */
     pipeline: PlannedPipeline;
-
-    /** Uniforms derived from program description */
-    uniforms: PlannedUniform[];
 }

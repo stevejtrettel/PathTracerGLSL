@@ -3,7 +3,7 @@
 import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, MaterialModel, Vec3, MaterialProperty, GlslExpression } from '../types.js';
 import { isGlslExpression } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
-import type { RenderPlan, PlannedSDFObject, PlannedMaterial, PlannedLight, PlannedUniform, ProgramDescription, PlannedPipeline } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
 
 export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): RenderPlan {
     // --- Assign material IDs (sorted for deterministic ordering) ---
@@ -70,7 +70,6 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     // --- Build program description ---
     const program = planProgram(features, strategy);
     const pipeline = planPipeline(program);
-    const uniforms = planUniforms(program);
 
     return {
         features,
@@ -79,7 +78,6 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         lights,
         program,
         pipeline,
-        uniforms,
     };
 }
 
@@ -118,43 +116,6 @@ function planProgram(features: SceneFeatures, strategy: RenderStrategy): Program
             ? { type: 'none' }
             : { type: strategy.display.type, exposure: strategy.display.exposure },
     };
-}
-
-// ============================================================================
-// Uniforms — derived from program description
-// ============================================================================
-
-function planUniforms(program: ProgramDescription): PlannedUniform[] {
-    const uniforms: PlannedUniform[] = [];
-
-    // Core uniforms are shared across all passes (pathtracer + display).
-    // The ParameterManager sets them per-shader, so display-pass uniforms
-    // like u_resolution work without needing separate bindings.
-    uniforms.push(
-        { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },
-        { name: 'u_time', type: 'float', parameterPath: 'engine.time' },
-        // RNG salt: bumped per accumulation reset so the seed doesn't replay (§2.11).
-        { name: 'u_resetSalt', type: 'int', parameterPath: 'engine.resetSalt' },
-    );
-
-    // Camera
-    if (program.camera.type === 'pinhole') {
-        uniforms.push(
-            { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: [0, 0, 8] },
-            { name: 'u_cameraTarget', type: 'vec3', parameterPath: 'camera.target', default: [0, 0, 0] },
-            { name: 'u_imageSize', type: 'vec2', parameterPath: 'engine.imageSize' },
-        );
-    }
-
-    // Accumulation
-    if (program.accumulation.type === 'average') {
-        uniforms.push(
-            { name: 'u_sampleCount', type: 'int', parameterPath: 'engine.sampleCount' },
-            { name: 'u_pixelOffset', type: 'vec2', parameterPath: 'engine.pixelOffset', default: [0, 0] },
-        );
-    }
-
-    return uniforms;
 }
 
 // ============================================================================

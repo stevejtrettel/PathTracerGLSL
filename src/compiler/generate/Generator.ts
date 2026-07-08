@@ -4,7 +4,8 @@ import type { SceneDescription, RenderStrategy, CompiledRenderer, SourceMap } fr
 import type { RenderPlan } from '../plan/types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { buildShaders } from './ShaderBuilder.js';
-import { buildPipeline, buildUniforms, buildParameters, buildExportTargets } from './PipelineBuilder.js';
+import { collectFeatures } from './features/index.js';
+import { buildPipeline, buildUniforms, buildExportTargets } from './PipelineBuilder.js';
 
 export function generate(
     plan: RenderPlan,
@@ -13,10 +14,15 @@ export function generate(
     bag: DiagnosticBag,
 ): CompiledRenderer {
     const rendererId = `${strategy.id}-${scene.id}`;
-    const { shaders, sourceMaps: blockMaps } = buildShaders(plan, rendererId, bag);
+
+    // Merge every feature's contribution once (§2.10) — the single source of truth the
+    // shaders, uniform bindings, and parameter metadata are all built from.
+    const merged = collectFeatures(plan, bag);
+
+    const { shaders, sourceMaps: blockMaps } = buildShaders(plan, merged, rendererId);
     const pipeline = buildPipeline(rendererId, plan);
-    const uniforms = buildUniforms(plan);
-    const parameters = buildParameters(plan);
+    const uniforms = buildUniforms(merged.uniforms);
+    const parameters = merged.parameters;
     const exportTargets = buildExportTargets();
 
     // Convert BlockMapping[] to SourceMap objects, including assembled source

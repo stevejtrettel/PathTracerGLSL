@@ -1,0 +1,2320 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell + pathtracer 1`] = `
+{
+  "exportTargets": {
+    "hdr": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
+    },
+  },
+  "id": "pathtracer-cornell",
+  "parameters": {
+    "camera.position": {
+      "default": [
+        0,
+        0,
+        8,
+      ],
+      "group": "Camera",
+      "name": "Position",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "camera.target": {
+      "default": [
+        0,
+        0,
+        0,
+      ],
+      "group": "Camera",
+      "name": "Target",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+  },
+  "pipeline": {
+    "framebuffers": [
+      {
+        "format": "rgba32f",
+        "id": "accumulation",
+        "type": "double_buffer",
+      },
+      {
+        "format": undefined,
+        "id": "screen",
+        "type": "screen",
+      },
+    ],
+    "passes": [
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "pathtracer-pass",
+        "inputs": {
+          "textures": {
+            "u_previous": "accumulation_previous",
+          },
+        },
+        "output": "accumulation_current",
+        "shader": "pathtracer-cornell-main",
+      },
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "display-pass",
+        "inputs": {
+          "textures": {
+            "u_radiance": "accumulation_current",
+          },
+        },
+        "output": "screen",
+        "shader": "pathtracer-cornell-display",
+      },
+    ],
+    "postFrame": {
+      "swaps": [
+        {
+          "buffers": [
+            "accumulation",
+          ],
+          "type": "swap",
+        },
+      ],
+    },
+  },
+  "shaders": {
+    "pathtracer-cornell-display": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+// Reinhard Tonemapping Display Pass
+// Full fragment shader for display pass
+// Reads HDR radiance, applies Reinhard + sRGB, outputs LDR
+
+uniform vec2 u_resolution;
+uniform sampler2D u_radiance;
+
+vec3 safe_color(vec3 c) {
+    c = max(c, vec3(0.0));
+    bvec3 ok = lessThanEqual(abs(c), vec3(1e19));
+    if (!(ok.x && ok.y && ok.z)) return vec3(0.0);
+    return c;
+}
+
+vec3 linear_to_srgb(vec3 c) {
+    vec3 lo = 12.92 * c;
+    vec3 hi = 1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055;
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    return mix(hi, lo, vec3(cutoff));
+}
+
+vec3 tonemap_reinhard(vec3 x) {
+    return x / (1.0 + x);
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec3 radiance = texture(u_radiance, uv).rgb;
+    vec3 color = safe_color(radiance);
+    color = tonemap_reinhard(color);
+    color = clamp(linear_to_srgb(color), 0.0, 1.0);
+    fragColor = vec4(color, 1.0);
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+    "pathtracer-cornell-main": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+
+#define MAX_BOUNCES 10
+#define ENABLE_NEE
+#define ENABLE_RUSSIAN_ROULETTE
+#define RR_START_DEPTH 3
+#define TAN_FOV 0.4227932187381618
+// Uniforms
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform int u_resetSalt;
+uniform vec3 u_cameraPosition;
+uniform vec3 u_cameraTarget;
+uniform vec2 u_imageSize;
+uniform int u_sampleCount;
+uniform vec2 u_pixelOffset;
+uniform sampler2D u_previous;
+// Core struct definitions
+// Provides: Ray, Hit, Frame, LightSample, MaterialProperties
+
+#define Point vec3
+#define Direction vec3
+#define Spectrum vec3
+#define Radiance vec3
+
+struct Ray {
+    Point origin;
+    Direction direction;
+    float tmin;
+    float tmax;
+};
+
+struct Frame {
+    Point p;
+    Direction t;
+    Direction b;
+    Direction n;
+};
+
+struct Hit {
+    float t;
+    Point p;
+    Frame frame;
+    int material_to;
+    int material_from;
+    vec2 uv;
+};
+
+struct LightSample {
+    Direction wi;
+    Point position;
+    Spectrum radiance;
+    float distance;
+    float pdf;
+};
+
+struct MaterialProperties {
+    Spectrum albedo;
+    Spectrum emission;
+    float emission_strength;
+    float roughness;
+};
+
+// RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
+// Provides: rng_init(), random(), random2()
+//
+// Counter-based (not stateful) so the sample stream is an addressable field,
+// keeping the §2.9 stratification/QMC door a drop-in: rng_dim is the dimension
+// index; a later QMC swap replaces pcg4d(base, dim) with sobol(sampleIndex, dim).
+
+uint rng_base;   // per (pixel, sample, reset) seed
+uint rng_dim;    // dimension / draw index
+
+// Jarzynski–Olano "Hash Functions for GPU Rendering" — pcg4d
+uvec4 pcg4d(uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    v ^= v >> 16u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    return v;
+}
+
+// Seed on two independent axes: sampleCount (within a converging render) and
+// resetSalt (bumped per accumulation reset — kills replay + frozen-motion noise).
+void rng_init(uvec2 pixel, uint sampleCount, uint resetSalt) {
+    rng_base = pcg4d(uvec4(pixel, sampleCount, resetSalt)).x;
+    rng_dim = 0u;
+}
+
+uint rng_u32() {
+    return pcg4d(uvec4(rng_base, rng_dim++, 0u, 0u)).x;
+}
+
+// Top 24 bits scaled by 2^-24: exactly representable, guaranteed in [0, 1).
+// (Dividing the full u32 by 2^32-1 rounds values near the top UP to >= 1.0,
+// which NaN-poisons sqrt(1-xi) in cosine sampling and overruns CDF selection.)
+float random() {
+    return float(rng_u32() >> 8) * (1.0 / 16777216.0);
+}
+
+vec2 random2() {
+    return vec2(random(), random());
+}
+
+// Math utilities
+// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world()
+
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
+#define EPSILON 0.001
+
+float luminance(vec3 c) {
+    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
+    // belongs to gamma-encoded SD video, not linear radiance.
+    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
+
+void build_basis(vec3 n, out vec3 t, out vec3 b) {
+    vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    t = normalize(cross(up, n));
+    b = cross(n, t);
+}
+
+// Local shading space convention: Z-up (normal direction). cos_theta = local_dir.z
+vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
+    return local_dir.x * t + local_dir.y * b + local_dir.z * n;
+}
+
+// Euclidean Ambient Geometry
+// Flat-space geometric operations
+// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport()
+
+Point ambient_geodesic(Point origin, Direction dir, float t) {
+    return origin + dir * t;
+}
+
+Frame ambient_frame(Point p, Direction n) {
+    Direction nn = normalize(n);
+    Direction t = abs(nn.x) < 0.9 ? Direction(1.0, 0.0, 0.0) : Direction(0.0, 1.0, 0.0);
+    t = normalize(t - dot(t, nn) * nn);
+    Direction b = cross(nn, t);
+    return Frame(p, t, b, nn);
+}
+
+float ambient_dot(Direction v1, Direction v2, Point p) {
+    return dot(v1, v2);
+}
+
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
+    return v;
+}
+
+// SDF Primitive Library
+// Provides: sdf_sphere(), sdf_plane(), sdf_box()
+// These are library functions — scene-specific SDF dispatch is generated by the compiler
+
+float sdf_sphere(vec3 p, vec3 center, float radius) {
+    return length(p - center) - radius;
+}
+
+float sdf_plane(vec3 p, vec3 normal, float offset) {
+    return dot(p, normal) + offset;
+}
+
+float sdf_box(vec3 p, vec3 center, vec3 half_size) {
+    vec3 d = abs(p - center) - half_size;
+    return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+// Generated SDF dispatch
+float sdf_object_0(vec3 p) {
+    return sdf_plane(p, vec3(0.0, 1.0, 0.0), 0.0);
+}
+
+float sdf_object_1(vec3 p) {
+    return sdf_plane(p, vec3(0.0, -1.0, 0.0), 2.0);
+}
+
+float sdf_object_2(vec3 p) {
+    return sdf_plane(p, vec3(0.0, 0.0, 1.0), 2.0);
+}
+
+float sdf_object_3(vec3 p) {
+    return sdf_plane(p, vec3(1.0, 0.0, 0.0), 1.5);
+}
+
+float sdf_object_4(vec3 p) {
+    return sdf_plane(p, vec3(-1.0, 0.0, 0.0), 1.5);
+}
+
+float sdf_object_5(vec3 p) {
+    return sdf_plane(p, vec3(0.0, 0.0, -1.0), 5.0);
+}
+
+float sdf_object_6(vec3 p) {
+    p = p - vec3(-0.5, 0.6, -0.5);
+    return sdf_box(p, vec3(0.0, 0.0, 0.0), vec3(0.3, 0.6, 0.3));
+}
+
+float sdf_object_7(vec3 p) {
+    p = p - vec3(0.5, 0.4, 0.3);
+    return sdf_sphere(p, vec3(0.0, 0.0, 0.0), 0.4);
+}
+
+float scene_sdf(vec3 p, out int material) {
+    float d = 1e20;
+    float d_obj;
+    material = 0;
+    d_obj = sdf_object_0(p);
+    if (d_obj < d) { d = d_obj; material = 2; }
+    d_obj = sdf_object_1(p);
+    if (d_obj < d) { d = d_obj; material = 2; }
+    d_obj = sdf_object_2(p);
+    if (d_obj < d) { d = d_obj; material = 2; }
+    d_obj = sdf_object_3(p);
+    if (d_obj < d) { d = d_obj; material = 1; }
+    d_obj = sdf_object_4(p);
+    if (d_obj < d) { d = d_obj; material = 0; }
+    d_obj = sdf_object_5(p);
+    if (d_obj < d) { d = d_obj; material = 2; }
+    d_obj = sdf_object_6(p);
+    if (d_obj < d) { d = d_obj; material = 2; }
+    d_obj = sdf_object_7(p);
+    if (d_obj < d) { d = d_obj; material = 2; }
+    return d;
+}
+
+float scene_sdf_dist(vec3 p) {
+    float d = 1e20;
+    d = min(d, sdf_object_0(p));
+    d = min(d, sdf_object_1(p));
+    d = min(d, sdf_object_2(p));
+    d = min(d, sdf_object_3(p));
+    d = min(d, sdf_object_4(p));
+    d = min(d, sdf_object_5(p));
+    d = min(d, sdf_object_6(p));
+    d = min(d, sdf_object_7(p));
+    return d;
+}
+// Raymarching Scene Infrastructure
+// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+
+#ifndef MAX_MARCH_STEPS
+#define MAX_MARCH_STEPS 128
+#endif
+#define MARCH_EPSILON 0.0001
+#define NORMAL_EPSILON 0.001
+
+vec3 scene_normal(vec3 p) {
+    vec2 e = vec2(NORMAL_EPSILON, 0.0);
+
+    vec3 n = vec3(
+        scene_sdf_dist(p + e.xyy) - scene_sdf_dist(p - e.xyy),
+        scene_sdf_dist(p + e.yxy) - scene_sdf_dist(p - e.yxy),
+        scene_sdf_dist(p + e.yyx) - scene_sdf_dist(p - e.yyx)
+    );
+
+    return normalize(n);
+}
+
+bool scene_intersect(Ray ray, out Hit hit) {
+    float t = ray.tmin;
+    int material = 0;
+
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        float dist = scene_sdf(p, material);
+
+        if (dist < MARCH_EPSILON) {
+            hit.t = t;
+            hit.p = p;
+            hit.frame = ambient_frame(p, scene_normal(p));
+            hit.material_to = material;
+            hit.material_from = 0;
+            hit.uv = vec2(p.x * 0.1, p.z * 0.1);
+            return true;
+        }
+
+        if (t > ray.tmax) {
+            break;
+        }
+
+        t += dist;
+    }
+
+    return false;
+}
+
+bool scene_intersect_any(Ray ray, float max_distance) {
+    float t = ray.tmin;
+    float limit = min(ray.tmax, max_distance);
+
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        float dist = scene_sdf_dist(p);
+
+        if (dist < MARCH_EPSILON) {
+            return true;
+        }
+
+        if (t > limit) {
+            break;
+        }
+
+        t += dist;
+    }
+
+    return false;
+}
+
+// Generated material properties lookup
+MaterialProperties scene_material_properties(int id, vec3 p) {
+    MaterialProperties props;
+    props.albedo = vec3(0.8);
+    props.emission = vec3(0.0);
+    props.emission_strength = 0.0;
+    props.roughness = 1.0;
+    if (id == 0) {
+        props.albedo = vec3(0.12, 0.45, 0.15);
+        props.roughness = 1.0;
+    }
+    else if (id == 1) {
+        props.albedo = vec3(0.65, 0.05, 0.05);
+        props.roughness = 1.0;
+    }
+    else if (id == 2) {
+        props.albedo = vec3(0.73, 0.73, 0.73);
+        props.roughness = 1.0;
+    }
+    return props;
+}
+// Lambert Diffuse BRDF
+// Cosine-weighted hemisphere sampling with energy conservation
+// Provides: interaction_surface_shade(), interaction_surface_scatter(), interaction_surface_pdf(), interaction_surface_emit()
+// Depends on: MaterialProperties, ambient_dot(), random2(), Frame
+
+Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
+    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
+    Spectrum brdf = props.albedo / PI;
+    return brdf * cos_theta;
+}
+
+Direction interaction_surface_scatter(Direction wo, Hit hit, MaterialProperties props, out float pdf) {
+    vec2 xi = random2();
+
+    float cos_theta = sqrt(xi.y);
+    float sin_theta = sqrt(1.0 - xi.y);
+    float phi = 2.0 * PI * xi.x;
+
+    vec3 local_wi = vec3(
+        sin_theta * cos(phi),
+        sin_theta * sin(phi),
+        cos_theta
+    );
+
+    Direction wi = hit.frame.t * local_wi.x +
+                  hit.frame.b * local_wi.y +
+                  hit.frame.n * local_wi.z;
+
+    pdf = cos_theta / PI;
+
+    return wi;
+}
+
+float interaction_surface_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
+    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
+    return cos_theta / PI;
+}
+
+Spectrum interaction_surface_emit(MaterialProperties props) {
+    return props.emission * props.emission_strength;
+}
+
+// Generated light sampling
+LightSample lighting_sample(Point p) {
+    LightSample ls;
+    vec3 light_vector = vec3(0.0, 1.9, 0.0) - p;
+    ls.distance = length(light_vector);
+    ls.wi = normalize(light_vector);
+    ls.position = vec3(0.0, 1.9, 0.0);
+    ls.radiance = vec3(15.0, 15.0, 15.0) / (ls.distance * ls.distance);
+    ls.pdf = 1.0;
+    return ls;
+}
+// Pinhole camera
+// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraTarget
+
+Ray camera_generateRay(vec2 pixel, vec2 xi) {
+    vec2 jittered_pixel = pixel + (xi - 0.5);
+    vec2 ndc = (2.0 * jittered_pixel / u_imageSize) - 1.0;
+    float aspect = u_imageSize.x / u_imageSize.y;
+    ndc.x *= aspect;
+
+    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
+    vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+    vec3 up = cross(right, forward);
+
+    vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
+
+    Ray ray;
+    ray.origin = u_cameraPosition;
+    ray.direction = dir;
+    ray.tmin = 0.001;
+    ray.tmax = 1000.0;
+    return ray;
+}
+
+// Path trace loop
+// Requires: MAX_BOUNCES (define)
+// Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
+
+Radiance transport_trace(Ray ray) {
+    vec3 throughput = vec3(1.0);
+    vec3 radiance = vec3(0.0);
+    Ray current_ray = ray;
+
+    for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
+        Hit hit;
+        if (!scene_intersect(current_ray, hit)) {
+            float sky_t = 0.5 * (current_ray.direction.y + 1.0);
+            vec3 sky = mix(vec3(0.5, 0.6, 0.8), vec3(0.2, 0.3, 0.6), sky_t);
+            radiance += throughput * sky;
+            break;
+        }
+
+        MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+
+        Spectrum emitted = interaction_surface_emit(props);
+        radiance += throughput * emitted;
+
+#ifdef ENABLE_NEE
+        // Next Event Estimation
+        LightSample ls = lighting_sample(hit.p);
+        if (ls.pdf > 0.0) {
+            Ray shadow_ray;
+            shadow_ray.origin = hit.p + hit.frame.n * EPSILON;
+            shadow_ray.direction = ls.wi;
+            shadow_ray.tmin = EPSILON;
+            shadow_ray.tmax = ls.distance - EPSILON;
+            if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
+                vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit, props);
+                radiance += throughput * ls.radiance * f / ls.pdf;
+            }
+        }
+#endif
+
+#ifdef ENABLE_RUSSIAN_ROULETTE
+        // Russian roulette
+        if (bounce >= RR_START_DEPTH) {
+            float p_survive = min(0.95, luminance(throughput));
+            if (random() > p_survive) break;
+            throughput /= p_survive;
+        }
+#endif
+
+        // BRDF sampling
+        float pdf;
+        Direction wi = interaction_surface_scatter(-current_ray.direction, hit, props, pdf);
+        if (pdf <= 0.0001) break;
+
+        Spectrum f = interaction_surface_shade(wi, -current_ray.direction, hit, props);
+        throughput *= f / pdf;
+
+        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
+        current_ray.direction = wi;
+        current_ray.tmin = EPSILON;
+        current_ray.tmax = 1000.0;
+    }
+
+    return radiance;
+}
+
+// Main function with progressive accumulation
+// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+
+void main() {
+    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
+    // Seed with the GLOBAL pixel (tile offset included) — seeding with the local
+    // gl_FragCoord replays the identical RNG stream in every tile of a tiled render.
+    // sampleCount decorrelates samples within a render; resetSalt (bumped per
+    // accumulation reset) decorrelates across resets (§2.11).
+    rng_init(uvec2(pixel), uint(u_sampleCount), uint(u_resetSalt));
+
+    vec2 xi = random2();
+    Ray ray = camera_generateRay(pixel, xi);
+    vec3 color = transport_trace(ray);
+
+    if (u_sampleCount == 0) {
+        fragColor = vec4(color, 1.0);
+    } else {
+        ivec2 coord = ivec2(gl_FragCoord.xy);
+        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
+        float n = float(u_sampleCount);
+        float new_weight = 1.0 / (n + 1.0);
+        fragColor = vec4(mix(previous, color, new_weight), 1.0);
+    }
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+  },
+  "sourceMaps": {
+    "pathtracer-cornell-display": [
+      {
+        "endLine": 5,
+        "origin": "generated:display-header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 39,
+        "origin": "glsl/tonemap_reinhard.glsl",
+        "startLine": 6,
+      },
+    ],
+    "pathtracer-cornell-main": [
+      {
+        "endLine": 11,
+        "origin": "generated:header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 21,
+        "origin": "generated:uniforms",
+        "startLine": 12,
+      },
+      {
+        "endLine": 67,
+        "origin": "glsl/structs.glsl",
+        "startLine": 22,
+      },
+      {
+        "endLine": 108,
+        "origin": "glsl/rng.glsl",
+        "startLine": 68,
+      },
+      {
+        "endLine": 132,
+        "origin": "glsl/math.glsl",
+        "startLine": 109,
+      },
+      {
+        "endLine": 156,
+        "origin": "glsl/euclidean.glsl",
+        "startLine": 133,
+      },
+      {
+        "endLine": 173,
+        "origin": "glsl/sdf_primitives.glsl",
+        "startLine": 157,
+      },
+      {
+        "endLine": 243,
+        "origin": "generated:sdf-dispatch",
+        "startLine": 174,
+      },
+      {
+        "endLine": 315,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 244,
+      },
+      {
+        "endLine": 336,
+        "origin": "generated:material-lookup",
+        "startLine": 316,
+      },
+      {
+        "endLine": 378,
+        "origin": "glsl/lambert.glsl",
+        "startLine": 337,
+      },
+      {
+        "endLine": 389,
+        "origin": "generated:light-sampling",
+        "startLine": 379,
+      },
+      {
+        "endLine": 412,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 390,
+      },
+      {
+        "endLine": 477,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 413,
+      },
+      {
+        "endLine": 503,
+        "origin": "glsl/main_accumulate.glsl",
+        "startLine": 478,
+      },
+    ],
+  },
+  "uniforms": [
+    {
+      "parameters": [
+        "engine.resolution",
+      ],
+      "type": "vec2",
+      "uniform": "u_resolution",
+    },
+    {
+      "parameters": [
+        "engine.time",
+      ],
+      "type": "float",
+      "uniform": "u_time",
+    },
+    {
+      "parameters": [
+        "engine.resetSalt",
+      ],
+      "type": "int",
+      "uniform": "u_resetSalt",
+    },
+    {
+      "parameters": [
+        "camera.position",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraPosition",
+    },
+    {
+      "parameters": [
+        "camera.target",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraTarget",
+    },
+    {
+      "parameters": [
+        "engine.imageSize",
+      ],
+      "type": "vec2",
+      "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "engine.sampleCount",
+      ],
+      "type": "int",
+      "uniform": "u_sampleCount",
+    },
+    {
+      "parameters": [
+        "engine.pixelOffset",
+      ],
+      "type": "vec2",
+      "uniform": "u_pixelOffset",
+    },
+  ],
+}
+`;
+
+exports[`generated GLSL snapshot (§2.10 refactor safety net) > minimal + direct 1`] = `
+{
+  "exportTargets": {
+    "hdr": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
+    },
+  },
+  "id": "direct-minimal",
+  "parameters": {
+    "camera.position": {
+      "default": [
+        0,
+        0,
+        8,
+      ],
+      "group": "Camera",
+      "name": "Position",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "camera.target": {
+      "default": [
+        0,
+        0,
+        0,
+      ],
+      "group": "Camera",
+      "name": "Target",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+  },
+  "pipeline": {
+    "framebuffers": [
+      {
+        "format": "rgba32f",
+        "id": "accumulation",
+        "type": "double_buffer",
+      },
+      {
+        "format": undefined,
+        "id": "screen",
+        "type": "screen",
+      },
+    ],
+    "passes": [
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "pathtracer-pass",
+        "inputs": {
+          "textures": {
+            "u_previous": "accumulation_previous",
+          },
+        },
+        "output": "accumulation_current",
+        "shader": "direct-minimal-main",
+      },
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "display-pass",
+        "inputs": {
+          "textures": {
+            "u_radiance": "accumulation_current",
+          },
+        },
+        "output": "screen",
+        "shader": "direct-minimal-display",
+      },
+    ],
+    "postFrame": {
+      "swaps": [
+        {
+          "buffers": [
+            "accumulation",
+          ],
+          "type": "swap",
+        },
+      ],
+    },
+  },
+  "shaders": {
+    "direct-minimal-display": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+// Reinhard Tonemapping Display Pass
+// Full fragment shader for display pass
+// Reads HDR radiance, applies Reinhard + sRGB, outputs LDR
+
+uniform vec2 u_resolution;
+uniform sampler2D u_radiance;
+
+vec3 safe_color(vec3 c) {
+    c = max(c, vec3(0.0));
+    bvec3 ok = lessThanEqual(abs(c), vec3(1e19));
+    if (!(ok.x && ok.y && ok.z)) return vec3(0.0);
+    return c;
+}
+
+vec3 linear_to_srgb(vec3 c) {
+    vec3 lo = 12.92 * c;
+    vec3 hi = 1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055;
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    return mix(hi, lo, vec3(cutoff));
+}
+
+vec3 tonemap_reinhard(vec3 x) {
+    return x / (1.0 + x);
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec3 radiance = texture(u_radiance, uv).rgb;
+    vec3 color = safe_color(radiance);
+    color = tonemap_reinhard(color);
+    color = clamp(linear_to_srgb(color), 0.0, 1.0);
+    fragColor = vec4(color, 1.0);
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+    "direct-minimal-main": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+
+#define MAX_BOUNCES 1
+#define ENABLE_NEE
+#define TAN_FOV 0.4227932187381618
+// Uniforms
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform int u_resetSalt;
+uniform vec3 u_cameraPosition;
+uniform vec3 u_cameraTarget;
+uniform vec2 u_imageSize;
+uniform int u_sampleCount;
+uniform vec2 u_pixelOffset;
+uniform sampler2D u_previous;
+// Core struct definitions
+// Provides: Ray, Hit, Frame, LightSample, MaterialProperties
+
+#define Point vec3
+#define Direction vec3
+#define Spectrum vec3
+#define Radiance vec3
+
+struct Ray {
+    Point origin;
+    Direction direction;
+    float tmin;
+    float tmax;
+};
+
+struct Frame {
+    Point p;
+    Direction t;
+    Direction b;
+    Direction n;
+};
+
+struct Hit {
+    float t;
+    Point p;
+    Frame frame;
+    int material_to;
+    int material_from;
+    vec2 uv;
+};
+
+struct LightSample {
+    Direction wi;
+    Point position;
+    Spectrum radiance;
+    float distance;
+    float pdf;
+};
+
+struct MaterialProperties {
+    Spectrum albedo;
+    Spectrum emission;
+    float emission_strength;
+    float roughness;
+};
+
+// RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
+// Provides: rng_init(), random(), random2()
+//
+// Counter-based (not stateful) so the sample stream is an addressable field,
+// keeping the §2.9 stratification/QMC door a drop-in: rng_dim is the dimension
+// index; a later QMC swap replaces pcg4d(base, dim) with sobol(sampleIndex, dim).
+
+uint rng_base;   // per (pixel, sample, reset) seed
+uint rng_dim;    // dimension / draw index
+
+// Jarzynski–Olano "Hash Functions for GPU Rendering" — pcg4d
+uvec4 pcg4d(uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    v ^= v >> 16u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    return v;
+}
+
+// Seed on two independent axes: sampleCount (within a converging render) and
+// resetSalt (bumped per accumulation reset — kills replay + frozen-motion noise).
+void rng_init(uvec2 pixel, uint sampleCount, uint resetSalt) {
+    rng_base = pcg4d(uvec4(pixel, sampleCount, resetSalt)).x;
+    rng_dim = 0u;
+}
+
+uint rng_u32() {
+    return pcg4d(uvec4(rng_base, rng_dim++, 0u, 0u)).x;
+}
+
+// Top 24 bits scaled by 2^-24: exactly representable, guaranteed in [0, 1).
+// (Dividing the full u32 by 2^32-1 rounds values near the top UP to >= 1.0,
+// which NaN-poisons sqrt(1-xi) in cosine sampling and overruns CDF selection.)
+float random() {
+    return float(rng_u32() >> 8) * (1.0 / 16777216.0);
+}
+
+vec2 random2() {
+    return vec2(random(), random());
+}
+
+// Math utilities
+// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world()
+
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
+#define EPSILON 0.001
+
+float luminance(vec3 c) {
+    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
+    // belongs to gamma-encoded SD video, not linear radiance.
+    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
+
+void build_basis(vec3 n, out vec3 t, out vec3 b) {
+    vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    t = normalize(cross(up, n));
+    b = cross(n, t);
+}
+
+// Local shading space convention: Z-up (normal direction). cos_theta = local_dir.z
+vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
+    return local_dir.x * t + local_dir.y * b + local_dir.z * n;
+}
+
+// Euclidean Ambient Geometry
+// Flat-space geometric operations
+// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport()
+
+Point ambient_geodesic(Point origin, Direction dir, float t) {
+    return origin + dir * t;
+}
+
+Frame ambient_frame(Point p, Direction n) {
+    Direction nn = normalize(n);
+    Direction t = abs(nn.x) < 0.9 ? Direction(1.0, 0.0, 0.0) : Direction(0.0, 1.0, 0.0);
+    t = normalize(t - dot(t, nn) * nn);
+    Direction b = cross(nn, t);
+    return Frame(p, t, b, nn);
+}
+
+float ambient_dot(Direction v1, Direction v2, Point p) {
+    return dot(v1, v2);
+}
+
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
+    return v;
+}
+
+// SDF Primitive Library
+// Provides: sdf_sphere(), sdf_plane(), sdf_box()
+// These are library functions — scene-specific SDF dispatch is generated by the compiler
+
+float sdf_sphere(vec3 p, vec3 center, float radius) {
+    return length(p - center) - radius;
+}
+
+float sdf_plane(vec3 p, vec3 normal, float offset) {
+    return dot(p, normal) + offset;
+}
+
+float sdf_box(vec3 p, vec3 center, vec3 half_size) {
+    vec3 d = abs(p - center) - half_size;
+    return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+// Generated SDF dispatch
+float sdf_object_0(vec3 p) {
+    return sdf_plane(p, vec3(0.0, 1.0, 0.0), 1.0);
+}
+
+float sdf_object_1(vec3 p) {
+    p = p - vec3(0.0, 0.0, 0.0);
+    return sdf_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
+}
+
+float scene_sdf(vec3 p, out int material) {
+    float d = 1e20;
+    float d_obj;
+    material = 0;
+    d_obj = sdf_object_0(p);
+    if (d_obj < d) { d = d_obj; material = 0; }
+    d_obj = sdf_object_1(p);
+    if (d_obj < d) { d = d_obj; material = 1; }
+    return d;
+}
+
+float scene_sdf_dist(vec3 p) {
+    float d = 1e20;
+    d = min(d, sdf_object_0(p));
+    d = min(d, sdf_object_1(p));
+    return d;
+}
+// Raymarching Scene Infrastructure
+// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+
+#ifndef MAX_MARCH_STEPS
+#define MAX_MARCH_STEPS 128
+#endif
+#define MARCH_EPSILON 0.0001
+#define NORMAL_EPSILON 0.001
+
+vec3 scene_normal(vec3 p) {
+    vec2 e = vec2(NORMAL_EPSILON, 0.0);
+
+    vec3 n = vec3(
+        scene_sdf_dist(p + e.xyy) - scene_sdf_dist(p - e.xyy),
+        scene_sdf_dist(p + e.yxy) - scene_sdf_dist(p - e.yxy),
+        scene_sdf_dist(p + e.yyx) - scene_sdf_dist(p - e.yyx)
+    );
+
+    return normalize(n);
+}
+
+bool scene_intersect(Ray ray, out Hit hit) {
+    float t = ray.tmin;
+    int material = 0;
+
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        float dist = scene_sdf(p, material);
+
+        if (dist < MARCH_EPSILON) {
+            hit.t = t;
+            hit.p = p;
+            hit.frame = ambient_frame(p, scene_normal(p));
+            hit.material_to = material;
+            hit.material_from = 0;
+            hit.uv = vec2(p.x * 0.1, p.z * 0.1);
+            return true;
+        }
+
+        if (t > ray.tmax) {
+            break;
+        }
+
+        t += dist;
+    }
+
+    return false;
+}
+
+bool scene_intersect_any(Ray ray, float max_distance) {
+    float t = ray.tmin;
+    float limit = min(ray.tmax, max_distance);
+
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        float dist = scene_sdf_dist(p);
+
+        if (dist < MARCH_EPSILON) {
+            return true;
+        }
+
+        if (t > limit) {
+            break;
+        }
+
+        t += dist;
+    }
+
+    return false;
+}
+
+// Generated material properties lookup
+MaterialProperties scene_material_properties(int id, vec3 p) {
+    MaterialProperties props;
+    props.albedo = vec3(0.8);
+    props.emission = vec3(0.0);
+    props.emission_strength = 0.0;
+    props.roughness = 1.0;
+    if (id == 0) {
+        props.albedo = vec3(0.6, 0.6, 0.6);
+        props.roughness = 1.0;
+    }
+    else if (id == 1) {
+        props.albedo = vec3(0.9, 0.2, 0.2);
+        props.roughness = 1.0;
+    }
+    return props;
+}
+// Lambert Diffuse BRDF
+// Cosine-weighted hemisphere sampling with energy conservation
+// Provides: interaction_surface_shade(), interaction_surface_scatter(), interaction_surface_pdf(), interaction_surface_emit()
+// Depends on: MaterialProperties, ambient_dot(), random2(), Frame
+
+Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
+    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
+    Spectrum brdf = props.albedo / PI;
+    return brdf * cos_theta;
+}
+
+Direction interaction_surface_scatter(Direction wo, Hit hit, MaterialProperties props, out float pdf) {
+    vec2 xi = random2();
+
+    float cos_theta = sqrt(xi.y);
+    float sin_theta = sqrt(1.0 - xi.y);
+    float phi = 2.0 * PI * xi.x;
+
+    vec3 local_wi = vec3(
+        sin_theta * cos(phi),
+        sin_theta * sin(phi),
+        cos_theta
+    );
+
+    Direction wi = hit.frame.t * local_wi.x +
+                  hit.frame.b * local_wi.y +
+                  hit.frame.n * local_wi.z;
+
+    pdf = cos_theta / PI;
+
+    return wi;
+}
+
+float interaction_surface_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
+    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
+    return cos_theta / PI;
+}
+
+Spectrum interaction_surface_emit(MaterialProperties props) {
+    return props.emission * props.emission_strength;
+}
+
+// Generated light sampling
+LightSample lighting_sample(Point p) {
+    LightSample ls;
+    vec3 light_vector = vec3(3.0, 4.0, 2.0) - p;
+    ls.distance = length(light_vector);
+    ls.wi = normalize(light_vector);
+    ls.position = vec3(3.0, 4.0, 2.0);
+    ls.radiance = vec3(30.0, 30.0, 30.0) / (ls.distance * ls.distance);
+    ls.pdf = 1.0;
+    return ls;
+}
+// Pinhole camera
+// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraTarget
+
+Ray camera_generateRay(vec2 pixel, vec2 xi) {
+    vec2 jittered_pixel = pixel + (xi - 0.5);
+    vec2 ndc = (2.0 * jittered_pixel / u_imageSize) - 1.0;
+    float aspect = u_imageSize.x / u_imageSize.y;
+    ndc.x *= aspect;
+
+    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
+    vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+    vec3 up = cross(right, forward);
+
+    vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
+
+    Ray ray;
+    ray.origin = u_cameraPosition;
+    ray.direction = dir;
+    ray.tmin = 0.001;
+    ray.tmax = 1000.0;
+    return ray;
+}
+
+// Path trace loop
+// Requires: MAX_BOUNCES (define)
+// Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
+
+Radiance transport_trace(Ray ray) {
+    vec3 throughput = vec3(1.0);
+    vec3 radiance = vec3(0.0);
+    Ray current_ray = ray;
+
+    for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
+        Hit hit;
+        if (!scene_intersect(current_ray, hit)) {
+            float sky_t = 0.5 * (current_ray.direction.y + 1.0);
+            vec3 sky = mix(vec3(0.5, 0.6, 0.8), vec3(0.2, 0.3, 0.6), sky_t);
+            radiance += throughput * sky;
+            break;
+        }
+
+        MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+
+        Spectrum emitted = interaction_surface_emit(props);
+        radiance += throughput * emitted;
+
+#ifdef ENABLE_NEE
+        // Next Event Estimation
+        LightSample ls = lighting_sample(hit.p);
+        if (ls.pdf > 0.0) {
+            Ray shadow_ray;
+            shadow_ray.origin = hit.p + hit.frame.n * EPSILON;
+            shadow_ray.direction = ls.wi;
+            shadow_ray.tmin = EPSILON;
+            shadow_ray.tmax = ls.distance - EPSILON;
+            if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
+                vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit, props);
+                radiance += throughput * ls.radiance * f / ls.pdf;
+            }
+        }
+#endif
+
+#ifdef ENABLE_RUSSIAN_ROULETTE
+        // Russian roulette
+        if (bounce >= RR_START_DEPTH) {
+            float p_survive = min(0.95, luminance(throughput));
+            if (random() > p_survive) break;
+            throughput /= p_survive;
+        }
+#endif
+
+        // BRDF sampling
+        float pdf;
+        Direction wi = interaction_surface_scatter(-current_ray.direction, hit, props, pdf);
+        if (pdf <= 0.0001) break;
+
+        Spectrum f = interaction_surface_shade(wi, -current_ray.direction, hit, props);
+        throughput *= f / pdf;
+
+        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
+        current_ray.direction = wi;
+        current_ray.tmin = EPSILON;
+        current_ray.tmax = 1000.0;
+    }
+
+    return radiance;
+}
+
+// Main function with progressive accumulation
+// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+
+void main() {
+    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
+    // Seed with the GLOBAL pixel (tile offset included) — seeding with the local
+    // gl_FragCoord replays the identical RNG stream in every tile of a tiled render.
+    // sampleCount decorrelates samples within a render; resetSalt (bumped per
+    // accumulation reset) decorrelates across resets (§2.11).
+    rng_init(uvec2(pixel), uint(u_sampleCount), uint(u_resetSalt));
+
+    vec2 xi = random2();
+    Ray ray = camera_generateRay(pixel, xi);
+    vec3 color = transport_trace(ray);
+
+    if (u_sampleCount == 0) {
+        fragColor = vec4(color, 1.0);
+    } else {
+        ivec2 coord = ivec2(gl_FragCoord.xy);
+        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
+        float n = float(u_sampleCount);
+        float new_weight = 1.0 / (n + 1.0);
+        fragColor = vec4(mix(previous, color, new_weight), 1.0);
+    }
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+  },
+  "sourceMaps": {
+    "direct-minimal-display": [
+      {
+        "endLine": 5,
+        "origin": "generated:display-header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 39,
+        "origin": "glsl/tonemap_reinhard.glsl",
+        "startLine": 6,
+      },
+    ],
+    "direct-minimal-main": [
+      {
+        "endLine": 9,
+        "origin": "generated:header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 19,
+        "origin": "generated:uniforms",
+        "startLine": 10,
+      },
+      {
+        "endLine": 65,
+        "origin": "glsl/structs.glsl",
+        "startLine": 20,
+      },
+      {
+        "endLine": 106,
+        "origin": "glsl/rng.glsl",
+        "startLine": 66,
+      },
+      {
+        "endLine": 130,
+        "origin": "glsl/math.glsl",
+        "startLine": 107,
+      },
+      {
+        "endLine": 154,
+        "origin": "glsl/euclidean.glsl",
+        "startLine": 131,
+      },
+      {
+        "endLine": 171,
+        "origin": "glsl/sdf_primitives.glsl",
+        "startLine": 155,
+      },
+      {
+        "endLine": 198,
+        "origin": "generated:sdf-dispatch",
+        "startLine": 172,
+      },
+      {
+        "endLine": 270,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 199,
+      },
+      {
+        "endLine": 287,
+        "origin": "generated:material-lookup",
+        "startLine": 271,
+      },
+      {
+        "endLine": 329,
+        "origin": "glsl/lambert.glsl",
+        "startLine": 288,
+      },
+      {
+        "endLine": 340,
+        "origin": "generated:light-sampling",
+        "startLine": 330,
+      },
+      {
+        "endLine": 363,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 341,
+      },
+      {
+        "endLine": 428,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 364,
+      },
+      {
+        "endLine": 454,
+        "origin": "glsl/main_accumulate.glsl",
+        "startLine": 429,
+      },
+    ],
+  },
+  "uniforms": [
+    {
+      "parameters": [
+        "engine.resolution",
+      ],
+      "type": "vec2",
+      "uniform": "u_resolution",
+    },
+    {
+      "parameters": [
+        "engine.time",
+      ],
+      "type": "float",
+      "uniform": "u_time",
+    },
+    {
+      "parameters": [
+        "engine.resetSalt",
+      ],
+      "type": "int",
+      "uniform": "u_resetSalt",
+    },
+    {
+      "parameters": [
+        "camera.position",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraPosition",
+    },
+    {
+      "parameters": [
+        "camera.target",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraTarget",
+    },
+    {
+      "parameters": [
+        "engine.imageSize",
+      ],
+      "type": "vec2",
+      "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "engine.sampleCount",
+      ],
+      "type": "int",
+      "uniform": "u_sampleCount",
+    },
+    {
+      "parameters": [
+        "engine.pixelOffset",
+      ],
+      "type": "vec2",
+      "uniform": "u_pixelOffset",
+    },
+  ],
+}
+`;
+
+exports[`generated GLSL snapshot (§2.10 refactor safety net) > minimal + pathtracer 1`] = `
+{
+  "exportTargets": {
+    "hdr": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
+    },
+  },
+  "id": "pathtracer-minimal",
+  "parameters": {
+    "camera.position": {
+      "default": [
+        0,
+        0,
+        8,
+      ],
+      "group": "Camera",
+      "name": "Position",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "camera.target": {
+      "default": [
+        0,
+        0,
+        0,
+      ],
+      "group": "Camera",
+      "name": "Target",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+  },
+  "pipeline": {
+    "framebuffers": [
+      {
+        "format": "rgba32f",
+        "id": "accumulation",
+        "type": "double_buffer",
+      },
+      {
+        "format": undefined,
+        "id": "screen",
+        "type": "screen",
+      },
+    ],
+    "passes": [
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "pathtracer-pass",
+        "inputs": {
+          "textures": {
+            "u_previous": "accumulation_previous",
+          },
+        },
+        "output": "accumulation_current",
+        "shader": "pathtracer-minimal-main",
+      },
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "display-pass",
+        "inputs": {
+          "textures": {
+            "u_radiance": "accumulation_current",
+          },
+        },
+        "output": "screen",
+        "shader": "pathtracer-minimal-display",
+      },
+    ],
+    "postFrame": {
+      "swaps": [
+        {
+          "buffers": [
+            "accumulation",
+          ],
+          "type": "swap",
+        },
+      ],
+    },
+  },
+  "shaders": {
+    "pathtracer-minimal-display": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+// Reinhard Tonemapping Display Pass
+// Full fragment shader for display pass
+// Reads HDR radiance, applies Reinhard + sRGB, outputs LDR
+
+uniform vec2 u_resolution;
+uniform sampler2D u_radiance;
+
+vec3 safe_color(vec3 c) {
+    c = max(c, vec3(0.0));
+    bvec3 ok = lessThanEqual(abs(c), vec3(1e19));
+    if (!(ok.x && ok.y && ok.z)) return vec3(0.0);
+    return c;
+}
+
+vec3 linear_to_srgb(vec3 c) {
+    vec3 lo = 12.92 * c;
+    vec3 hi = 1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055;
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    return mix(hi, lo, vec3(cutoff));
+}
+
+vec3 tonemap_reinhard(vec3 x) {
+    return x / (1.0 + x);
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec3 radiance = texture(u_radiance, uv).rgb;
+    vec3 color = safe_color(radiance);
+    color = tonemap_reinhard(color);
+    color = clamp(linear_to_srgb(color), 0.0, 1.0);
+    fragColor = vec4(color, 1.0);
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+    "pathtracer-minimal-main": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+
+#define MAX_BOUNCES 8
+#define ENABLE_NEE
+#define ENABLE_RUSSIAN_ROULETTE
+#define RR_START_DEPTH 3
+#define TAN_FOV 0.4227932187381618
+// Uniforms
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform int u_resetSalt;
+uniform vec3 u_cameraPosition;
+uniform vec3 u_cameraTarget;
+uniform vec2 u_imageSize;
+uniform int u_sampleCount;
+uniform vec2 u_pixelOffset;
+uniform sampler2D u_previous;
+// Core struct definitions
+// Provides: Ray, Hit, Frame, LightSample, MaterialProperties
+
+#define Point vec3
+#define Direction vec3
+#define Spectrum vec3
+#define Radiance vec3
+
+struct Ray {
+    Point origin;
+    Direction direction;
+    float tmin;
+    float tmax;
+};
+
+struct Frame {
+    Point p;
+    Direction t;
+    Direction b;
+    Direction n;
+};
+
+struct Hit {
+    float t;
+    Point p;
+    Frame frame;
+    int material_to;
+    int material_from;
+    vec2 uv;
+};
+
+struct LightSample {
+    Direction wi;
+    Point position;
+    Spectrum radiance;
+    float distance;
+    float pdf;
+};
+
+struct MaterialProperties {
+    Spectrum albedo;
+    Spectrum emission;
+    float emission_strength;
+    float roughness;
+};
+
+// RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
+// Provides: rng_init(), random(), random2()
+//
+// Counter-based (not stateful) so the sample stream is an addressable field,
+// keeping the §2.9 stratification/QMC door a drop-in: rng_dim is the dimension
+// index; a later QMC swap replaces pcg4d(base, dim) with sobol(sampleIndex, dim).
+
+uint rng_base;   // per (pixel, sample, reset) seed
+uint rng_dim;    // dimension / draw index
+
+// Jarzynski–Olano "Hash Functions for GPU Rendering" — pcg4d
+uvec4 pcg4d(uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    v ^= v >> 16u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    return v;
+}
+
+// Seed on two independent axes: sampleCount (within a converging render) and
+// resetSalt (bumped per accumulation reset — kills replay + frozen-motion noise).
+void rng_init(uvec2 pixel, uint sampleCount, uint resetSalt) {
+    rng_base = pcg4d(uvec4(pixel, sampleCount, resetSalt)).x;
+    rng_dim = 0u;
+}
+
+uint rng_u32() {
+    return pcg4d(uvec4(rng_base, rng_dim++, 0u, 0u)).x;
+}
+
+// Top 24 bits scaled by 2^-24: exactly representable, guaranteed in [0, 1).
+// (Dividing the full u32 by 2^32-1 rounds values near the top UP to >= 1.0,
+// which NaN-poisons sqrt(1-xi) in cosine sampling and overruns CDF selection.)
+float random() {
+    return float(rng_u32() >> 8) * (1.0 / 16777216.0);
+}
+
+vec2 random2() {
+    return vec2(random(), random());
+}
+
+// Math utilities
+// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world()
+
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
+#define EPSILON 0.001
+
+float luminance(vec3 c) {
+    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
+    // belongs to gamma-encoded SD video, not linear radiance.
+    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
+
+void build_basis(vec3 n, out vec3 t, out vec3 b) {
+    vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    t = normalize(cross(up, n));
+    b = cross(n, t);
+}
+
+// Local shading space convention: Z-up (normal direction). cos_theta = local_dir.z
+vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
+    return local_dir.x * t + local_dir.y * b + local_dir.z * n;
+}
+
+// Euclidean Ambient Geometry
+// Flat-space geometric operations
+// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport()
+
+Point ambient_geodesic(Point origin, Direction dir, float t) {
+    return origin + dir * t;
+}
+
+Frame ambient_frame(Point p, Direction n) {
+    Direction nn = normalize(n);
+    Direction t = abs(nn.x) < 0.9 ? Direction(1.0, 0.0, 0.0) : Direction(0.0, 1.0, 0.0);
+    t = normalize(t - dot(t, nn) * nn);
+    Direction b = cross(nn, t);
+    return Frame(p, t, b, nn);
+}
+
+float ambient_dot(Direction v1, Direction v2, Point p) {
+    return dot(v1, v2);
+}
+
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
+    return v;
+}
+
+// SDF Primitive Library
+// Provides: sdf_sphere(), sdf_plane(), sdf_box()
+// These are library functions — scene-specific SDF dispatch is generated by the compiler
+
+float sdf_sphere(vec3 p, vec3 center, float radius) {
+    return length(p - center) - radius;
+}
+
+float sdf_plane(vec3 p, vec3 normal, float offset) {
+    return dot(p, normal) + offset;
+}
+
+float sdf_box(vec3 p, vec3 center, vec3 half_size) {
+    vec3 d = abs(p - center) - half_size;
+    return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+// Generated SDF dispatch
+float sdf_object_0(vec3 p) {
+    return sdf_plane(p, vec3(0.0, 1.0, 0.0), 1.0);
+}
+
+float sdf_object_1(vec3 p) {
+    p = p - vec3(0.0, 0.0, 0.0);
+    return sdf_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
+}
+
+float scene_sdf(vec3 p, out int material) {
+    float d = 1e20;
+    float d_obj;
+    material = 0;
+    d_obj = sdf_object_0(p);
+    if (d_obj < d) { d = d_obj; material = 0; }
+    d_obj = sdf_object_1(p);
+    if (d_obj < d) { d = d_obj; material = 1; }
+    return d;
+}
+
+float scene_sdf_dist(vec3 p) {
+    float d = 1e20;
+    d = min(d, sdf_object_0(p));
+    d = min(d, sdf_object_1(p));
+    return d;
+}
+// Raymarching Scene Infrastructure
+// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+
+#ifndef MAX_MARCH_STEPS
+#define MAX_MARCH_STEPS 128
+#endif
+#define MARCH_EPSILON 0.0001
+#define NORMAL_EPSILON 0.001
+
+vec3 scene_normal(vec3 p) {
+    vec2 e = vec2(NORMAL_EPSILON, 0.0);
+
+    vec3 n = vec3(
+        scene_sdf_dist(p + e.xyy) - scene_sdf_dist(p - e.xyy),
+        scene_sdf_dist(p + e.yxy) - scene_sdf_dist(p - e.yxy),
+        scene_sdf_dist(p + e.yyx) - scene_sdf_dist(p - e.yyx)
+    );
+
+    return normalize(n);
+}
+
+bool scene_intersect(Ray ray, out Hit hit) {
+    float t = ray.tmin;
+    int material = 0;
+
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        float dist = scene_sdf(p, material);
+
+        if (dist < MARCH_EPSILON) {
+            hit.t = t;
+            hit.p = p;
+            hit.frame = ambient_frame(p, scene_normal(p));
+            hit.material_to = material;
+            hit.material_from = 0;
+            hit.uv = vec2(p.x * 0.1, p.z * 0.1);
+            return true;
+        }
+
+        if (t > ray.tmax) {
+            break;
+        }
+
+        t += dist;
+    }
+
+    return false;
+}
+
+bool scene_intersect_any(Ray ray, float max_distance) {
+    float t = ray.tmin;
+    float limit = min(ray.tmax, max_distance);
+
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        float dist = scene_sdf_dist(p);
+
+        if (dist < MARCH_EPSILON) {
+            return true;
+        }
+
+        if (t > limit) {
+            break;
+        }
+
+        t += dist;
+    }
+
+    return false;
+}
+
+// Generated material properties lookup
+MaterialProperties scene_material_properties(int id, vec3 p) {
+    MaterialProperties props;
+    props.albedo = vec3(0.8);
+    props.emission = vec3(0.0);
+    props.emission_strength = 0.0;
+    props.roughness = 1.0;
+    if (id == 0) {
+        props.albedo = vec3(0.6, 0.6, 0.6);
+        props.roughness = 1.0;
+    }
+    else if (id == 1) {
+        props.albedo = vec3(0.9, 0.2, 0.2);
+        props.roughness = 1.0;
+    }
+    return props;
+}
+// Lambert Diffuse BRDF
+// Cosine-weighted hemisphere sampling with energy conservation
+// Provides: interaction_surface_shade(), interaction_surface_scatter(), interaction_surface_pdf(), interaction_surface_emit()
+// Depends on: MaterialProperties, ambient_dot(), random2(), Frame
+
+Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
+    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
+    Spectrum brdf = props.albedo / PI;
+    return brdf * cos_theta;
+}
+
+Direction interaction_surface_scatter(Direction wo, Hit hit, MaterialProperties props, out float pdf) {
+    vec2 xi = random2();
+
+    float cos_theta = sqrt(xi.y);
+    float sin_theta = sqrt(1.0 - xi.y);
+    float phi = 2.0 * PI * xi.x;
+
+    vec3 local_wi = vec3(
+        sin_theta * cos(phi),
+        sin_theta * sin(phi),
+        cos_theta
+    );
+
+    Direction wi = hit.frame.t * local_wi.x +
+                  hit.frame.b * local_wi.y +
+                  hit.frame.n * local_wi.z;
+
+    pdf = cos_theta / PI;
+
+    return wi;
+}
+
+float interaction_surface_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
+    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
+    return cos_theta / PI;
+}
+
+Spectrum interaction_surface_emit(MaterialProperties props) {
+    return props.emission * props.emission_strength;
+}
+
+// Generated light sampling
+LightSample lighting_sample(Point p) {
+    LightSample ls;
+    vec3 light_vector = vec3(3.0, 4.0, 2.0) - p;
+    ls.distance = length(light_vector);
+    ls.wi = normalize(light_vector);
+    ls.position = vec3(3.0, 4.0, 2.0);
+    ls.radiance = vec3(30.0, 30.0, 30.0) / (ls.distance * ls.distance);
+    ls.pdf = 1.0;
+    return ls;
+}
+// Pinhole camera
+// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraTarget
+
+Ray camera_generateRay(vec2 pixel, vec2 xi) {
+    vec2 jittered_pixel = pixel + (xi - 0.5);
+    vec2 ndc = (2.0 * jittered_pixel / u_imageSize) - 1.0;
+    float aspect = u_imageSize.x / u_imageSize.y;
+    ndc.x *= aspect;
+
+    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
+    vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+    vec3 up = cross(right, forward);
+
+    vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
+
+    Ray ray;
+    ray.origin = u_cameraPosition;
+    ray.direction = dir;
+    ray.tmin = 0.001;
+    ray.tmax = 1000.0;
+    return ray;
+}
+
+// Path trace loop
+// Requires: MAX_BOUNCES (define)
+// Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
+
+Radiance transport_trace(Ray ray) {
+    vec3 throughput = vec3(1.0);
+    vec3 radiance = vec3(0.0);
+    Ray current_ray = ray;
+
+    for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
+        Hit hit;
+        if (!scene_intersect(current_ray, hit)) {
+            float sky_t = 0.5 * (current_ray.direction.y + 1.0);
+            vec3 sky = mix(vec3(0.5, 0.6, 0.8), vec3(0.2, 0.3, 0.6), sky_t);
+            radiance += throughput * sky;
+            break;
+        }
+
+        MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+
+        Spectrum emitted = interaction_surface_emit(props);
+        radiance += throughput * emitted;
+
+#ifdef ENABLE_NEE
+        // Next Event Estimation
+        LightSample ls = lighting_sample(hit.p);
+        if (ls.pdf > 0.0) {
+            Ray shadow_ray;
+            shadow_ray.origin = hit.p + hit.frame.n * EPSILON;
+            shadow_ray.direction = ls.wi;
+            shadow_ray.tmin = EPSILON;
+            shadow_ray.tmax = ls.distance - EPSILON;
+            if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
+                vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit, props);
+                radiance += throughput * ls.radiance * f / ls.pdf;
+            }
+        }
+#endif
+
+#ifdef ENABLE_RUSSIAN_ROULETTE
+        // Russian roulette
+        if (bounce >= RR_START_DEPTH) {
+            float p_survive = min(0.95, luminance(throughput));
+            if (random() > p_survive) break;
+            throughput /= p_survive;
+        }
+#endif
+
+        // BRDF sampling
+        float pdf;
+        Direction wi = interaction_surface_scatter(-current_ray.direction, hit, props, pdf);
+        if (pdf <= 0.0001) break;
+
+        Spectrum f = interaction_surface_shade(wi, -current_ray.direction, hit, props);
+        throughput *= f / pdf;
+
+        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
+        current_ray.direction = wi;
+        current_ray.tmin = EPSILON;
+        current_ray.tmax = 1000.0;
+    }
+
+    return radiance;
+}
+
+// Main function with progressive accumulation
+// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+
+void main() {
+    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
+    // Seed with the GLOBAL pixel (tile offset included) — seeding with the local
+    // gl_FragCoord replays the identical RNG stream in every tile of a tiled render.
+    // sampleCount decorrelates samples within a render; resetSalt (bumped per
+    // accumulation reset) decorrelates across resets (§2.11).
+    rng_init(uvec2(pixel), uint(u_sampleCount), uint(u_resetSalt));
+
+    vec2 xi = random2();
+    Ray ray = camera_generateRay(pixel, xi);
+    vec3 color = transport_trace(ray);
+
+    if (u_sampleCount == 0) {
+        fragColor = vec4(color, 1.0);
+    } else {
+        ivec2 coord = ivec2(gl_FragCoord.xy);
+        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
+        float n = float(u_sampleCount);
+        float new_weight = 1.0 / (n + 1.0);
+        fragColor = vec4(mix(previous, color, new_weight), 1.0);
+    }
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+  },
+  "sourceMaps": {
+    "pathtracer-minimal-display": [
+      {
+        "endLine": 5,
+        "origin": "generated:display-header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 39,
+        "origin": "glsl/tonemap_reinhard.glsl",
+        "startLine": 6,
+      },
+    ],
+    "pathtracer-minimal-main": [
+      {
+        "endLine": 11,
+        "origin": "generated:header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 21,
+        "origin": "generated:uniforms",
+        "startLine": 12,
+      },
+      {
+        "endLine": 67,
+        "origin": "glsl/structs.glsl",
+        "startLine": 22,
+      },
+      {
+        "endLine": 108,
+        "origin": "glsl/rng.glsl",
+        "startLine": 68,
+      },
+      {
+        "endLine": 132,
+        "origin": "glsl/math.glsl",
+        "startLine": 109,
+      },
+      {
+        "endLine": 156,
+        "origin": "glsl/euclidean.glsl",
+        "startLine": 133,
+      },
+      {
+        "endLine": 173,
+        "origin": "glsl/sdf_primitives.glsl",
+        "startLine": 157,
+      },
+      {
+        "endLine": 200,
+        "origin": "generated:sdf-dispatch",
+        "startLine": 174,
+      },
+      {
+        "endLine": 272,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 201,
+      },
+      {
+        "endLine": 289,
+        "origin": "generated:material-lookup",
+        "startLine": 273,
+      },
+      {
+        "endLine": 331,
+        "origin": "glsl/lambert.glsl",
+        "startLine": 290,
+      },
+      {
+        "endLine": 342,
+        "origin": "generated:light-sampling",
+        "startLine": 332,
+      },
+      {
+        "endLine": 365,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 343,
+      },
+      {
+        "endLine": 430,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 366,
+      },
+      {
+        "endLine": 456,
+        "origin": "glsl/main_accumulate.glsl",
+        "startLine": 431,
+      },
+    ],
+  },
+  "uniforms": [
+    {
+      "parameters": [
+        "engine.resolution",
+      ],
+      "type": "vec2",
+      "uniform": "u_resolution",
+    },
+    {
+      "parameters": [
+        "engine.time",
+      ],
+      "type": "float",
+      "uniform": "u_time",
+    },
+    {
+      "parameters": [
+        "engine.resetSalt",
+      ],
+      "type": "int",
+      "uniform": "u_resetSalt",
+    },
+    {
+      "parameters": [
+        "camera.position",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraPosition",
+    },
+    {
+      "parameters": [
+        "camera.target",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraTarget",
+    },
+    {
+      "parameters": [
+        "engine.imageSize",
+      ],
+      "type": "vec2",
+      "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "engine.sampleCount",
+      ],
+      "type": "int",
+      "uniform": "u_sampleCount",
+    },
+    {
+      "parameters": [
+        "engine.pixelOffset",
+      ],
+      "type": "vec2",
+      "uniform": "u_pixelOffset",
+    },
+  ],
+}
+`;
