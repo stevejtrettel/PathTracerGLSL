@@ -5,7 +5,7 @@ WebGL2 **research path tracer** — no frameworks, pure WebGL2/GLSL 300 es, Type
 ## Commands
 
 ```bash
-npm run dev          # dev server on port 3000 (index.html → examples/cornell-box.ts)
+npm run dev          # dev server on port 3000 (index.html → examples/scene-lab.ts; root = cornell, ?scene=<id> switches the suite in src/compiler/scenes/index.ts)
 npx vitest run       # run tests ONCE (plain `npm run test` starts watch mode)
 npx tsc --noEmit     # typecheck
 ```

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assembleBlocks, lookupLine } from '../generate/ShaderIR.js';
+import { assembleBlocks, lookupLine } from '../../src/compiler/generate/ShaderIR.js';
 
 describe('assembleBlocks', () => {
     it('joins blocks with newlines and computes correct line ranges', () => {

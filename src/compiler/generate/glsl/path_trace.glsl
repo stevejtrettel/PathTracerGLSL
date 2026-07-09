@@ -30,15 +30,12 @@ Radiance transport_trace(Ray ray) {
         // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
-            Ray shadow_ray;
-            shadow_ray.origin = hit.p + hit.frame.n * EPSILON;
-            shadow_ray.direction = ls.wi;
-            shadow_ray.tmin = EPSILON;
-            shadow_ray.tmax = ls.distance - EPSILON;
-            if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
+            // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
+            Spectrum vis = shadow_transmittance(hit.p + hit.frame.n * EPSILON, ls.wi, ls.distance - EPSILON);
+            if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                 float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
-                radiance += throughput * ls.radiance * f * cos_i / ls.pdf;
+                radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
             }
         }
 #endif

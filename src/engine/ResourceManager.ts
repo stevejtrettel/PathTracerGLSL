@@ -611,46 +611,53 @@ export class ResourceManager {
         qualifier: string | null;
         attachment: number;
     } {
-        // Parse attachment suffix first: 'buffer:2' → attachment=2, rest='buffer'
-        let rest = id;
-        let attachment = 0;
-
-        const colonIndex = id.lastIndexOf(':');
-        if (colonIndex !== -1) {
-            const attachmentStr = id.substring(colonIndex + 1);
-            const attachmentNum = parseInt(attachmentStr, 10);
-            if (!isNaN(attachmentNum)) {
-                attachment = attachmentNum;
-                rest = id.substring(0, colonIndex);
-            }
-        }
-
-        // Parse _current/_previous suffix: 'accumulation_current' → qualifier='current'
-        const parts = rest.split('_');
-        const lastPart = parts[parts.length - 1];
-
-        if (lastPart === 'current' || lastPart === 'previous') {
-            const baseId = parts.slice(0, -1).join('_');
-            return { baseId, qualifier: lastPart, attachment };
-        }
-
-        // Not a qualifier, treat as base id
-        return { baseId: rest, qualifier: null, attachment };
+        return parseResourceId(id);
     }
 
     /**
      * Resolve index based on qualifier and current state
      */
     private _resolveIndex(resource: FramebufferResource, qualifier: string | null): number {
-        if (qualifier === 'current') {
-            return resource.currentIndex;
-        }
-
-        if (qualifier === 'previous') {
-            return 1 - resource.currentIndex;
-        }
-
-        // No qualifier, default to current
-        return resource.currentIndex;
+        return resolveBufferIndex(resource.currentIndex, qualifier);
     }
+}
+
+// ============================================================================
+// Pure ID helpers (exported for unit testing; the class methods above delegate here)
+// ============================================================================
+
+/**
+ * Parse a framebuffer/texture id into base id, ping-pong qualifier, and MRT attachment.
+ * A non-numeric ':suffix' is left attached to the base id (attachment stays 0).
+ */
+export function parseResourceId(id: string): { baseId: string; qualifier: string | null; attachment: number } {
+    let rest = id;
+    let attachment = 0;
+
+    const colonIndex = id.lastIndexOf(':');
+    if (colonIndex !== -1) {
+        const attachmentNum = parseInt(id.substring(colonIndex + 1), 10);
+        if (!isNaN(attachmentNum)) {
+            attachment = attachmentNum;
+            rest = id.substring(0, colonIndex);
+        }
+    }
+
+    const parts = rest.split('_');
+    const lastPart = parts[parts.length - 1];
+
+    if (lastPart === 'current' || lastPart === 'previous') {
+        return { baseId: parts.slice(0, -1).join('_'), qualifier: lastPart, attachment };
+    }
+
+    return { baseId: rest, qualifier: null, attachment };
+}
+
+/**
+ * Resolve the physical buffer index for a ping-pong qualifier.
+ * 'previous' → the other of the two; 'current' or none → currentIndex.
+ */
+export function resolveBufferIndex(currentIndex: number, qualifier: string | null): number {
+    if (qualifier === 'previous') return 1 - currentIndex;
+    return currentIndex;
 }

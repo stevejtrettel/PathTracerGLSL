@@ -10,6 +10,7 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatVec3 } from './glsl-format.js';
 
 import lightPointGLSL from '../glsl/light_point.glsl?raw';
+import shadowOpaqueGLSL from '../glsl/shadow_opaque.glsl?raw';
 
 export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (plan.program.lighting === null) {
@@ -17,6 +18,9 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     }
 
     const blocks: ShaderBlock[] = [];
+    // Shadow query behind the §6.3 contract. Opaque specialization now (no media); the media
+    // form (reference §4) is a separate file the Planner selects later. Wraps scene_intersect_any.
+    blocks.push({ origin: 'glsl/shadow_opaque.glsl', source: shadowOpaqueGLSL });
     // Per-kind sampler libraries for the kinds present (declared before the dispatcher calls them).
     if (plan.lights.some((l) => l.kind === 'point')) {
         blocks.push({ origin: 'glsl/light_point.glsl', source: lightPointGLSL });

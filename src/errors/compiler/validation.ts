@@ -229,7 +229,7 @@ function validateUniforms(
  * Qualifiers (_current, _previous) are used for double_buffer framebuffers
  * and should resolve to the base buffer ID for validation purposes.
  */
-function parseBufferRef(ref: string): { bufferId: string; attachment?: number } {
+export function parseBufferRef(ref: string): { bufferId: string; attachment?: number } {
     // Step 1: Parse attachment suffix first (e.g., ':2')
     let rest = ref;
     let attachment: number | undefined;

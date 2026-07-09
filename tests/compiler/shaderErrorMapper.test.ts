@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { mapShaderErrors, mapEngineShaderError } from '../generate/ShaderErrorMapper.js';
-import type { BlockMapping } from '../generate/ShaderIR.js';
-import type { SourceMap } from '../types.js';
+import { mapShaderErrors, mapEngineShaderError } from '../../src/compiler/generate/ShaderErrorMapper.js';
+import type { BlockMapping } from '../../src/compiler/generate/ShaderIR.js';
+import type { SourceMap } from '../../src/compiler/types.js';
 
 // Test block map: header (1-5), structs (6-20), sdf-dispatch (21-30)
 const testBlockMap: BlockMapping[] = [

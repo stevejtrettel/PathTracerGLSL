@@ -212,6 +212,98 @@ export const VALIDATION_ERRORS = {
         code: 'invalid-uniform',
         category: 'validation' as const,
         description: 'Uniform binding is invalid'
+    },
+    // --- CompiledRenderer structural validation (errors/compiler/validation.ts) ---
+    'renderer-no-id': {
+        code: 'renderer-no-id',
+        category: 'validation' as const,
+        description: 'CompiledRenderer must have a non-empty id'
+    },
+    'renderer-no-shaders': {
+        code: 'renderer-no-shaders',
+        category: 'validation' as const,
+        description: 'CompiledRenderer must have at least one shader'
+    },
+    'renderer-no-passes': {
+        code: 'renderer-no-passes',
+        category: 'validation' as const,
+        description: 'CompiledRenderer must have at least one render pass'
+    },
+    'pass-invalid-shader': {
+        code: 'pass-invalid-shader',
+        category: 'validation' as const,
+        description: 'Render pass references a shader not present in the renderer'
+    },
+    'pass-invalid-output': {
+        code: 'pass-invalid-output',
+        category: 'validation' as const,
+        description: 'Render pass outputs to an unknown framebuffer'
+    },
+    'pass-invalid-attachment': {
+        code: 'pass-invalid-attachment',
+        category: 'validation' as const,
+        description: 'Render pass uses a color attachment outside the valid range 0-7'
+    },
+    'pass-invalid-texture': {
+        code: 'pass-invalid-texture',
+        category: 'validation' as const,
+        description: 'Render pass binds a texture from an unknown framebuffer'
+    },
+    'pass-mrt-multiple-buffers': {
+        code: 'pass-mrt-multiple-buffers',
+        category: 'validation' as const,
+        description: 'MRT outputs of a pass span multiple base framebuffers'
+    },
+    'swap-invalid-buffer': {
+        code: 'swap-invalid-buffer',
+        category: 'validation' as const,
+        description: 'Swap instruction references an unknown buffer'
+    },
+    'swap-not-double-buffer': {
+        code: 'swap-not-double-buffer',
+        category: 'validation' as const,
+        description: 'Swap targets a framebuffer that is not a double_buffer'
+    },
+    'export-invalid-buffer': {
+        code: 'export-invalid-buffer',
+        category: 'validation' as const,
+        description: 'Export target references an unknown framebuffer'
+    },
+    'uniform-duplicate': {
+        code: 'uniform-duplicate',
+        category: 'validation' as const,
+        description: 'A uniform is bound by more than one binding'
+    },
+    'uniform-conflict': {
+        code: 'uniform-conflict',
+        category: 'validation' as const,
+        description: 'Two feature contributions declare the same uniform with different type/path'
+    },
+    'texture-conflict': {
+        code: 'texture-conflict',
+        category: 'validation' as const,
+        description: 'Two feature contributions declare the same texture with different sources'
+    }
+};
+
+/**
+ * Compiler Codegen Errors/Warnings (analyze + generate stages)
+ */
+export const COMPILER_ERRORS = {
+    'empty-scene': {
+        code: 'empty-scene',
+        category: 'scene' as const,
+        description: 'Scene has no objects — nothing will be rendered (warning)'
+    },
+    'unsupported-environment': {
+        code: 'unsupported-environment',
+        category: 'scene' as const,
+        description: 'Environment type not yet supported (falls back to none)'
+    },
+    'shader-compile-error': {
+        code: 'shader-compile-error',
+        category: 'glsl' as const,
+        description: 'Generated GLSL failed to compile'
     }
 };
 
@@ -256,6 +348,7 @@ export const ALL_ERROR_CODES = {
     ...ENGINE_ERRORS,
     ...RESOURCE_ERRORS,
     ...VALIDATION_ERRORS,
+    ...COMPILER_ERRORS,
     ...GLSL_WARNINGS
 } as const;
 

@@ -390,29 +390,28 @@ export class RenderExecutor {
      * @returns Array of GL draw buffer constants
      */
     private _computeDrawBuffers(outputs: string[]): number[] {
-        const gl = this.gl;
-
-        // Parse attachment indices from output strings
-        const attachments: number[] = [];
-
-        for (const output of outputs) {
-            // Parse :N suffix
-            const colonIndex = output.lastIndexOf(':');
-            let attachment = 0;
-
-            if (colonIndex !== -1) {
-                const attachmentStr = output.substring(colonIndex + 1);
-                const attachmentNum = parseInt(attachmentStr, 10);
-                if (!isNaN(attachmentNum)) {
-                    attachment = attachmentNum;
-                }
-            }
-
-            attachments.push(attachment);
-        }
-
-        // Sort and create draw buffers array
-        const sortedAttachments = [...attachments].sort((a, b) => a - b);
-        return sortedAttachments.map(a => gl.COLOR_ATTACHMENT0 + a);
+        return computeDrawBuffers(outputs, this.gl.COLOR_ATTACHMENT0);
     }
+}
+
+// ============================================================================
+// Pure MRT helper (exported for unit testing; used by _computeDrawBuffers above)
+// ============================================================================
+
+/**
+ * Map output ids (with optional ':N' attachment suffix) to sorted GL draw-buffer
+ * constants. `colorAttachment0` is gl.COLOR_ATTACHMENT0 (0x8CE0). Pure.
+ */
+export function computeDrawBuffers(outputs: string[], colorAttachment0: number): number[] {
+    const attachments: number[] = [];
+    for (const output of outputs) {
+        const colonIndex = output.lastIndexOf(':');
+        let attachment = 0;
+        if (colonIndex !== -1) {
+            const attachmentNum = parseInt(output.substring(colonIndex + 1), 10);
+            if (!isNaN(attachmentNum)) attachment = attachmentNum;
+        }
+        attachments.push(attachment);
+    }
+    return [...attachments].sort((a, b) => a - b).map(a => colorAttachment0 + a);
 }

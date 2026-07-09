@@ -156,7 +156,7 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
  * SDF call is always origin-centered — preventing double-offset when both
  * parameters.center and transform.position are set.
  */
-function resolveSDFPositioning(
+export function resolveSDFPositioning(
     sdf: StandardSDF,
     transformPosition: Vec3 | undefined,
 ): { parameters: Record<string, number | number[]>; translation?: Vec3 } {
@@ -181,7 +181,7 @@ function resolveSDFPositioning(
     return { parameters, translation };
 }
 
-function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> {
+export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> {
     if (value === undefined) return fallback;
     if (isGlslExpression(value)) return value;
     if (isValueParam(value)) return value as ValueParam<Vec3>;  // preserve — emitted as a uniform (§2.8)
@@ -189,7 +189,7 @@ function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec
     return value;
 }
 
-function resolveScalarProperty(value: MaterialProperty | undefined, fallback: number): number | GlslExpression | ValueParam<number> {
+export function resolveScalarProperty(value: MaterialProperty | undefined, fallback: number): number | GlslExpression | ValueParam<number> {
     if (value === undefined) return fallback;
     if (isGlslExpression(value)) return value;
     if (isValueParam(value)) return value as ValueParam<number>;  // preserve — emitted as a uniform (§2.8)

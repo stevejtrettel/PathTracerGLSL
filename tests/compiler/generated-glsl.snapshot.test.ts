@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { Compiler } from '../Compiler.js';
-import type { CompiledRenderer, SceneDescription, RenderStrategy } from '../types.js';
-import { minimalScene, minimalStrategy, directOnlyStrategy } from '../scenes/minimalScene.js';
-import { cornellBox, cornellStrategy } from '../scenes/cornellBox.js';
+import { Compiler } from '../../src/compiler/Compiler.js';
+import type { CompiledRenderer, SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
+import { minimalScene, minimalStrategy, directOnlyStrategy } from '../../src/compiler/scenes/minimalScene.js';
+import { cornellBox, cornellStrategy } from '../../src/compiler/scenes/cornellBox.js';
+import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '../../src/compiler/scenes/twoLightScene.js';
+import { furnaceBox, furnaceStrategy } from '../../src/compiler/scenes/furnaceBox.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -44,6 +46,11 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     ['cornell + pathtracer', cornellBox, cornellStrategy],
     ['minimal + pathtracer', minimalScene, minimalStrategy],
     ['minimal + direct', minimalScene, directOnlyStrategy],
+    // Suite additions: the multi-light CDF branch + the lightSelection axis (item 3),
+    // and the furnace emitter (energy conservation).
+    ['two-light + power', twoLightScene, twoLightPowerStrategy],
+    ['two-light + uniform', twoLightScene, twoLightUniformStrategy],
+    ['furnace + no-direct', furnaceBox, furnaceStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

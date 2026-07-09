@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { annotateWithProvenance } from '../generate/ShaderProvenance.js';
-import type { SourceMap } from '../types.js';
+import { annotateWithProvenance } from '../../src/compiler/generate/ShaderProvenance.js';
+import type { SourceMap } from '../../src/compiler/types.js';
 
 describe('annotateWithProvenance', () => {
     const src = ['a', 'b', 'c', 'd'].join('\n'); // 4 lines
