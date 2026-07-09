@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "dump:shaders": "vite-node scripts/dump-shaders.ts"
   },
   "devDependencies": {
     "@vitest/ui": "^3.2.4",

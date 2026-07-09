@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Generated shader dumps (npm run dump:shaders) — regenerable, for local review
+generated-shaders/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
