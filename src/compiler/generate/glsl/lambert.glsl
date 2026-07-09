@@ -1,41 +1,36 @@
-// Lambert Diffuse BRDF
-// Cosine-weighted hemisphere sampling with energy conservation
-// Provides: interaction_surface_shade(), interaction_surface_scatter(), interaction_surface_pdf(), interaction_surface_emit()
-// Depends on: MaterialProperties, ambient_dot(), random2(), Frame
+// Lambert diffuse BRDF — conforms to §3.2 (transcribed from reference-implementations §1).
+// Fields read: mp.albedo, mp.emission. Reflection-only, non-delta.
+// Provides: lambert_eval(), lambert_sample(), lambert_pdf(), lambert_emission().
+// Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
+//             PI, TWO_PI, SPECTRUM_ZERO.
 
-Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
-    Spectrum brdf = props.albedo / PI;
-    return brdf * cos_theta;
+Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
+    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    return mp.albedo * (1.0 / PI);
 }
 
-Direction interaction_surface_scatter(Direction wo, Hit hit, MaterialProperties props, out float pdf) {
-    vec2 xi = random2();
+InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
+    Frame f = hit.frame;
+    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    float cos_theta = sqrt(u.y);
+    float sin_theta = sqrt(max(0.0, 1.0 - u.y));
+    float phi = TWO_PI * u.x;
 
-    float cos_theta = sqrt(xi.y);
-    float sin_theta = sqrt(1.0 - xi.y);
-    float phi = 2.0 * PI * xi.x;
-
-    vec3 local_wi = vec3(
-        sin_theta * cos(phi),
-        sin_theta * sin(phi),
-        cos_theta
-    );
-
-    Direction wi = hit.frame.t * local_wi.x +
-                  hit.frame.b * local_wi.y +
-                  hit.frame.n * local_wi.z;
-
-    pdf = cos_theta / PI;
-
-    return wi;
+    InteractionSample s;
+    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.weight = mp.albedo;                       // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
+    s.pdf    = cos_theta * (1.0 / PI);
+    s.flags  = LOBE_REFLECTION;
+    return s;
 }
 
-float interaction_surface_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
-    return cos_theta / PI;
+float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    return max(0.0, c) * (1.0 / PI);
 }
 
-Spectrum interaction_surface_emit(MaterialProperties props) {
-    return props.emission * props.emission_strength;
+Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
+    return mp.emission * mp.emission_strength;  // fixed struct still splits these (§3.4 defers the merge)
 }

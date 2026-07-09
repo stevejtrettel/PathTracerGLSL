@@ -229,6 +229,25 @@ struct MaterialProperties {
     float roughness;
 };
 
+// interaction.glsl — the unified scattering-event contract (§3.1/§3.2).
+// One InteractionSample serves surface BSDFs and (later) medium phase functions.
+// Depends on: structs.glsl (Direction, Spectrum typedefs).
+
+// Lobe / event flags. A flag earns its place only if transport branches on it.
+const uint LOBE_REFLECTION   = 1u;   // wi on the same side of the surface as wo
+const uint LOBE_TRANSMISSION = 2u;   // wi on the far side (drives medium update + offset sign)
+const uint LOBE_DELTA        = 4u;   // pdf is a Dirac delta; the pdf field is 0
+const uint LOBE_MEDIUM       = 8u;   // phase-function event, no surface (transport skips the cosine)
+// dropped LOBE_NULL      -> compile-time is_null_interface(hit) predicate (arrives with media, §3.6)
+// deferred LOBE_GLOSSY/DIFFUSE -> add when path regularization/guiding has a reader
+
+struct InteractionSample {
+    Direction wi;       // sampled next direction, world space
+    Spectrum  weight;   // throughput factor: f·|cosθi|/pdf (surface); phase/pdf (medium)
+    float     pdf;      // solid-angle pdf of the non-delta part; 0.0 for delta lobes
+    uint      flags;
+};
+
 // RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
 // Provides: rng_init(), random(), random2()
 //
@@ -271,7 +290,8 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world()
+// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
@@ -282,6 +302,13 @@ float luminance(vec3 c) {
     // belongs to gamma-encoded SD video, not linear radiance.
     return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 }
+
+// Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
+// literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
+const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
+float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
     vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
@@ -502,48 +529,56 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
     }
     return props;
 }
-// Lambert Diffuse BRDF
-// Cosine-weighted hemisphere sampling with energy conservation
-// Provides: interaction_surface_shade(), interaction_surface_scatter(), interaction_surface_pdf(), interaction_surface_emit()
-// Depends on: MaterialProperties, ambient_dot(), random2(), Frame
+// Lambert diffuse BRDF — conforms to §3.2 (transcribed from reference-implementations §1).
+// Fields read: mp.albedo, mp.emission. Reflection-only, non-delta.
+// Provides: lambert_eval(), lambert_sample(), lambert_pdf(), lambert_emission().
+// Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
+//             PI, TWO_PI, SPECTRUM_ZERO.
 
-Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
-    Spectrum brdf = props.albedo / PI;
-    return brdf * cos_theta;
+Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
+    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    return mp.albedo * (1.0 / PI);
 }
 
-Direction interaction_surface_scatter(Direction wo, Hit hit, MaterialProperties props, out float pdf) {
-    vec2 xi = random2();
+InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
+    Frame f = hit.frame;
+    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    float cos_theta = sqrt(u.y);
+    float sin_theta = sqrt(max(0.0, 1.0 - u.y));
+    float phi = TWO_PI * u.x;
 
-    float cos_theta = sqrt(xi.y);
-    float sin_theta = sqrt(1.0 - xi.y);
-    float phi = 2.0 * PI * xi.x;
-
-    vec3 local_wi = vec3(
-        sin_theta * cos(phi),
-        sin_theta * sin(phi),
-        cos_theta
-    );
-
-    Direction wi = hit.frame.t * local_wi.x +
-                  hit.frame.b * local_wi.y +
-                  hit.frame.n * local_wi.z;
-
-    pdf = cos_theta / PI;
-
-    return wi;
+    InteractionSample s;
+    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.weight = mp.albedo;                       // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
+    s.pdf    = cos_theta * (1.0 / PI);
+    s.flags  = LOBE_REFLECTION;
+    return s;
 }
 
-float interaction_surface_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
-    return cos_theta / PI;
+float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    return max(0.0, c) * (1.0 / PI);
 }
 
-Spectrum interaction_surface_emit(MaterialProperties props) {
-    return props.emission * props.emission_strength;
+Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
+    return mp.emission * mp.emission_strength;  // fixed struct still splits these (§3.4 defers the merge)
 }
 
+// Generated surface-interaction dispatch (§3.3)
+InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    return lambert_sample(wo, hit, mp, uc, u);
+}
+Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_eval(wi, wo, hit, mp);
+}
+float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_pdf(wi, wo, hit, mp);
+}
+Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_emission(wo, hit, mp);
+}
 // Generated light sampling
 LightSample lighting_sample(Point p) {
     LightSample ls;
@@ -583,13 +618,18 @@ vec3 environment_radiance(vec3 dir) {
     return vec3(0.0);
 }
 // Path trace loop
-// Requires: MAX_BOUNCES (define), environment_radiance()
+// Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
 // Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
 
 Radiance transport_trace(Ray ray) {
-    vec3 throughput = vec3(1.0);
-    vec3 radiance = vec3(0.0);
+    Spectrum throughput = SPECTRUM_ONE;
+    Radiance radiance   = SPECTRUM_ZERO;
     Ray current_ray = ray;
+
+    // §6.2 bookkeeping hook: tracked now, consumed when MIS / samplable environment land.
+    // The camera "bounce" counts as delta so bounce-0 emission would be full-weight. Inert for
+    // Lambert (never delta) until those readers exist — see docs/impl-plan-interaction-reshape.
+    bool prev_was_delta = true;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
@@ -598,13 +638,15 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+        int mat = hit.material_to;                      // region identity is item 2; material_to for now
+        MaterialProperties props = scene_material_properties(mat, hit.p);
+        Direction wo = -current_ray.direction;
 
-        Spectrum emitted = interaction_surface_emit(props);
-        radiance += throughput * emitted;
+        // Emission (bare property read; the one-sided/region_to gating is item 2 + §6.2)
+        radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation
+        // Next Event Estimation. Explicit-xi light sampler is item 3.
         LightSample ls = lighting_sample(hit.p);
         if (ls.pdf > 0.0) {
             Ray shadow_ray;
@@ -613,8 +655,9 @@ Radiance transport_trace(Ray ray) {
             shadow_ray.tmin = EPSILON;
             shadow_ray.tmax = ls.distance - EPSILON;
             if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
-                vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit, props);
-                radiance += throughput * ls.radiance * f / ls.pdf;
+                Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
+                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                radiance += throughput * ls.radiance * f * cos_i / ls.pdf;
             }
         }
 #endif
@@ -628,16 +671,14 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
-        // BRDF sampling
-        float pdf;
-        Direction wi = interaction_surface_scatter(-current_ray.direction, hit, props, pdf);
-        if (pdf <= 0.0001) break;
-
-        Spectrum f = interaction_surface_shade(wi, -current_ray.direction, hit, props);
-        throughput *= f / pdf;
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = wi;
+        current_ray.direction = bs.wi;
         current_ray.tmin = EPSILON;
         current_ray.tmax = 1000.0;
     }
@@ -713,69 +754,79 @@ void main() {
         "startLine": 24,
       },
       {
-        "endLine": 110,
-        "origin": "glsl/rng.glsl",
+        "endLine": 88,
+        "origin": "glsl/interaction.glsl",
         "startLine": 70,
       },
       {
-        "endLine": 134,
+        "endLine": 129,
+        "origin": "glsl/rng.glsl",
+        "startLine": 89,
+      },
+      {
+        "endLine": 161,
         "origin": "glsl/math.glsl",
-        "startLine": 111,
+        "startLine": 130,
       },
       {
-        "endLine": 158,
+        "endLine": 185,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 135,
+        "startLine": 162,
       },
       {
-        "endLine": 175,
+        "endLine": 202,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 159,
+        "startLine": 186,
       },
       {
-        "endLine": 245,
+        "endLine": 272,
         "origin": "generated:sdf-dispatch",
-        "startLine": 176,
+        "startLine": 203,
       },
       {
-        "endLine": 317,
+        "endLine": 344,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 246,
+        "startLine": 273,
       },
       {
-        "endLine": 342,
+        "endLine": 369,
         "origin": "generated:material-lookup",
-        "startLine": 318,
+        "startLine": 345,
       },
       {
-        "endLine": 384,
+        "endLine": 406,
         "origin": "glsl/lambert.glsl",
-        "startLine": 343,
+        "startLine": 370,
       },
       {
-        "endLine": 395,
+        "endLine": 419,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 407,
+      },
+      {
+        "endLine": 430,
         "origin": "generated:light-sampling",
-        "startLine": 385,
+        "startLine": 420,
       },
       {
-        "endLine": 418,
+        "endLine": 453,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 396,
+        "startLine": 431,
       },
       {
-        "endLine": 422,
+        "endLine": 457,
         "origin": "generated:environment",
-        "startLine": 419,
+        "startLine": 454,
       },
       {
-        "endLine": 485,
+        "endLine": 526,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 423,
+        "startLine": 458,
       },
       {
-        "endLine": 511,
+        "endLine": 552,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 486,
+        "startLine": 527,
       },
     ],
   },
@@ -1081,6 +1132,25 @@ struct MaterialProperties {
     float roughness;
 };
 
+// interaction.glsl — the unified scattering-event contract (§3.1/§3.2).
+// One InteractionSample serves surface BSDFs and (later) medium phase functions.
+// Depends on: structs.glsl (Direction, Spectrum typedefs).
+
+// Lobe / event flags. A flag earns its place only if transport branches on it.
+const uint LOBE_REFLECTION   = 1u;   // wi on the same side of the surface as wo
+const uint LOBE_TRANSMISSION = 2u;   // wi on the far side (drives medium update + offset sign)
+const uint LOBE_DELTA        = 4u;   // pdf is a Dirac delta; the pdf field is 0
+const uint LOBE_MEDIUM       = 8u;   // phase-function event, no surface (transport skips the cosine)
+// dropped LOBE_NULL      -> compile-time is_null_interface(hit) predicate (arrives with media, §3.6)
+// deferred LOBE_GLOSSY/DIFFUSE -> add when path regularization/guiding has a reader
+
+struct InteractionSample {
+    Direction wi;       // sampled next direction, world space
+    Spectrum  weight;   // throughput factor: f·|cosθi|/pdf (surface); phase/pdf (medium)
+    float     pdf;      // solid-angle pdf of the non-delta part; 0.0 for delta lobes
+    uint      flags;
+};
+
 // RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
 // Provides: rng_init(), random(), random2()
 //
@@ -1123,7 +1193,8 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world()
+// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
@@ -1134,6 +1205,13 @@ float luminance(vec3 c) {
     // belongs to gamma-encoded SD video, not linear radiance.
     return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 }
+
+// Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
+// literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
+const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
+float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
     vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
@@ -1303,48 +1381,56 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
     }
     return props;
 }
-// Lambert Diffuse BRDF
-// Cosine-weighted hemisphere sampling with energy conservation
-// Provides: interaction_surface_shade(), interaction_surface_scatter(), interaction_surface_pdf(), interaction_surface_emit()
-// Depends on: MaterialProperties, ambient_dot(), random2(), Frame
+// Lambert diffuse BRDF — conforms to §3.2 (transcribed from reference-implementations §1).
+// Fields read: mp.albedo, mp.emission. Reflection-only, non-delta.
+// Provides: lambert_eval(), lambert_sample(), lambert_pdf(), lambert_emission().
+// Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
+//             PI, TWO_PI, SPECTRUM_ZERO.
 
-Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
-    Spectrum brdf = props.albedo / PI;
-    return brdf * cos_theta;
+Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
+    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    return mp.albedo * (1.0 / PI);
 }
 
-Direction interaction_surface_scatter(Direction wo, Hit hit, MaterialProperties props, out float pdf) {
-    vec2 xi = random2();
+InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
+    Frame f = hit.frame;
+    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    float cos_theta = sqrt(u.y);
+    float sin_theta = sqrt(max(0.0, 1.0 - u.y));
+    float phi = TWO_PI * u.x;
 
-    float cos_theta = sqrt(xi.y);
-    float sin_theta = sqrt(1.0 - xi.y);
-    float phi = 2.0 * PI * xi.x;
-
-    vec3 local_wi = vec3(
-        sin_theta * cos(phi),
-        sin_theta * sin(phi),
-        cos_theta
-    );
-
-    Direction wi = hit.frame.t * local_wi.x +
-                  hit.frame.b * local_wi.y +
-                  hit.frame.n * local_wi.z;
-
-    pdf = cos_theta / PI;
-
-    return wi;
+    InteractionSample s;
+    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.weight = mp.albedo;                       // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
+    s.pdf    = cos_theta * (1.0 / PI);
+    s.flags  = LOBE_REFLECTION;
+    return s;
 }
 
-float interaction_surface_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
-    return cos_theta / PI;
+float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    return max(0.0, c) * (1.0 / PI);
 }
 
-Spectrum interaction_surface_emit(MaterialProperties props) {
-    return props.emission * props.emission_strength;
+Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
+    return mp.emission * mp.emission_strength;  // fixed struct still splits these (§3.4 defers the merge)
 }
 
+// Generated surface-interaction dispatch (§3.3)
+InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    return lambert_sample(wo, hit, mp, uc, u);
+}
+Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_eval(wi, wo, hit, mp);
+}
+float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_pdf(wi, wo, hit, mp);
+}
+Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_emission(wo, hit, mp);
+}
 // Generated light sampling
 LightSample lighting_sample(Point p) {
     LightSample ls;
@@ -1384,13 +1470,18 @@ vec3 environment_radiance(vec3 dir) {
     return u_environment_color * u_environment_intensity;
 }
 // Path trace loop
-// Requires: MAX_BOUNCES (define), environment_radiance()
+// Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
 // Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
 
 Radiance transport_trace(Ray ray) {
-    vec3 throughput = vec3(1.0);
-    vec3 radiance = vec3(0.0);
+    Spectrum throughput = SPECTRUM_ONE;
+    Radiance radiance   = SPECTRUM_ZERO;
     Ray current_ray = ray;
+
+    // §6.2 bookkeeping hook: tracked now, consumed when MIS / samplable environment land.
+    // The camera "bounce" counts as delta so bounce-0 emission would be full-weight. Inert for
+    // Lambert (never delta) until those readers exist — see docs/impl-plan-interaction-reshape.
+    bool prev_was_delta = true;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
@@ -1399,13 +1490,15 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+        int mat = hit.material_to;                      // region identity is item 2; material_to for now
+        MaterialProperties props = scene_material_properties(mat, hit.p);
+        Direction wo = -current_ray.direction;
 
-        Spectrum emitted = interaction_surface_emit(props);
-        radiance += throughput * emitted;
+        // Emission (bare property read; the one-sided/region_to gating is item 2 + §6.2)
+        radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation
+        // Next Event Estimation. Explicit-xi light sampler is item 3.
         LightSample ls = lighting_sample(hit.p);
         if (ls.pdf > 0.0) {
             Ray shadow_ray;
@@ -1414,8 +1507,9 @@ Radiance transport_trace(Ray ray) {
             shadow_ray.tmin = EPSILON;
             shadow_ray.tmax = ls.distance - EPSILON;
             if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
-                vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit, props);
-                radiance += throughput * ls.radiance * f / ls.pdf;
+                Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
+                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                radiance += throughput * ls.radiance * f * cos_i / ls.pdf;
             }
         }
 #endif
@@ -1429,16 +1523,14 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
-        // BRDF sampling
-        float pdf;
-        Direction wi = interaction_surface_scatter(-current_ray.direction, hit, props, pdf);
-        if (pdf <= 0.0001) break;
-
-        Spectrum f = interaction_surface_shade(wi, -current_ray.direction, hit, props);
-        throughput *= f / pdf;
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = wi;
+        current_ray.direction = bs.wi;
         current_ray.tmin = EPSILON;
         current_ray.tmax = 1000.0;
     }
@@ -1514,69 +1606,79 @@ void main() {
         "startLine": 22,
       },
       {
-        "endLine": 108,
-        "origin": "glsl/rng.glsl",
+        "endLine": 86,
+        "origin": "glsl/interaction.glsl",
         "startLine": 68,
       },
       {
-        "endLine": 132,
+        "endLine": 127,
+        "origin": "glsl/rng.glsl",
+        "startLine": 87,
+      },
+      {
+        "endLine": 159,
         "origin": "glsl/math.glsl",
-        "startLine": 109,
+        "startLine": 128,
       },
       {
-        "endLine": 156,
+        "endLine": 183,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 133,
-      },
-      {
-        "endLine": 173,
-        "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 157,
+        "startLine": 160,
       },
       {
         "endLine": 200,
-        "origin": "generated:sdf-dispatch",
-        "startLine": 174,
+        "origin": "glsl/sdf_primitives.glsl",
+        "startLine": 184,
       },
       {
-        "endLine": 272,
-        "origin": "glsl/raymarch.glsl",
+        "endLine": 227,
+        "origin": "generated:sdf-dispatch",
         "startLine": 201,
       },
       {
-        "endLine": 289,
+        "endLine": 299,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 228,
+      },
+      {
+        "endLine": 316,
         "origin": "generated:material-lookup",
-        "startLine": 273,
+        "startLine": 300,
       },
       {
-        "endLine": 331,
+        "endLine": 353,
         "origin": "glsl/lambert.glsl",
-        "startLine": 290,
+        "startLine": 317,
       },
       {
-        "endLine": 342,
+        "endLine": 366,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 354,
+      },
+      {
+        "endLine": 377,
         "origin": "generated:light-sampling",
-        "startLine": 332,
+        "startLine": 367,
       },
       {
-        "endLine": 365,
+        "endLine": 400,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 343,
+        "startLine": 378,
       },
       {
-        "endLine": 369,
+        "endLine": 404,
         "origin": "generated:environment",
-        "startLine": 366,
+        "startLine": 401,
       },
       {
-        "endLine": 432,
+        "endLine": 473,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 370,
+        "startLine": 405,
       },
       {
-        "endLine": 458,
+        "endLine": 499,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 433,
+        "startLine": 474,
       },
     ],
   },
@@ -1884,6 +1986,25 @@ struct MaterialProperties {
     float roughness;
 };
 
+// interaction.glsl — the unified scattering-event contract (§3.1/§3.2).
+// One InteractionSample serves surface BSDFs and (later) medium phase functions.
+// Depends on: structs.glsl (Direction, Spectrum typedefs).
+
+// Lobe / event flags. A flag earns its place only if transport branches on it.
+const uint LOBE_REFLECTION   = 1u;   // wi on the same side of the surface as wo
+const uint LOBE_TRANSMISSION = 2u;   // wi on the far side (drives medium update + offset sign)
+const uint LOBE_DELTA        = 4u;   // pdf is a Dirac delta; the pdf field is 0
+const uint LOBE_MEDIUM       = 8u;   // phase-function event, no surface (transport skips the cosine)
+// dropped LOBE_NULL      -> compile-time is_null_interface(hit) predicate (arrives with media, §3.6)
+// deferred LOBE_GLOSSY/DIFFUSE -> add when path regularization/guiding has a reader
+
+struct InteractionSample {
+    Direction wi;       // sampled next direction, world space
+    Spectrum  weight;   // throughput factor: f·|cosθi|/pdf (surface); phase/pdf (medium)
+    float     pdf;      // solid-angle pdf of the non-delta part; 0.0 for delta lobes
+    uint      flags;
+};
+
 // RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
 // Provides: rng_init(), random(), random2()
 //
@@ -1926,7 +2047,8 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world()
+// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
@@ -1937,6 +2059,13 @@ float luminance(vec3 c) {
     // belongs to gamma-encoded SD video, not linear radiance.
     return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 }
+
+// Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
+// literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
+const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
+float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
     vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
@@ -2106,48 +2235,56 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
     }
     return props;
 }
-// Lambert Diffuse BRDF
-// Cosine-weighted hemisphere sampling with energy conservation
-// Provides: interaction_surface_shade(), interaction_surface_scatter(), interaction_surface_pdf(), interaction_surface_emit()
-// Depends on: MaterialProperties, ambient_dot(), random2(), Frame
+// Lambert diffuse BRDF — conforms to §3.2 (transcribed from reference-implementations §1).
+// Fields read: mp.albedo, mp.emission. Reflection-only, non-delta.
+// Provides: lambert_eval(), lambert_sample(), lambert_pdf(), lambert_emission().
+// Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
+//             PI, TWO_PI, SPECTRUM_ZERO.
 
-Spectrum interaction_surface_shade(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
-    Spectrum brdf = props.albedo / PI;
-    return brdf * cos_theta;
+Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
+    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    return mp.albedo * (1.0 / PI);
 }
 
-Direction interaction_surface_scatter(Direction wo, Hit hit, MaterialProperties props, out float pdf) {
-    vec2 xi = random2();
+InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
+    Frame f = hit.frame;
+    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    float cos_theta = sqrt(u.y);
+    float sin_theta = sqrt(max(0.0, 1.0 - u.y));
+    float phi = TWO_PI * u.x;
 
-    float cos_theta = sqrt(xi.y);
-    float sin_theta = sqrt(1.0 - xi.y);
-    float phi = 2.0 * PI * xi.x;
-
-    vec3 local_wi = vec3(
-        sin_theta * cos(phi),
-        sin_theta * sin(phi),
-        cos_theta
-    );
-
-    Direction wi = hit.frame.t * local_wi.x +
-                  hit.frame.b * local_wi.y +
-                  hit.frame.n * local_wi.z;
-
-    pdf = cos_theta / PI;
-
-    return wi;
+    InteractionSample s;
+    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.weight = mp.albedo;                       // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
+    s.pdf    = cos_theta * (1.0 / PI);
+    s.flags  = LOBE_REFLECTION;
+    return s;
 }
 
-float interaction_surface_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties props) {
-    float cos_theta = max(0.0, ambient_dot(wi, hit.frame.n, hit.p));
-    return cos_theta / PI;
+float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    return max(0.0, c) * (1.0 / PI);
 }
 
-Spectrum interaction_surface_emit(MaterialProperties props) {
-    return props.emission * props.emission_strength;
+Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
+    return mp.emission * mp.emission_strength;  // fixed struct still splits these (§3.4 defers the merge)
 }
 
+// Generated surface-interaction dispatch (§3.3)
+InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    return lambert_sample(wo, hit, mp, uc, u);
+}
+Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_eval(wi, wo, hit, mp);
+}
+float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_pdf(wi, wo, hit, mp);
+}
+Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_emission(wo, hit, mp);
+}
 // Generated light sampling
 LightSample lighting_sample(Point p) {
     LightSample ls;
@@ -2187,13 +2324,18 @@ vec3 environment_radiance(vec3 dir) {
     return u_environment_color * u_environment_intensity;
 }
 // Path trace loop
-// Requires: MAX_BOUNCES (define), environment_radiance()
+// Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
 // Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
 
 Radiance transport_trace(Ray ray) {
-    vec3 throughput = vec3(1.0);
-    vec3 radiance = vec3(0.0);
+    Spectrum throughput = SPECTRUM_ONE;
+    Radiance radiance   = SPECTRUM_ZERO;
     Ray current_ray = ray;
+
+    // §6.2 bookkeeping hook: tracked now, consumed when MIS / samplable environment land.
+    // The camera "bounce" counts as delta so bounce-0 emission would be full-weight. Inert for
+    // Lambert (never delta) until those readers exist — see docs/impl-plan-interaction-reshape.
+    bool prev_was_delta = true;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
@@ -2202,13 +2344,15 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+        int mat = hit.material_to;                      // region identity is item 2; material_to for now
+        MaterialProperties props = scene_material_properties(mat, hit.p);
+        Direction wo = -current_ray.direction;
 
-        Spectrum emitted = interaction_surface_emit(props);
-        radiance += throughput * emitted;
+        // Emission (bare property read; the one-sided/region_to gating is item 2 + §6.2)
+        radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation
+        // Next Event Estimation. Explicit-xi light sampler is item 3.
         LightSample ls = lighting_sample(hit.p);
         if (ls.pdf > 0.0) {
             Ray shadow_ray;
@@ -2217,8 +2361,9 @@ Radiance transport_trace(Ray ray) {
             shadow_ray.tmin = EPSILON;
             shadow_ray.tmax = ls.distance - EPSILON;
             if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
-                vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit, props);
-                radiance += throughput * ls.radiance * f / ls.pdf;
+                Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
+                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                radiance += throughput * ls.radiance * f * cos_i / ls.pdf;
             }
         }
 #endif
@@ -2232,16 +2377,14 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
-        // BRDF sampling
-        float pdf;
-        Direction wi = interaction_surface_scatter(-current_ray.direction, hit, props, pdf);
-        if (pdf <= 0.0001) break;
-
-        Spectrum f = interaction_surface_shade(wi, -current_ray.direction, hit, props);
-        throughput *= f / pdf;
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = wi;
+        current_ray.direction = bs.wi;
         current_ray.tmin = EPSILON;
         current_ray.tmax = 1000.0;
     }
@@ -2317,69 +2460,79 @@ void main() {
         "startLine": 24,
       },
       {
-        "endLine": 110,
-        "origin": "glsl/rng.glsl",
+        "endLine": 88,
+        "origin": "glsl/interaction.glsl",
         "startLine": 70,
       },
       {
-        "endLine": 134,
+        "endLine": 129,
+        "origin": "glsl/rng.glsl",
+        "startLine": 89,
+      },
+      {
+        "endLine": 161,
         "origin": "glsl/math.glsl",
-        "startLine": 111,
+        "startLine": 130,
       },
       {
-        "endLine": 158,
+        "endLine": 185,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 135,
-      },
-      {
-        "endLine": 175,
-        "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 159,
+        "startLine": 162,
       },
       {
         "endLine": 202,
-        "origin": "generated:sdf-dispatch",
-        "startLine": 176,
+        "origin": "glsl/sdf_primitives.glsl",
+        "startLine": 186,
       },
       {
-        "endLine": 274,
-        "origin": "glsl/raymarch.glsl",
+        "endLine": 229,
+        "origin": "generated:sdf-dispatch",
         "startLine": 203,
       },
       {
-        "endLine": 291,
+        "endLine": 301,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 230,
+      },
+      {
+        "endLine": 318,
         "origin": "generated:material-lookup",
-        "startLine": 275,
+        "startLine": 302,
       },
       {
-        "endLine": 333,
+        "endLine": 355,
         "origin": "glsl/lambert.glsl",
-        "startLine": 292,
+        "startLine": 319,
       },
       {
-        "endLine": 344,
+        "endLine": 368,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 356,
+      },
+      {
+        "endLine": 379,
         "origin": "generated:light-sampling",
-        "startLine": 334,
+        "startLine": 369,
       },
       {
-        "endLine": 367,
+        "endLine": 402,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 345,
+        "startLine": 380,
       },
       {
-        "endLine": 371,
+        "endLine": 406,
         "origin": "generated:environment",
-        "startLine": 368,
+        "startLine": 403,
       },
       {
-        "endLine": 434,
+        "endLine": 475,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 372,
+        "startLine": 407,
       },
       {
-        "endLine": 460,
+        "endLine": 501,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 435,
+        "startLine": 476,
       },
     ],
   },

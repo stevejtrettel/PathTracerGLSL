@@ -3,7 +3,7 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
-import { isGlslExpression, isValueParam, type Vec3, type ValueParam } from '../../types.js';
+import { isGlslExpression, isValueParam, type Vec3, type ValueParam, type MaterialModel } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../../engine/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -20,6 +20,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     for (const model of plan.program.materials.models) {
         if (model === 'lambert') blocks.push({ origin: 'glsl/lambert.glsl', source: lambertGLSL });
     }
+
+    // The generated §3.3 dispatch, after the model libraries it calls.
+    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials) });
 
     // Scan every material's properties for { param } references → live uniforms.
     const uniforms: PlannedUniform[] = [];
@@ -130,5 +133,43 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
 
     lines.push('    return props;');
     lines.push('}');
+    return lines.join('\n');
+}
+
+// ============================================================================
+// Generated surface-interaction dispatch (§3.3)
+// ============================================================================
+// One dispatcher per operation, switching on material id over ONLY the models
+// present. Lambert-only collapses to a passthrough; a second model (dielectric)
+// is additive — it just adds `if (mat == <ids>) return <model>_<op>(...)`.
+
+function generateInteractionDispatch(materials: PlannedMaterial[]): string {
+    // Group material ids by model, preserving first-appearance order.
+    const order: MaterialModel[] = [];
+    const idsByModel = new Map<MaterialModel, number[]>();
+    for (const m of materials) {
+        if (!idsByModel.has(m.model)) { idsByModel.set(m.model, []); order.push(m.model); }
+        idsByModel.get(m.model)!.push(m.id);
+    }
+    const fallback = order[order.length - 1]; // the default arm
+
+    const ops = [
+        { name: 'sample',   ret: 'InteractionSample', params: 'int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u', args: 'wo, hit, mp, uc, u' },
+        { name: 'eval',     ret: 'Spectrum',          params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp',    args: 'wi, wo, hit, mp' },
+        { name: 'pdf',      ret: 'float',             params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp',    args: 'wi, wo, hit, mp' },
+        { name: 'emission', ret: 'Spectrum',          params: 'int mat, Direction wo, Hit hit, MaterialProperties mp',                 args: 'wo, hit, mp' },
+    ];
+
+    const lines: string[] = ['// Generated surface-interaction dispatch (§3.3)'];
+    for (const op of ops) {
+        lines.push(`${op.ret} interaction_surface_${op.name}(${op.params}) {`);
+        for (const model of order) {
+            if (model === fallback) continue;
+            const cond = idsByModel.get(model)!.map((id) => `mat == ${id}`).join(' || ');
+            lines.push(`    if (${cond}) return ${model}_${op.name}(${op.args});`);
+        }
+        lines.push(`    return ${fallback}_${op.name}(${op.args});`);
+        lines.push('}');
+    }
     return lines.join('\n');
 }

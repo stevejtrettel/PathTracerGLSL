@@ -1,5 +1,26 @@
 # TODO — PathTracerGLSL
 
+## ▶ START HERE (next session) — §10.1 item 1: reshape the surface interaction to the §3.2 contract
+
+**Context:** the §2.10 contribution refactor + all three proving cases (fov / material `{param}` / analytic environment) are done and committed (see Completed). The compiler now assembles from per-feature contributions in `src/compiler/generate/features/`. Next is the first *real GLSL-contract* migration.
+
+**The task:** reshape the surface material interaction from the slice's ad-hoc shape to the pinned §3.2 shape.
+- **Current** (`src/compiler/generate/glsl/lambert.glsl`): `interaction_surface_shade(wi,wo,hit,props)→f·cos`, `interaction_surface_scatter(wo,hit,props,out pdf)→wi` (draws `random2()` *internally*), `interaction_surface_pdf(...)`, `interaction_surface_emit(props)`.
+- **Target** (§3.2): **sample-returns-weight** (the sampler returns a `sample` struct carrying `weight = f·cos/pdf`, not a bare direction+pdf), **bare-f eval** (separate `f` without the cosine), **explicit `xi`** argument (§2.9 — don't call `random2()` inside), and **flags** (e.g. delta). For Lambert it's mechanical: `sample.weight = albedo`.
+
+**Read first (normative — transcribe, don't re-derive):**
+- `docs/fable-compiler-contracts.md` §3 / §3.1 (the sample struct) / §3.2 (the interaction interface).
+- `docs/fable-reference-implementations.md` — the normative Lambert to transcribe (and the annotated transport loop it plugs into).
+- `docs/fable-transport-verification.md` — the bounce/RR accounting pins the loop must honor.
+
+**Files that change together:** `glsl/lambert.glsl` (the interface) **and** `glsl/path_trace.glsl` (the call sites — lines ~19/32/49/52 combine `shade`+`scatter`+`pdf` by hand; the new sample-returns-weight shape simplifies these). `features/materials.ts` just includes lambert (unchanged). *(This couples material + transport because the loop consumes the interaction interface — that's expected. The transport-generator **split**, §10.1 item 9, is still separate and later.)*
+
+**Test discipline:** this is a *real* GLSL change, so the golden snapshot (`generated-glsl.snapshot.test.ts`) **will** differ — review the diff, confirm it's exactly the interaction reshape, then `npx vitest run … -u`. Then **verify live** (the established pattern): `npm run dev`, render cornell, confirm it still converges correctly (energy-conserving — this is where a sample/eval/pdf inconsistency would visibly bias the image; §11.1 furnace is the eventual automated form). Playwright harness recipe is in prior sessions' scratchpad pattern (install `playwright`, drive `channel:'chrome'`, read `app.readExport('hdr')` / screenshots, clean up after).
+
+**Then:** items 2 (Hit→`region_from/to` + `material_of()`), 3 (LightSample→CDF), etc., per §10.1. Deferred alternative if you'd rather: tabulated environments (`docs/impl-plan-tabulated-env.md`, T1 clears engine #2/#8 + display-hole i-b).
+
+---
+
 ## Next Major Milestone: Build the Real Compiler (on the contracts)
 
 A minimal vertical slice exists ("step zero" — Lambert/SDF/point-light only). The real compiler — volumes, swappable material and transport models, multi-region objects, the full design — is the work ahead. Path: migrate the slice to the pinned GLSL contracts, then grow features (dielectric, volumes, area lights, MIS) on top.

@@ -1,11 +1,16 @@
 // Path trace loop
-// Requires: MAX_BOUNCES (define), environment_radiance()
+// Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
 // Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
 
 Radiance transport_trace(Ray ray) {
-    vec3 throughput = vec3(1.0);
-    vec3 radiance = vec3(0.0);
+    Spectrum throughput = SPECTRUM_ONE;
+    Radiance radiance   = SPECTRUM_ZERO;
     Ray current_ray = ray;
+
+    // §6.2 bookkeeping hook: tracked now, consumed when MIS / samplable environment land.
+    // The camera "bounce" counts as delta so bounce-0 emission would be full-weight. Inert for
+    // Lambert (never delta) until those readers exist — see docs/impl-plan-interaction-reshape.
+    bool prev_was_delta = true;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
@@ -14,13 +19,15 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        MaterialProperties props = scene_material_properties(hit.material_to, hit.p);
+        int mat = hit.material_to;                      // region identity is item 2; material_to for now
+        MaterialProperties props = scene_material_properties(mat, hit.p);
+        Direction wo = -current_ray.direction;
 
-        Spectrum emitted = interaction_surface_emit(props);
-        radiance += throughput * emitted;
+        // Emission (bare property read; the one-sided/region_to gating is item 2 + §6.2)
+        radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation
+        // Next Event Estimation. Explicit-xi light sampler is item 3.
         LightSample ls = lighting_sample(hit.p);
         if (ls.pdf > 0.0) {
             Ray shadow_ray;
@@ -29,8 +36,9 @@ Radiance transport_trace(Ray ray) {
             shadow_ray.tmin = EPSILON;
             shadow_ray.tmax = ls.distance - EPSILON;
             if (!scene_intersect_any(shadow_ray, ls.distance - EPSILON)) {
-                vec3 f = interaction_surface_shade(ls.wi, -current_ray.direction, hit, props);
-                radiance += throughput * ls.radiance * f / ls.pdf;
+                Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
+                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                radiance += throughput * ls.radiance * f * cos_i / ls.pdf;
             }
         }
 #endif
@@ -44,16 +52,14 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
-        // BRDF sampling
-        float pdf;
-        Direction wi = interaction_surface_scatter(-current_ray.direction, hit, props, pdf);
-        if (pdf <= 0.0001) break;
-
-        Spectrum f = interaction_surface_shade(wi, -current_ray.direction, hit, props);
-        throughput *= f / pdf;
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = wi;
+        current_ray.direction = bs.wi;
         current_ray.tmin = EPSILON;
         current_ray.tmax = 1000.0;
     }

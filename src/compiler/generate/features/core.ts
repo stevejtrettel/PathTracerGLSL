@@ -5,6 +5,7 @@ import type { RenderPlan } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 
 import structsGLSL from '../glsl/structs.glsl?raw';
+import interactionGLSL from '../glsl/interaction.glsl?raw';
 import rngGLSL from '../glsl/rng.glsl?raw';
 import mathGLSL from '../glsl/math.glsl?raw';
 import euclideanGLSL from '../glsl/euclidean.glsl?raw';
@@ -14,6 +15,7 @@ export function contributeCore(_plan: RenderPlan): FeatureContribution {
         ...emptyContribution(),
         blocks: [
             { origin: 'glsl/structs.glsl', source: structsGLSL },
+            { origin: 'glsl/interaction.glsl', source: interactionGLSL },
             { origin: 'glsl/rng.glsl', source: rngGLSL },
             { origin: 'glsl/math.glsl', source: mathGLSL },
             { origin: 'glsl/euclidean.glsl', source: euclideanGLSL },
