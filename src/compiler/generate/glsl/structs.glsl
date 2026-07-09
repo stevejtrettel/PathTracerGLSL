@@ -29,12 +29,16 @@ struct Hit {
     vec2 uv;
 };
 
+// Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
+const uint LIGHT_DELTA = 1u;
+
 struct LightSample {
-    Direction wi;
-    Point position;
-    Spectrum radiance;
-    float distance;
-    float pdf;
+    Direction wi;         // toward the light, unit
+    float distance;       // to the sampled point (1e20 for directional/environment)
+    Spectrum radiance;    // incident radiance, WITHOUT visibility (delta lights fold 1/d² in)
+    float pdf;            // total: selection × per-light, in solid-angle measure
+    uint flags;
+    int light_id;
 };
 
 struct MaterialProperties {

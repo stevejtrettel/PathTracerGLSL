@@ -27,8 +27,8 @@ Radiance transport_trace(Ray ray) {
         radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation. Explicit-xi light sampler is item 3.
-        LightSample ls = lighting_sample(hit.p);
+        // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
+        LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             Ray shadow_ray;
             shadow_ray.origin = hit.p + hit.frame.n * EPSILON;

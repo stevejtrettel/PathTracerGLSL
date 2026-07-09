@@ -31,7 +31,7 @@ export interface MaterialsDesc {
 }
 
 export type LightingDesc =
-    | { method: 'nee' };
+    | { method: 'nee'; selection: 'uniform' | 'power' };
 
 export type CameraDesc =
     | { type: 'pinhole'; fov: Value<number> };

@@ -214,12 +214,16 @@ struct Hit {
     vec2 uv;
 };
 
+// Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
+const uint LIGHT_DELTA = 1u;
+
 struct LightSample {
-    Direction wi;
-    Point position;
-    Spectrum radiance;
-    float distance;
-    float pdf;
+    Direction wi;         // toward the light, unit
+    float distance;       // to the sampled point (1e20 for directional/environment)
+    Spectrum radiance;    // incident radiance, WITHOUT visibility (delta lights fold 1/d² in)
+    float pdf;            // total: selection × per-light, in solid-angle measure
+    uint flags;
+    int light_id;
 };
 
 struct MaterialProperties {
@@ -591,15 +595,30 @@ float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, Mate
 Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
     return lambert_emission(wo, hit, mp);
 }
-// Generated light sampling
-LightSample lighting_sample(Point p) {
+// Point light — delta light sampler (§6.1 / reference §6.3).
+// Provides: point_light_sample(). Depends on: LightSample, LIGHT_DELTA, Point, Spectrum.
+// The per-kind library (mirrors lambert.glsl); the generated dispatcher calls it with the
+// light's baked constants. Delta light: 1/d² falloff is folded into radiance, per-light pdf = 1.
+
+LightSample point_light_sample(Point position, Spectrum intensity, Point p) {
+    vec3 d = position - p;
+    float d2 = dot(d, d);
+
     LightSample ls;
-    vec3 light_vector = vec3(0.0, 1.9, 0.0) - p;
-    ls.distance = length(light_vector);
-    ls.wi = normalize(light_vector);
-    ls.position = vec3(0.0, 1.9, 0.0);
-    ls.radiance = vec3(15.0, 15.0, 15.0) / (ls.distance * ls.distance);
-    ls.pdf = 1.0;
+    ls.wi       = d * inversesqrt(d2);
+    ls.distance = sqrt(d2);
+    ls.radiance = intensity / d2;      // falloff folded in (delta light, §6.1)
+    ls.pdf      = 1.0;                  // per-light pdf; selection pdf applied by the dispatcher
+    ls.flags    = LIGHT_DELTA;
+    ls.light_id = -1;                  // dispatcher sets the real id
+    return ls;
+}
+
+// Generated light selection dispatcher (§6.1)
+LightSample lighting_sample(Point p, vec2 xi) {
+    LightSample ls;
+    ls = point_light_sample(vec3(0.0, 1.9, 0.0), vec3(15.0, 15.0, 15.0), p);
+    ls.light_id = 0;
     return ls;
 }
 // Pinhole camera
@@ -658,8 +677,8 @@ Radiance transport_trace(Ray ray) {
         radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation. Explicit-xi light sampler is item 3.
-        LightSample ls = lighting_sample(hit.p);
+        // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
+        LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             Ray shadow_ray;
             shadow_ray.origin = hit.p + hit.frame.n * EPSILON;
@@ -761,89 +780,94 @@ void main() {
         "startLine": 12,
       },
       {
-        "endLine": 69,
+        "endLine": 73,
         "origin": "glsl/structs.glsl",
         "startLine": 24,
       },
       {
-        "endLine": 88,
+        "endLine": 92,
         "origin": "glsl/interaction.glsl",
-        "startLine": 70,
+        "startLine": 74,
       },
       {
-        "endLine": 129,
+        "endLine": 133,
         "origin": "glsl/rng.glsl",
-        "startLine": 89,
+        "startLine": 93,
       },
       {
-        "endLine": 161,
+        "endLine": 165,
         "origin": "glsl/math.glsl",
-        "startLine": 130,
+        "startLine": 134,
       },
       {
-        "endLine": 185,
+        "endLine": 189,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 162,
+        "startLine": 166,
       },
       {
-        "endLine": 202,
+        "endLine": 206,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 186,
+        "startLine": 190,
       },
       {
-        "endLine": 272,
+        "endLine": 276,
         "origin": "generated:sdf-dispatch",
-        "startLine": 203,
+        "startLine": 207,
       },
       {
-        "endLine": 284,
+        "endLine": 288,
         "origin": "generated:material-of",
-        "startLine": 273,
+        "startLine": 277,
       },
       {
-        "endLine": 356,
+        "endLine": 360,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 285,
+        "startLine": 289,
       },
       {
-        "endLine": 381,
+        "endLine": 385,
         "origin": "generated:material-lookup",
-        "startLine": 357,
+        "startLine": 361,
       },
       {
-        "endLine": 418,
+        "endLine": 422,
         "origin": "glsl/lambert.glsl",
-        "startLine": 382,
+        "startLine": 386,
       },
       {
-        "endLine": 431,
+        "endLine": 435,
         "origin": "generated:interaction-dispatch",
-        "startLine": 419,
+        "startLine": 423,
       },
       {
-        "endLine": 442,
+        "endLine": 454,
+        "origin": "glsl/light_point.glsl",
+        "startLine": 436,
+      },
+      {
+        "endLine": 461,
         "origin": "generated:light-sampling",
-        "startLine": 432,
+        "startLine": 455,
       },
       {
-        "endLine": 465,
+        "endLine": 484,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 443,
+        "startLine": 462,
       },
       {
-        "endLine": 469,
+        "endLine": 488,
         "origin": "generated:environment",
-        "startLine": 466,
+        "startLine": 485,
       },
       {
-        "endLine": 538,
+        "endLine": 557,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 470,
+        "startLine": 489,
       },
       {
-        "endLine": 564,
+        "endLine": 583,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 539,
+        "startLine": 558,
       },
     ],
   },
@@ -1134,12 +1158,16 @@ struct Hit {
     vec2 uv;
 };
 
+// Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
+const uint LIGHT_DELTA = 1u;
+
 struct LightSample {
-    Direction wi;
-    Point position;
-    Spectrum radiance;
-    float distance;
-    float pdf;
+    Direction wi;         // toward the light, unit
+    float distance;       // to the sampled point (1e20 for directional/environment)
+    Spectrum radiance;    // incident radiance, WITHOUT visibility (delta lights fold 1/d² in)
+    float pdf;            // total: selection × per-light, in solid-angle measure
+    uint flags;
+    int light_id;
 };
 
 struct MaterialProperties {
@@ -1454,15 +1482,30 @@ float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, Mate
 Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
     return lambert_emission(wo, hit, mp);
 }
-// Generated light sampling
-LightSample lighting_sample(Point p) {
+// Point light — delta light sampler (§6.1 / reference §6.3).
+// Provides: point_light_sample(). Depends on: LightSample, LIGHT_DELTA, Point, Spectrum.
+// The per-kind library (mirrors lambert.glsl); the generated dispatcher calls it with the
+// light's baked constants. Delta light: 1/d² falloff is folded into radiance, per-light pdf = 1.
+
+LightSample point_light_sample(Point position, Spectrum intensity, Point p) {
+    vec3 d = position - p;
+    float d2 = dot(d, d);
+
     LightSample ls;
-    vec3 light_vector = vec3(3.0, 4.0, 2.0) - p;
-    ls.distance = length(light_vector);
-    ls.wi = normalize(light_vector);
-    ls.position = vec3(3.0, 4.0, 2.0);
-    ls.radiance = vec3(30.0, 30.0, 30.0) / (ls.distance * ls.distance);
-    ls.pdf = 1.0;
+    ls.wi       = d * inversesqrt(d2);
+    ls.distance = sqrt(d2);
+    ls.radiance = intensity / d2;      // falloff folded in (delta light, §6.1)
+    ls.pdf      = 1.0;                  // per-light pdf; selection pdf applied by the dispatcher
+    ls.flags    = LIGHT_DELTA;
+    ls.light_id = -1;                  // dispatcher sets the real id
+    return ls;
+}
+
+// Generated light selection dispatcher (§6.1)
+LightSample lighting_sample(Point p, vec2 xi) {
+    LightSample ls;
+    ls = point_light_sample(vec3(3.0, 4.0, 2.0), vec3(30.0, 30.0, 30.0), p);
+    ls.light_id = 0;
     return ls;
 }
 // Pinhole camera
@@ -1521,8 +1564,8 @@ Radiance transport_trace(Ray ray) {
         radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation. Explicit-xi light sampler is item 3.
-        LightSample ls = lighting_sample(hit.p);
+        // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
+        LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             Ray shadow_ray;
             shadow_ray.origin = hit.p + hit.frame.n * EPSILON;
@@ -1624,89 +1667,94 @@ void main() {
         "startLine": 10,
       },
       {
-        "endLine": 67,
+        "endLine": 71,
         "origin": "glsl/structs.glsl",
         "startLine": 22,
       },
       {
-        "endLine": 86,
+        "endLine": 90,
         "origin": "glsl/interaction.glsl",
-        "startLine": 68,
+        "startLine": 72,
       },
       {
-        "endLine": 127,
+        "endLine": 131,
         "origin": "glsl/rng.glsl",
-        "startLine": 87,
+        "startLine": 91,
       },
       {
-        "endLine": 159,
+        "endLine": 163,
         "origin": "glsl/math.glsl",
-        "startLine": 128,
+        "startLine": 132,
       },
       {
-        "endLine": 183,
+        "endLine": 187,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 160,
+        "startLine": 164,
       },
       {
-        "endLine": 200,
+        "endLine": 204,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 184,
+        "startLine": 188,
       },
       {
-        "endLine": 227,
+        "endLine": 231,
         "origin": "generated:sdf-dispatch",
-        "startLine": 201,
+        "startLine": 205,
       },
       {
-        "endLine": 233,
+        "endLine": 237,
         "origin": "generated:material-of",
-        "startLine": 228,
+        "startLine": 232,
       },
       {
-        "endLine": 305,
+        "endLine": 309,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 234,
+        "startLine": 238,
       },
       {
-        "endLine": 322,
+        "endLine": 326,
         "origin": "generated:material-lookup",
-        "startLine": 306,
+        "startLine": 310,
       },
       {
-        "endLine": 359,
+        "endLine": 363,
         "origin": "glsl/lambert.glsl",
-        "startLine": 323,
+        "startLine": 327,
       },
       {
-        "endLine": 372,
+        "endLine": 376,
         "origin": "generated:interaction-dispatch",
-        "startLine": 360,
+        "startLine": 364,
       },
       {
-        "endLine": 383,
+        "endLine": 395,
+        "origin": "glsl/light_point.glsl",
+        "startLine": 377,
+      },
+      {
+        "endLine": 402,
         "origin": "generated:light-sampling",
-        "startLine": 373,
+        "startLine": 396,
       },
       {
-        "endLine": 406,
+        "endLine": 425,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 384,
+        "startLine": 403,
       },
       {
-        "endLine": 410,
+        "endLine": 429,
         "origin": "generated:environment",
-        "startLine": 407,
+        "startLine": 426,
       },
       {
-        "endLine": 479,
+        "endLine": 498,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 411,
+        "startLine": 430,
       },
       {
-        "endLine": 505,
+        "endLine": 524,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 480,
+        "startLine": 499,
       },
     ],
   },
@@ -1999,12 +2047,16 @@ struct Hit {
     vec2 uv;
 };
 
+// Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
+const uint LIGHT_DELTA = 1u;
+
 struct LightSample {
-    Direction wi;
-    Point position;
-    Spectrum radiance;
-    float distance;
-    float pdf;
+    Direction wi;         // toward the light, unit
+    float distance;       // to the sampled point (1e20 for directional/environment)
+    Spectrum radiance;    // incident radiance, WITHOUT visibility (delta lights fold 1/d² in)
+    float pdf;            // total: selection × per-light, in solid-angle measure
+    uint flags;
+    int light_id;
 };
 
 struct MaterialProperties {
@@ -2319,15 +2371,30 @@ float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, Mate
 Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
     return lambert_emission(wo, hit, mp);
 }
-// Generated light sampling
-LightSample lighting_sample(Point p) {
+// Point light — delta light sampler (§6.1 / reference §6.3).
+// Provides: point_light_sample(). Depends on: LightSample, LIGHT_DELTA, Point, Spectrum.
+// The per-kind library (mirrors lambert.glsl); the generated dispatcher calls it with the
+// light's baked constants. Delta light: 1/d² falloff is folded into radiance, per-light pdf = 1.
+
+LightSample point_light_sample(Point position, Spectrum intensity, Point p) {
+    vec3 d = position - p;
+    float d2 = dot(d, d);
+
     LightSample ls;
-    vec3 light_vector = vec3(3.0, 4.0, 2.0) - p;
-    ls.distance = length(light_vector);
-    ls.wi = normalize(light_vector);
-    ls.position = vec3(3.0, 4.0, 2.0);
-    ls.radiance = vec3(30.0, 30.0, 30.0) / (ls.distance * ls.distance);
-    ls.pdf = 1.0;
+    ls.wi       = d * inversesqrt(d2);
+    ls.distance = sqrt(d2);
+    ls.radiance = intensity / d2;      // falloff folded in (delta light, §6.1)
+    ls.pdf      = 1.0;                  // per-light pdf; selection pdf applied by the dispatcher
+    ls.flags    = LIGHT_DELTA;
+    ls.light_id = -1;                  // dispatcher sets the real id
+    return ls;
+}
+
+// Generated light selection dispatcher (§6.1)
+LightSample lighting_sample(Point p, vec2 xi) {
+    LightSample ls;
+    ls = point_light_sample(vec3(3.0, 4.0, 2.0), vec3(30.0, 30.0, 30.0), p);
+    ls.light_id = 0;
     return ls;
 }
 // Pinhole camera
@@ -2386,8 +2453,8 @@ Radiance transport_trace(Ray ray) {
         radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation. Explicit-xi light sampler is item 3.
-        LightSample ls = lighting_sample(hit.p);
+        // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
+        LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             Ray shadow_ray;
             shadow_ray.origin = hit.p + hit.frame.n * EPSILON;
@@ -2489,89 +2556,94 @@ void main() {
         "startLine": 12,
       },
       {
-        "endLine": 69,
+        "endLine": 73,
         "origin": "glsl/structs.glsl",
         "startLine": 24,
       },
       {
-        "endLine": 88,
+        "endLine": 92,
         "origin": "glsl/interaction.glsl",
-        "startLine": 70,
+        "startLine": 74,
       },
       {
-        "endLine": 129,
+        "endLine": 133,
         "origin": "glsl/rng.glsl",
-        "startLine": 89,
+        "startLine": 93,
       },
       {
-        "endLine": 161,
+        "endLine": 165,
         "origin": "glsl/math.glsl",
-        "startLine": 130,
+        "startLine": 134,
       },
       {
-        "endLine": 185,
+        "endLine": 189,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 162,
+        "startLine": 166,
       },
       {
-        "endLine": 202,
+        "endLine": 206,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 186,
+        "startLine": 190,
       },
       {
-        "endLine": 229,
+        "endLine": 233,
         "origin": "generated:sdf-dispatch",
-        "startLine": 203,
+        "startLine": 207,
       },
       {
-        "endLine": 235,
+        "endLine": 239,
         "origin": "generated:material-of",
-        "startLine": 230,
+        "startLine": 234,
       },
       {
-        "endLine": 307,
+        "endLine": 311,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 236,
+        "startLine": 240,
       },
       {
-        "endLine": 324,
+        "endLine": 328,
         "origin": "generated:material-lookup",
-        "startLine": 308,
+        "startLine": 312,
       },
       {
-        "endLine": 361,
+        "endLine": 365,
         "origin": "glsl/lambert.glsl",
-        "startLine": 325,
+        "startLine": 329,
       },
       {
-        "endLine": 374,
+        "endLine": 378,
         "origin": "generated:interaction-dispatch",
-        "startLine": 362,
+        "startLine": 366,
       },
       {
-        "endLine": 385,
+        "endLine": 397,
+        "origin": "glsl/light_point.glsl",
+        "startLine": 379,
+      },
+      {
+        "endLine": 404,
         "origin": "generated:light-sampling",
-        "startLine": 375,
+        "startLine": 398,
       },
       {
-        "endLine": 408,
+        "endLine": 427,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 386,
+        "startLine": 405,
       },
       {
-        "endLine": 412,
+        "endLine": 431,
         "origin": "generated:environment",
-        "startLine": 409,
+        "startLine": 428,
       },
       {
-        "endLine": 481,
+        "endLine": 500,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 413,
+        "startLine": 432,
       },
       {
-        "endLine": 507,
+        "endLine": 526,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 482,
+        "startLine": 501,
       },
     ],
   },

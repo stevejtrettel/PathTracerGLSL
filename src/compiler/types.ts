@@ -169,6 +169,9 @@ export interface RenderStrategy {
 export interface TransportDescription {
     maxBounces: number;
     directLighting: 'none' | 'nee' | 'mis';
+    /** Light-selection metric for NEE (compile-time). 'power' importance-samples brighter
+     *  lights (spectrum_average(color·intensity)); 'uniform' is the naive baseline. Default 'power'. */
+    lightSelection?: 'uniform' | 'power';
     russianRoulette: { enabled: boolean; startDepth: number };
     samplesPerFrame: number;
 }
