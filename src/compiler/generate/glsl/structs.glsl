@@ -24,8 +24,8 @@ struct Hit {
     float t;
     Point p;
     Frame frame;
-    int material_to;
-    int material_from;
+    int region_from;    // region on the incoming side (-1 = ambient) — §4.1
+    int region_to;      // region on the far side (owner, for single-region solids)
     vec2 uv;
 };
 

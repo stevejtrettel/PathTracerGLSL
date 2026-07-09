@@ -17,6 +17,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks: [
             { origin: 'glsl/sdf_primitives.glsl', source: sdfPrimitivesGLSL },
             { origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects) },
+            { origin: 'generated:material-of', source: generateMaterialOf(plan.objects) },
             { origin: 'glsl/raymarch.glsl', source: raymarchGLSL },
         ],
     };
@@ -41,15 +42,15 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
         lines.push('');
     }
 
-    // scene_sdf dispatch
-    lines.push('float scene_sdf(vec3 p, out int material) {');
+    // scene_sdf dispatch — returns the OWNER region (object index), not a material id (§2.3).
+    lines.push('float scene_sdf(vec3 p, out int region) {');
     lines.push(`    float d = 1e20;`);
     lines.push(`    float d_obj;`);
-    lines.push(`    material = 0;`);
+    lines.push(`    region = -1;`);
 
     for (const obj of objects) {
         lines.push(`    d_obj = sdf_object_${obj.index}(p);`);
-        lines.push(`    if (d_obj < d) { d = d_obj; material = ${obj.materialId}; }`);
+        lines.push(`    if (d_obj < d) { d = d_obj; region = ${obj.index}; }`);
     }
 
     lines.push(`    return d;`);
@@ -67,6 +68,19 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
     lines.push('    return d;');
     lines.push('}');
 
+    return lines.join('\n');
+}
+
+// Generated region → material table (§2.3). Regions may share a material; each object
+// is its own region while every object is single-region. material_of(-1) = -1 (vacuum).
+function generateMaterialOf(objects: PlannedSDFObject[]): string {
+    const lines: string[] = ['// Generated region -> material table (§2.3)'];
+    lines.push('int material_of(int region) {');
+    for (const obj of objects) {
+        lines.push(`    if (region == ${obj.index}) return ${obj.materialId};`);
+    }
+    lines.push('    return -1;'); // ambient / no region = vacuum
+    lines.push('}');
     return lines.join('\n');
 }
 

@@ -22,18 +22,18 @@ vec3 scene_normal(vec3 p) {
 
 bool scene_intersect(Ray ray, out Hit hit) {
     float t = ray.tmin;
-    int material = 0;
+    int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
-        float dist = scene_sdf(p, material);
+        float dist = scene_sdf(p, region);   // region = the owner (arg-min object)
 
         if (dist < MARCH_EPSILON) {
             hit.t = t;
             hit.p = p;
             hit.frame = ambient_frame(p, scene_normal(p));
-            hit.material_to = material;
-            hit.material_from = 0;
+            hit.region_to = region;      // far side = owner (single-region solids, §4.3)
+            hit.region_from = -1;        // ambient — no transmission yet (item 2); §4.2 classification later
             hit.uv = vec2(p.x * 0.1, p.z * 0.1);
             return true;
         }

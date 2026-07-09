@@ -19,7 +19,7 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        int mat = hit.material_to;                      // region identity is item 2; material_to for now
+        int mat = material_of(hit.region_to);           // §2.3: material derived from region (owner == region_to for solids)
         MaterialProperties props = scene_material_properties(mat, hit.p);
         Direction wo = -current_ray.direction;
 

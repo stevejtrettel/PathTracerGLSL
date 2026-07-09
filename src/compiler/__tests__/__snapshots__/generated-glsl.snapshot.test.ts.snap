@@ -209,8 +209,8 @@ struct Hit {
     float t;
     Point p;
     Frame frame;
-    int material_to;
-    int material_from;
+    int region_from;    // region on the incoming side (-1 = ambient) — §4.1
+    int region_to;      // region on the far side (owner, for single-region solids)
     vec2 uv;
 };
 
@@ -397,26 +397,26 @@ float sdf_object_7(vec3 p) {
     return sdf_sphere(p, vec3(0.0, 0.0, 0.0), 0.4);
 }
 
-float scene_sdf(vec3 p, out int material) {
+float scene_sdf(vec3 p, out int region) {
     float d = 1e20;
     float d_obj;
-    material = 0;
+    region = -1;
     d_obj = sdf_object_0(p);
-    if (d_obj < d) { d = d_obj; material = 3; }
+    if (d_obj < d) { d = d_obj; region = 0; }
     d_obj = sdf_object_1(p);
-    if (d_obj < d) { d = d_obj; material = 3; }
+    if (d_obj < d) { d = d_obj; region = 1; }
     d_obj = sdf_object_2(p);
-    if (d_obj < d) { d = d_obj; material = 3; }
+    if (d_obj < d) { d = d_obj; region = 2; }
     d_obj = sdf_object_3(p);
-    if (d_obj < d) { d = d_obj; material = 2; }
+    if (d_obj < d) { d = d_obj; region = 3; }
     d_obj = sdf_object_4(p);
-    if (d_obj < d) { d = d_obj; material = 1; }
+    if (d_obj < d) { d = d_obj; region = 4; }
     d_obj = sdf_object_5(p);
-    if (d_obj < d) { d = d_obj; material = 3; }
+    if (d_obj < d) { d = d_obj; region = 5; }
     d_obj = sdf_object_6(p);
-    if (d_obj < d) { d = d_obj; material = 3; }
+    if (d_obj < d) { d = d_obj; region = 6; }
     d_obj = sdf_object_7(p);
-    if (d_obj < d) { d = d_obj; material = 0; }
+    if (d_obj < d) { d = d_obj; region = 7; }
     return d;
 }
 
@@ -431,6 +431,18 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_6(p));
     d = min(d, sdf_object_7(p));
     return d;
+}
+// Generated region -> material table (§2.3)
+int material_of(int region) {
+    if (region == 0) return 3;
+    if (region == 1) return 3;
+    if (region == 2) return 3;
+    if (region == 3) return 2;
+    if (region == 4) return 1;
+    if (region == 5) return 3;
+    if (region == 6) return 3;
+    if (region == 7) return 0;
+    return -1;
 }
 // Raymarching Scene Infrastructure
 // Provides: scene_normal(), scene_intersect(), scene_intersect_any()
@@ -456,18 +468,18 @@ vec3 scene_normal(vec3 p) {
 
 bool scene_intersect(Ray ray, out Hit hit) {
     float t = ray.tmin;
-    int material = 0;
+    int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
-        float dist = scene_sdf(p, material);
+        float dist = scene_sdf(p, region);   // region = the owner (arg-min object)
 
         if (dist < MARCH_EPSILON) {
             hit.t = t;
             hit.p = p;
             hit.frame = ambient_frame(p, scene_normal(p));
-            hit.material_to = material;
-            hit.material_from = 0;
+            hit.region_to = region;      // far side = owner (single-region solids, §4.3)
+            hit.region_from = -1;        // ambient — no transmission yet (item 2); §4.2 classification later
             hit.uv = vec2(p.x * 0.1, p.z * 0.1);
             return true;
         }
@@ -638,7 +650,7 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        int mat = hit.material_to;                      // region identity is item 2; material_to for now
+        int mat = material_of(hit.region_to);           // §2.3: material derived from region (owner == region_to for solids)
         MaterialProperties props = scene_material_properties(mat, hit.p);
         Direction wo = -current_ray.direction;
 
@@ -784,49 +796,54 @@ void main() {
         "startLine": 203,
       },
       {
-        "endLine": 344,
-        "origin": "glsl/raymarch.glsl",
+        "endLine": 284,
+        "origin": "generated:material-of",
         "startLine": 273,
       },
       {
-        "endLine": 369,
+        "endLine": 356,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 285,
+      },
+      {
+        "endLine": 381,
         "origin": "generated:material-lookup",
-        "startLine": 345,
+        "startLine": 357,
       },
       {
-        "endLine": 406,
+        "endLine": 418,
         "origin": "glsl/lambert.glsl",
-        "startLine": 370,
+        "startLine": 382,
       },
       {
-        "endLine": 419,
+        "endLine": 431,
         "origin": "generated:interaction-dispatch",
-        "startLine": 407,
+        "startLine": 419,
       },
       {
-        "endLine": 430,
+        "endLine": 442,
         "origin": "generated:light-sampling",
-        "startLine": 420,
+        "startLine": 432,
       },
       {
-        "endLine": 453,
+        "endLine": 465,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 431,
+        "startLine": 443,
       },
       {
-        "endLine": 457,
+        "endLine": 469,
         "origin": "generated:environment",
-        "startLine": 454,
+        "startLine": 466,
       },
       {
-        "endLine": 526,
+        "endLine": 538,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 458,
+        "startLine": 470,
       },
       {
-        "endLine": 552,
+        "endLine": 564,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 527,
+        "startLine": 539,
       },
     ],
   },
@@ -1112,8 +1129,8 @@ struct Hit {
     float t;
     Point p;
     Frame frame;
-    int material_to;
-    int material_from;
+    int region_from;    // region on the incoming side (-1 = ambient) — §4.1
+    int region_to;      // region on the far side (owner, for single-region solids)
     vec2 uv;
 };
 
@@ -1275,14 +1292,14 @@ float sdf_object_1(vec3 p) {
     return sdf_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
 }
 
-float scene_sdf(vec3 p, out int material) {
+float scene_sdf(vec3 p, out int region) {
     float d = 1e20;
     float d_obj;
-    material = 0;
+    region = -1;
     d_obj = sdf_object_0(p);
-    if (d_obj < d) { d = d_obj; material = 0; }
+    if (d_obj < d) { d = d_obj; region = 0; }
     d_obj = sdf_object_1(p);
-    if (d_obj < d) { d = d_obj; material = 1; }
+    if (d_obj < d) { d = d_obj; region = 1; }
     return d;
 }
 
@@ -1291,6 +1308,12 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_0(p));
     d = min(d, sdf_object_1(p));
     return d;
+}
+// Generated region -> material table (§2.3)
+int material_of(int region) {
+    if (region == 0) return 0;
+    if (region == 1) return 1;
+    return -1;
 }
 // Raymarching Scene Infrastructure
 // Provides: scene_normal(), scene_intersect(), scene_intersect_any()
@@ -1316,18 +1339,18 @@ vec3 scene_normal(vec3 p) {
 
 bool scene_intersect(Ray ray, out Hit hit) {
     float t = ray.tmin;
-    int material = 0;
+    int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
-        float dist = scene_sdf(p, material);
+        float dist = scene_sdf(p, region);   // region = the owner (arg-min object)
 
         if (dist < MARCH_EPSILON) {
             hit.t = t;
             hit.p = p;
             hit.frame = ambient_frame(p, scene_normal(p));
-            hit.material_to = material;
-            hit.material_from = 0;
+            hit.region_to = region;      // far side = owner (single-region solids, §4.3)
+            hit.region_from = -1;        // ambient — no transmission yet (item 2); §4.2 classification later
             hit.uv = vec2(p.x * 0.1, p.z * 0.1);
             return true;
         }
@@ -1490,7 +1513,7 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        int mat = hit.material_to;                      // region identity is item 2; material_to for now
+        int mat = material_of(hit.region_to);           // §2.3: material derived from region (owner == region_to for solids)
         MaterialProperties props = scene_material_properties(mat, hit.p);
         Direction wo = -current_ray.direction;
 
@@ -1636,49 +1659,54 @@ void main() {
         "startLine": 201,
       },
       {
-        "endLine": 299,
-        "origin": "glsl/raymarch.glsl",
+        "endLine": 233,
+        "origin": "generated:material-of",
         "startLine": 228,
       },
       {
-        "endLine": 316,
+        "endLine": 305,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 234,
+      },
+      {
+        "endLine": 322,
         "origin": "generated:material-lookup",
-        "startLine": 300,
+        "startLine": 306,
       },
       {
-        "endLine": 353,
+        "endLine": 359,
         "origin": "glsl/lambert.glsl",
-        "startLine": 317,
+        "startLine": 323,
       },
       {
-        "endLine": 366,
+        "endLine": 372,
         "origin": "generated:interaction-dispatch",
-        "startLine": 354,
+        "startLine": 360,
       },
       {
-        "endLine": 377,
+        "endLine": 383,
         "origin": "generated:light-sampling",
-        "startLine": 367,
+        "startLine": 373,
       },
       {
-        "endLine": 400,
+        "endLine": 406,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 378,
+        "startLine": 384,
       },
       {
-        "endLine": 404,
+        "endLine": 410,
         "origin": "generated:environment",
-        "startLine": 401,
+        "startLine": 407,
       },
       {
-        "endLine": 473,
+        "endLine": 479,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 405,
+        "startLine": 411,
       },
       {
-        "endLine": 499,
+        "endLine": 505,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 474,
+        "startLine": 480,
       },
     ],
   },
@@ -1966,8 +1994,8 @@ struct Hit {
     float t;
     Point p;
     Frame frame;
-    int material_to;
-    int material_from;
+    int region_from;    // region on the incoming side (-1 = ambient) — §4.1
+    int region_to;      // region on the far side (owner, for single-region solids)
     vec2 uv;
 };
 
@@ -2129,14 +2157,14 @@ float sdf_object_1(vec3 p) {
     return sdf_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
 }
 
-float scene_sdf(vec3 p, out int material) {
+float scene_sdf(vec3 p, out int region) {
     float d = 1e20;
     float d_obj;
-    material = 0;
+    region = -1;
     d_obj = sdf_object_0(p);
-    if (d_obj < d) { d = d_obj; material = 0; }
+    if (d_obj < d) { d = d_obj; region = 0; }
     d_obj = sdf_object_1(p);
-    if (d_obj < d) { d = d_obj; material = 1; }
+    if (d_obj < d) { d = d_obj; region = 1; }
     return d;
 }
 
@@ -2145,6 +2173,12 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_0(p));
     d = min(d, sdf_object_1(p));
     return d;
+}
+// Generated region -> material table (§2.3)
+int material_of(int region) {
+    if (region == 0) return 0;
+    if (region == 1) return 1;
+    return -1;
 }
 // Raymarching Scene Infrastructure
 // Provides: scene_normal(), scene_intersect(), scene_intersect_any()
@@ -2170,18 +2204,18 @@ vec3 scene_normal(vec3 p) {
 
 bool scene_intersect(Ray ray, out Hit hit) {
     float t = ray.tmin;
-    int material = 0;
+    int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
-        float dist = scene_sdf(p, material);
+        float dist = scene_sdf(p, region);   // region = the owner (arg-min object)
 
         if (dist < MARCH_EPSILON) {
             hit.t = t;
             hit.p = p;
             hit.frame = ambient_frame(p, scene_normal(p));
-            hit.material_to = material;
-            hit.material_from = 0;
+            hit.region_to = region;      // far side = owner (single-region solids, §4.3)
+            hit.region_from = -1;        // ambient — no transmission yet (item 2); §4.2 classification later
             hit.uv = vec2(p.x * 0.1, p.z * 0.1);
             return true;
         }
@@ -2344,7 +2378,7 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        int mat = hit.material_to;                      // region identity is item 2; material_to for now
+        int mat = material_of(hit.region_to);           // §2.3: material derived from region (owner == region_to for solids)
         MaterialProperties props = scene_material_properties(mat, hit.p);
         Direction wo = -current_ray.direction;
 
@@ -2490,49 +2524,54 @@ void main() {
         "startLine": 203,
       },
       {
-        "endLine": 301,
-        "origin": "glsl/raymarch.glsl",
+        "endLine": 235,
+        "origin": "generated:material-of",
         "startLine": 230,
       },
       {
-        "endLine": 318,
+        "endLine": 307,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 236,
+      },
+      {
+        "endLine": 324,
         "origin": "generated:material-lookup",
-        "startLine": 302,
+        "startLine": 308,
       },
       {
-        "endLine": 355,
+        "endLine": 361,
         "origin": "glsl/lambert.glsl",
-        "startLine": 319,
+        "startLine": 325,
       },
       {
-        "endLine": 368,
+        "endLine": 374,
         "origin": "generated:interaction-dispatch",
-        "startLine": 356,
+        "startLine": 362,
       },
       {
-        "endLine": 379,
+        "endLine": 385,
         "origin": "generated:light-sampling",
-        "startLine": 369,
+        "startLine": 375,
       },
       {
-        "endLine": 402,
+        "endLine": 408,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 380,
+        "startLine": 386,
       },
       {
-        "endLine": 406,
+        "endLine": 412,
         "origin": "generated:environment",
-        "startLine": 403,
+        "startLine": 409,
       },
       {
-        "endLine": 475,
+        "endLine": 481,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 407,
+        "startLine": 413,
       },
       {
-        "endLine": 501,
+        "endLine": 507,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 476,
+        "startLine": 482,
       },
     ],
   },
