@@ -181,31 +181,31 @@ Radiance transport_trace(Ray primary) {
     Spectrum throughput = SPECTRUM_ONE;
     Radiance radiance   = SPECTRUM_ZERO;
 
-    GeodesicState s;  s.p = primary.origin;  s.v = primary.direction;
+    Ray   ray = primary;                              // pure geodesic seed (§5); advanced via ambient_geodesic
     int   current_medium = -1;                        // §4.4 — ambient
     // §6.2 bookkeeping (spans loop iterations):
     bool  prev_was_delta = true;                      // camera "bounce" counts as delta: emission at bounce 0 is full-weight
     float prev_bsdf_pdf  = 0.0;
-    Point prev_p         = s.p;
+    Point prev_p         = ray.origin;
     int   null_crossings = 0;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; /* increment at real events only (§7.2 pins) */) {
 
         // ---- 1. Advance through current_medium: medium event vs boundary event ----
         Hit hit;
-        bool boundary = scene_intersect(s, hit);      // stepper-driven march (§5)
+        bool boundary = scene_intersect(ray, hit);    // ambient_geodesic march (§5)
         float t_hit = boundary ? hit.t : RAY_TMAX;
 
         int med_mat = material_of(current_medium);
         if (med_mat >= 0 && medium_is_scattering(med_mat)) {          // compile-time specialized per scene
-            MediumProperties m = scene_medium_properties(med_mat, s.p);
+            MediumProperties m = scene_medium_properties(med_mat, ray.origin);
             Spectrum sigma_t = m.sigma_s + m.sigma_a;                 // spectral extinction
             float sigma_bar  = spectrum_average(sigma_t);             // scalar SAMPLING density
             float t_med = -log(max(1e-9, 1.0 - random())) / sigma_bar; // closed-form (V1-C1)
 
             if (t_med < t_hit) {
                 // ---- 2. MEDIUM EVENT ----
-                Point p_evt = ambient_geodesic_point(s, t_med);
+                Point p_evt = ambient_geodesic(ray.origin, ray.direction, t_med);
                 // CHROMATIC-EXTINCTION weight (audit fix): sampling used scalar σ̄, physics uses σ_t(λ).
                 // Exact weight = σ_s(λ)·e^{−σ_t(λ)t} / (σ̄·e^{−σ̄t}). Reduces to σ_s/σ_t for grayscale
                 // extinction; writing only σ_s/σ̄ silently biases every COLORED scattering medium.
@@ -217,13 +217,13 @@ Radiance transport_trace(Ray primary) {
                 if (ls.pdf > 0.0) {
                     Spectrum T = shadow_transmittance(p_evt, ls.wi, ls.distance);
                     // §2.2: NO cosine at medium events — phase functions have none
-                    radiance += throughput * ls.radiance * hg_eval(ls.wi, -s.v, m) * T / ls.pdf;
+                    radiance += throughput * ls.radiance * hg_eval(ls.wi, -ray.direction, m) * T / ls.pdf;
                 }
 
-                InteractionSample ms = hg_sample(-s.v, m, random2());
+                InteractionSample ms = hg_sample(-ray.direction, m, random2());
                 throughput *= ms.weight;
                 prev_was_delta = false;  prev_bsdf_pdf = ms.pdf;  prev_p = p_evt;
-                s = geodesic_restart(p_evt, ms.wi);
+                ray = make_ray(p_evt, ms.wi);          // continue from the medium event (no surface offset)
                 bounce++;                                             // medium events count (§7.2)
                 if (russian_roulette(throughput, bounce)) break;      // §7.2 pin
                 continue;
@@ -233,7 +233,7 @@ Radiance transport_trace(Ray primary) {
             throughput *= spectrum_exp(-(sigma_t - Spectrum(sigma_bar)) * t_hit);
         } else if (med_mat >= 0) {
             // absorbing-only medium (tinted glass interior): deterministic Beer–Lambert
-            MediumProperties m = scene_medium_properties(med_mat, s.p);
+            MediumProperties m = scene_medium_properties(med_mat, ray.origin);
             throughput *= spectrum_exp(-m.sigma_a * t_hit);
         }
 
@@ -241,7 +241,7 @@ Radiance transport_trace(Ray primary) {
         if (!boundary) {
             float w = (prev_was_delta || !ENV_SAMPLABLE) ? 1.0
                     : /* MIS later; NEE-only: */ 0.0;                 // env samplable + non-delta prev → NEE counted it
-            radiance += throughput * Spectrum(w) * environment_radiance(s.v);
+            radiance += throughput * Spectrum(w) * environment_radiance(ray.direction);
             break;
         }
 
@@ -251,7 +251,7 @@ Radiance transport_trace(Ray primary) {
         // ---- 4. NULL INTERFACE (§3.6) ----
         if (surface_is_null(hit)) {                                   // generated: owner material has surface:none
             current_medium = hit.region_to;
-            s = geodesic_restart_offset(hit, s.v);                    // same direction, offset past boundary
+            ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ray.direction);  // same dir, offset past boundary
             if (++null_crossings > MAX_NULL_CROSSINGS) break;
             continue;                                                 // no bounce consumed
         }
@@ -260,7 +260,7 @@ Radiance transport_trace(Ray primary) {
         int owner = hit_owner_region(hit);                            // §4.1: boundary owner shades
         int mat   = material_of(owner);
         MaterialProperties mp = scene_material_properties(mat, hit.p);
-        Direction wo = -s.v;
+        Direction wo = -ray.direction;
 
         // Emission with §6.2 bookkeeping. AUDIT FIX: emission keys on region_to (the §6.2 side
         // convention), NOT on the boundary owner — the owner shades the BSDF (§4.1), region_to
@@ -296,7 +296,7 @@ Radiance transport_trace(Ray primary) {
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
         prev_bsdf_pdf  = bs.pdf;  prev_p = hit.p;
 
-        s = geodesic_restart_offset(hit, bs.wi);
+        ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);   // continuation (§5, offset origin)
         bounce++;                                                     // surface events count (§7.2)
         if (russian_roulette(throughput, bounce)) break;
     }
@@ -526,47 +526,49 @@ The comparison direction (`d > best_d` among negatives) is the entire innermost-
 
 ---
 
-## 10. Geodesic steppers — Euclidean, and H³ as the swappability proof
+## 10. Ambient geodesics — Euclidean, and H³ as the swappability proof
+
+Ray advancement is `ambient_geodesic(origin, dir, t) → Point` per ambient space (§5) — **no stepper,
+no `GeodesicState`.** The Ray is a pure seed; the ambient module owns how the geodesic is evaluated.
 
 ```glsl
-// euclidean_stepper.glsl — the compiler inlines this to nothing (§5.2)
-void  geodesic_step    (inout GeodesicState s, float dt) { s.p += s.v * dt; }
-float geodesic_max_step(GeodesicState s)                 { return 1e20; }
-Direction geodesic_transport(GeodesicState a, GeodesicState b, Direction u) { return u; }
+// euclidean.glsl — the compiler inlines these to nothing (§5.2)
+Point     ambient_geodesic (Point o, Direction d, float t)     { return o + d * t; }
+float     ambient_dot      (Direction a, Direction b, Point p) { return dot(a, b); }
+Direction ambient_transport(Direction u, Point from, Point to) { return u; }
 ```
 
 ```glsl
-// h3_stepper.glsl — hyperbolic 3-space, hyperboloid model. Point/Direction are vec4 here (§5.3):
-// points on ⟨p,p⟩ = -1 (Minkowski signature +++-), velocities with ⟨v,v⟩ = 1, ⟨p,v⟩ = 0.
+// hyperbolic.glsl — H³, hyperboloid model. Point/Direction are vec4 here (§5.3):
+// points on ⟨p,p⟩ = -1 (Minkowski signature +++-), directions with ⟨d,d⟩ = 1, ⟨p,d⟩ = 0.
 float mdot(vec4 a, vec4 b) { return a.x*b.x + a.y*b.y + a.z*b.z - a.w*b.w; }
 
-void geodesic_step(inout GeodesicState s, float dt) {
-    // Exact geodesic flow — closed form, no ODE needed for constant curvature:
-    vec4 p = s.p * cosh(dt) + s.v * sinh(dt);
-    vec4 v = s.p * sinh(dt) + s.v * cosh(dt);
-    // Renormalize against float drift off the hyperboloid (the H³ analog of ray-direction renorm):
-    p /= sqrt(max(1e-9, -mdot(p, p)));
-    v -= mdot(v, p) * -p;  v /= sqrt(max(1e-9, mdot(v, v)));   // re-orthogonalize, re-unitize
-    s.p = p;  s.v = v;
+Point ambient_geodesic(Point o, Direction d, float t) {        // exact closed form — constant curvature
+    vec4 p = o * cosh(t) + d * sinh(t);
+    return p / sqrt(max(1e-9, -mdot(p, p)));                    // renormalize onto the hyperboloid vs float drift
 }
-float geodesic_max_step(GeodesicState s) { return 0.5; }   // bound per-step drift; tune vs renorm cost
-// Parallel transport along the geodesic from a to b: closed form in terms of the connecting geodesic —
-// transport keeps the component along the geodesic rotated with it, normal components fixed:
-Direction geodesic_transport(GeodesicState a, GeodesicState b, Direction u) {
-    float w = mdot(u, b.p);                    // how far u has drifted off b's tangent space
-    return u + w * b.p / max(1e-9, -mdot(b.p, b.p)) * 1.0;  // project into T_b(H³)  [proof-of-shape; exact form documented with the H³ library]
-}
+float ambient_dot(Direction a, Direction b, Point p) { return mdot(a, b); }
+// ambient_transport (parallel transport) is nontrivial in H³ — closed form in terms of the
+// connecting geodesic; derived with the H³ backend when that work starts (shape-normative here).
 ```
 
-The point of including H³ here is the *existence proof*: `Point` widened to `vec4`, the step is a different closed form, transport is nontrivial — and the march loop, the transport loop, and every contract above are untouched. Schwarzschild replaces `geodesic_step` with an RK4 integration of the geodesic equation and adds conserved-quantity fields to `GeodesicState`; still no loop rewrite. (The H³ transport shown is shape-normative, not numerics-normative — derive the exact expression with the H³ SDF library when that work starts; the SDF primitives themselves must also be hyperbolic-distance functions, which is the real work of an H³ backend.)
+The point of including H³ is the *existence proof*: `Point` widens to `vec4`, `ambient_geodesic` is a
+different closed form, the metric is `mdot` — and the march loop, the transport loop, and every
+contract above are untouched. Schwarzschild replaces `ambient_geodesic`'s **body** with an RK4
+integration of the geodesic ODE (internal to the ambient module — no new type, no loop rewrite). The
+H³ forms are shape-normative, not numerics-normative — derive exact transport with the H³ SDF library
+when that work starts; the SDF primitives must also be hyperbolic-distance functions, the real work
+of an H³ backend. **Open (§5.3):** the ray's *direction at a far hit* (the transported velocity the
+retired stepper used to carry) — needed for `wo` in curved space; a companion to `ambient_geodesic`
+or an `ambient_transport` of the seed direction, resolved when the first curved backend is built.
 
 ---
 
 ## 11. What writing this verified (and one more generated table)
 
-Producing real code stressed the contracts one final time. Result: **no contract changes needed**, one addition: the generated-tables family gains **`ior_of(region_id)`** (§2 of this doc) so dielectrics read the far side's IOR without a full material-properties fetch. Everything else — the Hit fields, the sample struct, the flags, `light_of`, `current_medium`, the stepper indirection — was sufficient to write Lambert, dielectric, GGX, HG, three light samplers, shadow transmittance, the full NEE loop, the MIS diff, and two geodesic steppers (including vec4-point H³) without inventing anything off-contract. That is the property the contracts were designed for; it now has an existence proof across every contract.
+Producing real code stressed the contracts one final time. Result: **no contract changes needed**, one addition: the generated-tables family gains **`ior_of(region_id)`** (§2 of this doc) so dielectrics read the far side's IOR without a full material-properties fetch. Everything else — the Hit fields, the sample struct, the flags, `light_of`, `current_medium`, the `ambient_geodesic` indirection — was sufficient to write Lambert, dielectric, GGX, HG, three light samplers, shadow transmittance, the full NEE loop, the MIS diff, and two `ambient_geodesic` forms (Euclidean + vec4-point H³) without inventing anything off-contract. That is the property the contracts were designed for; it now has an existence proof across every contract.
 
-**Second-pass audit (do not skip this step when extending this document).** After the code above was written, a hostile re-read against PBRT conventions found and fixed three real errors: an HG sign-convention bug (eval used the `+2gc` form with a forward-measured angle — forward/backward swapped *and* eval desynced from sample), missing chromatic-extinction ratio weights in the transport loop (silent bias for every colored scattering medium), and emission keyed on the boundary owner instead of `region_to` (contradicting §6.2 at exit interfaces). All three were the *plausible-looking* kind that renders images without complaint. The lesson is procedural: reference code gets its own adversarial pass, and the §11 harnesses (furnace, cross-strategy, pdf-histogram) remain the ground truth — paper audits reduce the bug count; they do not zero it. Known remaining paper-only items: the H³ transport expression (shape-normative, §10), the sphere-light p-inside-light case (OPEN), and every helper marked as pseudo (`scene_intersect_from`, `geodesic_restart*`).
+**Second-pass audit (do not skip this step when extending this document).** After the code above was written, a hostile re-read against PBRT conventions found and fixed three real errors: an HG sign-convention bug (eval used the `+2gc` form with a forward-measured angle — forward/backward swapped *and* eval desynced from sample), missing chromatic-extinction ratio weights in the transport loop (silent bias for every colored scattering medium), and emission keyed on the boundary owner instead of `region_to` (contradicting §6.2 at exit interfaces). All three were the *plausible-looking* kind that renders images without complaint. The lesson is procedural: reference code gets its own adversarial pass, and the §11 harnesses (furnace, cross-strategy, pdf-histogram) remain the ground truth — paper audits reduce the bug count; they do not zero it. Known remaining paper-only items: the H³ transport expression (shape-normative, §10), the sphere-light p-inside-light case (OPEN), and every helper marked as pseudo (`scene_intersect_from`).
 
 **Implementation checklist derived from this document** (each item is a transcription target + its test):
 
@@ -576,7 +578,7 @@ Producing real code stressed the contracts one final time. Result: **no contract
 | §9 tables + classifier | item 2 | T2 scene renders correctly |
 | §6 light samplers | item 3 | cross-strategy convergence (§11.2) |
 | §4 shadow transmittance | item 5 | foggy-Cornell scene |
-| §10 Euclidean stepper | item 7 | image-identical to current output |
+| §10 Euclidean `ambient_geodesic` | item 7 (no stepper — see trace-loop-contract) | image-identical to current output |
 | §5 transport loop | item 9 | §11.2 across pt / pt-nee |
 | §2 dielectric, §7 GGX, §3 HG | post-migration features | §11.1 + §11.3 per model |
 | §8 MIS diff | with area lights | §11.2 three-way |

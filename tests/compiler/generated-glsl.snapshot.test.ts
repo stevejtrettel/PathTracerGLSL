@@ -5,6 +5,7 @@ import { minimalScene, minimalStrategy, directOnlyStrategy } from '../../src/com
 import { cornellBox, cornellStrategy } from '../../src/compiler/scenes/cornellBox.js';
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '../../src/compiler/scenes/twoLightScene.js';
 import { furnaceBox, furnaceStrategy } from '../../src/compiler/scenes/furnaceBox.js';
+import { analyticMinimal, mixedScene, analyticStrategy } from '../../src/compiler/scenes/analyticScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -51,6 +52,9 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     ['two-light + power', twoLightScene, twoLightPowerStrategy],
     ['two-light + uniform', twoLightScene, twoLightUniformStrategy],
     ['furnace + no-direct', furnaceBox, furnaceStrategy],
+    // Analytic backend: all-analytic (cross-method twin of minimal) + mixed SDF/analytic dispatch.
+    ['analytic-minimal', analyticMinimal, analyticStrategy],
+    ['mixed backends', mixedScene, analyticStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

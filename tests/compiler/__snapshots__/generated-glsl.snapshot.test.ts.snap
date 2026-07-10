@@ -1,5 +1,879 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`generated GLSL snapshot (§2.10 refactor safety net) > analytic-minimal 1`] = `
+{
+  "exportTargets": {
+    "hdr": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
+    },
+  },
+  "id": "pathtracer-analytic-minimal",
+  "parameters": {
+    "camera.position": {
+      "default": [
+        0,
+        0,
+        8,
+      ],
+      "group": "Camera",
+      "name": "Position",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "camera.target": {
+      "default": [
+        0,
+        0,
+        0,
+      ],
+      "group": "Camera",
+      "name": "Target",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "environment.color": {
+      "default": [
+        0.1,
+        0.2,
+        0.45,
+      ],
+      "group": "Environment",
+      "name": "Sky color",
+      "triggersReset": true,
+      "type": "color",
+    },
+    "environment.intensity": {
+      "default": 1,
+      "group": "Environment",
+      "name": "Sky intensity",
+      "range": [
+        0,
+        5,
+      ],
+      "triggersReset": true,
+      "type": "float",
+    },
+  },
+  "pipeline": {
+    "framebuffers": [
+      {
+        "format": "rgba32f",
+        "id": "accumulation",
+        "type": "double_buffer",
+      },
+      {
+        "format": undefined,
+        "id": "screen",
+        "type": "screen",
+      },
+    ],
+    "passes": [
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "pathtracer-pass",
+        "inputs": {
+          "textures": {
+            "u_previous": "accumulation_previous",
+          },
+        },
+        "output": "accumulation_current",
+        "shader": "pathtracer-analytic-minimal-main",
+      },
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "display-pass",
+        "inputs": {
+          "textures": {
+            "u_radiance": "accumulation_current",
+          },
+        },
+        "output": "screen",
+        "shader": "pathtracer-analytic-minimal-display",
+      },
+    ],
+    "postFrame": {
+      "swaps": [
+        {
+          "buffers": [
+            "accumulation",
+          ],
+          "type": "swap",
+        },
+      ],
+    },
+  },
+  "shaders": {
+    "pathtracer-analytic-minimal-display": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+// Reinhard Tonemapping Display Pass
+// Full fragment shader for display pass
+// Reads HDR radiance, applies Reinhard + sRGB, outputs LDR
+
+uniform vec2 u_resolution;
+uniform sampler2D u_radiance;
+
+vec3 safe_color(vec3 c) {
+    c = max(c, vec3(0.0));
+    bvec3 ok = lessThanEqual(abs(c), vec3(1e19));
+    if (!(ok.x && ok.y && ok.z)) return vec3(0.0);
+    return c;
+}
+
+vec3 linear_to_srgb(vec3 c) {
+    vec3 lo = 12.92 * c;
+    vec3 hi = 1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055;
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    return mix(hi, lo, vec3(cutoff));
+}
+
+vec3 tonemap_reinhard(vec3 x) {
+    return x / (1.0 + x);
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec3 radiance = texture(u_radiance, uv).rgb;
+    vec3 color = safe_color(radiance);
+    color = tonemap_reinhard(color);
+    color = clamp(linear_to_srgb(color), 0.0, 1.0);
+    fragColor = vec4(color, 1.0);
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+    "pathtracer-analytic-minimal-main": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+
+#define TAN_FOV 0.4227932187381618
+#define MAX_BOUNCES 8
+#define ENABLE_NEE
+#define ENABLE_RUSSIAN_ROULETTE
+#define RR_START_DEPTH 3
+// Uniforms
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform int u_resetSalt;
+uniform vec3 u_cameraPosition;
+uniform vec3 u_cameraTarget;
+uniform vec2 u_imageSize;
+uniform vec3 u_environment_color;
+uniform float u_environment_intensity;
+uniform int u_sampleCount;
+uniform vec2 u_pixelOffset;
+uniform sampler2D u_previous;
+// Core struct definitions
+// Provides: Ray, Hit, Frame, LightSample, MaterialProperties
+
+#define Point vec3
+#define Direction vec3
+#define Spectrum vec3
+#define Radiance vec3
+
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
+struct Ray {
+    Point origin;
+    Direction direction;
+};
+
+struct Frame {
+    Point p;
+    Direction t;
+    Direction b;
+    Direction n;
+};
+
+struct Hit {
+    float t;
+    Point p;
+    Frame frame;
+    int region_from;    // region on the incoming side (-1 = ambient) — §4.1
+    int region_to;      // region on the far side (owner, for single-region solids)
+    vec2 uv;
+};
+
+// Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
+const uint LIGHT_DELTA = 1u;
+
+struct LightSample {
+    Direction wi;         // toward the light, unit
+    float distance;       // to the sampled point (1e20 for directional/environment)
+    Spectrum radiance;    // incident radiance, WITHOUT visibility (delta lights fold 1/d² in)
+    float pdf;            // total: selection × per-light, in solid-angle measure
+    uint flags;
+    int light_id;
+};
+
+struct MaterialProperties {
+    Spectrum albedo;
+    Spectrum emission;
+    float emission_strength;
+    float roughness;
+};
+
+// interaction.glsl — the unified scattering-event contract (§3.1/§3.2).
+// One InteractionSample serves surface BSDFs and (later) medium phase functions.
+// Depends on: structs.glsl (Direction, Spectrum typedefs).
+
+// Lobe / event flags. A flag earns its place only if transport branches on it.
+const uint LOBE_REFLECTION   = 1u;   // wi on the same side of the surface as wo
+const uint LOBE_TRANSMISSION = 2u;   // wi on the far side (drives medium update + offset sign)
+const uint LOBE_DELTA        = 4u;   // pdf is a Dirac delta; the pdf field is 0
+const uint LOBE_MEDIUM       = 8u;   // phase-function event, no surface (transport skips the cosine)
+// dropped LOBE_NULL      -> compile-time is_null_interface(hit) predicate (arrives with media, §3.6)
+// deferred LOBE_GLOSSY/DIFFUSE -> add when path regularization/guiding has a reader
+
+struct InteractionSample {
+    Direction wi;       // sampled next direction, world space
+    Spectrum  weight;   // throughput factor: f·|cosθi|/pdf (surface); phase/pdf (medium)
+    float     pdf;      // solid-angle pdf of the non-delta part; 0.0 for delta lobes
+    uint      flags;
+};
+
+// RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
+// Provides: rng_init(), random(), random2()
+//
+// Counter-based (not stateful) so the sample stream is an addressable field,
+// keeping the §2.9 stratification/QMC door a drop-in: rng_dim is the dimension
+// index; a later QMC swap replaces pcg4d(base, dim) with sobol(sampleIndex, dim).
+
+uint rng_base;   // per (pixel, sample, reset) seed
+uint rng_dim;    // dimension / draw index
+
+// Jarzynski–Olano "Hash Functions for GPU Rendering" — pcg4d
+uvec4 pcg4d(uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    v ^= v >> 16u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    return v;
+}
+
+// Seed on two independent axes: sampleCount (within a converging render) and
+// resetSalt (bumped per accumulation reset — kills replay + frozen-motion noise).
+void rng_init(uvec2 pixel, uint sampleCount, uint resetSalt) {
+    rng_base = pcg4d(uvec4(pixel, sampleCount, resetSalt)).x;
+    rng_dim = 0u;
+}
+
+uint rng_u32() {
+    return pcg4d(uvec4(rng_base, rng_dim++, 0u, 0u)).x;
+}
+
+// Top 24 bits scaled by 2^-24: exactly representable, guaranteed in [0, 1).
+// (Dividing the full u32 by 2^32-1 rounds values near the top UP to >= 1.0,
+// which NaN-poisons sqrt(1-xi) in cosine sampling and overruns CDF selection.)
+float random() {
+    return float(rng_u32() >> 8) * (1.0 / 16777216.0);
+}
+
+vec2 random2() {
+    return vec2(random(), random());
+}
+
+// Math utilities
+// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
+
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
+#define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
+
+// Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
+// literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
+const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
+const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
+float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
+bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
+
+void build_basis(vec3 n, out vec3 t, out vec3 b) {
+    vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    t = normalize(cross(up, n));
+    b = cross(n, t);
+}
+
+// Local shading space convention: Z-up (normal direction). cos_theta = local_dir.z
+vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
+    return local_dir.x * t + local_dir.y * b + local_dir.z * n;
+}
+
+// Euclidean Ambient Geometry
+// Flat-space geometric operations
+// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport()
+
+Point ambient_geodesic(Point origin, Direction dir, float t) {
+    return origin + dir * t;
+}
+
+Frame ambient_frame(Point p, Direction n) {
+    Direction nn = normalize(n);
+    Direction t = abs(nn.x) < 0.9 ? Direction(1.0, 0.0, 0.0) : Direction(0.0, 1.0, 0.0);
+    t = normalize(t - dot(t, nn) * nn);
+    Direction b = cross(nn, t);
+    return Frame(p, t, b, nn);
+}
+
+float ambient_dot(Direction v1, Direction v2, Point p) {
+    return dot(v1, v2);
+}
+
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
+    return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET (done by the caller via ambient_geodesic), so the origin passed here
+// is already off the surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion
+// passes a maxDist argument.
+// Provides: make_ray(). Depends on: Ray (structs).
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    return r;
+}
+
+// Closed-form ray–primitive intersection — the analytic geometry backend.
+// Straight-ray algebra because the tracer is Euclidean FOR NOW; closed-form geodesic–surface
+// intersection in curved spaces is a later job, not precluded (the abstraction doesn't assume
+// straight rays). Provides: ray_sphere(), ray_plane(). Depends on: Ray (structs).
+// (The dots below are Euclidean ray-geometry algebra — raw dot, not ambient_dot; see the
+//  trace-loop contract's metric rule. Moot while the tracer is flat.)
+
+// Nearest intersection ahead of the ray with a sphere (t > EPSILON). direction is unit → a = 1.
+// The FAR bound is the caller's job (t < hit.t for nearest-hit, t < maxDist for occlusion).
+bool ray_sphere(Ray ray, vec3 center, float radius, out float t) {
+    vec3 oc = ray.origin - center;
+    float b = dot(oc, ray.direction);
+    float c = dot(oc, oc) - radius * radius;
+    float disc = b * b - c;
+    if (disc < 0.0) return false;
+    float s = sqrt(disc);
+    float t0 = -b - s;
+    t = (t0 > EPSILON) ? t0 : (-b + s);   // nearer root if it's ahead, else the far root
+    return (t > EPSILON);
+}
+
+// Intersection with the plane dot(p, normal) + offset = 0 (matches the SDF plane convention).
+bool ray_plane(Ray ray, vec3 normal, float offset, out float t) {
+    float denom = dot(ray.direction, normal);
+    if (abs(denom) < 1e-8) return false;   // ray parallel to the plane
+    t = -(dot(ray.origin, normal) + offset) / denom;
+    return (t > EPSILON);
+}
+
+// Generated analytic dispatch
+bool analytic_intersect(Ray ray, inout Hit hit) {
+    bool found = false;
+    float t;
+    if (ray_plane(ray, vec3(0.0, 1.0, 0.0), 1.0, t) && t < hit.t) {
+        hit.t = t; found = true;
+        hit.p = ambient_geodesic(ray.origin, ray.direction, t);
+        hit.frame = ambient_frame(hit.p, vec3(0.0, 1.0, 0.0));
+        hit.region_to = 0; hit.region_from = -1;
+        hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);
+    }
+    if (ray_sphere(ray, vec3(0.0, 0.0, 0.0), 1.0, t) && t < hit.t) {
+        hit.t = t; found = true;
+        hit.p = ambient_geodesic(ray.origin, ray.direction, t);
+        hit.frame = ambient_frame(hit.p, normalize(hit.p - vec3(0.0, 0.0, 0.0)));
+        hit.region_to = 1; hit.region_from = -1;
+        hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);
+    }
+    return found;
+}
+
+bool analytic_intersect_any(Ray ray, float maxDist) {
+    float t;
+    if (ray_plane(ray, vec3(0.0, 1.0, 0.0), 1.0, t) && t < maxDist) return true;
+    if (ray_sphere(ray, vec3(0.0, 0.0, 0.0), 1.0, t) && t < maxDist) return true;
+    return false;
+}
+// Generated region -> material table (§2.3), across both backends
+int material_of(int region) {
+    if (region == 0) return 0;
+    if (region == 1) return 1;
+    return -1;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (analytic_intersect(ray, hit)) found = true;
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (analytic_intersect_any(ray, maxDist)) return true;
+    return false;
+}
+// Generated material properties lookup
+MaterialProperties scene_material_properties(int id, vec3 p) {
+    MaterialProperties props;
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
+    props.emission_strength = 0.0;
+    props.roughness = 1.0;
+    if (id == 0) {
+        props.albedo = vec3(0.6, 0.6, 0.6);
+        props.roughness = 1.0;
+    }
+    else if (id == 1) {
+        props.albedo = vec3(0.9, 0.2, 0.2);
+        props.roughness = 1.0;
+    }
+    return props;
+}
+// Lambert diffuse BRDF — conforms to §3.2 (transcribed from reference-implementations §1).
+// Fields read: mp.albedo, mp.emission. Reflection-only, non-delta.
+// Provides: lambert_eval(), lambert_sample(), lambert_pdf(), lambert_emission().
+// Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
+//             PI, TWO_PI, SPECTRUM_ZERO.
+
+Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
+    return mp.albedo * (1.0 / PI);
+}
+
+InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
+    Frame f = hit.frame;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
+    float cos_theta = sqrt(u.y);
+    float sin_theta = sqrt(max(0.0, 1.0 - u.y));
+    float phi = TWO_PI * u.x;
+
+    InteractionSample s;
+    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.weight = mp.albedo;                       // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
+    s.pdf    = cos_theta * (1.0 / PI);
+    s.flags  = LOBE_REFLECTION;
+    return s;
+}
+
+float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
+    return max(0.0, c) * (1.0 / PI);
+}
+
+Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
+    return mp.emission * mp.emission_strength;  // fixed struct still splits these (§3.4 defers the merge)
+}
+
+// Generated surface-interaction dispatch (§3.3)
+InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    return lambert_sample(wo, hit, mp, uc, u);
+}
+Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_eval(wi, wo, hit, mp);
+}
+float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_pdf(wi, wo, hit, mp);
+}
+Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_emission(wo, hit, mp);
+}
+// Shadow transmittance — opaque specialization (§6.3, revised per docs/trace-loop-contract.md).
+// Provides: shadow_transmittance(). Depends on: scene_intersect_any() (intersection),
+//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math).
+//
+// The contract returns a Spectrum: the per-channel fraction of light surviving the shadow ray.
+// This is the OPAQUE specialization the compiler emits when the scene has no media —
+// transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
+// spectral contract. When media exist the compiler emits the segment-walking form instead
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+}
+
+// Point light — delta light sampler (§6.1 / reference §6.3).
+// Provides: point_light_sample(). Depends on: LightSample, LIGHT_DELTA, Point, Spectrum.
+// The per-kind library (mirrors lambert.glsl); the generated dispatcher calls it with the
+// light's baked constants. Delta light: 1/d² falloff is folded into radiance, per-light pdf = 1.
+
+LightSample point_light_sample(Point position, Spectrum intensity, Point p) {
+    vec3 d = position - p;
+    float d2 = dot(d, d);
+
+    LightSample ls;
+    ls.wi       = d * inversesqrt(d2);
+    ls.distance = sqrt(d2);
+    ls.radiance = intensity / d2;      // falloff folded in (delta light, §6.1)
+    ls.pdf      = 1.0;                  // per-light pdf; selection pdf applied by the dispatcher
+    ls.flags    = LIGHT_DELTA;
+    ls.light_id = -1;                  // dispatcher sets the real id
+    return ls;
+}
+
+// Generated light selection dispatcher (§6.1)
+LightSample lighting_sample(Point p, vec2 xi) {
+    LightSample ls;
+    ls = point_light_sample(vec3(3.0, 4.0, 2.0), vec3(30.0, 30.0, 30.0), p);
+    ls.light_id = 0;
+    return ls;
+}
+// Pinhole camera
+// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraTarget
+
+Ray camera_generateRay(vec2 pixel, vec2 xi) {
+    vec2 jittered_pixel = pixel + (xi - 0.5);
+    vec2 ndc = (2.0 * jittered_pixel / u_imageSize) - 1.0;
+    float aspect = u_imageSize.x / u_imageSize.y;
+    ndc.x *= aspect;
+
+    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
+    vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+    vec3 up = cross(right, forward);
+
+    vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
+
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
+}
+
+// Environment radiance
+vec3 environment_radiance(vec3 dir) {
+    return u_environment_color * u_environment_intensity;
+}
+// Path trace loop
+// Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
+// Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
+
+Radiance transport_trace(Ray ray) {
+    Spectrum throughput = SPECTRUM_ONE;
+    Radiance radiance   = SPECTRUM_ZERO;
+    Ray current_ray = ray;
+
+    // §6.2 bookkeeping hook: tracked now, consumed when MIS / samplable environment land.
+    // The camera "bounce" counts as delta so bounce-0 emission would be full-weight. Inert for
+    // Lambert (never delta) until those readers exist — see docs/impl-plan-interaction-reshape.
+    bool prev_was_delta = true;
+
+    for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
+        Hit hit;
+        if (!scene_intersect(current_ray, hit)) {
+            radiance += throughput * environment_radiance(current_ray.direction);
+            break;
+        }
+
+        int mat = material_of(hit.region_to);           // §2.3: material derived from region (owner == region_to for solids)
+        MaterialProperties props = scene_material_properties(mat, hit.p);
+        Direction wo = -current_ray.direction;
+
+        // Emission (bare property read; the one-sided/region_to gating is item 2 + §6.2)
+        radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
+
+#ifdef ENABLE_NEE
+        // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
+        LightSample ls = lighting_sample(hit.p, random2());
+        if (ls.pdf > 0.0) {
+            // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
+            if (!spectrum_is_black(vis)) {
+                Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
+                radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
+            }
+        }
+#endif
+
+#ifdef ENABLE_RUSSIAN_ROULETTE
+        // Russian roulette
+        if (bounce >= RR_START_DEPTH) {
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+            if (random() > p_survive) break;
+            throughput /= p_survive;
+        }
+#endif
+
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
+    }
+
+    return radiance;
+}
+
+// Main function with progressive accumulation
+// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+
+void main() {
+    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
+    // Seed with the GLOBAL pixel (tile offset included) — seeding with the local
+    // gl_FragCoord replays the identical RNG stream in every tile of a tiled render.
+    // sampleCount decorrelates samples within a render; resetSalt (bumped per
+    // accumulation reset) decorrelates across resets (§2.11).
+    rng_init(uvec2(pixel), uint(u_sampleCount), uint(u_resetSalt));
+
+    vec2 xi = random2();
+    Ray ray = camera_generateRay(pixel, xi);
+    vec3 color = transport_trace(ray);
+
+    if (u_sampleCount == 0) {
+        fragColor = vec4(color, 1.0);
+    } else {
+        ivec2 coord = ivec2(gl_FragCoord.xy);
+        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
+        float n = float(u_sampleCount);
+        float new_weight = 1.0 / (n + 1.0);
+        fragColor = vec4(mix(previous, color, new_weight), 1.0);
+    }
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+  },
+  "sourceMaps": {
+    "pathtracer-analytic-minimal-display": [
+      {
+        "endLine": 5,
+        "origin": "generated:display-header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 39,
+        "origin": "glsl/tonemap_reinhard.glsl",
+        "startLine": 6,
+      },
+    ],
+    "pathtracer-analytic-minimal-main": [
+      {
+        "endLine": 11,
+        "origin": "generated:header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 23,
+        "origin": "generated:uniforms",
+        "startLine": 12,
+      },
+      {
+        "endLine": 74,
+        "origin": "glsl/structs.glsl",
+        "startLine": 24,
+      },
+      {
+        "endLine": 93,
+        "origin": "glsl/interaction.glsl",
+        "startLine": 75,
+      },
+      {
+        "endLine": 134,
+        "origin": "glsl/rng.glsl",
+        "startLine": 94,
+      },
+      {
+        "endLine": 165,
+        "origin": "glsl/math.glsl",
+        "startLine": 135,
+      },
+      {
+        "endLine": 189,
+        "origin": "glsl/euclidean.glsl",
+        "startLine": 166,
+      },
+      {
+        "endLine": 203,
+        "origin": "glsl/ray.glsl",
+        "startLine": 190,
+      },
+      {
+        "endLine": 232,
+        "origin": "glsl/analytic_primitives.glsl",
+        "startLine": 204,
+      },
+      {
+        "endLine": 259,
+        "origin": "generated:analytic-dispatch",
+        "startLine": 233,
+      },
+      {
+        "endLine": 265,
+        "origin": "generated:material-of",
+        "startLine": 260,
+      },
+      {
+        "endLine": 277,
+        "origin": "generated:scene-intersect",
+        "startLine": 266,
+      },
+      {
+        "endLine": 294,
+        "origin": "generated:material-lookup",
+        "startLine": 278,
+      },
+      {
+        "endLine": 332,
+        "origin": "glsl/lambert.glsl",
+        "startLine": 295,
+      },
+      {
+        "endLine": 345,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 333,
+      },
+      {
+        "endLine": 360,
+        "origin": "glsl/shadow_opaque.glsl",
+        "startLine": 346,
+      },
+      {
+        "endLine": 379,
+        "origin": "glsl/light_point.glsl",
+        "startLine": 361,
+      },
+      {
+        "endLine": 386,
+        "origin": "generated:light-sampling",
+        "startLine": 380,
+      },
+      {
+        "endLine": 404,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 387,
+      },
+      {
+        "endLine": 408,
+        "origin": "generated:environment",
+        "startLine": 405,
+      },
+      {
+        "endLine": 475,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 409,
+      },
+      {
+        "endLine": 501,
+        "origin": "glsl/main_accumulate.glsl",
+        "startLine": 476,
+      },
+    ],
+  },
+  "uniforms": [
+    {
+      "parameters": [
+        "engine.resolution",
+      ],
+      "type": "vec2",
+      "uniform": "u_resolution",
+    },
+    {
+      "parameters": [
+        "engine.time",
+      ],
+      "type": "float",
+      "uniform": "u_time",
+    },
+    {
+      "parameters": [
+        "engine.resetSalt",
+      ],
+      "type": "int",
+      "uniform": "u_resetSalt",
+    },
+    {
+      "parameters": [
+        "camera.position",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraPosition",
+    },
+    {
+      "parameters": [
+        "camera.target",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraTarget",
+    },
+    {
+      "parameters": [
+        "engine.imageSize",
+      ],
+      "type": "vec2",
+      "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "environment.color",
+      ],
+      "type": "vec3",
+      "uniform": "u_environment_color",
+    },
+    {
+      "parameters": [
+        "environment.intensity",
+      ],
+      "type": "float",
+      "uniform": "u_environment_intensity",
+    },
+    {
+      "parameters": [
+        "engine.sampleCount",
+      ],
+      "type": "int",
+      "uniform": "u_sampleCount",
+    },
+    {
+      "parameters": [
+        "engine.pixelOffset",
+      ],
+      "type": "vec2",
+      "uniform": "u_pixelOffset",
+    },
+  ],
+}
+`;
+
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell + pathtracer 1`] = `
 {
   "exportTargets": {
@@ -191,11 +1065,12 @@ uniform sampler2D u_previous;
 #define Spectrum vec3
 #define Radiance vec3
 
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
 struct Ray {
     Point origin;
     Direction direction;
-    float tmin;
-    float tmax;
 };
 
 struct Frame {
@@ -349,27 +1224,16 @@ Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
 }
 
 // Ray construction — see docs/trace-loop-contract.md.
-// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
-// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
-// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
-// matching the original optics/types.md vocabulary.
-// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET (done by the caller via ambient_geodesic), so the origin passed here
+// is already off the surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion
+// passes a maxDist argument.
+// Provides: make_ray(). Depends on: Ray (structs).
 
 Ray make_ray(Point origin, Direction dir) {
     Ray r;
     r.origin    = origin;
     r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = MAX_DIST;
-    return r;
-}
-
-Ray make_shadow_ray(Point origin, Direction dir, float dist) {
-    Ray r;
-    r.origin    = origin;
-    r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
     return r;
 }
 
@@ -460,21 +1324,10 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_7(p));
     return d;
 }
-// Generated region -> material table (§2.3)
-int material_of(int region) {
-    if (region == 0) return 3;
-    if (region == 1) return 3;
-    if (region == 2) return 3;
-    if (region == 3) return 2;
-    if (region == 4) return 1;
-    if (region == 5) return 3;
-    if (region == 6) return 3;
-    if (region == 7) return 0;
-    return -1;
-}
-// Raymarching Scene Infrastructure
-// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
+// Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
 // Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+// The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these.
 
 #ifndef MAX_MARCH_STEPS
 #define MAX_MARCH_STEPS 128
@@ -494,8 +1347,10 @@ vec3 scene_normal(vec3 p) {
     return normalize(n);
 }
 
-bool scene_intersect(Ray ray, out Hit hit) {
-    float t = ray.tmin;
+// March bounded by the running nearest (hit.t); on a closer surface fill the whole hit and return
+// true, else leave hit untouched. hit.t is both the far bound in and the hit distance out.
+bool sdf_intersect(Ray ray, inout Hit hit) {
+    float t = EPSILON;   // near bound (self-intersection handled by the origin offset)
     int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
@@ -512,7 +1367,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
             return true;
         }
 
-        if (t > ray.tmax) {
+        if (t > hit.t) {
             break;
         }
 
@@ -522,9 +1377,8 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray) {
-    float t = ray.tmin;
-    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
+bool sdf_intersect_any(Ray ray, float maxDist) {
+    float t = EPSILON;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -534,7 +1388,7 @@ bool scene_intersect_any(Ray ray) {
             return true;
         }
 
-        if (t > limit) {
+        if (t > maxDist) {
             break;
         }
 
@@ -544,6 +1398,30 @@ bool scene_intersect_any(Ray ray) {
     return false;
 }
 
+// Generated region -> material table (§2.3), across both backends
+int material_of(int region) {
+    if (region == 0) return 3;
+    if (region == 1) return 3;
+    if (region == 2) return 3;
+    if (region == 3) return 2;
+    if (region == 4) return 1;
+    if (region == 5) return 3;
+    if (region == 6) return 3;
+    if (region == 7) return 0;
+    return -1;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (sdf_intersect(ray, hit)) found = true;
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (sdf_intersect_any(ray, maxDist)) return true;
+    return false;
+}
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
@@ -628,11 +1506,11 @@ Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialPr
 // This is the OPAQUE specialization the compiler emits when the scene has no media —
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
-// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
-// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
 
-Spectrum shadow_transmittance(Ray shadow_ray) {
-    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -716,8 +1594,9 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
-            Spectrum vis = shadow_transmittance(shadow_ray);
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                 float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
@@ -812,104 +1691,109 @@ void main() {
         "startLine": 12,
       },
       {
-        "endLine": 73,
+        "endLine": 74,
         "origin": "glsl/structs.glsl",
         "startLine": 24,
       },
       {
-        "endLine": 92,
+        "endLine": 93,
         "origin": "glsl/interaction.glsl",
-        "startLine": 74,
+        "startLine": 75,
       },
       {
-        "endLine": 133,
+        "endLine": 134,
         "origin": "glsl/rng.glsl",
-        "startLine": 93,
+        "startLine": 94,
       },
       {
-        "endLine": 164,
+        "endLine": 165,
         "origin": "glsl/math.glsl",
-        "startLine": 134,
+        "startLine": 135,
       },
       {
-        "endLine": 188,
+        "endLine": 189,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 165,
+        "startLine": 166,
       },
       {
-        "endLine": 213,
+        "endLine": 203,
         "origin": "glsl/ray.glsl",
-        "startLine": 189,
+        "startLine": 190,
       },
       {
-        "endLine": 230,
+        "endLine": 220,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 214,
+        "startLine": 204,
       },
       {
-        "endLine": 300,
+        "endLine": 290,
         "origin": "generated:sdf-dispatch",
-        "startLine": 231,
+        "startLine": 221,
       },
       {
-        "endLine": 312,
-        "origin": "generated:material-of",
-        "startLine": 301,
-      },
-      {
-        "endLine": 384,
+        "endLine": 364,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 313,
+        "startLine": 291,
       },
       {
-        "endLine": 409,
+        "endLine": 376,
+        "origin": "generated:material-of",
+        "startLine": 365,
+      },
+      {
+        "endLine": 388,
+        "origin": "generated:scene-intersect",
+        "startLine": 377,
+      },
+      {
+        "endLine": 413,
         "origin": "generated:material-lookup",
-        "startLine": 385,
+        "startLine": 389,
       },
       {
-        "endLine": 447,
+        "endLine": 451,
         "origin": "glsl/lambert.glsl",
-        "startLine": 410,
+        "startLine": 414,
       },
       {
-        "endLine": 460,
+        "endLine": 464,
         "origin": "generated:interaction-dispatch",
-        "startLine": 448,
+        "startLine": 452,
       },
       {
-        "endLine": 475,
+        "endLine": 479,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 461,
+        "startLine": 465,
       },
       {
-        "endLine": 494,
+        "endLine": 498,
         "origin": "glsl/light_point.glsl",
-        "startLine": 476,
+        "startLine": 480,
       },
       {
-        "endLine": 501,
+        "endLine": 505,
         "origin": "generated:light-sampling",
-        "startLine": 495,
-      },
-      {
-        "endLine": 519,
-        "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 502,
+        "startLine": 499,
       },
       {
         "endLine": 523,
-        "origin": "generated:environment",
-        "startLine": 520,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 506,
       },
       {
-        "endLine": 589,
-        "origin": "glsl/path_trace.glsl",
+        "endLine": 527,
+        "origin": "generated:environment",
         "startLine": 524,
       },
       {
-        "endLine": 615,
+        "endLine": 594,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 528,
+      },
+      {
+        "endLine": 620,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 590,
+        "startLine": 595,
       },
     ],
   },
@@ -1152,11 +2036,12 @@ uniform sampler2D u_previous;
 #define Spectrum vec3
 #define Radiance vec3
 
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
 struct Ray {
     Point origin;
     Direction direction;
-    float tmin;
-    float tmax;
 };
 
 struct Frame {
@@ -1310,27 +2195,16 @@ Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
 }
 
 // Ray construction — see docs/trace-loop-contract.md.
-// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
-// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
-// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
-// matching the original optics/types.md vocabulary.
-// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET (done by the caller via ambient_geodesic), so the origin passed here
+// is already off the surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion
+// passes a maxDist argument.
+// Provides: make_ray(). Depends on: Ray (structs).
 
 Ray make_ray(Point origin, Direction dir) {
     Ray r;
     r.origin    = origin;
     r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = MAX_DIST;
-    return r;
-}
-
-Ray make_shadow_ray(Point origin, Direction dir, float dist) {
-    Ray r;
-    r.origin    = origin;
-    r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
     return r;
 }
 
@@ -1405,19 +2279,10 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_5(p));
     return d;
 }
-// Generated region -> material table (§2.3)
-int material_of(int region) {
-    if (region == 0) return 0;
-    if (region == 1) return 0;
-    if (region == 2) return 0;
-    if (region == 3) return 0;
-    if (region == 4) return 0;
-    if (region == 5) return 0;
-    return -1;
-}
-// Raymarching Scene Infrastructure
-// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
+// Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
 // Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+// The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these.
 
 #ifndef MAX_MARCH_STEPS
 #define MAX_MARCH_STEPS 128
@@ -1437,8 +2302,10 @@ vec3 scene_normal(vec3 p) {
     return normalize(n);
 }
 
-bool scene_intersect(Ray ray, out Hit hit) {
-    float t = ray.tmin;
+// March bounded by the running nearest (hit.t); on a closer surface fill the whole hit and return
+// true, else leave hit untouched. hit.t is both the far bound in and the hit distance out.
+bool sdf_intersect(Ray ray, inout Hit hit) {
+    float t = EPSILON;   // near bound (self-intersection handled by the origin offset)
     int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
@@ -1455,7 +2322,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
             return true;
         }
 
-        if (t > ray.tmax) {
+        if (t > hit.t) {
             break;
         }
 
@@ -1465,9 +2332,8 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray) {
-    float t = ray.tmin;
-    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
+bool sdf_intersect_any(Ray ray, float maxDist) {
+    float t = EPSILON;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -1477,7 +2343,7 @@ bool scene_intersect_any(Ray ray) {
             return true;
         }
 
-        if (t > limit) {
+        if (t > maxDist) {
             break;
         }
 
@@ -1487,6 +2353,28 @@ bool scene_intersect_any(Ray ray) {
     return false;
 }
 
+// Generated region -> material table (§2.3), across both backends
+int material_of(int region) {
+    if (region == 0) return 0;
+    if (region == 1) return 0;
+    if (region == 2) return 0;
+    if (region == 3) return 0;
+    if (region == 4) return 0;
+    if (region == 5) return 0;
+    return -1;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (sdf_intersect(ray, hit)) found = true;
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (sdf_intersect_any(ray, maxDist)) return true;
+    return false;
+}
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
@@ -1608,8 +2496,9 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
-            Spectrum vis = shadow_transmittance(shadow_ray);
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                 float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
@@ -1704,89 +2593,94 @@ void main() {
         "startLine": 9,
       },
       {
-        "endLine": 68,
+        "endLine": 69,
         "origin": "glsl/structs.glsl",
         "startLine": 19,
       },
       {
-        "endLine": 87,
+        "endLine": 88,
         "origin": "glsl/interaction.glsl",
-        "startLine": 69,
+        "startLine": 70,
       },
       {
-        "endLine": 128,
+        "endLine": 129,
         "origin": "glsl/rng.glsl",
-        "startLine": 88,
+        "startLine": 89,
       },
       {
-        "endLine": 159,
+        "endLine": 160,
         "origin": "glsl/math.glsl",
-        "startLine": 129,
+        "startLine": 130,
       },
       {
-        "endLine": 183,
+        "endLine": 184,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 160,
+        "startLine": 161,
       },
       {
-        "endLine": 208,
+        "endLine": 198,
         "origin": "glsl/ray.glsl",
-        "startLine": 184,
+        "startLine": 185,
       },
       {
-        "endLine": 225,
+        "endLine": 215,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 209,
+        "startLine": 199,
       },
       {
-        "endLine": 279,
+        "endLine": 269,
         "origin": "generated:sdf-dispatch",
-        "startLine": 226,
+        "startLine": 216,
       },
       {
-        "endLine": 289,
-        "origin": "generated:material-of",
-        "startLine": 280,
-      },
-      {
-        "endLine": 361,
+        "endLine": 343,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 290,
+        "startLine": 270,
       },
       {
-        "endLine": 376,
+        "endLine": 353,
+        "origin": "generated:material-of",
+        "startLine": 344,
+      },
+      {
+        "endLine": 365,
+        "origin": "generated:scene-intersect",
+        "startLine": 354,
+      },
+      {
+        "endLine": 380,
         "origin": "generated:material-lookup",
-        "startLine": 362,
+        "startLine": 366,
       },
       {
-        "endLine": 414,
+        "endLine": 418,
         "origin": "glsl/lambert.glsl",
-        "startLine": 377,
+        "startLine": 381,
       },
       {
-        "endLine": 427,
+        "endLine": 431,
         "origin": "generated:interaction-dispatch",
-        "startLine": 415,
-      },
-      {
-        "endLine": 445,
-        "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 428,
+        "startLine": 419,
       },
       {
         "endLine": 449,
-        "origin": "generated:environment",
-        "startLine": 446,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 432,
       },
       {
-        "endLine": 515,
-        "origin": "glsl/path_trace.glsl",
+        "endLine": 453,
+        "origin": "generated:environment",
         "startLine": 450,
       },
       {
-        "endLine": 541,
+        "endLine": 520,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 454,
+      },
+      {
+        "endLine": 546,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 516,
+        "startLine": 521,
       },
     ],
   },
@@ -2040,11 +2934,12 @@ uniform sampler2D u_previous;
 #define Spectrum vec3
 #define Radiance vec3
 
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
 struct Ray {
     Point origin;
     Direction direction;
-    float tmin;
-    float tmax;
 };
 
 struct Frame {
@@ -2198,27 +3093,16 @@ Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
 }
 
 // Ray construction — see docs/trace-loop-contract.md.
-// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
-// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
-// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
-// matching the original optics/types.md vocabulary.
-// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET (done by the caller via ambient_geodesic), so the origin passed here
+// is already off the surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion
+// passes a maxDist argument.
+// Provides: make_ray(). Depends on: Ray (structs).
 
 Ray make_ray(Point origin, Direction dir) {
     Ray r;
     r.origin    = origin;
     r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = MAX_DIST;
-    return r;
-}
-
-Ray make_shadow_ray(Point origin, Direction dir, float dist) {
-    Ray r;
-    r.origin    = origin;
-    r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
     return r;
 }
 
@@ -2266,15 +3150,10 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_1(p));
     return d;
 }
-// Generated region -> material table (§2.3)
-int material_of(int region) {
-    if (region == 0) return 0;
-    if (region == 1) return 1;
-    return -1;
-}
-// Raymarching Scene Infrastructure
-// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
+// Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
 // Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+// The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these.
 
 #ifndef MAX_MARCH_STEPS
 #define MAX_MARCH_STEPS 128
@@ -2294,8 +3173,10 @@ vec3 scene_normal(vec3 p) {
     return normalize(n);
 }
 
-bool scene_intersect(Ray ray, out Hit hit) {
-    float t = ray.tmin;
+// March bounded by the running nearest (hit.t); on a closer surface fill the whole hit and return
+// true, else leave hit untouched. hit.t is both the far bound in and the hit distance out.
+bool sdf_intersect(Ray ray, inout Hit hit) {
+    float t = EPSILON;   // near bound (self-intersection handled by the origin offset)
     int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
@@ -2312,7 +3193,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
             return true;
         }
 
-        if (t > ray.tmax) {
+        if (t > hit.t) {
             break;
         }
 
@@ -2322,9 +3203,8 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray) {
-    float t = ray.tmin;
-    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
+bool sdf_intersect_any(Ray ray, float maxDist) {
+    float t = EPSILON;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -2334,7 +3214,7 @@ bool scene_intersect_any(Ray ray) {
             return true;
         }
 
-        if (t > limit) {
+        if (t > maxDist) {
             break;
         }
 
@@ -2344,6 +3224,24 @@ bool scene_intersect_any(Ray ray) {
     return false;
 }
 
+// Generated region -> material table (§2.3), across both backends
+int material_of(int region) {
+    if (region == 0) return 0;
+    if (region == 1) return 1;
+    return -1;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (sdf_intersect(ray, hit)) found = true;
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (sdf_intersect_any(ray, maxDist)) return true;
+    return false;
+}
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
@@ -2420,11 +3318,11 @@ Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialPr
 // This is the OPAQUE specialization the compiler emits when the scene has no media —
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
-// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
-// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
 
-Spectrum shadow_transmittance(Ray shadow_ray) {
-    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -2508,8 +3406,9 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
-            Spectrum vis = shadow_transmittance(shadow_ray);
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                 float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
@@ -2604,104 +3503,109 @@ void main() {
         "startLine": 10,
       },
       {
-        "endLine": 71,
+        "endLine": 72,
         "origin": "glsl/structs.glsl",
         "startLine": 22,
       },
       {
-        "endLine": 90,
+        "endLine": 91,
         "origin": "glsl/interaction.glsl",
-        "startLine": 72,
+        "startLine": 73,
       },
       {
-        "endLine": 131,
+        "endLine": 132,
         "origin": "glsl/rng.glsl",
-        "startLine": 91,
+        "startLine": 92,
       },
       {
-        "endLine": 162,
+        "endLine": 163,
         "origin": "glsl/math.glsl",
-        "startLine": 132,
+        "startLine": 133,
       },
       {
-        "endLine": 186,
+        "endLine": 187,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 163,
+        "startLine": 164,
       },
       {
-        "endLine": 211,
+        "endLine": 201,
         "origin": "glsl/ray.glsl",
-        "startLine": 187,
+        "startLine": 188,
       },
       {
-        "endLine": 228,
+        "endLine": 218,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 212,
+        "startLine": 202,
       },
       {
-        "endLine": 255,
+        "endLine": 245,
         "origin": "generated:sdf-dispatch",
-        "startLine": 229,
+        "startLine": 219,
       },
       {
-        "endLine": 261,
-        "origin": "generated:material-of",
-        "startLine": 256,
-      },
-      {
-        "endLine": 333,
+        "endLine": 319,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 262,
+        "startLine": 246,
       },
       {
-        "endLine": 350,
+        "endLine": 325,
+        "origin": "generated:material-of",
+        "startLine": 320,
+      },
+      {
+        "endLine": 337,
+        "origin": "generated:scene-intersect",
+        "startLine": 326,
+      },
+      {
+        "endLine": 354,
         "origin": "generated:material-lookup",
-        "startLine": 334,
+        "startLine": 338,
       },
       {
-        "endLine": 388,
+        "endLine": 392,
         "origin": "glsl/lambert.glsl",
-        "startLine": 351,
+        "startLine": 355,
       },
       {
-        "endLine": 401,
+        "endLine": 405,
         "origin": "generated:interaction-dispatch",
-        "startLine": 389,
+        "startLine": 393,
       },
       {
-        "endLine": 416,
+        "endLine": 420,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 402,
+        "startLine": 406,
       },
       {
-        "endLine": 435,
+        "endLine": 439,
         "origin": "glsl/light_point.glsl",
-        "startLine": 417,
+        "startLine": 421,
       },
       {
-        "endLine": 442,
+        "endLine": 446,
         "origin": "generated:light-sampling",
-        "startLine": 436,
-      },
-      {
-        "endLine": 460,
-        "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 443,
+        "startLine": 440,
       },
       {
         "endLine": 464,
-        "origin": "generated:environment",
-        "startLine": 461,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 447,
       },
       {
-        "endLine": 530,
-        "origin": "glsl/path_trace.glsl",
+        "endLine": 468,
+        "origin": "generated:environment",
         "startLine": 465,
       },
       {
-        "endLine": 556,
+        "endLine": 535,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 469,
+      },
+      {
+        "endLine": 561,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 531,
+        "startLine": 536,
       },
     ],
   },
@@ -2971,11 +3875,12 @@ uniform sampler2D u_previous;
 #define Spectrum vec3
 #define Radiance vec3
 
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
 struct Ray {
     Point origin;
     Direction direction;
-    float tmin;
-    float tmax;
 };
 
 struct Frame {
@@ -3129,27 +4034,16 @@ Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
 }
 
 // Ray construction — see docs/trace-loop-contract.md.
-// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
-// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
-// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
-// matching the original optics/types.md vocabulary.
-// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET (done by the caller via ambient_geodesic), so the origin passed here
+// is already off the surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion
+// passes a maxDist argument.
+// Provides: make_ray(). Depends on: Ray (structs).
 
 Ray make_ray(Point origin, Direction dir) {
     Ray r;
     r.origin    = origin;
     r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = MAX_DIST;
-    return r;
-}
-
-Ray make_shadow_ray(Point origin, Direction dir, float dist) {
-    Ray r;
-    r.origin    = origin;
-    r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
     return r;
 }
 
@@ -3197,15 +4091,10 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_1(p));
     return d;
 }
-// Generated region -> material table (§2.3)
-int material_of(int region) {
-    if (region == 0) return 0;
-    if (region == 1) return 1;
-    return -1;
-}
-// Raymarching Scene Infrastructure
-// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
+// Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
 // Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+// The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these.
 
 #ifndef MAX_MARCH_STEPS
 #define MAX_MARCH_STEPS 128
@@ -3225,8 +4114,10 @@ vec3 scene_normal(vec3 p) {
     return normalize(n);
 }
 
-bool scene_intersect(Ray ray, out Hit hit) {
-    float t = ray.tmin;
+// March bounded by the running nearest (hit.t); on a closer surface fill the whole hit and return
+// true, else leave hit untouched. hit.t is both the far bound in and the hit distance out.
+bool sdf_intersect(Ray ray, inout Hit hit) {
+    float t = EPSILON;   // near bound (self-intersection handled by the origin offset)
     int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
@@ -3243,7 +4134,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
             return true;
         }
 
-        if (t > ray.tmax) {
+        if (t > hit.t) {
             break;
         }
 
@@ -3253,9 +4144,8 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray) {
-    float t = ray.tmin;
-    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
+bool sdf_intersect_any(Ray ray, float maxDist) {
+    float t = EPSILON;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -3265,7 +4155,7 @@ bool scene_intersect_any(Ray ray) {
             return true;
         }
 
-        if (t > limit) {
+        if (t > maxDist) {
             break;
         }
 
@@ -3275,6 +4165,24 @@ bool scene_intersect_any(Ray ray) {
     return false;
 }
 
+// Generated region -> material table (§2.3), across both backends
+int material_of(int region) {
+    if (region == 0) return 0;
+    if (region == 1) return 1;
+    return -1;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (sdf_intersect(ray, hit)) found = true;
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (sdf_intersect_any(ray, maxDist)) return true;
+    return false;
+}
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
@@ -3351,11 +4259,11 @@ Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialPr
 // This is the OPAQUE specialization the compiler emits when the scene has no media —
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
-// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
-// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
 
-Spectrum shadow_transmittance(Ray shadow_ray) {
-    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -3439,8 +4347,9 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
-            Spectrum vis = shadow_transmittance(shadow_ray);
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                 float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
@@ -3535,104 +4444,1116 @@ void main() {
         "startLine": 12,
       },
       {
-        "endLine": 73,
+        "endLine": 74,
         "origin": "glsl/structs.glsl",
         "startLine": 24,
       },
       {
-        "endLine": 92,
+        "endLine": 93,
         "origin": "glsl/interaction.glsl",
-        "startLine": 74,
+        "startLine": 75,
       },
       {
-        "endLine": 133,
+        "endLine": 134,
         "origin": "glsl/rng.glsl",
-        "startLine": 93,
+        "startLine": 94,
       },
       {
-        "endLine": 164,
+        "endLine": 165,
         "origin": "glsl/math.glsl",
-        "startLine": 134,
+        "startLine": 135,
       },
       {
-        "endLine": 188,
+        "endLine": 189,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 165,
+        "startLine": 166,
       },
       {
-        "endLine": 213,
+        "endLine": 203,
         "origin": "glsl/ray.glsl",
-        "startLine": 189,
+        "startLine": 190,
       },
       {
-        "endLine": 230,
+        "endLine": 220,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 214,
+        "startLine": 204,
       },
       {
-        "endLine": 257,
+        "endLine": 247,
         "origin": "generated:sdf-dispatch",
-        "startLine": 231,
+        "startLine": 221,
       },
       {
-        "endLine": 263,
-        "origin": "generated:material-of",
-        "startLine": 258,
-      },
-      {
-        "endLine": 335,
+        "endLine": 321,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 264,
+        "startLine": 248,
       },
       {
-        "endLine": 352,
+        "endLine": 327,
+        "origin": "generated:material-of",
+        "startLine": 322,
+      },
+      {
+        "endLine": 339,
+        "origin": "generated:scene-intersect",
+        "startLine": 328,
+      },
+      {
+        "endLine": 356,
         "origin": "generated:material-lookup",
-        "startLine": 336,
+        "startLine": 340,
       },
       {
-        "endLine": 390,
+        "endLine": 394,
         "origin": "glsl/lambert.glsl",
-        "startLine": 353,
+        "startLine": 357,
       },
       {
-        "endLine": 403,
+        "endLine": 407,
         "origin": "generated:interaction-dispatch",
-        "startLine": 391,
+        "startLine": 395,
       },
       {
-        "endLine": 418,
+        "endLine": 422,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 404,
+        "startLine": 408,
       },
       {
-        "endLine": 437,
+        "endLine": 441,
         "origin": "glsl/light_point.glsl",
-        "startLine": 419,
+        "startLine": 423,
       },
       {
-        "endLine": 444,
+        "endLine": 448,
         "origin": "generated:light-sampling",
-        "startLine": 438,
-      },
-      {
-        "endLine": 462,
-        "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 445,
+        "startLine": 442,
       },
       {
         "endLine": 466,
-        "origin": "generated:environment",
-        "startLine": 463,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 449,
       },
       {
-        "endLine": 532,
-        "origin": "glsl/path_trace.glsl",
+        "endLine": 470,
+        "origin": "generated:environment",
         "startLine": 467,
       },
       {
-        "endLine": 558,
+        "endLine": 537,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 471,
+      },
+      {
+        "endLine": 563,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 533,
+        "startLine": 538,
+      },
+    ],
+  },
+  "uniforms": [
+    {
+      "parameters": [
+        "engine.resolution",
+      ],
+      "type": "vec2",
+      "uniform": "u_resolution",
+    },
+    {
+      "parameters": [
+        "engine.time",
+      ],
+      "type": "float",
+      "uniform": "u_time",
+    },
+    {
+      "parameters": [
+        "engine.resetSalt",
+      ],
+      "type": "int",
+      "uniform": "u_resetSalt",
+    },
+    {
+      "parameters": [
+        "camera.position",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraPosition",
+    },
+    {
+      "parameters": [
+        "camera.target",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraTarget",
+    },
+    {
+      "parameters": [
+        "engine.imageSize",
+      ],
+      "type": "vec2",
+      "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "environment.color",
+      ],
+      "type": "vec3",
+      "uniform": "u_environment_color",
+    },
+    {
+      "parameters": [
+        "environment.intensity",
+      ],
+      "type": "float",
+      "uniform": "u_environment_intensity",
+    },
+    {
+      "parameters": [
+        "engine.sampleCount",
+      ],
+      "type": "int",
+      "uniform": "u_sampleCount",
+    },
+    {
+      "parameters": [
+        "engine.pixelOffset",
+      ],
+      "type": "vec2",
+      "uniform": "u_pixelOffset",
+    },
+  ],
+}
+`;
+
+exports[`generated GLSL snapshot (§2.10 refactor safety net) > mixed backends 1`] = `
+{
+  "exportTargets": {
+    "hdr": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
+    },
+  },
+  "id": "pathtracer-mixed",
+  "parameters": {
+    "camera.position": {
+      "default": [
+        0,
+        0,
+        8,
+      ],
+      "group": "Camera",
+      "name": "Position",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "camera.target": {
+      "default": [
+        0,
+        0,
+        0,
+      ],
+      "group": "Camera",
+      "name": "Target",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "environment.color": {
+      "default": [
+        0.08,
+        0.12,
+        0.2,
+      ],
+      "group": "Environment",
+      "name": "Sky color",
+      "triggersReset": true,
+      "type": "color",
+    },
+    "environment.intensity": {
+      "default": 1,
+      "group": "Environment",
+      "name": "Sky intensity",
+      "range": [
+        0,
+        5,
+      ],
+      "triggersReset": true,
+      "type": "float",
+    },
+  },
+  "pipeline": {
+    "framebuffers": [
+      {
+        "format": "rgba32f",
+        "id": "accumulation",
+        "type": "double_buffer",
+      },
+      {
+        "format": undefined,
+        "id": "screen",
+        "type": "screen",
+      },
+    ],
+    "passes": [
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "pathtracer-pass",
+        "inputs": {
+          "textures": {
+            "u_previous": "accumulation_previous",
+          },
+        },
+        "output": "accumulation_current",
+        "shader": "pathtracer-mixed-main",
+      },
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "display-pass",
+        "inputs": {
+          "textures": {
+            "u_radiance": "accumulation_current",
+          },
+        },
+        "output": "screen",
+        "shader": "pathtracer-mixed-display",
+      },
+    ],
+    "postFrame": {
+      "swaps": [
+        {
+          "buffers": [
+            "accumulation",
+          ],
+          "type": "swap",
+        },
+      ],
+    },
+  },
+  "shaders": {
+    "pathtracer-mixed-display": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+// Reinhard Tonemapping Display Pass
+// Full fragment shader for display pass
+// Reads HDR radiance, applies Reinhard + sRGB, outputs LDR
+
+uniform vec2 u_resolution;
+uniform sampler2D u_radiance;
+
+vec3 safe_color(vec3 c) {
+    c = max(c, vec3(0.0));
+    bvec3 ok = lessThanEqual(abs(c), vec3(1e19));
+    if (!(ok.x && ok.y && ok.z)) return vec3(0.0);
+    return c;
+}
+
+vec3 linear_to_srgb(vec3 c) {
+    vec3 lo = 12.92 * c;
+    vec3 hi = 1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055;
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    return mix(hi, lo, vec3(cutoff));
+}
+
+vec3 tonemap_reinhard(vec3 x) {
+    return x / (1.0 + x);
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec3 radiance = texture(u_radiance, uv).rgb;
+    vec3 color = safe_color(radiance);
+    color = tonemap_reinhard(color);
+    color = clamp(linear_to_srgb(color), 0.0, 1.0);
+    fragColor = vec4(color, 1.0);
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+    "pathtracer-mixed-main": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+
+#define TAN_FOV 0.4227932187381618
+#define MAX_BOUNCES 8
+#define ENABLE_NEE
+#define ENABLE_RUSSIAN_ROULETTE
+#define RR_START_DEPTH 3
+// Uniforms
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform int u_resetSalt;
+uniform vec3 u_cameraPosition;
+uniform vec3 u_cameraTarget;
+uniform vec2 u_imageSize;
+uniform vec3 u_environment_color;
+uniform float u_environment_intensity;
+uniform int u_sampleCount;
+uniform vec2 u_pixelOffset;
+uniform sampler2D u_previous;
+// Core struct definitions
+// Provides: Ray, Hit, Frame, LightSample, MaterialProperties
+
+#define Point vec3
+#define Direction vec3
+#define Spectrum vec3
+#define Radiance vec3
+
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
+struct Ray {
+    Point origin;
+    Direction direction;
+};
+
+struct Frame {
+    Point p;
+    Direction t;
+    Direction b;
+    Direction n;
+};
+
+struct Hit {
+    float t;
+    Point p;
+    Frame frame;
+    int region_from;    // region on the incoming side (-1 = ambient) — §4.1
+    int region_to;      // region on the far side (owner, for single-region solids)
+    vec2 uv;
+};
+
+// Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
+const uint LIGHT_DELTA = 1u;
+
+struct LightSample {
+    Direction wi;         // toward the light, unit
+    float distance;       // to the sampled point (1e20 for directional/environment)
+    Spectrum radiance;    // incident radiance, WITHOUT visibility (delta lights fold 1/d² in)
+    float pdf;            // total: selection × per-light, in solid-angle measure
+    uint flags;
+    int light_id;
+};
+
+struct MaterialProperties {
+    Spectrum albedo;
+    Spectrum emission;
+    float emission_strength;
+    float roughness;
+};
+
+// interaction.glsl — the unified scattering-event contract (§3.1/§3.2).
+// One InteractionSample serves surface BSDFs and (later) medium phase functions.
+// Depends on: structs.glsl (Direction, Spectrum typedefs).
+
+// Lobe / event flags. A flag earns its place only if transport branches on it.
+const uint LOBE_REFLECTION   = 1u;   // wi on the same side of the surface as wo
+const uint LOBE_TRANSMISSION = 2u;   // wi on the far side (drives medium update + offset sign)
+const uint LOBE_DELTA        = 4u;   // pdf is a Dirac delta; the pdf field is 0
+const uint LOBE_MEDIUM       = 8u;   // phase-function event, no surface (transport skips the cosine)
+// dropped LOBE_NULL      -> compile-time is_null_interface(hit) predicate (arrives with media, §3.6)
+// deferred LOBE_GLOSSY/DIFFUSE -> add when path regularization/guiding has a reader
+
+struct InteractionSample {
+    Direction wi;       // sampled next direction, world space
+    Spectrum  weight;   // throughput factor: f·|cosθi|/pdf (surface); phase/pdf (medium)
+    float     pdf;      // solid-angle pdf of the non-delta part; 0.0 for delta lobes
+    uint      flags;
+};
+
+// RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
+// Provides: rng_init(), random(), random2()
+//
+// Counter-based (not stateful) so the sample stream is an addressable field,
+// keeping the §2.9 stratification/QMC door a drop-in: rng_dim is the dimension
+// index; a later QMC swap replaces pcg4d(base, dim) with sobol(sampleIndex, dim).
+
+uint rng_base;   // per (pixel, sample, reset) seed
+uint rng_dim;    // dimension / draw index
+
+// Jarzynski–Olano "Hash Functions for GPU Rendering" — pcg4d
+uvec4 pcg4d(uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    v ^= v >> 16u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    return v;
+}
+
+// Seed on two independent axes: sampleCount (within a converging render) and
+// resetSalt (bumped per accumulation reset — kills replay + frozen-motion noise).
+void rng_init(uvec2 pixel, uint sampleCount, uint resetSalt) {
+    rng_base = pcg4d(uvec4(pixel, sampleCount, resetSalt)).x;
+    rng_dim = 0u;
+}
+
+uint rng_u32() {
+    return pcg4d(uvec4(rng_base, rng_dim++, 0u, 0u)).x;
+}
+
+// Top 24 bits scaled by 2^-24: exactly representable, guaranteed in [0, 1).
+// (Dividing the full u32 by 2^32-1 rounds values near the top UP to >= 1.0,
+// which NaN-poisons sqrt(1-xi) in cosine sampling and overruns CDF selection.)
+float random() {
+    return float(rng_u32() >> 8) * (1.0 / 16777216.0);
+}
+
+vec2 random2() {
+    return vec2(random(), random());
+}
+
+// Math utilities
+// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
+
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
+#define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
+
+// Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
+// literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
+const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
+const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
+float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
+bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
+
+void build_basis(vec3 n, out vec3 t, out vec3 b) {
+    vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    t = normalize(cross(up, n));
+    b = cross(n, t);
+}
+
+// Local shading space convention: Z-up (normal direction). cos_theta = local_dir.z
+vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
+    return local_dir.x * t + local_dir.y * b + local_dir.z * n;
+}
+
+// Euclidean Ambient Geometry
+// Flat-space geometric operations
+// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport()
+
+Point ambient_geodesic(Point origin, Direction dir, float t) {
+    return origin + dir * t;
+}
+
+Frame ambient_frame(Point p, Direction n) {
+    Direction nn = normalize(n);
+    Direction t = abs(nn.x) < 0.9 ? Direction(1.0, 0.0, 0.0) : Direction(0.0, 1.0, 0.0);
+    t = normalize(t - dot(t, nn) * nn);
+    Direction b = cross(nn, t);
+    return Frame(p, t, b, nn);
+}
+
+float ambient_dot(Direction v1, Direction v2, Point p) {
+    return dot(v1, v2);
+}
+
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
+    return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET (done by the caller via ambient_geodesic), so the origin passed here
+// is already off the surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion
+// passes a maxDist argument.
+// Provides: make_ray(). Depends on: Ray (structs).
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    return r;
+}
+
+// SDF Primitive Library
+// Provides: sdf_sphere(), sdf_plane(), sdf_box()
+// These are library functions — scene-specific SDF dispatch is generated by the compiler
+
+float sdf_sphere(vec3 p, vec3 center, float radius) {
+    return length(p - center) - radius;
+}
+
+float sdf_plane(vec3 p, vec3 normal, float offset) {
+    return dot(p, normal) + offset;
+}
+
+float sdf_box(vec3 p, vec3 center, vec3 half_size) {
+    vec3 d = abs(p - center) - half_size;
+    return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+// Generated SDF dispatch
+float sdf_object_1(vec3 p) {
+    p = p - vec3(-1.2, 0.0, 0.0);
+    return sdf_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
+}
+
+float scene_sdf(vec3 p, out int region) {
+    float d = 1e20;
+    float d_obj;
+    region = -1;
+    d_obj = sdf_object_1(p);
+    if (d_obj < d) { d = d_obj; region = 1; }
+    return d;
+}
+
+float scene_sdf_dist(vec3 p) {
+    float d = 1e20;
+    d = min(d, sdf_object_1(p));
+    return d;
+}
+// Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
+// Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
+// Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+// The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these.
+
+#ifndef MAX_MARCH_STEPS
+#define MAX_MARCH_STEPS 128
+#endif
+#define MARCH_EPSILON 0.0001
+#define NORMAL_EPSILON 0.001
+
+vec3 scene_normal(vec3 p) {
+    vec2 e = vec2(NORMAL_EPSILON, 0.0);
+
+    vec3 n = vec3(
+        scene_sdf_dist(p + e.xyy) - scene_sdf_dist(p - e.xyy),
+        scene_sdf_dist(p + e.yxy) - scene_sdf_dist(p - e.yxy),
+        scene_sdf_dist(p + e.yyx) - scene_sdf_dist(p - e.yyx)
+    );
+
+    return normalize(n);
+}
+
+// March bounded by the running nearest (hit.t); on a closer surface fill the whole hit and return
+// true, else leave hit untouched. hit.t is both the far bound in and the hit distance out.
+bool sdf_intersect(Ray ray, inout Hit hit) {
+    float t = EPSILON;   // near bound (self-intersection handled by the origin offset)
+    int region = -1;
+
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        float dist = scene_sdf(p, region);   // region = the owner (arg-min object)
+
+        if (dist < MARCH_EPSILON) {
+            hit.t = t;
+            hit.p = p;
+            hit.frame = ambient_frame(p, scene_normal(p));
+            hit.region_to = region;      // far side = owner (single-region solids, §4.3)
+            hit.region_from = -1;        // ambient — no transmission yet (item 2); §4.2 classification later
+            hit.uv = vec2(p.x * 0.1, p.z * 0.1);
+            return true;
+        }
+
+        if (t > hit.t) {
+            break;
+        }
+
+        t += dist;
+    }
+
+    return false;
+}
+
+bool sdf_intersect_any(Ray ray, float maxDist) {
+    float t = EPSILON;
+
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        float dist = scene_sdf_dist(p);
+
+        if (dist < MARCH_EPSILON) {
+            return true;
+        }
+
+        if (t > maxDist) {
+            break;
+        }
+
+        t += dist;
+    }
+
+    return false;
+}
+
+// Closed-form ray–primitive intersection — the analytic geometry backend.
+// Straight-ray algebra because the tracer is Euclidean FOR NOW; closed-form geodesic–surface
+// intersection in curved spaces is a later job, not precluded (the abstraction doesn't assume
+// straight rays). Provides: ray_sphere(), ray_plane(). Depends on: Ray (structs).
+// (The dots below are Euclidean ray-geometry algebra — raw dot, not ambient_dot; see the
+//  trace-loop contract's metric rule. Moot while the tracer is flat.)
+
+// Nearest intersection ahead of the ray with a sphere (t > EPSILON). direction is unit → a = 1.
+// The FAR bound is the caller's job (t < hit.t for nearest-hit, t < maxDist for occlusion).
+bool ray_sphere(Ray ray, vec3 center, float radius, out float t) {
+    vec3 oc = ray.origin - center;
+    float b = dot(oc, ray.direction);
+    float c = dot(oc, oc) - radius * radius;
+    float disc = b * b - c;
+    if (disc < 0.0) return false;
+    float s = sqrt(disc);
+    float t0 = -b - s;
+    t = (t0 > EPSILON) ? t0 : (-b + s);   // nearer root if it's ahead, else the far root
+    return (t > EPSILON);
+}
+
+// Intersection with the plane dot(p, normal) + offset = 0 (matches the SDF plane convention).
+bool ray_plane(Ray ray, vec3 normal, float offset, out float t) {
+    float denom = dot(ray.direction, normal);
+    if (abs(denom) < 1e-8) return false;   // ray parallel to the plane
+    t = -(dot(ray.origin, normal) + offset) / denom;
+    return (t > EPSILON);
+}
+
+// Generated analytic dispatch
+bool analytic_intersect(Ray ray, inout Hit hit) {
+    bool found = false;
+    float t;
+    if (ray_plane(ray, vec3(0.0, 1.0, 0.0), 1.0, t) && t < hit.t) {
+        hit.t = t; found = true;
+        hit.p = ambient_geodesic(ray.origin, ray.direction, t);
+        hit.frame = ambient_frame(hit.p, vec3(0.0, 1.0, 0.0));
+        hit.region_to = 0; hit.region_from = -1;
+        hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);
+    }
+    if (ray_sphere(ray, vec3(1.2, 0.0, 0.0), 1.0, t) && t < hit.t) {
+        hit.t = t; found = true;
+        hit.p = ambient_geodesic(ray.origin, ray.direction, t);
+        hit.frame = ambient_frame(hit.p, normalize(hit.p - vec3(1.2, 0.0, 0.0)));
+        hit.region_to = 2; hit.region_from = -1;
+        hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);
+    }
+    return found;
+}
+
+bool analytic_intersect_any(Ray ray, float maxDist) {
+    float t;
+    if (ray_plane(ray, vec3(0.0, 1.0, 0.0), 1.0, t) && t < maxDist) return true;
+    if (ray_sphere(ray, vec3(1.2, 0.0, 0.0), 1.0, t) && t < maxDist) return true;
+    return false;
+}
+// Generated region -> material table (§2.3), across both backends
+int material_of(int region) {
+    if (region == 0) return 1;
+    if (region == 1) return 2;
+    if (region == 2) return 0;
+    return -1;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (analytic_intersect(ray, hit)) found = true;
+    if (sdf_intersect(ray, hit)) found = true;
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (analytic_intersect_any(ray, maxDist)) return true;
+    if (sdf_intersect_any(ray, maxDist)) return true;
+    return false;
+}
+// Generated material properties lookup
+MaterialProperties scene_material_properties(int id, vec3 p) {
+    MaterialProperties props;
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
+    props.emission_strength = 0.0;
+    props.roughness = 1.0;
+    if (id == 0) {
+        props.albedo = vec3(0.2, 0.3, 0.9);
+        props.roughness = 1.0;
+    }
+    else if (id == 1) {
+        props.albedo = vec3(0.6, 0.6, 0.6);
+        props.roughness = 1.0;
+    }
+    else if (id == 2) {
+        props.albedo = vec3(0.9, 0.2, 0.2);
+        props.roughness = 1.0;
+    }
+    return props;
+}
+// Lambert diffuse BRDF — conforms to §3.2 (transcribed from reference-implementations §1).
+// Fields read: mp.albedo, mp.emission. Reflection-only, non-delta.
+// Provides: lambert_eval(), lambert_sample(), lambert_pdf(), lambert_emission().
+// Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
+//             PI, TWO_PI, SPECTRUM_ZERO.
+
+Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
+    return mp.albedo * (1.0 / PI);
+}
+
+InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
+    Frame f = hit.frame;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
+    float cos_theta = sqrt(u.y);
+    float sin_theta = sqrt(max(0.0, 1.0 - u.y));
+    float phi = TWO_PI * u.x;
+
+    InteractionSample s;
+    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.weight = mp.albedo;                       // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
+    s.pdf    = cos_theta * (1.0 / PI);
+    s.flags  = LOBE_REFLECTION;
+    return s;
+}
+
+float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
+    return max(0.0, c) * (1.0 / PI);
+}
+
+Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
+    return mp.emission * mp.emission_strength;  // fixed struct still splits these (§3.4 defers the merge)
+}
+
+// Generated surface-interaction dispatch (§3.3)
+InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    return lambert_sample(wo, hit, mp, uc, u);
+}
+Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_eval(wi, wo, hit, mp);
+}
+float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_pdf(wi, wo, hit, mp);
+}
+Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_emission(wo, hit, mp);
+}
+// Shadow transmittance — opaque specialization (§6.3, revised per docs/trace-loop-contract.md).
+// Provides: shadow_transmittance(). Depends on: scene_intersect_any() (intersection),
+//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math).
+//
+// The contract returns a Spectrum: the per-channel fraction of light surviving the shadow ray.
+// This is the OPAQUE specialization the compiler emits when the scene has no media —
+// transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
+// spectral contract. When media exist the compiler emits the segment-walking form instead
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+}
+
+// Point light — delta light sampler (§6.1 / reference §6.3).
+// Provides: point_light_sample(). Depends on: LightSample, LIGHT_DELTA, Point, Spectrum.
+// The per-kind library (mirrors lambert.glsl); the generated dispatcher calls it with the
+// light's baked constants. Delta light: 1/d² falloff is folded into radiance, per-light pdf = 1.
+
+LightSample point_light_sample(Point position, Spectrum intensity, Point p) {
+    vec3 d = position - p;
+    float d2 = dot(d, d);
+
+    LightSample ls;
+    ls.wi       = d * inversesqrt(d2);
+    ls.distance = sqrt(d2);
+    ls.radiance = intensity / d2;      // falloff folded in (delta light, §6.1)
+    ls.pdf      = 1.0;                  // per-light pdf; selection pdf applied by the dispatcher
+    ls.flags    = LIGHT_DELTA;
+    ls.light_id = -1;                  // dispatcher sets the real id
+    return ls;
+}
+
+// Generated light selection dispatcher (§6.1)
+LightSample lighting_sample(Point p, vec2 xi) {
+    LightSample ls;
+    ls = point_light_sample(vec3(2.0, 5.0, 3.0), vec3(40.0, 40.0, 40.0), p);
+    ls.light_id = 0;
+    return ls;
+}
+// Pinhole camera
+// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraTarget
+
+Ray camera_generateRay(vec2 pixel, vec2 xi) {
+    vec2 jittered_pixel = pixel + (xi - 0.5);
+    vec2 ndc = (2.0 * jittered_pixel / u_imageSize) - 1.0;
+    float aspect = u_imageSize.x / u_imageSize.y;
+    ndc.x *= aspect;
+
+    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
+    vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+    vec3 up = cross(right, forward);
+
+    vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
+
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
+}
+
+// Environment radiance
+vec3 environment_radiance(vec3 dir) {
+    return u_environment_color * u_environment_intensity;
+}
+// Path trace loop
+// Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
+// Optional: ENABLE_NEE, ENABLE_RUSSIAN_ROULETTE, RR_START_DEPTH (defines)
+
+Radiance transport_trace(Ray ray) {
+    Spectrum throughput = SPECTRUM_ONE;
+    Radiance radiance   = SPECTRUM_ZERO;
+    Ray current_ray = ray;
+
+    // §6.2 bookkeeping hook: tracked now, consumed when MIS / samplable environment land.
+    // The camera "bounce" counts as delta so bounce-0 emission would be full-weight. Inert for
+    // Lambert (never delta) until those readers exist — see docs/impl-plan-interaction-reshape.
+    bool prev_was_delta = true;
+
+    for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
+        Hit hit;
+        if (!scene_intersect(current_ray, hit)) {
+            radiance += throughput * environment_radiance(current_ray.direction);
+            break;
+        }
+
+        int mat = material_of(hit.region_to);           // §2.3: material derived from region (owner == region_to for solids)
+        MaterialProperties props = scene_material_properties(mat, hit.p);
+        Direction wo = -current_ray.direction;
+
+        // Emission (bare property read; the one-sided/region_to gating is item 2 + §6.2)
+        radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
+
+#ifdef ENABLE_NEE
+        // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
+        LightSample ls = lighting_sample(hit.p, random2());
+        if (ls.pdf > 0.0) {
+            // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
+            if (!spectrum_is_black(vis)) {
+                Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
+                radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
+            }
+        }
+#endif
+
+#ifdef ENABLE_RUSSIAN_ROULETTE
+        // Russian roulette
+        if (bounce >= RR_START_DEPTH) {
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+            if (random() > p_survive) break;
+            throughput /= p_survive;
+        }
+#endif
+
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
+    }
+
+    return radiance;
+}
+
+// Main function with progressive accumulation
+// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+
+void main() {
+    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
+    // Seed with the GLOBAL pixel (tile offset included) — seeding with the local
+    // gl_FragCoord replays the identical RNG stream in every tile of a tiled render.
+    // sampleCount decorrelates samples within a render; resetSalt (bumped per
+    // accumulation reset) decorrelates across resets (§2.11).
+    rng_init(uvec2(pixel), uint(u_sampleCount), uint(u_resetSalt));
+
+    vec2 xi = random2();
+    Ray ray = camera_generateRay(pixel, xi);
+    vec3 color = transport_trace(ray);
+
+    if (u_sampleCount == 0) {
+        fragColor = vec4(color, 1.0);
+    } else {
+        ivec2 coord = ivec2(gl_FragCoord.xy);
+        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
+        float n = float(u_sampleCount);
+        float new_weight = 1.0 / (n + 1.0);
+        fragColor = vec4(mix(previous, color, new_weight), 1.0);
+    }
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+  },
+  "sourceMaps": {
+    "pathtracer-mixed-display": [
+      {
+        "endLine": 5,
+        "origin": "generated:display-header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 39,
+        "origin": "glsl/tonemap_reinhard.glsl",
+        "startLine": 6,
+      },
+    ],
+    "pathtracer-mixed-main": [
+      {
+        "endLine": 11,
+        "origin": "generated:header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 23,
+        "origin": "generated:uniforms",
+        "startLine": 12,
+      },
+      {
+        "endLine": 74,
+        "origin": "glsl/structs.glsl",
+        "startLine": 24,
+      },
+      {
+        "endLine": 93,
+        "origin": "glsl/interaction.glsl",
+        "startLine": 75,
+      },
+      {
+        "endLine": 134,
+        "origin": "glsl/rng.glsl",
+        "startLine": 94,
+      },
+      {
+        "endLine": 165,
+        "origin": "glsl/math.glsl",
+        "startLine": 135,
+      },
+      {
+        "endLine": 189,
+        "origin": "glsl/euclidean.glsl",
+        "startLine": 166,
+      },
+      {
+        "endLine": 203,
+        "origin": "glsl/ray.glsl",
+        "startLine": 190,
+      },
+      {
+        "endLine": 220,
+        "origin": "glsl/sdf_primitives.glsl",
+        "startLine": 204,
+      },
+      {
+        "endLine": 240,
+        "origin": "generated:sdf-dispatch",
+        "startLine": 221,
+      },
+      {
+        "endLine": 314,
+        "origin": "glsl/raymarch.glsl",
+        "startLine": 241,
+      },
+      {
+        "endLine": 343,
+        "origin": "glsl/analytic_primitives.glsl",
+        "startLine": 315,
+      },
+      {
+        "endLine": 370,
+        "origin": "generated:analytic-dispatch",
+        "startLine": 344,
+      },
+      {
+        "endLine": 377,
+        "origin": "generated:material-of",
+        "startLine": 371,
+      },
+      {
+        "endLine": 391,
+        "origin": "generated:scene-intersect",
+        "startLine": 378,
+      },
+      {
+        "endLine": 412,
+        "origin": "generated:material-lookup",
+        "startLine": 392,
+      },
+      {
+        "endLine": 450,
+        "origin": "glsl/lambert.glsl",
+        "startLine": 413,
+      },
+      {
+        "endLine": 463,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 451,
+      },
+      {
+        "endLine": 478,
+        "origin": "glsl/shadow_opaque.glsl",
+        "startLine": 464,
+      },
+      {
+        "endLine": 497,
+        "origin": "glsl/light_point.glsl",
+        "startLine": 479,
+      },
+      {
+        "endLine": 504,
+        "origin": "generated:light-sampling",
+        "startLine": 498,
+      },
+      {
+        "endLine": 522,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 505,
+      },
+      {
+        "endLine": 526,
+        "origin": "generated:environment",
+        "startLine": 523,
+      },
+      {
+        "endLine": 593,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 527,
+      },
+      {
+        "endLine": 619,
+        "origin": "glsl/main_accumulate.glsl",
+        "startLine": 594,
       },
     ],
   },
@@ -3876,11 +5797,12 @@ uniform sampler2D u_previous;
 #define Spectrum vec3
 #define Radiance vec3
 
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
 struct Ray {
     Point origin;
     Direction direction;
-    float tmin;
-    float tmax;
 };
 
 struct Frame {
@@ -4034,27 +5956,16 @@ Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
 }
 
 // Ray construction — see docs/trace-loop-contract.md.
-// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
-// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
-// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
-// matching the original optics/types.md vocabulary.
-// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET (done by the caller via ambient_geodesic), so the origin passed here
+// is already off the surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion
+// passes a maxDist argument.
+// Provides: make_ray(). Depends on: Ray (structs).
 
 Ray make_ray(Point origin, Direction dir) {
     Ray r;
     r.origin    = origin;
     r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = MAX_DIST;
-    return r;
-}
-
-Ray make_shadow_ray(Point origin, Direction dir, float dist) {
-    Ray r;
-    r.origin    = origin;
-    r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
     return r;
 }
 
@@ -4117,17 +6028,10 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_3(p));
     return d;
 }
-// Generated region -> material table (§2.3)
-int material_of(int region) {
-    if (region == 0) return 0;
-    if (region == 1) return 0;
-    if (region == 2) return 1;
-    if (region == 3) return 1;
-    return -1;
-}
-// Raymarching Scene Infrastructure
-// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
+// Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
 // Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+// The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these.
 
 #ifndef MAX_MARCH_STEPS
 #define MAX_MARCH_STEPS 128
@@ -4147,8 +6051,10 @@ vec3 scene_normal(vec3 p) {
     return normalize(n);
 }
 
-bool scene_intersect(Ray ray, out Hit hit) {
-    float t = ray.tmin;
+// March bounded by the running nearest (hit.t); on a closer surface fill the whole hit and return
+// true, else leave hit untouched. hit.t is both the far bound in and the hit distance out.
+bool sdf_intersect(Ray ray, inout Hit hit) {
+    float t = EPSILON;   // near bound (self-intersection handled by the origin offset)
     int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
@@ -4165,7 +6071,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
             return true;
         }
 
-        if (t > ray.tmax) {
+        if (t > hit.t) {
             break;
         }
 
@@ -4175,9 +6081,8 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray) {
-    float t = ray.tmin;
-    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
+bool sdf_intersect_any(Ray ray, float maxDist) {
+    float t = EPSILON;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -4187,7 +6092,7 @@ bool scene_intersect_any(Ray ray) {
             return true;
         }
 
-        if (t > limit) {
+        if (t > maxDist) {
             break;
         }
 
@@ -4197,6 +6102,26 @@ bool scene_intersect_any(Ray ray) {
     return false;
 }
 
+// Generated region -> material table (§2.3), across both backends
+int material_of(int region) {
+    if (region == 0) return 0;
+    if (region == 1) return 0;
+    if (region == 2) return 1;
+    if (region == 3) return 1;
+    return -1;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (sdf_intersect(ray, hit)) found = true;
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (sdf_intersect_any(ray, maxDist)) return true;
+    return false;
+}
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
@@ -4273,11 +6198,11 @@ Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialPr
 // This is the OPAQUE specialization the compiler emits when the scene has no media —
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
-// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
-// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
 
-Spectrum shadow_transmittance(Ray shadow_ray) {
-    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -4366,8 +6291,9 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
-            Spectrum vis = shadow_transmittance(shadow_ray);
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                 float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
@@ -4462,104 +6388,109 @@ void main() {
         "startLine": 10,
       },
       {
-        "endLine": 69,
+        "endLine": 70,
         "origin": "glsl/structs.glsl",
         "startLine": 20,
       },
       {
-        "endLine": 88,
+        "endLine": 89,
         "origin": "glsl/interaction.glsl",
-        "startLine": 70,
+        "startLine": 71,
       },
       {
-        "endLine": 129,
+        "endLine": 130,
         "origin": "glsl/rng.glsl",
-        "startLine": 89,
+        "startLine": 90,
       },
       {
-        "endLine": 160,
+        "endLine": 161,
         "origin": "glsl/math.glsl",
-        "startLine": 130,
+        "startLine": 131,
       },
       {
-        "endLine": 184,
+        "endLine": 185,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 161,
+        "startLine": 162,
       },
       {
-        "endLine": 209,
+        "endLine": 199,
         "origin": "glsl/ray.glsl",
-        "startLine": 185,
+        "startLine": 186,
       },
       {
-        "endLine": 226,
+        "endLine": 216,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 210,
+        "startLine": 200,
       },
       {
-        "endLine": 268,
+        "endLine": 258,
         "origin": "generated:sdf-dispatch",
-        "startLine": 227,
+        "startLine": 217,
       },
       {
-        "endLine": 276,
-        "origin": "generated:material-of",
-        "startLine": 269,
-      },
-      {
-        "endLine": 348,
+        "endLine": 332,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 277,
+        "startLine": 259,
       },
       {
-        "endLine": 365,
+        "endLine": 340,
+        "origin": "generated:material-of",
+        "startLine": 333,
+      },
+      {
+        "endLine": 352,
+        "origin": "generated:scene-intersect",
+        "startLine": 341,
+      },
+      {
+        "endLine": 369,
         "origin": "generated:material-lookup",
-        "startLine": 349,
+        "startLine": 353,
       },
       {
-        "endLine": 403,
+        "endLine": 407,
         "origin": "glsl/lambert.glsl",
-        "startLine": 366,
+        "startLine": 370,
       },
       {
-        "endLine": 416,
+        "endLine": 420,
         "origin": "generated:interaction-dispatch",
-        "startLine": 404,
+        "startLine": 408,
       },
       {
-        "endLine": 431,
+        "endLine": 435,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 417,
+        "startLine": 421,
       },
       {
-        "endLine": 450,
+        "endLine": 454,
         "origin": "glsl/light_point.glsl",
-        "startLine": 432,
+        "startLine": 436,
       },
       {
-        "endLine": 462,
+        "endLine": 466,
         "origin": "generated:light-sampling",
-        "startLine": 451,
-      },
-      {
-        "endLine": 480,
-        "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 463,
+        "startLine": 455,
       },
       {
         "endLine": 484,
-        "origin": "generated:environment",
-        "startLine": 481,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 467,
       },
       {
-        "endLine": 550,
-        "origin": "glsl/path_trace.glsl",
+        "endLine": 488,
+        "origin": "generated:environment",
         "startLine": 485,
       },
       {
-        "endLine": 576,
+        "endLine": 555,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 489,
+      },
+      {
+        "endLine": 581,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 551,
+        "startLine": 556,
       },
     ],
   },
@@ -4789,11 +6720,12 @@ uniform sampler2D u_previous;
 #define Spectrum vec3
 #define Radiance vec3
 
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
 struct Ray {
     Point origin;
     Direction direction;
-    float tmin;
-    float tmax;
 };
 
 struct Frame {
@@ -4947,27 +6879,16 @@ Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
 }
 
 // Ray construction — see docs/trace-loop-contract.md.
-// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
-// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
-// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
-// matching the original optics/types.md vocabulary.
-// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET (done by the caller via ambient_geodesic), so the origin passed here
+// is already off the surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion
+// passes a maxDist argument.
+// Provides: make_ray(). Depends on: Ray (structs).
 
 Ray make_ray(Point origin, Direction dir) {
     Ray r;
     r.origin    = origin;
     r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = MAX_DIST;
-    return r;
-}
-
-Ray make_shadow_ray(Point origin, Direction dir, float dist) {
-    Ray r;
-    r.origin    = origin;
-    r.direction = dir;
-    r.tmin      = EPSILON;
-    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
     return r;
 }
 
@@ -5030,17 +6951,10 @@ float scene_sdf_dist(vec3 p) {
     d = min(d, sdf_object_3(p));
     return d;
 }
-// Generated region -> material table (§2.3)
-int material_of(int region) {
-    if (region == 0) return 0;
-    if (region == 1) return 0;
-    if (region == 2) return 1;
-    if (region == 3) return 1;
-    return -1;
-}
-// Raymarching Scene Infrastructure
-// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
+// Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
 // Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+// The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these.
 
 #ifndef MAX_MARCH_STEPS
 #define MAX_MARCH_STEPS 128
@@ -5060,8 +6974,10 @@ vec3 scene_normal(vec3 p) {
     return normalize(n);
 }
 
-bool scene_intersect(Ray ray, out Hit hit) {
-    float t = ray.tmin;
+// March bounded by the running nearest (hit.t); on a closer surface fill the whole hit and return
+// true, else leave hit untouched. hit.t is both the far bound in and the hit distance out.
+bool sdf_intersect(Ray ray, inout Hit hit) {
+    float t = EPSILON;   // near bound (self-intersection handled by the origin offset)
     int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
@@ -5078,7 +6994,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
             return true;
         }
 
-        if (t > ray.tmax) {
+        if (t > hit.t) {
             break;
         }
 
@@ -5088,9 +7004,8 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray) {
-    float t = ray.tmin;
-    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
+bool sdf_intersect_any(Ray ray, float maxDist) {
+    float t = EPSILON;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -5100,7 +7015,7 @@ bool scene_intersect_any(Ray ray) {
             return true;
         }
 
-        if (t > limit) {
+        if (t > maxDist) {
             break;
         }
 
@@ -5110,6 +7025,26 @@ bool scene_intersect_any(Ray ray) {
     return false;
 }
 
+// Generated region -> material table (§2.3), across both backends
+int material_of(int region) {
+    if (region == 0) return 0;
+    if (region == 1) return 0;
+    if (region == 2) return 1;
+    if (region == 3) return 1;
+    return -1;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (sdf_intersect(ray, hit)) found = true;
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (sdf_intersect_any(ray, maxDist)) return true;
+    return false;
+}
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
@@ -5186,11 +7121,11 @@ Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialPr
 // This is the OPAQUE specialization the compiler emits when the scene has no media —
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
-// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
-// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
 
-Spectrum shadow_transmittance(Ray shadow_ray) {
-    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -5279,8 +7214,9 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
-            Spectrum vis = shadow_transmittance(shadow_ray);
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                 float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
@@ -5375,104 +7311,109 @@ void main() {
         "startLine": 10,
       },
       {
-        "endLine": 69,
+        "endLine": 70,
         "origin": "glsl/structs.glsl",
         "startLine": 20,
       },
       {
-        "endLine": 88,
+        "endLine": 89,
         "origin": "glsl/interaction.glsl",
-        "startLine": 70,
+        "startLine": 71,
       },
       {
-        "endLine": 129,
+        "endLine": 130,
         "origin": "glsl/rng.glsl",
-        "startLine": 89,
+        "startLine": 90,
       },
       {
-        "endLine": 160,
+        "endLine": 161,
         "origin": "glsl/math.glsl",
-        "startLine": 130,
+        "startLine": 131,
       },
       {
-        "endLine": 184,
+        "endLine": 185,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 161,
+        "startLine": 162,
       },
       {
-        "endLine": 209,
+        "endLine": 199,
         "origin": "glsl/ray.glsl",
-        "startLine": 185,
+        "startLine": 186,
       },
       {
-        "endLine": 226,
+        "endLine": 216,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 210,
+        "startLine": 200,
       },
       {
-        "endLine": 268,
+        "endLine": 258,
         "origin": "generated:sdf-dispatch",
-        "startLine": 227,
+        "startLine": 217,
       },
       {
-        "endLine": 276,
-        "origin": "generated:material-of",
-        "startLine": 269,
-      },
-      {
-        "endLine": 348,
+        "endLine": 332,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 277,
+        "startLine": 259,
       },
       {
-        "endLine": 365,
+        "endLine": 340,
+        "origin": "generated:material-of",
+        "startLine": 333,
+      },
+      {
+        "endLine": 352,
+        "origin": "generated:scene-intersect",
+        "startLine": 341,
+      },
+      {
+        "endLine": 369,
         "origin": "generated:material-lookup",
-        "startLine": 349,
+        "startLine": 353,
       },
       {
-        "endLine": 403,
+        "endLine": 407,
         "origin": "glsl/lambert.glsl",
-        "startLine": 366,
+        "startLine": 370,
       },
       {
-        "endLine": 416,
+        "endLine": 420,
         "origin": "generated:interaction-dispatch",
-        "startLine": 404,
+        "startLine": 408,
       },
       {
-        "endLine": 431,
+        "endLine": 435,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 417,
+        "startLine": 421,
       },
       {
-        "endLine": 450,
+        "endLine": 454,
         "origin": "glsl/light_point.glsl",
-        "startLine": 432,
+        "startLine": 436,
       },
       {
-        "endLine": 462,
+        "endLine": 466,
         "origin": "generated:light-sampling",
-        "startLine": 451,
-      },
-      {
-        "endLine": 480,
-        "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 463,
+        "startLine": 455,
       },
       {
         "endLine": 484,
-        "origin": "generated:environment",
-        "startLine": 481,
+        "origin": "glsl/camera_pinhole.glsl",
+        "startLine": 467,
       },
       {
-        "endLine": 550,
-        "origin": "glsl/path_trace.glsl",
+        "endLine": 488,
+        "origin": "generated:environment",
         "startLine": 485,
       },
       {
-        "endLine": 576,
+        "endLine": 555,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 489,
+      },
+      {
+        "endLine": 581,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 551,
+        "startLine": 556,
       },
     ],
   },

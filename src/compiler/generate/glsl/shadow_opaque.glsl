@@ -6,9 +6,9 @@
 // This is the OPAQUE specialization the compiler emits when the scene has no media —
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
-// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
-// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
 
-Spectrum shadow_transmittance(Ray shadow_ray) {
-    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }

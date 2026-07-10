@@ -20,7 +20,8 @@ npx tsc --noEmit     # typecheck
 
 | Document | Role |
 |---|---|
-| `docs/fable-compiler-contracts.md` | **Governs all compiler work.** GLSL contracts (interaction, Hit/regions/media, geodesic stepper, lights, transport-as-generator), pinned conventions, v1 constraints (§1.1 — deferred, NOT excluded), migration roadmap (§10.1 — do items in order). |
+| `docs/trace-loop-contract.md` | **Authority for the top-level loop and its types** (owner-decided). `Ray`=pure geodesic seed, `scene_intersect`/`Hit`/interaction/`make_ray`, the `ambient_dot` metric rule. **Supersedes Fable §5 (`GeodesicState` stepper — deleted) and §6.3 (`shadow_transmittance` signature).** Read before touching the loop. |
+| `docs/fable-compiler-contracts.md` | **Governs compiler work** *except where trace-loop-contract.md supersedes it.* GLSL contracts (interaction, Hit/regions/media, ~~geodesic stepper~~, lights, transport-as-generator), pinned conventions, v1 constraints (§1.1 — deferred, NOT excluded), migration roadmap (§10.1 — do items in order). |
 | `docs/fable-reference-implementations.md` | **Normative GLSL — transcribe, don't re-derive** (Lambert, dielectric incl. the η² factor, GGX, HG, light samplers, the transport loop). Ends with a checklist mapping each reference → migration item → test. |
 | `docs/fable-validation-scenes.md` | Concrete correctness tests with derived expected values (furnace = 0.4 exactly, etc.). Implement these as the harness. |
 | `docs/fable-transport-verification.md` | Why the non-obvious rules are what they are (innermost-wins, no medium stack, null interfaces). Check here before "fixing" something that looks odd. |
@@ -31,7 +32,9 @@ npx tsc --noEmit     # typecheck
 
 ## Current state
 
-Only a **minimal vertical slice** of the compiler exists ("step zero": Euclidean, SDF sphere/plane/box, Lambert, point light + NEE, pinhole, average accumulation, Reinhard). **The real compiler — the system the contracts describe — has not been built**; do not describe it as built. The slice also deliberately does not yet conform to the contracts. Build path: `fable-compiler-contracts.md` §10.1, in order — item 1 (reshape `lambert.glsl` to the interaction contract) is the starting point. Don't mix migration steps with feature work.
+Well past "step zero," but still narrow. **Done** (see `docs/trace-loop-contract.md` + the impl-plan-*.md docs + memory): the top-level loop conforms to the trace-loop contract (`Ray` pure geodesic seed, generated `scene_intersect` dispatcher, `ambient_dot` metric discipline, no `GeodesicState`); §10.1 items 1–6 & 8 (interaction interface, Hit/regions, LightSample+CDF, environment, `shadow_transmittance`, spectral discipline, `Value<T>`); and a **second geometry backend** — closed-form analytic sphere/plane alongside SDF marching, combined by the dispatcher (the capability model; V1-C3 relaxation).
+
+**Still Euclidean + Lambert + point-light + NEE** — no other materials (dielectric/GGX), no media, no curved spaces (the `ambient_*` seam is ready but H³/Schwarzschild are unbuilt), no MIS, no transport-generator split (§10.1 item 9, still last). Don't describe those as built. Build path: continue the trace-loop contract + remaining §10.1; **discuss loop/interface structure before implementing** (owner preference), fill bodies after. Don't mix migration steps with feature work.
 
 ## Critical conventions
 

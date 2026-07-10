@@ -25,26 +25,32 @@ Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  �
 ## `Ray` — the universal, geometry-independent abstraction
 
 ```glsl
-struct Ray { Point origin; Direction direction; float tmin; float tmax; };
+struct Ray { Point origin; Direction direction; };   // PURE geodesic seed — no search interval
 ```
 - A `Ray` **encodes a geodesic by its initial conditions** — `(origin, direction)`, a point of the
   unit tangent bundle. It flows via `ambient_geodesic(origin, direction, t)`; only the *space*
   changes (Euclidean → line, H³ → hyperbolic geodesic, Schwarzschild → light path). Same `Ray`.
 - `direction` is a **unit** tangent — unit *in the metric*.
-- `tmin`, `tmax` bound the **intersection query** along the geodesic (near/far, shadow length). `tmax`
-  is the **live search bound**: intersection backends shrink it in place as they find nearer hits
-  (the SDF hit bounds the BVH — capability coordination). `tmin` defaults to `EPSILON`; it is *not*
-  the self-intersection mechanism (see next).
+- **No `tmin`/`tmax` on the Ray.** Search bounds are the *query's* concern, not the ray's identity.
+  We tried the interval on the Ray and it conflated three roles (ray identity / query far-bound /
+  running-nearest) — the by-value-vs-`inout` confusion was the symptom. The bounds' real homes:
+  - **near bound** (`tmin`): a marcher constant `EPSILON` — self-intersection is handled by the
+    origin offset, so it never varies.
+  - **running nearest** (the old `tmax` shrinking): lives on **`hit.t`**. For a nearest-hit search
+    "the bound" and "the nearest distance found" are the *same quantity*, so `hit.t` holds both —
+    initialized to `MAX_DIST`, shrunk by each backend. (A Hit's fields other than `t` are valid only
+    when `scene_intersect` returns true.)
+  - **occlusion far-bound**: an explicit `maxDist` **argument** to `scene_intersect_any` (the light
+    distance) — an input, not ray state.
 - **Self-intersection escape is an origin offset**, done via the geodesic:
-  `origin = ambient_geodesic(hit.p, n, EPSILON)`. This is robust at grazing angles (offset along the
-  normal) and curved-space-correct (it *is* the exp-map step). The true geometric point lives on
-  `Hit.p`; the ray's `origin` is legitimately the escaped point.
+  `origin = ambient_geodesic(hit.p, n, EPSILON)`. Robust at grazing angles (offset along the normal)
+  and curved-space-correct (the exp-map step). The true geometric point lives on `Hit.p`; the ray's
+  `origin` is legitimately the escaped point.
   - Offset direction is `+n` for reflection; dielectric transmission will offset toward `wi`'s side
     (`sign(ambient_dot(wi, n, p))·n`) via a spawn helper — deferred to the dielectric material.
 
 ```glsl
-Ray make_ray       (Point origin, Direction dir);              // tmin = EPSILON, tmax = MAX_DIST
-Ray make_shadow_ray(Point origin, Direction dir, float dist);  // tmin = EPSILON, tmax = dist
+Ray make_ray(Point origin, Direction dir);   // just {origin, direction} — no interval
 ```
 
 ## The Riemannian metric — `ambient_dot`, paid once
@@ -66,13 +72,16 @@ There is no local-frame BSDF yet (Lambert works in world space), so **today ever
 ## Updated signatures (vs the current slice)
 
 ```glsl
-bool     scene_intersect     (Ray ray, out Hit hit);        // top level by value (owns a mutable copy)
-bool     <backend>_intersect (inout Ray ray, out Hit hit);  // backends shrink ray.tmax (Phase-2 seam; one backend now)
-bool     scene_intersect_any (Ray ray);                     // was (Ray, float max_distance) — redundant arg deleted
-Spectrum shadow_transmittance(Ray shadow_ray);              // was (Point p, Direction wi, float dist) — revises §6.3
+bool     scene_intersect     (Ray ray, out Hit hit);                   // hit.t = MAX_DIST in; running nearest out. Ray READ-ONLY.
+bool     <backend>_intersect (Ray ray, inout Hit hit);                 // accumulate nearest into hit (bound = hit.t); never mutate ray
+bool     scene_intersect_any (Ray ray, float maxDist);                 // occlusion bound is an argument
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);          // was (p, wi, dist) — revises §6.3
 Point    ambient_geodesic    (Point origin, Direction dir, float t);   // UNCHANGED — the geodesic mechanism
 float    ambient_dot         (Direction a, Direction b, Point p);      // UNCHANGED — now actually called
 ```
+The **running nearest lives on `hit.t`** (not on the Ray, and not `inout Ray`): each backend reads
+`hit.t` as its far bound and, on a closer hit, fills the whole Hit and shrinks `hit.t`. The Ray is
+never mutated by intersection — it is a pure seed.
 
 ## Supersedes
 

@@ -77,7 +77,7 @@ Every line the faithful §5 loop needs that item 1 does **not** implement, mappe
 | **`shadow_transmittance`** (media-general visibility) | no media; item 1 uses boolean `scene_intersect_any` | media item |
 | **`current_medium` tracking + `LOBE_TRANSMISSION` → `region_to`** | no media; transmission not reachable with Lambert | media item |
 | **Null interfaces** — `is_null_interface(hit)`, the null-crossing branch | no bounded volumes yet; `LOBE_NULL` already dropped to this predicate | media item (§3.6) |
-| **Geodesic stepper** — `GeodesicState`, `geodesic_restart_offset` | Euclidean only; item 1 uses `Ray` + `ambient_geodesic` offset | curved-space item |
+| **Curved-space geometry** — no stepper (`GeodesicState` retired); `Ray` seed + `ambient_geodesic` | item 1 uses the Euclidean offset | curved-space item |
 | **Generated `MaterialProperties`** (§3.4, per-scene field union) | keep the fixed struct (`albedo/emission/emission_strength/roughness`) | §3.4 |
 | **Spectral** — `Spectrum` as anything but `vec3` | typedef discipline only; RGB now | later strategy axis |
 | **`LOBE_GLOSSY` / `LOBE_DIFFUSE`** | no reader (path regularization/guiding not built); flags are non-breaking to add | when regularization lands |

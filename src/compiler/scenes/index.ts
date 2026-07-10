@@ -16,6 +16,7 @@ import {
     twoLightUniformStrategy,
 } from './twoLightScene.js';
 import { furnaceBox, furnaceStrategy } from './furnaceBox.js';
+import { analyticMinimal, mixedScene, analyticStrategy } from './analyticScenes.js';
 
 export interface SceneSuiteEntry {
     scene: SceneDescription;
@@ -63,6 +64,24 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         exercises: 'constant environment; pathtracer vs direct-only strategy from one scene',
         initialParameters: {
             'camera.position': [0, 1, 5],
+            'camera.target': [0, 0, 0],
+        },
+    },
+    'analytic-minimal': {
+        scene: analyticMinimal,
+        strategies: [analyticStrategy],
+        exercises: 'analytic backend (closed-form sphere+plane); cross-method twin of `minimal` — same image',
+        initialParameters: {
+            'camera.position': [0, 1, 5],
+            'camera.target': [0, 0, 0],
+        },
+    },
+    mixed: {
+        scene: mixedScene,
+        strategies: [analyticStrategy],
+        exercises: 'combined scene_intersect (SDF + analytic in one scene); cross-backend shadows',
+        initialParameters: {
+            'camera.position': [0, 1.5, 6],
             'camera.target': [0, 0, 0],
         },
     },

@@ -31,8 +31,9 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
-            Spectrum vis = shadow_transmittance(shadow_ray);
+            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                 float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)

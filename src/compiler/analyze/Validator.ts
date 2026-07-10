@@ -26,10 +26,8 @@ export function validate(
             .add();
     }
 
-    if (features.geometry.hasAnalytic) {
-        bag.error('missing-geometry', 'Analytic objects not yet supported')
-            .add();
-    }
+    // Analytic objects (closed-form sphere/plane) are supported — the analytic geometry backend
+    // (docs/impl-plan-analytic-backend.md). StandardAnalytic already constrains type to sphere|plane.
 
     if (features.lighting.directionalLightCount > 0) {
         bag.error('invalid-setting', 'Directional lights not yet supported')

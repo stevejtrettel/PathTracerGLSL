@@ -6,11 +6,12 @@
 #define Spectrum vec3
 #define Radiance vec3
 
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
 struct Ray {
     Point origin;
     Direction direction;
-    float tmin;
-    float tmax;
 };
 
 struct Frame {

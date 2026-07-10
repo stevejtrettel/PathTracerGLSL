@@ -73,6 +73,18 @@ export interface PlannedSDFObject {
 }
 
 /**
+ * Resolved analytic object for code generation — intersected in closed form (a second
+ * geometry backend behind scene_intersect). `index` shares the region-id space with SDF
+ * objects (regions are globally unique — §2.3), so material_of() spans both.
+ */
+export interface PlannedAnalyticObject {
+    index: number;
+    materialId: number;
+    shapeType: 'sphere' | 'plane';
+    parameters: Record<string, number | number[]>;
+}
+
+/**
  * Resolved material for code generation.
  * Each property is either a constant value or a GLSL expression string.
  */
@@ -121,6 +133,7 @@ export interface RenderPlan {
 
     /** Resolved scene data for code generators */
     objects: PlannedSDFObject[];
+    analyticObjects: PlannedAnalyticObject[];
     materials: PlannedMaterial[];
     lights: PlannedLight[];
 

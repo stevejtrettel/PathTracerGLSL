@@ -53,9 +53,9 @@ describe('Validator', () => {
         expect(bag.getErrors().some(e => e.code === 'missing-geometry' && /mesh/i.test(e.message))).toBe(true);
     });
 
-    it('rejects analytic geometry', () => {
-        const bag = run(s => { s.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: {} }, material: 'm' }); });
-        expect(bag.getErrors().some(e => e.code === 'missing-geometry' && /analytic/i.test(e.message))).toBe(true);
+    it('accepts analytic geometry (closed-form sphere/plane backend)', () => {
+        const bag = run(s => { s.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 } }, material: 'm' }); });
+        expect(bag.hasErrors()).toBe(false);
     });
 
     it('rejects directional lights', () => {

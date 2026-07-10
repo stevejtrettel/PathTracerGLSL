@@ -1,9 +1,9 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam } from '../types.js';
+import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
-import type { RenderPlan, PlannedSDFObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
 
 export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): RenderPlan {
     // --- Assign material IDs (sorted for deterministic ordering) ---
@@ -27,29 +27,36 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         materialIdMap.set(m.name, m.id);
     }
 
-    // --- Assign SDF objects ---
+    // --- Assign objects by geometry backend (SDF vs analytic) ---
+    // `index` is assigned in scene order across BOTH backends: it is the globally-unique
+    // region id (§2.3), so material_of() spans both lists and regions never collide.
     const objects: PlannedSDFObject[] = [];
+    const analyticObjects: PlannedAnalyticObject[] = [];
     let objectIndex = 0;
     for (const obj of scene.objects) {
-        if (obj.kind !== 'sdf') continue;
-        const sdfObj = obj as SDFObject;
-        const sdf = sdfObj.sdf as StandardSDF;
+        if (obj.kind === 'sdf') {
+            const sdfObj = obj as SDFObject;
+            const sdf = sdfObj.sdf as StandardSDF;
+            const matId = materialIdMap.get(sdfObj.material)!;   // validated by Validator
 
-        // Material reference already validated by Validator
-        const matId = materialIdMap.get(sdfObj.material)!;
+            // Fold center parameter into translation to avoid double-offset. The generated
+            // per-object wrapper handles positioning via translation; the SDF call is origin-centered.
+            const { parameters, translation } = resolveSDFPositioning(sdf, sdfObj.transform?.position);
 
-        // Fold center parameter into translation to avoid double-offset.
-        // The generated per-object wrapper handles all positioning via translation,
-        // and the SDF call is always origin-centered.
-        const { parameters, translation } = resolveSDFPositioning(sdf, sdfObj.transform?.position);
+            objects.push({ index: objectIndex++, materialId: matId, sdfType: sdf.type, parameters, translation });
+        } else if (obj.kind === 'analytic') {
+            const anaObj = obj as AnalyticObject;
+            const shape = anaObj.shape as StandardAnalytic;
+            const matId = materialIdMap.get(anaObj.material)!;
 
-        objects.push({
-            index: objectIndex++,
-            materialId: matId,
-            sdfType: sdf.type,
-            parameters,
-            translation,
-        });
+            analyticObjects.push({
+                index: objectIndex++,
+                materialId: matId,
+                shapeType: shape.type,
+                parameters: shape.parameters,
+            });
+        }
+        // mesh objects are not yet supported (deferred — see impl-plan-analytic-backend.md)
     }
 
     // --- Assign lights ---
@@ -74,6 +81,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     return {
         features,
         objects,
+        analyticObjects,
         materials,
         lights,
         program,

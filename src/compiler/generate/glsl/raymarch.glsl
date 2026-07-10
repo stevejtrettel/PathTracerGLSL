@@ -1,6 +1,7 @@
-// Raymarching Scene Infrastructure
-// Provides: scene_normal(), scene_intersect(), scene_intersect_any()
+// Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
+// Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
 // Depends on: scene_sdf() (generated), scene_sdf_dist() (generated), ambient_geodesic(), ambient_frame()
+// The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these.
 
 #ifndef MAX_MARCH_STEPS
 #define MAX_MARCH_STEPS 128
@@ -20,8 +21,10 @@ vec3 scene_normal(vec3 p) {
     return normalize(n);
 }
 
-bool scene_intersect(Ray ray, out Hit hit) {
-    float t = ray.tmin;
+// March bounded by the running nearest (hit.t); on a closer surface fill the whole hit and return
+// true, else leave hit untouched. hit.t is both the far bound in and the hit distance out.
+bool sdf_intersect(Ray ray, inout Hit hit) {
+    float t = EPSILON;   // near bound (self-intersection handled by the origin offset)
     int region = -1;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
@@ -38,7 +41,7 @@ bool scene_intersect(Ray ray, out Hit hit) {
             return true;
         }
 
-        if (t > ray.tmax) {
+        if (t > hit.t) {
             break;
         }
 
@@ -48,9 +51,8 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray) {
-    float t = ray.tmin;
-    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
+bool sdf_intersect_any(Ray ray, float maxDist) {
+    float t = EPSILON;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -60,7 +62,7 @@ bool scene_intersect_any(Ray ray) {
             return true;
         }
 
-        if (t > limit) {
+        if (t > maxDist) {
             break;
         }
 

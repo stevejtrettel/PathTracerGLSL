@@ -409,33 +409,39 @@ Pins: a batch is **one region** (one `region_id`, one material) — per-instance
 
 ---
 
-## 5. Contract 3 — Geodesic stepper
+## 5. Contract 3 — Curved-space geometry (geodesic advancement)
+
+> Revised by `docs/trace-loop-contract.md` (owner decision). Ray advancement is
+> `ambient_geodesic(origin, dir, t)`; there is **no `GeodesicState`/stepper** (an earlier draft's
+> stepper conflated an implementation optimization with the abstraction — retired). The `Ray` is a
+> pure `{origin, direction}` seed, never mutated by intersection.
 
 ### 5.1 The interface
 
-Ray advancement is written against a **stepper**, not a closed-form point query:
+Ray advancement and all curved-space geometry go through per-ambient-space functions, hand-written
+per space (`euclidean.glsl`, `hyperbolic.glsl`, …):
 
 ```glsl
-struct GeodesicState { Point p; Direction v; };
-// (future spacetimes may add generated fields: conserved quantities, affine parameter)
-
-void      geodesic_step     (inout GeodesicState s, float dt);            // advance along the geodesic
-float     geodesic_max_step (GeodesicState s);                            // curvature-limited safe dt (Euclidean: 1e20)
-Direction geodesic_transport(GeodesicState s_from, GeodesicState s_to, Direction u);  // parallel transport
+Point     ambient_geodesic (Point origin, Direction dir, float t);   // the point at arc-length t along the geodesic seeded by (origin, dir)
+float     ambient_dot      (Direction a, Direction b, Point p);      // Riemannian metric at p (§2.5 metric rule)
+Frame     ambient_frame    (Point p, Direction n);                   // local shading frame, metric-orthonormal
+Direction ambient_transport(Direction u, Point from, Point to);      // parallel transport
 ```
 
-The march loop becomes:
+The marcher samples points along the ray's geodesic: `p = ambient_geodesic(ray.origin, ray.direction, t)`.
 
-```glsl
-float dt = min(scene_sdf(s.p), geodesic_max_step(s));
-geodesic_step(s, dt);
-```
-
-The current `ambient_geodesic(origin, dir, t)` point form works only for spaces with closed-form geodesics (Euclidean, H³, S³) and is **structurally impossible** for Schwarzschild/wormhole metrics, where geodesics exist only as ODE solutions. Writing the loop against the stepper means generalizing later is *one new GLSL file* (an RK4 step in the metric), not a loop rewrite.
+**This signature holds in *every* space, including black holes.** A closed-form space (Euclidean,
+H³, S³) evaluates it directly; a metric with no closed-form geodesic (Schwarzschild, wormhole)
+**integrates the geodesic ODE internally** to reach arc-length `t` — a performance/implementation
+concern *private to the ambient-space module*, never a type in the trace loop.
 
 ### 5.2 Zero cost today
 
-For Euclidean, `geodesic_step` is `s.p += s.v * dt` and `geodesic_transport` is identity — the compiler inlines these and the loop collapses to exactly the current code. For H³/S³ the compiler may specialize back to closed-form point evaluation as an optimization. Paying for generality only when the scene needs it is precisely this compiler's philosophy.
+For Euclidean, `ambient_geodesic(o, d, t)` is `o + d*t` and `ambient_dot`/`ambient_transport` are the
+standard dot / identity — the compiler inlines them and the loop is exactly the flat marcher. A
+curved space swaps in *one new GLSL file* (its closed-form or ODE-integrated `ambient_*`), with no
+change to the march loop, the transport loop, or any other contract. Paying for generality only
+when the scene needs it is precisely this compiler's philosophy.
 
 ### 5.3 What curved space needs from the *other* contracts (readiness check)
 
@@ -514,10 +520,14 @@ The **environment** is a light kind in this registry (samplable via the existing
 
 ### 6.3 The shadow query returns transmittance — PINNED
 
+> **Signature revised by `docs/trace-loop-contract.md`:** now `shadow_transmittance(Ray shadow_ray,
+> float maxDist)` (the `Ray` is a pure seed; the far bound is an argument). The *semantics* below —
+> spectral return, boolean fast path when no media, spectral attenuation otherwise — are unchanged.
+
 ```glsl
-Spectrum shadow_transmittance(Point p, Direction wi, float dist);
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);   // was (Point p, Direction wi, float dist)
 // 0 or 1 when scene has no media/dielectrics along shadow rays — compiler emits the boolean
-// fast path (current scene_intersect_any) in that case, spectral attenuation otherwise.
+// fast path (scene_intersect_any(ray, maxDist)) in that case, spectral attenuation otherwise.
 ```
 
 A boolean visibility contract cannot express shadows through fog or tinted glass. Making the *contract* spectral and letting the compiler specialize to the cheap boolean version when features are absent gives correctness and speed without a contract change later. (Policy for shadow rays through refractive interfaces: opaque by default — the standard compromise — with transmittance-through-media handled; **OPEN:** transparent-shadow refinements.)
@@ -552,7 +562,7 @@ This is a `FeatureContribution` (§2.10) with `passes`/`buffers` added — trans
 The generated loop owns this state and this shape:
 
 ```glsl
-// state: Spectrum throughput; Spectrum radiance; int current_medium; GeodesicState s;
+// state: Spectrum throughput; Spectrum radiance; int current_medium; Ray ray;  (pure seed, §5)
 //        (spectral mode adds: vec4 lambda, float lambda_pdf — §8)
 for (bounce = 0; bounce < MAX_BOUNCES; bounce++) {
     // 1. advance through current_medium: either a MEDIUM EVENT (volume integrator:
@@ -634,7 +644,7 @@ One material (`'cloud'`, volumetric), 500 sphere instances → Planner selects b
 
 ### 9.6 Schwarzschild sanity check
 
-Does anything above assume closed-form geodesics? Audit: marching goes through `geodesic_step`/`geodesic_max_step` (§5.1 — an RK4 stepper in the metric slots in); `Hit.frame` is built from `geodesic_transport`ed tangents (§5.3); `Point` may widen to vec4 (typedef); direct lighting is a strategy axis, so the scene runs `directLighting: 'none'` with an environment + emissive accretion-disk material (path-only emitter, §6.2) — no contract hardwires NEE; `scene_sdf` as safe-step bound (§2.6) tolerates coordinate/metric divergence; redshift is a λ transform (§8, spectral). **Nothing in Contracts 1–4 needs to change.** Remaining open items are implementation physics (step control near the horizon, SDF Lipschitz bounds under the metric), not contract shape. ✓
+Does anything above assume closed-form geodesics? Audit: marching goes through `ambient_geodesic` (§5 — a metric with no closed form integrates the ODE inside its body); `Hit.frame` is built from `ambient_transport`ed tangents (§5.3); `Point` may widen to vec4 (typedef); direct lighting is a strategy axis, so the scene runs `directLighting: 'none'` with an environment + emissive accretion-disk material (path-only emitter, §6.2) — no contract hardwires NEE; `scene_sdf` as safe-step bound (§2.6) tolerates coordinate/metric divergence; redshift is a λ transform (§8, spectral). **Nothing in Contracts 1–4 needs to change.** Remaining open items are implementation physics (step control near the horizon, SDF Lipschitz bounds under the metric), not contract shape. ✓
 
 ---
 
@@ -650,7 +660,7 @@ Priority-ordered; overlaps with [fable-review.md](fable-review.md) noted.
 4. **Environment** — delete the hardcoded sky in `path_trace.glsl` (review C3); `environment` becomes scene data + a registry light. **(Absorbed into the §2.10 resource-contributions block — see ordering below.)**
 5. **Shadow query** — `scene_intersect_any` remains as the compiled fast path behind the `shadow_transmittance` contract.
 6. **Spectral discipline** — sweep library GLSL for raw radiometric `vec3` literals; introduce `spectrum_*` helpers; route generated constants through the formatter. (Replaces `luminance()` for RR per review note on Rec.601.)
-7. **Stepper** — introduce `GeodesicState` + Euclidean stepper; rewrite `raymarch.glsl`'s loop against it (compiler may specialize back).
+7. **Curved-space geometry** — ~~introduce `GeodesicState` + stepper~~ **DONE differently (owner decision — no stepper):** the `Ray` is a pure `{origin, direction}` seed advanced by `ambient_geodesic(origin, dir, t)`; the metric is `ambient_dot`. See `docs/trace-loop-contract.md` §5. Euclidean is live; H³/Schwarzschild are new `ambient_*` GLSL files (unbuilt).
 8. **`Value<T>`** — extend `MaterialProperty` and light/SDF parameters with the `{param}` variant; Planner emits uniforms/bindings/metadata (also resolves the fov-as-#define and baked-light-intensity issues from the review). **(Absorbed into the §2.10 resource-contributions block — see ordering below.)**
 9. **Transport generator** — split `path_trace.glsl` into generator-assembled blocks; `#ifdef`s become plan-driven block selection. Do this *last*, once 1–5 give it clean inputs.
 
