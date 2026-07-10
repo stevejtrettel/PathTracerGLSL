@@ -7,7 +7,7 @@
 import type { RenderPlan, PlannedLight } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatVec3 } from './glsl-format.js';
+import { formatFloat, formatVec3, formatSpectrum } from './glsl-format.js';
 
 import lightPointGLSL from '../glsl/light_point.glsl?raw';
 import shadowOpaqueGLSL from '../glsl/shadow_opaque.glsl?raw';
@@ -44,8 +44,8 @@ function spectrumAverage(rgb: number[]): number {
 /** GLSL call that samples light `l` at point `p`, returning a LightSample. */
 function sampleCall(l: PlannedLight): string {
     if (l.kind === 'point') {
-        const pos = formatVec3(l.position!);
-        const intensity = formatVec3(l.color.map((c) => c * l.intensity));
+        const pos = formatVec3(l.position!);                                  // geometric
+        const intensity = formatSpectrum(l.color.map((c) => c * l.intensity)); // radiometric (§2.5)
         return `point_light_sample(${pos}, ${intensity}, p)`;
     }
     throw new Error(`lighting: unsupported light kind '${l.kind}'`);

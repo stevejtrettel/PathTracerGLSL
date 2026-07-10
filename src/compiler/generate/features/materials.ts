@@ -8,7 +8,7 @@ import type { RenderPlan, PlannedMaterial, PlannedUniform } from '../../plan/typ
 import type { ParameterMetadata } from '../../../engine/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatVec3 } from './glsl-format.js';
+import { formatFloat, formatSpectrum } from './glsl-format.js';
 
 import lambertGLSL from '../glsl/lambert.glsl?raw';
 
@@ -86,8 +86,8 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
     lines.push('// Generated material properties lookup');
     lines.push('MaterialProperties scene_material_properties(int id, vec3 p) {');
     lines.push('    MaterialProperties props;');
-    lines.push('    props.albedo = vec3(0.8);');
-    lines.push('    props.emission = vec3(0.0);');
+    lines.push('    props.albedo = Spectrum(0.8);');       // §2.5: radiometric default via typedef, not raw vec3
+    lines.push('    props.emission = SPECTRUM_ZERO;');
     lines.push('    props.emission_strength = 0.0;');
     lines.push('    props.roughness = 1.0;');
 
@@ -102,7 +102,7 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
         } else if (isGlslExpression(mat.albedo)) {
             lines.push(`        props.albedo = ${mat.albedo.source};`);
         } else {
-            lines.push(`        props.albedo = ${formatVec3(mat.albedo)};`);
+            lines.push(`        props.albedo = ${formatSpectrum(mat.albedo)};`);
         }
 
         // emission (+ strength)
@@ -114,7 +114,7 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
         } else {
             const hasEmission = mat.emission[0] > 0 || mat.emission[1] > 0 || mat.emission[2] > 0;
             if (hasEmission) {
-                lines.push(`        props.emission = ${formatVec3(mat.emission)};`);
+                lines.push(`        props.emission = ${formatSpectrum(mat.emission)};`);
                 lines.push(`        props.emission_strength = 1.0;`);
             }
         }

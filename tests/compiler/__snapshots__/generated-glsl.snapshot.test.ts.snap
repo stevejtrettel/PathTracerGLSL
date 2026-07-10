@@ -294,24 +294,22 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
-//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
+// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
 
-float luminance(vec3 c) {
-    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
-    // belongs to gamma-encoded SD video, not linear radiance.
-    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-}
-
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
 const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
 const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
 float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
 bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
@@ -523,8 +521,8 @@ bool scene_intersect_any(Ray ray, float max_distance) {
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
-    props.albedo = vec3(0.8);
-    props.emission = vec3(0.0);
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
     props.emission_strength = 0.0;
     props.roughness = 1.0;
     if (id == 0) {
@@ -666,7 +664,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
 // Environment radiance
 vec3 environment_radiance(vec3 dir) {
-    return vec3(0.0);
+    return SPECTRUM_ZERO;
 }
 // Path trace loop
 // Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
@@ -713,7 +711,7 @@ Radiance transport_trace(Ray ray) {
 #ifdef ENABLE_RUSSIAN_ROULETTE
         // Russian roulette
         if (bounce >= RR_START_DEPTH) {
-            float p_survive = min(0.95, luminance(throughput));
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
@@ -812,84 +810,84 @@ void main() {
         "startLine": 93,
       },
       {
-        "endLine": 165,
+        "endLine": 163,
         "origin": "glsl/math.glsl",
         "startLine": 134,
       },
       {
-        "endLine": 189,
+        "endLine": 187,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 166,
+        "startLine": 164,
       },
       {
-        "endLine": 206,
+        "endLine": 204,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 190,
+        "startLine": 188,
       },
       {
-        "endLine": 276,
+        "endLine": 274,
         "origin": "generated:sdf-dispatch",
-        "startLine": 207,
+        "startLine": 205,
       },
       {
-        "endLine": 288,
+        "endLine": 286,
         "origin": "generated:material-of",
-        "startLine": 277,
+        "startLine": 275,
       },
       {
-        "endLine": 360,
+        "endLine": 358,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 289,
+        "startLine": 287,
       },
       {
-        "endLine": 385,
+        "endLine": 383,
         "origin": "generated:material-lookup",
-        "startLine": 361,
+        "startLine": 359,
       },
       {
-        "endLine": 422,
+        "endLine": 420,
         "origin": "glsl/lambert.glsl",
-        "startLine": 386,
+        "startLine": 384,
       },
       {
-        "endLine": 435,
+        "endLine": 433,
         "origin": "generated:interaction-dispatch",
-        "startLine": 423,
+        "startLine": 421,
       },
       {
-        "endLine": 455,
+        "endLine": 453,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 436,
+        "startLine": 434,
       },
       {
-        "endLine": 474,
+        "endLine": 472,
         "origin": "glsl/light_point.glsl",
-        "startLine": 456,
+        "startLine": 454,
       },
       {
-        "endLine": 481,
+        "endLine": 479,
         "origin": "generated:light-sampling",
-        "startLine": 475,
+        "startLine": 473,
       },
       {
-        "endLine": 504,
+        "endLine": 502,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 482,
+        "startLine": 480,
       },
       {
-        "endLine": 508,
+        "endLine": 506,
         "origin": "generated:environment",
-        "startLine": 505,
+        "startLine": 503,
       },
       {
-        "endLine": 574,
+        "endLine": 572,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 509,
+        "startLine": 507,
       },
       {
-        "endLine": 600,
+        "endLine": 598,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 575,
+        "startLine": 573,
       },
     ],
   },
@@ -1235,24 +1233,22 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
-//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
+// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
 
-float luminance(vec3 c) {
-    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
-    // belongs to gamma-encoded SD video, not linear radiance.
-    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-}
-
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
 const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
 const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
 float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
 bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
@@ -1446,8 +1442,8 @@ bool scene_intersect_any(Ray ray, float max_distance) {
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
-    props.albedo = vec3(0.8);
-    props.emission = vec3(0.0);
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
     props.emission_strength = 0.0;
     props.roughness = 1.0;
     if (id == 0) {
@@ -1533,7 +1529,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
 // Environment radiance
 vec3 environment_radiance(vec3 dir) {
-    return vec3(0.0);
+    return SPECTRUM_ZERO;
 }
 // Path trace loop
 // Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
@@ -1580,7 +1576,7 @@ Radiance transport_trace(Ray ray) {
 #ifdef ENABLE_RUSSIAN_ROULETTE
         // Russian roulette
         if (bounce >= RR_START_DEPTH) {
-            float p_survive = min(0.95, luminance(throughput));
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
@@ -1679,69 +1675,69 @@ void main() {
         "startLine": 88,
       },
       {
-        "endLine": 160,
+        "endLine": 158,
         "origin": "glsl/math.glsl",
         "startLine": 129,
       },
       {
-        "endLine": 184,
+        "endLine": 182,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 161,
+        "startLine": 159,
       },
       {
-        "endLine": 201,
+        "endLine": 199,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 185,
+        "startLine": 183,
       },
       {
-        "endLine": 255,
+        "endLine": 253,
         "origin": "generated:sdf-dispatch",
-        "startLine": 202,
+        "startLine": 200,
       },
       {
-        "endLine": 265,
+        "endLine": 263,
         "origin": "generated:material-of",
-        "startLine": 256,
+        "startLine": 254,
       },
       {
-        "endLine": 337,
+        "endLine": 335,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 266,
+        "startLine": 264,
       },
       {
-        "endLine": 352,
+        "endLine": 350,
         "origin": "generated:material-lookup",
-        "startLine": 338,
+        "startLine": 336,
       },
       {
-        "endLine": 389,
+        "endLine": 387,
         "origin": "glsl/lambert.glsl",
-        "startLine": 353,
+        "startLine": 351,
       },
       {
-        "endLine": 402,
+        "endLine": 400,
         "origin": "generated:interaction-dispatch",
-        "startLine": 390,
+        "startLine": 388,
       },
       {
-        "endLine": 425,
+        "endLine": 423,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 403,
+        "startLine": 401,
       },
       {
-        "endLine": 429,
+        "endLine": 427,
         "origin": "generated:environment",
-        "startLine": 426,
+        "startLine": 424,
       },
       {
-        "endLine": 495,
+        "endLine": 493,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 430,
+        "startLine": 428,
       },
       {
-        "endLine": 521,
+        "endLine": 519,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 496,
+        "startLine": 494,
       },
     ],
   },
@@ -2098,24 +2094,22 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
-//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
+// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
 
-float luminance(vec3 c) {
-    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
-    // belongs to gamma-encoded SD video, not linear radiance.
-    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-}
-
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
 const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
 const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
 float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
 bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
@@ -2278,8 +2272,8 @@ bool scene_intersect_any(Ray ray, float max_distance) {
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
-    props.albedo = vec3(0.8);
-    props.emission = vec3(0.0);
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
     props.emission_strength = 0.0;
     props.roughness = 1.0;
     if (id == 0) {
@@ -2460,7 +2454,7 @@ Radiance transport_trace(Ray ray) {
 #ifdef ENABLE_RUSSIAN_ROULETTE
         // Russian roulette
         if (bounce >= RR_START_DEPTH) {
-            float p_survive = min(0.95, luminance(throughput));
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
@@ -2559,84 +2553,84 @@ void main() {
         "startLine": 91,
       },
       {
-        "endLine": 163,
+        "endLine": 161,
         "origin": "glsl/math.glsl",
         "startLine": 132,
       },
       {
-        "endLine": 187,
+        "endLine": 185,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 164,
+        "startLine": 162,
       },
       {
-        "endLine": 204,
+        "endLine": 202,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 188,
+        "startLine": 186,
       },
       {
-        "endLine": 231,
+        "endLine": 229,
         "origin": "generated:sdf-dispatch",
-        "startLine": 205,
+        "startLine": 203,
       },
       {
-        "endLine": 237,
+        "endLine": 235,
         "origin": "generated:material-of",
-        "startLine": 232,
+        "startLine": 230,
       },
       {
-        "endLine": 309,
+        "endLine": 307,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 238,
+        "startLine": 236,
       },
       {
-        "endLine": 326,
+        "endLine": 324,
         "origin": "generated:material-lookup",
-        "startLine": 310,
+        "startLine": 308,
       },
       {
-        "endLine": 363,
+        "endLine": 361,
         "origin": "glsl/lambert.glsl",
-        "startLine": 327,
+        "startLine": 325,
       },
       {
-        "endLine": 376,
+        "endLine": 374,
         "origin": "generated:interaction-dispatch",
-        "startLine": 364,
+        "startLine": 362,
       },
       {
-        "endLine": 396,
+        "endLine": 394,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 377,
+        "startLine": 375,
       },
       {
-        "endLine": 415,
+        "endLine": 413,
         "origin": "glsl/light_point.glsl",
-        "startLine": 397,
+        "startLine": 395,
       },
       {
-        "endLine": 422,
+        "endLine": 420,
         "origin": "generated:light-sampling",
-        "startLine": 416,
+        "startLine": 414,
       },
       {
-        "endLine": 445,
+        "endLine": 443,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 423,
+        "startLine": 421,
       },
       {
-        "endLine": 449,
+        "endLine": 447,
         "origin": "generated:environment",
-        "startLine": 446,
+        "startLine": 444,
       },
       {
-        "endLine": 515,
+        "endLine": 513,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 450,
+        "startLine": 448,
       },
       {
-        "endLine": 541,
+        "endLine": 539,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 516,
+        "startLine": 514,
       },
     ],
   },
@@ -3009,24 +3003,22 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
-//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
+// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
 
-float luminance(vec3 c) {
-    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
-    // belongs to gamma-encoded SD video, not linear radiance.
-    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-}
-
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
 const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
 const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
 float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
 bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
@@ -3189,8 +3181,8 @@ bool scene_intersect_any(Ray ray, float max_distance) {
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
-    props.albedo = vec3(0.8);
-    props.emission = vec3(0.0);
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
     props.emission_strength = 0.0;
     props.roughness = 1.0;
     if (id == 0) {
@@ -3371,7 +3363,7 @@ Radiance transport_trace(Ray ray) {
 #ifdef ENABLE_RUSSIAN_ROULETTE
         // Russian roulette
         if (bounce >= RR_START_DEPTH) {
-            float p_survive = min(0.95, luminance(throughput));
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
@@ -3470,84 +3462,84 @@ void main() {
         "startLine": 93,
       },
       {
-        "endLine": 165,
+        "endLine": 163,
         "origin": "glsl/math.glsl",
         "startLine": 134,
       },
       {
-        "endLine": 189,
+        "endLine": 187,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 166,
+        "startLine": 164,
       },
       {
-        "endLine": 206,
+        "endLine": 204,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 190,
+        "startLine": 188,
       },
       {
-        "endLine": 233,
+        "endLine": 231,
         "origin": "generated:sdf-dispatch",
-        "startLine": 207,
+        "startLine": 205,
       },
       {
-        "endLine": 239,
+        "endLine": 237,
         "origin": "generated:material-of",
-        "startLine": 234,
+        "startLine": 232,
       },
       {
-        "endLine": 311,
+        "endLine": 309,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 240,
+        "startLine": 238,
       },
       {
-        "endLine": 328,
+        "endLine": 326,
         "origin": "generated:material-lookup",
-        "startLine": 312,
+        "startLine": 310,
       },
       {
-        "endLine": 365,
+        "endLine": 363,
         "origin": "glsl/lambert.glsl",
-        "startLine": 329,
+        "startLine": 327,
       },
       {
-        "endLine": 378,
+        "endLine": 376,
         "origin": "generated:interaction-dispatch",
-        "startLine": 366,
+        "startLine": 364,
       },
       {
-        "endLine": 398,
+        "endLine": 396,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 379,
+        "startLine": 377,
       },
       {
-        "endLine": 417,
+        "endLine": 415,
         "origin": "glsl/light_point.glsl",
-        "startLine": 399,
+        "startLine": 397,
       },
       {
-        "endLine": 424,
+        "endLine": 422,
         "origin": "generated:light-sampling",
-        "startLine": 418,
+        "startLine": 416,
       },
       {
-        "endLine": 447,
+        "endLine": 445,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 425,
+        "startLine": 423,
       },
       {
-        "endLine": 451,
+        "endLine": 449,
         "origin": "generated:environment",
-        "startLine": 448,
+        "startLine": 446,
       },
       {
-        "endLine": 517,
+        "endLine": 515,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 452,
+        "startLine": 450,
       },
       {
-        "endLine": 543,
+        "endLine": 541,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 518,
+        "startLine": 516,
       },
     ],
   },
@@ -3894,24 +3886,22 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
-//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
+// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
 
-float luminance(vec3 c) {
-    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
-    // belongs to gamma-encoded SD video, not linear radiance.
-    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-}
-
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
 const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
 const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
 float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
 bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
@@ -4091,8 +4081,8 @@ bool scene_intersect_any(Ray ray, float max_distance) {
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
-    props.albedo = vec3(0.8);
-    props.emission = vec3(0.0);
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
     props.emission_strength = 0.0;
     props.roughness = 1.0;
     if (id == 0) {
@@ -4231,7 +4221,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
 // Environment radiance
 vec3 environment_radiance(vec3 dir) {
-    return vec3(0.0);
+    return SPECTRUM_ZERO;
 }
 // Path trace loop
 // Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
@@ -4278,7 +4268,7 @@ Radiance transport_trace(Ray ray) {
 #ifdef ENABLE_RUSSIAN_ROULETTE
         // Russian roulette
         if (bounce >= RR_START_DEPTH) {
-            float p_survive = min(0.95, luminance(throughput));
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
@@ -4377,84 +4367,84 @@ void main() {
         "startLine": 89,
       },
       {
-        "endLine": 161,
+        "endLine": 159,
         "origin": "glsl/math.glsl",
         "startLine": 130,
       },
       {
-        "endLine": 185,
+        "endLine": 183,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 162,
+        "startLine": 160,
       },
       {
-        "endLine": 202,
+        "endLine": 200,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 186,
+        "startLine": 184,
       },
       {
-        "endLine": 244,
+        "endLine": 242,
         "origin": "generated:sdf-dispatch",
-        "startLine": 203,
+        "startLine": 201,
       },
       {
-        "endLine": 252,
+        "endLine": 250,
         "origin": "generated:material-of",
-        "startLine": 245,
+        "startLine": 243,
       },
       {
-        "endLine": 324,
+        "endLine": 322,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 253,
+        "startLine": 251,
       },
       {
-        "endLine": 341,
+        "endLine": 339,
         "origin": "generated:material-lookup",
-        "startLine": 325,
+        "startLine": 323,
       },
       {
-        "endLine": 378,
+        "endLine": 376,
         "origin": "glsl/lambert.glsl",
-        "startLine": 342,
+        "startLine": 340,
       },
       {
-        "endLine": 391,
+        "endLine": 389,
         "origin": "generated:interaction-dispatch",
-        "startLine": 379,
+        "startLine": 377,
       },
       {
-        "endLine": 411,
+        "endLine": 409,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 392,
+        "startLine": 390,
       },
       {
-        "endLine": 430,
+        "endLine": 428,
         "origin": "glsl/light_point.glsl",
-        "startLine": 412,
+        "startLine": 410,
       },
       {
-        "endLine": 442,
+        "endLine": 440,
         "origin": "generated:light-sampling",
-        "startLine": 431,
+        "startLine": 429,
       },
       {
-        "endLine": 465,
+        "endLine": 463,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 443,
+        "startLine": 441,
       },
       {
-        "endLine": 469,
+        "endLine": 467,
         "origin": "generated:environment",
-        "startLine": 466,
+        "startLine": 464,
       },
       {
-        "endLine": 535,
+        "endLine": 533,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 470,
+        "startLine": 468,
       },
       {
-        "endLine": 561,
+        "endLine": 559,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 536,
+        "startLine": 534,
       },
     ],
   },
@@ -4787,24 +4777,22 @@ vec2 random2() {
 }
 
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, luminance(), build_basis(), local_to_world(),
-//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_is_black()
+// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
 
-float luminance(vec3 c) {
-    // Rec.709 coefficients (linear light). The Rec.601 set (0.299/0.587/0.114)
-    // belongs to gamma-encoded SD video, not linear radiance.
-    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-}
-
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
 const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
 const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
 float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
 bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
@@ -4984,8 +4972,8 @@ bool scene_intersect_any(Ray ray, float max_distance) {
 // Generated material properties lookup
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
-    props.albedo = vec3(0.8);
-    props.emission = vec3(0.0);
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
     props.emission_strength = 0.0;
     props.roughness = 1.0;
     if (id == 0) {
@@ -5124,7 +5112,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
 // Environment radiance
 vec3 environment_radiance(vec3 dir) {
-    return vec3(0.0);
+    return SPECTRUM_ZERO;
 }
 // Path trace loop
 // Requires: MAX_BOUNCES (define), environment_radiance(), interaction_surface_* dispatch (§3.3)
@@ -5171,7 +5159,7 @@ Radiance transport_trace(Ray ray) {
 #ifdef ENABLE_RUSSIAN_ROULETTE
         // Russian roulette
         if (bounce >= RR_START_DEPTH) {
-            float p_survive = min(0.95, luminance(throughput));
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
@@ -5270,84 +5258,84 @@ void main() {
         "startLine": 89,
       },
       {
-        "endLine": 161,
+        "endLine": 159,
         "origin": "glsl/math.glsl",
         "startLine": 130,
       },
       {
-        "endLine": 185,
+        "endLine": 183,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 162,
+        "startLine": 160,
       },
       {
-        "endLine": 202,
+        "endLine": 200,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 186,
+        "startLine": 184,
       },
       {
-        "endLine": 244,
+        "endLine": 242,
         "origin": "generated:sdf-dispatch",
-        "startLine": 203,
+        "startLine": 201,
       },
       {
-        "endLine": 252,
+        "endLine": 250,
         "origin": "generated:material-of",
-        "startLine": 245,
+        "startLine": 243,
       },
       {
-        "endLine": 324,
+        "endLine": 322,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 253,
+        "startLine": 251,
       },
       {
-        "endLine": 341,
+        "endLine": 339,
         "origin": "generated:material-lookup",
-        "startLine": 325,
+        "startLine": 323,
       },
       {
-        "endLine": 378,
+        "endLine": 376,
         "origin": "glsl/lambert.glsl",
-        "startLine": 342,
+        "startLine": 340,
       },
       {
-        "endLine": 391,
+        "endLine": 389,
         "origin": "generated:interaction-dispatch",
-        "startLine": 379,
+        "startLine": 377,
       },
       {
-        "endLine": 411,
+        "endLine": 409,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 392,
+        "startLine": 390,
       },
       {
-        "endLine": 430,
+        "endLine": 428,
         "origin": "glsl/light_point.glsl",
-        "startLine": 412,
+        "startLine": 410,
       },
       {
-        "endLine": 442,
+        "endLine": 440,
         "origin": "generated:light-sampling",
-        "startLine": 431,
+        "startLine": 429,
       },
       {
-        "endLine": 465,
+        "endLine": 463,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 443,
+        "startLine": 441,
       },
       {
-        "endLine": 469,
+        "endLine": 467,
         "origin": "generated:environment",
-        "startLine": 466,
+        "startLine": 464,
       },
       {
-        "endLine": 535,
+        "endLine": 533,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 470,
+        "startLine": 468,
       },
       {
-        "endLine": 561,
+        "endLine": 559,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 536,
+        "startLine": 534,
       },
     ],
   },

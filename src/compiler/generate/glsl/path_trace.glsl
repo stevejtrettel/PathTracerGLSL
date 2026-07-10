@@ -43,7 +43,7 @@ Radiance transport_trace(Ray ray) {
 #ifdef ENABLE_RUSSIAN_ROULETTE
         // Russian roulette
         if (bounce >= RR_START_DEPTH) {
-            float p_survive = min(0.95, luminance(throughput));
+            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }

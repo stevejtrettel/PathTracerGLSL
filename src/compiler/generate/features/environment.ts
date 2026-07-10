@@ -47,7 +47,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
     // none (and the fallback)
     return {
         ...emptyContribution(),
-        blocks: [{ origin: ORIGIN, source: radianceFn('return vec3(0.0);') }],
+        blocks: [{ origin: ORIGIN, source: radianceFn('return SPECTRUM_ZERO;') }],  // §2.5: radiometric, not raw vec3
     };
 }
 
