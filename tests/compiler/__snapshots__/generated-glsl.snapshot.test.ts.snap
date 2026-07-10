@@ -300,6 +300,7 @@ vec2 random2() {
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
@@ -345,6 +346,31 @@ float ambient_dot(Direction v1, Direction v2, Point p) {
 
 Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
     return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
+// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
+// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
+// matching the original optics/types.md vocabulary.
+// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = MAX_DIST;
+    return r;
+}
+
+Ray make_shadow_ray(Point origin, Direction dir, float dist) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
+    return r;
 }
 
 // SDF Primitive Library
@@ -496,9 +522,9 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray, float max_distance) {
+bool scene_intersect_any(Ray ray) {
     float t = ray.tmin;
-    float limit = min(ray.tmax, max_distance);
+    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -551,14 +577,15 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
 
 Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
-    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
     return mp.albedo * (1.0 / PI);
 }
 
 InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
     // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
     Frame f = hit.frame;
-    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
     float cos_theta = sqrt(u.y);
     float sin_theta = sqrt(max(0.0, 1.0 - u.y));
     float phi = TWO_PI * u.x;
@@ -572,7 +599,7 @@ InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, f
 }
 
 float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
     return max(0.0, c) * (1.0 / PI);
 }
 
@@ -593,24 +620,19 @@ float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, Mate
 Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
     return lambert_emission(wo, hit, mp);
 }
-// Shadow transmittance — opaque specialization (§6.3).
+// Shadow transmittance — opaque specialization (§6.3, revised per docs/trace-loop-contract.md).
 // Provides: shadow_transmittance(). Depends on: scene_intersect_any() (intersection),
-//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math), EPSILON.
+//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math).
 //
-// The §6.3 contract returns a Spectrum: the per-channel fraction of light surviving the trip
-// from \`p\` toward \`wi\` over \`dist\`. This is the OPAQUE specialization the compiler emits when
-// the scene has no media — transmittance is exactly 0 (blocked) or 1 (clear), so it is the
-// old boolean occlusion test moved behind the spectral contract. When media exist the compiler
-// emits the segment-walking form instead (reference-implementations §4); the NEE call site
-// never changes. Caller pre-offsets \`p\` off the surface (hit.p + n·EPSILON).
+// The contract returns a Spectrum: the per-channel fraction of light surviving the shadow ray.
+// This is the OPAQUE specialization the compiler emits when the scene has no media —
+// transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
+// spectral contract. When media exist the compiler emits the segment-walking form instead
+// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
+// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
 
-Spectrum shadow_transmittance(Point p, Direction wi, float dist) {
-    Ray shadow_ray;
-    shadow_ray.origin    = p;
-    shadow_ray.direction = wi;
-    shadow_ray.tmin      = EPSILON;
-    shadow_ray.tmax      = dist;
-    return scene_intersect_any(shadow_ray, dist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray) {
+    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -654,12 +676,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
 
-    Ray ray;
-    ray.origin = u_cameraPosition;
-    ray.direction = dir;
-    ray.tmin = 0.001;
-    ray.tmax = 1000.0;
-    return ray;
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
 }
 
 // Environment radiance
@@ -699,10 +716,11 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Spectrum vis = shadow_transmittance(hit.p + hit.frame.n * EPSILON, ls.wi, ls.distance - EPSILON);
+            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
+            Spectrum vis = shadow_transmittance(shadow_ray);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
-                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
                 radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
             }
         }
@@ -723,10 +741,9 @@ Radiance transport_trace(Ray ray) {
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
-        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = bs.wi;
-        current_ray.tmin = EPSILON;
-        current_ray.tmax = 1000.0;
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
     }
 
     return radiance;
@@ -810,84 +827,89 @@ void main() {
         "startLine": 93,
       },
       {
-        "endLine": 163,
+        "endLine": 164,
         "origin": "glsl/math.glsl",
         "startLine": 134,
       },
       {
-        "endLine": 187,
+        "endLine": 188,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 164,
+        "startLine": 165,
       },
       {
-        "endLine": 204,
+        "endLine": 213,
+        "origin": "glsl/ray.glsl",
+        "startLine": 189,
+      },
+      {
+        "endLine": 230,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 188,
+        "startLine": 214,
       },
       {
-        "endLine": 274,
+        "endLine": 300,
         "origin": "generated:sdf-dispatch",
-        "startLine": 205,
+        "startLine": 231,
       },
       {
-        "endLine": 286,
+        "endLine": 312,
         "origin": "generated:material-of",
-        "startLine": 275,
+        "startLine": 301,
       },
       {
-        "endLine": 358,
+        "endLine": 384,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 287,
+        "startLine": 313,
       },
       {
-        "endLine": 383,
+        "endLine": 409,
         "origin": "generated:material-lookup",
-        "startLine": 359,
+        "startLine": 385,
       },
       {
-        "endLine": 420,
+        "endLine": 447,
         "origin": "glsl/lambert.glsl",
-        "startLine": 384,
+        "startLine": 410,
       },
       {
-        "endLine": 433,
+        "endLine": 460,
         "origin": "generated:interaction-dispatch",
-        "startLine": 421,
+        "startLine": 448,
       },
       {
-        "endLine": 453,
+        "endLine": 475,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 434,
+        "startLine": 461,
       },
       {
-        "endLine": 472,
+        "endLine": 494,
         "origin": "glsl/light_point.glsl",
-        "startLine": 454,
+        "startLine": 476,
       },
       {
-        "endLine": 479,
+        "endLine": 501,
         "origin": "generated:light-sampling",
-        "startLine": 473,
+        "startLine": 495,
       },
       {
-        "endLine": 502,
+        "endLine": 519,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 480,
+        "startLine": 502,
       },
       {
-        "endLine": 506,
+        "endLine": 523,
         "origin": "generated:environment",
-        "startLine": 503,
+        "startLine": 520,
       },
       {
-        "endLine": 572,
+        "endLine": 589,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 507,
+        "startLine": 524,
       },
       {
-        "endLine": 598,
+        "endLine": 615,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 573,
+        "startLine": 590,
       },
     ],
   },
@@ -1239,6 +1261,7 @@ vec2 random2() {
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
@@ -1284,6 +1307,31 @@ float ambient_dot(Direction v1, Direction v2, Point p) {
 
 Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
     return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
+// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
+// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
+// matching the original optics/types.md vocabulary.
+// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = MAX_DIST;
+    return r;
+}
+
+Ray make_shadow_ray(Point origin, Direction dir, float dist) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
+    return r;
 }
 
 // SDF Primitive Library
@@ -1417,9 +1465,9 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray, float max_distance) {
+bool scene_intersect_any(Ray ray) {
     float t = ray.tmin;
-    float limit = min(ray.tmax, max_distance);
+    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -1462,14 +1510,15 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
 
 Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
-    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
     return mp.albedo * (1.0 / PI);
 }
 
 InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
     // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
     Frame f = hit.frame;
-    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
     float cos_theta = sqrt(u.y);
     float sin_theta = sqrt(max(0.0, 1.0 - u.y));
     float phi = TWO_PI * u.x;
@@ -1483,7 +1532,7 @@ InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, f
 }
 
 float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
     return max(0.0, c) * (1.0 / PI);
 }
 
@@ -1519,12 +1568,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
 
-    Ray ray;
-    ray.origin = u_cameraPosition;
-    ray.direction = dir;
-    ray.tmin = 0.001;
-    ray.tmax = 1000.0;
-    return ray;
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
 }
 
 // Environment radiance
@@ -1564,10 +1608,11 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Spectrum vis = shadow_transmittance(hit.p + hit.frame.n * EPSILON, ls.wi, ls.distance - EPSILON);
+            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
+            Spectrum vis = shadow_transmittance(shadow_ray);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
-                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
                 radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
             }
         }
@@ -1588,10 +1633,9 @@ Radiance transport_trace(Ray ray) {
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
-        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = bs.wi;
-        current_ray.tmin = EPSILON;
-        current_ray.tmax = 1000.0;
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
     }
 
     return radiance;
@@ -1675,69 +1719,74 @@ void main() {
         "startLine": 88,
       },
       {
-        "endLine": 158,
+        "endLine": 159,
         "origin": "glsl/math.glsl",
         "startLine": 129,
       },
       {
-        "endLine": 182,
+        "endLine": 183,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 159,
+        "startLine": 160,
       },
       {
-        "endLine": 199,
+        "endLine": 208,
+        "origin": "glsl/ray.glsl",
+        "startLine": 184,
+      },
+      {
+        "endLine": 225,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 183,
+        "startLine": 209,
       },
       {
-        "endLine": 253,
+        "endLine": 279,
         "origin": "generated:sdf-dispatch",
-        "startLine": 200,
+        "startLine": 226,
       },
       {
-        "endLine": 263,
+        "endLine": 289,
         "origin": "generated:material-of",
-        "startLine": 254,
+        "startLine": 280,
       },
       {
-        "endLine": 335,
+        "endLine": 361,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 264,
+        "startLine": 290,
       },
       {
-        "endLine": 350,
+        "endLine": 376,
         "origin": "generated:material-lookup",
-        "startLine": 336,
+        "startLine": 362,
       },
       {
-        "endLine": 387,
+        "endLine": 414,
         "origin": "glsl/lambert.glsl",
-        "startLine": 351,
-      },
-      {
-        "endLine": 400,
-        "origin": "generated:interaction-dispatch",
-        "startLine": 388,
-      },
-      {
-        "endLine": 423,
-        "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 401,
+        "startLine": 377,
       },
       {
         "endLine": 427,
-        "origin": "generated:environment",
-        "startLine": 424,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 415,
       },
       {
-        "endLine": 493,
-        "origin": "glsl/path_trace.glsl",
+        "endLine": 445,
+        "origin": "glsl/camera_pinhole.glsl",
         "startLine": 428,
       },
       {
-        "endLine": 519,
+        "endLine": 449,
+        "origin": "generated:environment",
+        "startLine": 446,
+      },
+      {
+        "endLine": 515,
+        "origin": "glsl/path_trace.glsl",
+        "startLine": 450,
+      },
+      {
+        "endLine": 541,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 494,
+        "startLine": 516,
       },
     ],
   },
@@ -2100,6 +2149,7 @@ vec2 random2() {
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
@@ -2145,6 +2195,31 @@ float ambient_dot(Direction v1, Direction v2, Point p) {
 
 Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
     return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
+// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
+// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
+// matching the original optics/types.md vocabulary.
+// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = MAX_DIST;
+    return r;
+}
+
+Ray make_shadow_ray(Point origin, Direction dir, float dist) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
+    return r;
 }
 
 // SDF Primitive Library
@@ -2247,9 +2322,9 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray, float max_distance) {
+bool scene_intersect_any(Ray ray) {
     float t = ray.tmin;
-    float limit = min(ray.tmax, max_distance);
+    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -2294,14 +2369,15 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
 
 Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
-    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
     return mp.albedo * (1.0 / PI);
 }
 
 InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
     // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
     Frame f = hit.frame;
-    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
     float cos_theta = sqrt(u.y);
     float sin_theta = sqrt(max(0.0, 1.0 - u.y));
     float phi = TWO_PI * u.x;
@@ -2315,7 +2391,7 @@ InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, f
 }
 
 float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
     return max(0.0, c) * (1.0 / PI);
 }
 
@@ -2336,24 +2412,19 @@ float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, Mate
 Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
     return lambert_emission(wo, hit, mp);
 }
-// Shadow transmittance — opaque specialization (§6.3).
+// Shadow transmittance — opaque specialization (§6.3, revised per docs/trace-loop-contract.md).
 // Provides: shadow_transmittance(). Depends on: scene_intersect_any() (intersection),
-//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math), EPSILON.
+//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math).
 //
-// The §6.3 contract returns a Spectrum: the per-channel fraction of light surviving the trip
-// from \`p\` toward \`wi\` over \`dist\`. This is the OPAQUE specialization the compiler emits when
-// the scene has no media — transmittance is exactly 0 (blocked) or 1 (clear), so it is the
-// old boolean occlusion test moved behind the spectral contract. When media exist the compiler
-// emits the segment-walking form instead (reference-implementations §4); the NEE call site
-// never changes. Caller pre-offsets \`p\` off the surface (hit.p + n·EPSILON).
+// The contract returns a Spectrum: the per-channel fraction of light surviving the shadow ray.
+// This is the OPAQUE specialization the compiler emits when the scene has no media —
+// transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
+// spectral contract. When media exist the compiler emits the segment-walking form instead
+// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
+// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
 
-Spectrum shadow_transmittance(Point p, Direction wi, float dist) {
-    Ray shadow_ray;
-    shadow_ray.origin    = p;
-    shadow_ray.direction = wi;
-    shadow_ray.tmin      = EPSILON;
-    shadow_ray.tmax      = dist;
-    return scene_intersect_any(shadow_ray, dist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray) {
+    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -2397,12 +2468,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
 
-    Ray ray;
-    ray.origin = u_cameraPosition;
-    ray.direction = dir;
-    ray.tmin = 0.001;
-    ray.tmax = 1000.0;
-    return ray;
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
 }
 
 // Environment radiance
@@ -2442,10 +2508,11 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Spectrum vis = shadow_transmittance(hit.p + hit.frame.n * EPSILON, ls.wi, ls.distance - EPSILON);
+            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
+            Spectrum vis = shadow_transmittance(shadow_ray);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
-                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
                 radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
             }
         }
@@ -2466,10 +2533,9 @@ Radiance transport_trace(Ray ray) {
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
-        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = bs.wi;
-        current_ray.tmin = EPSILON;
-        current_ray.tmax = 1000.0;
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
     }
 
     return radiance;
@@ -2553,84 +2619,89 @@ void main() {
         "startLine": 91,
       },
       {
-        "endLine": 161,
+        "endLine": 162,
         "origin": "glsl/math.glsl",
         "startLine": 132,
       },
       {
-        "endLine": 185,
+        "endLine": 186,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 162,
+        "startLine": 163,
       },
       {
-        "endLine": 202,
+        "endLine": 211,
+        "origin": "glsl/ray.glsl",
+        "startLine": 187,
+      },
+      {
+        "endLine": 228,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 186,
+        "startLine": 212,
       },
       {
-        "endLine": 229,
+        "endLine": 255,
         "origin": "generated:sdf-dispatch",
-        "startLine": 203,
+        "startLine": 229,
       },
       {
-        "endLine": 235,
+        "endLine": 261,
         "origin": "generated:material-of",
-        "startLine": 230,
+        "startLine": 256,
       },
       {
-        "endLine": 307,
+        "endLine": 333,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 236,
+        "startLine": 262,
       },
       {
-        "endLine": 324,
+        "endLine": 350,
         "origin": "generated:material-lookup",
-        "startLine": 308,
+        "startLine": 334,
       },
       {
-        "endLine": 361,
+        "endLine": 388,
         "origin": "glsl/lambert.glsl",
-        "startLine": 325,
+        "startLine": 351,
       },
       {
-        "endLine": 374,
+        "endLine": 401,
         "origin": "generated:interaction-dispatch",
-        "startLine": 362,
+        "startLine": 389,
       },
       {
-        "endLine": 394,
+        "endLine": 416,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 375,
+        "startLine": 402,
       },
       {
-        "endLine": 413,
+        "endLine": 435,
         "origin": "glsl/light_point.glsl",
-        "startLine": 395,
+        "startLine": 417,
       },
       {
-        "endLine": 420,
+        "endLine": 442,
         "origin": "generated:light-sampling",
-        "startLine": 414,
+        "startLine": 436,
       },
       {
-        "endLine": 443,
+        "endLine": 460,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 421,
+        "startLine": 443,
       },
       {
-        "endLine": 447,
+        "endLine": 464,
         "origin": "generated:environment",
-        "startLine": 444,
+        "startLine": 461,
       },
       {
-        "endLine": 513,
+        "endLine": 530,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 448,
+        "startLine": 465,
       },
       {
-        "endLine": 539,
+        "endLine": 556,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 514,
+        "startLine": 531,
       },
     ],
   },
@@ -3009,6 +3080,7 @@ vec2 random2() {
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
@@ -3054,6 +3126,31 @@ float ambient_dot(Direction v1, Direction v2, Point p) {
 
 Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
     return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
+// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
+// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
+// matching the original optics/types.md vocabulary.
+// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = MAX_DIST;
+    return r;
+}
+
+Ray make_shadow_ray(Point origin, Direction dir, float dist) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
+    return r;
 }
 
 // SDF Primitive Library
@@ -3156,9 +3253,9 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray, float max_distance) {
+bool scene_intersect_any(Ray ray) {
     float t = ray.tmin;
-    float limit = min(ray.tmax, max_distance);
+    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -3203,14 +3300,15 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
 
 Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
-    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
     return mp.albedo * (1.0 / PI);
 }
 
 InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
     // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
     Frame f = hit.frame;
-    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
     float cos_theta = sqrt(u.y);
     float sin_theta = sqrt(max(0.0, 1.0 - u.y));
     float phi = TWO_PI * u.x;
@@ -3224,7 +3322,7 @@ InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, f
 }
 
 float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
     return max(0.0, c) * (1.0 / PI);
 }
 
@@ -3245,24 +3343,19 @@ float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, Mate
 Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
     return lambert_emission(wo, hit, mp);
 }
-// Shadow transmittance — opaque specialization (§6.3).
+// Shadow transmittance — opaque specialization (§6.3, revised per docs/trace-loop-contract.md).
 // Provides: shadow_transmittance(). Depends on: scene_intersect_any() (intersection),
-//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math), EPSILON.
+//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math).
 //
-// The §6.3 contract returns a Spectrum: the per-channel fraction of light surviving the trip
-// from \`p\` toward \`wi\` over \`dist\`. This is the OPAQUE specialization the compiler emits when
-// the scene has no media — transmittance is exactly 0 (blocked) or 1 (clear), so it is the
-// old boolean occlusion test moved behind the spectral contract. When media exist the compiler
-// emits the segment-walking form instead (reference-implementations §4); the NEE call site
-// never changes. Caller pre-offsets \`p\` off the surface (hit.p + n·EPSILON).
+// The contract returns a Spectrum: the per-channel fraction of light surviving the shadow ray.
+// This is the OPAQUE specialization the compiler emits when the scene has no media —
+// transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
+// spectral contract. When media exist the compiler emits the segment-walking form instead
+// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
+// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
 
-Spectrum shadow_transmittance(Point p, Direction wi, float dist) {
-    Ray shadow_ray;
-    shadow_ray.origin    = p;
-    shadow_ray.direction = wi;
-    shadow_ray.tmin      = EPSILON;
-    shadow_ray.tmax      = dist;
-    return scene_intersect_any(shadow_ray, dist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray) {
+    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -3306,12 +3399,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
 
-    Ray ray;
-    ray.origin = u_cameraPosition;
-    ray.direction = dir;
-    ray.tmin = 0.001;
-    ray.tmax = 1000.0;
-    return ray;
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
 }
 
 // Environment radiance
@@ -3351,10 +3439,11 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Spectrum vis = shadow_transmittance(hit.p + hit.frame.n * EPSILON, ls.wi, ls.distance - EPSILON);
+            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
+            Spectrum vis = shadow_transmittance(shadow_ray);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
-                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
                 radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
             }
         }
@@ -3375,10 +3464,9 @@ Radiance transport_trace(Ray ray) {
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
-        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = bs.wi;
-        current_ray.tmin = EPSILON;
-        current_ray.tmax = 1000.0;
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
     }
 
     return radiance;
@@ -3462,84 +3550,89 @@ void main() {
         "startLine": 93,
       },
       {
-        "endLine": 163,
+        "endLine": 164,
         "origin": "glsl/math.glsl",
         "startLine": 134,
       },
       {
-        "endLine": 187,
+        "endLine": 188,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 164,
+        "startLine": 165,
       },
       {
-        "endLine": 204,
+        "endLine": 213,
+        "origin": "glsl/ray.glsl",
+        "startLine": 189,
+      },
+      {
+        "endLine": 230,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 188,
+        "startLine": 214,
       },
       {
-        "endLine": 231,
+        "endLine": 257,
         "origin": "generated:sdf-dispatch",
-        "startLine": 205,
+        "startLine": 231,
       },
       {
-        "endLine": 237,
+        "endLine": 263,
         "origin": "generated:material-of",
-        "startLine": 232,
+        "startLine": 258,
       },
       {
-        "endLine": 309,
+        "endLine": 335,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 238,
+        "startLine": 264,
       },
       {
-        "endLine": 326,
+        "endLine": 352,
         "origin": "generated:material-lookup",
-        "startLine": 310,
+        "startLine": 336,
       },
       {
-        "endLine": 363,
+        "endLine": 390,
         "origin": "glsl/lambert.glsl",
-        "startLine": 327,
+        "startLine": 353,
       },
       {
-        "endLine": 376,
+        "endLine": 403,
         "origin": "generated:interaction-dispatch",
-        "startLine": 364,
+        "startLine": 391,
       },
       {
-        "endLine": 396,
+        "endLine": 418,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 377,
+        "startLine": 404,
       },
       {
-        "endLine": 415,
+        "endLine": 437,
         "origin": "glsl/light_point.glsl",
-        "startLine": 397,
+        "startLine": 419,
       },
       {
-        "endLine": 422,
+        "endLine": 444,
         "origin": "generated:light-sampling",
-        "startLine": 416,
+        "startLine": 438,
       },
       {
-        "endLine": 445,
+        "endLine": 462,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 423,
+        "startLine": 445,
       },
       {
-        "endLine": 449,
+        "endLine": 466,
         "origin": "generated:environment",
-        "startLine": 446,
+        "startLine": 463,
       },
       {
-        "endLine": 515,
+        "endLine": 532,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 450,
+        "startLine": 467,
       },
       {
-        "endLine": 541,
+        "endLine": 558,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 516,
+        "startLine": 533,
       },
     ],
   },
@@ -3892,6 +3985,7 @@ vec2 random2() {
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
@@ -3937,6 +4031,31 @@ float ambient_dot(Direction v1, Direction v2, Point p) {
 
 Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
     return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
+// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
+// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
+// matching the original optics/types.md vocabulary.
+// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = MAX_DIST;
+    return r;
+}
+
+Ray make_shadow_ray(Point origin, Direction dir, float dist) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
+    return r;
 }
 
 // SDF Primitive Library
@@ -4056,9 +4175,9 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray, float max_distance) {
+bool scene_intersect_any(Ray ray) {
     float t = ray.tmin;
-    float limit = min(ray.tmax, max_distance);
+    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -4103,14 +4222,15 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
 
 Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
-    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
     return mp.albedo * (1.0 / PI);
 }
 
 InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
     // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
     Frame f = hit.frame;
-    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
     float cos_theta = sqrt(u.y);
     float sin_theta = sqrt(max(0.0, 1.0 - u.y));
     float phi = TWO_PI * u.x;
@@ -4124,7 +4244,7 @@ InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, f
 }
 
 float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
     return max(0.0, c) * (1.0 / PI);
 }
 
@@ -4145,24 +4265,19 @@ float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, Mate
 Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
     return lambert_emission(wo, hit, mp);
 }
-// Shadow transmittance — opaque specialization (§6.3).
+// Shadow transmittance — opaque specialization (§6.3, revised per docs/trace-loop-contract.md).
 // Provides: shadow_transmittance(). Depends on: scene_intersect_any() (intersection),
-//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math), EPSILON.
+//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math).
 //
-// The §6.3 contract returns a Spectrum: the per-channel fraction of light surviving the trip
-// from \`p\` toward \`wi\` over \`dist\`. This is the OPAQUE specialization the compiler emits when
-// the scene has no media — transmittance is exactly 0 (blocked) or 1 (clear), so it is the
-// old boolean occlusion test moved behind the spectral contract. When media exist the compiler
-// emits the segment-walking form instead (reference-implementations §4); the NEE call site
-// never changes. Caller pre-offsets \`p\` off the surface (hit.p + n·EPSILON).
+// The contract returns a Spectrum: the per-channel fraction of light surviving the shadow ray.
+// This is the OPAQUE specialization the compiler emits when the scene has no media —
+// transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
+// spectral contract. When media exist the compiler emits the segment-walking form instead
+// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
+// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
 
-Spectrum shadow_transmittance(Point p, Direction wi, float dist) {
-    Ray shadow_ray;
-    shadow_ray.origin    = p;
-    shadow_ray.direction = wi;
-    shadow_ray.tmin      = EPSILON;
-    shadow_ray.tmax      = dist;
-    return scene_intersect_any(shadow_ray, dist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray) {
+    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -4211,12 +4326,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
 
-    Ray ray;
-    ray.origin = u_cameraPosition;
-    ray.direction = dir;
-    ray.tmin = 0.001;
-    ray.tmax = 1000.0;
-    return ray;
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
 }
 
 // Environment radiance
@@ -4256,10 +4366,11 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Spectrum vis = shadow_transmittance(hit.p + hit.frame.n * EPSILON, ls.wi, ls.distance - EPSILON);
+            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
+            Spectrum vis = shadow_transmittance(shadow_ray);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
-                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
                 radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
             }
         }
@@ -4280,10 +4391,9 @@ Radiance transport_trace(Ray ray) {
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
-        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = bs.wi;
-        current_ray.tmin = EPSILON;
-        current_ray.tmax = 1000.0;
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
     }
 
     return radiance;
@@ -4367,84 +4477,89 @@ void main() {
         "startLine": 89,
       },
       {
-        "endLine": 159,
+        "endLine": 160,
         "origin": "glsl/math.glsl",
         "startLine": 130,
       },
       {
-        "endLine": 183,
+        "endLine": 184,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 160,
+        "startLine": 161,
       },
       {
-        "endLine": 200,
+        "endLine": 209,
+        "origin": "glsl/ray.glsl",
+        "startLine": 185,
+      },
+      {
+        "endLine": 226,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 184,
+        "startLine": 210,
       },
       {
-        "endLine": 242,
+        "endLine": 268,
         "origin": "generated:sdf-dispatch",
-        "startLine": 201,
+        "startLine": 227,
       },
       {
-        "endLine": 250,
+        "endLine": 276,
         "origin": "generated:material-of",
-        "startLine": 243,
+        "startLine": 269,
       },
       {
-        "endLine": 322,
+        "endLine": 348,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 251,
+        "startLine": 277,
       },
       {
-        "endLine": 339,
+        "endLine": 365,
         "origin": "generated:material-lookup",
-        "startLine": 323,
+        "startLine": 349,
       },
       {
-        "endLine": 376,
+        "endLine": 403,
         "origin": "glsl/lambert.glsl",
-        "startLine": 340,
+        "startLine": 366,
       },
       {
-        "endLine": 389,
+        "endLine": 416,
         "origin": "generated:interaction-dispatch",
-        "startLine": 377,
+        "startLine": 404,
       },
       {
-        "endLine": 409,
+        "endLine": 431,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 390,
+        "startLine": 417,
       },
       {
-        "endLine": 428,
+        "endLine": 450,
         "origin": "glsl/light_point.glsl",
-        "startLine": 410,
+        "startLine": 432,
       },
       {
-        "endLine": 440,
+        "endLine": 462,
         "origin": "generated:light-sampling",
-        "startLine": 429,
+        "startLine": 451,
       },
       {
-        "endLine": 463,
+        "endLine": 480,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 441,
+        "startLine": 463,
       },
       {
-        "endLine": 467,
+        "endLine": 484,
         "origin": "generated:environment",
-        "startLine": 464,
+        "startLine": 481,
       },
       {
-        "endLine": 533,
+        "endLine": 550,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 468,
+        "startLine": 485,
       },
       {
-        "endLine": 559,
+        "endLine": 576,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 534,
+        "startLine": 551,
       },
     ],
   },
@@ -4783,6 +4898,7 @@ vec2 random2() {
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
@@ -4828,6 +4944,31 @@ float ambient_dot(Direction v1, Direction v2, Point p) {
 
 Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
     return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a geodesic seed (origin + unit direction) plus its intersection search interval
+// [tmin, tmax]. Self-intersection escape is an ORIGIN OFFSET (done by the caller via
+// ambient_geodesic), not a job for tmin — so these constructors take the already-offset origin,
+// matching the original optics/types.md vocabulary.
+// Provides: make_ray(), make_shadow_ray(). Depends on: Ray (structs), EPSILON/MAX_DIST (math).
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = MAX_DIST;
+    return r;
+}
+
+Ray make_shadow_ray(Point origin, Direction dir, float dist) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    r.tmin      = EPSILON;
+    r.tmax      = dist;      // bounded at the light distance (tmax = live search bound)
+    return r;
 }
 
 // SDF Primitive Library
@@ -4947,9 +5088,9 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray, float max_distance) {
+bool scene_intersect_any(Ray ray) {
     float t = ray.tmin;
-    float limit = min(ray.tmax, max_distance);
+    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -4994,14 +5135,15 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
 
 Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
-    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
     return mp.albedo * (1.0 / PI);
 }
 
 InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
     // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
     Frame f = hit.frame;
-    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
     float cos_theta = sqrt(u.y);
     float sin_theta = sqrt(max(0.0, 1.0 - u.y));
     float phi = TWO_PI * u.x;
@@ -5015,7 +5157,7 @@ InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, f
 }
 
 float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
     return max(0.0, c) * (1.0 / PI);
 }
 
@@ -5036,24 +5178,19 @@ float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, Mate
 Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
     return lambert_emission(wo, hit, mp);
 }
-// Shadow transmittance — opaque specialization (§6.3).
+// Shadow transmittance — opaque specialization (§6.3, revised per docs/trace-loop-contract.md).
 // Provides: shadow_transmittance(). Depends on: scene_intersect_any() (intersection),
-//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math), EPSILON.
+//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math).
 //
-// The §6.3 contract returns a Spectrum: the per-channel fraction of light surviving the trip
-// from \`p\` toward \`wi\` over \`dist\`. This is the OPAQUE specialization the compiler emits when
-// the scene has no media — transmittance is exactly 0 (blocked) or 1 (clear), so it is the
-// old boolean occlusion test moved behind the spectral contract. When media exist the compiler
-// emits the segment-walking form instead (reference-implementations §4); the NEE call site
-// never changes. Caller pre-offsets \`p\` off the surface (hit.p + n·EPSILON).
+// The contract returns a Spectrum: the per-channel fraction of light surviving the shadow ray.
+// This is the OPAQUE specialization the compiler emits when the scene has no media —
+// transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
+// spectral contract. When media exist the compiler emits the segment-walking form instead
+// (reference-implementations §4); the NEE call site never changes. The caller builds the shadow
+// Ray (origin escaped off the surface, tmax = light distance) via make_shadow_ray.
 
-Spectrum shadow_transmittance(Point p, Direction wi, float dist) {
-    Ray shadow_ray;
-    shadow_ray.origin    = p;
-    shadow_ray.direction = wi;
-    shadow_ray.tmin      = EPSILON;
-    shadow_ray.tmax      = dist;
-    return scene_intersect_any(shadow_ray, dist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+Spectrum shadow_transmittance(Ray shadow_ray) {
+    return scene_intersect_any(shadow_ray) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
 // Point light — delta light sampler (§6.1 / reference §6.3).
@@ -5102,12 +5239,7 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
 
-    Ray ray;
-    ray.origin = u_cameraPosition;
-    ray.direction = dir;
-    ray.tmin = 0.001;
-    ray.tmax = 1000.0;
-    return ray;
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
 }
 
 // Environment radiance
@@ -5147,10 +5279,11 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Spectrum vis = shadow_transmittance(hit.p + hit.frame.n * EPSILON, ls.wi, ls.distance - EPSILON);
+            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
+            Spectrum vis = shadow_transmittance(shadow_ray);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
-                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
                 radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
             }
         }
@@ -5171,10 +5304,9 @@ Radiance transport_trace(Ray ray) {
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
-        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = bs.wi;
-        current_ray.tmin = EPSILON;
-        current_ray.tmax = 1000.0;
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
     }
 
     return radiance;
@@ -5258,84 +5390,89 @@ void main() {
         "startLine": 89,
       },
       {
-        "endLine": 159,
+        "endLine": 160,
         "origin": "glsl/math.glsl",
         "startLine": 130,
       },
       {
-        "endLine": 183,
+        "endLine": 184,
         "origin": "glsl/euclidean.glsl",
-        "startLine": 160,
+        "startLine": 161,
       },
       {
-        "endLine": 200,
+        "endLine": 209,
+        "origin": "glsl/ray.glsl",
+        "startLine": 185,
+      },
+      {
+        "endLine": 226,
         "origin": "glsl/sdf_primitives.glsl",
-        "startLine": 184,
+        "startLine": 210,
       },
       {
-        "endLine": 242,
+        "endLine": 268,
         "origin": "generated:sdf-dispatch",
-        "startLine": 201,
+        "startLine": 227,
       },
       {
-        "endLine": 250,
+        "endLine": 276,
         "origin": "generated:material-of",
-        "startLine": 243,
+        "startLine": 269,
       },
       {
-        "endLine": 322,
+        "endLine": 348,
         "origin": "glsl/raymarch.glsl",
-        "startLine": 251,
+        "startLine": 277,
       },
       {
-        "endLine": 339,
+        "endLine": 365,
         "origin": "generated:material-lookup",
-        "startLine": 323,
+        "startLine": 349,
       },
       {
-        "endLine": 376,
+        "endLine": 403,
         "origin": "glsl/lambert.glsl",
-        "startLine": 340,
+        "startLine": 366,
       },
       {
-        "endLine": 389,
+        "endLine": 416,
         "origin": "generated:interaction-dispatch",
-        "startLine": 377,
+        "startLine": 404,
       },
       {
-        "endLine": 409,
+        "endLine": 431,
         "origin": "glsl/shadow_opaque.glsl",
-        "startLine": 390,
+        "startLine": 417,
       },
       {
-        "endLine": 428,
+        "endLine": 450,
         "origin": "glsl/light_point.glsl",
-        "startLine": 410,
+        "startLine": 432,
       },
       {
-        "endLine": 440,
+        "endLine": 462,
         "origin": "generated:light-sampling",
-        "startLine": 429,
+        "startLine": 451,
       },
       {
-        "endLine": 463,
+        "endLine": 480,
         "origin": "glsl/camera_pinhole.glsl",
-        "startLine": 441,
+        "startLine": 463,
       },
       {
-        "endLine": 467,
+        "endLine": 484,
         "origin": "generated:environment",
-        "startLine": 464,
+        "startLine": 481,
       },
       {
-        "endLine": 533,
+        "endLine": 550,
         "origin": "glsl/path_trace.glsl",
-        "startLine": 468,
+        "startLine": 485,
       },
       {
-        "endLine": 559,
+        "endLine": 576,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 534,
+        "startLine": 551,
       },
     ],
   },

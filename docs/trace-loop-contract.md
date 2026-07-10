@@ -1,0 +1,91 @@
+# Trace-Loop Contract
+
+**Status:** Design authority for the top-level path-tracing loop and its types. Owner-decided
+(July 2026), consolidated from the original `docs/archive/START/contracts/optics/*` +
+`pillars/objects.md` design and refined in discussion. **This supersedes Fable's `GeodesicState`
+stepper (`fable-compiler-contracts.md` §5) — see "Supersedes" below.**
+
+---
+
+## The loop — five abstractions
+
+```
+Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  →  make_ray  →  repeat
+```
+
+1. **`Ray`** — a *geodesic seed*: a position and a unit direction, plus the interval to search.
+2. **`scene_intersect(Ray) → Hit`** — advance to the next intersection. One contract; it subsumes
+   SDF marching, analytic intersection, and (future) mesh/BVH as geometry **capabilities**
+   (`sdf?` / `ray?` / `instances?`), taking the nearest hit and coordinating via `tmax`.
+3. **`Hit`** — the landing record: where you arrived, the shading frame, the regions flanking the boundary.
+4. **Interaction** — the scattering event (surface BSDF and medium phase unified): `sample` returns
+   the next direction + weight; `eval`/`emission` for NEE/MIS.
+5. **`make_ray`** — spawn the continuation ray from the hit; iterate.
+
+## `Ray` — the universal, geometry-independent abstraction
+
+```glsl
+struct Ray { Point origin; Direction direction; float tmin; float tmax; };
+```
+- A `Ray` **encodes a geodesic by its initial conditions** — `(origin, direction)`, a point of the
+  unit tangent bundle. It flows via `ambient_geodesic(origin, direction, t)`; only the *space*
+  changes (Euclidean → line, H³ → hyperbolic geodesic, Schwarzschild → light path). Same `Ray`.
+- `direction` is a **unit** tangent — unit *in the metric*.
+- `tmin`, `tmax` bound the **intersection query** along the geodesic (near/far, shadow length). `tmax`
+  is the **live search bound**: intersection backends shrink it in place as they find nearer hits
+  (the SDF hit bounds the BVH — capability coordination). `tmin` defaults to `EPSILON`; it is *not*
+  the self-intersection mechanism (see next).
+- **Self-intersection escape is an origin offset**, done via the geodesic:
+  `origin = ambient_geodesic(hit.p, n, EPSILON)`. This is robust at grazing angles (offset along the
+  normal) and curved-space-correct (it *is* the exp-map step). The true geometric point lives on
+  `Hit.p`; the ray's `origin` is legitimately the escaped point.
+  - Offset direction is `+n` for reflection; dielectric transmission will offset toward `wi`'s side
+    (`sign(ambient_dot(wi, n, p))·n`) via a spawn helper — deferred to the dielectric material.
+
+```glsl
+Ray make_ray       (Point origin, Direction dir);              // tmin = EPSILON, tmax = MAX_DIST
+Ray make_shadow_ray(Point origin, Direction dir, float dist);  // tmin = EPSILON, tmax = dist
+```
+
+## The Riemannian metric — `ambient_dot`, paid once
+
+Any inner product of **two world-space physical directions** (transport cosines, same-hemisphere
+tests, phase-angle cosines) is a *metric* operation → `ambient_dot(a, b, p)`, not raw `dot`. In
+Euclidean space `ambient_dot` unpacks to `dot`, so this is invisible today — and silently wrong the
+day curvature turns on, which is exactly why we name it now.
+
+**The rule (mechanical, so the compiler-less discipline is checkable by eye):**
+- world-space direction · direction, or the world↔frame projection (`to_local`/`from_local`) → **`ambient_dot`**
+- dots between vectors **already in local-frame components** → raw **`dot`** — the frame is
+  metric-orthonormal by construction, so the metric is the identity there. *The metric is paid
+  exactly once, at the world↔frame crossing.*
+
+There is no local-frame BSDF yet (Lambert works in world space), so **today every physical dot is
+`ambient_dot`**; the raw-`dot` exception first appears with GGX-style `to_local` materials.
+
+## Updated signatures (vs the current slice)
+
+```glsl
+bool     scene_intersect     (Ray ray, out Hit hit);        // top level by value (owns a mutable copy)
+bool     <backend>_intersect (inout Ray ray, out Hit hit);  // backends shrink ray.tmax (Phase-2 seam; one backend now)
+bool     scene_intersect_any (Ray ray);                     // was (Ray, float max_distance) — redundant arg deleted
+Spectrum shadow_transmittance(Ray shadow_ray);              // was (Point p, Direction wi, float dist) — revises §6.3
+Point    ambient_geodesic    (Point origin, Direction dir, float t);   // UNCHANGED — the geodesic mechanism
+float    ambient_dot         (Direction a, Direction b, Point p);      // UNCHANGED — now actually called
+```
+
+## Supersedes
+
+- **Fable §5 `GeodesicState` + `geodesic_step` stepper — deleted.** The geodesic abstraction is
+  `ambient_geodesic(origin, dir, t) → Point`; that signature holds in *every* space, including a
+  black hole (which integrates the ODE internally — an implementation/perf detail of the ambient
+  module, never a type in the loop). There is no stepper state in the trace loop.
+- **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray)` (the interval now
+  travels on the `Ray`).
+
+## Deferred (not this contract)
+
+Capability geometry (mesh/BVH `ray?`, `instances?`) and the `inout Ray` multi-backend coordination
+(one backend exists now); curved ambient spaces (H³/Schwarzschild — `ambient_*` are the seam);
+`Point`→`vec4` per space; the dielectric spawn-offset side; BVH under non-straight geodesics
+(open in the archive too); Fable's bare-`f`-vs-`f·cos` cosine-placement question (orthogonal).

@@ -31,10 +31,11 @@ Radiance transport_trace(Ray ray) {
         LightSample ls = lighting_sample(hit.p, random2());
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            Spectrum vis = shadow_transmittance(hit.p + hit.frame.n * EPSILON, ls.wi, ls.distance - EPSILON);
+            Ray shadow_ray = make_shadow_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi, ls.distance - EPSILON);
+            Spectrum vis = shadow_transmittance(shadow_ray);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
-                float cos_i = abs(dot(ls.wi, hit.frame.n));                         // transport applies the cosine
+                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
                 radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
             }
         }
@@ -55,10 +56,9 @@ Radiance transport_trace(Ray ray) {
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
-        current_ray.origin = ambient_geodesic(hit.p, hit.frame.n, EPSILON);
-        current_ray.direction = bs.wi;
-        current_ray.tmin = EPSILON;
-        current_ray.tmax = 1000.0;
+        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
+        // direction = sampled wi. See docs/trace-loop-contract.md.
+        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
     }
 
     return radiance;

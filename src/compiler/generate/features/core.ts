@@ -9,6 +9,7 @@ import interactionGLSL from '../glsl/interaction.glsl?raw';
 import rngGLSL from '../glsl/rng.glsl?raw';
 import mathGLSL from '../glsl/math.glsl?raw';
 import euclideanGLSL from '../glsl/euclidean.glsl?raw';
+import rayGLSL from '../glsl/ray.glsl?raw';
 
 export function contributeCore(_plan: RenderPlan): FeatureContribution {
     return {
@@ -19,6 +20,7 @@ export function contributeCore(_plan: RenderPlan): FeatureContribution {
             { origin: 'glsl/rng.glsl', source: rngGLSL },
             { origin: 'glsl/math.glsl', source: mathGLSL },
             { origin: 'glsl/euclidean.glsl', source: euclideanGLSL },
+            { origin: 'glsl/ray.glsl', source: rayGLSL },
         ],
         uniforms: [
             { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },

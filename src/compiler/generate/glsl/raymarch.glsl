@@ -48,9 +48,9 @@ bool scene_intersect(Ray ray, out Hit hit) {
     return false;
 }
 
-bool scene_intersect_any(Ray ray, float max_distance) {
+bool scene_intersect_any(Ray ray) {
     float t = ray.tmin;
-    float limit = min(ray.tmax, max_distance);
+    float limit = ray.tmax;   // the ray carries its own far bound (tmax); no separate arg
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);

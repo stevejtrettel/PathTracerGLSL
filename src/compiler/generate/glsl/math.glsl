@@ -5,6 +5,7 @@
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).

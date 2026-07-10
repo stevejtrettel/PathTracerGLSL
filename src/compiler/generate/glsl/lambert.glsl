@@ -6,14 +6,15 @@
 
 Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
-    if (dot(wi, hit.frame.n) * dot(wo, hit.frame.n) <= 0.0) return SPECTRUM_ZERO;
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
     return mp.albedo * (1.0 / PI);
 }
 
 InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
     // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
     Frame f = hit.frame;
-    Direction n = dot(wo, f.n) < 0.0 ? -f.n : f.n;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
     float cos_theta = sqrt(u.y);
     float sin_theta = sqrt(max(0.0, 1.0 - u.y));
     float phi = TWO_PI * u.x;
@@ -27,7 +28,7 @@ InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, f
 }
 
 float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    float c = dot(wi, hit.frame.n) * sign(dot(wo, hit.frame.n));
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
     return max(0.0, c) * (1.0 / PI);
 }
 

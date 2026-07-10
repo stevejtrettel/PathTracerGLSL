@@ -13,10 +13,5 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
 
-    Ray ray;
-    ray.origin = u_cameraPosition;
-    ray.direction = dir;
-    ray.tmin = 0.001;
-    ray.tmax = 1000.0;
-    return ray;
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
 }
