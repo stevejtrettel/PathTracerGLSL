@@ -145,6 +145,12 @@ Any numeric property anywhere in the scene/strategy (material fields, light inte
 
 Samplers take their primary random numbers as explicit arguments (`vec2 xi`), matching the archive optics contract. Models needing additional dimensions may draw from the global RNG stream, documented per model. This keeps the door open for stratification/QMC control at the transport level without forcing it now.
 
+> **Shape revised by §10.1 item 1 (implemented, owner-approved):** surface samplers take the split
+> `(float uc, vec2 u)` — `uc` selects the lobe, `u` samples the direction — instead of a bare
+> `vec2 xi`. Same principle (explicit inputs; transport owns the draws); the split serves
+> multi-lobe models (the dielectric's `uc < F` branch) and a future fixed QMC dimension layout.
+> See [impl-plan-interaction-reshape.md](impl-plan-interaction-reshape.md).
+
 ### 2.10 Resource contributions — PINNED (resolved in design discussion, July 2026)
 
 §2.8 pins the *authoring surface* (`Value<T>`: a property is a constant or a `{param}` reference). This section pins the *planning architecture* underneath it — how a feature's uniforms, textures, and parameter metadata reach the `CompiledRenderer` — and extends `Value<T>` to the one thing it doesn't cover: textures. The two are **layered, not merged**: the `{param}` scan is authoring; contributions are planning.
@@ -217,6 +223,11 @@ The path tracer's central abstraction is the **scattering event**, with exactly 
 
 ### 3.1 The sample struct
 
+> **Revised by §10.1 item 1 (implemented):** `LOBE_NULL` was **dropped** — null-interface status is
+> a compile-time *boundary classification* (a generated `is_null_interface(hit)` predicate from
+> region/material data), not a scattering lobe; §3.6's transport behavior is unchanged. Flags are
+> bitmask bits, so re-adding one later would be non-breaking.
+
 ```glsl
 // Lobe / event flags
 const uint LOBE_REFLECTION   = 1u;
@@ -236,6 +247,10 @@ struct InteractionSample {
 `weight` is what transport multiplies into throughput (§2.1). `pdf` and the eval/pdf functions exist for MIS (§6.4); they describe only the *non-delta* part of the material.
 
 ### 3.2 Surface interface (per material model)
+
+> **Sample signature revised by §10.1 item 1 (implemented):**
+> `<model>_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u)` — the `vec2 xi`
+> below is the original pin; see the §2.9 note. The §3.3 dispatchers carry the same change.
 
 Each material model is a GLSL library file providing four functions (names prefixed by model):
 
@@ -584,7 +599,7 @@ for (bounce = 0; bounce < MAX_BOUNCES; bounce++) {
 **Accounting pins (added by verification — two integrators must not be free to disagree on these):**
 
 - **Bounce budget:** surface scattering events and medium scattering events both count toward `maxBounces`; null crossings do not (own safety counter). Rationale: medium events do the same work and carry the same variance as surface bounces; null crossings are bookkeeping.
-- **Russian roulette:** applied once per loop iteration, *after* `throughput *= sample.weight`, using `spectrum_average(throughput)` (§2.5), starting after `russianRoulette.startDepth` *counted* events (nulls excluded).
+- **Russian roulette:** applied once per loop iteration, *after* `throughput *= sample.weight`, using `spectrum_max(throughput)` (**revised from `spectrum_average` by §10.1 item 6, owner-approved** — PBRT's MaxComponentValue). The survival metric is one generated expression; it can become a strategy knob later if a reader appears — `spectrum_max` is the pinned default. Starts after `russianRoulette.startDepth` *counted* events (nulls excluded). *Dielectric-era note:* raw-throughput RR over-kills inside dense media because transmission compresses radiance by η² (restored on exit) — carry PBRT's `etaScale` correction in the RR metric when the dielectric lands.
 
 Steps 1–2 exist only when the scene has media (Planner knows); their implementation is the `volumeIntegrator` axis. The loop is *generated* — a scene with no volumes, no NEE, and one Lambert material compiles to something as small as today's template.
 

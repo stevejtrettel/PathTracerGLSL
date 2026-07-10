@@ -149,14 +149,15 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) { return spectrum_
 
 ```glsl
 // Conforms to §6.3. Compiler emits the boolean fast path instead when the scene has no media.
-Spectrum shadow_transmittance(Point p, Direction wi, float dist) {
+// Ray is a pure seed; the far bound is maxDist (§ trace-loop-contract).
+Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
     Spectrum T = SPECTRUM_ONE;
-    int medium = /* caller's current_medium */;
+    int medium = /* the starting medium — recovered from scene_region_at(shadow_ray.origin), §4.4 */;
     float t = EPS_SHADOW; // offset off the surface/medium point
     for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
         Hit h;
-        bool hit_something = scene_intersect_from(p, wi, t, dist, h);   // next boundary in (t, dist)
-        float seg_len = (hit_something ? h.t : dist) - t;
+        bool hit_something = scene_intersect_from(shadow_ray, t, maxDist, h);   // next boundary in (t, maxDist)
+        float seg_len = (hit_something ? h.t : maxDist) - t;
         if (medium >= 0 || material_of(medium) >= 0) {                  // segment inside a medium
             MediumProperties m = scene_medium_properties(material_of(medium), /*p mid*/ ambient_point);
             T *= spectrum_exp(-(m.sigma_a + m.sigma_s) * seg_len);      // closed-form (V1-C1)
@@ -215,7 +216,7 @@ Radiance transport_trace(Ray primary) {
                 // NEE from the medium point (phase eval, §6.3 transmittance)
                 LightSample ls = lighting_sample(p_evt, random2());
                 if (ls.pdf > 0.0) {
-                    Spectrum T = shadow_transmittance(p_evt, ls.wi, ls.distance);
+                    Spectrum T = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance);
                     // §2.2: NO cosine at medium events — phase functions have none
                     radiance += throughput * ls.radiance * hg_eval(ls.wi, -ray.direction, m) * T / ls.pdf;
                 }
@@ -280,7 +281,7 @@ Radiance transport_trace(Ray primary) {
         if (material_has_nondelta_lobes(mat)) {                       // compile-time per material
             LightSample ls = lighting_sample(hit.p, random2());
             if (ls.pdf > 0.0) {
-                Spectrum T = shadow_transmittance(hit.p + hit.frame.n * EPS_OFFSET, ls.wi, ls.distance);
+                Spectrum T = shadow_transmittance(make_ray(ambient_geodesic(hit.p, hit.frame.n, EPS_OFFSET), ls.wi), ls.distance);
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, mp);   // bare f (§2.2)
                 float cos_i = abs(dot(ls.wi, hit.frame.n));                        // transport applies cosine (§2.2)
                 radiance += throughput * ls.radiance * f * cos_i * T / ls.pdf;

@@ -89,7 +89,7 @@ never mutated by intersection — it is a pure seed.
   `ambient_geodesic(origin, dir, t) → Point`; that signature holds in *every* space, including a
   black hole (which integrates the ODE internally — an implementation/perf detail of the ambient
   module, never a type in the loop). There is no stepper state in the trace loop.
-- **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray)` (the interval now
+- **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray, float maxDist)` (the interval now
   travels on the `Ray`).
 
 ## Deferred (not this contract)

@@ -1,5 +1,9 @@
 # Impl plan — §10.1 item 5: shadow query → `shadow_transmittance` contract
 
+> **Note (dated plan):** the signature has since changed to `shadow_transmittance(Ray shadow_ray,
+> float maxDist)` per `docs/trace-loop-contract.md` (the `Ray` is a pure seed; the far bound is an
+> argument). The semantics below hold; ignore the `(Point p, Direction wi, float dist)` signature.
+
 Route NEE's occlusion test through the pinned §6.3 `shadow_transmittance()` contract, which
 returns a **`Spectrum`** (per-channel surviving fraction) instead of a boolean. For today's
 opaque-only scenes the compiler emits the cheap boolean specialization — `scene_intersect_any`

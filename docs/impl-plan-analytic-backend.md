@@ -1,5 +1,10 @@
 # Impl plan — analytic intersection backend (sphere + plane)
 
+> **Note (dated plan):** the dispatcher below shrinks `ray.tmax`; the final form (after the Ray
+> was made a pure seed — `docs/trace-loop-contract.md`) instead carries the running nearest on
+> `hit.t`, with backends `(Ray, inout Hit)` and occlusion taking a `maxDist` arg. Structure/roles
+> are the same; only where the bound lives changed.
+
 Add a second geometry **capability** so a scene can put a primitive behind *analytic* ray
 intersection (closed-form) instead of *SDF marching* — and `scene_intersect` dispatches over
 whichever backends the scene uses. This is the archive's capability model
