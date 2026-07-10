@@ -612,20 +612,21 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
-        // Russian roulette
+        // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
+        // is keyed on post-weight throughput (kills worthless paths before the next trace).
         if (bounce >= RR_START_DEPTH) {
             float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
 #endif
-
-        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
-        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
-        if (spectrum_is_black(bs.weight)) break;
-        throughput *= bs.weight;
-        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
         // direction = sampled wi. See docs/trace-loop-contract.md.
@@ -788,14 +789,14 @@ void main() {
         "startLine": 405,
       },
       {
-        "endLine": 475,
+        "endLine": 476,
         "origin": "glsl/path_trace.glsl",
         "startLine": 409,
       },
       {
-        "endLine": 501,
+        "endLine": 502,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 476,
+        "startLine": 477,
       },
     ],
   },
@@ -1605,20 +1606,21 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
-        // Russian roulette
+        // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
+        // is keyed on post-weight throughput (kills worthless paths before the next trace).
         if (bounce >= RR_START_DEPTH) {
             float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
 #endif
-
-        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
-        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
-        if (spectrum_is_black(bs.weight)) break;
-        throughput *= bs.weight;
-        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
         // direction = sampled wi. See docs/trace-loop-contract.md.
@@ -1786,14 +1788,14 @@ void main() {
         "startLine": 524,
       },
       {
-        "endLine": 594,
+        "endLine": 595,
         "origin": "glsl/path_trace.glsl",
         "startLine": 528,
       },
       {
-        "endLine": 620,
+        "endLine": 621,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 595,
+        "startLine": 596,
       },
     ],
   },
@@ -2507,20 +2509,21 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
-        // Russian roulette
+        // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
+        // is keyed on post-weight throughput (kills worthless paths before the next trace).
         if (bounce >= RR_START_DEPTH) {
             float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
 #endif
-
-        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
-        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
-        if (spectrum_is_black(bs.weight)) break;
-        throughput *= bs.weight;
-        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
         // direction = sampled wi. See docs/trace-loop-contract.md.
@@ -2673,14 +2676,14 @@ void main() {
         "startLine": 450,
       },
       {
-        "endLine": 520,
+        "endLine": 521,
         "origin": "glsl/path_trace.glsl",
         "startLine": 454,
       },
       {
-        "endLine": 546,
+        "endLine": 547,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 521,
+        "startLine": 522,
       },
     ],
   },
@@ -3417,20 +3420,21 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
-        // Russian roulette
+        // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
+        // is keyed on post-weight throughput (kills worthless paths before the next trace).
         if (bounce >= RR_START_DEPTH) {
             float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
 #endif
-
-        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
-        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
-        if (spectrum_is_black(bs.weight)) break;
-        throughput *= bs.weight;
-        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
         // direction = sampled wi. See docs/trace-loop-contract.md.
@@ -3598,14 +3602,14 @@ void main() {
         "startLine": 465,
       },
       {
-        "endLine": 535,
+        "endLine": 536,
         "origin": "glsl/path_trace.glsl",
         "startLine": 469,
       },
       {
-        "endLine": 561,
+        "endLine": 562,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 536,
+        "startLine": 537,
       },
     ],
   },
@@ -4358,20 +4362,21 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
-        // Russian roulette
+        // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
+        // is keyed on post-weight throughput (kills worthless paths before the next trace).
         if (bounce >= RR_START_DEPTH) {
             float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
 #endif
-
-        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
-        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
-        if (spectrum_is_black(bs.weight)) break;
-        throughput *= bs.weight;
-        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
         // direction = sampled wi. See docs/trace-loop-contract.md.
@@ -4539,14 +4544,14 @@ void main() {
         "startLine": 467,
       },
       {
-        "endLine": 537,
+        "endLine": 538,
         "origin": "glsl/path_trace.glsl",
         "startLine": 471,
       },
       {
-        "endLine": 563,
+        "endLine": 564,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 538,
+        "startLine": 539,
       },
     ],
   },
@@ -5355,20 +5360,21 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
-        // Russian roulette
+        // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
+        // is keyed on post-weight throughput (kills worthless paths before the next trace).
         if (bounce >= RR_START_DEPTH) {
             float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
 #endif
-
-        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
-        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
-        if (spectrum_is_black(bs.weight)) break;
-        throughput *= bs.weight;
-        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
         // direction = sampled wi. See docs/trace-loop-contract.md.
@@ -5546,14 +5552,14 @@ void main() {
         "startLine": 523,
       },
       {
-        "endLine": 593,
+        "endLine": 594,
         "origin": "glsl/path_trace.glsl",
         "startLine": 527,
       },
       {
-        "endLine": 619,
+        "endLine": 620,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 594,
+        "startLine": 595,
       },
     ],
   },
@@ -6302,20 +6308,21 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
-        // Russian roulette
+        // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
+        // is keyed on post-weight throughput (kills worthless paths before the next trace).
         if (bounce >= RR_START_DEPTH) {
             float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
 #endif
-
-        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
-        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
-        if (spectrum_is_black(bs.weight)) break;
-        throughput *= bs.weight;
-        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
         // direction = sampled wi. See docs/trace-loop-contract.md.
@@ -6483,14 +6490,14 @@ void main() {
         "startLine": 485,
       },
       {
-        "endLine": 555,
+        "endLine": 556,
         "origin": "glsl/path_trace.glsl",
         "startLine": 489,
       },
       {
-        "endLine": 581,
+        "endLine": 582,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 556,
+        "startLine": 557,
       },
     ],
   },
@@ -7225,20 +7232,21 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
+        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+        if (spectrum_is_black(bs.weight)) break;
+        throughput *= bs.weight;
+        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
-        // Russian roulette
+        // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
+        // is keyed on post-weight throughput (kills worthless paths before the next trace).
         if (bounce >= RR_START_DEPTH) {
             float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
             if (random() > p_survive) break;
             throughput /= p_survive;
         }
 #endif
-
-        // BSDF sampling: sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
-        InteractionSample bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
-        if (spectrum_is_black(bs.weight)) break;
-        throughput *= bs.weight;
-        prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
         // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
         // direction = sampled wi. See docs/trace-loop-contract.md.
@@ -7406,14 +7414,14 @@ void main() {
         "startLine": 485,
       },
       {
-        "endLine": 555,
+        "endLine": 556,
         "origin": "glsl/path_trace.glsl",
         "startLine": 489,
       },
       {
-        "endLine": 581,
+        "endLine": 582,
         "origin": "glsl/main_accumulate.glsl",
-        "startLine": 556,
+        "startLine": 557,
       },
     ],
   },
