@@ -19,12 +19,17 @@ Radiance transport_trace(Ray ray) {
             break;
         }
 
-        int mat = material_of(hit.region_to);           // §2.3: material derived from region (owner == region_to for solids)
+        int mat = material_of(hit.region_owner);        // §4.1: the boundary OWNER's BSDF shades (≠ region_to at exits)
         MaterialProperties props = scene_material_properties(mat, hit.p);
         Direction wo = -current_ray.direction;
 
-        // Emission (bare property read; the one-sided/region_to gating is item 2 + §6.2)
-        radiance += throughput * interaction_surface_emission(mat, wo, hit, props);
+        // Emission keys on region_to (§6.2 side convention: you receive emission from the region
+        // ahead) — NOT on the owner. They differ at exits: leaving an emissive region contributes
+        // nothing from behind. material_of(-1) = -1 resolves to non-emissive defaults.
+        int mat_emit = material_of(hit.region_to);
+        MaterialProperties eprops = props;
+        if (mat_emit != mat) eprops = scene_material_properties(mat_emit, hit.p);
+        radiance += throughput * interaction_surface_emission(mat_emit, wo, hit, eprops);
 
 #ifdef ENABLE_NEE
         // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
@@ -32,7 +37,7 @@ Radiance transport_trace(Ray ray) {
         if (ls.pdf > 0.0) {
             // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
             // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
-            Ray shadow_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), ls.wi);
+            Ray shadow_ray = ray_spawn(hit, ls.wi);
             Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
             if (!spectrum_is_black(vis)) {
                 Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
@@ -58,9 +63,9 @@ Radiance transport_trace(Ray ray) {
         }
 #endif
 
-        // Continuation ray: origin escaped off the surface along the geodesic (self-intersection),
-        // direction = sampled wi. See docs/trace-loop-contract.md.
-        current_ray = make_ray(ambient_geodesic(hit.p, hit.frame.n, EPSILON), bs.wi);
+        // Continuation ray: ray_spawn escapes the origin to wi's side of the surface along the
+        // geodesic (self-intersection; transmission gets the far side). See docs/trace-loop-contract.md.
+        current_ray = ray_spawn(hit, bs.wi);
     }
 
     return radiance;

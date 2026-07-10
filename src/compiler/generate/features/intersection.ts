@@ -24,7 +24,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const hasAnalytic = plan.analyticObjects.length > 0;
     const blocks: ShaderBlock[] = [];
 
-    // SDF backend: primitives + per-scene scene_sdf dispatch + the marcher (sdf_intersect*).
+    // SDF backend: primitives + per-scene march-bound dispatch + the marcher (sdf_intersect*).
     if (hasSDF) {
         blocks.push({ origin: 'glsl/sdf_primitives.glsl', source: sdfPrimitivesGLSL });
         blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects) });
@@ -39,6 +39,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
 
     // region → material table spans BOTH backends (regions are globally unique).
     blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects) });
+
+    // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
+    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects) });
 
     // The top-level dispatcher, combining only the backends present (declared after both).
     blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic) });
@@ -64,19 +67,22 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
         lines.push('');
     }
 
-    // scene_sdf — returns the OWNER region (object index), not a material id (§2.3).
-    lines.push('float scene_sdf(vec3 p, out int region) {');
+    // scene_march_bound — UNSIGNED nearest-surface bound min|sdf_i| + its owner (§2.3, arg-min).
+    // Unsigned (not the signed min) so marching works from object interiors and, inside a big
+    // region, steps stay bounded by nested inner surfaces (|signed min| would overshoot them).
+    lines.push('float scene_march_bound(vec3 p, out int region) {');
     lines.push(`    float d = 1e20;`);
     lines.push(`    float d_obj;`);
     lines.push(`    region = -1;`);
     for (const obj of objects) {
-        lines.push(`    d_obj = sdf_object_${obj.index}(p);`);
+        lines.push(`    d_obj = abs(sdf_object_${obj.index}(p));`);
         lines.push(`    if (d_obj < d) { d = d_obj; region = ${obj.index}; }`);
     }
     lines.push(`    return d;`);
     lines.push(`}`);
     lines.push('');
 
+    // Signed min — kept for scene_normal (the gradient needs the sign).
     lines.push('float scene_sdf_dist(vec3 p) {');
     lines.push('    float d = 1e20;');
     for (const obj of objects) {
@@ -121,18 +127,19 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[]): string {
     const lines: string[] = ['// Generated analytic dispatch'];
 
     // Nearest-hit bounded by the incoming hit.t (the running nearest — set by the caller / a prior
-    // backend). Fills the whole hit and shrinks hit.t on a closer object; leaves hit untouched otherwise.
+    // backend). Fills the hit's GEOMETRY + owner and shrinks hit.t on a closer object; leaves hit
+    // untouched otherwise. region_from/to are classified once by the dispatcher (§4.2).
     lines.push('bool analytic_intersect(Ray ray, inout Hit hit) {');
     lines.push('    bool found = false;');
     lines.push('    float t;');
     for (const obj of objects) {
         const test = analyticTest(obj);
-        const normal = analyticNormal(obj); // GLSL expr for the surface normal at hit.p
+        const normal = analyticNormal(obj); // GLSL expr for the OUTWARD surface normal at hit.p
         lines.push(`    if (${test} && t < hit.t) {`);
         lines.push(`        hit.t = t; found = true;`);
         lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
         lines.push(`        hit.frame = ambient_frame(hit.p, ${normal});`);
-        lines.push(`        hit.region_to = ${obj.index}; hit.region_from = -1;`);
+        lines.push(`        hit.region_owner = ${obj.index};`);
         lines.push(`        hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);`);
         lines.push(`    }`);
     }
@@ -183,6 +190,51 @@ function analyticNormal(obj: PlannedAnalyticObject): string {
     }
 }
 
+/** GLSL expr for the SIGNED distance to `obj` at point `p` (analytic backend; matches SDF sign). */
+function analyticSignedDistance(obj: PlannedAnalyticObject): string {
+    const p = obj.parameters;
+    switch (obj.shapeType) {
+        case 'sphere': {
+            const center = formatVec3(p.center as number[] ?? [0, 0, 0]);
+            const radius = formatFloat(p.radius as number ?? 1.0);
+            return `length(p - ${center}) - ${radius}`;
+        }
+        case 'plane': {
+            const normal = formatVec3(p.normal as number[] ?? [0, 1, 0]);
+            const offset = formatFloat(p.offset as number ?? 0.0);
+            return `dot(p, ${normal}) + ${offset}`;
+        }
+        default:
+            throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
+    }
+}
+
+// ============================================================================
+// Point classification — scene_region_at (§2.7 innermost-wins, §4.2)
+// ============================================================================
+// Among regions containing p (sdf < 0), the LEAST negative wins (innermost). The bug is one
+// flipped inequality away: `d > best` among negatives — deepest-wins made a submerged sphere
+// invisible (verification T2 / R-SUBMERGED). Spans both backends.
+
+function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[]): string {
+    const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
+    lines.push('int scene_region_at(vec3 p) {');
+    lines.push('    int region = -1;');
+    lines.push('    float best = -1.0e20;   // best = least-negative inside distance so far');
+    lines.push('    float d;');
+    for (const obj of sdf) {
+        lines.push(`    d = sdf_object_${obj.index}(p);`);
+        lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
+    }
+    for (const obj of analytic) {
+        lines.push(`    d = ${analyticSignedDistance(obj)};`);
+        lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
+    }
+    lines.push('    return region;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
 // ============================================================================
 // region → material table (both backends)
 // ============================================================================
@@ -205,6 +257,12 @@ function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticOb
 // far clip); each backend takes (Ray, inout Hit) and updates hit only if it finds something closer,
 // so nearest-hit + bound-shrinking fall out with the Ray read-only (multi-tracing.md §5). Occlusion
 // takes an explicit maxDist. See docs/trace-loop-contract.md.
+// After the nearest hit is final, the dispatcher classifies the boundary ONCE (§4.2 "never per
+// march step"): the owner covers its own side, so a single probe classifies the outside. The probe
+// runs along the GEOMETRIC NORMAL, not the ray — the marcher stops MARCH_EPSILON shy of the
+// surface, so ray-direction probes fail at grazing incidence; normal probes always clear the
+// residual (EPS_INTERFACE = 10× MARCH_EPSILON). Entering ⇒ region_to = owner; exiting ⇒
+// region_from = owner and the frame flips so n faces region_from (§4.1).
 
 function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean): string {
     const lines: string[] = ['// Generated scene_intersect dispatcher'];
@@ -215,6 +273,18 @@ function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean): string {
     lines.push('    bool found = false;');
     if (hasAnalytic) lines.push('    if (analytic_intersect(ray, hit)) found = true;');
     if (hasSDF) lines.push('    if (sdf_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
+    lines.push('    if (found) {');
+    lines.push('        // §4.2/§4.3: one outside-probe along the outward normal; owner covers its own side.');
+    lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.frame.n, EPS_INTERFACE));');
+    lines.push('        if (ambient_dot(ray.direction, hit.frame.n, hit.p) < 0.0) {');
+    lines.push('            hit.region_from = outside;              // entering the owner');
+    lines.push('            hit.region_to   = hit.region_owner;');
+    lines.push('        } else {');
+    lines.push('            hit.region_from = hit.region_owner;     // exiting the owner');
+    lines.push('            hit.region_to   = outside;');
+    lines.push('            hit.frame = ambient_frame(hit.p, -hit.frame.n);   // §4.1: n faces region_from');
+    lines.push('        }');
+    lines.push('    }');
     lines.push('    return found;');
     lines.push('}');
     lines.push('');

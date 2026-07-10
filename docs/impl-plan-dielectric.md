@@ -56,21 +56,29 @@ Ray ray_spawn(Hit hit, Direction wi);  // continuation ray offset to wi's side:
    least-negative among insides; `-1` if none. (Cornell sanity: inward-facing wall half-spaces
    put the interior *outside* every wall → interior classifies ambient, as today.)
 3. **Classification once per hit, in the generated `scene_intersect`** (§4.2 "never per march
-   step"): after the nearest hit is final,
-   `region_from = scene_region_at(p − ε·dir)`, `region_to = scene_region_at(p + ε·dir)`,
-   `EPS_INTERFACE = 1e-4`. Backends stop writing `region_from/to` (they report `owner` + geometry).
-   The §4.3 owner shortcut (skip classification for known single-region cases) is a later
-   optimization — v1 always classifies, it's a cheap generated loop.
+   step") — **implemented form (revised during phase 1):** probes run along the **geometric
+   normal**, not the ray, and the **owner covers its own side**, so ONE probe classifies the
+   outside: entering (`dir·n < 0`) ⇒ `region_to = owner`, `region_from = probe(+n)`; exiting ⇒
+   `region_from = owner`, `region_to = probe(+n)`. Why not §4.2's literal `p ∓ ε·dir`: the marcher
+   stops `MARCH_EPSILON` *short* of the surface, so a ray-direction probe reaches the far side
+   only when `ε·cosθ` beats that residual — it misclassifies at grazing incidence. Normal probes
+   clear the residual at every angle (`EPS_INTERFACE = 1e-3 = 10× MARCH_EPSILON`), and the
+   owner-shortcut half is §4.3's hint made exact. Same semantics, robust mechanism (§4.2
+   annotated). Backends stop writing `region_from/to` (they report `region_owner` + geometry).
 4. **Frame orientation** (§4.1): after classification, if `ambient_dot(ray.direction, n, p) > 0`,
    rebuild the frame on `−n` — `n` faces `region_from`. (Lambert's internal flip becomes dead —
    leave it; eval may be called with arbitrary `wi`.)
 5. **`ray_spawn`** (ray.glsl): transport's continuation *and* NEE shadow rays go through it —
    no hand-written offsets left in path_trace.
-6. **Interior SDF marching** (raymarch.glsl): march `d = abs(scene_sdf(p, region))`, hit at
-   `d < MARCH_EPSILON` — unsigned sphere-tracing (valid conservative bound for exact SDFs; §2.6).
-   From a spawn point 1e-3 inside, |sdf| ≈ 1e-3 > MARCH_EPSILON (1e-4), so no false immediate
-   hit; |d| grows toward the interior then shrinks to the far boundary. `sdf_intersect_any`
-   likewise. Analytic backend already interior-correct (`ray_sphere` returns the far root).
+6. **Interior SDF marching** (raymarch.glsl) — **implemented form:** march the generated
+   `scene_march_bound(p, out region)` = **min over objects of |sdf_i|** (per-object abs, then
+   min — NOT abs of the signed min: inside a big region, |signed min| is the distance to the
+   *container's* boundary and overshoots nested inner surfaces, e.g. the submerged sphere).
+   Hit at `bound < MARCH_EPSILON`; `region` = arg-min = the owner. From a spawn point 1e-3
+   inside, bound ≈ 1e-3 > MARCH_EPSILON (1e-4), so no false immediate hit. `scene_sdf_dist`
+   (signed min) is kept for `scene_normal` — the gradient needs the sign. `sdf_intersect_any`
+   marches the unsigned bound likewise. Analytic backend already interior-correct
+   (`ray_sphere` returns the far root).
 7. **path_trace**: BSDF key `material_of(hit.region_owner)`; **emission keys on `region_to`**
    (§6.2 side convention — at a glass exit the BSDF is glass but you receive ambient's emission,
    i.e. none). Two lookups, two jobs.

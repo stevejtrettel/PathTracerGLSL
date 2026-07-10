@@ -353,6 +353,14 @@ hit.region_to   = scene_region_at(p + EPS_INTERFACE * ray.direction);
 
 `EPS_INTERFACE` defaults to `1e-4`, overridable per object for thin shells (archive guidance adopted). Classification runs **once per hit**, never per march step — marching uses only the cheap step-bound function.
 
+> **Mechanism revised in implementation (dielectric phase 1, July 2026):** probes run along the
+> **geometric normal**, not the ray, and the owner side skips its probe — entering ⇒
+> `region_to = owner`, exiting ⇒ `region_from = owner`, one `+n`-probe classifies the outside.
+> Reason: the marcher stops `MARCH_EPSILON` short of the surface, so ray-direction probes fail at
+> grazing incidence (probe depth `ε·cosθ` vs the residual); normal probes clear the residual at
+> every angle. `EPS_INTERFACE = 1e-3` (10× `MARCH_EPSILON`). Semantics unchanged; this is §4.3's
+> owner hint made exact. See `docs/impl-plan-dielectric.md` phase 1.
+
 ### 4.3 What the marcher reports
 
 The march loop tracks which object's bound was active at the hit (free — it's the arg-min of the step computation) and uses it as a *hint* to shortcut classification: single-region objects resolve `region_to` immediately; only multi-region objects and overlap cases pay for full `scene_region_at`. This resolves the archive's "marching kernel challenge" (classification cost) without putting region logic in the march loop.

@@ -6,6 +6,8 @@
 #define TWO_PI 6.28318530718
 #define EPSILON 0.001
 #define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
+#define EPS_INTERFACE 0.001   // §4.2 classification probe depth — 10× MARCH_EPSILON so a probe
+                              // along the normal clears the marcher's stop-short residual
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).

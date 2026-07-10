@@ -24,9 +24,10 @@ struct Frame {
 struct Hit {
     float t;
     Point p;
-    Frame frame;
-    int region_from;    // region on the incoming side (-1 = ambient) — §4.1
-    int region_to;      // region on the far side (owner, for single-region solids)
+    Frame frame;        // shading frame; n oriented toward region_from (§4.1)
+    int region_from;    // medium behind the boundary (-1 = ambient) — §4.2 classification
+    int region_to;      // medium ahead of the boundary — emission keys on this (§6.2)
+    int region_owner;   // whose surface this IS (§4.3) — material_of(region_owner) shades (§4.1)
     vec2 uv;
 };
 
