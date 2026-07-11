@@ -22,6 +22,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             // Non-dielectrics default to 1.0 (vacuum-like): ior_of is only physically meaningful
             // for regions a transmitted ray can enter; opaque solids must not bend η ratios.
             ior: resolveScalarProperty(mat.ior, mat.model === 'dielectric' ? 1.5 : 1.0),
+            medium: mat.medium === undefined ? null : {
+                sigma_a: resolveColorProperty(mat.medium.sigma_a, [0.0, 0.0, 0.0]),
+                sigma_s: resolveColorProperty(mat.medium.sigma_s, [0.0, 0.0, 0.0]),
+                phase_g: resolveScalarProperty(mat.medium.phase_g, 0.0),
+            },
         });
     }
 
@@ -78,6 +83,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         }
     }
 
+    // --- Ambient medium (§2.4): material_of(-1) resolves to this id; -1 = vacuum ---
+    const ambientMedium = scene.ambientMedium !== undefined
+        ? materialIdMap.get(scene.ambientMedium) ?? -1   // unknown name already errored in the Validator
+        : -1;
+
     // --- Build program description ---
     const program = planProgram(features, scene, strategy);
     const pipeline = planPipeline(program);
@@ -88,6 +98,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         analyticObjects,
         materials,
         lights,
+        ambientMedium,
         program,
         pipeline,
     };
@@ -98,11 +109,12 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // ============================================================================
 
 function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): ProgramDescription {
+    // Surface models only — 'none' is a boundary classification (§3.6), never a dispatch arm;
+    // 'emissive' is Validator-rejected (review C4) so it can't reach here.
     const brdfModels: MaterialModel[] = [];
     if (features.materials.hasLambert) brdfModels.push('lambert');
     if (features.materials.hasDisney) brdfModels.push('disney');
     if (features.materials.hasDielectric) brdfModels.push('dielectric');
-    if (features.materials.hasEmissive) brdfModels.push('emissive');
 
     const hasLights = features.lighting.totalLightCount > 0;
     const wantsNEE = strategy.transport.directLighting !== 'none' && hasLights;
@@ -120,6 +132,11 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             russianRoulette: strategy.transport.russianRoulette.enabled
                 ? { startDepth: strategy.transport.russianRoulette.startDepth }
                 : null,
+            // Volumetric-component §5: explicit strategy value or derived from scene content.
+            // Only 'none' | 'analytic' survive the Validator.
+            volumeIntegrator: strategy.transport.volumeIntegrator === 'none' || strategy.transport.volumeIntegrator === 'analytic'
+                ? strategy.transport.volumeIntegrator
+                : (features.media.hasScatteringMedia ? 'analytic' : 'none'),
         },
         accumulation: strategy.accumulation.type === 'exponential'
             ? { type: 'exponential', alpha: strategy.accumulation.alpha }

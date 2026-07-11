@@ -11,6 +11,7 @@ import { formatFloat, formatVec3, formatSpectrum } from './glsl-format.js';
 
 import lightPointGLSL from '../glsl/light_point.glsl?raw';
 import shadowOpaqueGLSL from '../glsl/shadow_opaque.glsl?raw';
+import shadowMediaGLSL from '../glsl/shadow_media.glsl?raw';
 
 export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (plan.program.lighting === null) {
@@ -18,9 +19,16 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     }
 
     const blocks: ShaderBlock[] = [];
-    // Shadow query behind the §6.3 contract. Opaque specialization now (no media); the media
-    // form (reference §4) is a separate file the Planner selects later. Wraps scene_intersect_any.
-    blocks.push({ origin: 'glsl/shadow_opaque.glsl', source: shadowOpaqueGLSL });
+    const defines: Record<string, string> = {};
+    // Shadow query behind the §6.3 contract — the compiler specializes: the boolean-fast-path
+    // opaque form for media-free scenes, the spectral segment walker (composing the generated
+    // medium_transmittance, seam 2) when media exist. The NEE call sites never change.
+    if (plan.features.media.hasMedia) {
+        blocks.push({ origin: 'glsl/shadow_media.glsl', source: shadowMediaGLSL });
+        defines['MAX_SHADOW_SEGMENTS'] = '8';   // §6.3 pin; exhaustion is conservative (ZERO)
+    } else {
+        blocks.push({ origin: 'glsl/shadow_opaque.glsl', source: shadowOpaqueGLSL });
+    }
     // Per-kind sampler libraries for the kinds present (declared before the dispatcher calls them).
     if (plan.lights.some((l) => l.kind === 'point')) {
         blocks.push({ origin: 'glsl/light_point.glsl', source: lightPointGLSL });
@@ -30,7 +38,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         source: generateLightSampling(plan.lights, plan.program.lighting.selection),
     });
 
-    return { ...emptyContribution(), blocks };
+    return { ...emptyContribution(), blocks, defines };
 }
 
 // ============================================================================

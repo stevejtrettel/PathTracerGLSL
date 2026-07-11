@@ -175,6 +175,14 @@ Note the asymmetry with the main loop: *only null interfaces* pass shadow rays i
 
 ## 5. The v1 transport loop (pt-nee, homogeneous media, null interfaces)
 
+> **Medium-segment lines superseded (owner decision, July 2026):** the σ̄ = `spectrum_average(σ_t)`
+> distance sampling with chromatic ratio weights below (steps 1–2) transcribed the Production Volume
+> Rendering course's reference integrator; we instead follow pbrt-v3's uniform channel selection with
+> balance-heuristic weights (bounded, vs the ratio scheme's unbounded e^{+(σ̄−σ_min)t} factors).
+> The normative replacement — and the `medium_sample`/`MediumSample` seam that now wraps this whole
+> block — is [fable-volumetric-component.md](fable-volumetric-component.md) §2/§4. The rest of the
+> loop (null interfaces, emission keying, NEE shape, RR) stands.
+
 This is the loop the transport generator emits for `{integrator:'pt', directLighting:'nee', volumeIntegrator:'raymarch'}` with all v1 constraints active. Blocks the Planner disables (no media in scene, no NEE) simply vanish.
 
 ```glsl

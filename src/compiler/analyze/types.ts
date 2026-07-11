@@ -26,4 +26,13 @@ export interface SceneFeatures {
         directionalLightCount: number;
         totalLightCount: number;
     };
+
+    media: {
+        /** Any material declares a medium block, or the scene names an ambientMedium. */
+        hasMedia: boolean;
+        /** Any medium has σ_s nonzero or {param}-driven — transport needs the scattering arms. */
+        hasScatteringMedia: boolean;
+        /** Any material has model 'none' (§3.6) — transport needs the null-crossing branch. */
+        hasNullInterfaces: boolean;
+    };
 }

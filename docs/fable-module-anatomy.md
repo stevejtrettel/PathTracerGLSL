@@ -150,9 +150,8 @@ reads as a table of contents.
 - **Reconciled by annotation** (uncommitted, July 2026): §2.9/§3.2 `(uc, u)` sampler split;
   §3.1 `LOBE_NULL` dropped for compile-time `is_null_interface`; §7.2 RR metric →
   `spectrum_max` (item 6) with the modular-metric note and the dielectric-era `etaScale` warning.
-- **Code change queued:** RR placement moves to the §7.2 pin (post-`weight` — both placements
-  proven unbiased; post-weight decides on strictly better information, kills worthless paths
-  before the next trace, matches PBRT). Verify: Cornell 512-spp mean ≈ 1.216 holds; F-BOX 0.4
-  with RR forced on.
+- **Code change DONE (dielectric phase 0):** RR placement moved to the §7.2 pin (post-`weight` —
+  both placements proven unbiased; post-weight decides on strictly better information, kills
+  worthless paths before the next trace, matches PBRT).
 - **Reconcile at procedural-media ratification (§10.2):** the current slice's raw *expression*
   property kind vs the archive Phase-1 *function/`compute`* form.

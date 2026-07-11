@@ -1,5 +1,11 @@
 # Impl plan — dielectric + "make regions real"
 
+> **Status: IMPLEMENTED (July 2026)** — all phases (0–3), plus the post-build stress-test review
+> and its six fixes (marcher `t < hit.t` accept guard, `ray_sphere` inside-test root selection,
+> floated sphere, fail-safe NEE guard, `ior_of` pinned to transmissive models, Validator ior
+> checks). F-ETA 0.5540 GPU-verified by owner. The in-body "implemented form" notes record where
+> implementation refined the plan.
+
 The first delta material, and with it the region machinery it forces: two-sided hits
 (`scene_region_at`, epsilon classification, the boundary-owner rule), interior marching, the
 transmission spawn offset, and the `ior_of` table. The BSDF itself is a transcription

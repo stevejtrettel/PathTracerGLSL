@@ -26,6 +26,17 @@ import {
     analyticGlass,
     glassStrategy,
 } from './dielectricScenes.js';
+import {
+    slabScene,
+    slabStrategy,
+    fogcubeScene,
+    fogcubeStrategy,
+    furnaceScatterScene,
+    furnaceScatterStrategy,
+    hazeScene,
+    hazeNeeStrategy,
+    hazePtStrategy,
+} from './mediaScenes.js';
 
 export interface SceneSuiteEntry {
     scene: SceneDescription;
@@ -146,6 +157,54 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],
+        },
+    },
+    slab: {
+        scene: slabScene,
+        strategies: [slabStrategy],
+        exercises:
+            'F-SLAB Beer–Lambert witness (validation §2): null interfaces (model none), spectral σ_a, current_medium across two null crossings',
+        expected:
+            'converged CENTER pixel = (0.36788, 0.13534, 0.01832) ± 1%/channel in linear HDR (the SQUARE of those ⇒ double-attenuation; a Fresnel shift ⇒ null-BSDF leak)',
+        initialParameters: {
+            'camera.position': [0, 0, 2],
+            'camera.target': [0, 0, -2],
+        },
+    },
+    fogcube: {
+        scene: fogcubeScene,
+        strategies: [fogcubeStrategy],
+        exercises:
+            'R-FOGCUBE null-interface rim witness (validation §5, absorbing variant): a bounded absorber over an emissive checker',
+        expected:
+            'the cube dims the checker behind it with NO bright rim at the silhouette (a Fresnel-like edge = the null interface leaked a BSDF); grazing edges fade smoothly',
+        initialParameters: {
+            'camera.position': [0, 1.6, 3],
+            'camera.target': [0, 0.9, 0],
+        },
+    },
+    'furnace-scatter': {
+        scene: furnaceScatterScene,
+        strategies: [furnaceScatterStrategy],
+        exercises:
+            'F-BOX-M chromatic scattering furnace (validation §1b): channel-MIS medium sampling, HG normalization, medium-event weights, §7.2 bounce accounting',
+        expected:
+            'per-channel mean = EXACTLY 0.4 ± 0.004 in linear HDR at high spp — channels splitting ⇒ chromatic weight bug; mean below 0.4 ⇒ bounce starvation (raise maxBounces)',
+        initialParameters: {
+            'camera.position': [0, 0, 0],
+            'camera.target': [0, 0, -1],
+        },
+    },
+    haze: {
+        scene: hazeScene,
+        strategies: [hazeNeeStrategy, hazePtStrategy],
+        exercises:
+            'HG-sign witness + medium NEE + spectral shadow_media (light shafts); {param}-driven haze.g; key 2 (pt) sees only the emissive panel — delta lights are invisible to phase paths (the equality pair is X-FOG, deferred to area lights)',
+        expected:
+            'drag haze.g: POSITIVE g brightens the glow around the light direction, negative dims it (inverted ⇒ the +2gc HG sign bug); key 1 ≥ key 2 everywhere by exactly the point-light term; spike-noise halos near the light are EXPECTED (equiangular placement is deferred)',
+        initialParameters: {
+            'camera.position': [0, 1.2, 5],
+            'camera.target': [0, 1.2, -1],
         },
     },
 };

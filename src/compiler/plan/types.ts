@@ -37,7 +37,11 @@ export type CameraDesc =
     | { type: 'pinhole'; fov: Value<number> };
 
 export type TransportDesc =
-    | { type: 'pathtracer'; maxBounces: number; russianRoulette: { startDepth: number } | null };
+    | { type: 'pathtracer'; maxBounces: number; russianRoulette: { startDepth: number } | null;
+        /** Resolved volume strategy (fable-volumetric-component §5): strategy override or
+         *  derived (scattering media present ? 'analytic' : 'none'). Only live values here —
+         *  the Validator rejects the rest. */
+        volumeIntegrator: 'none' | 'analytic' };
 
 export type AccumulationDesc =
     | { type: 'average' }
@@ -85,6 +89,16 @@ export interface PlannedAnalyticObject {
 }
 
 /**
+ * Resolved interior medium (§3.5) — constants/params only (V1-C1; the Validator rejects GLSL
+ * expressions, the generator backstop-throws like ior).
+ */
+export interface PlannedMedium {
+    sigma_a: Vec3 | GlslExpression | ValueParam<Vec3>;
+    sigma_s: Vec3 | GlslExpression | ValueParam<Vec3>;
+    phase_g: number | GlslExpression | ValueParam<number>;
+}
+
+/**
  * Resolved material for code generation.
  * Each property is either a constant value or a GLSL expression string.
  */
@@ -97,6 +111,7 @@ export interface PlannedMaterial {
     roughness: number | GlslExpression | ValueParam<number>;
     transmittance: Vec3 | GlslExpression | ValueParam<Vec3>;    // dielectric interface tint
     ior: number | GlslExpression | ValueParam<number>;          // → generated ior_of table (expressions rejected)
+    medium: PlannedMedium | null;                               // interior medium (§3.5); null = no medium block
 }
 
 /**
@@ -138,6 +153,9 @@ export interface RenderPlan {
     analyticObjects: PlannedAnalyticObject[];
     materials: PlannedMaterial[];
     lights: PlannedLight[];
+
+    /** Material id the ambient region (−1) resolves to via material_of(-1), or −1 = vacuum (§2.4). */
+    ambientMedium: number;
 
     /** What the generated program does */
     program: ProgramDescription;

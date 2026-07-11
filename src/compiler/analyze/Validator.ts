@@ -45,6 +45,61 @@ export function validate(
     if (features.materials.hasDisney) {
         bag.error('invalid-setting', "Material model 'disney' not yet supported").add();
     }
+    if (features.materials.hasEmissive) {
+        // Review C4: 'emissive' flowed through the Planner into the dispatch and failed at the
+        // GPU with an undeclared-identifier error instead of a diagnostic. Superseded by
+        // emission on any surface model, and by model 'none' + medium for pure volume regions.
+        bag.error('invalid-setting',
+            "Material model 'emissive' is not a model — use emission on a surface model (e.g. lambert with albedo 0), or model 'none' with a medium block for a pure volume region")
+            .add();
+    }
+
+    // --- Media (impl-plan-media M0; V1-C1 as rejections per §1.1) ---
+    for (const [name, mat] of Object.entries(scene.materials)) {
+        if (mat.medium !== undefined) {
+            for (const [prop, value] of Object.entries(mat.medium)) {
+                if (isGlslExpression(value)) {
+                    bag.error('invalid-setting',
+                        `Material '${name}': medium.${prop} is a GLSL expression — procedural media not yet supported (V1-C1); declare a majorant when they are (§3.5). Use a constant or {param}`)
+                        .add();
+                }
+            }
+        }
+        if (mat.model === 'none' && mat.medium === undefined) {
+            bag.error('invalid-setting',
+                `Material '${name}': model 'none' (no optical surface, §3.6) requires a medium block — an object that neither reflects nor participates is invisible, which is an authoring error`)
+                .add();
+        }
+    }
+
+    const vi = strategy.transport.volumeIntegrator;
+    if (vi === 'raymarch' || vi === 'delta-tracking' || vi === 'ratio-tracking') {
+        bag.error('invalid-setting',
+            `volumeIntegrator '${vi}' not yet supported — homogeneous media (V1-C1) are exact under 'analytic' (closed-form sampling); 'raymarch' is reserved for biased marching and the null-collision pair needs majorants`)
+            .add();
+    }
+
+    if (scene.ambientMedium !== undefined) {
+        const ambient = scene.materials[scene.ambientMedium];
+        if (ambient === undefined) {
+            bag.error('missing-material',
+                `ambientMedium references unknown material '${scene.ambientMedium}'`)
+                .suggest(`Available materials: ${Object.keys(scene.materials).join(', ')}`)
+                .add();
+        } else {
+            if (ambient.medium === undefined) {
+                bag.error('invalid-setting',
+                    `ambientMedium '${scene.ambientMedium}' has no medium block — the ambient region's material only contributes its medium (§2.4)`)
+                    .add();
+            }
+            if (ambient.model !== 'none') {
+                bag.warning('invalid-setting',
+                    `ambientMedium '${scene.ambientMedium}' has surface model '${ambient.model}' — the ambient region has no boundary, so the surface model never runs (declare it 'none')`)
+                    .add();
+            }
+        }
+    }
+
 
     // Dielectric ior constraints: the generated ior_of table is region-indexed (no shading
     // point), so a GLSL-expression ior is unrepresentable — reject here with a real diagnostic

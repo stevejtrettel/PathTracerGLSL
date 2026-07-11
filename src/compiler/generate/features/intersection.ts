@@ -39,7 +39,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     }
 
     // region → material table spans BOTH backends (regions are globally unique).
-    blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects) });
+    blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects, plan.ambientMedium) });
 
     // region → IOR table (§2.3 generated-tables family) — only when a dielectric reads it.
     if (plan.materials.some((m) => m.model === 'dielectric')) {
@@ -248,13 +248,14 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
 // region → material table (both backends)
 // ============================================================================
 
-function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[]): string {
+function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], ambientMedium: number): string {
     const lines: string[] = ['// Generated region -> material table (§2.3), across both backends'];
     lines.push('int material_of(int region) {');
     for (const obj of [...sdf, ...analytic].sort((a, b) => a.index - b.index)) {
         lines.push(`    if (region == ${obj.index}) return ${obj.materialId};`);
     }
-    lines.push('    return -1;'); // ambient / no region = vacuum
+    // Default arm covers region -1: the ambientMedium's material id, or -1 = vacuum (§2.4).
+    lines.push(`    return ${ambientMedium};`);
     lines.push('}');
     return lines.join('\n');
 }

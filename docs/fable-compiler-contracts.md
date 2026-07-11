@@ -1,6 +1,6 @@
 # Compiler GLSL Contracts
 
-**Status:** Design contract — governs all future compiler work. The current vertical slice does *not* yet conform; §10 lists the migration gaps.
+**Status:** Design contract — governs all future compiler work. **Migration largely complete (July 2026):** §10.1 items 1–6 & 8 implemented, item 7 superseded by `trace-loop-contract.md`, item 9 (transport split) deliberately last; the dielectric (§10.1's first post-migration feature) landed with two-sided hits, `scene_region_at`, and `ior_of`. Media are next (`impl-plan-media.md`).
 **Date:** July 2026
 **Companion:** [compiler-engine-contract.md](compiler-engine-contract.md) governs the compiler↔engine boundary (CompiledRenderer, RenderPipeline). This document governs the boundaries *inside* the generated GLSL: the interfaces between geometry, materials, media, lights, and transport.
 **Verification:** §2.7, §3.6, §4.4, and the §7.2 accounting pins were revised/added by adversarial walkthrough — traces and findings in [fable-transport-verification.md](fable-transport-verification.md).
@@ -676,6 +676,12 @@ Does anything above assume closed-form geodesics? Audit: marching goes through `
 ### 10.1 Gaps between the current vertical slice and these contracts
 
 Priority-ordered; overlaps with [fable-review.md](fable-review.md) noted.
+
+> **Status (July 2026): items 1–6 & 8 are DONE** (one `impl-plan-*.md` per item records scope +
+> verification); item 7 was done differently (owner decision, note below); **item 9 remains,
+> deliberately last.** The first post-migration feature (the dielectric,
+> `impl-plan-dielectric.md`) additionally delivered §4.1/§4.2 two-sided hits, `scene_region_at`,
+> and `ior_of`.
 
 1. **Interaction interface** — `lambert.glsl`'s `interaction_surface_shade/scatter/pdf/emit` → the §3.2 shape: sample-returns-weight, bare-f eval, explicit `xi`, flags. Mechanical for Lambert (`sample.weight = albedo`).
 2. **Hit struct** — `material_to/material_from` ints → `region_from/region_to` + `material_of()` table. The current per-object material tracking in `scene_sdf` becomes region tracking (trivial while every object is one region).

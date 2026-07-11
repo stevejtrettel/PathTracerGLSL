@@ -7,6 +7,7 @@ import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '.
 import { furnaceBox, furnaceStrategy } from '../../src/compiler/scenes/furnaceBox.js';
 import { analyticMinimal, mixedScene, analyticStrategy } from '../../src/compiler/scenes/analyticScenes.js';
 import { etaScene, etaStrategy, submergedScene, submergedStrategy, cornellGlass, analyticGlass, glassStrategy } from '../../src/compiler/scenes/dielectricScenes.js';
+import { slabScene, slabStrategy, fogcubeScene, fogcubeStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../../src/compiler/scenes/mediaScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -62,6 +63,16 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     ['submerged witness', submergedScene, submergedStrategy],
     ['cornell-glass', cornellGlass, glassStrategy],
     ['analytic-glass', analyticGlass, glassStrategy],
+    // Media (impl-plan-media M1): null interfaces + absorbing media — HAS_MEDIA/
+    // HAS_NULL_INTERFACES defines, media tables, medium_sample dispatch, emission gate.
+    ['slab witness', slabScene, slabStrategy],
+    ['fogcube witness', fogcubeScene, fogcubeStrategy],
+    // Media (M2): scattering — HAS_SCATTERING, channel-MIS arms, phase_hg, ambientMedium
+    // (material_of(-1)), medium events; haze additionally: medium NEE + shadow_media +
+    // {param}-driven phase_g, and the pt variant (scattering without NEE).
+    ['furnace-scatter witness', furnaceScatterScene, furnaceScatterStrategy],
+    ['haze + pt-nee', hazeScene, hazeNeeStrategy],
+    ['haze + pt', hazeScene, hazePtStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

@@ -23,6 +23,11 @@ export interface SceneDescription {
     lights: LightDescription[];
     /** What a ray sees when it hits nothing. Defaults to `none` (black). */
     environment?: EnvironmentDescription;
+    /**
+     * Material name of the AMBIENT medium (§2.4) — what region −1 is filled with; absent =
+     * vacuum. A foggy world is just `ambientMedium: 'fog'`. material_of(-1) resolves to it.
+     */
+    ambientMedium?: string;
 }
 
 export interface AmbientSpaceDescription {
@@ -125,7 +130,24 @@ export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';
 }
 
-export type MaterialModel = 'lambert' | 'disney' | 'dielectric' | 'emissive';
+// 'none' = no optical surface (§3.6): the region's boundary is a null interface — requires a
+// medium block (an invisible object with no medium is an authoring error, Validator-enforced).
+// 'emissive' is rejected by the Validator (review C4) — use emission on a surface model instead.
+export type MaterialModel = 'lambert' | 'disney' | 'dielectric' | 'emissive' | 'none';
+
+/**
+ * Medium of the region's INTERIOR (§3.5) — "materials of the interior". Homogeneous (V1-C1):
+ * constants or {param} only; GLSL expressions are rejected until majorant declaration exists.
+ * Segment behavior behind the volumetric-component seams (fable-volumetric-component.md).
+ */
+export interface MediumDescription {
+    /** Absorption coefficient σ_a (per unit arc length). */
+    sigma_a: MaterialProperty;
+    /** Scattering coefficient σ_s. Default 0 (absorbing-only, e.g. tinted glass interior). */
+    sigma_s?: MaterialProperty;
+    /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). */
+    phase_g?: MaterialProperty;
+}
 
 export interface MaterialDescription {
     model: MaterialModel;
@@ -135,6 +157,8 @@ export interface MaterialDescription {
     ior?: MaterialProperty;          // dielectric: region's interior IOR (→ generated ior_of table)
     transmittance?: MaterialProperty; // dielectric: interface tint; interior absorption is the medium's job (§4.4)
     emission?: MaterialProperty;
+    /** Interior medium (§3.5/§4.4). Composes with any surface model; required for model 'none'. */
+    medium?: MediumDescription;
 }
 
 // --- Lights ---
@@ -175,6 +199,13 @@ export interface TransportDescription {
     lightSelection?: 'uniform' | 'power';
     russianRoulette: { enabled: boolean; startDepth: number };
     samplesPerFrame: number;
+    /**
+     * Volume-integrator axis (§7.3, as amended by fable-volumetric-component.md §5). Default
+     * DERIVED from scene content (scattering media ? 'analytic' : 'none'). 'analytic' = the v1
+     * closed-form homogeneous body (V1-C1); 'raymarch' is reserved for honest biased marching;
+     * the null-collision pair needs majorants — all three rejected-not-removed.
+     */
+    volumeIntegrator?: 'none' | 'analytic' | 'raymarch' | 'delta-tracking' | 'ratio-tracking';
 }
 
 export type CameraDescription =

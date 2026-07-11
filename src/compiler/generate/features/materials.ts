@@ -3,8 +3,8 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
-import { isGlslExpression, isValueParam, type Vec3, type ValueParam, type MaterialModel } from '../../types.js';
-import type { RenderPlan, PlannedMaterial, PlannedUniform } from '../../plan/types.js';
+import { isGlslExpression, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
+import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../../engine/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -12,12 +12,32 @@ import { formatFloat, formatSpectrum, paramToUniform } from './glsl-format.js';
 
 import lambertGLSL from '../glsl/lambert.glsl?raw';
 import dielectricGLSL from '../glsl/dielectric.glsl?raw';
+import mediumAnalyticGLSL from '../glsl/medium_analytic.glsl?raw';
+import phaseHgGLSL from '../glsl/phase_hg.glsl?raw';
 
 /** Per-model capability facts (the future descriptor's `capabilities` — inline until the reorg pass). */
 const MODEL_HAS_NONDELTA_LOBES: Record<string, boolean> = {
     lambert: true,
     dielectric: false,   // pure delta: NEE can't sample it, eval ≡ 0
+    none: false,         // null interface (§3.6): no surface at all — transport skips before NEE anyway
 };
+
+/** 'none' is a boundary classification (§3.6), never a surface-dispatch arm. */
+function surfaceMaterials(materials: PlannedMaterial[]): PlannedMaterial[] {
+    return materials.filter((m) => m.model !== 'none');
+}
+
+/** Emissive at compile time: nonzero constant, or {param}/expression (may be nonzero at runtime). */
+function isEmissive(mat: PlannedMaterial): boolean {
+    if (isValueParam(mat.emission) || isGlslExpression(mat.emission)) return true;
+    return mat.emission.some((c) => c !== 0);
+}
+
+/** Scattering at compile time: σ_s nonzero constant, or {param}/expression-driven. */
+function isScattering(medium: PlannedMedium): boolean {
+    if (isValueParam(medium.sigma_s) || isGlslExpression(medium.sigma_s)) return true;
+    return medium.sigma_s.some((c) => c !== 0);
+}
 
 export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     const blocks: ShaderBlock[] = [
@@ -36,6 +56,35 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // the shadow march. Constant-folds when the scene's materials are uniform in delta-ness.
     blocks.push({ origin: 'generated:nondelta-guard', source: generateNondeltaGuard(plan.materials) });
 
+    // Emission gate (§6.2 / impl-plan-media M1.2): the emission fetch+dispatch sits behind this
+    // compile-time table — the reference-loop pattern, and the fix for the review's
+    // unguarded-emission-block finding. Emitted for EVERY scene (transport reads it unconditionally).
+    blocks.push({ origin: 'generated:emissive-table', source: generateEmissiveTable(plan.materials) });
+
+    // The volumetric component (fable-volumetric-component §2): media tables + the seam
+    // dispatches, only when the scene has media. Media are "materials of the interior" (§3.5),
+    // so their codegen lives here beside the material tables.
+    const media = plan.features.media;
+    const scatteringLive = media.hasScatteringMedia && plan.program.transport.volumeIntegrator === 'analytic';
+    const wantsShadowMedia = media.hasMedia && plan.program.lighting !== null;
+    if (media.hasMedia) {
+        blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials) });
+        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials) });
+        // The 'analytic' strategy bodies (volumetric-component §4) — needed by the scattering
+        // arms (seam 1) and by the spectral shadow walker's per-segment form (seam 2).
+        if (scatteringLive || wantsShadowMedia) {
+            blocks.push({ origin: 'glsl/medium_analytic.glsl', source: mediumAnalyticGLSL });
+        }
+        if (scatteringLive) {
+            blocks.push({ origin: 'glsl/phase_hg.glsl', source: phaseHgGLSL });
+        }
+        blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan) });
+        // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).
+        if (wantsShadowMedia) {
+            blocks.push({ origin: 'generated:medium-transmittance', source: generateMediumTransmittance(plan.materials) });
+        }
+    }
+
     // Scan every material's properties for { param } references → live uniforms.
     const uniforms: PlannedUniform[] = [];
     const parameters: Record<string, ParameterMetadata> = {};
@@ -46,11 +95,28 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         addParamUniform(mat.roughness, 'float', 'float', uniforms, parameters, seen);
         addParamUniform(mat.transmittance, 'vec3', 'color', uniforms, parameters, seen);
         addParamUniform(mat.ior, 'float', 'float', uniforms, parameters, seen);
+        if (mat.medium !== null) {
+            addParamUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen);
+            addParamUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen);
+            addParamUniform(mat.medium.phase_g, 'float', 'float', uniforms, parameters, seen);
+        }
     }
 
     // Transmission present → transport tracks etaScale for the RR metric (§7.2).
     const defines: Record<string, string> = {};
     if (plan.program.materials.models.includes('dielectric')) defines['HAS_TRANSMISSION'] = '';
+    // Media defines gate ALL media GLSL (structs, helpers, transport blocks) so media-free
+    // scenes preprocess to exactly the pre-media program (impl-plan-media M1 gate).
+    if (media.hasMedia) defines['HAS_MEDIA'] = '';
+    if (media.hasNullInterfaces) {
+        defines['HAS_NULL_INTERFACES'] = '';
+        defines['MAX_NULL_CROSSINGS'] = '32';   // §3.6 pin
+    }
+    // Scattering arms exist when scattering media are present AND the strategy runs a volume
+    // integrator ('none' override renders scattering media as absorbing-only — a research A/B).
+    if (scatteringLive) {
+        defines['HAS_SCATTERING'] = '';
+    }
 
     return { ...emptyContribution(), blocks, defines, uniforms, parameters };
 }
@@ -187,6 +253,137 @@ function generateNondeltaGuard(materials: PlannedMaterial[]): string {
 }
 
 // ============================================================================
+// Generated emission gate — material_is_emissive (§6.2 / impl-plan-media M1.2)
+// ============================================================================
+// Transport fetches+dispatches emission only behind this compile-time table. Model 'none'
+// materials are never emissive here: their boundary is not an optical surface (§3.6) —
+// volumetric emission is the deferred MediumProperties.emission, a different term entirely.
+
+function generateEmissiveTable(materials: PlannedMaterial[]): string {
+    const ids = materials.filter((m) => m.model !== 'none' && isEmissive(m)).map((m) => m.id);
+    const lines: string[] = ['// Generated emission gate: fetch/dispatch emission only where it can exist'];
+    lines.push('bool material_is_emissive(int mat) {');
+    if (ids.length === 0) {
+        lines.push('    return false;');
+    } else if (ids.length === materials.length) {
+        lines.push('    return true;');
+    } else {
+        lines.push(`    return ${ids.map((id) => `mat == ${id}`).join(' || ')};`);
+    }
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// ============================================================================
+// Generated media tables + the volumetric component dispatch
+// (fable-volumetric-component §2; media are "materials of the interior", §3.5)
+// ============================================================================
+
+function generateMediaTables(materials: PlannedMaterial[]): string {
+    const lines: string[] = ['// Generated media capability tables (§3.5/§3.6)'];
+
+    // Null interfaces: model 'none' — transport passes through, no optical event.
+    const nullIds = materials.filter((m) => m.model === 'none').map((m) => m.id);
+    lines.push('bool is_null_interface(int mat) {');
+    lines.push(nullIds.length === 0
+        ? '    return false;'
+        : `    return ${nullIds.map((id) => `mat == ${id}`).join(' || ')};`);
+    lines.push('}');
+
+    // Media presence: gates the per-segment volumetric call site so it constant-folds away
+    // whenever current_medium's material has no medium block (vacuum, plain solids' interiors).
+    const mediumIds = materials.filter((m) => m.medium !== null).map((m) => m.id);
+    lines.push('bool material_has_medium(int mat) {');
+    lines.push(mediumIds.length === 0
+        ? '    return false;'
+        : `    return ${mediumIds.map((id) => `mat == ${id}`).join(' || ')};`);
+    lines.push('}');
+
+    return lines.join('\n');
+}
+
+function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Vec3 | number>, name: string, format: (v: never) => string): string {
+    if (isValueParam(prop)) return paramToUniform(prop.param);
+    if (isGlslExpression(prop)) {
+        // Backstop only — the Validator rejects procedural media (V1-C1) with a real diagnostic.
+        throw new Error(`materials: medium.${name} cannot be a GLSL expression (procedural media not yet supported, V1-C1)`);
+    }
+    return format(prop as never);
+}
+
+function generateMediumProperties(materials: PlannedMaterial[]): string {
+    const withMedium = materials.filter((m) => m.medium !== null);
+    const lines: string[] = ['// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)'];
+    lines.push('MediumProperties scene_medium_properties(int mat, vec3 p) {');
+    lines.push('    MediumProperties m;');
+    lines.push('    m.sigma_a = SPECTRUM_ZERO;');
+    lines.push('    m.sigma_s = SPECTRUM_ZERO;');
+    lines.push('    m.phase_g = 0.0;');
+    for (let i = 0; i < withMedium.length; i++) {
+        const mat = withMedium[i];
+        const med = mat.medium!;
+        const cond = i === 0 ? 'if' : 'else if';
+        lines.push(`    ${cond} (mat == ${mat.id}) {   // '${mat.name}'`);
+        lines.push(`        m.sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatSpectrum)};`);
+        lines.push(`        m.sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatSpectrum)};`);
+        lines.push(`        m.phase_g = ${mediumPropertyExpr(med.phase_g, 'phase_g', formatFloat)};`);
+        lines.push('    }');
+    }
+    lines.push('    return m;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// Seam 1 of the volumetric component: medium_sample(med, ray, t_max, xi) — the segment decision.
+// One dispatch over the media present, each arm specialized at compile time:
+//   absorbing-only  → deterministic Beer–Lambert, no RNG draw ({scattered:false, weight:e^{−σ_a·t}})
+//   scattering      → the analytic channel-MIS body (volumetric-component §4; HAS_SCATTERING, M2)
+// Every arm assigns ms.radiance (mandatory — §3 partition rule; uninitialized GLSL is garbage).
+function generateMediumSample(plan: RenderPlan): string {
+    const withMedium = plan.materials.filter((m) => m.medium !== null);
+    const scatteringLive = plan.features.media.hasScatteringMedia
+        && plan.program.transport.volumeIntegrator === 'analytic';
+
+    const lines: string[] = ['// Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)'];
+    lines.push('MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {');
+    lines.push('    MediumSample ms;');
+    lines.push('    ms.scattered = false;');
+    lines.push('    ms.t = t_max;');
+    lines.push('    ms.weight = SPECTRUM_ONE;');
+    lines.push('    ms.radiance = SPECTRUM_ZERO;');
+    for (const mat of withMedium) {
+        const scatters = scatteringLive && isScattering(mat.medium!);
+        lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — ${scatters ? 'scattering (analytic channel-MIS)' : 'absorbing-only (deterministic)'}`);
+        if (scatters) {
+            lines.push(`        return medium_sample_analytic(scene_medium_properties(${mat.id}, ray.origin), t_max, xi);`);
+        } else {
+            lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, ray.origin);`);
+            lines.push('        ms.weight = spectrum_exp(-m.sigma_a * t_max);');
+        }
+        lines.push('    }');
+    }
+    lines.push('    return ms;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// Seam 2 of the volumetric component: per-segment shadow transmittance over full σ_t.
+// Called only by shadow_media's segment walker; every arm is the analytic closed form (V1-C1).
+function generateMediumTransmittance(materials: PlannedMaterial[]): string {
+    const withMedium = materials.filter((m) => m.medium !== null);
+    const lines: string[] = ['// Generated volumetric-component dispatch (seam 2, fable-volumetric-component §2)'];
+    lines.push('Spectrum medium_transmittance(int med, Ray ray, float len) {');
+    for (const mat of withMedium) {
+        lines.push(`    if (med == ${mat.id}) {   // '${mat.name}'`);
+        lines.push(`        return medium_transmittance_analytic(scene_medium_properties(${mat.id}, ray.origin), len);`);
+        lines.push('    }');
+    }
+    lines.push('    return SPECTRUM_ONE;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// ============================================================================
 // Generated surface-interaction dispatch (§3.3)
 // ============================================================================
 // One dispatcher per operation, switching on material id over ONLY the models
@@ -194,31 +391,40 @@ function generateNondeltaGuard(materials: PlannedMaterial[]): string {
 // is additive — it just adds `if (mat == <ids>) return <model>_<op>(...)`.
 
 function generateInteractionDispatch(materials: PlannedMaterial[]): string {
-    // Group material ids by model, preserving first-appearance order.
+    // Group SURFACE material ids by model, preserving first-appearance order. 'none' materials
+    // never reach this dispatch: transport's null-interface branch continues before any surface
+    // op (§3.6), so they contribute no arm.
+    const surface = surfaceMaterials(materials);
     const order: MaterialModel[] = [];
     const idsByModel = new Map<MaterialModel, number[]>();
-    for (const m of materials) {
+    for (const m of surface) {
         if (!idsByModel.has(m.model)) { idsByModel.set(m.model, []); order.push(m.model); }
         idsByModel.get(m.model)!.push(m.id);
     }
     const fallback = order[order.length - 1]; // the default arm
 
     const ops = [
-        { name: 'sample',   ret: 'InteractionSample', params: 'int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u', args: 'wo, hit, mp, uc, u' },
-        { name: 'eval',     ret: 'Spectrum',          params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp',    args: 'wi, wo, hit, mp' },
-        { name: 'pdf',      ret: 'float',             params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp',    args: 'wi, wo, hit, mp' },
-        { name: 'emission', ret: 'Spectrum',          params: 'int mat, Direction wo, Hit hit, MaterialProperties mp',                 args: 'wo, hit, mp' },
+        { name: 'sample',   ret: 'InteractionSample', params: 'int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u', args: 'wo, hit, mp, uc, u', zero: 'InteractionSample s; s.wi = wo; s.weight = SPECTRUM_ZERO; s.pdf = 0.0; s.flags = 0u; return s;' },
+        { name: 'eval',     ret: 'Spectrum',          params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp',    args: 'wi, wo, hit, mp', zero: 'return SPECTRUM_ZERO;' },
+        { name: 'pdf',      ret: 'float',             params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp',    args: 'wi, wo, hit, mp', zero: 'return 0.0;' },
+        { name: 'emission', ret: 'Spectrum',          params: 'int mat, Direction wo, Hit hit, MaterialProperties mp',                 args: 'wo, hit, mp', zero: 'return SPECTRUM_ZERO;' },
     ];
 
     const lines: string[] = ['// Generated surface-interaction dispatch (§3.3)'];
     for (const op of ops) {
         lines.push(`${op.ret} interaction_surface_${op.name}(${op.params}) {`);
-        for (const model of order) {
-            if (model === fallback) continue;
-            const cond = idsByModel.get(model)!.map((id) => `mat == ${id}`).join(' || ');
-            lines.push(`    if (${cond}) return ${model}_${op.name}(${op.args});`);
+        if (order.length === 0) {
+            // Degenerate all-'none' scene (pure media, e.g. a fog ball under an environment):
+            // no surface ops exist — zeroed stubs keep the transport template linkable.
+            lines.push(`    ${op.zero}`);
+        } else {
+            for (const model of order) {
+                if (model === fallback) continue;
+                const cond = idsByModel.get(model)!.map((id) => `mat == ${id}`).join(' || ');
+                lines.push(`    if (${cond}) return ${model}_${op.name}(${op.args});`);
+            }
+            lines.push(`    return ${fallback}_${op.name}(${op.args});`);
         }
-        lines.push(`    return ${fallback}_${op.name}(${op.args});`);
         lines.push('}');
     }
     return lines.join('\n');
