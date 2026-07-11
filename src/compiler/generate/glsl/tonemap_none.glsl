@@ -2,9 +2,7 @@
 // Linear radiance straight to the canvas — no tonemap, no sRGB. This is the display mode
 // the §11 on-screen radiance checks need: what you probe is what the accumulator holds
 // (clamped to [0,1] only by the 8-bit target itself). NaN/Inf sanitized like the tonemapped path.
-
-uniform vec2 u_resolution;
-uniform sampler2D u_radiance;
+// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated display header.
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));

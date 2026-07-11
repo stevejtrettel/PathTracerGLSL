@@ -2,6 +2,7 @@
 
 import type { ShaderProgram } from '../types.js';
 import type { PlannedUniform, ProgramDescription } from '../plan/types.js';
+import type { PlannedTexture } from './features/types.js';
 import type { ShaderBlock, BlockMapping } from './ShaderIR.js';
 import { assembleBlocks } from './ShaderIR.js';
 import type { MergedContributions } from './features/merge.js';
@@ -54,7 +55,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
 function buildPathtracerBlocks(merged: MergedContributions): ShaderBlock[] {
     return [
         { origin: 'generated:header', source: buildHeader(merged.defines) },
-        { origin: 'generated:uniforms', source: buildUniformDeclarations(merged.uniforms) },
+        { origin: 'generated:uniforms', source: buildUniformDeclarations(merged.uniforms, merged.textures) },
         ...merged.blocks,
     ];
 }
@@ -68,10 +69,15 @@ function buildDisplayBlocks(tonemap: ProgramDescription['tonemap']): ShaderBlock
     // silently ignoring `display: { type: 'none' }` and `exposure`). Exposure is strategy
     // data, so it bakes as a constant — a strategy change recompiles anyway.
     const exposure = tonemap.type === 'none' ? 1.0 : (tonemap.exposure ?? 1.0);
+    // The display pass's resources are declared HERE, not in the tonemap templates
+    // (bundle i-b): u_radiance is the pass's texture input, u_resolution the engine
+    // builtin — templates only contain the tonemap math.
     const header = [
         FRAGMENT_PREAMBLE,
         '',
         'out vec4 fragColor;',
+        'uniform vec2 u_resolution;',
+        'uniform sampler2D u_radiance;',
         `#define DISPLAY_EXPOSURE ${exposure.toPrecision(8)}`,
     ].join('\n');
     return [
@@ -107,12 +113,18 @@ function buildHeader(defines: Record<string, string>): string {
 // Uniform declarations (from the merged contribution list)
 // ============================================================================
 
-function buildUniformDeclarations(uniforms: PlannedUniform[]): string {
+function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedTexture[] = []): string {
     const lines: string[] = [];
     lines.push('// Uniforms');
 
     for (const u of uniforms) {
         lines.push(`uniform ${u.type} ${u.name};`);
+    }
+
+    // Feature-declared external textures (§2.10): the sampler declaration matches the
+    // pass-input name PipelineBuilder threads through as `extern:<name>`.
+    for (const t of textures) {
+        lines.push(`uniform sampler2D ${t.name};`);
     }
 
     // Previous accumulation texture (always needed for progressive rendering)

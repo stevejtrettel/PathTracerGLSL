@@ -20,7 +20,7 @@ export function generate(
     const merged = collectFeatures(plan, bag);
 
     const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.tonemap);
-    const pipeline = buildPipeline(rendererId, plan);
+    const pipeline = buildPipeline(rendererId, plan, merged.textures);
     const uniforms = buildUniforms(merged.uniforms);
     const parameters = merged.parameters;
     const exportTargets = buildExportTargets();

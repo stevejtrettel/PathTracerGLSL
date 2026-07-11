@@ -57,7 +57,8 @@ describe('buildEnvironmentSampler', () => {
         const W = 5, H = 4;
         const rgb = new Float32Array(W * H * 3);
         for (let i = 0; i < rgb.length; i++) rgb[i] = ((i * 37) % 11) * 0.13; // varied, non-negative
-        const res = buildEnvironmentSampler(glStub(), fakeRegistry(), rgb, W, H);
+        // blur: false — this test is the exact identity against the RAW luminance weights
+        const res = buildEnvironmentSampler(glStub(), fakeRegistry(), rgb, W, H, undefined, { blur: false });
         const { cond, marg } = res.cdf;
 
         // Reference density directly from the build weights
@@ -92,6 +93,30 @@ describe('buildEnvironmentSampler', () => {
             }
         }
         expect(integral).toBeCloseTo(1.0, 6);
+    });
+
+    // env-plan D2.3: the default blur guarantees pdf support wherever bilinear radiance is
+    // nonzero — a lone bright texel must give its 8 neighbors nonzero selection density
+    // (without it, NEE-only is biased at black↔bright boundaries).
+    it('default blur spreads support to the neighbors of a lone bright texel', () => {
+        const W = 6, H = 5;
+        const rgb = new Float32Array(W * H * 3);            // all black…
+        const ci = 3, cj = 2;
+        rgb[3 * (cj * W + ci)] = 100;                        // …except one bright red texel
+        const res = buildEnvironmentSampler(glStub(), fakeRegistry(), rgb, W, H);
+        const { cond, marg } = res.cdf;
+        const density = (i: number, j: number) => {
+            const dM = marg[j] - (j > 0 ? marg[j - 1] : 0);
+            const dC = cond[j * W + i] - (i > 0 ? cond[j * W + i - 1] : 0);
+            return dC * dM;
+        };
+        for (let dj = -1; dj <= 1; dj++) {
+            for (let di = -1; di <= 1; di++) {
+                expect(density(ci + di, cj + dj)).toBeGreaterThan(0);
+            }
+        }
+        // …and a far-away texel has zero density (blur is local, not a global floor)
+        expect(density(0, 4)).toBe(0);
     });
 
     // Direct math check of the invariants, independent of the GL upload.

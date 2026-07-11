@@ -47,9 +47,9 @@ export class Engine {
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
         this.resourceManager = new ResourceManager(gl);
-        this.renderExecutor = new RenderExecutor(gl, this.resourceManager);
+        this.textureRegistry = new TextureRegistry(gl);   // dumb store; executor owns units (§2.10)
+        this.renderExecutor = new RenderExecutor(gl, this.resourceManager, this.textureRegistry);
         this.parameterManager = new ParameterManager(gl);
-        this.textureRegistry = new TextureRegistry(gl, 1);  // Reserve unit 0 for accumulator
         this.hdrLoader = new HDREnvironmentLoader(gl, this.textureRegistry);
         this.startTime = performance.now();
 
@@ -353,42 +353,16 @@ export class Engine {
 
     // -- Environment Loading --
 
-    async loadEnvironmentHDR(path: string): Promise<void> {
+    /**
+     * Load a Radiance .hdr file into the texture registry under the extern names
+     * (env_map, env_cdf_cond, env_cdf_marg). No binding happens here: the executor
+     * binds `extern:` pass inputs to units per pass (§2.10 — the old per-program
+     * bind-at-load path was the blind-executor violation; deleted in env-as-light T1).
+     * Returns the env metadata so the app can set the `env.*` parameters.
+     */
+    async loadEnvironmentHDR(path: string): Promise<{ width: number; height: number; totalWeight: number }> {
         const envData = await this.hdrLoader.loadEnvironmentHDR(path);
-
-        for (const [, renderer] of this.renderers.entries()) {
-            this._bindEnvironmentTexturesToRenderer(renderer, envData.width, envData.height, envData.totalWeight);
-        }
-    }
-
-    private _bindEnvironmentTexturesToRenderer(
-        renderer: CompiledRenderer,
-        envWidth: number,
-        envHeight: number,
-        totalWeight: number
-    ): void {
-        const gl = this.gl;
-
-        for (const [shaderId] of renderer.shaders) {
-            const program = this.renderExecutor.getProgram(shaderId);
-            if (!program) continue;
-
-            gl.useProgram(program);
-
-            const envMapLoc = gl.getUniformLocation(program, 'u_envMap');
-            const envCdfCondLoc = gl.getUniformLocation(program, 'u_envCDFCond');
-            const envCdfMargLoc = gl.getUniformLocation(program, 'u_envCDFMarg');
-
-            if (envMapLoc) this.textureRegistry.bind('env_map', envMapLoc);
-            if (envCdfCondLoc) this.textureRegistry.bind('env_cdf_cond', envCdfCondLoc);
-            if (envCdfMargLoc) this.textureRegistry.bind('env_cdf_marg', envCdfMargLoc);
-
-            const envSizeLoc = gl.getUniformLocation(program, 'u_envSize');
-            const envWeightLoc = gl.getUniformLocation(program, 'u_envTotalWeight');
-
-            if (envSizeLoc) gl.uniform2f(envSizeLoc, envWidth, envHeight);
-            if (envWeightLoc) gl.uniform1f(envWeightLoc, totalWeight);
-        }
+        return { width: envData.width, height: envData.height, totalWeight: envData.totalWeight };
     }
 
     // -- Cleanup --

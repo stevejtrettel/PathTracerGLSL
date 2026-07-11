@@ -209,7 +209,9 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         brdfModels.push('lambert');
     }
 
-    const hasLights = features.lighting.totalLightCount > 0;
+    // A samplable environment is a light for NEE purposes (T3) — an env-only scene under
+    // 'nee'/'mis' gets the lighting infrastructure with an env-only lighting_sample.
+    const hasLights = features.lighting.totalLightCount > 0 || features.environment.samplable;
     const wantsNEE = strategy.transport.directLighting !== 'none' && hasLights;
 
     return {

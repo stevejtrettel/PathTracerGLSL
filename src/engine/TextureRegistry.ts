@@ -1,26 +1,21 @@
 // engine/TextureRegistry.ts
 
 /**
- * TextureRegistry - Manages texture units and bindings
+ * TextureRegistry — a dumb name → WebGLTexture store (contracts §2.10).
  *
- * Responsibilities:
- * - Register textures and assign texture units
- * - Bind textures to shader uniforms
- * - Handle texture cleanup
- *
- * Note: Unit 0 is typically reserved for accumulator texture
+ * The registry holds externally-loaded textures (e.g. an environment map + its CDFs)
+ * under stable names. It does NOT own texture units or bind anything: the RenderExecutor
+ * is the sole texture-unit authority — per pass, it binds framebuffer refs and
+ * `extern:<name>` refs alike to sequential units in declaration order. (The old
+ * fixed-unit reservation + bind-at-load scheme was the blind-executor violation and
+ * collided with pass-input units — audit F1/F10; deleted in env-as-light T1.)
  */
 export class TextureRegistry {
     private gl: WebGL2RenderingContext;
     private textures = new Map<string, WebGLTexture>();
-    private units = new Map<string, number>();
-    private nextUnit: number;
-    private readonly reservedUnits: number;
 
-    constructor(gl: WebGL2RenderingContext, reservedUnits: number = 1) {
+    constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-        this.reservedUnits = reservedUnits;
-        this.nextUnit = reservedUnits;
     }
 
     /**
@@ -30,75 +25,37 @@ export class TextureRegistry {
      */
     handleContextLoss(): void {
         this.textures.clear();
-        this.units.clear();
-        this.nextUnit = this.reservedUnits;
     }
 
-    /**
-     * Register a texture with optional unit assignment
-     */
-    register(name: string, texture: WebGLTexture, requestedUnit?: number): void {
-        // Clean up existing texture if replacing
+    /** Register a texture under a stable name, deleting any texture it replaces. */
+    register(name: string, texture: WebGLTexture): void {
         const oldTexture = this.textures.get(name);
         if (oldTexture) {
             this.gl.deleteTexture(oldTexture);
         }
-
         this.textures.set(name, texture);
-
-        // Reuse the unit already assigned to this name when re-registering (e.g.
-        // reloading an HDR). Only a genuinely new name consumes a fresh unit —
-        // otherwise every re-registration leaks one of the ~32 available units.
-        let unit = requestedUnit ?? this.units.get(name);
-        if (unit === undefined) {
-            unit = this.nextUnit++;
-        }
-        this.units.set(name, unit);
     }
 
-    /**
-     * Bind texture to uniform location
-     */
-    bind(name: string, location: WebGLUniformLocation): void {
-        const texture = this.textures.get(name);
-        const unit = this.units.get(name);
-
-        if (!texture || unit === undefined) {
-            return; // Silently skip - texture might be optional
-        }
-
-        this.gl.activeTexture(this.gl.TEXTURE0 + unit);
-        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-        this.gl.uniform1i(location, unit);
+    /** Look up a texture by name (undefined if not registered). */
+    get(name: string): WebGLTexture | undefined {
+        return this.textures.get(name);
     }
 
-    /**
-     * Check if texture is registered
-     */
+    /** Check if a texture is registered. */
     has(name: string): boolean {
         return this.textures.has(name);
     }
 
-    /**
-     * Print debug information
-     */
-    debug(): void {
-        console.log('=== Texture Registry ===');
-        for (const [name, unit] of this.units) {
-            const texture = this.textures.get(name);
-            console.log(`  ${name} → unit ${unit}`, texture);
-        }
-        console.log(`Next available unit: ${this.nextUnit}`);
+    /** Registered names (for error messages). */
+    names(): string[] {
+        return [...this.textures.keys()];
     }
 
-    /**
-     * Clean up all textures
-     */
+    /** Clean up all textures. */
     dispose(): void {
         for (const texture of this.textures.values()) {
             this.gl.deleteTexture(texture);
         }
         this.textures.clear();
-        this.units.clear();
     }
 }

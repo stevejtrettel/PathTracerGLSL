@@ -1,9 +1,7 @@
 // Reinhard Tonemapping Display Pass
-// Full fragment shader for display pass
-// Reads HDR radiance, applies Reinhard + sRGB, outputs LDR
-
-uniform vec2 u_resolution;
-uniform sampler2D u_radiance;
+// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
+// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
+// display header (ShaderBuilder) — this template is tonemap math only.
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));

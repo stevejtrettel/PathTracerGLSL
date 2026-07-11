@@ -40,4 +40,14 @@ export interface SceneFeatures {
         /** Any material has model 'none' (§3.6) — transport needs the null-crossing branch. */
         hasNullInterfaces: boolean;
     };
+
+    environment: {
+        /**
+         * The env participates in NEE/MIS as a light (env-as-light T3): `image` unless
+         * sampleAsLight: false; `constant` only when sampleAsLight: true (D6 opt-in — the
+         * default preserves every pre-T3 witness's estimator behavior). Satisfies the
+         * NEE-needs-lights check and drives ENV_SAMPLABLE + the selection codegen.
+         */
+        samplable: boolean;
+    };
 }

@@ -2,9 +2,10 @@
 
 import type { RenderPipeline, CompiledRenderer } from '../types.js';
 import type { RenderPlan, PlannedUniform } from '../plan/types.js';
+import type { PlannedTexture } from './features/types.js';
 import type { UniformBinding } from '../../engine/types.js';
 
-export function buildPipeline(rendererId: string, plan: RenderPlan): RenderPipeline {
+export function buildPipeline(rendererId: string, plan: RenderPlan, externTextures: PlannedTexture[] = []): RenderPipeline {
     const planned = plan.pipeline;
 
     // Map pass roles to shader IDs
@@ -12,6 +13,11 @@ export function buildPipeline(rendererId: string, plan: RenderPlan): RenderPipel
         'pathtracer': `${rendererId}-main`,
         'display': `${rendererId}-display`,
     };
+
+    // Feature-declared external textures (§2.10) join the PATHTRACER pass inputs as
+    // `extern:<name>` refs — the engine executor resolves them from the registry and
+    // binds them to sequential units exactly like framebuffer refs.
+    const externInputs = Object.fromEntries(externTextures.map(t => [t.name, t.source]));
 
     return {
         framebuffers: planned.framebuffers.map(fb => ({
@@ -22,7 +28,7 @@ export function buildPipeline(rendererId: string, plan: RenderPlan): RenderPipel
         passes: planned.passes.map(pass => ({
             id: `${pass.role}-pass`,
             shader: roleToShader[pass.role] ?? `${rendererId}-${pass.role}`,
-            inputs: { textures: pass.inputs },
+            inputs: { textures: pass.role === 'pathtracer' ? { ...pass.inputs, ...externInputs } : pass.inputs },
             output: pass.output,
             execution: { type: 'once' as const },
         })),

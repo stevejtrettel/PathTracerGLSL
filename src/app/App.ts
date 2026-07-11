@@ -132,11 +132,19 @@ export class App {
             throw error;
         }
 
-        if (config.environmentHDR) {
+        // Scene-driven environment load (env-as-light T2): an `image` environment's textures
+        // must be in the extern registry BEFORE the first frame — the executor hard-errors on
+        // a missing extern (never a silent unit-0 sample), so initialize awaits the load.
+        const sceneEnv = config.scene?.environment;
+        const hdrPath = config.environmentHDR ?? (sceneEnv?.type === 'image' ? sceneEnv.url : undefined);
+        if (hdrPath) {
             try {
-                await this.engine.loadEnvironmentHDR(config.environmentHDR);
+                const env = await this.engine.loadEnvironmentHDR(hdrPath);
+                // env.size / env.totalWeight feed the T3 sampling uniforms; set eagerly —
+                // renderers without those uniforms just never consume the parameters.
+                this.parameterStore.batch({ 'env.size': [env.width, env.height], 'env.totalWeight': env.totalWeight });
             } catch (error) {
-                console.error(`Failed to load HDR environment: ${config.environmentHDR}`, error);
+                console.error(`Failed to load HDR environment: ${hdrPath}`, error);
                 throw error;
             }
         }

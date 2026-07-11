@@ -10,6 +10,7 @@ import { etaScene, etaStrategy, submergedScene, submergedStrategy, cornellGlass,
 import { slabScene, slabStrategy, fogcubeScene, fogcubeStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../../src/compiler/scenes/mediaScenes.js';
 import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistStrategy } from '../../src/compiler/scenes/demoScenes.js';
 import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy, fogPanel, orbScene, orbNeeStrategy, orbPtStrategy } from '../../src/compiler/scenes/areaLightScenes.js';
+import { skyScene, skyPtStrategy, skyNeeStrategy, furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, skyLampScene, skyLampMisStrategy } from '../../src/compiler/scenes/envScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -102,6 +103,16 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     // Audit H2 witness: diffuse zero-thickness quad in fog → the scene_region_thin probe path.
     ['fog-panel + pt-nee', fogPanel, fogAreaNeeStrategy],
     ['fog-panel + pt', fogPanel, fogAreaPtStrategy],
+    // env-as-light T2: image environment — env_equirect chart block, extern:env_map pass
+    // input + sampler declaration, env.* uniforms.
+    ['sky + pt', skyScene, skyPtStrategy],
+    // env-as-light T3: samplable environments. sky+pt-nee = env-only tabulated selection;
+    // furnace-sky = constant-samplable (uniform sphere, no textures) under NEE and MIS;
+    // sky-lamp+pt-mis = the two-stage wrapper + scaled lighting_pdf + miss-MIS factor.
+    ['sky + pt-nee', skyScene, skyNeeStrategy],
+    ['furnace-sky + pt-nee', furnaceSkyScene, furnaceSkyNeeStrategy],
+    ['furnace-sky + pt-mis', furnaceSkyScene, furnaceSkyMisStrategy],
+    ['sky-lamp + pt-mis', skyLampScene, skyLampMisStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

@@ -58,9 +58,15 @@ import {
     fogAreaPtStrategy,
     fogPanel,
     orbScene,
+
     orbNeeStrategy,
     orbPtStrategy,
 } from './areaLightScenes.js';
+import {
+    skyScene, skyPtStrategy, skyNeeStrategy, skyMisStrategy,
+    furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy,
+    skyLampScene, skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy,
+} from './envScenes.js';
 
 export interface SceneSuiteEntry {
     scene: SceneDescription;
@@ -301,6 +307,42 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],
+        },
+    },
+    sky: {
+        scene: skyScene,
+        strategies: [skyNeeStrategy, skyMisStrategy, skyPtStrategy],
+        exercises:
+            'X-ENV (T3): the tabulated env as a samplable light — CDF inversion (env_sampler_cdf), pdf-from-CDF-differences, the sinθ Jacobian, miss-branch w-bookkeeping, env-only selection (probability 1). Plus T2: extern chain, rotation-sign chart fix, scene-driven HDR load',
+        expected:
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image — divergence implicates the CDF build, the Jacobian, or the miss-weight bookkeeping. Sky visible as background, lights the spheres, glass refracts the horizon; env.rotation pans everything consistently',
+        initialParameters: {
+            'camera.position': [0, 1.4, 5],
+            'camera.target': [0, 0.9, 0],
+        },
+    },
+    'furnace-sky': {
+        scene: furnaceSkyScene,
+        strategies: [furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy],
+        exercises:
+            'W1/W2 (T3): the OPEN furnace — constant SAMPLABLE env (uniform-sphere sampler, pdf 1/4π), miss-branch bookkeeping in its purest form (no textures anywhere). RR off; display tonemap NONE for on-screen radiance checks',
+        expected:
+            'sphere/sky pixel ratio = ρ = 0.4 EXACTLY (convex body: exit radiance ρ·L, single bounce — the closed-furnace L/(1−ρ) does NOT apply), sky pixels = L, on ALL THREE keys — any key diverging implicates the env miss-weight or the uniform-sphere pdf',
+        initialParameters: {
+            'camera.position': [0, 0, 3.5],
+            'camera.target': [0, 0, 0],
+        },
+    },
+    'sky-lamp': {
+        scene: skyLampScene,
+        strategies: [skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy],
+        exercises:
+            'TWO-STAGE selection (T3, plan D3): image env AND a quad light — u_envSelectProb stage 0, the wrapped lighting_sample_finite CDF, the (1−P) factor in lighting_pdf, and the P factor in the miss-MIS weight. The full §6.1 pdf symmetry across techniques',
+        expected:
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image (warm lamp pool + cool sky fill); sweeping env.selectProb changes NOISE ONLY, never brightness — brightness drift under the sweep is a selection-pdf asymmetry',
+        initialParameters: {
+            'camera.position': [0, 1.4, 5],
+            'camera.target': [0, 0.9, 0],
         },
     },
     orb: {

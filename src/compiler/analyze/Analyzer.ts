@@ -96,6 +96,17 @@ export function analyze(scene: SceneDescription): SceneFeatures {
 
     const totalLightCount = pointLightCount + directionalLightCount + areaLightCount + samplableEmitterCount;
 
+    // --- Environment as a light (T3, D6): image default TRUE, constant opt-in, none/procedural never.
+    const env = scene.environment;
+    let envSamplable = false;
+    if (env?.type === 'image') {
+        envSamplable = env.sampleAsLight !== false;
+    } else if (env?.type === 'constant') {
+        envSamplable = env.sampleAsLight === true
+            && (env.intensity ?? 1) > 0
+            && env.color.some((c) => c > 0);
+    }
+
     return {
         ambientSpace: scene.ambientSpace.type,
         geometry: {
@@ -123,6 +134,9 @@ export function analyze(scene: SceneDescription): SceneFeatures {
             hasMedia,
             hasScatteringMedia,
             hasNullInterfaces,
+        },
+        environment: {
+            samplable: envSamplable,
         },
     };
 }

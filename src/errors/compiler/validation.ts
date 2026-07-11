@@ -139,6 +139,19 @@ function validatePass(
     // Validate texture inputs
     if (pass.inputs?.textures) {
         for (const [uniformName, bufferRef] of Object.entries(pass.inputs.textures)) {
+            // 'extern:' is a RESERVED prefix (§2.10): the ref is resolved from the engine's
+            // texture registry at bind time, not from a framebuffer. Loading is async, so
+            // existence can't be validated here — a missing key at bind is a hard, named
+            // engine error (never a silent unit-0 sample).
+            if (bufferRef.startsWith('extern:')) {
+                if (bufferRef.length <= 'extern:'.length) {
+                    bag.error('pass-invalid-texture',
+                        `Pass '${pass.id}' binds texture '${uniformName}' with an empty extern name`)
+                        .add();
+                }
+                continue;
+            }
+
             const { bufferId } = parseBufferRef(bufferRef);
 
             if (!framebufferIds.has(bufferId)) {

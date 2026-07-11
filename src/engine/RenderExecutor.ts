@@ -2,8 +2,12 @@
 
 import type { RenderPipeline, RenderPass, ShaderProgram } from '../compiler/types.js';
 import type { ResourceManager } from './ResourceManager.js';
+import type { TextureRegistry } from './TextureRegistry.js';
 import type { GPUProfiler } from './GPUProfiler.js';
 import type { ParameterManager } from './ParameterManager.js';
+
+/** Reserved prefix for registry-resolved texture inputs (contracts §2.10). */
+const EXTERN_PREFIX = 'extern:';
 
 /**
  * RenderExecutor
@@ -23,6 +27,7 @@ import type { ParameterManager } from './ParameterManager.js';
 export class RenderExecutor {
     private gl: WebGL2RenderingContext;
     private resourceManager: ResourceManager;
+    private textureRegistry: TextureRegistry | null;
     private parameterManager: ParameterManager | null = null;
 
     // Compiled shader programs (shader id → WebGLProgram)
@@ -34,9 +39,14 @@ export class RenderExecutor {
     // Cached draw buffers per pass (passId → drawBuffers array)
     private drawBuffersCache: Map<string, number[]> = new Map();
 
-    constructor(gl: WebGL2RenderingContext, resourceManager: ResourceManager) {
+    // getUniformLocation cache — one GL round-trip per (program, name), not per frame.
+    // WeakMap keyed on the program so deleted programs drop their entries automatically.
+    private uniformLocationCache = new WeakMap<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
+
+    constructor(gl: WebGL2RenderingContext, resourceManager: ResourceManager, textureRegistry: TextureRegistry | null = null) {
         this.gl = gl;
         this.resourceManager = resourceManager;
+        this.textureRegistry = textureRegistry;
         this.programs = new Map();
     }
 
@@ -361,24 +371,52 @@ export class RenderExecutor {
     private _bindTextures(program: WebGLProgram, textures: Record<string, string>): void {
         const gl = this.gl;
 
+        // The executor is the SOLE texture-unit authority (§2.10): framebuffer refs and
+        // extern: refs bind identically to sequential units per pass, every pass, every
+        // frame — no unit is owned by anything outside this loop.
         let textureUnit = 0;
 
         for (const [uniformName, textureId] of Object.entries(textures)) {
-            // Get texture from resource manager (handles :N suffix for MRT)
-            const texture = this.resourceManager.getTexture(textureId);
+            let texture: WebGLTexture;
+            if (textureId.startsWith(EXTERN_PREFIX)) {
+                // Registry-resolved external texture (e.g. an environment map). A missing
+                // key is a HARD, NAMED error — never a silent unit-0 sample (§2.10 (3)).
+                const name = textureId.slice(EXTERN_PREFIX.length);
+                const registered = this.textureRegistry?.get(name);
+                if (!registered) {
+                    throw new Error(
+                        `Extern texture '${name}' (input '${uniformName}') is not registered — ` +
+                        `load it before rendering (registered: ${this.textureRegistry?.names().join(', ') || 'none'})`);
+                }
+                texture = registered;
+            } else {
+                // Framebuffer-backed texture (handles _current/_previous + :N MRT suffix)
+                texture = this.resourceManager.getTexture(textureId);
+            }
 
-            // Bind texture to unit
             gl.activeTexture(gl.TEXTURE0 + textureUnit);
             gl.bindTexture(gl.TEXTURE_2D, texture);
 
-            // Set sampler uniform
-            const location = gl.getUniformLocation(program, uniformName);
+            const location = this._uniformLocation(program, uniformName);
             if (location) {
                 gl.uniform1i(location, textureUnit);
             }
 
             textureUnit++;
         }
+    }
+
+    /** Cached getUniformLocation (engine review #9, cheap half). */
+    private _uniformLocation(program: WebGLProgram, name: string): WebGLUniformLocation | null {
+        let perProgram = this.uniformLocationCache.get(program);
+        if (!perProgram) {
+            perProgram = new Map();
+            this.uniformLocationCache.set(program, perProgram);
+        }
+        if (!perProgram.has(name)) {
+            perProgram.set(name, this.gl.getUniformLocation(program, name));
+        }
+        return perProgram.get(name)!;
     }
 
     /**

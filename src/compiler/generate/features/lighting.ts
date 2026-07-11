@@ -23,6 +23,41 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
 
     const blocks: ShaderBlock[] = [];
     const defines: Record<string, string> = {};
+    const uniforms: FeatureContribution['uniforms'] = [];
+    const parameters: FeatureContribution['parameters'] = {};
+
+    // Environment as a light (T3): the env joins selection through a TWO-STAGE draw —
+    // stage 0 picks env-vs-finite with probability u_envSelectProb, stage 1 is the baked
+    // CDF (rescaled). The env's power is load-time data the baked CDF can't absorb; the
+    // uniform is the deliberate deviation from reference §8's compile-time ENV_SELECT_PDF
+    // (same structure — see impl-plan-env-as-light D3). Arnold's dome-as-dedicated-technique
+    // is the precedent for the two-stage shape.
+    const envSamplable = plan.features.environment.samplable;
+    const env = plan.program.environment;
+    const envSelectDefault = plan.lights.length === 0
+        ? 1.0                                                            // env-only: certainty
+        : ((env.type === 'constant' || env.type === 'image') && env.selectWeight !== undefined
+            ? env.selectWeight
+            : 0.5);                                                      // plan O1 default
+    if (envSamplable) {
+        // The forward declarations let lighting_sample call the env sampler even though the
+        // environment feature's block assembles AFTER lighting (feature order is pinned).
+        blocks.push({
+            origin: 'generated:env-light-decls',
+            source: '// Environment-as-light forward declarations (defined by the environment feature)\n'
+                + 'LightSample environment_sample(Point p, vec2 xi);\n'
+                + 'float environment_pdf(vec3 dir);',
+        });
+        uniforms.push({ name: 'u_envSelectProb', type: 'float', parameterPath: 'env.selectProb', default: envSelectDefault });
+        if (plan.lights.length > 0) {
+            // Live-tunable ONLY when finite lights exist: in an env-only scene there is no
+            // other technique to absorb the remaining mass — changing 1.0 would be bias.
+            parameters['env.selectProb'] = {
+                type: 'float', default: envSelectDefault, range: [0.05, 0.95],
+                name: 'Env select P', group: 'Environment', triggersReset: true,
+            };
+        }
+    }
     // Shadow query behind the §6.3 contract — the compiler specializes: the boolean-fast-path
     // opaque form for media-free scenes, the spectral segment walker (composing the generated
     // medium_transmittance, seam 2) when media exist. The NEE call sites never change.
@@ -52,7 +87,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
 
     blocks.push({
         origin: 'generated:light-sampling',
-        source: generateLightSampling(plan.lights, selectPdf),
+        source: generateLightSampling(plan.lights, selectPdf, envSamplable),
     });
 
     // §6.2 registry table + the transport emission-bookkeeping gate: only when a samplable
@@ -63,11 +98,11 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         defines['HAS_SAMPLABLE_EMITTERS'] = '';
         // The MIS pdf query (§6.1): only under 'mis' — its sole reader is the emitter-hit weight.
         if (plan.program.lighting.method === 'mis') {
-            blocks.push({ origin: 'generated:lighting-pdf', source: generateLightingPdf(plan.lights, selectPdf) });
+            blocks.push({ origin: 'generated:lighting-pdf', source: generateLightingPdf(plan.lights, selectPdf, envSamplable) });
         }
     }
 
-    return { ...emptyContribution(), blocks, defines };
+    return { ...emptyContribution(), blocks, defines, uniforms, parameters };
 }
 
 // ============================================================================
@@ -141,17 +176,29 @@ export function computeSelectPdf(lights: PlannedLight[], selection: 'uniform' | 
     return weights.map((w) => w / total);
 }
 
-function generateLightSampling(lights: PlannedLight[], selectPdf: number[]): string {
+function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean): string {
     const lines: string[] = ['// Generated light selection dispatcher (§6.1)'];
 
     if (lights.length === 0) {
+        if (envSamplable) {
+            // Env-only: selection probability 1 — lighting_sample IS the env sampler.
+            lines.push('LightSample lighting_sample(Point p, vec2 xi) {');
+            lines.push('    return environment_sample(p, xi);');
+            lines.push('}');
+            return lines.join('\n');
+        }
         lines.push('LightSample lighting_sample(Point p, vec2 xi) {');
         lines.push('    LightSample ls; ls.pdf = 0.0; return ls;'); // no samplable light → NEE skipped
         lines.push('}');
         return lines.join('\n');
     }
 
-    lines.push('LightSample lighting_sample(Point p, vec2 xi) {');
+    // With a samplable env, the finite-light dispatcher keeps its exact body under a private
+    // name and a two-stage wrapper owns the env-vs-finite draw (cdf_rescale on stage 0's
+    // random — pitfall 4 applies across stages too).
+    const finiteName = envSamplable ? 'lighting_sample_finite' : 'lighting_sample';
+
+    lines.push(`LightSample ${finiteName}(Point p, vec2 xi) {`);
     lines.push('    LightSample ls;');
 
     if (lights.length === 1) {
@@ -191,6 +238,26 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[]): str
 
     lines.push('    return ls;');
     lines.push('}');
+
+    if (envSamplable) {
+        lines.push('');
+        lines.push('// Two-stage selection (env-as-light D3): stage 0 picks env vs the finite set;');
+        lines.push('// pdfs scale by the SAME uniform on both sides (and in lighting_pdf and the');
+        lines.push("// miss-MIS weight) — the byte-match invariant extends across the stage.");
+        lines.push('LightSample lighting_sample(Point p, vec2 xi) {');
+        lines.push('    if (xi.x < u_envSelectProb) {');
+        lines.push('        vec2 env_xi = vec2(clamp(xi.x / u_envSelectProb, 0.0, 0.9999999), xi.y);');
+        lines.push('        LightSample ls = environment_sample(p, env_xi);');
+        lines.push('        ls.pdf *= u_envSelectProb;');
+        lines.push('        return ls;');
+        lines.push('    }');
+        lines.push('    float finite_x = clamp((xi.x - u_envSelectProb) / (1.0 - u_envSelectProb), 0.0, 0.9999999);');
+        lines.push('    LightSample ls = lighting_sample_finite(p, vec2(finite_x, xi.y));');
+        lines.push('    ls.pdf *= (1.0 - u_envSelectProb);');
+        lines.push('    return ls;');
+        lines.push('}');
+    }
+
     return lines.join('\n');
 }
 
@@ -202,13 +269,17 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[]): str
 // carry no arm; unknown ids return 0 (weight → 1 on the BSDF side, conservative).
 // ============================================================================
 
-function generateLightingPdf(lights: PlannedLight[], selectPdf: number[]): string {
+function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean): string {
     const lines: string[] = ['// Generated MIS pdf query (§6.1) — must mirror lighting_sample exactly'];
+    // With a samplable env, every finite light's selection pdf carries the stage-0 factor —
+    // exactly what the sampler applied. The env itself has no arm here (never hit; the miss
+    // branch queries u_envSelectProb * environment_pdf directly, reference §8 line 3).
+    const stage0 = envSamplable ? ' * (1.0 - u_envSelectProb)' : '';
     lines.push('float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit) {');
     for (let i = 0; i < lights.length; i++) {
         const l = lights[i];
         if (l.regionId === undefined) continue;   // delta: not hittable, never queried
-        const select = formatFloat(lights.length === 1 ? 1.0 : selectPdf[i]);
+        const select = formatFloat(lights.length === 1 ? 1.0 : selectPdf[i]) + stage0;
         lines.push(`    if (light_id == ${l.id}) {`);
         if (l.kind === 'quad') {
             const n = quadNormal(l.edge1!, l.edge2!);

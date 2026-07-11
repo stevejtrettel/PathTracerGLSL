@@ -45,9 +45,28 @@ export interface AmbientSpaceDescription {
 
 export type EnvironmentDescription =
     | { type: 'none' }
-    | { type: 'constant'; color: Vec3; intensity?: number }
-    | { type: 'procedural'; glsl: GlslExpression }   // tabulated — not yet implemented
-    | { type: 'image'; url: string };                // tabulated — not yet implemented
+    | {
+          type: 'constant';
+          color: Vec3;
+          intensity?: number;
+          /** T3 opt-in (default FALSE — preserves pre-T3 witnesses): uniform-sphere NEE. */
+          sampleAsLight?: boolean;
+          /** P(select env) in NEE when finite samplable lights coexist. Default 0.5 (plan O1). */
+          selectWeight?: number;
+      }
+    | { type: 'procedural'; glsl: GlslExpression }   // tabulated — not yet implemented (T4)
+    | {
+          type: 'image';
+          /** Radiance .hdr file (equirect). Loaded by the app into the extern registry. */
+          url: string;
+          intensity?: number;
+          /** Rotation about +Y in radians (live uniform; the chart applies it). */
+          rotation?: number;
+          /** T3: joins NEE/MIS via the CDF machinery. Default TRUE for tabulated envs. */
+          sampleAsLight?: boolean;
+          /** P(select env) in NEE when finite samplable lights coexist. Default 0.5 (plan O1). */
+          selectWeight?: number;
+      };
 
 // --- Objects ---
 

@@ -42,9 +42,11 @@ export function validate(
             .add();
     }
 
-    if (strategy.transport.directLighting !== 'none' && features.lighting.totalLightCount === 0) {
+    if (strategy.transport.directLighting !== 'none'
+        && features.lighting.totalLightCount === 0
+        && !features.environment.samplable) {
         bag.error('incompatible-options',
-            `Direct lighting '${strategy.transport.directLighting}' requested but scene has no lights`)
+            `Direct lighting '${strategy.transport.directLighting}' requested but scene has no lights (a samplable environment counts — image env, or constant with sampleAsLight: true)`)
             .add();
     }
 

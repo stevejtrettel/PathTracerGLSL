@@ -116,7 +116,24 @@ Radiance transport_trace(Ray ray) {
 #else
         if (!scene_intersect(current_ray, hit)) {
 #endif
+#if defined(ENV_SAMPLABLE) && defined(ENABLE_NEE)
+            // Reference §5 annotation 3 + §8 line 3: a samplable environment reached by a
+            // non-delta bounce was already counted by NEE at the previous vertex — weight 0
+            // under NEE-only, the power heuristic under MIS. prev_was_delta inits true, so
+            // camera-direct misses always show the sky at full weight. The selection factor
+            // (u_envSelectProb) mirrors lighting_sample's stage 0 — total pdf symmetry (§6.1).
+            float w_env = 1.0;
+            if (!prev_was_delta) {
+#ifdef ENABLE_MIS
+                w_env = power_heuristic(prev_bsdf_pdf, u_envSelectProb * environment_pdf(current_ray.direction));
+#else
+                w_env = 0.0;
+#endif
+            }
+            radiance += throughput * w_env * environment_radiance(current_ray.direction);
+#else
             radiance += throughput * environment_radiance(current_ray.direction);
+#endif
             break;
         }
 

@@ -60,6 +60,14 @@ describe('validateCompiledRenderer — passes', () => {
         const r = validRenderer(); r.pipeline.passes[0].inputs = { textures: { u_x: 'ghost' } };
         expect(errorCodes(r)).toContain('pass-invalid-texture');
     });
+    it("accepts 'extern:' texture refs (reserved prefix, resolved by the engine registry at bind)", () => {
+        const r = validRenderer(); r.pipeline.passes[0].inputs = { textures: { u_envMap: 'extern:env_map' } };
+        expect(errorCodes(r)).not.toContain('pass-invalid-texture');
+    });
+    it('flags an empty extern name', () => {
+        const r = validRenderer(); r.pipeline.passes[0].inputs = { textures: { u_envMap: 'extern:' } };
+        expect(errorCodes(r)).toContain('pass-invalid-texture');
+    });
     it('flags MRT outputs spanning multiple base framebuffers', () => {
         const r = validRenderer(); r.pipeline.passes[0].output = ['accumulation_current:0', 'screen:1'];
         expect(errorCodes(r)).toContain('pass-mrt-multiple-buffers');
