@@ -76,6 +76,15 @@ function validateStructure(
     if (renderer.pipeline.passes.length === 0) {
         bag.error('renderer-no-passes', 'CompiledRenderer must have at least one render pass').add();
     }
+
+    // §9 rule 1: exactly one 'screen' framebuffer. Zero would surface as a mid-frame
+    // "Resource not found: screen" in the ResourceManager; two is ambiguous output.
+    const screenCount = renderer.pipeline.framebuffers.filter(fb => fb.type === 'screen').length;
+    if (screenCount !== 1) {
+        bag.error('pipeline-screen-count',
+            `Pipeline declares ${screenCount} framebuffers of type 'screen' — §9 requires exactly one`)
+            .add();
+    }
 }
 
 /**
@@ -152,6 +161,24 @@ function validateSwaps(
     bag: DiagnosticBag
 ): void {
     for (const swap of swaps) {
+        // 'rotate' is a locked contract type (§2/§12) the engine does not implement — the
+        // ResourceManager throws MID-FRAME on the first renderFrame(). Reject at load instead.
+        if (swap.type === 'rotate') {
+            bag.error('swap-rotate-unsupported',
+                "SwapInstruction type 'rotate' is not implemented by the engine yet — temporal history queues are deferred")
+                .add();
+            continue;
+        }
+
+        // §9 rule 4: 'swap' requires exactly one buffer of type 'double_buffer'. A misdeclared
+        // swap silently no-ops at runtime (executeSwap skips wrong types) — the accumulation
+        // never advances and the image renders frame 1 forever, so this is an ERROR, not a warning.
+        if (swap.type === 'swap' && swap.buffers.length !== 1) {
+            bag.error('swap-not-double-buffer',
+                `Swap instruction lists ${swap.buffers.length} buffers — §9 requires exactly one double_buffer per swap`)
+                .add();
+        }
+
         for (const bufferId of swap.buffers) {
             if (!framebufferIds.has(bufferId)) {
                 bag.error('swap-invalid-buffer',
@@ -159,12 +186,10 @@ function validateSwaps(
                     .add();
             }
 
-            // Warn if swapping non-double_buffer
             const config = framebufferConfigs.get(bufferId);
             if (config && swap.type === 'swap' && config.type !== 'double_buffer') {
-                bag.warning('swap-not-double-buffer',
-                    `Swap on '${bufferId}' but it's type '${config.type}', not 'double_buffer'`)
-                    .suggest('Swap operations are typically used with double_buffer framebuffers')
+                bag.error('swap-not-double-buffer',
+                    `Swap on '${bufferId}' but it's type '${config.type}', not 'double_buffer' — the swap would silently no-op and accumulation would never advance`)
                     .add();
             }
         }

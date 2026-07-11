@@ -53,7 +53,6 @@ export const analyticStrategy: RenderStrategy = {
         maxBounces: 8,
         directLighting: 'nee',
         russianRoulette: { enabled: true, startDepth: 3 },
-        samplesPerFrame: 1,
     },
     camera: { type: 'pinhole', fov: 0.8 },
     accumulation: { type: 'average' },

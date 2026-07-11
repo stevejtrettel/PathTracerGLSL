@@ -52,7 +52,6 @@ export const etaStrategy: RenderStrategy = {
         maxBounces: 4,
         directLighting: 'none',
         russianRoulette: { enabled: false, startDepth: 0 }, // witness protocol: RR off
-        samplesPerFrame: 1,
     },
     camera: { type: 'pinhole', fov: 0.6 },
     accumulation: { type: 'average' },
@@ -111,7 +110,6 @@ export const submergedStrategy: RenderStrategy = {
         maxBounces: 12, // TIR chains inside the sphere; paths that TIR at the pool walls just die
         directLighting: 'none',
         russianRoulette: { enabled: false, startDepth: 0 }, // witness protocol: RR off
-        samplesPerFrame: 1,
     },
     camera: { type: 'pinhole', fov: 0.7 },
     accumulation: { type: 'average' },
@@ -185,7 +183,6 @@ export const glassStrategy: RenderStrategy = {
         maxBounces: 12,
         directLighting: 'nee',
         russianRoulette: { enabled: true, startDepth: 3 },
-        samplesPerFrame: 1,
     },
     camera: { type: 'pinhole', fov: 0.8 },
     accumulation: { type: 'average' },

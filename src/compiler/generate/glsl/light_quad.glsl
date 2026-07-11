@@ -4,6 +4,8 @@
 // the hit-side region_to convention agrees. n_l and area are precompiled constants.
 // Pitfall 1: radiance carries NO 1/d² — the falloff IS the d²/(A·cosθ) measure (double-falloff bug).
 // Pitfall 2: back-face samples return pdf = 0 (the old GLSL's pdf=1,radiance=0 poisons MIS).
+// METRIC EXEMPTION (trace-loop contract): raw dot() on world-space physical directions is
+// deliberate — light samplers are Euclidean closed forms; curved spaces get new bodies (§5.3).
 
 LightSample quad_light_sample(Point corner, vec3 edge1, vec3 edge2, Direction n_l, float area, Spectrum Le, Point p, vec2 xi) {
     Point q = corner + xi.x * edge1 + xi.y * edge2;

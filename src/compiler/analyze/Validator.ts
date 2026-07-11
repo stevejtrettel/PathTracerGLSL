@@ -1,9 +1,16 @@
 // compiler/analyze/Validator.ts
 
 import type { SceneFeatures } from './types.js';
-import type { SceneDescription, RenderStrategy } from '../types.js';
-import { isGlslExpression } from '../types.js';
+import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
+import { isGlslExpression, isValueParam } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
+
+/** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
+const MIN_QUAD_AREA = 1e-8;
+/** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
+const MAX_PHASE_G = 0.99;
+/** Models whose interaction_surface_emission dispatch reads mp.emission (the phantom-light rule). */
+const EMITTING_MODELS = new Set<string>(['lambert']);
 
 /**
  * Validate scene + strategy against current compiler capabilities.
@@ -41,23 +48,70 @@ export function validate(
             .add();
     }
 
-    // --- Area lights (impl-plan-area-lights A0) ---
+    // --- Area lights (impl-plan-area-lights A0; thresholds hardened per the July 2026 audit) ---
     for (let i = 0; i < scene.lights.length; i++) {
         const light = scene.lights[i];
         if (light.kind === 'quad') {
-            const [ax, ay, az] = light.edge1;
-            const [bx, by, bz] = light.edge2;
-            const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
-            if (cx * cx + cy * cy + cz * cz <= 0) {
+            // Near-degenerate quads (area ~1e-20) pass an exact-zero test but produce Inf pdfs
+            // in the sampler/lighting_pdf — require a real minimum area.
+            if (quadCrossSq(light.edge1, light.edge2) < MIN_QUAD_AREA * MIN_QUAD_AREA) {
                 bag.error('invalid-setting',
-                    `Light ${i}: quad edges are parallel or zero — the quad is degenerate (|edge1 × edge2| = 0)`)
+                    `Light ${i}: quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= ${MIN_QUAD_AREA}`)
                     .add();
             }
         }
         if (light.kind === 'sphere' && light.radius <= 0) {
             bag.error('invalid-setting', `Light ${i}: sphere light radius must be > 0`).add();
         }
+        // Negative radiance is non-physical: pt sees negative energy on every hit while the
+        // power CDF floors at ~0 so NEE almost never samples it — the strategies diverge.
+        if (light.intensity < 0) {
+            bag.error('invalid-setting', `Light ${i}: intensity must be >= 0 (negative radiance diverges pt vs pt-nee)`).add();
+        }
+        const color = 'color' in light ? light.color : undefined;
+        if (color !== undefined && color.some((c) => c < 0)) {
+            bag.error('invalid-setting', `Light ${i}: color components must be >= 0`).add();
+        }
     }
+
+    // --- Analytic OBJECT degeneracy (audit C1): the light checks above never covered analytic
+    // quad/sphere objects, which reach codegen where a zero cross product is NaN → a raw
+    // formatter throw instead of a diagnostic (and near-zero areas make Inf pdfs if emissive).
+    for (let i = 0; i < scene.objects.length; i++) {
+        const obj = scene.objects[i];
+        if (obj.kind !== 'analytic') continue;
+        const shape = obj.shape;
+        if (shape.type === 'quad') {
+            const e1 = shape.parameters.edge1, e2 = shape.parameters.edge2;
+            if (!isVec3(e1) || !isVec3(e2) || !isVec3(shape.parameters.corner)) {
+                bag.error('invalid-setting',
+                    `Object ${i}: analytic quad requires corner/edge1/edge2 as [x,y,z] arrays`)
+                    .withOriginal('scene', [`objects[${i}]`])
+                    .add();
+            } else if (quadCrossSq(e1 as [number, number, number], e2 as [number, number, number]) < MIN_QUAD_AREA * MIN_QUAD_AREA) {
+                bag.error('invalid-setting',
+                    `Object ${i}: analytic quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= ${MIN_QUAD_AREA}`)
+                    .withOriginal('scene', [`objects[${i}]`])
+                    .add();
+            }
+        }
+        if (shape.type === 'sphere') {
+            const r = shape.parameters.radius;
+            if (typeof r !== 'number' || r <= 0) {
+                bag.error('invalid-setting', `Object ${i}: analytic sphere radius must be a number > 0`)
+                    .withOriginal('scene', [`objects[${i}]`])
+                    .add();
+            }
+        }
+    }
+
+    // --- Finiteness (audit C6): a NaN/Inf anywhere in the scene reaches the GLSL number
+    // formatter, which throws a raw unmapped Error. One central sweep; the formatter throw
+    // stays as an unreachable backstop.
+    validateFinite(scene.objects, 'objects', bag);
+    validateFinite(scene.materials, 'materials', bag);
+    validateFinite(scene.lights, 'lights', bag);
+    validateFinite(scene.environment, 'environment', bag);
 
     // sampleAsLight (§6.2 / V1-C2): explicit true demands an analytically samplable emitter —
     // an analytic quad/sphere object with CONSTANT nonzero emission. SDF emitters stay
@@ -77,6 +131,38 @@ export function validate(
             bag.error('invalid-setting',
                 `Material '${name}': sampleAsLight requires CONSTANT nonzero emission in v1 — {param}/procedural emitter power needs the light-registry accessor (deferred)`)
                 .add();
+        }
+    }
+
+    // --- Emission model discipline (audit: the phantom-light rule) ---
+    // The registry admits emitters by shape + constant nonzero emission, but only models whose
+    // surface-emission dispatch actually reads mp.emission may back a samplable light — a
+    // dielectric/'none' "emitter" would receive NEE energy that BSDF paths can never see, and
+    // pt vs pt-nee would converge to different images.
+    for (const [name, mat] of Object.entries(scene.materials)) {
+        if (name.startsWith('__light_')) {
+            bag.error('invalid-setting',
+                `Material '${name}': the '__light_' name prefix is reserved for desugared area-light materials — a user material with this prefix would be silently skipped by the light registry`)
+                .add();
+        }
+        const e = mat.emission;
+        const nonzeroEmission = typeof e === 'number' ? e > 0 : Array.isArray(e) ? e.some((c) => c > 0) : false;
+        const negativeEmission = typeof e === 'number' ? e < 0 : Array.isArray(e) ? e.some((c) => c < 0) : false;
+        if (negativeEmission) {
+            bag.error('invalid-setting', `Material '${name}': emission components must be >= 0`).add();
+        }
+        if (nonzeroEmission && !EMITTING_MODELS.has(mat.model)) {
+            const wouldRegister = mat.sampleAsLight !== false && scene.objects.some((o) =>
+                o.kind === 'analytic' && (o.shape.type === 'quad' || o.shape.type === 'sphere') && o.material === name);
+            if (wouldRegister) {
+                bag.error('invalid-setting',
+                    `Material '${name}': model '${mat.model}' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use model 'lambert' (albedo 0 for a pure emitter) or set sampleAsLight: false`)
+                    .add();
+            } else {
+                bag.warning('invalid-setting',
+                    `Material '${name}': emission is ignored for model '${mat.model}' — its emission dispatch returns zero (only lambert emits in v1)`)
+                    .add();
+            }
         }
     }
 
@@ -102,6 +188,22 @@ export function validate(
                         `Material '${name}': medium.${prop} is a GLSL expression — procedural media not yet supported (V1-C1); declare a majorant when they are (§3.5). Use a constant or {param}`)
                         .add();
                 }
+            }
+            // |g| = 1 exactly is deterministic NaN in the HG sampler (d = 0 at the sampled pole)
+            // → NaN prev_bsdf_pdf → NaN frame under MIS. Require a real margin.
+            const g = mat.medium.phase_g;
+            const gParam = g !== undefined && !isGlslExpression(g) && isValueParam(g) ? g : undefined;
+            const gConst = typeof g === 'number' ? g
+                : gParam !== undefined && typeof gParam.default === 'number' ? gParam.default : undefined;
+            if (gConst !== undefined && Math.abs(gConst) > MAX_PHASE_G) {
+                bag.error('invalid-setting',
+                    `Material '${name}': medium.phase_g = ${gConst} — |g| must be <= ${MAX_PHASE_G} (|g| = 1 NaN-poisons the frame)`)
+                    .add();
+            }
+            if (gParam !== undefined && ((gParam.min !== undefined && gParam.min < -MAX_PHASE_G) || (gParam.max !== undefined && gParam.max > MAX_PHASE_G))) {
+                bag.warning('invalid-setting',
+                    `Material '${name}': medium.phase_g parameter range exceeds ±${MAX_PHASE_G} — runtime values near |g| = 1 produce NaN`)
+                    .add();
             }
         }
         if (mat.model === 'none' && mat.medium === undefined) {
@@ -200,4 +302,40 @@ export function validate(
                 .add();
         }
     }
+}
+
+// ============================================================================
+// Helpers (audit-hardening H1)
+// ============================================================================
+
+function quadCrossSq(e1: Vec3, e2: Vec3): number {
+    const [ax, ay, az] = e1;
+    const [bx, by, bz] = e2;
+    const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+    return cx * cx + cy * cy + cz * cz;
+}
+
+function isVec3(v: unknown): v is Vec3 {
+    return Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number');
+}
+
+/**
+ * Recursive finiteness sweep: every number reaching codegen must be finite, or the GLSL
+ * number formatter throws a raw unmapped Error. Strings/booleans pass through; typed arrays
+ * (mesh data) are skipped — meshes are rejected by their own rule.
+ */
+function validateFinite(value: unknown, path: string, bag: DiagnosticBag): void {
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) {
+            bag.error('invalid-setting', `Scene value '${path}' is not finite (${value})`).add();
+        }
+        return;
+    }
+    if (value === null || typeof value !== 'object') return;
+    if (ArrayBuffer.isView(value)) return;
+    if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) validateFinite(value[i], `${path}[${i}]`, bag);
+        return;
+    }
+    for (const [k, v] of Object.entries(value)) validateFinite(v, `${path}.${k}`, bag);
 }

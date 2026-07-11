@@ -27,10 +27,14 @@ function surfaceMaterials(materials: PlannedMaterial[]): PlannedMaterial[] {
     return materials.filter((m) => m.model !== 'none');
 }
 
-/** Emissive at compile time: nonzero constant, or {param}/expression (may be nonzero at runtime). */
+/**
+ * Emissive at compile time: positive constant, or {param}/expression (may be nonzero at runtime).
+ * `> 0` (not `!== 0`) so the gate can never disagree with the emission lookup, which only
+ * fetches positive constants — negatives are Validator-rejected anyway (audit H1.3).
+ */
 function isEmissive(mat: PlannedMaterial): boolean {
     if (isValueParam(mat.emission) || isGlslExpression(mat.emission)) return true;
-    return mat.emission.some((c) => c !== 0);
+    return mat.emission.some((c) => c > 0);
 }
 
 /** Scattering at compile time: σ_s nonzero constant, or {param}/expression-driven. */

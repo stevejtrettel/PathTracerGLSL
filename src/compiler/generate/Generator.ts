@@ -19,7 +19,7 @@ export function generate(
     // shaders, uniform bindings, and parameter metadata are all built from.
     const merged = collectFeatures(plan, bag);
 
-    const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId);
+    const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.tonemap);
     const pipeline = buildPipeline(rendererId, plan);
     const uniforms = buildUniforms(merged.uniforms);
     const parameters = merged.parameters;

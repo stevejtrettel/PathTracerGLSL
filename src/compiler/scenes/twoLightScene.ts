@@ -65,7 +65,6 @@ const baseTransport = {
     directLighting: 'nee' as const,
     // RR off: keeps the power-vs-uniform variance comparison a fair, unbiased A/B.
     russianRoulette: { enabled: false, startDepth: 0 },
-    samplesPerFrame: 1,
 };
 
 const baseView = {

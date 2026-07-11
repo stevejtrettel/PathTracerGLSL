@@ -75,9 +75,23 @@ describe('validateCompiledRenderer — swaps / exports / uniforms', () => {
         const r = validRenderer(); r.pipeline.postFrame!.swaps = [{ type: 'swap', buffers: ['ghost'] }];
         expect(errorCodes(r)).toContain('swap-invalid-buffer');
     });
-    it('warns when swapping a non-double_buffer', () => {
+    it('rejects swapping a non-double_buffer (§9 rule 4 — a misdeclared swap silently no-ops at runtime)', () => {
         const r = validRenderer(); r.pipeline.postFrame!.swaps = [{ type: 'swap', buffers: ['screen'] }];
-        expect(warningCodes(r)).toContain('swap-not-double-buffer');
+        expect(errorCodes(r)).toContain('swap-not-double-buffer');
+    });
+    it("rejects the unimplemented 'rotate' swap at validation instead of mid-frame", () => {
+        const r = validRenderer(); r.pipeline.postFrame!.swaps = [{ type: 'rotate', buffers: ['accumulation'] }];
+        expect(errorCodes(r)).toContain('swap-rotate-unsupported');
+    });
+    it('rejects a swap listing more than one buffer (§9 rule 4: exactly one double_buffer)', () => {
+        const r = validRenderer(); r.pipeline.postFrame!.swaps = [{ type: 'swap', buffers: ['accumulation', 'accumulation'] }];
+        expect(errorCodes(r)).toContain('swap-not-double-buffer');
+    });
+    it("requires exactly one 'screen' framebuffer (§9 rule 1)", () => {
+        const r = validRenderer();
+        r.pipeline.framebuffers = r.pipeline.framebuffers.filter((fb) => fb.type !== 'screen');
+        r.pipeline.passes = r.pipeline.passes.filter((p) => p.output !== 'screen');
+        expect(errorCodes(r)).toContain('pipeline-screen-count');
     });
     it('flags an export from an unknown buffer', () => {
         const r = validRenderer(); r.exportTargets = { hdr: { bufferId: 'ghost', format: 'float' } };

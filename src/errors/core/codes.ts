@@ -262,7 +262,17 @@ export const VALIDATION_ERRORS = {
     'swap-not-double-buffer': {
         code: 'swap-not-double-buffer',
         category: 'validation' as const,
-        description: 'Swap targets a framebuffer that is not a double_buffer'
+        description: 'Swap targets a framebuffer that is not a double_buffer (§9 rule 4)'
+    },
+    'swap-rotate-unsupported': {
+        code: 'swap-rotate-unsupported',
+        category: 'validation' as const,
+        description: "SwapInstruction type 'rotate' is a locked contract type the engine does not implement yet"
+    },
+    'pipeline-screen-count': {
+        code: 'pipeline-screen-count',
+        category: 'validation' as const,
+        description: "Pipeline must declare exactly one framebuffer of type 'screen' (§9 rule 1)"
     },
     'export-invalid-buffer': {
         code: 'export-invalid-buffer',

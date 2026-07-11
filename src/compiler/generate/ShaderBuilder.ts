@@ -1,7 +1,7 @@
 // compiler/generate/ShaderBuilder.ts
 
 import type { ShaderProgram } from '../types.js';
-import type { PlannedUniform } from '../plan/types.js';
+import type { PlannedUniform, ProgramDescription } from '../plan/types.js';
 import type { ShaderBlock, BlockMapping } from './ShaderIR.js';
 import { assembleBlocks } from './ShaderIR.js';
 import type { MergedContributions } from './features/merge.js';
@@ -9,13 +9,14 @@ import type { MergedContributions } from './features/merge.js';
 // GLSL owned by the Generator itself (not a swappable feature)
 import fullscreenVertGLSL from './glsl/fullscreen.vert.glsl?raw';
 import tonemapReinhardGLSL from './glsl/tonemap_reinhard.glsl?raw';
+import tonemapNoneGLSL from './glsl/tonemap_none.glsl?raw';
 
 export interface ShaderBuildResult {
     shaders: Map<string, ShaderProgram>;
     sourceMaps: Map<string, BlockMapping[]>;
 }
 
-export function buildShaders(merged: MergedContributions, rendererId: string): ShaderBuildResult {
+export function buildShaders(merged: MergedContributions, rendererId: string, tonemap: ProgramDescription['tonemap']): ShaderBuildResult {
     const shaders = new Map<string, ShaderProgram>();
     const sourceMaps = new Map<string, BlockMapping[]>();
 
@@ -35,7 +36,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string): S
     sourceMaps.set(mainShaderId, ptAssembled.blockMap);
 
     // Display fragment
-    const displayAssembled = assembleBlocks(buildDisplayBlocks());
+    const displayAssembled = assembleBlocks(buildDisplayBlocks(tonemap));
     const displayShaderId = `${rendererId}-display`;
     shaders.set(displayShaderId, {
         vertex: vertexAssembled.source,
@@ -62,10 +63,22 @@ function buildPathtracerBlocks(merged: MergedContributions): ShaderBlock[] {
 // Display Fragment Shader (block assembly)
 // ============================================================================
 
-function buildDisplayBlocks(): ShaderBlock[] {
+function buildDisplayBlocks(tonemap: ProgramDescription['tonemap']): ShaderBlock[] {
+    // The display shader is plan-driven (audit C2: it used to emit Reinhard unconditionally,
+    // silently ignoring `display: { type: 'none' }` and `exposure`). Exposure is strategy
+    // data, so it bakes as a constant — a strategy change recompiles anyway.
+    const exposure = tonemap.type === 'none' ? 1.0 : (tonemap.exposure ?? 1.0);
+    const header = [
+        FRAGMENT_PREAMBLE,
+        '',
+        'out vec4 fragColor;',
+        `#define DISPLAY_EXPOSURE ${exposure.toPrecision(8)}`,
+    ].join('\n');
     return [
-        { origin: 'generated:display-header', source: FRAGMENT_PREAMBLE + '\n\nout vec4 fragColor;' },
-        { origin: 'glsl/tonemap_reinhard.glsl', source: tonemapReinhardGLSL },
+        { origin: 'generated:display-header', source: header },
+        tonemap.type === 'none'
+            ? { origin: 'glsl/tonemap_none.glsl', source: tonemapNoneGLSL }
+            : { origin: 'glsl/tonemap_reinhard.glsl', source: tonemapReinhardGLSL },
     ];
 }
 

@@ -60,7 +60,7 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         }
 
         // Check for procedural properties (GLSL expressions)
-        for (const prop of [mat.albedo, mat.roughness, mat.metallic, mat.ior, mat.emission]) {
+        for (const prop of [mat.albedo, mat.roughness, mat.ior, mat.emission]) {
             if (isGlslExpression(prop)) {
                 hasProcedural = true;
                 break;

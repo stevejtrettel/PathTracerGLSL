@@ -9,7 +9,7 @@ import { analyticMinimal, mixedScene, analyticStrategy } from '../../src/compile
 import { etaScene, etaStrategy, submergedScene, submergedStrategy, cornellGlass, analyticGlass, glassStrategy } from '../../src/compiler/scenes/dielectricScenes.js';
 import { slabScene, slabStrategy, fogcubeScene, fogcubeStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../../src/compiler/scenes/mediaScenes.js';
 import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistStrategy } from '../../src/compiler/scenes/demoScenes.js';
-import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaMisStrategy, orbScene, orbNeeStrategy } from '../../src/compiler/scenes/areaLightScenes.js';
+import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy, fogPanel, orbScene, orbNeeStrategy, orbPtStrategy } from '../../src/compiler/scenes/areaLightScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -91,6 +91,17 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     ['cornell-area + pt-mis', cornellArea, cornellAreaMisStrategy],
     ['cornell-area-glass + pt-mis', cornellAreaGlass, cornellAreaMisStrategy],
     ['fog-area + pt-mis', fogArea, fogAreaMisStrategy],
+    // Audit H6.3: the previously-uncovered registry pairs (exactly the strategies the suite
+    // gallery runs). fog-area+pt-nee is a genuinely distinct define combination — medium NEE
+    // toward a quad WITHOUT ENABLE_MIS; the rest complete the glass/fog/orb strategy matrix.
+    ['fog-area + pt-nee', fogArea, fogAreaNeeStrategy],
+    ['fog-area + pt', fogArea, fogAreaPtStrategy],
+    ['cornell-area-glass + pt-nee', cornellAreaGlass, cornellAreaNeeStrategy],
+    ['cornell-area-glass + pt', cornellAreaGlass, cornellAreaPtStrategy],
+    ['orb + pt', orbScene, orbPtStrategy],
+    // Audit H2 witness: diffuse zero-thickness quad in fog → the scene_region_thin probe path.
+    ['fog-panel + pt-nee', fogPanel, fogAreaNeeStrategy],
+    ['fog-panel + pt', fogPanel, fogAreaPtStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

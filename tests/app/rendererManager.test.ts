@@ -7,7 +7,7 @@ import { fakeEngine, fakeCompiler, asEngine, type FakeEngine } from './fakes.js'
 import type { ICompiler } from '../../src/compiler/types.js';
 
 const scene = { id: 'scn', ambientSpace: { type: 'euclidean' as const }, objects: [], materials: {}, lights: [] };
-const stratA = { id: 'a', transport: { maxBounces: 1, directLighting: 'none' as const, russianRoulette: { enabled: false, startDepth: 0 }, samplesPerFrame: 1 }, camera: { type: 'pinhole' as const, fov: 0.8 }, accumulation: { type: 'average' as const }, display: { type: 'reinhard' as const } };
+const stratA = { id: 'a', transport: { maxBounces: 1, directLighting: 'none' as const, russianRoulette: { enabled: false, startDepth: 0 } }, camera: { type: 'pinhole' as const, fov: 0.8 }, accumulation: { type: 'average' as const }, display: { type: 'reinhard' as const } };
 
 async function initialized(engine: FakeEngine) {
     const compiler = fakeCompiler();

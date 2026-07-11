@@ -8,7 +8,10 @@ Ray camera_generateRay(vec2 pixel, vec2 xi) {
     ndc.x *= aspect;
 
     vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
-    vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+    // Degenerate up-reference guard: forward ∥ ±Y makes cross(forward, +Y) zero-length —
+    // normalize(0) is NaN and poisons every ray of the frame. Fall back to +Z as reference.
+    vec3 up_ref = abs(forward.y) > 0.999999 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+    vec3 right = normalize(cross(forward, up_ref));
     vec3 up = cross(right, forward);
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);

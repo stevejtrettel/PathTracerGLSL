@@ -104,8 +104,9 @@ function quadArea(l: PlannedLight): number {
 
 /** Emitted power (watts-ish) for CDF selection — AREA-AWARE (pitfall 6: luminance-only
  *  weighting mis-prioritizes a big dim panel vs a tiny bright one). Formulas match pbrt's
- *  PowerLightSampler: point 4π·I, one-sided quad π·A·Le, sphere π·4πr²·Le. */
-function lightPower(l: PlannedLight): number {
+ *  PowerLightSampler: point 4π·I, one-sided quad π·A·Le, sphere π·4πr²·Le.
+ *  Exported for the H6 invariant tests. */
+export function lightPower(l: PlannedLight): number {
     const avg = spectrumAverage(l.color.map((c) => c * l.intensity));
     switch (l.kind) {
         case 'point': return Math.max(1e-8, 4 * Math.PI * avg);
@@ -131,8 +132,9 @@ function sampleCall(l: PlannedLight, xiExpr: string): string {
     throw new Error(`lighting: unsupported light kind '${l.kind}'`);
 }
 
-/** Compile-time selection pdfs — shared by lighting_sample and lighting_pdf. */
-function computeSelectPdf(lights: PlannedLight[], selection: 'uniform' | 'power'): number[] {
+/** Compile-time selection pdfs — shared by lighting_sample and lighting_pdf.
+ *  Exported for the H6 invariant tests. */
+export function computeSelectPdf(lights: PlannedLight[], selection: 'uniform' | 'power'): number[] {
     if (lights.length === 0) return [];
     const weights = lights.map((l) => (selection === 'uniform' ? 1 : lightPower(l)));
     const total = weights.reduce((a, b) => a + b, 0);

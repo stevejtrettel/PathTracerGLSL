@@ -43,7 +43,6 @@ export const cornellAreaNeeStrategy: RenderStrategy = {
         maxBounces: 10,
         directLighting: 'nee',
         russianRoulette: { enabled: true, startDepth: 3 },
-        samplesPerFrame: 1,
     },
     camera: { type: 'pinhole', fov: { param: 'camera.fov', default: 0.8, min: 0.3, max: 1.5 } },
     accumulation: { type: 'average' },
@@ -125,6 +124,36 @@ export const fogAreaPtStrategy: RenderStrategy = {
 };
 
 // ---------------------------------------------------------------------------
+// fog-panel — the audit-H2 witness: a user-authored DIFFUSE quad (nonzero albedo, not a
+// light) floating mid-fog. Paths bounce off BOTH faces; before the back-face region_from
+// fix, every back-face bounce fabricated region_from = the quad's own region, the §4.4
+// self-heal set current_medium to it, and one segment behind the panel went un-fogged —
+// pt vs pt-nee diverge and the fog shows a subtle dry rim behind the panel. With the fix
+// (scene_region_thin probe) the pair must converge. Desugared __light_n quads can NOT see
+// this (black albedo kills the path at the back-face bounce), hence this dedicated scene.
+// ---------------------------------------------------------------------------
+
+export const fogPanel: SceneDescription = {
+    ...fogArea,
+    id: 'fog-panel',
+    name: 'Foggy Cornell + Diffuse Panel (H2 witness)',
+    objects: [
+        ...fogArea.objects,
+        {
+            kind: 'analytic',
+            // Vertical panel mid-box, normal cross(e1,e2) = +z (toward the camera); the back
+            // face looks into the fog toward the rear wall.
+            shape: { type: 'quad', parameters: { corner: [-0.4, 0.5, 0.2], edge1: [0.8, 0.0, 0.0], edge2: [0.0, 0.8, 0.0] } },
+            material: 'panel',
+        },
+    ],
+    materials: {
+        ...fogArea.materials,
+        panel: { model: 'lambert', albedo: [0.6, 0.6, 0.6] },
+    },
+};
+
+// ---------------------------------------------------------------------------
 // orb — sphere light via the sampleAsLight route
 // ---------------------------------------------------------------------------
 
@@ -176,7 +205,6 @@ export const orbNeeStrategy: RenderStrategy = {
         maxBounces: 12,
         directLighting: 'nee',
         russianRoulette: { enabled: true, startDepth: 3 },
-        samplesPerFrame: 1,
     },
     camera: { type: 'pinhole', fov: 0.8 },
     accumulation: { type: 'average' },

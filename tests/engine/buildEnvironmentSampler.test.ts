@@ -49,6 +49,51 @@ describe('buildEnvironmentSampler', () => {
         expect(reg.registered).toEqual(['env_cdf_cond', 'env_cdf_marg']);
     });
 
+    // Audit H6.4 / env-plan D11: the density must round-trip through CDF DIFFERENCES —
+    // density(i,j) = Δcond(i,j)·Δmarg(j) must equal Y·sinθ/total and sum to exactly 1.
+    // This is the invariant the GLSL environment_pdf will read off the CDF textures
+    // (never recomputing from radiance — the reference's intensity bug class).
+    it('density reconstructed from CDF differences sums to 1 and matches Y·sinθ/total', () => {
+        const W = 5, H = 4;
+        const rgb = new Float32Array(W * H * 3);
+        for (let i = 0; i < rgb.length; i++) rgb[i] = ((i * 37) % 11) * 0.13; // varied, non-negative
+        const res = buildEnvironmentSampler(glStub(), fakeRegistry(), rgb, W, H);
+        const { cond, marg } = res.cdf;
+
+        // Reference density directly from the build weights
+        const refDensity = (i: number, j: number) => {
+            const k = 3 * (j * W + i);
+            const Y = 0.2126 * rgb[k] + 0.7152 * rgb[k + 1] + 0.0722 * rgb[k + 2];
+            return (Math.max(0, Y) * Math.sin(Math.PI * (j + 0.5) / H)) / res.totalWeight;
+        };
+
+        let sum = 0;
+        for (let j = 0; j < H; j++) {
+            const dMarg = marg[j] - (j > 0 ? marg[j - 1] : 0);
+            expect(cond[j * W + W - 1]).toBeCloseTo(1.0, 5);   // every row CDF closes at 1
+            for (let i = 0; i < W; i++) {
+                const dCond = cond[j * W + i] - (i > 0 ? cond[j * W + i - 1] : 0);
+                const density = dCond * dMarg;
+                expect(density).toBeCloseTo(refDensity(i, j), 6);
+                sum += density;
+            }
+        }
+        expect(sum).toBeCloseTo(1.0, 6);
+
+        // Solid-angle pdf form: pdf = density/dΩ with dΩ = (2π/W)(π/H)sinθ — integrates to 1.
+        let integral = 0;
+        for (let j = 0; j < H; j++) {
+            const sinT = Math.sin(Math.PI * (j + 0.5) / H);
+            const dOmega = (2 * Math.PI / W) * (Math.PI / H) * sinT;
+            for (let i = 0; i < W; i++) {
+                const dCond = cond[j * W + i] - (i > 0 ? cond[j * W + i - 1] : 0);
+                const dMarg = marg[j] - (j > 0 ? marg[j - 1] : 0);
+                integral += ((dCond * dMarg) / dOmega) * dOmega;
+            }
+        }
+        expect(integral).toBeCloseTo(1.0, 6);
+    });
+
     // Direct math check of the invariants, independent of the GL upload.
     it('produces a non-decreasing marginal CDF (recomputed reference matches invariant)', () => {
         const W = 3, H = 4;

@@ -54,7 +54,6 @@ export const slabStrategy: RenderStrategy = {
         maxBounces: 4, // one surface event; null crossings don't consume bounces
         directLighting: 'none',
         russianRoulette: { enabled: false, startDepth: 0 }, // witness protocol: RR off
-        samplesPerFrame: 1,
     },
     camera: { type: 'pinhole', fov: 0.6 },
     accumulation: { type: 'average' },
@@ -107,7 +106,6 @@ export const fogcubeStrategy: RenderStrategy = {
         maxBounces: 6,
         directLighting: 'none',
         russianRoulette: { enabled: false, startDepth: 0 },
-        samplesPerFrame: 1,
     },
     camera: { type: 'pinhole', fov: 0.8 },
     accumulation: { type: 'average' },
@@ -149,7 +147,6 @@ export const furnaceScatterStrategy: RenderStrategy = {
         maxBounces: 48, // medium events count (§7.2); truncation shows as mean < 0.4
         directLighting: 'none',
         russianRoulette: { enabled: false, startDepth: 0 }, // witness protocol: RR off
-        samplesPerFrame: 1,
         volumeIntegrator: 'analytic', // explicit (derived would say the same)
     },
     camera: { type: 'pinhole', fov: 1.0 },
@@ -213,7 +210,6 @@ export const hazeNeeStrategy: RenderStrategy = {
         maxBounces: 24,
         directLighting: 'nee',
         russianRoulette: { enabled: true, startDepth: 4 },
-        samplesPerFrame: 1,
         volumeIntegrator: 'analytic',
     },
     camera: { type: 'pinhole', fov: 0.9 },
@@ -227,7 +223,6 @@ export const hazePtStrategy: RenderStrategy = {
         maxBounces: 24,
         directLighting: 'none',
         russianRoulette: { enabled: true, startDepth: 4 },
-        samplesPerFrame: 1,
         volumeIntegrator: 'analytic',
     },
     camera: { type: 'pinhole', fov: 0.9 },

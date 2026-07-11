@@ -26,7 +26,7 @@ vec3 tonemap_reinhard(vec3 x) {
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
     vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance);
+    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
     color = tonemap_reinhard(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);

@@ -3,9 +3,13 @@
 import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
+import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
 
-export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): RenderPlan {
+/** SDF primitives the generator has arms for — anything else must diagnose here, not throw there. */
+const IMPLEMENTED_SDF_TYPES = new Set<string>(['sphere', 'plane', 'box']);
+
+export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag): RenderPlan {
     // --- Assign material IDs (sorted for deterministic ordering) ---
     const materials: PlannedMaterial[] = [];
     let materialIndex = 0;
@@ -46,6 +50,15 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         if (obj.kind === 'sdf') {
             const sdfObj = obj as SDFObject;
             const sdf = sdfObj.sdf as StandardSDF;
+            // Review C7 (partial): torus/capsule/custom exist in the type but have no generator
+            // arm — a raw generator throw is not a diagnostic. Emit one here and skip the object.
+            if (!IMPLEMENTED_SDF_TYPES.has(sdf.type)) {
+                bag.error('missing-geometry',
+                    `SDF primitive '${sdf.type}' is not implemented yet (available: ${[...IMPLEMENTED_SDF_TYPES].join(', ')})`)
+                    .add();
+                objectIndex++;   // keep region ids scene-order stable for the remaining objects
+                continue;
+            }
             const matId = materialIdMap.get(sdfObj.material)!;   // validated by Validator
 
             // Fold center parameter into translation to avoid double-offset. The generated

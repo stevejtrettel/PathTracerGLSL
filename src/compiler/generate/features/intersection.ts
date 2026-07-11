@@ -50,7 +50,10 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects) });
 
     // The top-level dispatcher, combining only the backends present (declared after both).
-    blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic) });
+    // Zero-thickness regions (analytic quads): their SDF never claims containment, so the
+    // dispatcher's owner-covers-own-side shortcut is invalid for them (audit H2).
+    const thinRegions = plan.analyticObjects.filter((o) => o.shapeType === 'quad').map((o) => o.index);
+    blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic, thinRegions) });
 
     return { ...emptyContribution(), blocks };
 }
@@ -328,8 +331,19 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
 // residual (EPS_INTERFACE = 10× MARCH_EPSILON). Entering ⇒ region_to = owner; exiting ⇒
 // region_from = owner and the frame flips so n faces region_from (§4.1).
 
-function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean): string {
+function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, thinRegions: number[]): string {
     const lines: string[] = ['// Generated scene_intersect dispatcher'];
+
+    // Zero-thickness owners (quads) never claim containment in scene_region_at, so
+    // "owner covers its own side" is FALSE for them: a back-face hit must probe the entering
+    // side instead of fabricating region_from = owner — the fabricated value feeds the §4.4
+    // self-heal and drops one segment of medium attenuation behind the quad (audit H2).
+    if (thinRegions.length > 0) {
+        lines.push('bool scene_region_thin(int region) {');
+        lines.push(`    return ${thinRegions.map((r) => `region == ${r}`).join(' || ')};`);
+        lines.push('}');
+        lines.push('');
+    }
 
     // scene_intersect — hit.t is the running nearest (a Hit is valid only when this returns true).
     lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
@@ -344,7 +358,14 @@ function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean): string {
     lines.push('            hit.region_from = outside;              // entering the owner');
     lines.push('            hit.region_to   = hit.region_owner;');
     lines.push('        } else {');
-    lines.push('            hit.region_from = hit.region_owner;     // exiting the owner');
+    if (thinRegions.length > 0) {
+        lines.push('            // Back-face hit on a zero-thickness owner: probe the entering (-n) side.');
+        lines.push('            hit.region_from = scene_region_thin(hit.region_owner)');
+        lines.push('                ? scene_region_at(ambient_geodesic(hit.p, hit.frame.n, -EPS_INTERFACE))');
+        lines.push('                : hit.region_owner;             // solid owners cover their own side');
+    } else {
+        lines.push('            hit.region_from = hit.region_owner;     // exiting the owner');
+    }
     lines.push('            hit.region_to   = outside;');
     lines.push('            hit.frame = ambient_frame(hit.p, -hit.frame.n);   // §4.1: n faces region_from');
     lines.push('        }');

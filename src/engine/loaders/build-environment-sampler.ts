@@ -5,6 +5,9 @@ export type EnvSamplerBuildResult = {
     texNames: { cond: string; marg: string; map: string };
     size: [number, number];
     totalWeight: number;
+    /** The CPU-side CDF arrays (also uploaded as R32F textures). Exposed so tests can verify
+     *  the density round-trips through CDF differences — the invariant the GLSL pdf relies on. */
+    cdf: { cond: Float32Array; marg: Float32Array };
 };
 
 export function buildEnvironmentSampler(
@@ -68,6 +71,7 @@ export function buildEnvironmentSampler(
     return {
         texNames: { cond: names.cond, marg: names.marg, map: names.map },
         size: [W, H],
-        totalWeight: total
+        totalWeight: total,
+        cdf: { cond: condCDF, marg: margCDF },
     };
 }

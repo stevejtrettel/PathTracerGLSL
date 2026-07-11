@@ -87,7 +87,6 @@ export const marbleStrategy: RenderStrategy = {
         maxBounces: 32,
         directLighting: 'none', // no explicit lights; the panel is a path-only emitter
         russianRoulette: { enabled: true, startDepth: 4 },
-        samplesPerFrame: 1,
         volumeIntegrator: 'analytic',
     },
     camera: { type: 'pinhole', fov: 0.7 },
@@ -174,7 +173,6 @@ export const mistStrategy: RenderStrategy = {
         maxBounces: 12, // shafts are 1–2 scatter events; ground bounce adds a few
         directLighting: 'nee',
         russianRoulette: { enabled: true, startDepth: 3 },
-        samplesPerFrame: 1,
         volumeIntegrator: 'analytic',
     },
     camera: { type: 'pinhole', fov: 1.0 },

@@ -4,7 +4,9 @@
 //
 // Each entry pairs a scene with one or more strategies (each strategy is a renderer, keys
 // 1-9 in the dev app) plus a default camera pose. `examples/scene-lab.ts` reads a scene
-// from here by id (?scene=<id>); the snapshot test compiles every (scene, strategy) pair.
+// from here by id (?scene=<id>). Test coverage: sceneSuite.test.ts iterates EVERY
+// (scene, strategy) pair (compile-smoke + ID convention); the golden snapshot test keeps
+// its own explicit case list — keep it in sync when adding pairs here.
 
 import type { SceneDescription, RenderStrategy } from '../types.js';
 
@@ -54,6 +56,7 @@ import {
     fogAreaNeeStrategy,
     fogAreaMisStrategy,
     fogAreaPtStrategy,
+    fogPanel,
     orbScene,
     orbNeeStrategy,
     orbPtStrategy,
@@ -283,6 +286,18 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
             'X-FOG proper (validation §4) — the resurrected haze equality pair: medium-NEE toward a hittable quad through haze; hg_eval/hg_sample consistency; the medium-side MIS weight (hg_pdf); spectral shadow_media segments',
         expected:
             'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image, light shafts included — pt vs pt-nee divergence is the HG sign/eval-desync regression; pt-mis divergence implicates hg_pdf or lighting_pdf',
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
+    },
+    'fog-panel': {
+        scene: fogPanel,
+        strategies: [fogAreaNeeStrategy, fogAreaPtStrategy],
+        exercises:
+            'audit-H2 witness: back-face hits on a zero-thickness DIFFUSE quad (nonzero albedo) in ambient fog — the scene_region_thin entering-side probe vs the fabricated region_from that poisoned current_medium for one segment',
+        expected:
+            'keys 1 (pt-nee) and 2 (pt) converge to the same image with CONTINUOUS fog behind the panel — a dry rim behind the panel or pt/pt-nee divergence is the region_from fabrication regressing',
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],

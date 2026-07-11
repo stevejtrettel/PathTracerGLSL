@@ -18,8 +18,9 @@ export class Compiler implements ICompiler {
         validate(features, scene, strategy, bag);
         bag.throwIfErrors();
 
-        // Phase 2: Plan
-        const renderPlan = plan(features, scene, strategy);
+        // Phase 2: Plan (passes bag — review C8: the Planner emits diagnostics like every stage)
+        const renderPlan = plan(features, scene, strategy, bag);
+        bag.throwIfErrors();
 
         // Phase 3: Generate (passes bag for shader build errors)
         const renderer = generate(renderPlan, scene, strategy, bag);

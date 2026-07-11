@@ -153,7 +153,6 @@ export interface MaterialDescription {
     model: MaterialModel;
     albedo?: MaterialProperty;
     roughness?: MaterialProperty;
-    metallic?: MaterialProperty;
     ior?: MaterialProperty;          // dielectric: region's interior IOR (→ generated ior_of table)
     transmittance?: MaterialProperty; // dielectric: interface tint; interior absorption is the medium's job (§4.4)
     emission?: MaterialProperty;
@@ -228,7 +227,6 @@ export interface TransportDescription {
      *  lights (spectrum_average(color·intensity)); 'uniform' is the naive baseline. Default 'power'. */
     lightSelection?: 'uniform' | 'power';
     russianRoulette: { enabled: boolean; startDepth: number };
-    samplesPerFrame: number;
     /**
      * Volume-integrator axis (§7.3, as amended by fable-volumetric-component.md §5). Default
      * DERIVED from scene content (scattering media ? 'analytic' : 'none'). 'analytic' = the v1

@@ -3,6 +3,8 @@
 // Pitfall 3: cone sampling, NOT uniform-surface (the old sphere-light.glsl wasted half its
 // samples on the back hemisphere). p inside the light: pdf = 0 punt — OPEN; pbrt falls back to
 // uniform-area sampling there (deferred).
+// METRIC EXEMPTION (trace-loop contract): raw dot() on world-space physical directions is
+// deliberate — light samplers are Euclidean closed forms; curved spaces get new bodies (§5.3).
 
 LightSample sphere_light_sample(Point center, float radius, Spectrum Le, Point p, vec2 xi) {
     vec3 to_c = center - p;

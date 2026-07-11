@@ -26,7 +26,7 @@ npx tsc --noEmit     # typecheck
 | `docs/fable-validation-scenes.md` | Concrete correctness tests with derived expected values (furnace = 0.4 exactly, etc.). Implement these as the harness. |
 | `docs/fable-volumetric-component.md` | **Authority for the media build** (owner-decided) — the volumetric component seams (`medium_sample`/`medium_transmittance`/phase), interface-vs-segment separation, the RTE partition rule + radiance capability flag, chromatic sampling per pbrt-v3 (**supersedes reference-implementations §5's medium lines**), `volumeIntegrator` axis rename (v1 = `analytic`). |
 | `docs/fable-transport-verification.md` | Why the non-obvious rules are what they are (innermost-wins, no medium stack, null interfaces). Check here before "fixing" something that looks odd. |
-| `docs/fable-review.md` | Known bugs in all layers, ranked. Most are fixed across batches (headers note which); C4/C5/C7/C8 + camera-straight-down NaN remain open. |
+| `docs/fable-review.md` | Known bugs in all layers, ranked. Nearly all fixed across batches (headers note which) — C4/C5/C8 + camera NaN closed; C7 only partially (SDF param schemas deferred to module-anatomy §7). The July 2026 audit ledger + hardening batch live in `docs/impl-plan-audit-hardening.md`. |
 | `docs/fable-module-anatomy.md` | Module anatomy & property machinery — descriptor/schema shapes for §3.3/§3.4, family taxonomy, deferred file layout, staging (dielectric landed on hand-written plumbing; schema reorg later). |
 | `docs/compiler-engine-contract.md` | The **locked** compiler↔engine boundary (CompiledRenderer/RenderPipeline types). Do not change these types. |
 
