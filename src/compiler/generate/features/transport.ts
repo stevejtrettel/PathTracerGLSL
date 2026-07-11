@@ -15,6 +15,9 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
     };
     if (program.lighting !== null) {
         defines['ENABLE_NEE'] = '';
+        // MIS = NEE + the reference-§8 weights; both estimators share every other line (§11.2's
+        // premise — anything else differing between the generated loops is a bug).
+        if (program.lighting.method === 'mis') defines['ENABLE_MIS'] = '';
     }
     if (program.transport.russianRoulette) {
         defines['ENABLE_RUSSIAN_ROULETTE'] = '';

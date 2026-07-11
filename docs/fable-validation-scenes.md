@@ -5,6 +5,14 @@
 **Prerequisite:** the HDR-export off-by-one ([fable-review.md](fable-review.md) C2) — **fixed** (PipelineBuilder now exports `accumulation_previous`, the post-swap freshly-written buffer). Numeric assertions below are safe to trust against `readExport('hdr')`.
 **Protocol note:** all expected values are **linear HDR** (`readExport('hdr')`), pre-tonemap. Strategies for tests: Russian roulette **off** (unbiased but adds variance and complicates tolerances), pixel jitter on, `display` irrelevant.
 
+**Scoreboard (July 2026, owner-GPU-verified; suite scene ids in parens):**
+- §1 F-BOX (`furnace`) ✓ 0.4 exactly. §1b F-BOX-M (`furnace-scatter`) ✓ 0.39954–0.39989, channels together.
+- §2 F-SLAB (`slab`) ✓ (0.36825, 0.13561, 0.01839) — residual is the predicted ray_spawn epsilon-gap signature, within ±1%.
+- §3 F-ETA (`eta`) ✓ 0.5542 (re-verified after the emission gate landed).
+- §4 X-CORNELL (`cornell-area`) ✓ three-way pt/pt-nee/pt-mis; X-GLASS (`cornell-area-glass`) ✓ three-way; X-FOG (`fog-area`) ✓ three-way — implemented with a point light REPLACED by the quad per this doc, haze per this doc.
+- §5 R-SUBMERGED (`submerged`) ✓; R-FOGCUBE (`fogcube`, absorbing variant) ✓ no rim. R-CUP: not yet built (multi-region objects unimplemented).
+- §6 H (pdf-histogram): not yet built — first customers HG, then GGX, unchanged.
+
 ---
 
 ## 1. F-BOX — the analytic furnace (energy conservation)

@@ -41,14 +41,6 @@ export function validate(
             .add();
     }
 
-    // MIS is phase B of impl-plan-area-lights — reject rather than silently compile plain NEE
-    // (the pre-existing hole: 'mis' used to fall through to the NEE path with no diagnostic).
-    if (strategy.transport.directLighting === 'mis') {
-        bag.error('invalid-setting',
-            "directLighting 'mis' not yet supported — lands with area-lights phase B (docs/impl-plan-area-lights.md); use 'nee'")
-            .add();
-    }
-
     // --- Area lights (impl-plan-area-lights A0) ---
     for (let i = 0; i < scene.lights.length; i++) {
         const light = scene.lights[i];

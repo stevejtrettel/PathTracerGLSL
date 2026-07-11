@@ -1,5 +1,13 @@
 # Impl plan — area lights: quad + sphere emitters, NEE first, MIS second
 
+> **STATUS: DONE (July 2026).** Both phases landed and owner-GPU-verified: pt / pt-nee / pt-mis
+> converge on all three witnesses (cornell-area, cornell-area-glass, fog-area — X-FOG passing
+> retires the media plan's deferred haze-equality item). One bug found at bring-up, now fixed
+> and documented at the call sites: area lights self-shadowed surfaces facing them (`ray_spawn`'s
+> normal offset vs the `maxDist` back-off — widened to 2·EPSILON at both NEE sites; the 2×
+> couples to the spawn offset). §6.2's "two-sided thin quads" aside is annotated in the
+> contracts: quads are ONE-SIDED as pinned below. The deferred table stands.
+
 Samplable area lights on the region machinery: the §6.2 unified registry (`light_of`), quad +
 sphere samplers in solid-angle measure, the emission double-count bookkeeping, then MIS as the
 three-line diff. Two phases with a convergence wall between them; every generated branch gets a

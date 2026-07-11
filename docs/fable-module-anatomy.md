@@ -144,6 +144,9 @@ reads as a table of contents.
    descriptor type (Lambert, dielectric, point light as first instances) + schema-driven
    struct/resolver generation replacing the hand-written triples. Byte-identical GLSL,
    snapshot-guarded, with the numeric witnesses as the semantic backstop.
+   *(Trigger watch, July 2026: the media + area-light builds added phase_hg, medium_analytic,
+   light_quad, light_sphere on hand-written plumbing — the model-file count now plausibly
+   warrants the pass; GGX would make it overdue.)*
 
 ## 8. Drift ledger (docs ↔ code), status at writing
 

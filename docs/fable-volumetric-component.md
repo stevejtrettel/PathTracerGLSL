@@ -220,6 +220,8 @@ is unchanged under §4's sampler (0.4 exactly, per channel); the weight formulas
    equality pair moves to X-FOG with area lights. Replacement HG-sign witness: `{param}`-driven
    `phase_g`, watching the forward/backward halo asymmetry around the point light invert (the
    audit's `+2gc` bug swaps it). Expect Kulla–Fajardo spike-noise halos until seam 4 lands; write
-   that into the scene's `expected`.
+   that into the scene's `expected`. *(Resolved: X-FOG landed with area lights — the `fog-area`
+   witness passes three-way, July 2026. The g-flip witness (`haze`) stays as the live-slider
+   regression.)*
 5. M1→M2 staging guard: media + NEE without the spectral shadow walker is silently wrong (a null
    boundary would block a shadow ray) — temporary Validator rejection in M1, deleted by M2.

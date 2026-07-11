@@ -56,6 +56,74 @@ export const cornellAreaPtStrategy: RenderStrategy = {
     transport: { ...cornellAreaNeeStrategy.transport, directLighting: 'none' },
 };
 
+export const cornellAreaMisStrategy: RenderStrategy = {
+    ...cornellAreaNeeStrategy,
+    id: 'pt-mis',
+    transport: { ...cornellAreaNeeStrategy.transport, directLighting: 'mis' },
+};
+
+// ---------------------------------------------------------------------------
+// cornell-area-glass — X-GLASS (validation §4): the delta-bookkeeping stressor.
+// The clay sphere becomes GLASS: prev_was_delta propagation through specular chains, NEE
+// correctly skipped at the glass (the nondelta guard), full-weight emission after delta
+// bounces, and the MIS emitter-hit weight staying 1 exactly there. The noisiest pair —
+// double spp before suspecting bias (§4 protocol note).
+// ---------------------------------------------------------------------------
+
+export const cornellAreaGlass: SceneDescription = {
+    ...cornellArea,
+    id: 'cornell-area-glass',
+    name: 'Cornell + Quad + Glass (X-GLASS)',
+    objects: cornellArea.objects.map((o) => (o.material === 'clay' ? { ...o, material: 'glass' } : o)),
+    materials: {
+        white: { model: 'lambert', albedo: [0.73, 0.73, 0.73] },
+        red: { model: 'lambert', albedo: [0.65, 0.05, 0.05] },
+        green: { model: 'lambert', albedo: [0.12, 0.45, 0.15] },
+        glass: { model: 'dielectric', ior: 1.5 },
+    },
+};
+
+// ---------------------------------------------------------------------------
+// fog-area — X-FOG proper (validation §4): the RESURRECTED haze equality pair. Grayscale
+// ambient haze in the quad-lit Cornell box. This is the scene the media plan had to defer
+// (delta lights are invisible to phase paths) — with a hittable quad, pt / pt-nee / pt-mis
+// are three estimators of the same integral: divergence between pt and pt-nee implicates
+// hg_eval/hg_sample consistency (the audit's +2gc bug makes EXACTLY these two disagree);
+// pt-mis joining implicates the medium-side weight (hg_pdf) or lighting_pdf.
+// ---------------------------------------------------------------------------
+
+export const fogArea: SceneDescription = {
+    ...cornellArea,
+    id: 'fog-area',
+    name: 'Foggy Cornell + Quad (X-FOG)',
+    materials: {
+        ...cornellArea.materials,
+        haze: {
+            model: 'none',
+            medium: { sigma_a: [0.05, 0.05, 0.05], sigma_s: [0.4, 0.4, 0.4], phase_g: 0.6 },
+        },
+    },
+    ambientMedium: 'haze',
+};
+
+export const fogAreaNeeStrategy: RenderStrategy = {
+    ...cornellAreaNeeStrategy,
+    id: 'pt-nee',
+    transport: { ...cornellAreaNeeStrategy.transport, maxBounces: 16, volumeIntegrator: 'analytic' },
+};
+
+export const fogAreaMisStrategy: RenderStrategy = {
+    ...fogAreaNeeStrategy,
+    id: 'pt-mis',
+    transport: { ...fogAreaNeeStrategy.transport, directLighting: 'mis' },
+};
+
+export const fogAreaPtStrategy: RenderStrategy = {
+    ...fogAreaNeeStrategy,
+    id: 'pt',
+    transport: { ...fogAreaNeeStrategy.transport, directLighting: 'none' },
+};
+
 // ---------------------------------------------------------------------------
 // orb — sphere light via the sampleAsLight route
 // ---------------------------------------------------------------------------

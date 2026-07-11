@@ -4,6 +4,8 @@
 **Date:** July 7, 2026
 **Status update (same session):** six bugs fixed — compiler C1 (RNG ≥ 1.0), C2 (export off-by-one), C6 (tile RNG seed), the Rec.601 luminance note, engine #1 (`ResourceManager.cleanup()` 2D-array crash), and app #1 (EventBus mid-dispatch skip). See TODO.md.
 
+**Status update (media build, July 2026):** C4 FIXED — `model: 'emissive'` is now a Validator rejection with a real diagnostic (impl-plan-media M0; superseded by emission on any surface model and `model: 'none'` + medium). The unguarded-emission-block finding is also closed (the generated `material_is_emissive` gate, impl-plan-media M1).
+
 **Status update (batch 2, Opus):** four more fixed — app #5 (tiled grid math / edge-tile overrun), engine #3 (reload/unload path: `loadRenderer` now replaces instead of skipping, `unloadRenderer` added across Engine/RenderExecutor/ResourceManager, `loadShaders` deletes-before-overwrite; plus `RendererManager.recompile()` / `App.recompile()` dev-loop entry points), app #8-partial (ErrorOverlay now reachable outside `initialize` — factored `App._showErrorOverlay` + `RendererManager.attachShaderDiagnostics`, used by both init and recompile), and engine #4 (resize now resets *all* renderers' sample counts). **Known gap left open:** atomic "keep the last-good renderer" recovery when a scene-changing `recompile` hits a shader-compile error mid-swap — see TODO.md. Remaining app #8 items (hardcoded reset prefixes, `selectRendererByStrategy` re-deriving the id convention) and all other findings remain open.
 **Scope:** Active docs (`docs/*.md`, archive excluded) and all of `src/` — compiler reviewed in depth directly; engine, app, and UI layers reviewed via parallel deep-dive passes with findings verified against source.
 

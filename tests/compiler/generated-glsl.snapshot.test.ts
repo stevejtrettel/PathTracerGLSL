@@ -9,7 +9,7 @@ import { analyticMinimal, mixedScene, analyticStrategy } from '../../src/compile
 import { etaScene, etaStrategy, submergedScene, submergedStrategy, cornellGlass, analyticGlass, glassStrategy } from '../../src/compiler/scenes/dielectricScenes.js';
 import { slabScene, slabStrategy, fogcubeScene, fogcubeStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../../src/compiler/scenes/mediaScenes.js';
 import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistStrategy } from '../../src/compiler/scenes/demoScenes.js';
-import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, orbScene, orbNeeStrategy } from '../../src/compiler/scenes/areaLightScenes.js';
+import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaMisStrategy, orbScene, orbNeeStrategy } from '../../src/compiler/scenes/areaLightScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -86,6 +86,11 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     ['cornell-area + pt-nee', cornellArea, cornellAreaNeeStrategy],
     ['cornell-area + pt', cornellArea, cornellAreaPtStrategy],
     ['orb + pt-nee', orbScene, orbNeeStrategy],
+    // MIS (phase B): ENABLE_MIS + lighting_pdf + power_heuristic + prev_bsdf_pdf; the glass
+    // variant exercises delta bookkeeping; fog-area is X-FOG (medium-side MIS + shadow_media).
+    ['cornell-area + pt-mis', cornellArea, cornellAreaMisStrategy],
+    ['cornell-area-glass + pt-mis', cornellAreaGlass, cornellAreaMisStrategy],
+    ['fog-area + pt-mis', fogArea, fogAreaMisStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

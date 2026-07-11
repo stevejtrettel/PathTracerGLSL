@@ -1,5 +1,12 @@
 # Impl plan — homogeneous media: null interfaces, absorption, scattering (V1-C1)
 
+> **STATUS: DONE (July 2026).** M0–M2 landed and owner-GPU-verified: F-SLAB exact numbers
+> (epsilon-gap residual as predicted), F-BOX-M 0.4/channel with channels together, fogcube
+> rim-free, haze g-flip correct; F-ETA re-verified after the emission gate. The
+> classification-init deferred item landed later with the `mist` demo; the X-FOG deferred item
+> landed with area lights (`fog-area` passes three-way). One GPU-only fix at bring-up: ANGLE
+> rejects `?:` on struct operands. Remaining deferred rows stand.
+
 Volumetric media on the region machinery the dielectric item built, behind the **volumetric
 component** contract: `current_medium` with the §4.4 self-heal (its first real reader), null
 interfaces (§3.6), the `medium_sample`/`medium_transmittance` seams with per-material
@@ -160,7 +167,7 @@ scenes still identical-after-preprocessing; `npx vitest run` + snapshot review.
 | Equiangular medium-NEE placement (seam 4 — point lights in fog; Kulla–Fajardo) | own item, after area lights or when halo noise hurts |
 | Volumetric emission (`MediumProperties.emission` + the radiance capability flag's first reader) | first emissive-medium scene |
 | Analytic/approximate fog strategies (inline-radiance readers) | first approximate-strategy experiment |
-| X-FOG proper (the pt/pt-nee equality pair) + medium-side MIS + `prev_bsdf_pdf` bookkeeping | area-lights/MIS item |
+| ~~X-FOG proper (the pt/pt-nee equality pair) + medium-side MIS + `prev_bsdf_pdf` bookkeeping~~ | **LANDED** with area lights (impl-plan-area-lights phase B): the `fog-area` witness passes three-way |
 | `medium_sample_pdf` companion (MIS between distance-sampling strategies) | if that research direction opens |
 | §11.4 repair-counter debug strategy (self-heal is silent for now) | debug-views item |
 | Env-samplable miss weighting | env-as-light item |

@@ -6,7 +6,7 @@
 |----------|-------------|
 | [architecture.md](architecture.md) | Full system reference — three-layer architecture, all components |
 | [compiler-engine-contract.md](compiler-engine-contract.md) | Locked compiler-engine boundary contract and types |
-| [fable-compiler-contracts.md](fable-compiler-contracts.md) | GLSL contracts inside the compiler — interaction, regions/media, geodesic stepper, lights, transport |
+| [fable-compiler-contracts.md](fable-compiler-contracts.md) | GLSL contracts inside the compiler — interaction, regions/media, lights, transport (geodesic stepper superseded by trace-loop-contract.md) |
 | [fable-transport-verification.md](fable-transport-verification.md) | Adversarial walkthrough of the medium/transport contracts — traces, findings, resulting amendments |
 | [fable-reference-implementations.md](fable-reference-implementations.md) | Normative GLSL: Lambert, dielectric (η² factor), GGX, HG phase, light samplers, shadow transmittance, the v1 transport loop, MIS diff, geodesic steppers |
 | [fable-validation-scenes.md](fable-validation-scenes.md) | Concrete test scenes with derived expected values — furnace box, Beer–Lambert slab, η² witness, cross-strategy trio, trace regressions |

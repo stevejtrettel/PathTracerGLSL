@@ -28,10 +28,15 @@ Radiance transport_trace(Ray ray) {
     int null_crossings = 0;   // §3.6: nulls are bookkeeping with their own safety counter
 #endif
 
-    // §6.2 bookkeeping hook: tracked now, consumed when MIS / samplable environment land.
-    // The camera "bounce" counts as delta so bounce-0 emission would be full-weight. Inert for
-    // Lambert (never delta) until those readers exist — see docs/impl-plan-interaction-reshape.
+    // §6.2 bookkeeping: the camera "bounce" counts as delta so bounce-0 emission is full-weight.
+    // Consumed by the emission w-bookkeeping (samplable emitters) and the MIS weights.
     bool prev_was_delta = true;
+#ifdef ENABLE_MIS
+    // Reference §8: the previous vertex and its sampled solid-angle pdf — the BSDF side of the
+    // emitter-hit power heuristic. Written at surface AND medium scattering events.
+    float prev_bsdf_pdf = 0.0;
+    Point prev_p = ray.origin;
+#endif
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         Hit hit;
@@ -64,7 +69,17 @@ Radiance transport_trace(Ray ray) {
                         // strict-< boundary test at exactly ls.distance is a float coin flip.
                         Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
                         if (!spectrum_is_black(vis)) {
+#ifdef ENABLE_MIS
+                            // Reference §8's closing line: the medium-side NEE weight balances
+                            // against the phase density (hg_pdf) — no cosine anywhere (§2.2).
+                            float w_m = 1.0;
+                            if ((ls.flags & LIGHT_DELTA) == 0u) {
+                                w_m = power_heuristic(ls.pdf, hg_pdf(ls.wi, wo_med, m_evt));
+                            }
+                            radiance += throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis * w_m / ls.pdf;
+#else
                             radiance += throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis / ls.pdf;
+#endif
                         }
                     }
                 }
@@ -73,6 +88,10 @@ Radiance transport_trace(Ray ray) {
                 InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
                 throughput *= ps.weight;
                 prev_was_delta = false;
+#ifdef ENABLE_MIS
+                prev_bsdf_pdf = ps.pdf;   // medium events count for the emitter-hit weight too (§8)
+                prev_p = p_evt;
+#endif
                 current_ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
 
 #ifdef ENABLE_RUSSIAN_ROULETTE
@@ -135,13 +154,21 @@ Radiance transport_trace(Ray ray) {
             if (mat_emit != mat) eprops = scene_material_properties(mat_emit, hit.p);
 #if defined(ENABLE_NEE) && defined(HAS_SAMPLABLE_EMITTERS)
             // §6.2 double-count bookkeeping: a SAMPLABLE emitter (light_of ≥ 0) found by a
-            // non-delta bounce was already counted by NEE at the previous vertex → w = 0.
-            // Path-only emitters, post-delta hits, and the camera "bounce" (prev_was_delta
-            // inits true) stay full-weight. MIS (phase B) swaps the 0.0 for the power
-            // heuristic — reference §8's first line. Under directLighting 'none' this block
-            // is absent and emission stays full-weight: that is WHY pt and pt-nee converge
-            // to the same image (§11.2's witness).
-            float w_emit = (light_of(hit.region_to) < 0 || prev_was_delta) ? 1.0 : 0.0;
+            // non-delta bounce was already counted by NEE at the previous vertex — weight 0
+            // under NEE-only, the power heuristic under MIS (reference §8 line 1). Path-only
+            // emitters, post-delta hits, and the camera "bounce" (prev_was_delta inits true)
+            // stay full-weight in every strategy. Under directLighting 'none' this block is
+            // absent and emission stays full-weight: that is WHY pt, pt-nee, and pt-mis all
+            // converge to the same image (§11.2's witness).
+            float w_emit = 1.0;
+            int lid_emit = light_of(hit.region_to);
+            if (lid_emit >= 0 && !prev_was_delta) {
+#ifdef ENABLE_MIS
+                w_emit = power_heuristic(prev_bsdf_pdf, lighting_pdf(prev_p, current_ray.direction, lid_emit, hit));
+#else
+                w_emit = 0.0;
+#endif
+            }
             radiance += throughput * w_emit * interaction_surface_emission(mat_emit, wo, hit, eprops);
 #else
             radiance += throughput * interaction_surface_emission(mat_emit, wo, hit, eprops);
@@ -166,7 +193,17 @@ Radiance transport_trace(Ray ray) {
                 if (!spectrum_is_black(vis)) {
                     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
+#ifdef ENABLE_MIS
+                    // Reference §8 line 2: balance the light sample against the BSDF's density.
+                    // Delta lights get weight 1 — BSDF sampling can never hit them (§6.4).
+                    float w_l = 1.0;
+                    if ((ls.flags & LIGHT_DELTA) == 0u) {
+                        w_l = power_heuristic(ls.pdf, interaction_surface_pdf(mat, ls.wi, wo, hit, props));
+                    }
+                    radiance += throughput * ls.radiance * f * cos_i * vis * w_l / ls.pdf;
+#else
                     radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
+#endif
                 }
             }
         }
@@ -177,6 +214,10 @@ Radiance transport_trace(Ray ray) {
         if (spectrum_is_black(bs.weight)) break;
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
+#ifdef ENABLE_MIS
+        prev_bsdf_pdf = bs.pdf;   // 0 for delta lobes — never read (prev_was_delta short-circuits)
+        prev_p = hit.p;
+#endif
 
 #ifdef HAS_MEDIA
         // §4.4: transmission moves the path into the far region's medium (tinted glass

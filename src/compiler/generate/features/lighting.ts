@@ -44,9 +44,15 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'glsl/light_sphere.glsl', source: lightSphereGLSL });
     }
 
+    // Selection pdfs are computed ONCE and shared by the sampler and the MIS pdf query —
+    // lighting_pdf must byte-match lighting_sample's selection (the env-sampling lesson,
+    // pitfall 11, applied to the CDF).
+    const selection = plan.program.lighting.selection;
+    const selectPdf = computeSelectPdf(plan.lights, selection);
+
     blocks.push({
         origin: 'generated:light-sampling',
-        source: generateLightSampling(plan.lights, plan.program.lighting.selection),
+        source: generateLightSampling(plan.lights, selectPdf),
     });
 
     // §6.2 registry table + the transport emission-bookkeeping gate: only when a samplable
@@ -55,6 +61,10 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (samplable.length > 0) {
         blocks.push({ origin: 'generated:light-of', source: generateLightOf(samplable) });
         defines['HAS_SAMPLABLE_EMITTERS'] = '';
+        // The MIS pdf query (§6.1): only under 'mis' — its sole reader is the emitter-hit weight.
+        if (plan.program.lighting.method === 'mis') {
+            blocks.push({ origin: 'generated:lighting-pdf', source: generateLightingPdf(plan.lights, selectPdf) });
+        }
     }
 
     return { ...emptyContribution(), blocks, defines };
@@ -121,7 +131,15 @@ function sampleCall(l: PlannedLight, xiExpr: string): string {
     throw new Error(`lighting: unsupported light kind '${l.kind}'`);
 }
 
-function generateLightSampling(lights: PlannedLight[], selection: 'uniform' | 'power'): string {
+/** Compile-time selection pdfs — shared by lighting_sample and lighting_pdf. */
+function computeSelectPdf(lights: PlannedLight[], selection: 'uniform' | 'power'): number[] {
+    if (lights.length === 0) return [];
+    const weights = lights.map((l) => (selection === 'uniform' ? 1 : lightPower(l)));
+    const total = weights.reduce((a, b) => a + b, 0);
+    return weights.map((w) => w / total);
+}
+
+function generateLightSampling(lights: PlannedLight[], selectPdf: number[]): string {
     const lines: string[] = ['// Generated light selection dispatcher (§6.1)'];
 
     if (lights.length === 0) {
@@ -140,9 +158,6 @@ function generateLightSampling(lights: PlannedLight[], selection: 'uniform' | 'p
         lines.push('    ls.light_id = 0;');
     } else {
         // Compile-time power-weighted (or uniform) CDF over samplable lights.
-        const weights = lights.map((l) => (selection === 'uniform' ? 1 : lightPower(l)));
-        const total = weights.reduce((a, b) => a + b, 0);
-        const selectPdf = weights.map((w) => w / total);
         const cdf: number[] = [];
         let acc = 0;
         for (const sp of selectPdf) { acc += sp; cdf.push(acc); }
@@ -173,6 +188,43 @@ function generateLightSampling(lights: PlannedLight[], selection: 'uniform' | 'p
     }
 
     lines.push('    return ls;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// ============================================================================
+// Generated MIS pdf query (§6.1): the density with which lighting_sample(p, ·) would have
+// produced direction wi TOWARD THE LIGHT THAT WAS HIT — identity is known (light_of at the
+// emitter hit), no search. Per-kind solid-angle pdf recomputed from the hit geometry, × the
+// SAME baked selection pdf as the sampler. Delta lights are never queried (pitfall 12) and
+// carry no arm; unknown ids return 0 (weight → 1 on the BSDF side, conservative).
+// ============================================================================
+
+function generateLightingPdf(lights: PlannedLight[], selectPdf: number[]): string {
+    const lines: string[] = ['// Generated MIS pdf query (§6.1) — must mirror lighting_sample exactly'];
+    lines.push('float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit) {');
+    for (let i = 0; i < lights.length; i++) {
+        const l = lights[i];
+        if (l.regionId === undefined) continue;   // delta: not hittable, never queried
+        const select = formatFloat(lights.length === 1 ? 1.0 : selectPdf[i]);
+        lines.push(`    if (light_id == ${l.id}) {`);
+        if (l.kind === 'quad') {
+            const n = quadNormal(l.edge1!, l.edge2!);
+            lines.push(`        float cos_l = dot(${formatVec3(n)}, -wi);`);
+            lines.push('        if (cos_l <= 0.0) return 0.0;');
+            lines.push('        vec3 d = light_hit.p - p;');
+            lines.push(`        return ${select} * dot(d, d) / (${formatFloat(quadArea(l))} * cos_l);`);
+        } else {
+            // sphere: the cone pdf depends only on p (same formula as the sampler).
+            lines.push(`        vec3 to_c = ${formatVec3(l.position!)} - p;`);
+            lines.push('        float dc2 = dot(to_c, to_c);');
+            lines.push(`        if (dc2 <= ${formatFloat(l.radius! * l.radius!)}) return 0.0;   // inside: sampler punts too`);
+            lines.push(`        float cos_max = sqrt(max(0.0, 1.0 - ${formatFloat(l.radius! * l.radius!)} / dc2));`);
+            lines.push(`        return ${select} / (TWO_PI * max(1e-8, 1.0 - cos_max));`);
+        }
+        lines.push('    }');
+    }
+    lines.push('    return 0.0;');
     lines.push('}');
     return lines.join('\n');
 }

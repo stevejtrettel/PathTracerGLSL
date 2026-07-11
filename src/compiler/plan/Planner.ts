@@ -202,7 +202,12 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     return {
         intersection: { method: 'raymarch' },
         materials: { models: brdfModels },
-        lighting: wantsNEE ? { method: 'nee', selection: strategy.transport.lightSelection ?? 'power' } : null,
+        lighting: wantsNEE
+            ? {
+                  method: strategy.transport.directLighting === 'mis' ? 'mis' : 'nee',
+                  selection: strategy.transport.lightSelection ?? 'power',
+              }
+            : null,
         camera: strategy.camera.type === 'pinhole'
             ? { type: 'pinhole', fov: strategy.camera.fov }
             : { type: 'pinhole', fov: Math.PI / 4 }, // fallback, validator catches unsupported

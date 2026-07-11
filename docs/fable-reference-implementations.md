@@ -334,6 +334,11 @@ bool russian_roulette(inout Spectrum throughput, int bounce) {        // §7.2 p
 
 ## 6. Light samplers — measure conventions made concrete
 
+> **IMPLEMENTED (impl-plan-area-lights, July 2026):** §6.1/§6.2/§6.3 transcribed to
+> `light_quad.glsl` / `light_sphere.glsl` / `light_point.glsl` + the generated dispatcher
+> (with `cdf_rescale` and area-aware power). Deviation: the sphere's p-inside case punts
+> `pdf = 0` as written here (still OPEN; pbrt's uniform-area fallback is the deferred upgrade).
+
 Measure bugs (area vs solid-angle pdfs, falloff folded twice or not at all) are the most common cause of NEE/MIS bias. These implementations *are* the §6.1 conventions.
 
 ### 6.1 Quad light (area → solid angle conversion)
@@ -485,6 +490,11 @@ The `sample.pdf` / `ggx_pdf` agreement is the exact triple-consistency the §11.
 ---
 
 ## 8. The MIS diff — exactly three lines change from NEE-only
+
+> **IMPLEMENTED (impl-plan-area-lights phase B, July 2026):** lines (1) and (2) plus the
+> medium-side closing line are live under `ENABLE_MIS`; line (3) (environment) waits for the
+> env-as-light item (`ENV_SAMPLABLE` doesn't exist yet). §11.2 passes three-way on
+> X-CORNELL / X-GLASS / X-FOG.
 
 The §5 loop becomes `pt-mis` by changing *only* these (anything else differing between the two generated loops is a bug §11.2 will catch):
 

@@ -48,6 +48,12 @@ import {
     cornellArea,
     cornellAreaNeeStrategy,
     cornellAreaPtStrategy,
+    cornellAreaMisStrategy,
+    cornellAreaGlass,
+    fogArea,
+    fogAreaNeeStrategy,
+    fogAreaMisStrategy,
+    fogAreaPtStrategy,
     orbScene,
     orbNeeStrategy,
     orbPtStrategy,
@@ -248,11 +254,35 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
     },
     'cornell-area': {
         scene: cornellArea,
-        strategies: [cornellAreaNeeStrategy, cornellAreaPtStrategy],
+        strategies: [cornellAreaNeeStrategy, cornellAreaMisStrategy, cornellAreaPtStrategy],
         exercises:
-            'X-CORNELL (validation §4): explicit quad light desugared to an emissive region; quad solid-angle pdf; §6.2 emission w-bookkeeping (w=0 after non-delta bounces under NEE); soft shadows',
+            'X-CORNELL (validation §4): explicit quad light desugared to an emissive region; quad solid-angle pdf; §6.2 emission w-bookkeeping; the reference-§8 MIS diff (key 2)',
         expected:
-            'keys 1 (pt-nee) and 2 (pt) converge to the SAME image (RMSE < 1.5% at 4096 spp) — divergence implicates the w-bookkeeping, the quad pdf, or shadow offsets; the ceiling panel is VISIBLE; shadows are soft',
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) ALL converge to the same image (§11.2: pairwise RMSE < 1.5% at 4096 spp) — nee/pt divergence implicates the w-bookkeeping or quad pdf; mis joining implicates lighting_pdf or the power heuristic; the panel is VISIBLE; shadows soft',
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
+    },
+    'cornell-area-glass': {
+        scene: cornellAreaGlass,
+        strategies: [cornellAreaNeeStrategy, cornellAreaMisStrategy, cornellAreaPtStrategy],
+        exercises:
+            'X-GLASS (validation §4): delta bookkeeping under a samplable emitter — prev_was_delta through specular chains, NEE skipped at glass, full-weight emission after delta, MIS emitter weight = 1 there',
+        expected:
+            'all three keys converge to the same image; the NOISIEST trio (double spp before suspecting bias); the panel appears in the glass sphere at full brightness',
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
+    },
+    'fog-area': {
+        scene: fogArea,
+        strategies: [fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy],
+        exercises:
+            'X-FOG proper (validation §4) — the resurrected haze equality pair: medium-NEE toward a hittable quad through haze; hg_eval/hg_sample consistency; the medium-side MIS weight (hg_pdf); spectral shadow_media segments',
+        expected:
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image, light shafts included — pt vs pt-nee divergence is the HG sign/eval-desync regression; pt-mis divergence implicates hg_pdf or lighting_pdf',
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],
