@@ -6,10 +6,11 @@
 // so "swapping the details of intersect" is exactly what the codegen does. Region ids are
 // globally unique across both backends (§2.3), so material_of() spans them.
 
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject } from '../../plan/types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial } from '../../plan/types.js';
+import { isGlslExpression, isValueParam } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatVec3 } from './glsl-format.js';
+import { formatFloat, formatVec3, paramToUniform } from './glsl-format.js';
 
 import sdfPrimitivesGLSL from '../glsl/sdf_primitives.glsl?raw';
 import raymarchGLSL from '../glsl/raymarch.glsl?raw';
@@ -39,6 +40,11 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
 
     // region → material table spans BOTH backends (regions are globally unique).
     blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects) });
+
+    // region → IOR table (§2.3 generated-tables family) — only when a dielectric reads it.
+    if (plan.materials.some((m) => m.model === 'dielectric')) {
+        blocks.push({ origin: 'generated:ior-of', source: generateIorOf(plan.objects, plan.analyticObjects, plan.materials) });
+    }
 
     // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
     blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects) });
@@ -82,13 +88,16 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
     lines.push(`}`);
     lines.push('');
 
-    // Signed min — kept for scene_normal (the gradient needs the sign).
-    lines.push('float scene_sdf_dist(vec3 p) {');
-    lines.push('    float d = 1e20;');
+    // Per-owner signed SDF — scene_normal takes the gradient of the HIT OBJECT's own field.
+    // The global signed min is hijacked by containers: on a nested surface (glass sphere inside
+    // a water pool) the pool's deeply-negative sdf wins the min everywhere inside, and its
+    // gradient points at the nearest POOL face — cube-quantized normals on the sphere
+    // (found by the R-SUBMERGED witness).
+    lines.push('float scene_object_sdf(vec3 p, int region) {');
     for (const obj of objects) {
-        lines.push(`    d = min(d, sdf_object_${obj.index}(p));`);
+        lines.push(`    if (region == ${obj.index}) return sdf_object_${obj.index}(p);`);
     }
-    lines.push('    return d;');
+    lines.push('    return 1e20;');
     lines.push('}');
 
     return lines.join('\n');
@@ -246,6 +255,37 @@ function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticOb
         lines.push(`    if (region == ${obj.index}) return ${obj.materialId};`);
     }
     lines.push('    return -1;'); // ambient / no region = vacuum
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// region → IOR of the region's interior (reference-implementations §2: dielectrics read the far
+// side's IOR without a full material-properties fetch). Non-dielectric materials are 1.0
+// (vacuum-like — pinned in the Planner), ior_of(-1) = 1.0 (ambient; ambientMedium is a media-era
+// concern, §2.4). Value<T>-driven ior reads its uniform (declared via the materials {param} scan).
+function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], materials: PlannedMaterial[]): string {
+    const byId = new Map(materials.map((m) => [m.id, m]));
+    const lines: string[] = ['// Generated region -> IOR table (§2.3 family)'];
+    lines.push('float ior_of(int region) {');
+    for (const obj of [...sdf, ...analytic].sort((a, b) => a.index - b.index)) {
+        const mat = byId.get(obj.materialId);
+        // Non-transmissive materials are PINNED to 1.0 (fall through to the default), even if the
+        // author set an ior on them — an authored lambert ior leaking into the table silently
+        // yields η = 1 at adjacent dielectric boundaries (review finding). The Validator warns.
+        // ('dielectric' string check → the capability record, deferred to the reorg pass.)
+        if (!mat || mat.model !== 'dielectric') continue;
+        let expr: string;
+        if (isValueParam(mat.ior)) {
+            expr = paramToUniform(mat.ior.param);
+        } else if (isGlslExpression(mat.ior)) {
+            // Backstop only — the Validator rejects this with a proper diagnostic upstream.
+            throw new Error(`intersection: material '${mat.name}': ior cannot be a GLSL expression (ior_of is region-indexed, no shading point)`);
+        } else {
+            expr = formatFloat(mat.ior);
+        }
+        lines.push(`    if (region == ${obj.index}) return ${expr};`);
+    }
+    lines.push('    return 1.0;'); // ambient / vacuum / non-transmissive regions
     lines.push('}');
     return lines.join('\n');
 }

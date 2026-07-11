@@ -18,6 +18,10 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             albedo: resolveColorProperty(mat.albedo, [0.8, 0.8, 0.8]),
             emission: resolveColorProperty(mat.emission, [0.0, 0.0, 0.0]),
             roughness: resolveScalarProperty(mat.roughness, 1.0),
+            transmittance: resolveColorProperty(mat.transmittance, [1.0, 1.0, 1.0]),
+            // Non-dielectrics default to 1.0 (vacuum-like): ior_of is only physically meaningful
+            // for regions a transmitted ray can enter; opaque solids must not bend η ratios.
+            ior: resolveScalarProperty(mat.ior, mat.model === 'dielectric' ? 1.5 : 1.0),
         });
     }
 

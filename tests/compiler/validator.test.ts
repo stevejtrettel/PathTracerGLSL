@@ -73,9 +73,20 @@ describe('Validator', () => {
         expect(bag.getErrors().some(e => e.code === 'invalid-setting' && /disney/i.test(e.message))).toBe(true);
     });
 
-    it('rejects the dielectric material model', () => {
-        const bag = run(s => { s.materials.m = { model: 'dielectric' }; });
-        expect(bag.getErrors().some(e => e.code === 'invalid-setting' && /dielectric/i.test(e.message))).toBe(true);
+    it('accepts the dielectric material model (supported since the dielectric item)', () => {
+        const bag = run(s => { s.materials.m = { model: 'dielectric', ior: 1.5 }; });
+        expect(bag.getErrors().some(e => /dielectric/i.test(e.message))).toBe(false);
+    });
+
+    it('rejects a GLSL-expression ior on a dielectric (ior_of is region-indexed)', () => {
+        const bag = run(s => { s.materials.m = { model: 'dielectric', ior: { kind: 'glsl', source: '1.5' } }; });
+        expect(bag.getErrors().some(e => /ior/i.test(e.message))).toBe(true);
+    });
+
+    it('warns (does not error) on ior set on a non-dielectric material', () => {
+        const bag = run(s => { s.materials.m = { model: 'lambert', ior: 1.5 }; });
+        expect(bag.hasErrors()).toBe(false);
+        expect(bag.getWarnings().some(w => /ior/i.test(w.message))).toBe(true);
     });
 
     it('warns (does not error) on an empty scene', () => {

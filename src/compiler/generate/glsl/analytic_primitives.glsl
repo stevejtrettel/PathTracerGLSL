@@ -14,8 +14,11 @@ bool ray_sphere(Ray ray, vec3 center, float radius, out float t) {
     float disc = b * b - c;
     if (disc < 0.0) return false;
     float s = sqrt(disc);
-    float t0 = -b - s;
-    t = (t0 > EPSILON) ? t0 : (-b + s);   // nearer root if it's ahead, else the far root
+    // Root selection by the INSIDE test (c < 0), never by a t-threshold: an outside origin
+    // within EPSILON of the surface must NOT fall through to the far root — that skips the
+    // entry interface and fakes an exit from a region the ray never entered (review finding).
+    // Outside origins whose near root is ≤ EPSILON now miss (hairline, energy-bounded).
+    t = (c < 0.0) ? (-b + s) : (-b - s);
     return (t > EPSILON);
 }
 

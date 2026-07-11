@@ -95,6 +95,8 @@ export interface PlannedMaterial {
     albedo: Vec3 | GlslExpression | ValueParam<Vec3>;
     emission: Vec3 | GlslExpression | ValueParam<Vec3>;
     roughness: number | GlslExpression | ValueParam<number>;
+    transmittance: Vec3 | GlslExpression | ValueParam<Vec3>;    // dielectric interface tint
+    ior: number | GlslExpression | ValueParam<number>;          // → generated ior_of table (expressions rejected)
 }
 
 /**

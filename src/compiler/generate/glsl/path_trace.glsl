@@ -7,6 +7,13 @@ Radiance transport_trace(Ray ray) {
     Radiance radiance   = SPECTRUM_ZERO;
     Ray current_ray = ray;
 
+#ifdef HAS_TRANSMISSION
+    // §7.2 etaScale: transmission compresses radiance by η² (restored on exit), so RR keyed on
+    // raw throughput over-kills inside dense media — this factor divides the compression back
+    // out of the survival metric only. Efficiency, not bias.
+    float eta_scale = 1.0;
+#endif
+
     // §6.2 bookkeeping hook: tracked now, consumed when MIS / samplable environment land.
     // The camera "bounce" counts as delta so bounce-0 emission would be full-weight. Inert for
     // Lambert (never delta) until those readers exist — see docs/impl-plan-interaction-reshape.
@@ -32,17 +39,21 @@ Radiance transport_trace(Ray ray) {
         radiance += throughput * interaction_surface_emission(mat_emit, wo, hit, eprops);
 
 #ifdef ENABLE_NEE
-        // Next Event Estimation (explicit xi — §2.9; delta lights ignore it).
-        LightSample ls = lighting_sample(hit.p, random2());
-        if (ls.pdf > 0.0) {
-            // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
-            // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
-            Ray shadow_ray = ray_spawn(hit, ls.wi);
-            Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
-            if (!spectrum_is_black(vis)) {
-                Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
-                float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
-                radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
+        // Next Event Estimation (explicit xi — §2.9; delta lights ignore it). Pure-delta
+        // materials skip it entirely (generated guard): their eval is zero, the shadow march
+        // would be wasted.
+        if (material_has_nondelta_lobes(mat)) {
+            LightSample ls = lighting_sample(hit.p, random2());
+            if (ls.pdf > 0.0) {
+                // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
+                // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+                Ray shadow_ray = ray_spawn(hit, ls.wi);
+                Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
+                if (!spectrum_is_black(vis)) {
+                    Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
+                    float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)
+                    radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;
+                }
             }
         }
 #endif
@@ -53,11 +64,25 @@ Radiance transport_trace(Ray ray) {
         throughput *= bs.weight;
         prev_was_delta = (bs.flags & LOBE_DELTA) != 0u;
 
+#ifdef HAS_TRANSMISSION
+        // Accumulate the η² compression this crossing added (derivable from the hit's regions —
+        // no eta field on the sample struct needed).
+        if ((bs.flags & LOBE_TRANSMISSION) != 0u) {
+            float r = ior_of(hit.region_to) / ior_of(hit.region_from);
+            eta_scale *= r * r;
+        }
+#endif
+
 #ifdef ENABLE_RUSSIAN_ROULETTE
         // Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, so survival
         // is keyed on post-weight throughput (kills worthless paths before the next trace).
+#ifdef HAS_TRANSMISSION
+        float rr_metric = spectrum_max(throughput) * eta_scale;   // η²-corrected (§7.2 note)
+#else
+        float rr_metric = spectrum_max(throughput);   // §2.5: basis-agnostic, no Rec.709 weights
+#endif
         if (bounce >= RR_START_DEPTH) {
-            float p_survive = min(0.95, spectrum_max(throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+            float p_survive = min(0.95, rr_metric);
             if (random() > p_survive) break;
             throughput /= p_survive;
         }

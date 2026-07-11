@@ -75,10 +75,18 @@ Ray ray_spawn(Hit hit, Direction wi);  // continuation ray offset to wi's side:
    min — NOT abs of the signed min: inside a big region, |signed min| is the distance to the
    *container's* boundary and overshoots nested inner surfaces, e.g. the submerged sphere).
    Hit at `bound < MARCH_EPSILON`; `region` = arg-min = the owner. From a spawn point 1e-3
-   inside, bound ≈ 1e-3 > MARCH_EPSILON (1e-4), so no false immediate hit. `scene_sdf_dist`
-   (signed min) is kept for `scene_normal` — the gradient needs the sign. `sdf_intersect_any`
+   inside, bound ≈ 1e-3 > MARCH_EPSILON (1e-4), so no false immediate hit. `sdf_intersect_any`
    marches the unsigned bound likewise. Analytic backend already interior-correct
    (`ray_sphere` returns the far root).
+   **Normals come from the OWNER's own field** — `scene_normal(p, region)` takes the gradient of
+   the generated `scene_object_sdf(p, region)`, never of the global signed min. The global min is
+   hijacked by containers: on a nested surface the pool's deeply-negative sdf wins the min
+   everywhere inside, and its gradient points at the nearest *pool* face — the sphere renders as
+   a rounded cube with undeviated central rays. **Found on the GPU by the R-SUBMERGED witness**
+   (invisible to the phase-1 gate: in non-nested scenes every other sdf is positive at a hit, so
+   the owner always won the min). Matches the analytic backend's per-object normals. Side effect:
+   concave corners no longer blend adjacent objects' fields inside the normal stencil — corner
+   normals are marginally sharper than the old global-min gradient (more correct).
 7. **path_trace**: BSDF key `material_of(hit.region_owner)`; **emission keys on `region_to`**
    (§6.2 side convention — at a glass exit the BSDF is glass but you receive ambient's emission,
    i.e. none). Two lookups, two jobs.
@@ -134,7 +142,12 @@ exactly) — cornell/two-light means, furnace 0.4, mixed-backend scene unchanged
   footprint mean-abs-diff **> 5%** of Le scale. Deepest-wins bug → η=1 → sphere perfectly
   invisible → diff ≈ 0. Binary, tied to the flipped inequality.
 - **`cornell-glass`** — glass sphere in the Cornell box (eyeball: Fresnel rim, TIR at grazing,
-  inverted image through the sphere, brightened floor spot).
+  inverted image through the sphere). **The shadow under the sphere is DARK and that is correct
+  v1 physics** — dielectrics are shadow-opaque (§6.3 pin) and the point light is BSDF-unhittable,
+  so no transport path can form a caustic until area lights/`light_of` or transmissive shadows
+  land; the shadow is lit only by diffuse interreflection. Do not chase a bright spot. (The
+  sphere floats per validation X-GLASS — exact floor tangency parks the scene on epsilon
+  degeneracies; review finding.)
 - **`analytic-glass`** — the same glass sphere behind the analytic backend: cross-backend
   convergence twin (interior far-root path exercised).
 - X-GLASS (cross-strategy trio) **deferred** — needs the emissive-quad light (area lights/MIS

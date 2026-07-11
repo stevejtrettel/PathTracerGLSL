@@ -48,4 +48,5 @@ struct MaterialProperties {
     Spectrum emission;
     float emission_strength;
     float roughness;
+    Spectrum transmittance;   // dielectric interface tint (hand-added; schema-generated struct is the reorg pass)
 };

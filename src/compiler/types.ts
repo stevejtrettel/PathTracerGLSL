@@ -132,7 +132,8 @@ export interface MaterialDescription {
     albedo?: MaterialProperty;
     roughness?: MaterialProperty;
     metallic?: MaterialProperty;
-    ior?: MaterialProperty;
+    ior?: MaterialProperty;          // dielectric: region's interior IOR (→ generated ior_of table)
+    transmittance?: MaterialProperty; // dielectric: interface tint; interior absorption is the medium's job (§4.4)
     emission?: MaterialProperty;
 }
 

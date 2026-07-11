@@ -6,6 +6,7 @@ import { cornellBox, cornellStrategy } from '../../src/compiler/scenes/cornellBo
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '../../src/compiler/scenes/twoLightScene.js';
 import { furnaceBox, furnaceStrategy } from '../../src/compiler/scenes/furnaceBox.js';
 import { analyticMinimal, mixedScene, analyticStrategy } from '../../src/compiler/scenes/analyticScenes.js';
+import { etaScene, etaStrategy, submergedScene, submergedStrategy, cornellGlass, analyticGlass, glassStrategy } from '../../src/compiler/scenes/dielectricScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -55,6 +56,12 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     // Analytic backend: all-analytic (cross-method twin of minimal) + mixed SDF/analytic dispatch.
     ['analytic-minimal', analyticMinimal, analyticStrategy],
     ['mixed backends', mixedScene, analyticStrategy],
+    // Dielectric (impl-plan-dielectric): ior_of + dielectric dispatch + NEE guard + etaScale,
+    // across the witnesses (η², innermost-wins) and both geometry backends.
+    ['eta witness', etaScene, etaStrategy],
+    ['submerged witness', submergedScene, submergedStrategy],
+    ['cornell-glass', cornellGlass, glassStrategy],
+    ['analytic-glass', analyticGlass, glassStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

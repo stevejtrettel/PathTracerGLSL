@@ -17,6 +17,15 @@ import {
 } from './twoLightScene.js';
 import { furnaceBox, furnaceStrategy } from './furnaceBox.js';
 import { analyticMinimal, mixedScene, analyticStrategy } from './analyticScenes.js';
+import {
+    etaScene,
+    etaStrategy,
+    submergedScene,
+    submergedStrategy,
+    cornellGlass,
+    analyticGlass,
+    glassStrategy,
+} from './dielectricScenes.js';
 
 export interface SceneSuiteEntry {
     scene: SceneDescription;
@@ -83,6 +92,46 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             'camera.position': [0, 1.5, 6],
             'camera.target': [0, 0, 0],
+        },
+    },
+    eta: {
+        scene: etaScene,
+        strategies: [etaStrategy],
+        exercises:
+            'F-ETA η² witness (validation §3): center pixel = 0.5540 ± 1% linear HDR; omitting η² renders 0.980',
+        initialParameters: {
+            'camera.position': [0, 1, 0.05],
+            'camera.target': [0, -1, 0],
+        },
+    },
+    submerged: {
+        scene: submergedScene,
+        strategies: [submergedStrategy],
+        exercises:
+            'R-SUBMERGED innermost-wins witness (validation §5): sphere entry must classify region_from = water (η = 1.33/1.5); under deepest-wins the sphere is invisible',
+        initialParameters: {
+            'camera.position': [0, 0, 2],
+            'camera.target': [0, 0, 0],
+        },
+    },
+    'cornell-glass': {
+        scene: cornellGlass,
+        strategies: [glassStrategy],
+        exercises:
+            'dielectric eyeball scene: Fresnel rim, TIR, inverted image; RR-on exercises etaScale; NEE guard skips shadow rays at glass. Dark shadow under the sphere is CORRECT v1 (§6.3 shadow-opaque + delta light — caustics need area lights)',
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
+    },
+    'analytic-glass': {
+        scene: analyticGlass,
+        strategies: [glassStrategy],
+        exercises:
+            'cross-backend twin of cornell-glass (analytic glass sphere, interior far-root) — must converge to the same image',
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
         },
     },
 };

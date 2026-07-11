@@ -2,6 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy } from '../types.js';
+import { isGlslExpression } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 
 /**
@@ -44,8 +45,22 @@ export function validate(
     if (features.materials.hasDisney) {
         bag.error('invalid-setting', "Material model 'disney' not yet supported").add();
     }
-    if (features.materials.hasDielectric) {
-        bag.error('invalid-setting', "Material model 'dielectric' not yet supported").add();
+
+    // Dielectric ior constraints: the generated ior_of table is region-indexed (no shading
+    // point), so a GLSL-expression ior is unrepresentable — reject here with a real diagnostic
+    // (the generator's throw is only a backstop). An ior on a NON-dielectric material is ignored
+    // (pinned to 1.0 in the table) — warn so the author isn't silently surprised.
+    for (const [name, mat] of Object.entries(scene.materials)) {
+        if (mat.model === 'dielectric' && isGlslExpression(mat.ior)) {
+            bag.error('invalid-setting',
+                `Material '${name}': ior cannot be a GLSL expression — ior_of(region) is a region-indexed table with no shading point (use a constant or {param})`)
+                .add();
+        }
+        if (mat.model !== 'dielectric' && mat.ior !== undefined) {
+            bag.warning('invalid-setting',
+                `Material '${name}': ior is ignored for model '${mat.model}' (non-transmissive regions are pinned to 1.0 in ior_of)`)
+                .add();
+        }
     }
 
     // Warn on empty scene

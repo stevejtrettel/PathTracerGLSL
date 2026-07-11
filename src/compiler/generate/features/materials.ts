@@ -8,9 +8,16 @@ import type { RenderPlan, PlannedMaterial, PlannedUniform } from '../../plan/typ
 import type { ParameterMetadata } from '../../../engine/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatSpectrum } from './glsl-format.js';
+import { formatFloat, formatSpectrum, paramToUniform } from './glsl-format.js';
 
 import lambertGLSL from '../glsl/lambert.glsl?raw';
+import dielectricGLSL from '../glsl/dielectric.glsl?raw';
+
+/** Per-model capability facts (the future descriptor's `capabilities` — inline until the reorg pass). */
+const MODEL_HAS_NONDELTA_LOBES: Record<string, boolean> = {
+    lambert: true,
+    dielectric: false,   // pure delta: NEE can't sample it, eval ≡ 0
+};
 
 export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     const blocks: ShaderBlock[] = [
@@ -19,10 +26,15 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 
     for (const model of plan.program.materials.models) {
         if (model === 'lambert') blocks.push({ origin: 'glsl/lambert.glsl', source: lambertGLSL });
+        if (model === 'dielectric') blocks.push({ origin: 'glsl/dielectric.glsl', source: dielectricGLSL });
     }
 
     // The generated §3.3 dispatch, after the model libraries it calls.
     blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials) });
+
+    // NEE guard (§6.2 / reference loop): at a pure-delta hit the eval is zero — transport skips
+    // the shadow march. Constant-folds when the scene's materials are uniform in delta-ness.
+    blocks.push({ origin: 'generated:nondelta-guard', source: generateNondeltaGuard(plan.materials) });
 
     // Scan every material's properties for { param } references → live uniforms.
     const uniforms: PlannedUniform[] = [];
@@ -32,14 +44,15 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         addParamUniform(mat.albedo, 'vec3', 'color', uniforms, parameters, seen);
         addParamUniform(mat.emission, 'vec3', 'color', uniforms, parameters, seen);
         addParamUniform(mat.roughness, 'float', 'float', uniforms, parameters, seen);
+        addParamUniform(mat.transmittance, 'vec3', 'color', uniforms, parameters, seen);
+        addParamUniform(mat.ior, 'float', 'float', uniforms, parameters, seen);
     }
 
-    return { ...emptyContribution(), blocks, uniforms, parameters };
-}
+    // Transmission present → transport tracks etaScale for the RR metric (§7.2).
+    const defines: Record<string, string> = {};
+    if (plan.program.materials.models.includes('dielectric')) defines['HAS_TRANSMISSION'] = '';
 
-/** Uniform name from a parameter path: 'clay.albedo' → 'u_clay_albedo'. */
-function paramToUniform(path: string): string {
-    return 'u_' + path.replace(/\./g, '_');
+    return { ...emptyContribution(), blocks, defines, uniforms, parameters };
 }
 
 function addParamUniform(
@@ -90,6 +103,7 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
     lines.push('    props.emission = SPECTRUM_ZERO;');
     lines.push('    props.emission_strength = 0.0;');
     lines.push('    props.roughness = 1.0;');
+    lines.push('    props.transmittance = SPECTRUM_ONE;');
 
     for (let i = 0; i < materials.length; i++) {
         const mat = materials[i];
@@ -111,6 +125,7 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
             lines.push(`        props.emission_strength = 1.0;`);
         } else if (isGlslExpression(mat.emission)) {
             lines.push(`        props.emission = ${mat.emission.source};`);
+            lines.push(`        props.emission_strength = 1.0;`);   // an expression emitter is an emitter
         } else {
             const hasEmission = mat.emission[0] > 0 || mat.emission[1] > 0 || mat.emission[2] > 0;
             if (hasEmission) {
@@ -128,10 +143,45 @@ function generateMaterialLookup(materials: PlannedMaterial[]): string {
             lines.push(`        props.roughness = ${formatFloat(mat.roughness)};`);
         }
 
+        // transmittance — dielectric materials only (others keep the SPECTRUM_ONE default)
+        if (mat.model === 'dielectric') {
+            if (isValueParam(mat.transmittance)) {
+                lines.push(`        props.transmittance = ${paramToUniform(mat.transmittance.param)};`);
+            } else if (isGlslExpression(mat.transmittance)) {
+                lines.push(`        props.transmittance = ${mat.transmittance.source};`);
+            } else {
+                lines.push(`        props.transmittance = ${formatSpectrum(mat.transmittance)};`);
+            }
+        }
+
         lines.push(`    }`);
     }
 
     lines.push('    return props;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// ============================================================================
+// Generated NEE guard — material_has_nondelta_lobes (reference loop / §6.2)
+// ============================================================================
+
+function generateNondeltaGuard(materials: PlannedMaterial[]): string {
+    // Fail SAFE on models missing from the capability map: only an EXPLICIT `false` skips NEE.
+    // (`!map[model]` treated unknown models as delta → a future model wired into the dispatch but
+    // not this map would silently lose all direct lighting — review finding. Defaulting to true
+    // costs at worst a wasted shadow ray.)
+    const deltaIds = materials.filter((m) => MODEL_HAS_NONDELTA_LOBES[m.model] === false).map((m) => m.id);
+    const lines: string[] = ['// Generated NEE guard: pure-delta materials skip the shadow ray (eval ≡ 0)'];
+    lines.push('bool material_has_nondelta_lobes(int mat) {');
+    if (deltaIds.length === 0) {
+        lines.push('    return true;');
+    } else if (deltaIds.length === materials.length) {
+        lines.push('    return false;');
+    } else {
+        lines.push(`    if (${deltaIds.map((id) => `mat == ${id}`).join(' || ')}) return false;`);
+        lines.push('    return true;');
+    }
     lines.push('}');
     return lines.join('\n');
 }
