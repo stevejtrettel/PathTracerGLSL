@@ -37,6 +37,21 @@ import {
     hazeNeeStrategy,
     hazePtStrategy,
 } from './mediaScenes.js';
+import {
+    marbleScene,
+    marbleStrategy,
+    marbleNoScatterStrategy,
+    mistScene,
+    mistStrategy,
+} from './demoScenes.js';
+import {
+    cornellArea,
+    cornellAreaNeeStrategy,
+    cornellAreaPtStrategy,
+    orbScene,
+    orbNeeStrategy,
+    orbPtStrategy,
+} from './areaLightScenes.js';
 
 export interface SceneSuiteEntry {
     scene: SceneDescription;
@@ -205,6 +220,54 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             'camera.position': [0, 1.2, 5],
             'camera.target': [0, 1.2, -1],
+        },
+    },
+    marble: {
+        scene: marbleScene,
+        strategies: [marbleStrategy, marbleNoScatterStrategy],
+        exercises:
+            'DEMO — dielectric surface + scattering interior composed in ONE material, lit by an emissive panel (point lights cannot NEE-light a glass shell, §6.3); {param} smoke color + g; key 2 = volumeIntegrator none (scattering off)',
+        expected:
+            'a glowing storm-cloud core inside the glass, Fresnel rim from the panel below, dark moody surround; key 2 collapses the interior to clear tinted glass — the difference IS the volume integrator',
+        initialParameters: {
+            'camera.position': [0.4, 1.15, 3.2],
+            'camera.target': [0, 0.55, 0],
+        },
+    },
+    mist: {
+        scene: mistScene,
+        strategies: [mistStrategy],
+        exercises:
+            'DEMO — bounded ground-fog layer (null interfaces at world scale), camera INSIDE the volume (classification-init, §4.4), medium NEE shafts from a warm sun, aerial perspective; {param} mist.density',
+        expected:
+            'warm crepuscular shadow-lanes between backlit stones, far monoliths fading into the haze, cool clear sky above the fog layer; expect halo spike-noise near the sun direction (equiangular is deferred)',
+        initialParameters: {
+            'camera.position': [0, 1.7, 6],
+            'camera.target': [0, 1.6, -8],
+        },
+    },
+    'cornell-area': {
+        scene: cornellArea,
+        strategies: [cornellAreaNeeStrategy, cornellAreaPtStrategy],
+        exercises:
+            'X-CORNELL (validation §4): explicit quad light desugared to an emissive region; quad solid-angle pdf; §6.2 emission w-bookkeeping (w=0 after non-delta bounces under NEE); soft shadows',
+        expected:
+            'keys 1 (pt-nee) and 2 (pt) converge to the SAME image (RMSE < 1.5% at 4096 spp) — divergence implicates the w-bookkeeping, the quad pdf, or shadow offsets; the ceiling panel is VISIBLE; shadows are soft',
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
+    },
+    orb: {
+        scene: orbScene,
+        strategies: [orbNeeStrategy, orbPtStrategy],
+        exercises:
+            'sphere light via the sampleAsLight route (emissive analytic sphere, default-true registry entry); visible-cone sampling; delta bookkeeping (glass keeps full-weight emission after specular chains)',
+        expected:
+            'keys 1 (pt-nee) and 2 (pt) converge to the same image; the orb is visible directly AND in the glass reflections; soft shadow from the box',
+        initialParameters: {
+            'camera.position': [0, 1.3, 3.4],
+            'camera.target': [0, 0.7, 0],
         },
     },
 };

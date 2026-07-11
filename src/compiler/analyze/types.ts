@@ -24,6 +24,11 @@ export interface SceneFeatures {
     lighting: {
         pointLightCount: number;
         directionalLightCount: number;
+        /** Explicit quad/sphere area lights in scene.lights (each desugars to a region, §6.2). */
+        areaLightCount: number;
+        /** Emissive analytic quad/sphere OBJECTS that enter the registry via sampleAsLight. */
+        samplableEmitterCount: number;
+        /** Every samplable source: point + directional + area + samplable emitters. */
         totalLightCount: number;
     };
 

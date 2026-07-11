@@ -167,6 +167,15 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[]): string {
     return lines.join('\n');
 }
 
+/** Unit cross(edge1, edge2) — a quad's emitting-side normal, precomputed at compile time. */
+export function quadNormal(edge1: number[], edge2: number[]): [number, number, number] {
+    const cx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
+    const cy = edge1[2] * edge2[0] - edge1[0] * edge2[2];
+    const cz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
+    const len = Math.hypot(cx, cy, cz);
+    return [cx / len, cy / len, cz / len];
+}
+
 /** GLSL boolean test call that writes `t` for object `obj`. */
 function analyticTest(obj: PlannedAnalyticObject): string {
     const p = obj.parameters;
@@ -181,6 +190,12 @@ function analyticTest(obj: PlannedAnalyticObject): string {
             const offset = formatFloat(p.offset as number ?? 0.0);
             return `ray_plane(ray, ${normal}, ${offset}, t)`;
         }
+        case 'quad': {
+            const corner = formatVec3(p.corner as number[] ?? [0, 0, 0]);
+            const edge1 = p.edge1 as number[] ?? [1, 0, 0];
+            const edge2 = p.edge2 as number[] ?? [0, 0, 1];
+            return `ray_quad(ray, ${corner}, ${formatVec3(edge1)}, ${formatVec3(edge2)}, ${formatVec3(quadNormal(edge1, edge2))}, t)`;
+        }
         default:
             throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
     }
@@ -194,6 +209,10 @@ function analyticNormal(obj: PlannedAnalyticObject): string {
             return `normalize(hit.p - ${formatVec3(p.center as number[] ?? [0, 0, 0])})`;
         case 'plane':
             return formatVec3(p.normal as number[] ?? [0, 1, 0]);
+        case 'quad':
+            // The emitting side (impl-plan-area-lights: one-sided pin). Back-face hits get the
+            // dispatcher's exit flip, which keys emission on the region BEHIND — dark, correct.
+            return formatVec3(quadNormal(p.edge1 as number[] ?? [1, 0, 0], p.edge2 as number[] ?? [0, 0, 1]));
         default:
             throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
     }
@@ -213,6 +232,10 @@ function analyticSignedDistance(obj: PlannedAnalyticObject): string {
             const offset = formatFloat(p.offset as number ?? 0.0);
             return `dot(p, ${normal}) + ${offset}`;
         }
+        case 'quad':
+            // Zero-thickness: never contains a point, so it never claims a region in
+            // scene_region_at — which is exactly what makes it one-sided under region_to.
+            return '1.0e20';
         default:
             throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
     }

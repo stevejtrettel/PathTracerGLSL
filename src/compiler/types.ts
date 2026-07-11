@@ -86,7 +86,7 @@ export interface CustomSDF {
 }
 
 export interface StandardAnalytic {
-    type: 'sphere' | 'plane';
+    type: 'sphere' | 'plane' | 'quad';
     parameters: Record<string, number | number[]>;
 }
 
@@ -159,11 +159,17 @@ export interface MaterialDescription {
     emission?: MaterialProperty;
     /** Interior medium (§3.5/§4.4). Composes with any surface model; required for model 'none'. */
     medium?: MediumDescription;
+    /**
+     * §6.2 registry opt-in: an emissive material on an ANALYTIC quad/sphere object becomes a
+     * samplable light (default true for those shapes; constant emission only in v1). On SDF
+     * shapes `true` is a Validator error (V1-C2) — emissive SDFs stay path-only and still glow.
+     */
+    sampleAsLight?: boolean;
 }
 
 // --- Lights ---
 
-export type LightDescription = PointLight | DirectionalLight;
+export type LightDescription = PointLight | DirectionalLight | QuadLight | SphereLight;
 
 export interface PointLight {
     kind: 'point';
@@ -175,6 +181,30 @@ export interface PointLight {
 export interface DirectionalLight {
     kind: 'directional';
     direction: Vec3;
+    intensity: number;
+    color?: Vec3;
+}
+
+/**
+ * Rectangular area light (§6.2): DESUGARS to a synthesized emissive quad region — hittable,
+ * visible in reflections, samplable via the registry. ONE-SIDED: emits from the
+ * `cross(edge1, edge2)` side (impl-plan-area-lights pinned deviation). Emitted radiance
+ * Le = color·intensity (no falloff — the falloff IS the solid-angle measure, §6.1).
+ */
+export interface QuadLight {
+    kind: 'quad';
+    corner: Vec3;
+    edge1: Vec3;
+    edge2: Vec3;
+    intensity: number;
+    color?: Vec3;
+}
+
+/** Spherical area light (§6.2): desugars like the quad; sampled via the visible cone. */
+export interface SphereLight {
+    kind: 'sphere';
+    position: Vec3;
+    radius: number;
     intensity: number;
     color?: Vec3;
 }

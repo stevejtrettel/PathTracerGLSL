@@ -8,6 +8,8 @@ import { furnaceBox, furnaceStrategy } from '../../src/compiler/scenes/furnaceBo
 import { analyticMinimal, mixedScene, analyticStrategy } from '../../src/compiler/scenes/analyticScenes.js';
 import { etaScene, etaStrategy, submergedScene, submergedStrategy, cornellGlass, analyticGlass, glassStrategy } from '../../src/compiler/scenes/dielectricScenes.js';
 import { slabScene, slabStrategy, fogcubeScene, fogcubeStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../../src/compiler/scenes/mediaScenes.js';
+import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistStrategy } from '../../src/compiler/scenes/demoScenes.js';
+import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, orbScene, orbNeeStrategy } from '../../src/compiler/scenes/areaLightScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -73,6 +75,17 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     ['furnace-scatter witness', furnaceScatterScene, furnaceScatterStrategy],
     ['haze + pt-nee', hazeScene, hazeNeeStrategy],
     ['haze + pt', hazeScene, hazePtStrategy],
+    // Demos: dielectric+medium in one material (marble; key 2 = volumeIntegrator 'none'
+    // collapsing the scattering arms) and camera-inside-bounded-fog (mist; classification-init).
+    ['marble demo', marbleScene, marbleStrategy],
+    ['marble demo (no scatter)', marbleScene, marbleNoScatterStrategy],
+    ['mist demo', mistScene, mistStrategy],
+    // Area lights (impl-plan-area-lights phase A): quad desugar + light_of + w-bookkeeping
+    // (cornell-area, both strategies — pt has NO light_of table); sphere light via the
+    // sampleAsLight route (orb).
+    ['cornell-area + pt-nee', cornellArea, cornellAreaNeeStrategy],
+    ['cornell-area + pt', cornellArea, cornellAreaPtStrategy],
+    ['orb + pt-nee', orbScene, orbNeeStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

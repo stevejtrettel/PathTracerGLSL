@@ -6,10 +6,16 @@
 // performs the once-per-hit region classification (§4.2) — the marcher only reports geometry + owner.
 
 #ifndef MAX_MARCH_STEPS
-#define MAX_MARCH_STEPS 128
+#define MAX_MARCH_STEPS 512
 #endif
 #define MARCH_EPSILON 0.0001
 #define NORMAL_EPSILON 0.001
+
+// Acceptance threshold grows with travel distance (pixel-footprint scaling: a fixed 1e-4 at
+// t = 40 resolves geometry far below one pixel and just burns steps) but stays CAPPED at half
+// of EPS_INTERFACE, so the §4.2 classification probes always clear the accepted residual.
+#define MARCH_EPSILON_MAX 0.0005
+float march_epsilon(float t) { return min(MARCH_EPSILON_MAX, MARCH_EPSILON * (1.0 + t)); }
 
 // Gradient of the OWNER's own signed field — never the global min, which a containing region's
 // deeply-negative sdf hijacks on nested surfaces (the R-SUBMERGED rounded-cube bug).
@@ -33,15 +39,16 @@ vec3 scene_normal(vec3 p, int region) {
 bool sdf_intersect(Ray ray, inout Hit hit) {
     float t = EPSILON;   // near bound (self-intersection handled by the ray_spawn origin offset)
     int region = -1;
+    float bound = 1e20;
 
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
-        float bound = scene_march_bound(p, region);   // region = nearest surface's owner (arg-min)
+        bound = scene_march_bound(p, region);   // region = nearest surface's owner (arg-min)
 
         // Accept only if CLOSER than the running nearest: the march is blind to analytic
         // surfaces, so without `t < hit.t` a step can sail through an analytic object and
         // commit an SDF surface BEHIND it, clobbering the closer hit (review finding).
-        if (bound < MARCH_EPSILON && t < hit.t) {
+        if (bound < march_epsilon(t) && t < hit.t) {
             hit.t = t;
             hit.p = p;
             hit.frame = ambient_frame(p, scene_normal(p, region));   // owner's outward normal; dispatcher orients (§4.1)
@@ -51,12 +58,31 @@ bool sdf_intersect(Ray ray, inout Hit hit) {
         }
 
         if (t > hit.t) {
-            break;
+            return false;   // searched past the running nearest: genuine miss
         }
 
         t += bound;
     }
 
+    // Budget exhausted. A STALL (bound still small) means the ray is pinned against geometry at
+    // grazing incidence — commit the graze as a hit: reporting a miss here paints the
+    // BACKGROUND through the silhouette (the black-edge artifact; the ray had no budget left to
+    // find the surface behind either). Sub-pixel bias, correct color. A non-stalled exhaustion
+    // (long flight through a big scene) remains a miss.
+    // Window sizing: face-grazing rays advance by ~their height h per step, so rays with
+    // h ≲ face_length / MAX_MARCH_STEPS stall — the window must cover that band. The residual
+    // off-surface distance only threatens §4.2 classification on EXIT hits (interior side must
+    // stay within EPS_INTERFACE of the surface for the outside probe to clear); entry-side
+    // grazes tolerate any δ. 16ε ≈ 8e-3 covers the band at 512 steps for unit-scale faces.
+    if (bound < 16.0 * march_epsilon(t) && t < hit.t) {
+        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
+        hit.t = t;
+        hit.p = p;
+        hit.frame = ambient_frame(p, scene_normal(p, region));
+        hit.region_owner = region;
+        hit.uv = vec2(p.x * 0.1, p.z * 0.1);
+        return true;
+    }
     return false;
 }
 
@@ -69,16 +95,20 @@ bool sdf_intersect_any(Ray ray, float maxDist) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
         float bound = scene_march_bound(p, region);   // unsigned: valid from inside media/solids too
 
-        if (bound < MARCH_EPSILON) {
+        if (bound < march_epsilon(t)) {
             return true;
         }
 
         if (t > maxDist) {
-            break;
+            return false;   // cleared the light distance: unoccluded
         }
 
         t += bound;
     }
 
-    return false;
+    // Budget exhausted while still inside the search interval: pinned against geometry at
+    // grazing. Conservatively OCCLUDED — the old `return false` here LEAKED light through
+    // contact edges (the inverse of the primary-ray black-edge artifact). Over-darkening a
+    // grazed shadow ray is the physically-safe failure direction.
+    return true;
 }

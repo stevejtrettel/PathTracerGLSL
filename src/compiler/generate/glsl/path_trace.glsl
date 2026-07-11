@@ -18,10 +18,11 @@ Radiance transport_trace(Ray ray) {
 #endif
 #ifdef HAS_MEDIA
     // §4.4: THE medium variable — a single int ground-truthed by classification (self-heal
-    // below), never a stack. Camera starts in ambient (-1 → ambientMedium via material_of);
-    // a camera inside a BOUNDED medium mistracks exactly one segment, then heals —
-    // classification-init is a two-line upgrade when a scene needs it.
-    int current_medium = -1;
+    // below), never a stack. Initialized by classifying the camera origin: init -1 would
+    // mistrack exactly the PRIMARY segment when the camera sits inside a bounded medium —
+    // unfogging direct visibility (the `mist` demo is that scene; deferred-until-a-reader,
+    // now it has one). Ambient scenes classify to -1 — identical behavior, one query per path.
+    int current_medium = scene_region_at(ray.origin);
 #endif
 #ifdef HAS_NULL_INTERFACES
     int null_crossings = 0;   // §3.6: nulls are bookkeeping with their own safety counter
@@ -58,7 +59,10 @@ Radiance transport_trace(Ray ray) {
                     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
                     LightSample ls = lighting_sample(p_evt, random2());
                     if (ls.pdf > 0.0) {
-                        Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance);
+                        // Same 2·EPSILON back-off as the surface site: with AREA lights the
+                        // sampled point is ON the emitter's surface, and the walker's
+                        // strict-< boundary test at exactly ls.distance is a float coin flip.
+                        Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
                         if (!spectrum_is_black(vis)) {
                             radiance += throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis / ls.pdf;
                         }
@@ -129,7 +133,19 @@ Radiance transport_trace(Ray ray) {
             // No ternary here: ANGLE rejects '?:' on struct operands (ESSL restriction).
             MaterialProperties eprops = props;
             if (mat_emit != mat) eprops = scene_material_properties(mat_emit, hit.p);
+#if defined(ENABLE_NEE) && defined(HAS_SAMPLABLE_EMITTERS)
+            // §6.2 double-count bookkeeping: a SAMPLABLE emitter (light_of ≥ 0) found by a
+            // non-delta bounce was already counted by NEE at the previous vertex → w = 0.
+            // Path-only emitters, post-delta hits, and the camera "bounce" (prev_was_delta
+            // inits true) stay full-weight. MIS (phase B) swaps the 0.0 for the power
+            // heuristic — reference §8's first line. Under directLighting 'none' this block
+            // is absent and emission stays full-weight: that is WHY pt and pt-nee converge
+            // to the same image (§11.2's witness).
+            float w_emit = (light_of(hit.region_to) < 0 || prev_was_delta) ? 1.0 : 0.0;
+            radiance += throughput * w_emit * interaction_surface_emission(mat_emit, wo, hit, eprops);
+#else
             radiance += throughput * interaction_surface_emission(mat_emit, wo, hit, eprops);
+#endif
         }
 
 #ifdef ENABLE_NEE
@@ -141,8 +157,12 @@ Radiance transport_trace(Ray ray) {
             if (ls.pdf > 0.0) {
                 // §6.3: the shadow query returns per-channel transmittance (opaque form: 0 or 1).
                 // The shadow ray is a pure seed; its far bound (the light distance) is an argument.
+                // Back-off is 2·EPSILON: ray_spawn moved the origin up to EPSILON along the
+                // normal, so with wi ∥ n an AREA light's own surface sits at exactly
+                // distance−EPSILON from the spawned origin — a 1·EPSILON bound is a coin flip
+                // that self-shadows surfaces facing the panel (the dark-tops bug).
                 Ray shadow_ray = ray_spawn(hit, ls.wi);
-                Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - EPSILON);
+                Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
                 if (!spectrum_is_black(vis)) {
                     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);  // bare f (§2.2)
                     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));          // transport applies the cosine (metric)

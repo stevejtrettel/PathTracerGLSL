@@ -164,7 +164,7 @@ scenes still identical-after-preprocessing; `npx vitest run` + snapshot review.
 | `medium_sample_pdf` companion (MIS between distance-sampling strategies) | if that research direction opens |
 | §11.4 repair-counter debug strategy (self-heal is silent for now) | debug-views item |
 | Env-samplable miss weighting | env-as-light item |
-| Camera-inside-bounded-medium classification init | first scene that needs it |
+| ~~Camera-inside-bounded-medium classification init~~ | **LANDED** with the `mist` demo (camera inside a bounded fog layer): `current_medium = scene_region_at(ray.origin)` — one query per path, −1 in ambient scenes |
 | Diffusion-BSSRDF SSS (material-axis, not medium-axis — volumetric-component §1) | future material model |
 | Transport template → generated blocks (the #ifdef count keeps arguing for it) | §10.1 item 9, still last |
 

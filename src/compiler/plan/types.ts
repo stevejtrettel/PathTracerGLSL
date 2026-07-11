@@ -84,7 +84,7 @@ export interface PlannedSDFObject {
 export interface PlannedAnalyticObject {
     index: number;
     materialId: number;
-    shapeType: 'sphere' | 'plane';
+    shapeType: 'sphere' | 'plane' | 'quad';
     parameters: Record<string, number | number[]>;
 }
 
@@ -115,13 +115,22 @@ export interface PlannedMaterial {
 }
 
 /**
- * Resolved light for code generation.
+ * Resolved samplable-light registry entry (§6.2). Explicit area lights DESUGAR into a
+ * synthesized emissive region + one of these; sampleAsLight emitters contribute one per
+ * region (two objects sharing an emissive material = two lights). Registry order = light id
+ * = CDF order. Delta kinds carry no region.
  */
 export interface PlannedLight {
     id: number;
-    kind: 'point' | 'directional';
-    position?: Vec3;
-    direction?: Vec3;
+    kind: 'point' | 'directional' | 'quad' | 'sphere';
+    position?: Vec3;      // point; sphere center
+    direction?: Vec3;     // directional (rejected in v1)
+    corner?: Vec3;        // quad
+    edge1?: Vec3;
+    edge2?: Vec3;
+    radius?: number;      // sphere
+    /** The emitter's region id (quad/sphere) — feeds the generated light_of table. */
+    regionId?: number;
     intensity: number;
     color: Vec3;
 }

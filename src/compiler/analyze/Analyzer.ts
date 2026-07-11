@@ -13,6 +13,14 @@ function mayBeNonzero(prop: MaterialProperty | undefined): boolean {
     return true; // {param} or GLSL expression (the latter is rejected by the Validator)
 }
 
+/** Nonzero CONSTANT only — {param}/expression are false (the v1 sampleAsLight restriction). */
+function isConstantNonzero(prop: MaterialProperty | undefined): boolean {
+    if (prop === undefined) return false;
+    if (typeof prop === 'number') return prop !== 0;
+    if (Array.isArray(prop)) return prop.some((c) => c !== 0);
+    return false;
+}
+
 export function analyze(scene: SceneDescription): SceneFeatures {
     // --- Geometry ---
     let sdfCount = 0;
@@ -63,15 +71,30 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     // --- Lighting ---
     let pointLightCount = 0;
     let directionalLightCount = 0;
+    let areaLightCount = 0;
 
     for (const light of scene.lights) {
         switch (light.kind) {
             case 'point': pointLightCount++; break;
             case 'directional': directionalLightCount++; break;
+            case 'quad': areaLightCount++; break;
+            case 'sphere': areaLightCount++; break;
         }
     }
 
-    const totalLightCount = pointLightCount + directionalLightCount;
+    // §6.2 registry, sampleAsLight route: emissive analytic quad/sphere OBJECTS are samplable
+    // (default true for those shapes). V1: CONSTANT nonzero emission only — param/procedural
+    // emitters stay path-only under the default (explicit `true` on those is a Validator error).
+    let samplableEmitterCount = 0;
+    for (const obj of scene.objects) {
+        if (obj.kind !== 'analytic') continue;
+        if (obj.shape.type !== 'quad' && obj.shape.type !== 'sphere') continue;
+        const mat = scene.materials[obj.material];
+        if (mat === undefined || mat.sampleAsLight === false) continue;
+        if (isConstantNonzero(mat.emission)) samplableEmitterCount++;
+    }
+
+    const totalLightCount = pointLightCount + directionalLightCount + areaLightCount + samplableEmitterCount;
 
     return {
         ambientSpace: scene.ambientSpace.type,
@@ -92,6 +115,8 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         lighting: {
             pointLightCount,
             directionalLightCount,
+            areaLightCount,
+            samplableEmitterCount,
             totalLightCount,
         },
         media: {

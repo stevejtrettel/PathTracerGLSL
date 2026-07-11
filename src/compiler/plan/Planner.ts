@@ -68,17 +68,92 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         // mesh objects are not yet supported (deferred — see impl-plan-analytic-backend.md)
     }
 
-    // --- Assign lights ---
+    // --- Assign lights (the §6.2 samplable registry; order = light id = CDF order) ---
     const lights: PlannedLight[] = [];
     let lightIndex = 0;
     for (const light of scene.lights) {
+        const color = ('color' in light ? light.color : undefined) ?? ([1.0, 1.0, 1.0] as Vec3);
         if (light.kind === 'point') {
             lights.push({
                 id: lightIndex++,
                 kind: 'point',
                 position: light.position,
                 intensity: light.intensity,
-                color: light.color ?? [1.0, 1.0, 1.0] as Vec3,
+                color,
+            });
+        } else if (light.kind === 'quad' || light.kind === 'sphere') {
+            // DESUGAR (§6.2): every hittable light is a region — synthesize the emissive
+            // material + the analytic emitter object, then register the samplable entry.
+            // Le = color·intensity, shared EXACTLY between the emission table and the sampler
+            // (any mismatch makes pt and pt-nee converge to different images).
+            const radiance: Vec3 = [color[0] * light.intensity, color[1] * light.intensity, color[2] * light.intensity];
+            const matId = materialIndex++;
+            materials.push({
+                id: matId,
+                name: `__light_${lightIndex}`,
+                model: 'lambert',
+                albedo: [0.0, 0.0, 0.0],
+                emission: radiance,
+                roughness: 1.0,
+                transmittance: [1.0, 1.0, 1.0],
+                ior: 1.0,
+                medium: null,
+            });
+            const regionId = objectIndex++;
+            if (light.kind === 'quad') {
+                analyticObjects.push({
+                    index: regionId,
+                    materialId: matId,
+                    shapeType: 'quad',
+                    parameters: { corner: light.corner, edge1: light.edge1, edge2: light.edge2 },
+                });
+                lights.push({
+                    id: lightIndex++, kind: 'quad', regionId,
+                    corner: light.corner, edge1: light.edge1, edge2: light.edge2,
+                    intensity: light.intensity, color,
+                });
+            } else {
+                analyticObjects.push({
+                    index: regionId,
+                    materialId: matId,
+                    shapeType: 'sphere',
+                    parameters: { center: light.position, radius: light.radius },
+                });
+                lights.push({
+                    id: lightIndex++, kind: 'sphere', regionId,
+                    position: light.position, radius: light.radius,
+                    intensity: light.intensity, color,
+                });
+            }
+        }
+        // directional: Validator-rejected; skipped here
+    }
+
+    // sampleAsLight route (§6.2): emissive analytic quad/sphere OBJECTS join the registry —
+    // per REGION, so two objects sharing one emissive material become two lights. V1: constant
+    // nonzero emission only (Analyzer/Validator enforce); Le read from the material constant.
+    for (const planned of analyticObjects) {
+        const mat = materials[planned.materialId];
+        if (mat === undefined || mat.name.startsWith('__light_')) continue;   // synthesized: already registered
+        if (planned.shapeType !== 'quad' && planned.shapeType !== 'sphere') continue;
+        const sceneMat = scene.materials[mat.name];
+        if (sceneMat === undefined || sceneMat.sampleAsLight === false) continue;
+        if (!Array.isArray(mat.emission) || !mat.emission.some((c) => c !== 0)) continue;
+        const Le = mat.emission as Vec3;
+        // Registry stores color·intensity factored as (Le, 1.0) — samplers only consume the product.
+        if (planned.shapeType === 'quad') {
+            const p = planned.parameters;
+            lights.push({
+                id: lightIndex++, kind: 'quad', regionId: planned.index,
+                corner: p.corner as Vec3, edge1: p.edge1 as Vec3, edge2: p.edge2 as Vec3,
+                intensity: 1.0, color: Le,
+            });
+        } else {
+            const p = planned.parameters;
+            lights.push({
+                id: lightIndex++, kind: 'sphere', regionId: planned.index,
+                position: p.center as Vec3, radius: p.radius as number,
+                intensity: 1.0, color: Le,
             });
         }
     }
@@ -115,6 +190,11 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     if (features.materials.hasLambert) brdfModels.push('lambert');
     if (features.materials.hasDisney) brdfModels.push('disney');
     if (features.materials.hasDielectric) brdfModels.push('dielectric');
+    // Desugared area lights synthesize lambert emitter materials — a lambert-free scene with a
+    // quad light still needs the lambert arms (else the emitter dispatches to a wrong fallback).
+    if (!brdfModels.includes('lambert') && scene.lights.some((l) => l.kind === 'quad' || l.kind === 'sphere')) {
+        brdfModels.push('lambert');
+    }
 
     const hasLights = features.lighting.totalLightCount > 0;
     const wantsNEE = strategy.transport.directLighting !== 'none' && hasLights;

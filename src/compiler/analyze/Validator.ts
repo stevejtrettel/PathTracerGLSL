@@ -41,6 +41,53 @@ export function validate(
             .add();
     }
 
+    // MIS is phase B of impl-plan-area-lights — reject rather than silently compile plain NEE
+    // (the pre-existing hole: 'mis' used to fall through to the NEE path with no diagnostic).
+    if (strategy.transport.directLighting === 'mis') {
+        bag.error('invalid-setting',
+            "directLighting 'mis' not yet supported — lands with area-lights phase B (docs/impl-plan-area-lights.md); use 'nee'")
+            .add();
+    }
+
+    // --- Area lights (impl-plan-area-lights A0) ---
+    for (let i = 0; i < scene.lights.length; i++) {
+        const light = scene.lights[i];
+        if (light.kind === 'quad') {
+            const [ax, ay, az] = light.edge1;
+            const [bx, by, bz] = light.edge2;
+            const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+            if (cx * cx + cy * cy + cz * cz <= 0) {
+                bag.error('invalid-setting',
+                    `Light ${i}: quad edges are parallel or zero — the quad is degenerate (|edge1 × edge2| = 0)`)
+                    .add();
+            }
+        }
+        if (light.kind === 'sphere' && light.radius <= 0) {
+            bag.error('invalid-setting', `Light ${i}: sphere light radius must be > 0`).add();
+        }
+    }
+
+    // sampleAsLight (§6.2 / V1-C2): explicit true demands an analytically samplable emitter —
+    // an analytic quad/sphere object with CONSTANT nonzero emission. SDF emitters stay
+    // path-only (they still glow; they converge slower — the honest open-question-#10 answer).
+    for (const [name, mat] of Object.entries(scene.materials)) {
+        if (mat.sampleAsLight !== true) continue;
+        const analyticSamplable = scene.objects.some((o) =>
+            o.kind === 'analytic' && (o.shape.type === 'quad' || o.shape.type === 'sphere') && o.material === name);
+        if (!analyticSamplable) {
+            bag.error('invalid-setting',
+                `Material '${name}': sampleAsLight requires an ANALYTIC quad or sphere object using it (V1-C2 — emissive SDF/custom shapes are path-only and still glow)`)
+                .add();
+        }
+        const e = mat.emission;
+        const constantEmission = typeof e === 'number' ? e !== 0 : Array.isArray(e) ? e.some((c) => c !== 0) : false;
+        if (!constantEmission) {
+            bag.error('invalid-setting',
+                `Material '${name}': sampleAsLight requires CONSTANT nonzero emission in v1 — {param}/procedural emitter power needs the light-registry accessor (deferred)`)
+                .add();
+        }
+    }
+
     // Check for unsupported material models
     if (features.materials.hasDisney) {
         bag.error('invalid-setting', "Material model 'disney' not yet supported").add();
