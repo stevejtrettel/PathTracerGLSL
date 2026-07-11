@@ -1,10 +1,10 @@
 /**
  * Scene Lab
  *
- * A single dev entry that views any scene from the suite (src/compiler/scenes/index.ts).
- * Pick one with the URL: /lab.html?scene=furnace  (default: two-light).
- * Strategies bind to keys 1-9; `r` resets accumulation. The documented cornell dev entry
- * (index.html → examples/cornell-box.ts) is left untouched.
+ * Renders any scene from the suite (src/compiler/scenes/index.ts):
+ * /lab.html?scene=furnace  (default: two-light). Strategies bind to keys 1-9; `r` resets
+ * accumulation. The landing page (index.html and /suite.html) is the suite GALLERY
+ * (examples/suite.ts) — every card links here.
  */
 
 import { App } from '../src/app/index.js';
@@ -19,18 +19,13 @@ import {
 } from '../src/app/extensions/index.js';
 
 async function main() {
-    // Both entries load this file. Root (index.html) defaults to cornell — the documented
-    // default dev experience; lab.html defaults to the suite (two-light). `?scene=<id>`
-    // overrides on EITHER path, so the URL param always works no matter where you are.
-    const onLab = window.location.pathname.includes('lab.html');
-    const fallback = onLab ? DEFAULT_SCENE : 'cornell';
-    const requested = new URLSearchParams(window.location.search).get('scene') ?? fallback;
-    const id = requested in sceneSuite ? requested : fallback;
+    const requested = new URLSearchParams(window.location.search).get('scene') ?? DEFAULT_SCENE;
+    const id = requested in sceneSuite ? requested : DEFAULT_SCENE;
     const entry = sceneSuite[id];
 
     console.log(`=== Scene Lab: ${id} ===`);
     console.log(`Exercises: ${entry.exercises}`);
-    console.log(`Available scenes: ${Object.keys(sceneSuite).join(', ')} (switch with ?scene=<id>)`);
+    console.log(`Available scenes: ${Object.keys(sceneSuite).join(', ')} (switch with ?scene=<id>; gallery at /suite.html)`);
 
     const app = App.create(document.body, { layout: 'fullscreen' });
 

@@ -33,6 +33,12 @@ export interface SceneSuiteEntry {
     strategies: RenderStrategy[];
     /** What this scene is for — which feature(s) it exercises. */
     exercises: string;
+    /**
+     * The pass criterion, when the scene has one — a derived number (validation-scenes doc)
+     * or a checkable invariant. Displayed on the suite gallery; the future §11 harness
+     * asserts the numeric ones automatically.
+     */
+    expected?: string;
     /** Default camera pose (and any other live params) for viewing. */
     initialParameters?: Record<string, unknown>;
 }
@@ -43,6 +49,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         strategies: [twoLightPowerStrategy, twoLightUniformStrategy],
         exercises:
             'multi-light CDF dispatcher (lights.length>1); lightSelection power (key 1) vs uniform (key 2)',
+        expected: 'power (key 1) and uniform (key 2) converge to the SAME image; power is lower-variance',
         initialParameters: {
             'camera.position': [0, 1.2, 4],
             'camera.target': [0, 0.5, 0],
@@ -53,6 +60,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         strategies: [furnaceStrategy],
         exercises:
             'emission + energy conservation (F-BOX); expect linear-HDR mean = 0.4 everywhere',
+        expected: 'every pixel = EXACTLY 0.4 in linear HDR (F-BOX: Le/(1−ρ) = 0.2/0.5)',
         initialParameters: {
             'camera.position': [0, 0, 0],
             'camera.target': [0, 0, -1],
@@ -80,6 +88,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         scene: analyticMinimal,
         strategies: [analyticStrategy],
         exercises: 'analytic backend (closed-form sphere+plane); cross-method twin of `minimal` — same image',
+        expected: 'converges to the same image as `minimal` (strategy 1)',
         initialParameters: {
             'camera.position': [0, 1, 5],
             'camera.target': [0, 0, 0],
@@ -89,6 +98,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         scene: mixedScene,
         strategies: [analyticStrategy],
         exercises: 'combined scene_intersect (SDF + analytic in one scene); cross-backend shadows',
+        expected: 'both spheres cast shadows on the analytic floor; no backend-dependent artifacts',
         initialParameters: {
             'camera.position': [0, 1.5, 6],
             'camera.target': [0, 0, 0],
@@ -99,6 +109,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         strategies: [etaStrategy],
         exercises:
             'F-ETA η² witness (validation §3): center pixel = 0.5540 ± 1% linear HDR; omitting η² renders 0.980',
+        expected: 'converged CENTER pixel = 0.5540 ± 1% in the linear HDR export (0.98 ⇒ η² factor missing)',
         initialParameters: {
             'camera.position': [0, 1, 0.05],
             'camera.target': [0, -1, 0],
@@ -109,6 +120,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         strategies: [submergedStrategy],
         exercises:
             'R-SUBMERGED innermost-wins witness (validation §5): sphere entry must classify region_from = water (η = 1.33/1.5); under deepest-wins the sphere is invisible',
+        expected: 'the sphere VISIBLY distorts the checker with a Fresnel ring (invisible ⇒ classification bug); distortion is mild — relative η ≈ 1.13',
         initialParameters: {
             'camera.position': [0, 0, 2],
             'camera.target': [0, 0, 0],
@@ -119,6 +131,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         strategies: [glassStrategy],
         exercises:
             'dielectric eyeball scene: Fresnel rim, TIR, inverted image; RR-on exercises etaScale; NEE guard skips shadow rays at glass. Dark shadow under the sphere is CORRECT v1 (§6.3 shadow-opaque + delta light — caustics need area lights)',
+        expected: 'Fresnel rim + inverted Cornell through the sphere; DARK shadow under it is correct v1; converges to the same image as analytic-glass',
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],
@@ -129,6 +142,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         strategies: [glassStrategy],
         exercises:
             'cross-backend twin of cornell-glass (analytic glass sphere, interior far-root) — must converge to the same image',
+        expected: 'converged image identical to cornell-glass',
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],

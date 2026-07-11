@@ -5,7 +5,7 @@ WebGL2 **research path tracer** — no frameworks, pure WebGL2/GLSL 300 es, Type
 ## Commands
 
 ```bash
-npm run dev          # dev server on port 3000 (index.html → examples/scene-lab.ts; root = cornell, ?scene=<id> switches the suite in src/compiler/scenes/index.ts)
+npm run dev          # dev server on port 3000 (root = suite GALLERY; click a card → lab.html?scene=<id> renders it; suite registry in src/compiler/scenes/index.ts)
 npx vitest run       # run tests ONCE (plain `npm run test` starts watch mode)
 npx tsc --noEmit     # typecheck
 ```
@@ -50,4 +50,4 @@ Well past "step zero," but still narrow. **Done** (see `docs/trace-loop-contract
 
 - `npx vitest run` covers compiler structure (shader assembly, source maps, validation). It does NOT compile GLSL — GPU errors only surface in the browser (ErrorOverlay maps them through source maps back to origin blocks).
 - Rendering correctness = the scenes in `fable-validation-scenes.md` (furnace box, Beer–Lambert slab, η² witness, cross-strategy convergence). For any change to sampling/lighting/transport GLSL, run or reason through the relevant one.
-- To see it render: `npm run dev`, open port 3000 — Cornell box with orbit controls; keys 1-9 switch renderers, `r` resets accumulation.
+- To see it render: `npm run dev`, open port 3000 — the suite gallery; click a scene card (each shows what it exercises + its expected value). In a scene: orbit controls, keys 1-9 switch renderers, `r` resets accumulation.
