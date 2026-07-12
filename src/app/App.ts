@@ -1,6 +1,7 @@
 // app/App.ts — Main orchestrator, facade over internal managers
 
 import { Compiler } from '../compiler/Compiler.js';
+import { compileEnvironmentBake, DEFAULT_ENV_TABLE_SIZE } from '../compiler/EnvironmentBake.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
 import { ParameterStore } from './ParameterStore.js';
@@ -125,6 +126,18 @@ export class App {
 
     // Compile all strategies and optionally load environment HDR
     async initialize(config: AppConfig): Promise<void> {
+        // T4: a procedural environment bakes its table BEFORE the main renderers exist —
+        // no selection state to restore, and the CDF externs are registered before any
+        // pass could bind them. Run-once semantics live HERE; the engine just renders.
+        if (config.scene?.environment?.type === 'procedural') {
+            try {
+                this._bakeProceduralEnvironment(config.scene);
+            } catch (error: any) {
+                this._showErrorOverlay(error);
+                throw error;
+            }
+        }
+
         try {
             await this.rendererManager.initialize(config);
         } catch (error: any) {
@@ -147,6 +160,38 @@ export class App {
                 console.error(`Failed to load HDR environment: ${hdrPath}`, error);
                 throw error;
             }
+        }
+    }
+
+    /**
+     * T4 bake: compile the tiny bake renderer, render ONE frame, read the table back,
+     * feed it to the CPU CDF builder (extern registry), and unload. The engine executes
+     * a perfectly ordinary pipeline; run-once semantics belong to the app.
+     */
+    private _bakeProceduralEnvironment(scene: SceneDescription): void {
+        const bake = compileEnvironmentBake(scene);
+        if (!bake) return;
+        const env = scene.environment as Extract<SceneDescription['environment'], { type: 'procedural' }>;
+        const [w, h] = env.tableSize ?? DEFAULT_ENV_TABLE_SIZE;
+
+        // loadRenderers (bulk) rather than loadRenderer: it selects and moves the engine to
+        // 'running', which renderFrame's state guard requires. The main renderers re-run it.
+        this.engine.loadRenderers([bake]);
+        try {
+            this.engine.renderFrame();
+            const rgba = this.engine.readExport('table') as Float32Array;
+            // RGBA readback → tightly-packed RGB for the CDF builder
+            const rgb = new Float32Array(w * h * 3);
+            for (let i = 0; i < w * h; i++) {
+                rgb[3 * i] = rgba[4 * i];
+                rgb[3 * i + 1] = rgba[4 * i + 1];
+                rgb[3 * i + 2] = rgba[4 * i + 2];
+            }
+            const { totalWeight } = this.engine.registerEnvironmentTable(rgb, w, h);
+            this.parameterStore.batch({ 'env.size': [w, h], 'env.totalWeight': totalWeight });
+            console.log(`Baked procedural environment: ${w}×${h}, totalWeight ${totalWeight.toFixed(3)}`);
+        } finally {
+            this.engine.unloadRenderer(bake.id);
         }
     }
 

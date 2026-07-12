@@ -54,7 +54,24 @@ export type EnvironmentDescription =
           /** P(select env) in NEE when finite samplable lights coexist. Default 0.5 (plan O1). */
           selectWeight?: number;
       }
-    | { type: 'procedural'; glsl: GlslExpression }   // tabulated — not yet implemented (T4)
+    | {
+          type: 'procedural';
+          /**
+           * GLSL expression in `dir` (unit vec3, world-space) → vec3 radiance. V1 pin: a
+           * PURE function of dir — no live {param} uniforms (a live uniform desyncs the
+           * direct-eval'd radiance from the frozen CDF; rebake-on-change is deferred).
+           */
+          glsl: GlslExpression;
+          intensity?: number;
+          /** Rotation about +Y in radians (live; applied in direction space, table unrotated). */
+          rotation?: number;
+          /** Importance-table resolution for the bake (plan O3). Default [512, 256]. */
+          tableSize?: [number, number];
+          /** T4: joins NEE/MIS via the baked CDF. Default TRUE for tabulated envs. */
+          sampleAsLight?: boolean;
+          /** P(select env) in NEE when finite samplable lights coexist. Default 0.5 (plan O1). */
+          selectWeight?: number;
+      }
     | {
           type: 'image';
           /** Radiance .hdr file (equirect). Loaded by the app into the extern registry. */
@@ -300,6 +317,14 @@ export interface FramebufferConfig {
      * - 'double_buffer': ping-pong pair for accumulation
      */
     type: 'screen' | 'texture' | 'double_buffer';
+
+    /**
+     * Fixed pixel size (owner-approved contract EXTENSION, env-as-light T4): a framebuffer
+     * with `size` allocates at exactly [width, height] and is EXEMPT from canvas resize.
+     * Absent = canvas-sized (all pre-T4 behavior unchanged). Use case: bake targets whose
+     * dimensions are data (an equirect table), not display geometry.
+     */
+    size?: [number, number];
 
     /**
      * Texture format(s)

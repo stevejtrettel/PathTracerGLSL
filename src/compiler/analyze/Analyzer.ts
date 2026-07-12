@@ -96,10 +96,10 @@ export function analyze(scene: SceneDescription): SceneFeatures {
 
     const totalLightCount = pointLightCount + directionalLightCount + areaLightCount + samplableEmitterCount;
 
-    // --- Environment as a light (T3, D6): image default TRUE, constant opt-in, none/procedural never.
+    // --- Environment as a light (T3/T4, D6): tabulated kinds default TRUE, constant opt-in, none never.
     const env = scene.environment;
     let envSamplable = false;
-    if (env?.type === 'image') {
+    if (env?.type === 'image' || env?.type === 'procedural') {
         envSamplable = env.sampleAsLight !== false;
     } else if (env?.type === 'constant') {
         envSamplable = env.sampleAsLight === true

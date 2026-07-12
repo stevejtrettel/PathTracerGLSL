@@ -6,6 +6,7 @@ import { ParameterManager } from './ParameterManager.js';
 import { GPUProfiler } from './GPUProfiler.js';
 import { TextureRegistry } from './TextureRegistry.js';
 import { HDREnvironmentLoader } from './HDREnvironmentLoader.js';
+import { buildEnvironmentSampler } from './loaders/build-environment-sampler.js';
 import {
     validateCompiledRenderer,
     ConsoleReporter
@@ -317,9 +318,11 @@ export class Engine {
         rect?: Rectangle
     ): Float32Array | Uint8Array {
         const gl = this.gl;
-        const canvas = gl.canvas as HTMLCanvasElement;
 
-        const r = rect || { x: 0, y: 0, width: canvas.width, height: canvas.height };
+        // Default rect = the buffer's own dimensions (fixed-size buffers read their full
+        // extent, not the canvas's — T4 contract extension).
+        const [bw, bh] = this.resourceManager.getBufferSize(bufferId);
+        const r = rect || { x: 0, y: 0, width: bw, height: bh };
         if (r.x < 0 || r.y < 0 || r.width <= 0 || r.height <= 0) {
             throw new Error(`Invalid rectangle: ${JSON.stringify(r)}`);
         }
@@ -363,6 +366,17 @@ export class Engine {
     async loadEnvironmentHDR(path: string): Promise<{ width: number; height: number; totalWeight: number }> {
         const envData = await this.hdrLoader.loadEnvironmentHDR(path);
         return { width: envData.width, height: envData.height, totalWeight: envData.totalWeight };
+    }
+
+    /**
+     * Register a tabulated environment from raw RGB data (T4: the app's bake readback) —
+     * builds the CDF textures into the extern registry exactly like the HDR-load path.
+     * The radiance table itself is NOT registered: a procedural env direct-evals its
+     * formula; the table exists only as CDF food.
+     */
+    registerEnvironmentTable(rgb: Float32Array, width: number, height: number): { totalWeight: number } {
+        const result = buildEnvironmentSampler(this.gl, this.textureRegistry, rgb, width, height);
+        return { totalWeight: result.totalWeight };
     }
 
     // -- Cleanup --

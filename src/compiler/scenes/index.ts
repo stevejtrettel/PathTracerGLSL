@@ -66,6 +66,7 @@ import {
     skyScene, skyPtStrategy, skyNeeStrategy, skyMisStrategy,
     furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy,
     skyLampScene, skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy,
+    procSkyScene, procSkyNeeStrategy, procSkyMisStrategy, procSkyPtStrategy,
 } from './envScenes.js';
 
 export interface SceneSuiteEntry {
@@ -340,6 +341,18 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
             'TWO-STAGE selection (T3, plan D3): image env AND a quad light — u_envSelectProb stage 0, the wrapped lighting_sample_finite CDF, the (1−P) factor in lighting_pdf, and the P factor in the miss-MIS weight. The full §6.1 pdf symmetry across techniques',
         expected:
             'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image (warm lamp pool + cool sky fill); sweeping env.selectProb changes NOISE ONLY, never brightness — brightness drift under the sweep is a selection-pdf asymmetry',
+        initialParameters: {
+            'camera.position': [0, 1.4, 5],
+            'camera.target': [0, 0.9, 0],
+        },
+    },
+    'proc-sky': {
+        scene: procSkyScene,
+        strategies: [procSkyNeeStrategy, procSkyMisStrategy, procSkyPtStrategy],
+        exercises:
+            'T4 procedural environment: the one-shot GPU bake (fixed-size framebuffer + readExport, app-orchestrated), formula direct-eval at lookup (sharp sun), CDF from the baked table, the sampler-radiance unification (ls.radiance ≡ environment_radiance)',
+        expected:
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image; pt-nee resolves the ~2° sun\'s illumination orders of magnitude faster than pt (that asymmetry IS the CDF working); sun disk edges stay SHARP at any zoom (direct-eval, not table-resolution)',
         initialParameters: {
             'camera.position': [0, 1.4, 5],
             'camera.target': [0, 0.9, 0],

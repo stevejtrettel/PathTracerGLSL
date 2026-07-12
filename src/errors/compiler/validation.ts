@@ -77,13 +77,32 @@ function validateStructure(
         bag.error('renderer-no-passes', 'CompiledRenderer must have at least one render pass').add();
     }
 
-    // §9 rule 1: exactly one 'screen' framebuffer. Zero would surface as a mid-frame
-    // "Resource not found: screen" in the ResourceManager; two is ambiguous output.
+    // §9 rule 1, refined for headless pipelines (T4): at most one 'screen' framebuffer; a
+    // pass targeting 'screen' requires it to exist (else a mid-frame "Resource not found").
+    // ZERO screens is legal iff no pass outputs to screen — bake/offline pipelines render
+    // to fixed-size textures and are read back, never displayed.
     const screenCount = renderer.pipeline.framebuffers.filter(fb => fb.type === 'screen').length;
-    if (screenCount !== 1) {
+    const targetsScreen = renderer.pipeline.passes.some(p =>
+        (Array.isArray(p.output) ? p.output : [p.output]).some(o => o === 'screen' || o.startsWith('screen:')));
+    if (screenCount > 1 || (screenCount === 0 && targetsScreen)) {
         bag.error('pipeline-screen-count',
-            `Pipeline declares ${screenCount} framebuffers of type 'screen' — §9 requires exactly one`)
+            `Pipeline declares ${screenCount} 'screen' framebuffers${targetsScreen ? ' but a pass outputs to screen' : ''} — §9 allows at most one, and exactly one when a pass targets it`)
             .add();
+    }
+
+    // Fixed-size framebuffers (T4 contract extension): size must be positive integers,
+    // and 'screen' can't carry one (the canvas owns its size).
+    for (const fb of renderer.pipeline.framebuffers) {
+        if (fb.size === undefined) continue;
+        const [w, h] = fb.size;
+        if (fb.type === 'screen') {
+            bag.error('invalid-pipeline', `Framebuffer '${fb.id}': 'screen' cannot have a fixed size`).add();
+        }
+        if (!Number.isInteger(w) || !Number.isInteger(h) || w <= 0 || h <= 0) {
+            bag.error('invalid-pipeline',
+                `Framebuffer '${fb.id}': size must be positive integers (got [${w}, ${h}])`)
+                .add();
+        }
     }
 }
 

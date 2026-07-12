@@ -160,3 +160,32 @@ export const skyLampPtStrategy: RenderStrategy = {
     ...skyPtStrategy,
     id: 'pt',
 };
+
+// ---------------------------------------------------------------------------
+// proc-sky — T4: a PROCEDURAL environment (gradient sky + analytic sun disk) baked to a
+// 512×256 CDF table at load, direct-eval'd at lookup. The sun disk (~2° across, radiance 18)
+// spans only a few table texels — exactly the case importance sampling exists for: pt-nee
+// finds it through the CDF, pt only by rare BSDF luck. 3-way convergence exercises the
+// formula↔CDF consistency the same way X-ENV did for images.
+// ---------------------------------------------------------------------------
+
+export const procSkyScene: SceneDescription = {
+    ...skyScene,
+    id: 'proc-sky',
+    name: 'Procedural Sky (baked CDF)',
+    environment: {
+        type: 'procedural',
+        glsl: {
+            kind: 'glsl',
+            source:
+                'mix(vec3(0.06, 0.08, 0.12), vec3(0.35, 0.45, 0.65), 0.5 * (dir.y + 1.0))'
+                + ' + vec3(18.0, 16.0, 13.0) * smoothstep(0.9994, 0.9999, dot(dir, normalize(vec3(0.4, 0.35, 0.2))))',
+        },
+        intensity: 1.0,
+        rotation: 0.0,
+    },
+};
+
+export const procSkyNeeStrategy: RenderStrategy = { ...skyNeeStrategy };
+export const procSkyMisStrategy: RenderStrategy = { ...skyMisStrategy };
+export const procSkyPtStrategy: RenderStrategy = { ...skyPtStrategy };

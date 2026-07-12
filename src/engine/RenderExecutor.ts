@@ -172,9 +172,10 @@ export class RenderExecutor {
         const framebuffer = this.resourceManager.getFramebuffer(outputs[0]);
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 
-        // Set viewport (get dimensions from canvas)
-        const canvas = gl.canvas as HTMLCanvasElement;
-        gl.viewport(0, 0, canvas.width, canvas.height);
+        // Set viewport to the OUTPUT's dimensions — fixed-size buffers (config.size, the T4
+        // contract extension) render at their own size, everything else at canvas size.
+        const [vw, vh] = this.resourceManager.getBufferSize(outputs[0]);
+        gl.viewport(0, 0, vw, vh);
 
         // Set up draw buffers if MRT (use cached values)
         if (outputs.length > 1) {

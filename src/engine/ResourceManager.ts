@@ -212,13 +212,26 @@ export class ResourceManager {
         // Recreate all textures at new size
         for (const resources of this.renderers.values()) {
             for (const resource of resources.values()) {
-                if (resource.config.type !== 'screen') {
+                // Fixed-size framebuffers (config.size) are data targets, not display
+                // geometry — exempt from canvas resize (contract extension, T4).
+                if (resource.config.type !== 'screen' && resource.config.size === undefined) {
                     this._resizeTextures(resource);
                 }
             }
         }
 
         console.log(`Resized ${rendererCount} renderer(s) - accumulation reset for all`);
+    }
+
+    /**
+     * Pixel dimensions of a buffer's render target: config.size for fixed-size buffers
+     * (T4 contract extension), canvas size otherwise (including 'screen').
+     */
+    getBufferSize(bufferId: string): [number, number] {
+        const { baseId } = this._parseId(bufferId);
+        const resource = this._getActiveResource(baseId);
+        if (resource?.config.size) return resource.config.size;
+        return [this.width, this.height];
     }
 
     /**
@@ -357,7 +370,7 @@ export class ResourceManager {
         for (let a = 0; a < formats.length; a++) {
             const attachmentTextures: WebGLTexture[] = [];
             for (let b = 0; b < numBuffers; b++) {
-                attachmentTextures.push(this._createTexture(formats[a]));
+                attachmentTextures.push(this._createTexture(formats[a], config.size));
             }
             textures.push(attachmentTextures);
         }
@@ -382,7 +395,7 @@ export class ResourceManager {
     /**
      * Create a texture with specified format
      */
-    private _createTexture(format: string): WebGLTexture {
+    private _createTexture(format: string, size?: [number, number]): WebGLTexture {
         const gl = this.gl;
         const texture = gl.createTexture();
         if (!texture) throw new Error('Failed to create texture');
@@ -396,7 +409,7 @@ export class ResourceManager {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
         // Allocate storage based on format
-        this._allocateTextureStorage(texture, format);
+        this._allocateTextureStorage(texture, format, size);
 
         gl.bindTexture(gl.TEXTURE_2D, null);
 
@@ -406,8 +419,10 @@ export class ResourceManager {
     /**
      * Allocate texture storage based on format
      */
-    private _allocateTextureStorage(texture: WebGLTexture, format: string): void {
+    private _allocateTextureStorage(texture: WebGLTexture, format: string, size?: [number, number]): void {
         const gl = this.gl;
+        const w = size?.[0] ?? this.width;
+        const h = size?.[1] ?? this.height;
         // FUTURE: Add WebGL error checking after GL calls (checkGLError utility)
 
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -418,8 +433,8 @@ export class ResourceManager {
                     gl.TEXTURE_2D,
                     0,
                     gl.RGBA32F,
-                    this.width,
-                    this.height,
+                    w,
+                    h,
                     0,
                     gl.RGBA,
                     gl.FLOAT,
@@ -432,8 +447,8 @@ export class ResourceManager {
                     gl.TEXTURE_2D,
                     0,
                     gl.RGBA16F,
-                    this.width,
-                    this.height,
+                    w,
+                    h,
                     0,
                     gl.RGBA,
                     gl.HALF_FLOAT,
@@ -446,8 +461,8 @@ export class ResourceManager {
                     gl.TEXTURE_2D,
                     0,
                     gl.RGBA8,
-                    this.width,
-                    this.height,
+                    w,
+                    h,
                     0,
                     gl.RGBA,
                     gl.UNSIGNED_BYTE,
@@ -460,8 +475,8 @@ export class ResourceManager {
                     gl.TEXTURE_2D,
                     0,
                     gl.R32F,
-                    this.width,
-                    this.height,
+                    w,
+                    h,
                     0,
                     gl.RED,
                     gl.FLOAT,

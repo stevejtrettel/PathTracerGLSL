@@ -95,11 +95,29 @@ describe('validateCompiledRenderer — swaps / exports / uniforms', () => {
         const r = validRenderer(); r.pipeline.postFrame!.swaps = [{ type: 'swap', buffers: ['accumulation', 'accumulation'] }];
         expect(errorCodes(r)).toContain('swap-not-double-buffer');
     });
-    it("requires exactly one 'screen' framebuffer (§9 rule 1)", () => {
+    it("rejects a pass targeting 'screen' with no screen framebuffer (§9 rule 1)", () => {
+        const r = validRenderer();
+        r.pipeline.framebuffers = r.pipeline.framebuffers.filter((fb) => fb.type !== 'screen');
+        expect(errorCodes(r)).toContain('pipeline-screen-count');
+    });
+    it('rejects two screen framebuffers', () => {
+        const r = validRenderer();
+        r.pipeline.framebuffers.push({ id: 'screen2', type: 'screen' });
+        expect(errorCodes(r)).toContain('pipeline-screen-count');
+    });
+    it('accepts a HEADLESS pipeline — zero screens, no pass targets screen (T4 bake renderers)', () => {
         const r = validRenderer();
         r.pipeline.framebuffers = r.pipeline.framebuffers.filter((fb) => fb.type !== 'screen');
         r.pipeline.passes = r.pipeline.passes.filter((p) => p.output !== 'screen');
-        expect(errorCodes(r)).toContain('pipeline-screen-count');
+        expect(errorCodes(r)).not.toContain('pipeline-screen-count');
+    });
+    it('rejects a fixed size on a screen framebuffer and non-positive sizes (T4 contract extension)', () => {
+        const r1 = validRenderer();
+        r1.pipeline.framebuffers.find((fb) => fb.type === 'screen')!.size = [64, 64];
+        expect(errorCodes(r1)).toContain('invalid-pipeline');
+        const r2 = validRenderer();
+        r2.pipeline.framebuffers.find((fb) => fb.id === 'accumulation')!.size = [0, 256];
+        expect(errorCodes(r2)).toContain('invalid-pipeline');
     });
     it('flags an export from an unknown buffer', () => {
         const r = validRenderer(); r.exportTargets = { hdr: { bufferId: 'ghost', format: 'float' } };

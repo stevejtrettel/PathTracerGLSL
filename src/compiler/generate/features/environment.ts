@@ -15,7 +15,7 @@ import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../../engine/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import envEquirectGLSL from '../glsl/env_equirect.glsl?raw';
+import envChartEquirectGLSL from '../glsl/env_chart_equirect.glsl?raw';
 import envSamplerCdfGLSL from '../glsl/env_sampler_cdf.glsl?raw';
 
 const ORIGIN = 'generated:environment';
@@ -41,6 +41,7 @@ LightSample environment_sample(Point p, vec2 xi) {
 }`;
 
 export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
+    void bag;   // all four kinds are implemented (T4); kept for future env diagnostics
     const env = plan.program.environment;
 
     // The samplable predicate lives in the Analyzer (single source of truth for lighting,
@@ -79,7 +80,11 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Env intensity', group: 'Environment', triggersReset: true },
             'env.rotation': { type: 'float', default: rotation, range: [-Math.PI, Math.PI], name: 'Env rotation', group: 'Environment', triggersReset: true },
         };
-        const blocks = [{ origin: 'glsl/env_equirect.glsl', source: envEquirectGLSL }];
+        const blocks = [
+            { origin: 'glsl/env_chart_equirect.glsl', source: envChartEquirectGLSL },
+            // Radiance = table fetch through the chart (rotation applied by env_chart_uv).
+            { origin: ORIGIN, source: radianceFn('return texture(u_envMap, env_chart_uv(dir)).rgb * u_envIntensity;') },
+        ];
         const textures = [{ name: 'u_envMap', source: 'extern:env_map' }];
         if (samplable) {
             // The CDF sampler needs the tables + the size (pdf/dΩ). u_envSize arrives on the
@@ -102,10 +107,45 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
     }
 
     if (env.type === 'procedural') {
-        bag.error(
-            'unsupported-environment',
-            `Environment type 'procedural' is not implemented yet (T4: bake-to-table). Falling back to none.`,
-        ).add();
+        // T4: the formula IS the radiance (direct-eval — sharp, resolution-free, D7); the
+        // baked table exists only as CPU CDF food. No radiance texture at all: the sampler's
+        // radiance is environment_radiance(ls.wi) by the T4 unification.
+        const intensity = env.intensity ?? 1.0;
+        const rotation = env.rotation ?? 0.0;
+        const uniforms: PlannedUniform[] = [
+            { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
+            { name: 'u_envRotation', type: 'float', parameterPath: 'env.rotation', default: rotation },
+        ];
+        const parameters: Record<string, ParameterMetadata> = {
+            'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Env intensity', group: 'Environment', triggersReset: true },
+            'env.rotation': { type: 'float', default: rotation, range: [-Math.PI, Math.PI], name: 'Env rotation', group: 'Environment', triggersReset: true },
+        };
+        const blocks = [
+            { origin: 'glsl/env_chart_equirect.glsl', source: envChartEquirectGLSL },
+            // env_rotate_y(dir, +rot) evaluates the formula at the TABLE azimuth — the exact
+            // direction-space form of the chart's rotation term, so the direct-eval'd field
+            // and the CDF (baked unrotated, sampled through the chart) agree under rotation.
+            // GLSL params are value copies: reassigning `dir` scopes the rotation to the
+            // formula without touching the author's expression.
+            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_y(normalize(dir), u_envRotation);\n    return (${env.glsl.source}) * u_envIntensity;`) },
+        ];
+        const textures: FeatureContribution['textures'] = [];
+        if (samplable) {
+            blocks.push({ origin: 'glsl/env_sampler_cdf.glsl', source: envSamplerCdfGLSL });
+            textures.push(
+                { name: 'u_envCdfCond', source: 'extern:env_cdf_cond' },
+                { name: 'u_envCdfMarg', source: 'extern:env_cdf_marg' },
+            );
+            uniforms.push({ name: 'u_envSize', type: 'vec2', parameterPath: 'env.size', default: [1, 1] });
+        }
+        return {
+            ...emptyContribution(),
+            blocks,
+            defines: samplable ? { ENV_SAMPLABLE: '' } : {},
+            uniforms,
+            parameters,
+            textures,
+        };
     }
 
     // none (and the fallback)

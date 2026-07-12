@@ -66,7 +66,11 @@ LightSample environment_sample(Point p, vec2 xi) {
     LightSample ls;
     ls.wi = env_chart_dir(uv);
     ls.distance = 1.0e20;                                     // §6.1 environment convention
-    ls.radiance = texture(u_envMap, uv).rgb * u_envIntensity; // without visibility
+    // DEFINITIONAL consistency (T4): the sampler returns exactly the radiance the miss
+    // branch would see for this direction — image envs re-fetch through the chart (an exact
+    // round-trip), procedural envs direct-eval the formula. This is the MIS requirement
+    // stated as code, and it frees procedural tables from carrying a radiance texture at all.
+    ls.radiance = environment_radiance(ls.wi);                // without visibility
     ls.pdf = (dCond * dMarg) / env_texel_dOmega(j, sz);       // per-light density; selection applied by lighting_sample
     ls.flags = 0u;                                            // NOT delta — BSDF paths hit the env on miss
     ls.light_id = -1;                                         // never consulted via light_of
