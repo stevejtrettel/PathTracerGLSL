@@ -17,7 +17,7 @@ import shadowOpaqueGLSL from '../glsl/shadow_opaque.glsl?raw';
 import shadowMediaGLSL from '../glsl/shadow_media.glsl?raw';
 
 export function contributeLighting(plan: RenderPlan): FeatureContribution {
-    if (plan.program.lighting === null) {
+    if (plan.program.estimator.lighting === null) {
         return emptyContribution();
     }
 
@@ -32,7 +32,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // uniform is the deliberate deviation from reference §8's compile-time ENV_SELECT_PDF
     // (same structure — see impl-plan-env-as-light D3). Arnold's dome-as-dedicated-technique
     // is the precedent for the two-stage shape.
-    const envSamplable = plan.features.environment.samplable;
+    const envSamplable = plan.program.environmentSamplable;
     const env = plan.program.environment;
     const envSelectDefault = plan.lights.length === 0
         ? 1.0                                                            // env-only: certainty
@@ -61,7 +61,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // Shadow query behind the §6.3 contract — the compiler specializes: the boolean-fast-path
     // opaque form for media-free scenes, the spectral segment walker (composing the generated
     // medium_transmittance, seam 2) when media exist. The NEE call sites never change.
-    if (plan.features.media.hasMedia) {
+    if (plan.program.media.shadowWalker) {
         blocks.push({ origin: 'glsl/shadow_media.glsl', source: shadowMediaGLSL });
         defines['MAX_SHADOW_SEGMENTS'] = '8';   // §6.3 pin; exhaustion is conservative (ZERO)
     } else {
@@ -82,7 +82,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // Selection pdfs are computed ONCE and shared by the sampler and the MIS pdf query —
     // lighting_pdf must byte-match lighting_sample's selection (the env-sampling lesson,
     // pitfall 11, applied to the CDF).
-    const selection = plan.program.lighting.selection;
+    const selection = plan.program.estimator.lighting.selection;
     const selectPdf = computeSelectPdf(plan.lights, selection);
 
     blocks.push({
@@ -92,12 +92,13 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
 
     // §6.2 registry table + the transport emission-bookkeeping gate: only when a samplable
     // NON-DELTA emitter exists (delta-only scenes preprocess to the pre-area-light program).
+    // The DECISIONS are Planner-made (program.emitters, T2); the list is codegen data.
     const samplable = plan.lights.filter((l) => l.regionId !== undefined);
-    if (samplable.length > 0) {
+    if (plan.program.emitters.samplable) {
         blocks.push({ origin: 'generated:light-of', source: generateLightOf(samplable) });
         defines['HAS_SAMPLABLE_EMITTERS'] = '';
         // The MIS pdf query (§6.1): only under 'mis' — its sole reader is the emitter-hit weight.
-        if (plan.program.lighting.method === 'mis') {
+        if (plan.program.emitters.lightingPdf) {
             blocks.push({ origin: 'generated:lighting-pdf', source: generateLightingPdf(plan.lights, selectPdf, envSamplable) });
         }
     }

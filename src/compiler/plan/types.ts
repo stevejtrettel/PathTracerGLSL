@@ -1,29 +1,87 @@
 // compiler/plan/types.ts
 
 import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value, ValueParam, EnvironmentDescription } from '../types.js';
-import type { SceneFeatures } from '../analyze/types.js';
 
 // ============================================================================
 // Program Description — what the generated program does
 // ============================================================================
 
 /**
- * Describes the structure and capabilities of the GPU program to generate.
- * The Planner builds this from scene features + render strategy.
- * The Generator reads it to decide what code to produce.
+ * The complete description of the generated program — the compiler's "link map"
+ * (impl-plan-decision-hoist T2). The Planner builds it from scene features + strategy;
+ * it is the ONLY decision record the Generator may read (plus the RenderPlan data
+ * tables). Feature generators never read analyzer facts or re-derive decisions —
+ * every "does this program contain X" question is answered here, once.
+ *
+ * Sections mirror the strategy taxonomy (fable-strategy-taxonomy.md): measurement
+ * (with the scene, defines the integral), estimator (the computation — bias-free by
+ * contract), view (presentation). All fields are RESOLVED: defaults applied, no
+ * optionals — a ProgramDescription is a closed, serializable artifact (it has its own
+ * structural snapshot test).
  */
 export interface ProgramDescription {
+    /** Defines the integral (taxonomy §2): camera = W_j; the rest are truncations
+     *  (the bias ledger, each with a declared exact limit — taxonomy §4). */
+    measurement: {
+        camera: CameraDesc;
+        response: 'radiance';
+        maxBounces: number;
+        scattering: 'full' | 'ignored';
+        shadows: 'opaque-dielectrics';
+        color: 'rgb';
+    };
+    /** Defines the computation (taxonomy §3): no field here may change the converged
+     *  image — §11.2 cross-strategy convergence is the enforcement. */
+    estimator: {
+        /** null = BSDF-only transport (no NEE machinery in the program at all). */
+        lighting: LightingDesc | null;
+        russianRoulette: { startDepth: number } | null;
+        /** 'analytic' iff scattering arms are live (media.scatteringArms); 'none'
+         *  otherwise. Future null-collision methods are new values here. */
+        volumeSampling: 'none' | 'analytic';
+        /** T5 strategy axis (plan D11): which chart the env sampler's CDF table lives
+         *  in, and whether the table is MIS-compensated. Radiance is chart-independent. */
+        envSampler: { chart: 'equirect' | 'octahedral'; compensation: boolean };
+        accumulation: AccumulationDesc;
+    };
+    /** Presentation — applied to the converged linear HDR quantity only (taxonomy §10). */
+    view: {
+        tonemap: TonemapDesc;
+    };
+
+    // ——— Link tables: what THIS program contains. Decisions, not analyzer facts —
+    // the Planner derives them once; features only read.
     intersection: IntersectionDesc;
     materials: MaterialsDesc;
-    lighting: LightingDesc | null;
-    camera: CameraDesc;
-    transport: TransportDesc;
-    accumulation: AccumulationDesc;
-    tonemap: TonemapDesc;
+    media: MediaDesc;
+    emitters: EmittersDesc;
     environment: EnvironmentDescription;
-    /** T5 strategy axis (plan D11): which chart the env sampler's CDF table lives in, and
-     *  whether the table is MIS-compensated. Radiance is chart-independent. */
-    envSampler: { chart: 'equirect' | 'octahedral'; compensation: boolean };
+    /** The env participates in NEE/MIS as a light (env-as-light T3/D6) — drives the
+     *  selection codegen, the miss-branch w-bookkeeping, and env sampler emission. */
+    environmentSamplable: boolean;
+}
+
+/** What media machinery this program contains (volumetric-component seams). */
+export interface MediaDesc {
+    /** Any medium block or ambientMedium: media tables + medium_sample seam exist. */
+    present: boolean;
+    /** Scattering media present AND the measurement computes them (scattering 'full'):
+     *  phase functions + the channel-MIS scattering arms exist. Equivalent to
+     *  estimator.volumeSampling !== 'none' — kept explicit for readers. */
+    scatteringArms: boolean;
+    /** Some material is model 'none' (§3.6): the null-crossing branch exists. */
+    nullInterfaces: boolean;
+    /** Media AND NEE: the spectral segment walker (shadow_media) replaces the boolean
+     *  fast path (shadow_opaque) behind the §6.3 contract. */
+    shadowWalker: boolean;
+}
+
+/** What samplable-emitter machinery this program contains (§6.2). */
+export interface EmittersDesc {
+    /** Some light has a region: light_of table + §6.2 emission w-bookkeeping exist. */
+    samplable: boolean;
+    /** samplable AND mis: the generated lighting_pdf MIS query is emitted. */
+    lightingPdf: boolean;
 }
 
 export type IntersectionDesc =
@@ -38,13 +96,6 @@ export type LightingDesc =
 
 export type CameraDesc =
     | { type: 'pinhole'; fov: Value<number> };
-
-export type TransportDesc =
-    | { type: 'pathtracer'; maxBounces: number; russianRoulette: { startDepth: number } | null;
-        /** Resolved volume strategy (fable-volumetric-component §5): strategy override or
-         *  derived (scattering media present ? 'analytic' : 'none'). Only live values here —
-         *  the Validator rejects the rest. */
-        volumeIntegrator: 'none' | 'analytic' };
 
 export type AccumulationDesc =
     | { type: 'average' }
@@ -156,10 +207,12 @@ export interface PlannedUniform {
 
 /**
  * Complete render plan — everything the Generator needs to emit code.
+ *
+ * T2 rule (impl-plan-decision-hoist): the Generator reads `program` (decisions) and the
+ * resolved data tables below — analyzer facts (`SceneFeatures`) are Planner-internal and
+ * deliberately NOT carried here, so a feature generator CANNOT re-derive a decision.
  */
 export interface RenderPlan {
-    features: SceneFeatures;
-
     /** Resolved scene data for code generators */
     objects: PlannedSDFObject[];
     analyticObjects: PlannedAnalyticObject[];

@@ -14,7 +14,7 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
         blocks: [{ origin: accumulationOrigin(program), source: buildAccumulationSource(program, bag) }],
     };
 
-    if (program.accumulation.type === 'average') {
+    if (program.estimator.accumulation.type === 'average') {
         contribution.uniforms = [
             { name: 'u_sampleCount', type: 'int', parameterPath: 'engine.sampleCount' },
             { name: 'u_pixelOffset', type: 'vec2', parameterPath: 'engine.pixelOffset', default: [0, 0] },
@@ -25,14 +25,14 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
 }
 
 function accumulationOrigin(program: ProgramDescription): string {
-    if (program.accumulation.type === 'average') return 'glsl/main_accumulate.glsl';
-    return `generated:main-${program.accumulation.type}`;
+    if (program.estimator.accumulation.type === 'average') return 'glsl/main_accumulate.glsl';
+    return `generated:main-${program.estimator.accumulation.type}`;
 }
 
 function buildAccumulationSource(program: ProgramDescription, bag: DiagnosticBag): string {
-    if (program.accumulation.type === 'average') {
+    if (program.estimator.accumulation.type === 'average') {
         return mainAccumulateGLSL;
     }
-    bag.error('invalid-setting', `Accumulation type '${(program.accumulation as any).type}' not yet supported`).add();
+    bag.error('invalid-setting', `Accumulation type '${(program.estimator.accumulation as any).type}' not yet supported`).add();
     return '// unsupported accumulation';
 }

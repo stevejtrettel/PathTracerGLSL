@@ -11,17 +11,17 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
 
     // Flag defines carry an empty value → emitted as `#define NAME` (no value).
     const defines: Record<string, string> = {
-        MAX_BOUNCES: String(program.transport.maxBounces),
+        MAX_BOUNCES: String(program.measurement.maxBounces),
     };
-    if (program.lighting !== null) {
+    if (program.estimator.lighting !== null) {
         defines['ENABLE_NEE'] = '';
         // MIS = NEE + the reference-§8 weights; both estimators share every other line (§11.2's
         // premise — anything else differing between the generated loops is a bug).
-        if (program.lighting.method === 'mis') defines['ENABLE_MIS'] = '';
+        if (program.estimator.lighting.method === 'mis') defines['ENABLE_MIS'] = '';
     }
-    if (program.transport.russianRoulette) {
+    if (program.estimator.russianRoulette) {
         defines['ENABLE_RUSSIAN_ROULETTE'] = '';
-        defines['RR_START_DEPTH'] = String(program.transport.russianRoulette.startDepth);
+        defines['RR_START_DEPTH'] = String(program.estimator.russianRoulette.startDepth);
     }
 
     return {

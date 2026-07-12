@@ -68,10 +68,10 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // The volumetric component (fable-volumetric-component §2): media tables + the seam
     // dispatches, only when the scene has media. Media are "materials of the interior" (§3.5),
     // so their codegen lives here beside the material tables.
-    const media = plan.features.media;
-    const scatteringLive = media.hasScatteringMedia && plan.program.transport.volumeIntegrator === 'analytic';
-    const wantsShadowMedia = media.hasMedia && plan.program.lighting !== null;
-    if (media.hasMedia) {
+    const media = plan.program.media;
+    const scatteringLive = media.scatteringArms;
+    const wantsShadowMedia = media.shadowWalker;
+    if (media.present) {
         blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials) });
         blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials) });
         // The 'analytic' strategy bodies (volumetric-component §4) — needed by the scattering
@@ -111,8 +111,8 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     if (plan.program.materials.models.includes('dielectric')) defines['HAS_TRANSMISSION'] = '';
     // Media defines gate ALL media GLSL (structs, helpers, transport blocks) so media-free
     // scenes preprocess to exactly the pre-media program (impl-plan-media M1 gate).
-    if (media.hasMedia) defines['HAS_MEDIA'] = '';
-    if (media.hasNullInterfaces) {
+    if (media.present) defines['HAS_MEDIA'] = '';
+    if (media.nullInterfaces) {
         defines['HAS_NULL_INTERFACES'] = '';
         defines['MAX_NULL_CROSSINGS'] = '32';   // §3.6 pin
     }
@@ -345,8 +345,7 @@ function generateMediumProperties(materials: PlannedMaterial[]): string {
 // Every arm assigns ms.radiance (mandatory — §3 partition rule; uninitialized GLSL is garbage).
 function generateMediumSample(plan: RenderPlan): string {
     const withMedium = plan.materials.filter((m) => m.medium !== null);
-    const scatteringLive = plan.features.media.hasScatteringMedia
-        && plan.program.transport.volumeIntegrator === 'analytic';
+    const scatteringLive = plan.program.media.scatteringArms;
 
     const lines: string[] = ['// Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)'];
     lines.push('MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {');

@@ -30,8 +30,8 @@ export function contributeCamera(plan: RenderPlan, bag: DiagnosticBag): FeatureC
         },
     };
 
-    if (program.camera.type === 'pinhole') {
-        const fov = program.camera.fov;
+    if (program.measurement.camera.type === 'pinhole') {
+        const fov = program.measurement.camera.fov;
         if (isValueParam(fov)) {
             const path = fov.param;
             const def = fov.default ?? 0.8;
@@ -60,14 +60,14 @@ export function contributeCamera(plan: RenderPlan, bag: DiagnosticBag): FeatureC
 }
 
 function cameraOrigin(program: ProgramDescription): string {
-    if (program.camera.type === 'pinhole') return 'glsl/camera_pinhole.glsl';
-    return `generated:camera-${program.camera.type}`;
+    if (program.measurement.camera.type === 'pinhole') return 'glsl/camera_pinhole.glsl';
+    return `generated:camera-${program.measurement.camera.type}`;
 }
 
 function buildCameraSource(program: ProgramDescription, bag: DiagnosticBag): string {
-    if (program.camera.type === 'pinhole') {
+    if (program.measurement.camera.type === 'pinhole') {
         return cameraPinholeGLSL;
     }
-    bag.error('invalid-setting', `Camera type '${(program.camera as any).type}' not yet supported`).add();
+    bag.error('invalid-setting', `Camera type '${(program.measurement.camera as any).type}' not yet supported`).add();
     return '// unsupported camera';
 }

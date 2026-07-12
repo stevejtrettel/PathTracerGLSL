@@ -71,9 +71,9 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
     void bag;   // all four kinds are implemented (T4); kept for future env diagnostics
     const env = plan.program.environment;
 
-    // The samplable predicate lives in the Analyzer (single source of truth for lighting,
+    // The samplable decision is Planner-resolved (T2: single source of truth for lighting,
     // transport, and this feature — they must agree or the estimators diverge).
-    const samplable = plan.features.environment.samplable;
+    const samplable = plan.program.environmentSamplable;
 
     if (env.type === 'constant') {
         const intensity = env.intensity ?? 1.0;
@@ -110,7 +110,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         // RADIANCE IS CHART-INDEPENDENT (D11: the integrand is held fixed across samplers):
         // the map is equirect, so the lookup uses its own fixed equirect mapping — the
         // swappable env_chart_* seam belongs exclusively to the SAMPLER below.
-        const { chart, compensation } = plan.program.envSampler;
+        const { chart, compensation } = plan.program.estimator.envSampler;
         const blocks = [
             ROTATE_BLOCK,
             { origin: ORIGIN, source: '// Fixed equirect map lookup (sampler-chart-independent)\n'
@@ -156,7 +156,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Env intensity', group: 'Environment', triggersReset: true },
             'env.rotation': { type: 'float', default: rotation, range: [-Math.PI, Math.PI], name: 'Env rotation', group: 'Environment', triggersReset: true },
         };
-        const { chart, compensation } = plan.program.envSampler;
+        const { chart, compensation } = plan.program.estimator.envSampler;
         const blocks = [
             ROTATE_BLOCK,
             // env_rotate_y(dir, +rot) evaluates the formula at the TABLE azimuth — the exact

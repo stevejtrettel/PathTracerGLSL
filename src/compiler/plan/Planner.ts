@@ -177,11 +177,10 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         : -1;
 
     // --- Build program description ---
-    const program = planProgram(features, scene, strategy);
+    const program = planProgram(features, scene, strategy, lights);
     const pipeline = planPipeline(program);
 
     return {
-        features,
         objects,
         analyticObjects,
         materials,
@@ -196,7 +195,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[]): ProgramDescription {
     // Surface models only — 'none' is a boundary classification (§3.6), never a dispatch arm;
     // 'emissive' is Validator-rejected (review C4) so it can't reach here.
     const brdfModels: MaterialModel[] = [];
@@ -211,47 +210,71 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
 
     // A samplable environment is a light for NEE purposes (T3) — an env-only scene under
     // 'nee'/'mis' gets the lighting infrastructure with an env-only lighting_sample.
-    const hasLights = features.lighting.totalLightCount > 0 || features.environment.samplable;
+    const envSamplable = features.environment.samplable;
+    const hasLights = features.lighting.totalLightCount > 0 || envSamplable;
     const wantsNEE = strategy.estimator.directLighting !== 'none' && hasLights;
+    const lighting = wantsNEE
+        ? {
+              method: (strategy.estimator.directLighting === 'mis' ? 'mis' : 'nee') as 'mis' | 'nee',
+              selection: strategy.estimator.lightSelection ?? 'power',
+          }
+        : null;
 
     // Taxonomy §8 (the volumeIntegrator split): whether scattering is COMPUTED is a
     // measurement truncation (scattering 'ignored' renders scattering media absorbing-only);
     // HOW live scattering is sampled is the estimator's volumeSampling axis. Only 'analytic'
-    // survives the Validator, so the plan-side value stays 'none' | 'analytic'.
-    const scatteringLive = features.media.hasScatteringMedia
-        && (strategy.measurement.scattering ?? 'full') === 'full';
+    // survives the Validator.
+    const scattering = strategy.measurement.scattering ?? 'full';
+    const scatteringArms = features.media.hasScatteringMedia
+        && scattering === 'full'
+        && (strategy.estimator.volumeSampling ?? 'analytic') === 'analytic';
+
+    // §6.2: samplable-emitter machinery exists iff some light entered the registry with a
+    // region (delta-only scenes compile to the pre-area-light program).
+    const samplableEmitters = lights.some((l) => l.regionId !== undefined);
 
     return {
+        measurement: {
+            camera: strategy.measurement.camera.type === 'pinhole'
+                ? { type: 'pinhole', fov: strategy.measurement.camera.fov }
+                : { type: 'pinhole', fov: Math.PI / 4 }, // fallback, validator catches unsupported
+            response: strategy.measurement.response ?? 'radiance',
+            maxBounces: strategy.measurement.maxBounces,
+            scattering,
+            shadows: strategy.measurement.shadows ?? 'opaque-dielectrics',
+            color: 'rgb',   // 'spectral' is Validator-rejected (reserved, contracts §8)
+        },
+        estimator: {
+            lighting,
+            russianRoulette: strategy.estimator.russianRoulette,
+            volumeSampling: scatteringArms ? 'analytic' : 'none',
+            envSampler: {
+                chart: strategy.estimator.envSampler ?? 'equirect',
+                compensation: strategy.estimator.envCompensation ?? false,
+            },
+            accumulation: strategy.estimator.accumulation.type === 'exponential'
+                ? { type: 'exponential', alpha: strategy.estimator.accumulation.alpha }
+                : { type: strategy.estimator.accumulation.type },
+        },
+        view: {
+            tonemap: strategy.view.tonemap.type === 'none'
+                ? { type: 'none' }
+                : { type: strategy.view.tonemap.type, exposure: strategy.view.tonemap.exposure },
+        },
         intersection: { method: 'raymarch' },
         materials: { models: brdfModels },
-        lighting: wantsNEE
-            ? {
-                  method: strategy.estimator.directLighting === 'mis' ? 'mis' : 'nee',
-                  selection: strategy.estimator.lightSelection ?? 'power',
-              }
-            : null,
-        camera: strategy.measurement.camera.type === 'pinhole'
-            ? { type: 'pinhole', fov: strategy.measurement.camera.fov }
-            : { type: 'pinhole', fov: Math.PI / 4 }, // fallback, validator catches unsupported
-        transport: {
-            type: 'pathtracer',
-            maxBounces: strategy.measurement.maxBounces,
-            russianRoulette: strategy.estimator.russianRoulette,
-            volumeIntegrator: scatteringLive && (strategy.estimator.volumeSampling ?? 'analytic') === 'analytic'
-                ? 'analytic'
-                : 'none',
+        media: {
+            present: features.media.hasMedia,
+            scatteringArms,
+            nullInterfaces: features.media.hasNullInterfaces,
+            shadowWalker: features.media.hasMedia && lighting !== null,
         },
-        accumulation: strategy.estimator.accumulation.type === 'exponential'
-            ? { type: 'exponential', alpha: strategy.estimator.accumulation.alpha }
-            : { type: strategy.estimator.accumulation.type },
-        tonemap: strategy.view.tonemap.type === 'none'
-            ? { type: 'none' }
-            : { type: strategy.view.tonemap.type, exposure: strategy.view.tonemap.exposure },
+        emitters: {
+            samplable: samplableEmitters,
+            lightingPdf: samplableEmitters && lighting?.method === 'mis',
+        },
         environment: scene.environment ?? { type: 'none' },
-        envSampler: {
-            chart: strategy.estimator.envSampler ?? 'equirect',
-            compensation: strategy.estimator.envCompensation ?? false,
-        },
+        environmentSamplable: envSamplable,
     };
 }
 

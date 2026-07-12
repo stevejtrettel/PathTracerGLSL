@@ -17,7 +17,7 @@ export interface ShaderBuildResult {
     sourceMaps: Map<string, BlockMapping[]>;
 }
 
-export function buildShaders(merged: MergedContributions, rendererId: string, tonemap: ProgramDescription['tonemap']): ShaderBuildResult {
+export function buildShaders(merged: MergedContributions, rendererId: string, tonemap: ProgramDescription['view']['tonemap']): ShaderBuildResult {
     const shaders = new Map<string, ShaderProgram>();
     const sourceMaps = new Map<string, BlockMapping[]>();
 
@@ -64,7 +64,7 @@ function buildPathtracerBlocks(merged: MergedContributions): ShaderBlock[] {
 // Display Fragment Shader (block assembly)
 // ============================================================================
 
-function buildDisplayBlocks(tonemap: ProgramDescription['tonemap']): ShaderBlock[] {
+function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): ShaderBlock[] {
     // The display shader is plan-driven (audit C2: it used to emit Reinhard unconditionally,
     // silently ignoring `display: { type: 'none' }` and `exposure`). Exposure is strategy
     // data, so it bakes as a constant — a strategy change recompiles anyway.
