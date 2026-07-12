@@ -22,11 +22,8 @@ import { emptyContribution, type FeatureContribution } from './types.js';
 export function contributeTransport(plan: RenderPlan): FeatureContribution {
     const program = plan.program;
 
-    // The last structural define transport emits: math.glsl gates power_heuristic on
-    // ENABLE_MIS. Dies in the split's commit D (the gated section becomes a
-    // conditionally-included block). The generator itself reads no defines.
-    const defines: Record<string, string> = {};
-    if (program.estimator.lighting?.method === 'mis') defines['ENABLE_MIS'] = '';
+    // No defines: the loop is generated (structure) and its knobs are literals (values).
+    // power_heuristic arrives via core's conditionally-included math_mis.glsl.
 
     // T4 seams: what the loop calls, conditioned exactly like the emitted segments.
     const requires = [
@@ -53,7 +50,6 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
 
     return {
         ...emptyContribution('transport'),
-        defines,
         blocks: emitTransportTrace(program),
         provides: [{ name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' }],
         requires,

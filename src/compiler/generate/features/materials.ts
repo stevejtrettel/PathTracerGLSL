@@ -106,12 +106,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
     }
 
-    // The last structural define materials emits: structs.glsl gates MediumProperties/
-    // MediumSample and math.glsl gates spectrum_exp on HAS_MEDIA. Dies in the split's
-    // commit D (the gated sections become conditionally-included blocks). The transport
-    // generator reads program.media directly — no other define consumers remain.
+    // No structural defines remain (item-9 commit D): media structs/helpers arrive via
+    // core's conditionally-included structs_media/math_media blocks.
     const defines: Record<string, string> = {};
-    if (media.present) defines['HAS_MEDIA'] = '';
 
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     const provides = [
