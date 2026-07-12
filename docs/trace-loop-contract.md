@@ -5,6 +5,13 @@
 `pillars/objects.md` design and refined in discussion. **This supersedes Fable's `GeodesicState`
 stepper (`fable-compiler-contracts.md` §5) — see "Supersedes" below.**
 
+> **Where the loop lives (item-9 split, July 2026):** the loop is GENERATED — its source of
+> truth is `emitTransportTrace` + the segment emitters in
+> `src/compiler/generate/features/transport.ts` (`path_trace.glsl` is deleted). This contract
+> still governs the loop's types and semantics; read it before touching the emitters. To READ
+> a concrete loop, dump the shader for a (scene, strategy) pair — each emitted program contains
+> exactly its own estimator.
+
 ---
 
 ## The loop — five abstractions

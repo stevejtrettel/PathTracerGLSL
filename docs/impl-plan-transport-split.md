@@ -1,9 +1,15 @@
 # Implementation Plan — Transport-Generator Split (§10.1 item 9)
 
 **Author:** Fable (July 2026, owner-approved design discussion)
-**Status:** planned — NEXT BUILD (goes BEFORE GGX, owner decision July 12 2026)
+**Status:** **BUILT (July 2026)** — commits A (5f8590f, equivalence scaffolding),
+B (3b607e2, the generator: 47/47 pairs token-identical to the template), C (dfdb079,
+template + test + template-only defines deleted), D (685276e, library gates → conditional
+inclusion; transport and materials emit ZERO defines). **Pending: owner GPU witness sweep
++ dump review** (dumps/minimal-pt + fog-area-pt-mis extracted for the emission-quality-bar
+read). The loop's source of truth is `emitTransportTrace` + segment emitters in
+`src/compiler/generate/features/transport.ts`.
 **Kind:** refactor-only batch. Zero behavior change, zero new features — the equivalence
-test below is the definition of done. Don't mix anything else in.
+test below was the definition of done. Don't mix anything else in.
 
 ## Why now (the owner's framing)
 
