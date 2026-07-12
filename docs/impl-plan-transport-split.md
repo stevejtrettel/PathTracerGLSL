@@ -63,6 +63,28 @@ Consequences:
 - The trace-loop contract types (`Ray`, `Hit`, `scene_intersect`, `make_ray`, `ray_spawn`,
   `ambient_dot`) — this is a re-plumbing of who EMITS the loop, not a change to it.
 
+## The emission quality bar — PINNED (owner, July 2026)
+
+The emitted program reads as if a careful human wrote a bespoke path tracer for exactly
+this scene and this estimator, including its documentation. Readable means *you see what
+this program does* — never *you see what other configurations would do*. Consequences:
+
+- **Comments are emitted conditionally and describe THIS program.** Contract citations
+  (§7.2, §6.2, §4.4) travel with their segments, emitted only when the segment is. The
+  template's cross-configuration meta-comments ("under 'none' this block is absent, which
+  is why pt/pt-nee/pt-mis converge…") stay in the emitter source and docs — they are
+  commentary about other programs and must not appear in dumps.
+- **Degenerate cases collapse, as a requirement not a habit:** one material → direct call;
+  one light → no CDF; RR off → no block and no metric variable. A vestigial variable or
+  always-true branch in a dump is a bug against this pin even when the image is right.
+- **No generator fingerprints:** human-choosable names, formatter-routed literals.
+- Audit criterion: a graphics programmer can open `dump:shaders` output and audit the
+  estimator without knowing the compiler exists.
+
+(Applies during the split *after* the template is deleted — during it, token equivalence
+wins every conflict; the comment rewrite happens in the same commit that deletes the
+template, since comments are normalized out of the token stream anyway.)
+
 ## The proof (definition of done)
 
 1. **Token-equivalence test (temporary):** the old template uses only
@@ -95,8 +117,12 @@ Consequences:
 - **ANGLE no-struct-ternary** (memory): the template avoids `?:` on structs — segment
   generators must preserve that discipline (the emission block's `eprops` pattern).
 - **`prev_*` writes at medium AND surface events** — the MIS bookkeeping's most fragile
-  invariant; the equivalence test covers it, but keep the two sites emitted from shared
-  helpers where possible.
+  invariant; the equivalence test covers it during the split. **Design rule (owner
+  discussion, July 2026): any invariant that spans emission sites gets exactly ONE emitter
+  function** — RR, the `prev_*` bookkeeping, the MIS-weight construction. Where the docs
+  pin "these sites must agree," the generator makes them the same code, so agreement is
+  inherited by construction, not checked by reading. This is the enforcement upgrade the
+  split exists for — not a mitigation.
 - The `boundary` variable split (`HAS_MEDIA` changes the `scene_intersect` call shape) is
   the trickiest toggle — it restructures the top of the loop, not just a branch.
 - Snapshot churn is TOTAL — do not eyeball-accept without the equivalence test green first.
