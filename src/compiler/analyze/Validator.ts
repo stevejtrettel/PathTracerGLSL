@@ -5,6 +5,7 @@ import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../generate/glsl/materials/index.js';
+import { PRIMITIVE_PARAMS } from '../generate/glsl/geometry/index.js';
 
 /** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
 const MIN_QUAD_AREA = 1e-8;
@@ -297,6 +298,48 @@ export function validate(
             if (!emissiveCapable && hasEmission) {
                 bag.warning('invalid-setting',
                     `Material '${name}': emission is set but model '${mat.model}' cannot emit (its emission is identically zero) — the value is ignored`)
+                    .add();
+            }
+        }
+    }
+
+    // Geometry-primitive parameter schemas (R3 / review C7): `{ r: 2 }` must not silently
+    // render a unit sphere. Unknown keys warn (typo class); missing required / wrong shape
+    // error. Unimplemented primitive TYPES are the Planner's diagnostic, not ours.
+    for (let i = 0; i < scene.objects.length; i++) {
+        const obj = scene.objects[i];
+        if (obj.kind !== 'sdf' && obj.kind !== 'analytic') continue;   // mesh: rejected elsewhere
+        const spec = obj.kind === 'sdf'
+            ? (obj.sdf as { type?: string; parameters?: Record<string, unknown> })
+            : (obj.shape as { type?: string; parameters?: Record<string, unknown> });
+        const type = spec.type;
+        const params = spec.parameters ?? {};
+        const schema = PRIMITIVE_PARAMS[`${obj.kind}:${type}`];
+        if (!schema) continue;
+        const known = new Map(schema.map((s) => [s.name, s]));
+        for (const key of Object.keys(params)) {
+            if (!known.has(key)) {
+                bag.warning('invalid-setting',
+                    `Object ${i} (${obj.kind} ${type}): unknown parameter '${key}' is ignored (valid: ${schema.map((s) => s.name).join(', ')})`)
+                    .add();
+            }
+        }
+        for (const s of schema) {
+            const v = params[s.name];
+            if (v === undefined) {
+                if (s.required) {
+                    bag.error('invalid-setting',
+                        `Object ${i} (${obj.kind} ${type}): required parameter '${s.name}' is missing`)
+                        .add();
+                }
+                continue;
+            }
+            const shapeOk = s.shape === 'number'
+                ? typeof v === 'number' && Number.isFinite(v)
+                : Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number' && Number.isFinite(c));
+            if (!shapeOk) {
+                bag.error('invalid-setting',
+                    `Object ${i} (${obj.kind} ${type}): parameter '${s.name}' must be a ${s.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
                     .add();
             }
         }

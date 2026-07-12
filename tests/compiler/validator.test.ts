@@ -209,3 +209,42 @@ describe('Validator — hardening pack (H1)', () => {
         expect(bag.getErrors().some(e => /sphere radius/.test(e.message))).toBe(true);
     });
 });
+
+describe('Validator — primitive parameter schemas (R3 / review C7)', () => {
+    it('errors on a missing required parameter (the { r: 2 } unit-sphere hole)', () => {
+        const bag = run(s => {
+            s.objects = [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { r: 2 } as never }, material: 'm' }];
+        });
+        expect(bag.getErrors().some(e => /required parameter 'radius' is missing/.test(e.message))).toBe(true);
+    });
+
+    it('warns on an unknown parameter key, naming the valid ones', () => {
+        const bag = run(s => {
+            s.objects = [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 1, radios: 2 } as never }, material: 'm' }];
+        });
+        expect(bag.getWarnings().some(w => /unknown parameter 'radios'.*valid: center, radius/.test(w.message))).toBe(true);
+    });
+
+    it('errors on a wrong-shape parameter', () => {
+        const bag = run(s => {
+            s.objects = [{ kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: 2 } as never }, material: 'm' }];
+        });
+        expect(bag.getErrors().some(e => /'halfSize' must be a vec3/.test(e.message))).toBe(true);
+    });
+});
+
+describe('Validator — schema discipline warnings (R2)', () => {
+    it("warns when a {param}-driven property has no reader in the material's model", () => {
+        const bag = run(s => {
+            s.materials['m'] = { model: 'lambert', roughness: { param: 'm.rough', default: 0.5 } };
+        });
+        expect(bag.getWarnings().some(w => /'roughness' is \{param\}-driven but model 'lambert' does not read it/.test(w.message))).toBe(true);
+    });
+
+    it('warns when a non-emissive-capable model carries an emission value', () => {
+        const bag = run(s => {
+            s.materials['m'] = { model: 'dielectric', ior: 1.5, emission: [1, 1, 1] };
+        });
+        expect(bag.getWarnings().some(w => /model 'dielectric' cannot emit/.test(w.message))).toBe(true);
+    });
+});
