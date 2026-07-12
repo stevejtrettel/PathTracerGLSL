@@ -1,7 +1,10 @@
 # Implementation Plan — Descriptor/Schema Reorg (module-anatomy §7 step 2)
 
 **Author:** Fable (July 2026, owner-approved sequence: after the transport split, before GGX)
-**Status:** planned
+**Status:** **BUILT (July 2026)** — R1a (9439cee), R1b (495643b), R1c (53d4c90) all
+byte-identical; R2 (ef695bc) churn verified pure (struct/resolver only; roughness gone
+everywhere pending GGX's schema); R3 (33a63a8) diagnostics + tests. The extension-cost
+target holds: a new material = one GLSL file + one descriptor + one registry line.
 **Authority:** [fable-module-anatomy.md](fable-module-anatomy.md) §2–§6 (descriptor shapes,
 family taxonomy, file layout — this plan implements them); contracts §3.3/§3.4/§3.5.
 **Kind:** refactor-only. R1 is byte-identical (stronger than the split's gate: zero text

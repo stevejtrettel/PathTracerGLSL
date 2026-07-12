@@ -139,14 +139,14 @@ reads as a table of contents.
 1. **Dielectric first, on today's plumbing.** Hand-add its one struct field (`transmittance`) and
    the generated `ior_of` table; no descriptor machinery yet. Rationale (verification asymmetry):
    the dielectric *creates* the witnesses (F-ETA, R-SUBMERGED, X-GLASS) — refactors should run
-   against witnesses, not alongside the feature that introduces them.
-2. **Reorganization pass later, as one unit, when file count warrants:** family folders +
-   descriptor type (Lambert, dielectric, point light as first instances) + schema-driven
-   struct/resolver generation replacing the hand-written triples. Byte-identical GLSL,
-   snapshot-guarded, with the numeric witnesses as the semantic backstop.
-   *(Trigger watch, July 2026: the media + area-light builds added phase_hg, medium_analytic,
-   light_quad, light_sphere on hand-written plumbing — the model-file count now plausibly
-   warrants the pass; GGX would make it overdue.)*
+   against witnesses, not alongside the feature that introduces them. **DONE.**
+2. **Reorganization pass** — **DONE (July 2026, `impl-plan-descriptor-reorg.md` R1–R3):**
+   §6 family folders adopted verbatim (+ an env/ family); descriptors for lambert/dielectric,
+   point/quad/sphere light kinds (power + sample-call + pdf-arm as declared facts), and hg;
+   schema-generated `MaterialProperties`/`MediumProperties` (§3.4 literal — roughness absent
+   until GGX declares it); schema-following resolver + {param} scan; C5-class Validator
+   warnings; C7 primitive-parameter schemas. R1 byte-identical, R2's slimming churn proven
+   pure, witnesses green.
 
 ## 8. Drift ledger (docs ↔ code), status at writing
 
