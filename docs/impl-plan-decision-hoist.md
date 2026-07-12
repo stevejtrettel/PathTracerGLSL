@@ -1,9 +1,13 @@
 # Implementation Plan — Decision Hoist (batch 1 of the compiler cleanup)
 
 **Author:** Fable (July 2026, owner-approved design discussion — see `fable-strategy-taxonomy.md`)
-**Status:** planned — precedes the transport split (`impl-plan-transport-split.md`), which
-consumes this batch's output shape. Same precedent as §2.10-before-item-9: land the input
-shape before the consumer, or do it twice.
+**Status:** **BUILT (July 2026)** — T1 (c32a927), T2 (1d94c22), T3 (c469682), T4 (82766b3);
+all gates green (T1/T2 GLSL snapshot-identical; T3 47 pairs statically compile; T4 churn =
+exactly the interfaces block + deleted env-light-decls, GPU furnace spot-check clean).
+One recorded deviation: NO separate transport-flags record — the ProgramDescription
+sections ARE the flags (avoids duplicated truth); the split's segment generators read
+`program.measurement/estimator/media` directly. Precedes the transport split, which
+consumes this batch's output shape (the §2.10-before-item-9 precedent).
 **Kind:** refactor-only. Zero behavior change; generated GLSL snapshot-identical at every
 step except T4 (whose churn is exactly one added header block, reviewed by diff shape).
 Don't mix transport-split or descriptor-reorg work in.

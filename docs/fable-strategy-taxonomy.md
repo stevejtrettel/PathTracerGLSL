@@ -168,11 +168,12 @@ Anything that shapes **what accumulates** is measurement; anything applied to th
 (future) spectral→XYZ film integration: measurement. The existing "HDR export reads
 pre-tonemap accumulation" behavior is this line, already drawn.
 
-## 11. Migration
+## 11. Migration — DONE (July 2026)
 
-Lands with the **decision-hoist batch** (before the transport split): `RenderStrategy` gains
-the three sections; `ProgramDescription` mirrors them (it is the *linked* record of the same
-decomposition); scene-registry strategy literals update mechanically. Pure input-schema
-reshape — generated GLSL asserted snapshot-identical. Until then, this doc's classifications
-govern design discussion; no code obeys them yet. Contracts §7.3 gets a cross-reference
-annotation, not a rewrite.
+Landed with the **decision-hoist batch** (`impl-plan-decision-hoist.md` T1–T2, commits
+c32a927/1d94c22): `RenderStrategy` carries the three sections; `ProgramDescription` mirrors
+them and is the complete link map with its own structural snapshot; the §8 `volumeIntegrator`
+split is implemented (`measurement.scattering` + `estimator.volumeSampling`); `shadows` and
+`color` are declared truncation fields with `'spectral'` reserved-rejected. Generated GLSL
+was asserted snapshot-identical at both steps. Contracts §7.3 carries the cross-reference
+annotation.

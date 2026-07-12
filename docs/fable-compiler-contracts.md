@@ -613,6 +613,14 @@ Steps 1–2 exist only when the scene has media (Planner knows); their implement
 
 ### 7.3 The strategy axis
 
+> **Shape superseded by [fable-strategy-taxonomy.md](fable-strategy-taxonomy.md) (owner-decided
+> July 2026, implemented in the decision-hoist batch):** the flat `transport:` sketch below became
+> the three-sectioned `measurement / estimator / view` schema — scene+measurement define the
+> integral, estimator is bias-free by contract, view is display-only. The `volumeIntegrator`
+> field split into `measurement.scattering` (truncation) + `estimator.volumeSampling` (method).
+> The *semantics* below (scene = specimen, strategy = experiment, integrators as loop
+> generators) are unchanged.
+
 ```typescript
 transport: {
     integrator: 'pt',                                   // loop generator id

@@ -150,6 +150,15 @@ reads as a table of contents.
 
 ## 8. Drift ledger (docs ↔ code), status at writing
 
+- **Decision-hoist batch (July 2026, `impl-plan-decision-hoist.md`):** strategy schema now
+  three-sectioned per `fable-strategy-taxonomy.md` (contracts §7.3's flat sketch is
+  superseded on *shape*, unchanged on *semantics* — annotated there); `ProgramDescription`
+  is the complete link map (Generate never reads analyzer facts — the §2.10 "Planner
+  concatenates" wording remains drift: collection happens in Generate, harmless);
+  contributions now carry `provides`/`requires` (the review-endorsed `PlannedResource`
+  sketch, realized); generated GLSL statically compiled in CI (glslang; NOT ANGLE —
+  dialect quirks stay with GPU witnesses).
+
 - **Reconciled by annotation** (uncommitted, July 2026): §2.9/§3.2 `(uc, u)` sampler split;
   §3.1 `LOBE_NULL` dropped for compile-time `is_null_interface`; §7.2 RR metric →
   `spectrum_max` (item 6) with the modular-metric note and the dielectric-era `etaScale` warning.
