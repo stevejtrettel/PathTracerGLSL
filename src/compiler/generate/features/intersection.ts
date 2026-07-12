@@ -11,6 +11,7 @@ import { isGlslExpression, isValueParam } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatVec3, paramToUniform } from './glsl-format.js';
+import { modelTransmission } from '../glsl/material-registry.js';
 
 import sdfPrimitivesGLSL from '../glsl/sdf_primitives.glsl?raw';
 import raymarchGLSL from '../glsl/raymarch.glsl?raw';
@@ -41,8 +42,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // region → material table spans BOTH backends (regions are globally unique).
     blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects, plan.ambientMedium) });
 
-    // region → IOR table (§2.3 generated-tables family) — only when a dielectric reads it.
-    if (plan.materials.some((m) => m.model === 'dielectric')) {
+    // region → IOR table (§2.3 generated-tables family) — only when a transmissive model
+    // reads it (capability-driven, R1a — the far side's IOR has no shading point).
+    if (plan.materials.some((m) => modelTransmission(m.model))) {
         blocks.push({ origin: 'generated:ior-of', source: generateIorOf(plan.objects, plan.analyticObjects, plan.materials) });
     }
 
@@ -62,7 +64,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         { name: 'scene_region_at', signature: 'int scene_region_at(vec3 p)' },
         { name: 'material_of', signature: 'int material_of(int region)' },
     ];
-    if (plan.materials.some((m) => m.model === 'dielectric')) {
+    if (plan.materials.some((m) => modelTransmission(m.model))) {
         provides.push({ name: 'ior_of', signature: 'float ior_of(int region)' });
     }
 
@@ -310,8 +312,7 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
         // Non-transmissive materials are PINNED to 1.0 (fall through to the default), even if the
         // author set an ior on them — an authored lambert ior leaking into the table silently
         // yields η = 1 at adjacent dielectric boundaries (review finding). The Validator warns.
-        // ('dielectric' string check → the capability record, deferred to the reorg pass.)
-        if (!mat || mat.model !== 'dielectric') continue;
+        if (!mat || !modelTransmission(mat.model)) continue;
         let expr: string;
         if (isValueParam(mat.ior)) {
             expr = paramToUniform(mat.ior.param);

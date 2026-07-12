@@ -10,17 +10,18 @@ import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, paramToUniform } from './glsl-format.js';
 
-import lambertGLSL from '../glsl/lambert.glsl?raw';
-import dielectricGLSL from '../glsl/dielectric.glsl?raw';
+import { MATERIAL_MODELS, materialModel } from '../glsl/material-registry.js';
 import mediumAnalyticGLSL from '../glsl/medium_analytic.glsl?raw';
 import phaseHgGLSL from '../glsl/phase_hg.glsl?raw';
 
-/** Per-model capability facts (the future descriptor's `capabilities` — inline until the reorg pass). */
-const MODEL_HAS_NONDELTA_LOBES: Record<string, boolean> = {
-    lambert: true,
-    dielectric: false,   // pure delta: NEE can't sample it, eval ≡ 0
-    none: false,         // null interface (§3.6): no surface at all — transport skips before NEE anyway
-};
+/** Capability lookup over the descriptor registry (R1a — replaces the inline
+ *  MODEL_HAS_NONDELTA_LOBES map). 'none' is a boundary classification, not a model:
+ *  no surface, no lobes (§3.6). Unregistered models return undefined so callers keep
+ *  the fail-safe polarity they need. */
+function modelNonDeltaLobes(model: PlannedMaterial['model']): boolean | undefined {
+    if (model === 'none') return false;
+    return MATERIAL_MODELS[model]?.capabilities.nonDeltaLobes;
+}
 
 /** 'none' is a boundary classification (§3.6), never a surface-dispatch arm. */
 function surfaceMaterials(materials: PlannedMaterial[]): PlannedMaterial[] {
@@ -48,9 +49,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         { origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials) },
     ];
 
+    // Model includes from the registry (R1a): one line per model PRESENT, no per-model ifs.
     for (const model of plan.program.materials.models) {
-        if (model === 'lambert') blocks.push({ origin: 'glsl/lambert.glsl', source: lambertGLSL });
-        if (model === 'dielectric') blocks.push({ origin: 'glsl/dielectric.glsl', source: dielectricGLSL });
+        blocks.push({ origin: `glsl/${model}.glsl`, source: materialModel(model).glsl });
     }
 
     // The generated §3.3 dispatch, after the model libraries it calls.
@@ -258,7 +259,7 @@ function generateNondeltaGuard(materials: PlannedMaterial[]): string {
     // (`!map[model]` treated unknown models as delta → a future model wired into the dispatch but
     // not this map would silently lose all direct lighting — review finding. Defaulting to true
     // costs at worst a wasted shadow ray.)
-    const deltaIds = materials.filter((m) => MODEL_HAS_NONDELTA_LOBES[m.model] === false).map((m) => m.id);
+    const deltaIds = materials.filter((m) => modelNonDeltaLobes(m.model) === false).map((m) => m.id);
     const lines: string[] = ['// Generated NEE guard: pure-delta materials skip the shadow ray (eval ≡ 0)'];
     lines.push('bool material_has_nondelta_lobes(int mat) {');
     if (deltaIds.length === 0) {

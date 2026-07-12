@@ -18,6 +18,7 @@
 import type { RenderPlan, ProgramDescription } from '../../plan/types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
+import { modelTransmission } from '../glsl/material-registry.js';
 
 export function contributeTransport(plan: RenderPlan): FeatureContribution {
     const program = plan.program;
@@ -45,7 +46,7 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
         if (lighting?.method === 'mis') requires.push('hg_pdf');
     }
     if (program.media.nullInterfaces) requires.push('is_null_interface');
-    if (program.materials.models.includes('dielectric')) requires.push('ior_of');
+    if (program.materials.models.some(modelTransmission)) requires.push('ior_of');
     if (program.environmentSamplable && lighting?.method === 'mis') requires.push('environment_pdf');
 
     return {
@@ -127,7 +128,7 @@ function flags(p: ProgramDescription) {
         media: p.media.present,
         scattering: p.media.scatteringArms,
         nulls: p.media.nullInterfaces,
-        transmission: p.materials.models.includes('dielectric'),
+        transmission: p.materials.models.some(modelTransmission),
         envSamplable: p.environmentSamplable,
         emitters: p.emitters.samplable,
         rr: p.estimator.russianRoulette,
