@@ -245,6 +245,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             ? { type: 'none' }
             : { type: strategy.display.type, exposure: strategy.display.exposure },
         environment: scene.environment ?? { type: 'none' },
+        envSampler: {
+            chart: strategy.transport.envSampler ?? 'equirect',
+            compensation: strategy.transport.envCompensation ?? false,
+        },
     };
 }
 

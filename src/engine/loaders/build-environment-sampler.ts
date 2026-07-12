@@ -18,9 +18,21 @@ export function buildEnvironmentSampler(
     H: number,
     // names to register under (optional, choose your own scheme)
     names = { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' },
-    opts: { blur?: boolean } = {},
+    opts: {
+        blur?: boolean;
+        /** Chart the table lives in (T5, D11): 'equirect' weights texels by the sinθ
+         *  Jacobian; 'octahedral' texels are equal-area (constant weight). Default equirect. */
+        chart?: 'equirect' | 'octahedral';
+        /** MIS compensation (pbrt-v4 / Karlík et al. 2019): subtract the dΩ-weighted mean
+         *  luminance before the CDF build — spend light samples only where the env beats
+         *  the average that BSDF sampling already covers. ONLY sound under MIS (the
+         *  Validator gates it); pdf-0-where-L>0 is deliberate here. */
+        compensation?: boolean;
+    } = {},
 ): EnvSamplerBuildResult {
     const blur = opts.blur ?? true;
+    const chart = opts.chart ?? 'equirect';
+    const compensation = opts.compensation ?? false;
 
     // 1) luminance per texel
     let Y = new Float32Array(W * H);
@@ -40,13 +52,17 @@ export function buildEnvironmentSampler(
     // u wraps (equirect seam), v clamps (poles).
     if (blur) {
         const blurred = new Float32Array(W * H);
+        // Neighborhood policy per chart: equirect wraps u (the φ seam) and clamps v (poles);
+        // octahedral edges are fold lines — clamp both (conservative; blur only needs to
+        // cover the bilinear footprint, and fold-aware wrapping isn't worth its complexity).
+        const wrapU = chart === 'equirect';
         for (let j = 0; j < H; ++j) {
             for (let i = 0; i < W; ++i) {
                 let sum = 0, wsum = 0;
                 for (let dj = -1; dj <= 1; ++dj) {
                     const jj = Math.min(H - 1, Math.max(0, j + dj));
                     for (let di = -1; di <= 1; ++di) {
-                        const ii = (i + di + W) % W;
+                        const ii = wrapU ? (i + di + W) % W : Math.min(W - 1, Math.max(0, i + di));
                         const w = (dj === 0 ? 2 : 1) * (di === 0 ? 2 : 1);   // 3×3 tent
                         sum += w * Y[jj * W + ii];
                         wsum += w;
@@ -58,6 +74,26 @@ export function buildEnvironmentSampler(
         Y = blurred;
     }
 
+    // Per-texel solid angle in the table's chart (must match the GLSL chart's env_texel_dOmega)
+    const texelOmega = (j: number): number =>
+        chart === 'octahedral'
+            ? (4 * Math.PI) / (W * H)
+            : (2 * Math.PI / W) * (Math.PI / H) * Math.sin(Math.PI * (j + 0.5) / H);
+
+    // 1c) MIS compensation (post-blur): subtract the dΩ-weighted mean luminance — the level
+    // BSDF sampling already covers — and clamp at zero. A uniform env compensates to an
+    // all-zero table → the uniform-fallback CDF with pdf 0 everywhere → miss-MIS weight 1
+    // on the BSDF side. Unbiased by construction, MIS-only by Validator rule.
+    if (compensation) {
+        let num = 0, den = 0;
+        for (let j = 0; j < H; ++j) {
+            const dO = texelOmega(j);
+            for (let i = 0; i < W; ++i) { num += Y[j * W + i] * dO; den += dO; }
+        }
+        const mean = den > 0 ? num / den : 0;
+        for (let k = 0; k < Y.length; ++k) Y[k] = Math.max(0, Y[k] - mean);
+    }
+
     // 2) conditional CDF per row & marginal CDF over rows
     const condCDF = new Float32Array(W * H);
     const margCDF = new Float32Array(H);
@@ -67,8 +103,10 @@ export function buildEnvironmentSampler(
     const PI = Math.PI;
 
     for (let j = 0; j < H; ++j) {
+        // Chart Jacobian weight, up to a constant factor (constants cancel in the CDF):
+        // equirect rows shrink by sinθ; octahedral texels are equal-area (weight 1).
         const theta = PI * (j + 0.5) / H;
-        const sinT  = Math.sin(theta);
+        const sinT  = chart === 'octahedral' ? 1.0 : Math.sin(theta);
         let sum = 0.0;
         for (let i = 0; i < W; ++i) sum += Math.max(0, Y[j*W + i]) * sinT;
         rowSum[j] = sum;

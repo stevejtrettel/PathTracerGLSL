@@ -215,6 +215,14 @@ export function validate(
         }
     }
 
+    // T5: a compensated env table deliberately has pdf = 0 where L > 0 — unbiased ONLY when
+    // BSDF sampling covers those directions with MIS weighting. NEE-only would lose energy.
+    if (strategy.transport.envCompensation === true && strategy.transport.directLighting !== 'mis') {
+        bag.error('incompatible-options',
+            `envCompensation requires directLighting 'mis' — a compensated importance table has deliberate pdf-0 regions that only MIS covers unbiasedly (got '${strategy.transport.directLighting}')`)
+            .add();
+    }
+
     const vi = strategy.transport.volumeIntegrator;
     if (vi === 'raymarch' || vi === 'delta-tracking' || vi === 'ratio-tracking') {
         bag.error('invalid-setting',

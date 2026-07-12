@@ -16,9 +16,36 @@ import type { ParameterMetadata } from '../../../engine/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import envChartEquirectGLSL from '../glsl/env_chart_equirect.glsl?raw';
+import envChartOctahedralGLSL from '../glsl/env_chart_octahedral.glsl?raw';
 import envSamplerCdfGLSL from '../glsl/env_sampler_cdf.glsl?raw';
 
 const ORIGIN = 'generated:environment';
+
+// Shared azimuth rotation (used by the octahedral chart and procedural radiance bodies).
+const ROTATE_BLOCK = {
+    origin: 'generated:env-rotate',
+    source: '// Azimuth rotation by +a (adds a to atan(z, x)) — the chart rotation in direction space\n'
+        + 'vec3 env_rotate_y(vec3 d, float a) {\n'
+        + '    float c = cos(a), s = sin(a);\n'
+        + '    return vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);\n'
+        + '}',
+};
+
+/** T5 variant table suffix: which registered CDF pair this program samples. */
+export function envVariantSuffix(chart: 'equirect' | 'octahedral', compensation: boolean): string {
+    return (chart === 'octahedral' ? '_oct' : '') + (compensation ? '_comp' : '');
+}
+
+function chartBlock(chart: 'equirect' | 'octahedral') {
+    return chart === 'octahedral'
+        ? { origin: 'glsl/env_chart_octahedral.glsl', source: envChartOctahedralGLSL }
+        : { origin: 'glsl/env_chart_equirect.glsl', source: envChartEquirectGLSL };
+}
+
+/** Per-chart table dimensions live on separate parameter paths (they differ: W×H vs N×N). */
+function sizeParamPath(chart: 'equirect' | 'octahedral'): string {
+    return chart === 'octahedral' ? 'env.sizeOct' : 'env.size';
+}
 
 // Constant env, samplable (D6 opt-in): uniform-sphere sampling, pdf = 1/(4π) exactly.
 // The cheap path to the miss-MIS bookkeeping witnesses — no textures anywhere.
@@ -80,21 +107,30 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Env intensity', group: 'Environment', triggersReset: true },
             'env.rotation': { type: 'float', default: rotation, range: [-Math.PI, Math.PI], name: 'Env rotation', group: 'Environment', triggersReset: true },
         };
+        // RADIANCE IS CHART-INDEPENDENT (D11: the integrand is held fixed across samplers):
+        // the map is equirect, so the lookup uses its own fixed equirect mapping — the
+        // swappable env_chart_* seam belongs exclusively to the SAMPLER below.
+        const { chart, compensation } = plan.program.envSampler;
         const blocks = [
-            { origin: 'glsl/env_chart_equirect.glsl', source: envChartEquirectGLSL },
-            // Radiance = table fetch through the chart (rotation applied by env_chart_uv).
-            { origin: ORIGIN, source: radianceFn('return texture(u_envMap, env_chart_uv(dir)).rgb * u_envIntensity;') },
+            ROTATE_BLOCK,
+            { origin: ORIGIN, source: '// Fixed equirect map lookup (sampler-chart-independent)\n'
+                + 'vec2 env_map_uv(vec3 dir) {\n'
+                + '    vec3 n = normalize(dir);\n'
+                + '    return vec2((atan(n.z, n.x) + u_envRotation) * (1.0 / TWO_PI) + 0.5,\n'
+                + '                acos(clamp(n.y, -1.0, 1.0)) * (1.0 / PI));\n'
+                + '}\n'
+                + radianceFn('return texture(u_envMap, env_map_uv(dir)).rgb * u_envIntensity;') },
         ];
         const textures = [{ name: 'u_envMap', source: 'extern:env_map' }];
         if (samplable) {
-            // The CDF sampler needs the tables + the size (pdf/dΩ). u_envSize arrives on the
-            // env.size parameter the app sets at HDR-load time.
+            const suffix = envVariantSuffix(chart, compensation);
+            blocks.splice(1, 0, chartBlock(chart));   // chart before radiance/sampler
             blocks.push({ origin: 'glsl/env_sampler_cdf.glsl', source: envSamplerCdfGLSL });
             textures.push(
-                { name: 'u_envCdfCond', source: 'extern:env_cdf_cond' },
-                { name: 'u_envCdfMarg', source: 'extern:env_cdf_marg' },
+                { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },
+                { name: 'u_envCdfMarg', source: `extern:env_cdf_marg${suffix}` },
             );
-            uniforms.push({ name: 'u_envSize', type: 'vec2', parameterPath: 'env.size', default: [1, 1] });
+            uniforms.push({ name: 'u_envSize', type: 'vec2', parameterPath: sizeParamPath(chart), default: [1, 1] });
         }
         return {
             ...emptyContribution(),
@@ -120,8 +156,9 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Env intensity', group: 'Environment', triggersReset: true },
             'env.rotation': { type: 'float', default: rotation, range: [-Math.PI, Math.PI], name: 'Env rotation', group: 'Environment', triggersReset: true },
         };
+        const { chart, compensation } = plan.program.envSampler;
         const blocks = [
-            { origin: 'glsl/env_chart_equirect.glsl', source: envChartEquirectGLSL },
+            ROTATE_BLOCK,
             // env_rotate_y(dir, +rot) evaluates the formula at the TABLE azimuth — the exact
             // direction-space form of the chart's rotation term, so the direct-eval'd field
             // and the CDF (baked unrotated, sampled through the chart) agree under rotation.
@@ -131,12 +168,14 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         ];
         const textures: FeatureContribution['textures'] = [];
         if (samplable) {
+            const suffix = envVariantSuffix(chart, compensation);
+            blocks.splice(1, 0, chartBlock(chart));   // chart before radiance/sampler
             blocks.push({ origin: 'glsl/env_sampler_cdf.glsl', source: envSamplerCdfGLSL });
             textures.push(
-                { name: 'u_envCdfCond', source: 'extern:env_cdf_cond' },
-                { name: 'u_envCdfMarg', source: 'extern:env_cdf_marg' },
+                { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },
+                { name: 'u_envCdfMarg', source: `extern:env_cdf_marg${suffix}` },
             );
-            uniforms.push({ name: 'u_envSize', type: 'vec2', parameterPath: 'env.size', default: [1, 1] });
+            uniforms.push({ name: 'u_envSize', type: 'vec2', parameterPath: sizeParamPath(chart), default: [1, 1] });
         }
         return {
             ...emptyContribution(),

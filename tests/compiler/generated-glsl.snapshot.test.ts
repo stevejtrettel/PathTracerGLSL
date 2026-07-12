@@ -10,7 +10,7 @@ import { etaScene, etaStrategy, submergedScene, submergedStrategy, cornellGlass,
 import { slabScene, slabStrategy, fogcubeScene, fogcubeStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../../src/compiler/scenes/mediaScenes.js';
 import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistStrategy } from '../../src/compiler/scenes/demoScenes.js';
 import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy, fogPanel, orbScene, orbNeeStrategy, orbPtStrategy } from '../../src/compiler/scenes/areaLightScenes.js';
-import { skyScene, skyPtStrategy, skyNeeStrategy, furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, skyLampScene, skyLampMisStrategy, procSkyScene, procSkyNeeStrategy } from '../../src/compiler/scenes/envScenes.js';
+import { skyScene, skyPtStrategy, skyNeeStrategy, skyMisOctStrategy, furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, skyLampScene, skyLampMisStrategy, procSkyScene, procSkyNeeStrategy, procSkyMisCompStrategy } from '../../src/compiler/scenes/envScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -116,6 +116,10 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     // env-as-light T4: procedural env — formula direct-eval radiance body, CDF externs
     // WITHOUT u_envMap, the sampler-radiance unification.
     ['proc-sky + pt-nee', procSkyScene, procSkyNeeStrategy],
+    // env-as-light T5: the strategy axis. Octahedral chart block + _oct extern names +
+    // env.sizeOct; compensated tables reuse the chart but bind _comp extern names.
+    ['sky + pt-mis-oct', skyScene, skyMisOctStrategy],
+    ['proc-sky + pt-mis-comp', procSkyScene, procSkyMisCompStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

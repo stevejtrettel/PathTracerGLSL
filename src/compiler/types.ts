@@ -270,6 +270,19 @@ export interface TransportDescription {
      * the null-collision pair needs majorants — all three rejected-not-removed.
      */
     volumeIntegrator?: 'none' | 'analytic' | 'raymarch' | 'delta-tracking' | 'ratio-tracking';
+    /**
+     * Environment-sampler chart (T5, plan D11 — a swappable strategy axis): 'equirect' is
+     * pbrt-v3's sinθ-weighted CDF (default); 'octahedral' is pbrt-v4's equal-area mapping
+     * (constant Jacobian, no pole waste). The radiance integrand is IDENTICAL under both —
+     * cross-chart convergence is a controlled experiment (the X-CHART witness).
+     */
+    envSampler?: 'equirect' | 'octahedral';
+    /**
+     * MIS compensation for the env importance table (pbrt-v4 / Karlík et al. 2019): build
+     * the CDF from max(L − L̄, 0). Requires directLighting 'mis' (Validator-enforced) —
+     * the deliberate pdf-0 regions are only unbiased when BSDF sampling covers them.
+     */
+    envCompensation?: boolean;
 }
 
 export type CameraDescription =

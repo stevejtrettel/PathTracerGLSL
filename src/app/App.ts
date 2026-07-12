@@ -1,7 +1,10 @@
 // app/App.ts — Main orchestrator, facade over internal managers
 
 import { Compiler } from '../compiler/Compiler.js';
-import { compileEnvironmentBake, DEFAULT_ENV_TABLE_SIZE } from '../compiler/EnvironmentBake.js';
+import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '../compiler/EnvironmentBake.js';
+import { envVariantSuffix } from '../compiler/generate/features/environment.js';
+import { resampleEquirectToOctahedral } from '../engine/loaders/octahedral.js';
+import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
 import { ParameterStore } from './ParameterStore.js';
@@ -126,12 +129,14 @@ export class App {
 
     // Compile all strategies and optionally load environment HDR
     async initialize(config: AppConfig): Promise<void> {
-        // T4: a procedural environment bakes its table BEFORE the main renderers exist —
+        // T4: a procedural environment bakes its table(s) BEFORE the main renderers exist —
         // no selection state to restore, and the CDF externs are registered before any
         // pass could bind them. Run-once semantics live HERE; the engine just renders.
+        // T5: one table per (chart, compensation) VARIANT the strategies use — keys 1-9
+        // switch strategies live, so all variants must coexist in the registry.
         if (config.scene?.environment?.type === 'procedural') {
             try {
-                this._bakeProceduralEnvironment(config.scene);
+                this._bakeProceduralEnvironment(config.scene, envVariants(config.strategies));
             } catch (error: any) {
                 this._showErrorOverlay(error);
                 throw error;
@@ -152,10 +157,27 @@ export class App {
         const hdrPath = config.environmentHDR ?? (sceneEnv?.type === 'image' ? sceneEnv.url : undefined);
         if (hdrPath) {
             try {
+                // The loader registers env_map + the DEFAULT tables (equirect, uncompensated).
                 const env = await this.engine.loadEnvironmentHDR(hdrPath);
-                // env.size / env.totalWeight feed the T3 sampling uniforms; set eagerly —
-                // renderers without those uniforms just never consume the parameters.
                 this.parameterStore.batch({ 'env.size': [env.width, env.height], 'env.totalWeight': env.totalWeight });
+
+                // T5: build the non-default (chart, compensation) variants the strategies use.
+                let octaRgb: Float32Array | null = null;
+                const octaN = DEFAULT_ENV_TABLE_SIZE[1];
+                for (const { chart, compensation } of envVariants(config.strategies)) {
+                    const suffix = envVariantSuffix(chart, compensation);
+                    if (suffix === '') continue;   // default already built by the loader
+                    let rgb = env.data, w = env.width, h = env.height;
+                    if (chart === 'octahedral') {
+                        octaRgb ??= resampleEquirectToOctahedral(env.data, env.width, env.height, octaN);
+                        rgb = octaRgb; w = octaN; h = octaN;
+                        this.parameterStore.set('env.sizeOct', [octaN, octaN]);
+                    }
+                    this.engine.registerEnvironmentTable(rgb, w, h, {
+                        names: { map: 'env_map', cond: `env_cdf_cond${suffix}`, marg: `env_cdf_marg${suffix}` },
+                        chart, compensation,
+                    });
+                }
             } catch (error) {
                 console.error(`Failed to load HDR environment: ${hdrPath}`, error);
                 throw error;
@@ -164,36 +186,49 @@ export class App {
     }
 
     /**
-     * T4 bake: compile the tiny bake renderer, render ONE frame, read the table back,
-     * feed it to the CPU CDF builder (extern registry), and unload. The engine executes
-     * a perfectly ordinary pipeline; run-once semantics belong to the app.
+     * T4/T5 bake: for each CHART the strategies use, compile the tiny bake renderer, render
+     * ONE frame, read the table back, and build every (chart, compensation) variant's CDFs
+     * from it. The engine executes perfectly ordinary pipelines; run-once semantics and
+     * variant knowledge belong to the app.
      */
-    private _bakeProceduralEnvironment(scene: SceneDescription): void {
-        const bake = compileEnvironmentBake(scene);
-        if (!bake) return;
+    private _bakeProceduralEnvironment(scene: SceneDescription, variants: Array<{ chart: 'equirect' | 'octahedral'; compensation: boolean }>): void {
         const env = scene.environment as Extract<SceneDescription['environment'], { type: 'procedural' }>;
-        const [w, h] = env.tableSize ?? DEFAULT_ENV_TABLE_SIZE;
+        const charts = [...new Set(variants.map((v) => v.chart))];
 
-        // loadRenderers (bulk) rather than loadRenderer: it selects and moves the engine to
-        // 'running', which renderFrame's state guard requires. The main renderers re-run it.
-        this.engine.loadRenderers([bake]);
-        try {
-            this.engine.renderFrame();
-            const rgba = this.engine.readExport('table') as Float32Array;
-            // RGBA readback → tightly-packed RGB for the CDF builder
-            const rgb = new Float32Array(w * h * 3);
-            for (let i = 0; i < w * h; i++) {
-                rgb[3 * i] = rgba[4 * i];
-                rgb[3 * i + 1] = rgba[4 * i + 1];
-                rgb[3 * i + 2] = rgba[4 * i + 2];
+        for (const chart of charts) {
+            const bake = compileEnvironmentBake(scene, chart);
+            if (!bake) return;
+            const [w, h] = envTableSize(env, chart);
+
+            // loadRenderers (bulk) rather than loadRenderer: it selects and moves the engine
+            // to 'running', which renderFrame's state guard requires. Main renderers re-run it.
+            this.engine.loadRenderers([bake]);
+            try {
+                this.engine.renderFrame();
+                const rgba = this.engine.readExport('table') as Float32Array;
+                // RGBA readback → tightly-packed RGB for the CDF builder
+                const rgb = new Float32Array(w * h * 3);
+                for (let i = 0; i < w * h; i++) {
+                    rgb[3 * i] = rgba[4 * i];
+                    rgb[3 * i + 1] = rgba[4 * i + 1];
+                    rgb[3 * i + 2] = rgba[4 * i + 2];
+                }
+                for (const v of variants.filter((v) => v.chart === chart)) {
+                    const suffix = envVariantSuffix(v.chart, v.compensation);
+                    const { totalWeight } = this.engine.registerEnvironmentTable(rgb, w, h, {
+                        names: { map: 'env_map', cond: `env_cdf_cond${suffix}`, marg: `env_cdf_marg${suffix}` },
+                        chart: v.chart, compensation: v.compensation,
+                    });
+                    console.log(`Baked procedural environment [${v.chart}${v.compensation ? '+comp' : ''}]: ${w}×${h}, totalWeight ${totalWeight.toFixed(3)}`);
+                }
+                this.parameterStore.set(chart === 'octahedral' ? 'env.sizeOct' : 'env.size', [w, h]);
+            } finally {
+                this.engine.unloadRenderer(bake.id);
             }
-            const { totalWeight } = this.engine.registerEnvironmentTable(rgb, w, h);
-            this.parameterStore.batch({ 'env.size': [w, h], 'env.totalWeight': totalWeight });
-            console.log(`Baked procedural environment: ${w}×${h}, totalWeight ${totalWeight.toFixed(3)}`);
-        } finally {
-            this.engine.unloadRenderer(bake.id);
         }
     }
+
+    // (see envVariants at module scope below the class)
 
     async initializeWithPresets(
         scene: SceneDescription,
@@ -717,4 +752,21 @@ export class App {
         this.engine.dispose();
         this.rendererManager.dispose();
     }
+}
+
+
+/**
+ * The distinct (chart, compensation) env-table variants a strategy set needs (T5).
+ * Live strategy switching (keys 1-9) means every variant's tables must be registered
+ * up front; missing-extern binds are hard errors by design.
+ */
+function envVariants(strategies: RenderStrategy[] | undefined): Array<{ chart: 'equirect' | 'octahedral'; compensation: boolean }> {
+    const seen = new Map<string, { chart: 'equirect' | 'octahedral'; compensation: boolean }>();
+    for (const st of strategies ?? []) {
+        const chart = st.transport.envSampler ?? 'equirect';
+        const compensation = st.transport.envCompensation ?? false;
+        seen.set(`${chart}|${compensation}`, { chart, compensation });
+    }
+    if (seen.size === 0) seen.set('equirect|false', { chart: 'equirect', compensation: false });
+    return [...seen.values()];
 }

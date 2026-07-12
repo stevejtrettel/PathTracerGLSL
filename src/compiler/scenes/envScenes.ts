@@ -189,3 +189,24 @@ export const procSkyScene: SceneDescription = {
 export const procSkyNeeStrategy: RenderStrategy = { ...skyNeeStrategy };
 export const procSkyMisStrategy: RenderStrategy = { ...skyMisStrategy };
 export const procSkyPtStrategy: RenderStrategy = { ...skyPtStrategy };
+
+// ---------------------------------------------------------------------------
+// T5 strategy-axis keys (plan D11):
+//   X-CHART (W8) — pt-mis under the OCTAHEDRAL chart on the sky scene. The radiance
+//   integrand is bit-identical to the equirect key (radiance never touches the sampler
+//   chart), so convergence to the same image is a controlled experiment on the chart alone.
+//   W9 — pt-mis with a COMPENSATED table on proc-sky. Same converged image (MIS covers the
+//   deliberately-zeroed dim regions); the payoff is measured VARIANCE at fixed render time.
+// ---------------------------------------------------------------------------
+
+export const skyMisOctStrategy: RenderStrategy = {
+    ...skyMisStrategy,
+    id: 'pt-mis-oct',
+    transport: { ...skyMisStrategy.transport, envSampler: 'octahedral' },
+};
+
+export const procSkyMisCompStrategy: RenderStrategy = {
+    ...procSkyMisStrategy,
+    id: 'pt-mis-comp',
+    transport: { ...procSkyMisStrategy.transport, envCompensation: true },
+};

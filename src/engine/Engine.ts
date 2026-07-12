@@ -363,9 +363,9 @@ export class Engine {
      * bind-at-load path was the blind-executor violation; deleted in env-as-light T1).
      * Returns the env metadata so the app can set the `env.*` parameters.
      */
-    async loadEnvironmentHDR(path: string): Promise<{ width: number; height: number; totalWeight: number }> {
+    async loadEnvironmentHDR(path: string): Promise<{ width: number; height: number; totalWeight: number; data: Float32Array }> {
         const envData = await this.hdrLoader.loadEnvironmentHDR(path);
-        return { width: envData.width, height: envData.height, totalWeight: envData.totalWeight };
+        return { width: envData.width, height: envData.height, totalWeight: envData.totalWeight, data: envData.data };
     }
 
     /**
@@ -374,8 +374,15 @@ export class Engine {
      * The radiance table itself is NOT registered: a procedural env direct-evals its
      * formula; the table exists only as CDF food.
      */
-    registerEnvironmentTable(rgb: Float32Array, width: number, height: number): { totalWeight: number } {
-        const result = buildEnvironmentSampler(this.gl, this.textureRegistry, rgb, width, height);
+    registerEnvironmentTable(
+        rgb: Float32Array,
+        width: number,
+        height: number,
+        opts: { names?: { map: string; cond: string; marg: string }; chart?: 'equirect' | 'octahedral'; compensation?: boolean } = {},
+    ): { totalWeight: number } {
+        const result = buildEnvironmentSampler(
+            this.gl, this.textureRegistry, rgb, width, height,
+            opts.names, { chart: opts.chart, compensation: opts.compensation });
         return { totalWeight: result.totalWeight };
     }
 

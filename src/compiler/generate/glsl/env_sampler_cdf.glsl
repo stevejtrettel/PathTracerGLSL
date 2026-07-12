@@ -1,6 +1,6 @@
 // Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
 // Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
-// (the chart file), LightSample (structs), u_envMap/u_envIntensity (T2 uniforms),
+// (the chart file), environment_radiance (the radiance body — T4 unification),
 // u_envCdfCond (W×H R32F), u_envCdfMarg (1×H R32F), u_envSize (vec2).
 //
 // THE PDF COMES FROM CDF DIFFERENCES — density(i,j) = Δcond·Δmarg read off the same textures
@@ -19,12 +19,8 @@
 float env_cdf_marg(int j) { return texelFetch(u_envCdfMarg, ivec2(0, j), 0).r; }
 float env_cdf_cond(int j, int i) { return texelFetch(u_envCdfCond, ivec2(i, j), 0).r; }
 
-// Equirect chart Jacobian: solid angle of texel (i,j) at the row center — MUST match the
-// CPU builder's θ_j = π(j+½)/H convention (build-environment-sampler.ts).
-float env_texel_dOmega(int j, ivec2 sz) {
-    float theta = PI * (float(j) + 0.5) / float(sz.y);
-    return (TWO_PI / float(sz.x)) * (PI / float(sz.y)) * max(1.0e-6, sin(theta));
-}
+// env_texel_dOmega comes from the CHART file (T5, D11): equirect = sinθ row form,
+// octahedral = constant 4π/N². The pdf below is chart-generic.
 
 float environment_pdf(vec3 dir) {
     ivec2 sz = ivec2(u_envSize + 0.5);

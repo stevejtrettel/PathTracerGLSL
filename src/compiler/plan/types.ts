@@ -21,6 +21,9 @@ export interface ProgramDescription {
     accumulation: AccumulationDesc;
     tonemap: TonemapDesc;
     environment: EnvironmentDescription;
+    /** T5 strategy axis (plan D11): which chart the env sampler's CDF table lives in, and
+     *  whether the table is MIS-compensated. Radiance is chart-independent. */
+    envSampler: { chart: 'equirect' | 'octahedral'; compensation: boolean };
 }
 
 export type IntersectionDesc =

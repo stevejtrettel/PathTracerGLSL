@@ -26,9 +26,9 @@ vec3 env_chart_dir(vec2 uv) {
     return vec3(cos(phi) * s, cos(theta), sin(phi) * s);
 }
 
-// Azimuth rotation by +a (adds a to atan(z, x)) — the direction-space form of the chart's
-// rotation term, for radiance bodies that evaluate a formula rather than fetch a texture.
-vec3 env_rotate_y(vec3 d, float a) {
-    float c = cos(a), s = sin(a);
-    return vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);
+// Chart Jacobian: solid angle of table texel (i, j) — equirect texels shrink by sinθ toward
+// the poles. MUST match the CPU builder's θ_j = π(j+½)/H row-center convention.
+float env_texel_dOmega(int j, ivec2 sz) {
+    float theta = PI * (float(j) + 0.5) / float(sz.y);
+    return (TWO_PI / float(sz.x)) * (PI / float(sz.y)) * max(1.0e-6, sin(theta));
 }

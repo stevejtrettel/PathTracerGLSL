@@ -25,6 +25,8 @@ export interface HDREnvironmentData {
     height: number;
     /** Total luminance weight (for importance sampling normalization) */
     totalWeight: number;
+    /** Parsed linear RGB (W*H*3) — kept so the app can build variant tables (T5). */
+    data: Float32Array;
 }
 
 /**
@@ -128,7 +130,8 @@ export class HDREnvironmentLoader {
             return {
                 width,
                 height,
-                totalWeight: built.totalWeight
+                totalWeight: built.totalWeight,
+                data,   // kept for T5 variant-table builds (octahedral resample, compensation)
             };
         } catch (error) {
             if (error instanceof EnvironmentLoadError) {

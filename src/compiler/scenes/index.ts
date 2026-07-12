@@ -67,6 +67,7 @@ import {
     furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy,
     skyLampScene, skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy,
     procSkyScene, procSkyNeeStrategy, procSkyMisStrategy, procSkyPtStrategy,
+    skyMisOctStrategy, procSkyMisCompStrategy,
 } from './envScenes.js';
 
 export interface SceneSuiteEntry {
@@ -312,11 +313,11 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
     },
     sky: {
         scene: skyScene,
-        strategies: [skyNeeStrategy, skyMisStrategy, skyPtStrategy],
+        strategies: [skyNeeStrategy, skyMisStrategy, skyPtStrategy, skyMisOctStrategy],
         exercises:
             'X-ENV (T3): the tabulated env as a samplable light — CDF inversion (env_sampler_cdf), pdf-from-CDF-differences, the sinθ Jacobian, miss-branch w-bookkeeping, env-only selection (probability 1). Plus T2: extern chain, rotation-sign chart fix, scene-driven HDR load',
         expected:
-            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image — divergence implicates the CDF build, the Jacobian, or the miss-weight bookkeeping. Sky visible as background, lights the spheres, glass refracts the horizon; env.rotation pans everything consistently',
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image — divergence implicates the CDF build, the Jacobian, or the miss-weight bookkeeping. Key 4 (pt-mis-oct) is X-CHART (T5): the OCTAHEDRAL sampler on the bit-identical integrand — divergence from key 2 implicates the chart mapping or its constant Jacobian, nothing else. env.rotation pans everything consistently',
         initialParameters: {
             'camera.position': [0, 1.4, 5],
             'camera.target': [0, 0.9, 0],
@@ -340,7 +341,7 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         exercises:
             'TWO-STAGE selection (T3, plan D3): image env AND a quad light — u_envSelectProb stage 0, the wrapped lighting_sample_finite CDF, the (1−P) factor in lighting_pdf, and the P factor in the miss-MIS weight. The full §6.1 pdf symmetry across techniques',
         expected:
-            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image (warm lamp pool + cool sky fill); sweeping env.selectProb changes NOISE ONLY, never brightness — brightness drift under the sweep is a selection-pdf asymmetry',
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image (warm lamp pool + cool sky fill); sweeping env.selectProb changes NOISE ONLY, never brightness — brightness drift under the sweep is a selection-pdf asymmetry. KNOWN estimator boundary: sun-through-glass is BSDF-only in ALL keys (delta lobes skip NEE, §6.3 blocks shadow rays at glass) — equal noise there across keys is expected, not a bug',
         initialParameters: {
             'camera.position': [0, 1.4, 5],
             'camera.target': [0, 0.9, 0],
@@ -348,11 +349,11 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
     },
     'proc-sky': {
         scene: procSkyScene,
-        strategies: [procSkyNeeStrategy, procSkyMisStrategy, procSkyPtStrategy],
+        strategies: [procSkyNeeStrategy, procSkyMisStrategy, procSkyPtStrategy, procSkyMisCompStrategy],
         exercises:
             'T4 procedural environment: the one-shot GPU bake (fixed-size framebuffer + readExport, app-orchestrated), formula direct-eval at lookup (sharp sun), CDF from the baked table, the sampler-radiance unification (ls.radiance ≡ environment_radiance)',
         expected:
-            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image; pt-nee resolves the ~2° sun\'s illumination orders of magnitude faster than pt (that asymmetry IS the CDF working); sun disk edges stay SHARP at any zoom (direct-eval, not table-resolution)',
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image; pt-nee resolves the ~2° sun\'s illumination orders of magnitude faster than pt (that asymmetry IS the CDF working); sun disk edges stay SHARP at any zoom (direct-eval, not table-resolution). Key 4 (pt-mis-comp, W9): SAME converged image with a compensated table — the win is lower noise at equal time on the sky-dominated regions',
         initialParameters: {
             'camera.position': [0, 1.4, 5],
             'camera.target': [0, 0.9, 0],

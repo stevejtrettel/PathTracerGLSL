@@ -14,15 +14,25 @@
 import type { SceneDescription, CompiledRenderer } from './types.js';
 import fullscreenVertGLSL from './generate/glsl/fullscreen.vert.glsl?raw';
 import envChartEquirectGLSL from './generate/glsl/env_chart_equirect.glsl?raw';
+import envChartOctahedralGLSL from './generate/glsl/env_chart_octahedral.glsl?raw';
 
 export const DEFAULT_ENV_TABLE_SIZE: [number, number] = [512, 256];
 
-export function compileEnvironmentBake(scene: SceneDescription): CompiledRenderer | null {
+/** Table dimensions per chart: equirect W×H, octahedral N×N (equal-area, D11/T5). */
+export function envTableSize(env: { tableSize?: [number, number] }, chart: 'equirect' | 'octahedral'): [number, number] {
+    if (chart === 'octahedral') {
+        const n = env.tableSize?.[1] ?? DEFAULT_ENV_TABLE_SIZE[1];
+        return [n, n];
+    }
+    return env.tableSize ?? DEFAULT_ENV_TABLE_SIZE;
+}
+
+export function compileEnvironmentBake(scene: SceneDescription, chart: 'equirect' | 'octahedral' = 'equirect'): CompiledRenderer | null {
     const env = scene.environment;
     if (env?.type !== 'procedural') return null;
 
-    const [w, h] = env.tableSize ?? DEFAULT_ENV_TABLE_SIZE;
-    const rendererId = `envbake-${scene.id}`;
+    const [w, h] = envTableSize(env, chart);
+    const rendererId = `envbake-${scene.id}-${chart}`;
     const shaderId = `${rendererId}-bake`;
 
     const fragment = [
@@ -38,7 +48,12 @@ export function compileEnvironmentBake(scene: SceneDescription): CompiledRendere
         '// lookup-time transform) — a const shadows the uniform the chart file expects.',
         'const float u_envRotation = 0.0;',
         '',
-        envChartEquirectGLSL,
+        'vec3 env_rotate_y(vec3 d, float a) {',
+        '    float c = cos(a), s = sin(a);',
+        '    return vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);',
+        '}',
+        '',
+        chart === 'octahedral' ? envChartOctahedralGLSL : envChartEquirectGLSL,
         '',
         '// gl_FragCoord centers at +0.5, so uv hits texel centers; readback row j then',
         '// corresponds to θ = π(j+½)/H — the exact convention the CPU CDF builder assumes.',
