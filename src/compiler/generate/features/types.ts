@@ -18,7 +18,21 @@ export interface PlannedTexture {
     source: string;
 }
 
+/**
+ * A cross-feature GLSL seam this feature's blocks DEFINE (impl-plan-decision-hoist T4).
+ * Declared seams are forward-declared in the generated interface header — declaration
+ * order stops mattering across features — and validated against every `requires`.
+ * `signature` is the full prototype without the trailing ';' and must match the
+ * definition's parameter/return types exactly (glslang enforces this — T3).
+ */
+export interface ProvidedSeam {
+    name: string;
+    signature: string;
+}
+
 export interface FeatureContribution {
+    /** Feature name — diagnostics + the interface header's grouping comments. */
+    feature: string;
     /** Shader code — fixed snippets and/or generated-per-scene blocks. */
     blocks: ShaderBlock[];
     /** #define NAME value. */
@@ -29,9 +43,14 @@ export interface FeatureContribution {
     parameters: Record<string, ParameterMetadata>;
     /** External textures (unused until the environment feature lands). */
     textures: PlannedTexture[];
+    /** Cross-feature seams this feature's blocks define (T4). */
+    provides: ProvidedSeam[];
+    /** Names of seams this feature's blocks call but do not define — merge validates
+     *  every one is provided by some feature (structural link check, T4). */
+    requires: string[];
 }
 
 /** An empty contribution — convenient base for features that only add some fields. */
-export function emptyContribution(): FeatureContribution {
-    return { blocks: [], defines: {}, uniforms: [], parameters: {}, textures: [] };
+export function emptyContribution(feature: string): FeatureContribution {
+    return { feature, blocks: [], defines: {}, uniforms: [], parameters: {}, textures: [], provides: [], requires: [] };
 }

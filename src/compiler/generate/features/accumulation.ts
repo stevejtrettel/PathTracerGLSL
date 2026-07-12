@@ -10,8 +10,9 @@ import mainAccumulateGLSL from '../glsl/main_accumulate.glsl?raw';
 export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
     const program = plan.program;
     const contribution: FeatureContribution = {
-        ...emptyContribution(),
+        ...emptyContribution('accumulation'),
         blocks: [{ origin: accumulationOrigin(program), source: buildAccumulationSource(program, bag) }],
+        requires: ['camera_generateRay', 'transport_trace'],
     };
 
     if (program.estimator.accumulation.type === 'average') {

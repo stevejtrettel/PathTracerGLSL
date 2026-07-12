@@ -5,7 +5,7 @@ import type { FeatureContribution } from '../../src/compiler/generate/features/t
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 
 function contribution(over: Partial<FeatureContribution>): FeatureContribution {
-    return { ...emptyContribution(), ...over };
+    return { ...emptyContribution('test'), ...over };
 }
 
 describe('mergeContributions — blocks', () => {

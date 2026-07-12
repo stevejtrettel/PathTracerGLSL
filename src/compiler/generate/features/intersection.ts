@@ -18,7 +18,7 @@ import analyticPrimitivesGLSL from '../glsl/analytic_primitives.glsl?raw';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     if (plan.program.intersection.method !== 'raymarch') {
-        return emptyContribution();
+        return emptyContribution('intersection');
     }
 
     const hasSDF = plan.objects.length > 0;
@@ -55,7 +55,18 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const thinRegions = plan.analyticObjects.filter((o) => o.shapeType === 'quad').map((o) => o.index);
     blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic, thinRegions) });
 
-    return { ...emptyContribution(), blocks };
+    // T4 seams: the geometry/region contract surface (§2.3 tables + the trace-loop queries).
+    const provides = [
+        { name: 'scene_intersect', signature: 'bool scene_intersect(Ray ray, out Hit hit)' },
+        { name: 'scene_intersect_any', signature: 'bool scene_intersect_any(Ray ray, float maxDist)' },
+        { name: 'scene_region_at', signature: 'int scene_region_at(vec3 p)' },
+        { name: 'material_of', signature: 'int material_of(int region)' },
+    ];
+    if (plan.materials.some((m) => m.model === 'dielectric')) {
+        provides.push({ name: 'ior_of', signature: 'float ior_of(int region)' });
+    }
+
+    return { ...emptyContribution('intersection'), blocks, provides };
 }
 
 // ============================================================================

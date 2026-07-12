@@ -293,6 +293,16 @@ export const VALIDATION_ERRORS = {
         code: 'texture-conflict',
         category: 'validation' as const,
         description: 'Two feature contributions declare the same texture with different sources'
+    },
+    'seam-conflict': {
+        code: 'seam-conflict',
+        category: 'validation' as const,
+        description: 'Two feature contributions provide the same GLSL seam (T4: one definition per seam)'
+    },
+    'seam-missing': {
+        code: 'seam-missing',
+        category: 'validation' as const,
+        description: 'A feature requires a GLSL seam no feature provides (T4 structural link check)'
     }
 };
 

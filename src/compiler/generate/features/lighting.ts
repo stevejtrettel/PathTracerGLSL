@@ -18,7 +18,7 @@ import shadowMediaGLSL from '../glsl/shadow_media.glsl?raw';
 
 export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (plan.program.estimator.lighting === null) {
-        return emptyContribution();
+        return emptyContribution('lighting');
     }
 
     const blocks: ShaderBlock[] = [];
@@ -40,14 +40,8 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
             ? env.selectWeight
             : 0.5);                                                      // plan O1 default
     if (envSamplable) {
-        // The forward declarations let lighting_sample call the env sampler even though the
-        // environment feature's block assembles AFTER lighting (feature order is pinned).
-        blocks.push({
-            origin: 'generated:env-light-decls',
-            source: '// Environment-as-light forward declarations (defined by the environment feature)\n'
-                + 'LightSample environment_sample(Point p, vec2 xi);\n'
-                + 'float environment_pdf(vec3 dir);',
-        });
+        // environment_sample/environment_pdf are declared by the T4 interface header even
+        // though the environment feature's definitions assemble AFTER lighting.
         uniforms.push({ name: 'u_envSelectProb', type: 'float', parameterPath: 'env.selectProb', default: envSelectDefault });
         if (plan.lights.length > 0) {
             // Live-tunable ONLY when finite lights exist: in an env-only scene there is no
@@ -103,7 +97,27 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         }
     }
 
-    return { ...emptyContribution(), blocks, defines, uniforms, parameters };
+    // T4 seams: the §6.1/§6.2/§6.3 direct-lighting contract surface.
+    const provides = [
+        { name: 'lighting_sample', signature: 'LightSample lighting_sample(Point p, vec2 xi)' },
+        { name: 'shadow_transmittance', signature: 'Spectrum shadow_transmittance(Ray shadow_ray, float maxDist)' },
+    ];
+    if (plan.program.emitters.samplable) {
+        provides.push({ name: 'light_of', signature: 'int light_of(int region)' });
+    }
+    if (plan.program.emitters.lightingPdf) {
+        provides.push({ name: 'lighting_pdf', signature: 'float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit)' });
+    }
+    const requires: string[] = [];
+    if (envSamplable) requires.push('environment_sample', 'environment_pdf');
+    if (plan.program.media.shadowWalker) {
+        // shadow_media walks segments: re-spawned scene_intersect + the generated seams.
+        requires.push('scene_intersect', 'material_of', 'material_has_medium', 'is_null_interface', 'medium_transmittance');
+    } else {
+        requires.push('scene_intersect_any');   // the §6.3 boolean fast path
+    }
+
+    return { ...emptyContribution('lighting'), blocks, defines, uniforms, parameters, provides, requires };
 }
 
 // ============================================================================

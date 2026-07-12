@@ -13,7 +13,7 @@ import rayGLSL from '../glsl/ray.glsl?raw';
 
 export function contributeCore(_plan: RenderPlan): FeatureContribution {
     return {
-        ...emptyContribution(),
+        ...emptyContribution('core'),
         blocks: [
             { origin: 'glsl/structs.glsl', source: structsGLSL },
             { origin: 'glsl/interaction.glsl', source: interactionGLSL },

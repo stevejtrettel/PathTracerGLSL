@@ -122,7 +122,36 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         defines['HAS_SCATTERING'] = '';
     }
 
-    return { ...emptyContribution(), blocks, defines, uniforms, parameters };
+    // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
+    const provides = [
+        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p)' },
+        { name: 'interaction_surface_sample', signature: 'InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u)' },
+        { name: 'interaction_surface_eval', signature: 'Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp)' },
+        { name: 'interaction_surface_pdf', signature: 'float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp)' },
+        { name: 'interaction_surface_emission', signature: 'Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp)' },
+        { name: 'material_has_nondelta_lobes', signature: 'bool material_has_nondelta_lobes(int mat)' },
+        { name: 'material_is_emissive', signature: 'bool material_is_emissive(int mat)' },
+    ];
+    if (media.present) {
+        provides.push(
+            { name: 'material_has_medium', signature: 'bool material_has_medium(int mat)' },
+            { name: 'is_null_interface', signature: 'bool is_null_interface(int mat)' },
+            { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, vec3 p)' },
+            { name: 'medium_sample', signature: 'MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi)' },
+        );
+        if (wantsShadowMedia) {
+            provides.push({ name: 'medium_transmittance', signature: 'Spectrum medium_transmittance(int med, Ray ray, float len)' });
+        }
+        if (scatteringLive) {
+            provides.push(
+                { name: 'hg_eval', signature: 'Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp)' },
+                { name: 'hg_sample', signature: 'InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi)' },
+                { name: 'hg_pdf', signature: 'float hg_pdf(Direction wi, Direction wo, MediumProperties mp)' },
+            );
+        }
+    }
+
+    return { ...emptyContribution('materials'), blocks, defines, uniforms, parameters, provides };
 }
 
 function addParamUniform(

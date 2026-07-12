@@ -67,6 +67,18 @@ LightSample environment_sample(Point p, vec2 xi) {
     return ls;
 }`;
 
+/** T4 seams: every env kind provides the radiance body; samplable envs add the §6.1 pair. */
+function envProvides(samplable: boolean): Array<{ name: string; signature: string }> {
+    const provides = [{ name: 'environment_radiance', signature: 'vec3 environment_radiance(vec3 dir)' }];
+    if (samplable) {
+        provides.push(
+            { name: 'environment_sample', signature: 'LightSample environment_sample(Point p, vec2 xi)' },
+            { name: 'environment_pdf', signature: 'float environment_pdf(vec3 dir)' },
+        );
+    }
+    return provides;
+}
+
 export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
     void bag;   // all four kinds are implemented (T4); kept for future env diagnostics
     const env = plan.program.environment;
@@ -88,11 +100,12 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         const blocks = [{ origin: ORIGIN, source: radianceFn('return u_environment_color * u_environment_intensity;') }];
         if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: CONSTANT_SAMPLER });
         return {
-            ...emptyContribution(),
+            ...emptyContribution('environment'),
             blocks,
             defines: samplable ? { ENV_SAMPLABLE: '' } : {},
             uniforms,
             parameters,
+            provides: envProvides(samplable),
         };
     }
 
@@ -133,12 +146,13 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             uniforms.push({ name: 'u_envSize', type: 'vec2', parameterPath: sizeParamPath(chart), default: [1, 1] });
         }
         return {
-            ...emptyContribution(),
+            ...emptyContribution('environment'),
             blocks,
             defines: samplable ? { ENV_SAMPLABLE: '' } : {},
             uniforms,
             parameters,
             textures,
+            provides: envProvides(samplable),
         };
     }
 
@@ -178,19 +192,21 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             uniforms.push({ name: 'u_envSize', type: 'vec2', parameterPath: sizeParamPath(chart), default: [1, 1] });
         }
         return {
-            ...emptyContribution(),
+            ...emptyContribution('environment'),
             blocks,
             defines: samplable ? { ENV_SAMPLABLE: '' } : {},
             uniforms,
             parameters,
             textures,
+            provides: envProvides(samplable),
         };
     }
 
     // none (and the fallback)
     return {
-        ...emptyContribution(),
+        ...emptyContribution('environment'),
         blocks: [{ origin: ORIGIN, source: radianceFn('return SPECTRUM_ZERO;') }],  // §2.5: radiometric, not raw vec3
+        provides: envProvides(false),
     };
 }
 

@@ -39,6 +39,34 @@ export function mergeContributions(
     const textures: PlannedTexture[] = [];
     const texturesByName = new Map<string, PlannedTexture>();
 
+    // T4 structural link check: every provided seam is unique; every required seam is
+    // provided by SOME feature. This replaces ordering discipline held by comments —
+    // a missing definition is a named compile-time diagnostic, not a GLSL error later.
+    const providedBy = new Map<string, string>();
+    for (const c of contributions) {
+        for (const p of c.provides) {
+            const prior = providedBy.get(p.name);
+            if (prior !== undefined) {
+                bag.addError(
+                    'seam-conflict',
+                    `Seam '${p.name}' provided by both '${prior}' and '${c.feature}' — one definition per seam`,
+                );
+                continue;
+            }
+            providedBy.set(p.name, c.feature);
+        }
+    }
+    for (const c of contributions) {
+        for (const r of c.requires) {
+            if (!providedBy.has(r)) {
+                bag.addError(
+                    'seam-missing',
+                    `Feature '${c.feature}' requires seam '${r}' but no feature provides it`,
+                );
+            }
+        }
+    }
+
     for (const c of contributions) {
         blocks.push(...c.blocks);
         Object.assign(defines, c.defines);
