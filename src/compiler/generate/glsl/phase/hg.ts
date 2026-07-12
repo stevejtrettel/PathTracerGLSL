@@ -3,8 +3,8 @@
 // FORWARD convention: 1+g²−2gc with c = dot(wi, −wo) — do not consult pbrt for this
 // function (its +2gc form pairs with the opposite dot; the X-FOG witness guards it).
 
-import type { PhaseModelDescriptor } from '../descriptors.js';
-import phaseHgGLSL from './phase_hg.glsl?raw';
+import type { PhaseModelDescriptor } from '../../descriptors.js';
+import phaseHgGLSL from './hg.glsl?raw';
 
 export const hgDescriptor: PhaseModelDescriptor = {
     id: 'hg',

@@ -1,9 +1,9 @@
 // Point-light descriptor — co-located with light_point.glsl (module-anatomy §2).
 
-import type { LightKindDescriptor } from '../descriptors.js';
-import { formatSpectrum, formatVec3 } from '../features/glsl-format.js';
-import { emittedScalar } from './light-registry.js';
-import lightPointGLSL from './light_point.glsl?raw';
+import type { LightKindDescriptor } from '../../descriptors.js';
+import { formatSpectrum, formatVec3 } from '../../features/glsl-format.js';
+import { emittedScalar } from './index.js';
+import lightPointGLSL from './point.glsl?raw';
 
 export const pointLightDescriptor: LightKindDescriptor = {
     kind: 'point',

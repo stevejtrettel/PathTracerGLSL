@@ -6,7 +6,7 @@
  * A tagged block of GLSL source with provenance.
  */
 export interface ShaderBlock {
-    /** Origin label: 'glsl/structs.glsl' or 'generated:sdf-dispatch' */
+    /** Origin label: 'glsl/core/structs.glsl' or 'generated:sdf-dispatch' */
     origin: string;
     /** The GLSL source text */
     source: string;

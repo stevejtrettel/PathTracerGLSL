@@ -194,10 +194,10 @@ describe('Compiler', () => {
         it('includes expected origin blocks', () => {
             const sm = result.sourceMaps!.get('pathtracer-minimal-main')!;
             const origins = sm.blocks.map(b => b.origin);
-            expect(origins).toContain('glsl/structs.glsl');
+            expect(origins).toContain('glsl/core/structs.glsl');
             expect(origins).toContain('generated:sdf-dispatch');
             expect(origins).toContain('generated:material-lookup');
-            expect(origins).toContain('glsl/raymarch.glsl');
+            expect(origins).toContain('glsl/geometry/raymarch.glsl');
         });
     });
 

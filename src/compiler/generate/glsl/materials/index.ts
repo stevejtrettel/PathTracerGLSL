@@ -3,8 +3,8 @@
 // GLSL file + one descriptor + one line below, and nothing else (the extension-cost test).
 // (Temporary location: moves to glsl/materials/index.ts in the R1c family-folder reorg.)
 
-import type { MaterialModel } from '../../types.js';
-import type { MaterialModelDescriptor } from '../descriptors.js';
+import type { MaterialModel } from '../../../types.js';
+import type { MaterialModelDescriptor } from '../../descriptors.js';
 import { lambertDescriptor } from './lambert.js';
 import { dielectricDescriptor } from './dielectric.js';
 

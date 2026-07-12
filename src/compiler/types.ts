@@ -520,7 +520,7 @@ export interface SourceMap {
  * A line range in assembled GLSL mapped to its source block.
  */
 export interface SourceBlockMapping {
-    /** Origin label: 'glsl/structs.glsl' or 'generated:sdf-dispatch' */
+    /** Origin label: 'glsl/core/structs.glsl' or 'generated:sdf-dispatch' */
     origin: string;
 
     /** First line in assembled output (1-based) */

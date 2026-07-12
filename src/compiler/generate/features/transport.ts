@@ -18,7 +18,7 @@
 import type { RenderPlan, ProgramDescription } from '../../plan/types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import { modelTransmission } from '../glsl/material-registry.js';
+import { modelTransmission } from '../glsl/materials/index.js';
 
 export function contributeTransport(plan: RenderPlan): FeatureContribution {
     const program = plan.program;

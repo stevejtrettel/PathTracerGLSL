@@ -2,12 +2,12 @@
 // ONE-SIDED (pinned deviation from the §6.2 two-sided aside — hit side and sample side
 // must agree; see impl-plan-area-lights).
 
-import type { LightKindDescriptor } from '../descriptors.js';
-import type { PlannedLight } from '../../plan/types.js';
-import { formatFloat, formatSpectrum, formatVec3 } from '../features/glsl-format.js';
-import { quadNormal } from '../features/intersection.js';
-import { emittedScalar } from './light-registry.js';
-import lightQuadGLSL from './light_quad.glsl?raw';
+import type { LightKindDescriptor } from '../../descriptors.js';
+import type { PlannedLight } from '../../../plan/types.js';
+import { formatFloat, formatSpectrum, formatVec3 } from '../../features/glsl-format.js';
+import { quadNormal } from '../../features/intersection.js';
+import { emittedScalar } from './index.js';
+import lightQuadGLSL from './quad.glsl?raw';
 
 function quadArea(l: PlannedLight): number {
     const e1 = l.edge1!, e2 = l.edge2!;

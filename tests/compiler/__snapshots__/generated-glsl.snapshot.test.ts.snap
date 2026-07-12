@@ -1040,7 +1040,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -1057,32 +1057,32 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 89,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 71,
       },
       {
         "endLine": 130,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 90,
       },
       {
         "endLine": 162,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 131,
       },
       {
         "endLine": 186,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 163,
       },
       {
         "endLine": 206,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 187,
       },
       {
@@ -1092,7 +1092,7 @@ void main() {
       },
       {
         "endLine": 247,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 231,
       },
       {
@@ -1102,12 +1102,12 @@ void main() {
       },
       {
         "endLine": 423,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 309,
       },
       {
         "endLine": 474,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 424,
       },
       {
@@ -1142,12 +1142,12 @@ void main() {
       },
       {
         "endLine": 624,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 587,
       },
       {
         "endLine": 682,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 625,
       },
       {
@@ -1167,12 +1167,12 @@ void main() {
       },
       {
         "endLine": 723,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 709,
       },
       {
         "endLine": 742,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 724,
       },
       {
@@ -1182,7 +1182,7 @@ void main() {
       },
       {
         "endLine": 770,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 750,
       },
       {
@@ -1252,7 +1252,7 @@ void main() {
       },
       {
         "endLine": 880,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 855,
       },
     ],
@@ -2088,7 +2088,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -2105,32 +2105,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -2140,7 +2140,7 @@ void main() {
       },
       {
         "endLine": 282,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 232,
       },
       {
@@ -2170,7 +2170,7 @@ void main() {
       },
       {
         "endLine": 406,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 369,
       },
       {
@@ -2190,12 +2190,12 @@ void main() {
       },
       {
         "endLine": 442,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 428,
       },
       {
         "endLine": 461,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 443,
       },
       {
@@ -2205,7 +2205,7 @@ void main() {
       },
       {
         "endLine": 489,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 469,
       },
       {
@@ -2270,7 +2270,7 @@ void main() {
       },
       {
         "endLine": 588,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 563,
       },
     ],
@@ -3269,7 +3269,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -3286,32 +3286,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -3321,7 +3321,7 @@ void main() {
       },
       {
         "endLine": 248,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 232,
       },
       {
@@ -3331,7 +3331,7 @@ void main() {
       },
       {
         "endLine": 432,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 318,
       },
       {
@@ -3356,7 +3356,7 @@ void main() {
       },
       {
         "endLine": 555,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 518,
       },
       {
@@ -3376,12 +3376,12 @@ void main() {
       },
       {
         "endLine": 591,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 577,
       },
       {
         "endLine": 610,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 592,
       },
       {
@@ -3391,7 +3391,7 @@ void main() {
       },
       {
         "endLine": 638,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 618,
       },
       {
@@ -3456,7 +3456,7 @@ void main() {
       },
       {
         "endLine": 737,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 712,
       },
     ],
@@ -4481,7 +4481,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -4498,32 +4498,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -4533,7 +4533,7 @@ void main() {
       },
       {
         "endLine": 245,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 229,
       },
       {
@@ -4543,12 +4543,12 @@ void main() {
       },
       {
         "endLine": 429,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 315,
       },
       {
         "endLine": 480,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 430,
       },
       {
@@ -4578,7 +4578,7 @@ void main() {
       },
       {
         "endLine": 640,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 603,
       },
       {
@@ -4598,7 +4598,7 @@ void main() {
       },
       {
         "endLine": 682,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 662,
       },
       {
@@ -4658,7 +4658,7 @@ void main() {
       },
       {
         "endLine": 763,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 738,
       },
     ],
@@ -5800,7 +5800,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -5817,37 +5817,37 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 172,
-        "origin": "glsl/math_mis.glsl",
+        "origin": "glsl/core/math_mis.glsl",
         "startLine": 165,
       },
       {
         "endLine": 196,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 173,
       },
       {
         "endLine": 216,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 197,
       },
       {
@@ -5857,7 +5857,7 @@ void main() {
       },
       {
         "endLine": 258,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 242,
       },
       {
@@ -5867,12 +5867,12 @@ void main() {
       },
       {
         "endLine": 442,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 328,
       },
       {
         "endLine": 493,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 443,
       },
       {
@@ -5902,7 +5902,7 @@ void main() {
       },
       {
         "endLine": 653,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 616,
       },
       {
@@ -5922,12 +5922,12 @@ void main() {
       },
       {
         "endLine": 689,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 675,
       },
       {
         "endLine": 718,
-        "origin": "glsl/light_quad.glsl",
+        "origin": "glsl/lights/quad.glsl",
         "startLine": 690,
       },
       {
@@ -5947,7 +5947,7 @@ void main() {
       },
       {
         "endLine": 761,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 741,
       },
       {
@@ -6012,7 +6012,7 @@ void main() {
       },
       {
         "endLine": 880,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 855,
       },
     ],
@@ -7123,7 +7123,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -7140,32 +7140,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -7175,7 +7175,7 @@ void main() {
       },
       {
         "endLine": 249,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -7185,12 +7185,12 @@ void main() {
       },
       {
         "endLine": 433,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 319,
       },
       {
         "endLine": 484,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 434,
       },
       {
@@ -7220,7 +7220,7 @@ void main() {
       },
       {
         "endLine": 644,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 607,
       },
       {
@@ -7240,12 +7240,12 @@ void main() {
       },
       {
         "endLine": 680,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 666,
       },
       {
         "endLine": 709,
-        "origin": "glsl/light_quad.glsl",
+        "origin": "glsl/lights/quad.glsl",
         "startLine": 681,
       },
       {
@@ -7260,7 +7260,7 @@ void main() {
       },
       {
         "endLine": 742,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 722,
       },
       {
@@ -7325,7 +7325,7 @@ void main() {
       },
       {
         "endLine": 849,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 824,
       },
     ],
@@ -8419,7 +8419,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -8436,32 +8436,32 @@ void main() {
       },
       {
         "endLine": 71,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 19,
       },
       {
         "endLine": 90,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 72,
       },
       {
         "endLine": 131,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 91,
       },
       {
         "endLine": 163,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 132,
       },
       {
         "endLine": 187,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 164,
       },
       {
         "endLine": 207,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 188,
       },
       {
@@ -8471,7 +8471,7 @@ void main() {
       },
       {
         "endLine": 245,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 229,
       },
       {
@@ -8481,12 +8481,12 @@ void main() {
       },
       {
         "endLine": 429,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 315,
       },
       {
         "endLine": 480,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 430,
       },
       {
@@ -8521,12 +8521,12 @@ void main() {
       },
       {
         "endLine": 646,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 609,
       },
       {
         "endLine": 704,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 647,
       },
       {
@@ -8546,7 +8546,7 @@ void main() {
       },
       {
         "endLine": 751,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 731,
       },
       {
@@ -8611,7 +8611,7 @@ void main() {
       },
       {
         "endLine": 843,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 818,
       },
     ],
@@ -9815,7 +9815,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -9832,37 +9832,37 @@ void main() {
       },
       {
         "endLine": 71,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 19,
       },
       {
         "endLine": 90,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 72,
       },
       {
         "endLine": 131,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 91,
       },
       {
         "endLine": 163,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 132,
       },
       {
         "endLine": 171,
-        "origin": "glsl/math_mis.glsl",
+        "origin": "glsl/core/math_mis.glsl",
         "startLine": 164,
       },
       {
         "endLine": 195,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 172,
       },
       {
         "endLine": 215,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 196,
       },
       {
@@ -9872,7 +9872,7 @@ void main() {
       },
       {
         "endLine": 258,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 242,
       },
       {
@@ -9882,12 +9882,12 @@ void main() {
       },
       {
         "endLine": 442,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 328,
       },
       {
         "endLine": 493,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 443,
       },
       {
@@ -9922,12 +9922,12 @@ void main() {
       },
       {
         "endLine": 659,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 622,
       },
       {
         "endLine": 717,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 660,
       },
       {
@@ -9947,12 +9947,12 @@ void main() {
       },
       {
         "endLine": 758,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 744,
       },
       {
         "endLine": 787,
-        "origin": "glsl/light_quad.glsl",
+        "origin": "glsl/lights/quad.glsl",
         "startLine": 759,
       },
       {
@@ -9972,7 +9972,7 @@ void main() {
       },
       {
         "endLine": 830,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 810,
       },
       {
@@ -10042,7 +10042,7 @@ void main() {
       },
       {
         "endLine": 960,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 935,
       },
     ],
@@ -11215,7 +11215,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -11232,32 +11232,32 @@ void main() {
       },
       {
         "endLine": 71,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 19,
       },
       {
         "endLine": 90,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 72,
       },
       {
         "endLine": 131,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 91,
       },
       {
         "endLine": 163,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 132,
       },
       {
         "endLine": 187,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 164,
       },
       {
         "endLine": 207,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 188,
       },
       {
@@ -11267,7 +11267,7 @@ void main() {
       },
       {
         "endLine": 249,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -11277,12 +11277,12 @@ void main() {
       },
       {
         "endLine": 433,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 319,
       },
       {
         "endLine": 484,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 434,
       },
       {
@@ -11317,12 +11317,12 @@ void main() {
       },
       {
         "endLine": 650,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 613,
       },
       {
         "endLine": 708,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 651,
       },
       {
@@ -11342,12 +11342,12 @@ void main() {
       },
       {
         "endLine": 749,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 735,
       },
       {
         "endLine": 778,
-        "origin": "glsl/light_quad.glsl",
+        "origin": "glsl/lights/quad.glsl",
         "startLine": 750,
       },
       {
@@ -11362,7 +11362,7 @@ void main() {
       },
       {
         "endLine": 811,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 791,
       },
       {
@@ -11432,7 +11432,7 @@ void main() {
       },
       {
         "endLine": 929,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 904,
       },
     ],
@@ -12481,7 +12481,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -12498,32 +12498,32 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 89,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 71,
       },
       {
         "endLine": 130,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 90,
       },
       {
         "endLine": 162,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 131,
       },
       {
         "endLine": 186,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 163,
       },
       {
         "endLine": 206,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 187,
       },
       {
@@ -12533,7 +12533,7 @@ void main() {
       },
       {
         "endLine": 247,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 231,
       },
       {
@@ -12543,7 +12543,7 @@ void main() {
       },
       {
         "endLine": 431,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 317,
       },
       {
@@ -12573,12 +12573,12 @@ void main() {
       },
       {
         "endLine": 560,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 523,
       },
       {
         "endLine": 618,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 561,
       },
       {
@@ -12598,12 +12598,12 @@ void main() {
       },
       {
         "endLine": 659,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 645,
       },
       {
         "endLine": 678,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 660,
       },
       {
@@ -12613,7 +12613,7 @@ void main() {
       },
       {
         "endLine": 706,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 686,
       },
       {
@@ -12683,7 +12683,7 @@ void main() {
       },
       {
         "endLine": 816,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 791,
       },
     ],
@@ -13588,7 +13588,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -13605,32 +13605,32 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 89,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 71,
       },
       {
         "endLine": 130,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 90,
       },
       {
         "endLine": 162,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 131,
       },
       {
         "endLine": 186,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 163,
       },
       {
         "endLine": 206,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 187,
       },
       {
@@ -13640,7 +13640,7 @@ void main() {
       },
       {
         "endLine": 244,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 228,
       },
       {
@@ -13650,7 +13650,7 @@ void main() {
       },
       {
         "endLine": 384,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 270,
       },
       {
@@ -13680,12 +13680,12 @@ void main() {
       },
       {
         "endLine": 489,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 452,
       },
       {
         "endLine": 547,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 490,
       },
       {
@@ -13705,7 +13705,7 @@ void main() {
       },
       {
         "endLine": 594,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 574,
       },
       {
@@ -13765,7 +13765,7 @@ void main() {
       },
       {
         "endLine": 679,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 654,
       },
     ],
@@ -14985,7 +14985,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -15002,42 +15002,42 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 95,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 73,
       },
       {
         "endLine": 114,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 96,
       },
       {
         "endLine": 155,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 115,
       },
       {
         "endLine": 187,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 156,
       },
       {
         "endLine": 191,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 188,
       },
       {
         "endLine": 215,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 192,
       },
       {
         "endLine": 235,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 216,
       },
       {
@@ -15047,7 +15047,7 @@ void main() {
       },
       {
         "endLine": 279,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 263,
       },
       {
@@ -15057,12 +15057,12 @@ void main() {
       },
       {
         "endLine": 463,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 349,
       },
       {
         "endLine": 514,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 464,
       },
       {
@@ -15092,7 +15092,7 @@ void main() {
       },
       {
         "endLine": 678,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 641,
       },
       {
@@ -15122,12 +15122,12 @@ void main() {
       },
       {
         "endLine": 763,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 721,
       },
       {
         "endLine": 806,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 764,
       },
       {
@@ -15137,7 +15137,7 @@ void main() {
       },
       {
         "endLine": 839,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 819,
       },
       {
@@ -15222,7 +15222,7 @@ void main() {
       },
       {
         "endLine": 972,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 947,
       },
     ],
@@ -16629,7 +16629,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -16646,47 +16646,47 @@ void main() {
       },
       {
         "endLine": 73,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 21,
       },
       {
         "endLine": 96,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 74,
       },
       {
         "endLine": 115,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 97,
       },
       {
         "endLine": 156,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 116,
       },
       {
         "endLine": 188,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 157,
       },
       {
         "endLine": 192,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 189,
       },
       {
         "endLine": 200,
-        "origin": "glsl/math_mis.glsl",
+        "origin": "glsl/core/math_mis.glsl",
         "startLine": 193,
       },
       {
         "endLine": 224,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 201,
       },
       {
         "endLine": 244,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 225,
       },
       {
@@ -16696,7 +16696,7 @@ void main() {
       },
       {
         "endLine": 294,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 278,
       },
       {
@@ -16706,12 +16706,12 @@ void main() {
       },
       {
         "endLine": 478,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 364,
       },
       {
         "endLine": 529,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 479,
       },
       {
@@ -16741,7 +16741,7 @@ void main() {
       },
       {
         "endLine": 693,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 656,
       },
       {
@@ -16771,12 +16771,12 @@ void main() {
       },
       {
         "endLine": 778,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 736,
       },
       {
         "endLine": 821,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 779,
       },
       {
@@ -16791,12 +16791,12 @@ void main() {
       },
       {
         "endLine": 880,
-        "origin": "glsl/shadow_media.glsl",
+        "origin": "glsl/transport/shadow_media.glsl",
         "startLine": 841,
       },
       {
         "endLine": 909,
-        "origin": "glsl/light_quad.glsl",
+        "origin": "glsl/lights/quad.glsl",
         "startLine": 881,
       },
       {
@@ -16816,7 +16816,7 @@ void main() {
       },
       {
         "endLine": 952,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 932,
       },
       {
@@ -16906,7 +16906,7 @@ void main() {
       },
       {
         "endLine": 1145,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 1120,
       },
     ],
@@ -18274,7 +18274,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -18291,42 +18291,42 @@ void main() {
       },
       {
         "endLine": 73,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 21,
       },
       {
         "endLine": 96,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 74,
       },
       {
         "endLine": 115,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 97,
       },
       {
         "endLine": 156,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 116,
       },
       {
         "endLine": 188,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 157,
       },
       {
         "endLine": 192,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 189,
       },
       {
         "endLine": 216,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 193,
       },
       {
         "endLine": 236,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 217,
       },
       {
@@ -18336,7 +18336,7 @@ void main() {
       },
       {
         "endLine": 285,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 269,
       },
       {
@@ -18346,12 +18346,12 @@ void main() {
       },
       {
         "endLine": 469,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 355,
       },
       {
         "endLine": 520,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 470,
       },
       {
@@ -18381,7 +18381,7 @@ void main() {
       },
       {
         "endLine": 684,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 647,
       },
       {
@@ -18411,12 +18411,12 @@ void main() {
       },
       {
         "endLine": 769,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 727,
       },
       {
         "endLine": 812,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 770,
       },
       {
@@ -18431,12 +18431,12 @@ void main() {
       },
       {
         "endLine": 871,
-        "origin": "glsl/shadow_media.glsl",
+        "origin": "glsl/transport/shadow_media.glsl",
         "startLine": 832,
       },
       {
         "endLine": 900,
-        "origin": "glsl/light_quad.glsl",
+        "origin": "glsl/lights/quad.glsl",
         "startLine": 872,
       },
       {
@@ -18451,7 +18451,7 @@ void main() {
       },
       {
         "endLine": 933,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 913,
       },
       {
@@ -18541,7 +18541,7 @@ void main() {
       },
       {
         "endLine": 1106,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 1081,
       },
     ],
@@ -19790,7 +19790,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -19807,42 +19807,42 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 95,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 73,
       },
       {
         "endLine": 114,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 96,
       },
       {
         "endLine": 155,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 115,
       },
       {
         "endLine": 187,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 156,
       },
       {
         "endLine": 191,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 188,
       },
       {
         "endLine": 215,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 192,
       },
       {
         "endLine": 235,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 216,
       },
       {
@@ -19852,7 +19852,7 @@ void main() {
       },
       {
         "endLine": 279,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 263,
       },
       {
@@ -19862,12 +19862,12 @@ void main() {
       },
       {
         "endLine": 463,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 349,
       },
       {
         "endLine": 514,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 464,
       },
       {
@@ -19897,7 +19897,7 @@ void main() {
       },
       {
         "endLine": 693,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 656,
       },
       {
@@ -19927,12 +19927,12 @@ void main() {
       },
       {
         "endLine": 778,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 736,
       },
       {
         "endLine": 821,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 779,
       },
       {
@@ -19942,7 +19942,7 @@ void main() {
       },
       {
         "endLine": 854,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 834,
       },
       {
@@ -20027,7 +20027,7 @@ void main() {
       },
       {
         "endLine": 987,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 962,
       },
     ],
@@ -21410,7 +21410,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -21427,42 +21427,42 @@ void main() {
       },
       {
         "endLine": 73,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 21,
       },
       {
         "endLine": 96,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 74,
       },
       {
         "endLine": 115,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 97,
       },
       {
         "endLine": 156,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 116,
       },
       {
         "endLine": 188,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 157,
       },
       {
         "endLine": 192,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 189,
       },
       {
         "endLine": 216,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 193,
       },
       {
         "endLine": 236,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 217,
       },
       {
@@ -21472,7 +21472,7 @@ void main() {
       },
       {
         "endLine": 285,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 269,
       },
       {
@@ -21482,12 +21482,12 @@ void main() {
       },
       {
         "endLine": 469,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 355,
       },
       {
         "endLine": 520,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 470,
       },
       {
@@ -21517,7 +21517,7 @@ void main() {
       },
       {
         "endLine": 699,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 662,
       },
       {
@@ -21547,12 +21547,12 @@ void main() {
       },
       {
         "endLine": 784,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 742,
       },
       {
         "endLine": 827,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 785,
       },
       {
@@ -21567,12 +21567,12 @@ void main() {
       },
       {
         "endLine": 886,
-        "origin": "glsl/shadow_media.glsl",
+        "origin": "glsl/transport/shadow_media.glsl",
         "startLine": 847,
       },
       {
         "endLine": 915,
-        "origin": "glsl/light_quad.glsl",
+        "origin": "glsl/lights/quad.glsl",
         "startLine": 887,
       },
       {
@@ -21587,7 +21587,7 @@ void main() {
       },
       {
         "endLine": 948,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 928,
       },
       {
@@ -21677,7 +21677,7 @@ void main() {
       },
       {
         "endLine": 1121,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 1096,
       },
     ],
@@ -22614,7 +22614,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -22631,42 +22631,42 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 93,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 71,
       },
       {
         "endLine": 112,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 94,
       },
       {
         "endLine": 153,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 113,
       },
       {
         "endLine": 185,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 154,
       },
       {
         "endLine": 189,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 186,
       },
       {
         "endLine": 213,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 190,
       },
       {
         "endLine": 233,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 214,
       },
       {
@@ -22676,7 +22676,7 @@ void main() {
       },
       {
         "endLine": 274,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 258,
       },
       {
@@ -22686,7 +22686,7 @@ void main() {
       },
       {
         "endLine": 415,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 301,
       },
       {
@@ -22711,7 +22711,7 @@ void main() {
       },
       {
         "endLine": 514,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 477,
       },
       {
@@ -22746,7 +22746,7 @@ void main() {
       },
       {
         "endLine": 590,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 570,
       },
       {
@@ -22826,7 +22826,7 @@ void main() {
       },
       {
         "endLine": 697,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 672,
       },
     ],
@@ -23686,7 +23686,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -23703,32 +23703,32 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 89,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 71,
       },
       {
         "endLine": 130,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 90,
       },
       {
         "endLine": 162,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 131,
       },
       {
         "endLine": 186,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 163,
       },
       {
         "endLine": 206,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 187,
       },
       {
@@ -23738,7 +23738,7 @@ void main() {
       },
       {
         "endLine": 243,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 227,
       },
       {
@@ -23748,7 +23748,7 @@ void main() {
       },
       {
         "endLine": 411,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 297,
       },
       {
@@ -23773,7 +23773,7 @@ void main() {
       },
       {
         "endLine": 518,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 481,
       },
       {
@@ -23793,7 +23793,7 @@ void main() {
       },
       {
         "endLine": 560,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 540,
       },
       {
@@ -23848,7 +23848,7 @@ void main() {
       },
       {
         "endLine": 634,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 609,
       },
     ],
@@ -24910,7 +24910,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -24927,42 +24927,42 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 93,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 71,
       },
       {
         "endLine": 112,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 94,
       },
       {
         "endLine": 153,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 113,
       },
       {
         "endLine": 185,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 154,
       },
       {
         "endLine": 189,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 186,
       },
       {
         "endLine": 213,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 190,
       },
       {
         "endLine": 233,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 214,
       },
       {
@@ -24972,7 +24972,7 @@ void main() {
       },
       {
         "endLine": 277,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 261,
       },
       {
@@ -24982,7 +24982,7 @@ void main() {
       },
       {
         "endLine": 445,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 331,
       },
       {
@@ -25007,7 +25007,7 @@ void main() {
       },
       {
         "endLine": 556,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 519,
       },
       {
@@ -25037,12 +25037,12 @@ void main() {
       },
       {
         "endLine": 641,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 599,
       },
       {
         "endLine": 684,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 642,
       },
       {
@@ -25052,7 +25052,7 @@ void main() {
       },
       {
         "endLine": 717,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 697,
       },
       {
@@ -25132,7 +25132,7 @@ void main() {
       },
       {
         "endLine": 836,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 811,
       },
     ],
@@ -25972,7 +25972,7 @@ void main() {
       },
       {
         "endLine": 27,
-        "origin": "glsl/tonemap_none.glsl",
+        "origin": "glsl/film/tonemap_none.glsl",
         "startLine": 9,
       },
     ],
@@ -25989,37 +25989,37 @@ void main() {
       },
       {
         "endLine": 74,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 22,
       },
       {
         "endLine": 93,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 75,
       },
       {
         "endLine": 134,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 94,
       },
       {
         "endLine": 166,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 135,
       },
       {
         "endLine": 174,
-        "origin": "glsl/math_mis.glsl",
+        "origin": "glsl/core/math_mis.glsl",
         "startLine": 167,
       },
       {
         "endLine": 198,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 175,
       },
       {
         "endLine": 218,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 199,
       },
       {
@@ -26029,7 +26029,7 @@ void main() {
       },
       {
         "endLine": 294,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 244,
       },
       {
@@ -26059,7 +26059,7 @@ void main() {
       },
       {
         "endLine": 403,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 366,
       },
       {
@@ -26079,7 +26079,7 @@ void main() {
       },
       {
         "endLine": 439,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 425,
       },
       {
@@ -26089,7 +26089,7 @@ void main() {
       },
       {
         "endLine": 464,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 444,
       },
       {
@@ -26154,7 +26154,7 @@ void main() {
       },
       {
         "endLine": 594,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 569,
       },
     ],
@@ -27000,7 +27000,7 @@ void main() {
       },
       {
         "endLine": 27,
-        "origin": "glsl/tonemap_none.glsl",
+        "origin": "glsl/film/tonemap_none.glsl",
         "startLine": 9,
       },
     ],
@@ -27017,32 +27017,32 @@ void main() {
       },
       {
         "endLine": 74,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 22,
       },
       {
         "endLine": 93,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 75,
       },
       {
         "endLine": 134,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 94,
       },
       {
         "endLine": 166,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 135,
       },
       {
         "endLine": 190,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 167,
       },
       {
         "endLine": 210,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 191,
       },
       {
@@ -27052,7 +27052,7 @@ void main() {
       },
       {
         "endLine": 286,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 236,
       },
       {
@@ -27082,7 +27082,7 @@ void main() {
       },
       {
         "endLine": 395,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 358,
       },
       {
@@ -27102,7 +27102,7 @@ void main() {
       },
       {
         "endLine": 431,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 417,
       },
       {
@@ -27112,7 +27112,7 @@ void main() {
       },
       {
         "endLine": 456,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 436,
       },
       {
@@ -27177,7 +27177,7 @@ void main() {
       },
       {
         "endLine": 572,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 547,
       },
     ],
@@ -28308,7 +28308,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -28325,42 +28325,42 @@ void main() {
       },
       {
         "endLine": 71,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 19,
       },
       {
         "endLine": 94,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 72,
       },
       {
         "endLine": 113,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 95,
       },
       {
         "endLine": 154,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 114,
       },
       {
         "endLine": 186,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 155,
       },
       {
         "endLine": 190,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 187,
       },
       {
         "endLine": 214,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 191,
       },
       {
         "endLine": 234,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 215,
       },
       {
@@ -28370,7 +28370,7 @@ void main() {
       },
       {
         "endLine": 278,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 262,
       },
       {
@@ -28380,7 +28380,7 @@ void main() {
       },
       {
         "endLine": 454,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 340,
       },
       {
@@ -28405,7 +28405,7 @@ void main() {
       },
       {
         "endLine": 572,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 535,
       },
       {
@@ -28435,12 +28435,12 @@ void main() {
       },
       {
         "endLine": 657,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 615,
       },
       {
         "endLine": 700,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 658,
       },
       {
@@ -28450,7 +28450,7 @@ void main() {
       },
       {
         "endLine": 733,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 713,
       },
       {
@@ -28535,7 +28535,7 @@ void main() {
       },
       {
         "endLine": 866,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 841,
       },
     ],
@@ -29755,7 +29755,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -29772,42 +29772,42 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 95,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 73,
       },
       {
         "endLine": 114,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 96,
       },
       {
         "endLine": 155,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 115,
       },
       {
         "endLine": 187,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 156,
       },
       {
         "endLine": 191,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 188,
       },
       {
         "endLine": 215,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 192,
       },
       {
         "endLine": 235,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 216,
       },
       {
@@ -29817,7 +29817,7 @@ void main() {
       },
       {
         "endLine": 283,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 267,
       },
       {
@@ -29827,7 +29827,7 @@ void main() {
       },
       {
         "endLine": 459,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 345,
       },
       {
@@ -29852,7 +29852,7 @@ void main() {
       },
       {
         "endLine": 577,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 540,
       },
       {
@@ -29882,12 +29882,12 @@ void main() {
       },
       {
         "endLine": 662,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 620,
       },
       {
         "endLine": 705,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 663,
       },
       {
@@ -29902,12 +29902,12 @@ void main() {
       },
       {
         "endLine": 764,
-        "origin": "glsl/shadow_media.glsl",
+        "origin": "glsl/transport/shadow_media.glsl",
         "startLine": 725,
       },
       {
         "endLine": 783,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 765,
       },
       {
@@ -29917,7 +29917,7 @@ void main() {
       },
       {
         "endLine": 811,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 791,
       },
       {
@@ -30007,7 +30007,7 @@ void main() {
       },
       {
         "endLine": 976,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 951,
       },
     ],
@@ -31172,7 +31172,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -31189,42 +31189,42 @@ void main() {
       },
       {
         "endLine": 74,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 22,
       },
       {
         "endLine": 97,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 75,
       },
       {
         "endLine": 116,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 98,
       },
       {
         "endLine": 157,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 117,
       },
       {
         "endLine": 189,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 158,
       },
       {
         "endLine": 193,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 190,
       },
       {
         "endLine": 217,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 194,
       },
       {
         "endLine": 237,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 218,
       },
       {
@@ -31234,7 +31234,7 @@ void main() {
       },
       {
         "endLine": 279,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 263,
       },
       {
@@ -31244,12 +31244,12 @@ void main() {
       },
       {
         "endLine": 436,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 322,
       },
       {
         "endLine": 487,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 437,
       },
       {
@@ -31284,12 +31284,12 @@ void main() {
       },
       {
         "endLine": 636,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 599,
       },
       {
         "endLine": 694,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 637,
       },
       {
@@ -31324,7 +31324,7 @@ void main() {
       },
       {
         "endLine": 774,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 754,
       },
       {
@@ -31404,7 +31404,7 @@ void main() {
       },
       {
         "endLine": 888,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 863,
       },
     ],
@@ -32697,7 +32697,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -32714,42 +32714,42 @@ void main() {
       },
       {
         "endLine": 74,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 22,
       },
       {
         "endLine": 97,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 75,
       },
       {
         "endLine": 116,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 98,
       },
       {
         "endLine": 157,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 117,
       },
       {
         "endLine": 189,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 158,
       },
       {
         "endLine": 193,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 190,
       },
       {
         "endLine": 217,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 194,
       },
       {
         "endLine": 237,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 218,
       },
       {
@@ -32759,7 +32759,7 @@ void main() {
       },
       {
         "endLine": 282,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 266,
       },
       {
@@ -32769,12 +32769,12 @@ void main() {
       },
       {
         "endLine": 439,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 325,
       },
       {
         "endLine": 490,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 440,
       },
       {
@@ -32809,12 +32809,12 @@ void main() {
       },
       {
         "endLine": 639,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 602,
       },
       {
         "endLine": 697,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 640,
       },
       {
@@ -32844,12 +32844,12 @@ void main() {
       },
       {
         "endLine": 786,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 744,
       },
       {
         "endLine": 829,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 787,
       },
       {
@@ -32859,7 +32859,7 @@ void main() {
       },
       {
         "endLine": 862,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 842,
       },
       {
@@ -32939,7 +32939,7 @@ void main() {
       },
       {
         "endLine": 995,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 970,
       },
     ],
@@ -33876,7 +33876,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -33893,32 +33893,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -33928,7 +33928,7 @@ void main() {
       },
       {
         "endLine": 248,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 232,
       },
       {
@@ -33938,7 +33938,7 @@ void main() {
       },
       {
         "endLine": 389,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 275,
       },
       {
@@ -33963,7 +33963,7 @@ void main() {
       },
       {
         "endLine": 486,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 449,
       },
       {
@@ -33983,12 +33983,12 @@ void main() {
       },
       {
         "endLine": 522,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 508,
       },
       {
         "endLine": 541,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 523,
       },
       {
@@ -33998,7 +33998,7 @@ void main() {
       },
       {
         "endLine": 569,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 549,
       },
       {
@@ -34058,7 +34058,7 @@ void main() {
       },
       {
         "endLine": 661,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 636,
       },
     ],
@@ -34988,7 +34988,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -35005,32 +35005,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -35040,7 +35040,7 @@ void main() {
       },
       {
         "endLine": 248,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 232,
       },
       {
@@ -35050,7 +35050,7 @@ void main() {
       },
       {
         "endLine": 389,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 275,
       },
       {
@@ -35075,7 +35075,7 @@ void main() {
       },
       {
         "endLine": 486,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 449,
       },
       {
@@ -35095,12 +35095,12 @@ void main() {
       },
       {
         "endLine": 522,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 508,
       },
       {
         "endLine": 541,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 523,
       },
       {
@@ -35110,7 +35110,7 @@ void main() {
       },
       {
         "endLine": 569,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 549,
       },
       {
@@ -35175,7 +35175,7 @@ void main() {
       },
       {
         "endLine": 668,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 643,
       },
     ],
@@ -36462,7 +36462,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -36479,42 +36479,42 @@ void main() {
       },
       {
         "endLine": 74,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 22,
       },
       {
         "endLine": 97,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 75,
       },
       {
         "endLine": 116,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 98,
       },
       {
         "endLine": 157,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 117,
       },
       {
         "endLine": 189,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 158,
       },
       {
         "endLine": 193,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 190,
       },
       {
         "endLine": 217,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 194,
       },
       {
         "endLine": 237,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 218,
       },
       {
@@ -36524,7 +36524,7 @@ void main() {
       },
       {
         "endLine": 285,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 269,
       },
       {
@@ -36534,7 +36534,7 @@ void main() {
       },
       {
         "endLine": 490,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 376,
       },
       {
@@ -36559,7 +36559,7 @@ void main() {
       },
       {
         "endLine": 615,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 578,
       },
       {
@@ -36589,12 +36589,12 @@ void main() {
       },
       {
         "endLine": 700,
-        "origin": "glsl/medium_analytic.glsl",
+        "origin": "glsl/transport/medium_analytic.glsl",
         "startLine": 658,
       },
       {
         "endLine": 743,
-        "origin": "glsl/phase_hg.glsl",
+        "origin": "glsl/phase/hg.glsl",
         "startLine": 701,
       },
       {
@@ -36609,12 +36609,12 @@ void main() {
       },
       {
         "endLine": 802,
-        "origin": "glsl/shadow_media.glsl",
+        "origin": "glsl/transport/shadow_media.glsl",
         "startLine": 763,
       },
       {
         "endLine": 821,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 803,
       },
       {
@@ -36624,7 +36624,7 @@ void main() {
       },
       {
         "endLine": 849,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 829,
       },
       {
@@ -36714,7 +36714,7 @@ void main() {
       },
       {
         "endLine": 1014,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 989,
       },
     ],
@@ -37731,7 +37731,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -37748,32 +37748,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -37783,7 +37783,7 @@ void main() {
       },
       {
         "endLine": 248,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 232,
       },
       {
@@ -37793,12 +37793,12 @@ void main() {
       },
       {
         "endLine": 382,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 268,
       },
       {
         "endLine": 433,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 383,
       },
       {
@@ -37828,7 +37828,7 @@ void main() {
       },
       {
         "endLine": 566,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 529,
       },
       {
@@ -37848,12 +37848,12 @@ void main() {
       },
       {
         "endLine": 602,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 588,
       },
       {
         "endLine": 621,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 603,
       },
       {
@@ -37863,7 +37863,7 @@ void main() {
       },
       {
         "endLine": 649,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 629,
       },
       {
@@ -37928,7 +37928,7 @@ void main() {
       },
       {
         "endLine": 748,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 723,
       },
     ],
@@ -38973,7 +38973,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -38990,32 +38990,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -39025,7 +39025,7 @@ void main() {
       },
       {
         "endLine": 246,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 230,
       },
       {
@@ -39035,12 +39035,12 @@ void main() {
       },
       {
         "endLine": 395,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 281,
       },
       {
         "endLine": 446,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 396,
       },
       {
@@ -39075,12 +39075,12 @@ void main() {
       },
       {
         "endLine": 586,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 549,
       },
       {
         "endLine": 644,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 587,
       },
       {
@@ -39100,7 +39100,7 @@ void main() {
       },
       {
         "endLine": 691,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 671,
       },
       {
@@ -39165,7 +39165,7 @@ void main() {
       },
       {
         "endLine": 783,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 758,
       },
     ],
@@ -40311,7 +40311,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -40328,32 +40328,32 @@ void main() {
       },
       {
         "endLine": 72,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 20,
       },
       {
         "endLine": 91,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 73,
       },
       {
         "endLine": 132,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 92,
       },
       {
         "endLine": 164,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 133,
       },
       {
         "endLine": 188,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 165,
       },
       {
         "endLine": 208,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 189,
       },
       {
@@ -40363,7 +40363,7 @@ void main() {
       },
       {
         "endLine": 250,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 234,
       },
       {
@@ -40373,12 +40373,12 @@ void main() {
       },
       {
         "endLine": 399,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 285,
       },
       {
         "endLine": 450,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 400,
       },
       {
@@ -40413,12 +40413,12 @@ void main() {
       },
       {
         "endLine": 590,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 553,
       },
       {
         "endLine": 648,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 591,
       },
       {
@@ -40438,12 +40438,12 @@ void main() {
       },
       {
         "endLine": 689,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 675,
       },
       {
         "endLine": 733,
-        "origin": "glsl/light_sphere.glsl",
+        "origin": "glsl/lights/sphere.glsl",
         "startLine": 690,
       },
       {
@@ -40458,7 +40458,7 @@ void main() {
       },
       {
         "endLine": 766,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 746,
       },
       {
@@ -40528,7 +40528,7 @@ void main() {
       },
       {
         "endLine": 884,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 859,
       },
     ],
@@ -41617,7 +41617,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -41634,37 +41634,37 @@ void main() {
       },
       {
         "endLine": 77,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 25,
       },
       {
         "endLine": 96,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 78,
       },
       {
         "endLine": 137,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 97,
       },
       {
         "endLine": 169,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 138,
       },
       {
         "endLine": 177,
-        "origin": "glsl/math_mis.glsl",
+        "origin": "glsl/core/math_mis.glsl",
         "startLine": 170,
       },
       {
         "endLine": 201,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 178,
       },
       {
         "endLine": 221,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 202,
       },
       {
@@ -41674,7 +41674,7 @@ void main() {
       },
       {
         "endLine": 298,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 248,
       },
       {
@@ -41709,12 +41709,12 @@ void main() {
       },
       {
         "endLine": 443,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 406,
       },
       {
         "endLine": 501,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 444,
       },
       {
@@ -41734,7 +41734,7 @@ void main() {
       },
       {
         "endLine": 542,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 528,
       },
       {
@@ -41744,7 +41744,7 @@ void main() {
       },
       {
         "endLine": 567,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 547,
       },
       {
@@ -41754,7 +41754,7 @@ void main() {
       },
       {
         "endLine": 607,
-        "origin": "glsl/env_chart_equirect.glsl",
+        "origin": "glsl/env/env_chart_equirect.glsl",
         "startLine": 573,
       },
       {
@@ -41764,7 +41764,7 @@ void main() {
       },
       {
         "endLine": 687,
-        "origin": "glsl/env_sampler_cdf.glsl",
+        "origin": "glsl/env/env_sampler_cdf.glsl",
         "startLine": 613,
       },
       {
@@ -41829,7 +41829,7 @@ void main() {
       },
       {
         "endLine": 814,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 789,
       },
     ],
@@ -42917,7 +42917,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -42934,32 +42934,32 @@ void main() {
       },
       {
         "endLine": 77,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 25,
       },
       {
         "endLine": 96,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 78,
       },
       {
         "endLine": 137,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 97,
       },
       {
         "endLine": 169,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 138,
       },
       {
         "endLine": 193,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 170,
       },
       {
         "endLine": 213,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 194,
       },
       {
@@ -42969,7 +42969,7 @@ void main() {
       },
       {
         "endLine": 290,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 240,
       },
       {
@@ -43004,12 +43004,12 @@ void main() {
       },
       {
         "endLine": 435,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 398,
       },
       {
         "endLine": 493,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 436,
       },
       {
@@ -43029,7 +43029,7 @@ void main() {
       },
       {
         "endLine": 534,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 520,
       },
       {
@@ -43039,7 +43039,7 @@ void main() {
       },
       {
         "endLine": 559,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 539,
       },
       {
@@ -43049,7 +43049,7 @@ void main() {
       },
       {
         "endLine": 599,
-        "origin": "glsl/env_chart_equirect.glsl",
+        "origin": "glsl/env/env_chart_equirect.glsl",
         "startLine": 565,
       },
       {
@@ -43059,7 +43059,7 @@ void main() {
       },
       {
         "endLine": 679,
-        "origin": "glsl/env_sampler_cdf.glsl",
+        "origin": "glsl/env/env_sampler_cdf.glsl",
         "startLine": 605,
       },
       {
@@ -43124,7 +43124,7 @@ void main() {
       },
       {
         "endLine": 792,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 767,
       },
     ],
@@ -44171,7 +44171,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -44188,32 +44188,32 @@ void main() {
       },
       {
         "endLine": 77,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 25,
       },
       {
         "endLine": 96,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 78,
       },
       {
         "endLine": 137,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 97,
       },
       {
         "endLine": 169,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 138,
       },
       {
         "endLine": 193,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 170,
       },
       {
         "endLine": 213,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 194,
       },
       {
@@ -44223,7 +44223,7 @@ void main() {
       },
       {
         "endLine": 287,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 237,
       },
       {
@@ -44258,12 +44258,12 @@ void main() {
       },
       {
         "endLine": 432,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 395,
       },
       {
         "endLine": 490,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 433,
       },
       {
@@ -44283,7 +44283,7 @@ void main() {
       },
       {
         "endLine": 537,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 517,
       },
       {
@@ -44293,7 +44293,7 @@ void main() {
       },
       {
         "endLine": 577,
-        "origin": "glsl/env_chart_equirect.glsl",
+        "origin": "glsl/env/env_chart_equirect.glsl",
         "startLine": 543,
       },
       {
@@ -44303,7 +44303,7 @@ void main() {
       },
       {
         "endLine": 662,
-        "origin": "glsl/env_sampler_cdf.glsl",
+        "origin": "glsl/env/env_sampler_cdf.glsl",
         "startLine": 588,
       },
       {
@@ -44363,7 +44363,7 @@ void main() {
       },
       {
         "endLine": 750,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 725,
       },
     ],
@@ -45502,7 +45502,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -45519,37 +45519,37 @@ void main() {
       },
       {
         "endLine": 78,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 26,
       },
       {
         "endLine": 97,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 79,
       },
       {
         "endLine": 138,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 98,
       },
       {
         "endLine": 170,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 139,
       },
       {
         "endLine": 178,
-        "origin": "glsl/math_mis.glsl",
+        "origin": "glsl/core/math_mis.glsl",
         "startLine": 171,
       },
       {
         "endLine": 202,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 179,
       },
       {
         "endLine": 222,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 203,
       },
       {
@@ -45559,7 +45559,7 @@ void main() {
       },
       {
         "endLine": 299,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 249,
       },
       {
@@ -45594,12 +45594,12 @@ void main() {
       },
       {
         "endLine": 444,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 407,
       },
       {
         "endLine": 502,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 445,
       },
       {
@@ -45619,7 +45619,7 @@ void main() {
       },
       {
         "endLine": 543,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 529,
       },
       {
@@ -45629,7 +45629,7 @@ void main() {
       },
       {
         "endLine": 568,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 548,
       },
       {
@@ -45639,7 +45639,7 @@ void main() {
       },
       {
         "endLine": 637,
-        "origin": "glsl/env_chart_octahedral.glsl",
+        "origin": "glsl/env/env_chart_octahedral.glsl",
         "startLine": 574,
       },
       {
@@ -45649,7 +45649,7 @@ void main() {
       },
       {
         "endLine": 722,
-        "origin": "glsl/env_sampler_cdf.glsl",
+        "origin": "glsl/env/env_sampler_cdf.glsl",
         "startLine": 648,
       },
       {
@@ -45714,7 +45714,7 @@ void main() {
       },
       {
         "endLine": 849,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 824,
       },
     ],
@@ -46809,7 +46809,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -46826,32 +46826,32 @@ void main() {
       },
       {
         "endLine": 78,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 26,
       },
       {
         "endLine": 97,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 79,
       },
       {
         "endLine": 138,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 98,
       },
       {
         "endLine": 170,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 139,
       },
       {
         "endLine": 194,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 171,
       },
       {
         "endLine": 214,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 195,
       },
       {
@@ -46861,7 +46861,7 @@ void main() {
       },
       {
         "endLine": 291,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 241,
       },
       {
@@ -46896,12 +46896,12 @@ void main() {
       },
       {
         "endLine": 436,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 399,
       },
       {
         "endLine": 494,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 437,
       },
       {
@@ -46921,7 +46921,7 @@ void main() {
       },
       {
         "endLine": 535,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 521,
       },
       {
@@ -46931,7 +46931,7 @@ void main() {
       },
       {
         "endLine": 560,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 540,
       },
       {
@@ -46941,7 +46941,7 @@ void main() {
       },
       {
         "endLine": 600,
-        "origin": "glsl/env_chart_equirect.glsl",
+        "origin": "glsl/env/env_chart_equirect.glsl",
         "startLine": 566,
       },
       {
@@ -46951,7 +46951,7 @@ void main() {
       },
       {
         "endLine": 685,
-        "origin": "glsl/env_sampler_cdf.glsl",
+        "origin": "glsl/env/env_sampler_cdf.glsl",
         "startLine": 611,
       },
       {
@@ -47016,7 +47016,7 @@ void main() {
       },
       {
         "endLine": 798,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 773,
       },
     ],
@@ -48241,7 +48241,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -48258,37 +48258,37 @@ void main() {
       },
       {
         "endLine": 78,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 26,
       },
       {
         "endLine": 97,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 79,
       },
       {
         "endLine": 138,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 98,
       },
       {
         "endLine": 170,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 139,
       },
       {
         "endLine": 178,
-        "origin": "glsl/math_mis.glsl",
+        "origin": "glsl/core/math_mis.glsl",
         "startLine": 171,
       },
       {
         "endLine": 202,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 179,
       },
       {
         "endLine": 222,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 203,
       },
       {
@@ -48298,7 +48298,7 @@ void main() {
       },
       {
         "endLine": 301,
-        "origin": "glsl/analytic_primitives.glsl",
+        "origin": "glsl/geometry/analytic_primitives.glsl",
         "startLine": 251,
       },
       {
@@ -48333,12 +48333,12 @@ void main() {
       },
       {
         "endLine": 470,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 433,
       },
       {
         "endLine": 528,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 471,
       },
       {
@@ -48358,12 +48358,12 @@ void main() {
       },
       {
         "endLine": 569,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 555,
       },
       {
         "endLine": 598,
-        "origin": "glsl/light_quad.glsl",
+        "origin": "glsl/lights/quad.glsl",
         "startLine": 570,
       },
       {
@@ -48383,7 +48383,7 @@ void main() {
       },
       {
         "endLine": 657,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 637,
       },
       {
@@ -48393,7 +48393,7 @@ void main() {
       },
       {
         "endLine": 697,
-        "origin": "glsl/env_chart_equirect.glsl",
+        "origin": "glsl/env/env_chart_equirect.glsl",
         "startLine": 663,
       },
       {
@@ -48403,7 +48403,7 @@ void main() {
       },
       {
         "endLine": 782,
-        "origin": "glsl/env_sampler_cdf.glsl",
+        "origin": "glsl/env/env_sampler_cdf.glsl",
         "startLine": 708,
       },
       {
@@ -48468,7 +48468,7 @@ void main() {
       },
       {
         "endLine": 917,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 892,
       },
     ],
@@ -49426,7 +49426,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -49443,42 +49443,42 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 93,
-        "origin": "glsl/structs_media.glsl",
+        "origin": "glsl/core/structs_media.glsl",
         "startLine": 71,
       },
       {
         "endLine": 112,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 94,
       },
       {
         "endLine": 153,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 113,
       },
       {
         "endLine": 185,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 154,
       },
       {
         "endLine": 189,
-        "origin": "glsl/math_media.glsl",
+        "origin": "glsl/core/math_media.glsl",
         "startLine": 186,
       },
       {
         "endLine": 213,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 190,
       },
       {
         "endLine": 233,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 214,
       },
       {
@@ -49488,7 +49488,7 @@ void main() {
       },
       {
         "endLine": 274,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 258,
       },
       {
@@ -49498,7 +49498,7 @@ void main() {
       },
       {
         "endLine": 415,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 301,
       },
       {
@@ -49523,7 +49523,7 @@ void main() {
       },
       {
         "endLine": 514,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 477,
       },
       {
@@ -49558,7 +49558,7 @@ void main() {
       },
       {
         "endLine": 590,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 570,
       },
       {
@@ -49638,7 +49638,7 @@ void main() {
       },
       {
         "endLine": 697,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 672,
       },
     ],
@@ -50561,7 +50561,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -50578,32 +50578,32 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 89,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 71,
       },
       {
         "endLine": 130,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 90,
       },
       {
         "endLine": 162,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 131,
       },
       {
         "endLine": 186,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 163,
       },
       {
         "endLine": 206,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 187,
       },
       {
@@ -50613,7 +50613,7 @@ void main() {
       },
       {
         "endLine": 244,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 228,
       },
       {
@@ -50623,7 +50623,7 @@ void main() {
       },
       {
         "endLine": 393,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 279,
       },
       {
@@ -50653,12 +50653,12 @@ void main() {
       },
       {
         "endLine": 507,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 470,
       },
       {
         "endLine": 565,
-        "origin": "glsl/dielectric.glsl",
+        "origin": "glsl/materials/dielectric.glsl",
         "startLine": 508,
       },
       {
@@ -50678,7 +50678,7 @@ void main() {
       },
       {
         "endLine": 612,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 592,
       },
       {
@@ -50738,7 +50738,7 @@ void main() {
       },
       {
         "endLine": 697,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 672,
       },
     ],
@@ -51650,7 +51650,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -51667,32 +51667,32 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 89,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 71,
       },
       {
         "endLine": 130,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 90,
       },
       {
         "endLine": 162,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 131,
       },
       {
         "endLine": 186,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 163,
       },
       {
         "endLine": 206,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 187,
       },
       {
@@ -51702,7 +51702,7 @@ void main() {
       },
       {
         "endLine": 246,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 230,
       },
       {
@@ -51712,7 +51712,7 @@ void main() {
       },
       {
         "endLine": 402,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 288,
       },
       {
@@ -51737,7 +51737,7 @@ void main() {
       },
       {
         "endLine": 505,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 468,
       },
       {
@@ -51757,12 +51757,12 @@ void main() {
       },
       {
         "endLine": 541,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 527,
       },
       {
         "endLine": 560,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 542,
       },
       {
@@ -51772,7 +51772,7 @@ void main() {
       },
       {
         "endLine": 594,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 574,
       },
       {
@@ -51832,7 +51832,7 @@ void main() {
       },
       {
         "endLine": 686,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 661,
       },
     ],
@@ -52744,7 +52744,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "glsl/tonemap_reinhard.glsl",
+        "origin": "glsl/film/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -52761,32 +52761,32 @@ void main() {
       },
       {
         "endLine": 70,
-        "origin": "glsl/structs.glsl",
+        "origin": "glsl/core/structs.glsl",
         "startLine": 18,
       },
       {
         "endLine": 89,
-        "origin": "glsl/interaction.glsl",
+        "origin": "glsl/core/interaction.glsl",
         "startLine": 71,
       },
       {
         "endLine": 130,
-        "origin": "glsl/rng.glsl",
+        "origin": "glsl/core/rng.glsl",
         "startLine": 90,
       },
       {
         "endLine": 162,
-        "origin": "glsl/math.glsl",
+        "origin": "glsl/core/math.glsl",
         "startLine": 131,
       },
       {
         "endLine": 186,
-        "origin": "glsl/euclidean.glsl",
+        "origin": "glsl/ambient/euclidean.glsl",
         "startLine": 163,
       },
       {
         "endLine": 206,
-        "origin": "glsl/ray.glsl",
+        "origin": "glsl/core/ray.glsl",
         "startLine": 187,
       },
       {
@@ -52796,7 +52796,7 @@ void main() {
       },
       {
         "endLine": 246,
-        "origin": "glsl/sdf_primitives.glsl",
+        "origin": "glsl/geometry/sdf_primitives.glsl",
         "startLine": 230,
       },
       {
@@ -52806,7 +52806,7 @@ void main() {
       },
       {
         "endLine": 402,
-        "origin": "glsl/raymarch.glsl",
+        "origin": "glsl/geometry/raymarch.glsl",
         "startLine": 288,
       },
       {
@@ -52831,7 +52831,7 @@ void main() {
       },
       {
         "endLine": 505,
-        "origin": "glsl/lambert.glsl",
+        "origin": "glsl/materials/lambert.glsl",
         "startLine": 468,
       },
       {
@@ -52851,12 +52851,12 @@ void main() {
       },
       {
         "endLine": 541,
-        "origin": "glsl/shadow_opaque.glsl",
+        "origin": "glsl/transport/shadow_opaque.glsl",
         "startLine": 527,
       },
       {
         "endLine": 560,
-        "origin": "glsl/light_point.glsl",
+        "origin": "glsl/lights/point.glsl",
         "startLine": 542,
       },
       {
@@ -52866,7 +52866,7 @@ void main() {
       },
       {
         "endLine": 594,
-        "origin": "glsl/camera_pinhole.glsl",
+        "origin": "glsl/camera/camera_pinhole.glsl",
         "startLine": 574,
       },
       {
@@ -52926,7 +52926,7 @@ void main() {
       },
       {
         "endLine": 686,
-        "origin": "glsl/main_accumulate.glsl",
+        "origin": "glsl/film/main_accumulate.glsl",
         "startLine": 661,
       },
     ],

@@ -8,10 +8,10 @@ import type { RenderPlan, PlannedLight } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat } from './glsl-format.js';
-import { LIGHT_KINDS } from '../glsl/light-registry.js';
+import { LIGHT_KINDS } from '../glsl/lights/index.js';
 
-import shadowOpaqueGLSL from '../glsl/shadow_opaque.glsl?raw';
-import shadowMediaGLSL from '../glsl/shadow_media.glsl?raw';
+import shadowOpaqueGLSL from '../glsl/transport/shadow_opaque.glsl?raw';
+import shadowMediaGLSL from '../glsl/transport/shadow_media.glsl?raw';
 
 export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (plan.program.estimator.lighting === null) {
@@ -53,17 +53,17 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // opaque form for media-free scenes, the spectral segment walker (composing the generated
     // medium_transmittance, seam 2) when media exist. The NEE call sites never change.
     if (plan.program.media.shadowWalker) {
-        blocks.push({ origin: 'glsl/shadow_media.glsl', source: shadowMediaGLSL });
+        blocks.push({ origin: 'glsl/transport/shadow_media.glsl', source: shadowMediaGLSL });
         defines['MAX_SHADOW_SEGMENTS'] = '8';   // §6.3 pin; exhaustion is conservative (ZERO)
     } else {
-        blocks.push({ origin: 'glsl/shadow_opaque.glsl', source: shadowOpaqueGLSL });
+        blocks.push({ origin: 'glsl/transport/shadow_opaque.glsl', source: shadowOpaqueGLSL });
     }
 
     // Per-kind sampler libraries for the kinds present (registry-driven, R1b; declared
     // before the dispatcher).
     for (const kind of ['point', 'quad', 'sphere'] as const) {
         if (plan.lights.some((l) => l.kind === kind)) {
-            blocks.push({ origin: `glsl/light_${kind}.glsl`, source: LIGHT_KINDS[kind].glsl });
+            blocks.push({ origin: `glsl/lights/${kind}.glsl`, source: LIGHT_KINDS[kind].glsl });
         }
     }
 

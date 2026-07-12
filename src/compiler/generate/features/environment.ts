@@ -15,9 +15,9 @@ import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../../engine/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import envChartEquirectGLSL from '../glsl/env_chart_equirect.glsl?raw';
-import envChartOctahedralGLSL from '../glsl/env_chart_octahedral.glsl?raw';
-import envSamplerCdfGLSL from '../glsl/env_sampler_cdf.glsl?raw';
+import envChartEquirectGLSL from '../glsl/env/env_chart_equirect.glsl?raw';
+import envChartOctahedralGLSL from '../glsl/env/env_chart_octahedral.glsl?raw';
+import envSamplerCdfGLSL from '../glsl/env/env_sampler_cdf.glsl?raw';
 
 const ORIGIN = 'generated:environment';
 
@@ -38,8 +38,8 @@ export function envVariantSuffix(chart: 'equirect' | 'octahedral', compensation:
 
 function chartBlock(chart: 'equirect' | 'octahedral') {
     return chart === 'octahedral'
-        ? { origin: 'glsl/env_chart_octahedral.glsl', source: envChartOctahedralGLSL }
-        : { origin: 'glsl/env_chart_equirect.glsl', source: envChartEquirectGLSL };
+        ? { origin: 'glsl/env/env_chart_octahedral.glsl', source: envChartOctahedralGLSL }
+        : { origin: 'glsl/env/env_chart_equirect.glsl', source: envChartEquirectGLSL };
 }
 
 /** Per-chart table dimensions live on separate parameter paths (they differ: W×H vs N×N). */
@@ -137,7 +137,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         if (samplable) {
             const suffix = envVariantSuffix(chart, compensation);
             blocks.splice(1, 0, chartBlock(chart));   // chart before radiance/sampler
-            blocks.push({ origin: 'glsl/env_sampler_cdf.glsl', source: envSamplerCdfGLSL });
+            blocks.push({ origin: 'glsl/env/env_sampler_cdf.glsl', source: envSamplerCdfGLSL });
             textures.push(
                 { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },
                 { name: 'u_envCdfMarg', source: `extern:env_cdf_marg${suffix}` },
@@ -182,7 +182,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         if (samplable) {
             const suffix = envVariantSuffix(chart, compensation);
             blocks.splice(1, 0, chartBlock(chart));   // chart before radiance/sampler
-            blocks.push({ origin: 'glsl/env_sampler_cdf.glsl', source: envSamplerCdfGLSL });
+            blocks.push({ origin: 'glsl/env/env_sampler_cdf.glsl', source: envSamplerCdfGLSL });
             textures.push(
                 { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },
                 { name: 'u_envCdfMarg', source: `extern:env_cdf_marg${suffix}` },

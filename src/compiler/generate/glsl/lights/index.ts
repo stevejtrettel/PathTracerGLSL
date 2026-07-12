@@ -5,10 +5,10 @@
 // descriptor + one line here.
 // (Temporary location: moves to glsl/lights/index.ts in the R1c family-folder reorg.)
 
-import type { LightKindDescriptor } from '../descriptors.js';
-import { pointLightDescriptor } from './light_point.js';
-import { quadLightDescriptor } from './light_quad.js';
-import { sphereLightDescriptor } from './light_sphere.js';
+import type { LightKindDescriptor } from '../../descriptors.js';
+import { pointLightDescriptor } from './point.js';
+import { quadLightDescriptor } from './quad.js';
+import { sphereLightDescriptor } from './sphere.js';
 
 export const LIGHT_KINDS: Record<'point' | 'quad' | 'sphere', LightKindDescriptor> = {
     point: pointLightDescriptor,

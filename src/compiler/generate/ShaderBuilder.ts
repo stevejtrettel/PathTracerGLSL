@@ -8,9 +8,9 @@ import { assembleBlocks } from './ShaderIR.js';
 import type { MergedContributions } from './features/merge.js';
 
 // GLSL owned by the Generator itself (not a swappable feature)
-import fullscreenVertGLSL from './glsl/fullscreen.vert.glsl?raw';
-import tonemapReinhardGLSL from './glsl/tonemap_reinhard.glsl?raw';
-import tonemapNoneGLSL from './glsl/tonemap_none.glsl?raw';
+import fullscreenVertGLSL from './glsl/film/fullscreen.vert.glsl?raw';
+import tonemapReinhardGLSL from './glsl/film/tonemap_reinhard.glsl?raw';
+import tonemapNoneGLSL from './glsl/film/tonemap_none.glsl?raw';
 
 export interface ShaderBuildResult {
     shaders: Map<string, ShaderProgram>;
@@ -24,7 +24,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
     // Vertex shader (shared)
     const vertexAssembled = assembleBlocks([
         { origin: 'generated:version', source: '#version 300 es' },
-        { origin: 'glsl/fullscreen.vert.glsl', source: fullscreenVertGLSL },
+        { origin: 'glsl/film/fullscreen.vert.glsl', source: fullscreenVertGLSL },
     ]);
 
     // Pathtracer fragment — from the feature contributions merged in section order (§2.10)
@@ -83,8 +83,8 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
     return [
         { origin: 'generated:display-header', source: header },
         tonemap.type === 'none'
-            ? { origin: 'glsl/tonemap_none.glsl', source: tonemapNoneGLSL }
-            : { origin: 'glsl/tonemap_reinhard.glsl', source: tonemapReinhardGLSL },
+            ? { origin: 'glsl/film/tonemap_none.glsl', source: tonemapNoneGLSL }
+            : { origin: 'glsl/film/tonemap_reinhard.glsl', source: tonemapReinhardGLSL },
     ];
 }
 
