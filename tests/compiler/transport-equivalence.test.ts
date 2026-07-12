@@ -79,8 +79,11 @@ export function tokens(source: string, defines: Record<string, string>): string[
 
 function parseDefines(shader: string): Record<string, string> {
     const defines: Record<string, string> = {};
-    for (const m of shader.matchAll(/^#define\s+(\w+)\s*(.*)$/gm)) {
-        defines[m[1]] = m[2].trim();
+    // Horizontal whitespace ONLY between name and value — \s would match the newline and
+    // swallow the next line as a flag-define's "value". Values lose trailing comments
+    // (some header defines carry them) so macro substitution injects clean tokens.
+    for (const m of shader.matchAll(/^#define[ \t]+(\w+)[ \t]*([^\n]*)$/gm)) {
+        defines[m[1]] = m[2].replace(/\/\/.*$/, '').trim();
     }
     return defines;
 }
@@ -152,7 +155,18 @@ describe('transport loop token equivalence (item 9 — temporary)', () => {
 
                 expect(newTokens.length).toBeGreaterThan(50);
                 expect(newTokens).toContain('transport_trace');
-                expect(newTokens).toEqual(oldTokens);
+
+                // Readable first-divergence report (full-array diffs are unusable).
+                const n = Math.max(oldTokens.length, newTokens.length);
+                for (let i = 0; i < n; i++) {
+                    if (oldTokens[i] !== newTokens[i]) {
+                        const ctx = (a: string[]) => a.slice(Math.max(0, i - 8), i + 8).join(' ');
+                        expect.fail(
+                            `first token divergence at ${i}:\n  OLD … ${ctx(oldTokens)} …\n  NEW … ${ctx(newTokens)} …`,
+                        );
+                    }
+                }
+                expect(newTokens.length).toBe(oldTokens.length);
             });
         }
     }
