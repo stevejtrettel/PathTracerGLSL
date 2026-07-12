@@ -90,7 +90,6 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     const samplable = plan.lights.filter((l) => l.regionId !== undefined);
     if (plan.program.emitters.samplable) {
         blocks.push({ origin: 'generated:light-of', source: generateLightOf(samplable) });
-        defines['HAS_SAMPLABLE_EMITTERS'] = '';
         // The MIS pdf query (§6.1): only under 'mis' — its sole reader is the emitter-hit weight.
         if (plan.program.emitters.lightingPdf) {
             blocks.push({ origin: 'generated:lighting-pdf', source: generateLightingPdf(plan.lights, selectPdf, envSamplable) });

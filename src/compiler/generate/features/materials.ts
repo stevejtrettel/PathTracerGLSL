@@ -106,21 +106,12 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
     }
 
-    // Transmission present → transport tracks etaScale for the RR metric (§7.2).
+    // The last structural define materials emits: structs.glsl gates MediumProperties/
+    // MediumSample and math.glsl gates spectrum_exp on HAS_MEDIA. Dies in the split's
+    // commit D (the gated sections become conditionally-included blocks). The transport
+    // generator reads program.media directly — no other define consumers remain.
     const defines: Record<string, string> = {};
-    if (plan.program.materials.models.includes('dielectric')) defines['HAS_TRANSMISSION'] = '';
-    // Media defines gate ALL media GLSL (structs, helpers, transport blocks) so media-free
-    // scenes preprocess to exactly the pre-media program (impl-plan-media M1 gate).
     if (media.present) defines['HAS_MEDIA'] = '';
-    if (media.nullInterfaces) {
-        defines['HAS_NULL_INTERFACES'] = '';
-        defines['MAX_NULL_CROSSINGS'] = '32';   // §3.6 pin
-    }
-    // Scattering arms exist when scattering media are present AND the strategy runs a volume
-    // integrator ('none' override renders scattering media as absorbing-only — a research A/B).
-    if (scatteringLive) {
-        defines['HAS_SCATTERING'] = '';
-    }
 
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     const provides = [

@@ -102,7 +102,6 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         return {
             ...emptyContribution('environment'),
             blocks,
-            defines: samplable ? { ENV_SAMPLABLE: '' } : {},
             uniforms,
             parameters,
             provides: envProvides(samplable),
@@ -148,7 +147,6 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         return {
             ...emptyContribution('environment'),
             blocks,
-            defines: samplable ? { ENV_SAMPLABLE: '' } : {},
             uniforms,
             parameters,
             textures,
@@ -194,7 +192,6 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         return {
             ...emptyContribution('environment'),
             blocks,
-            defines: samplable ? { ENV_SAMPLABLE: '' } : {},
             uniforms,
             parameters,
             textures,

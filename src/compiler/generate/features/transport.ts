@@ -22,22 +22,11 @@ import { emptyContribution, type FeatureContribution } from './types.js';
 export function contributeTransport(plan: RenderPlan): FeatureContribution {
     const program = plan.program;
 
-    // Structural defines, still emitted (NOT read by the generator): math.glsl gates
-    // power_heuristic on ENABLE_MIS and spectrum_exp on HAS_MEDIA (library cleanup is
-    // the split's commit D), and the temporary token-equivalence test preprocesses the
-    // old template under these. MAX_BOUNCES/RR_START_DEPTH are inlined as literals below;
-    // their defines survive only for the test and die in commit C.
-    const defines: Record<string, string> = {
-        MAX_BOUNCES: String(program.measurement.maxBounces),
-    };
-    if (program.estimator.lighting !== null) {
-        defines['ENABLE_NEE'] = '';
-        if (program.estimator.lighting.method === 'mis') defines['ENABLE_MIS'] = '';
-    }
-    if (program.estimator.russianRoulette) {
-        defines['ENABLE_RUSSIAN_ROULETTE'] = '';
-        defines['RR_START_DEPTH'] = String(program.estimator.russianRoulette.startDepth);
-    }
+    // The last structural define transport emits: math.glsl gates power_heuristic on
+    // ENABLE_MIS. Dies in the split's commit D (the gated section becomes a
+    // conditionally-included block). The generator itself reads no defines.
+    const defines: Record<string, string> = {};
+    if (program.estimator.lighting?.method === 'mis') defines['ENABLE_MIS'] = '';
 
     // T4 seams: what the loop calls, conditioned exactly like the emitted segments.
     const requires = [
