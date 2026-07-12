@@ -11,8 +11,8 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, paramToUniform } from './glsl-format.js';
 
 import { MATERIAL_MODELS, materialModel } from '../glsl/material-registry.js';
+import { PHASE_MODELS } from '../glsl/phase-registry.js';
 import mediumAnalyticGLSL from '../glsl/medium_analytic.glsl?raw';
-import phaseHgGLSL from '../glsl/phase_hg.glsl?raw';
 
 /** Capability lookup over the descriptor registry (R1a — replaces the inline
  *  MODEL_HAS_NONDELTA_LOBES map). 'none' is a boundary classification, not a model:
@@ -81,7 +81,8 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             blocks.push({ origin: 'glsl/medium_analytic.glsl', source: mediumAnalyticGLSL });
         }
         if (scatteringLive) {
-            blocks.push({ origin: 'glsl/phase_hg.glsl', source: phaseHgGLSL });
+            // v1: every scattering medium phases through HG (registry-driven, R1b).
+            blocks.push({ origin: 'glsl/phase_hg.glsl', source: PHASE_MODELS['hg'].glsl });
         }
         blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan) });
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).

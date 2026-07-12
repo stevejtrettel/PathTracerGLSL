@@ -7,12 +7,9 @@
 import type { RenderPlan, PlannedLight } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatVec3, formatSpectrum } from './glsl-format.js';
-import { quadNormal } from './intersection.js';
+import { formatFloat } from './glsl-format.js';
+import { LIGHT_KINDS } from '../glsl/light-registry.js';
 
-import lightPointGLSL from '../glsl/light_point.glsl?raw';
-import lightQuadGLSL from '../glsl/light_quad.glsl?raw';
-import lightSphereGLSL from '../glsl/light_sphere.glsl?raw';
 import shadowOpaqueGLSL from '../glsl/shadow_opaque.glsl?raw';
 import shadowMediaGLSL from '../glsl/shadow_media.glsl?raw';
 
@@ -62,15 +59,12 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'glsl/shadow_opaque.glsl', source: shadowOpaqueGLSL });
     }
 
-    // Per-kind sampler libraries for the kinds present (declared before the dispatcher).
-    if (plan.lights.some((l) => l.kind === 'point')) {
-        blocks.push({ origin: 'glsl/light_point.glsl', source: lightPointGLSL });
-    }
-    if (plan.lights.some((l) => l.kind === 'quad')) {
-        blocks.push({ origin: 'glsl/light_quad.glsl', source: lightQuadGLSL });
-    }
-    if (plan.lights.some((l) => l.kind === 'sphere')) {
-        blocks.push({ origin: 'glsl/light_sphere.glsl', source: lightSphereGLSL });
+    // Per-kind sampler libraries for the kinds present (registry-driven, R1b; declared
+    // before the dispatcher).
+    for (const kind of ['point', 'quad', 'sphere'] as const) {
+        if (plan.lights.some((l) => l.kind === kind)) {
+            blocks.push({ origin: `glsl/light_${kind}.glsl`, source: LIGHT_KINDS[kind].glsl });
+        }
     }
 
     // Selection pdfs are computed ONCE and shared by the sampler and the MIS pdf query —
@@ -139,46 +133,18 @@ function generateLightOf(samplable: PlannedLight[]): string {
 // Generated selection dispatcher (per-scene codegen)
 // ============================================================================
 
-function spectrumAverage(rgb: number[]): number {
-    return (rgb[0] + rgb[1] + rgb[2]) / 3;
-}
-
-function quadArea(l: PlannedLight): number {
-    const e1 = l.edge1!, e2 = l.edge2!;
-    const cx = e1[1] * e2[2] - e1[2] * e2[1];
-    const cy = e1[2] * e2[0] - e1[0] * e2[2];
-    const cz = e1[0] * e2[1] - e1[1] * e2[0];
-    return Math.hypot(cx, cy, cz);
-}
-
-/** Emitted power (watts-ish) for CDF selection — AREA-AWARE (pitfall 6: luminance-only
- *  weighting mis-prioritizes a big dim panel vs a tiny bright one). Formulas match pbrt's
- *  PowerLightSampler: point 4π·I, one-sided quad π·A·Le, sphere π·4πr²·Le.
- *  Exported for the H6 invariant tests. */
+/** Emitted power for CDF selection — the kind descriptors carry the pbrt formulas
+ *  (area-aware, pitfall 6). Exported for the H6 invariant tests. */
 export function lightPower(l: PlannedLight): number {
-    const avg = spectrumAverage(l.color.map((c) => c * l.intensity));
-    switch (l.kind) {
-        case 'point': return Math.max(1e-8, 4 * Math.PI * avg);
-        case 'quad': return Math.max(1e-8, Math.PI * quadArea(l) * avg);
-        case 'sphere': return Math.max(1e-8, Math.PI * 4 * Math.PI * l.radius! * l.radius! * avg);
-        default: return 1e-8;
-    }
+    const d = l.kind === 'directional' ? undefined : LIGHT_KINDS[l.kind];
+    return d ? d.power(l) : 1e-8;
 }
 
-/** GLSL call that samples light `l` at point `p`. Area kinds consume `xiExpr` (a vec2). */
+/** GLSL call that samples light `l` at point `p` — the kind descriptor's dispatcher arm. */
 function sampleCall(l: PlannedLight, xiExpr: string): string {
-    const Le = formatSpectrum(l.color.map((c) => c * l.intensity)); // radiometric (§2.5)
-    if (l.kind === 'point') {
-        return `point_light_sample(${formatVec3(l.position!)}, ${Le}, p)`;
-    }
-    if (l.kind === 'quad') {
-        const n = quadNormal(l.edge1!, l.edge2!);
-        return `quad_light_sample(${formatVec3(l.corner!)}, ${formatVec3(l.edge1!)}, ${formatVec3(l.edge2!)}, ${formatVec3(n)}, ${formatFloat(quadArea(l))}, ${Le}, p, ${xiExpr})`;
-    }
-    if (l.kind === 'sphere') {
-        return `sphere_light_sample(${formatVec3(l.position!)}, ${formatFloat(l.radius!)}, ${Le}, p, ${xiExpr})`;
-    }
-    throw new Error(`lighting: unsupported light kind '${l.kind}'`);
+    const d = l.kind === 'directional' ? undefined : LIGHT_KINDS[l.kind];
+    if (!d) throw new Error(`lighting: unsupported light kind '${l.kind}'`);
+    return d.emitSampleCall(l, xiExpr);
 }
 
 /** Compile-time selection pdfs — shared by lighting_sample and lighting_pdf.
@@ -294,21 +260,12 @@ function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSam
         const l = lights[i];
         if (l.regionId === undefined) continue;   // delta: not hittable, never queried
         const select = formatFloat(lights.length === 1 ? 1.0 : selectPdf[i]) + stage0;
+        // Hittable kinds carry their pdf arm on the descriptor — it must mirror the
+        // sampler's density exactly (the §6.1 byte-match invariant lives in ONE file per kind).
+        const arm = l.kind === 'directional' ? undefined : LIGHT_KINDS[l.kind].emitPdfArm;
+        if (!arm) continue;   // delta kinds have no arm (backstop; regionId already filtered)
         lines.push(`    if (light_id == ${l.id}) {`);
-        if (l.kind === 'quad') {
-            const n = quadNormal(l.edge1!, l.edge2!);
-            lines.push(`        float cos_l = dot(${formatVec3(n)}, -wi);`);
-            lines.push('        if (cos_l <= 0.0) return 0.0;');
-            lines.push('        vec3 d = light_hit.p - p;');
-            lines.push(`        return ${select} * dot(d, d) / (${formatFloat(quadArea(l))} * cos_l);`);
-        } else {
-            // sphere: the cone pdf depends only on p (same formula as the sampler).
-            lines.push(`        vec3 to_c = ${formatVec3(l.position!)} - p;`);
-            lines.push('        float dc2 = dot(to_c, to_c);');
-            lines.push(`        if (dc2 <= ${formatFloat(l.radius! * l.radius!)}) return 0.0;   // inside: sampler punts too`);
-            lines.push(`        float cos_max = sqrt(max(0.0, 1.0 - ${formatFloat(l.radius! * l.radius!)} / dc2));`);
-            lines.push(`        return ${select} / (TWO_PI * max(1e-8, 1.0 - cos_max));`);
-        }
+        lines.push(...arm(l, select));
         lines.push('    }');
     }
     lines.push('    return 0.0;');
