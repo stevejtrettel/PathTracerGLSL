@@ -12,6 +12,8 @@ import { formatFloat, formatSpectrum, paramToUniform } from './glsl-format.js';
 
 import { MATERIAL_MODELS, materialModel } from '../glsl/materials/index.js';
 import { PHASE_MODELS } from '../glsl/phase/index.js';
+import { unionFields } from '../schema.js';
+import type { PropertySchema } from '../descriptors.js';
 import mediumAnalyticGLSL from '../glsl/transport/medium_analytic.glsl?raw';
 
 /** Capability lookup over the descriptor registry (R1a — replaces the inline
@@ -45,8 +47,13 @@ function isScattering(medium: PlannedMedium): boolean {
 }
 
 export function contributeMaterials(plan: RenderPlan): FeatureContribution {
+    // The union the resolver assigns = the union the struct declares (core emits the
+    // struct from the same registry + models — one truth, two readers).
+    const structFields = unionFields(
+        plan.program.materials.models.map((m) => MATERIAL_MODELS[m]?.properties ?? []),
+    );
     const blocks: ShaderBlock[] = [
-        { origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials) },
+        { origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials, structFields) },
     ];
 
     // Model includes from the registry (R1a): one line per model PRESENT, no per-model ifs.
@@ -91,16 +98,24 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
     }
 
-    // Scan every material's properties for { param } references → live uniforms.
+    // {param} scan follows the schemas (R2): a material's model declares which fields
+    // can become live uniforms — incl. region-table fields (ior) for declaring models.
+    // A driven param on an UNDECLARED field is a Validator warning (the C5 silent-inert
+    // class), not a silent uniform. Medium fields: RTE extinction + phase params, for
+    // any material with a medium block (media are materials of the interior, §3.5).
     const uniforms: PlannedUniform[] = [];
     const parameters: Record<string, ParameterMetadata> = {};
     const seen = new Set<string>();
     for (const mat of plan.materials) {
-        addParamUniform(mat.albedo, 'vec3', 'color', uniforms, parameters, seen);
-        addParamUniform(mat.emission, 'vec3', 'color', uniforms, parameters, seen);
-        addParamUniform(mat.roughness, 'float', 'float', uniforms, parameters, seen);
-        addParamUniform(mat.transmittance, 'vec3', 'color', uniforms, parameters, seen);
-        addParamUniform(mat.ior, 'float', 'float', uniforms, parameters, seen);
+        const schemas = mat.model === 'none' ? [] : (MATERIAL_MODELS[mat.model]?.properties ?? []);
+        for (const f of schemas) {
+            addParamUniform(
+                mat[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>,
+                f.glslType === 'Spectrum' ? 'vec3' : 'float',
+                f.semantic === 'radiometric' ? 'color' : 'float',
+                uniforms, parameters, seen,
+            );
+        }
         if (mat.medium !== null) {
             addParamUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen);
             addParamUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen);
@@ -183,67 +198,48 @@ function capitalize(s: string): string {
 // Generated material lookup (per-scene codegen)
 // ============================================================================
 
-function generateMaterialLookup(materials: PlannedMaterial[]): string {
+function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySchema[]): string {
     const lines: string[] = [];
-    lines.push('// Generated material properties lookup');
+    lines.push('// Generated material properties lookup — assignments follow the models\' schemas (§3.4):');
+    lines.push('// a material sets exactly the fields its model reads, nothing else.');
     lines.push('MaterialProperties scene_material_properties(int id, vec3 p) {');
     lines.push('    MaterialProperties props;');
-    lines.push('    props.albedo = Spectrum(0.8);');       // §2.5: radiometric default via typedef, not raw vec3
-    lines.push('    props.emission = SPECTRUM_ZERO;');
-    lines.push('    props.emission_strength = 0.0;');
-    lines.push('    props.roughness = 1.0;');
-    lines.push('    props.transmittance = SPECTRUM_ONE;');
+    // Defaults from the union schemas (emission carries its paired strength).
+    for (const f of fields) {
+        lines.push(`    props.${f.name} = ${f.default};`);
+        if (f.name === 'emission') lines.push('    props.emission_strength = 0.0;');
+    }
 
-    for (let i = 0; i < materials.length; i++) {
-        const mat = materials[i];
-        const cond = i === 0 ? 'if' : 'else if';
-        lines.push(`    ${cond} (id == ${mat.id}) {`);
-
-        // albedo
-        if (isValueParam(mat.albedo)) {
-            lines.push(`        props.albedo = ${paramToUniform(mat.albedo.param)};`);
-        } else if (isGlslExpression(mat.albedo)) {
-            lines.push(`        props.albedo = ${mat.albedo.source};`);
-        } else {
-            lines.push(`        props.albedo = ${formatSpectrum(mat.albedo)};`);
-        }
-
-        // emission (+ strength)
-        if (isValueParam(mat.emission)) {
-            lines.push(`        props.emission = ${paramToUniform(mat.emission.param)};`);
-            lines.push(`        props.emission_strength = 1.0;`);
-        } else if (isGlslExpression(mat.emission)) {
-            lines.push(`        props.emission = ${mat.emission.source};`);
-            lines.push(`        props.emission_strength = 1.0;`);   // an expression emitter is an emitter
-        } else {
-            const hasEmission = mat.emission[0] > 0 || mat.emission[1] > 0 || mat.emission[2] > 0;
-            if (hasEmission) {
-                lines.push(`        props.emission = ${formatSpectrum(mat.emission)};`);
-                lines.push(`        props.emission_strength = 1.0;`);
-            }
-        }
-
-        // roughness
-        if (isValueParam(mat.roughness)) {
-            lines.push(`        props.roughness = ${paramToUniform(mat.roughness.param)};`);
-        } else if (isGlslExpression(mat.roughness)) {
-            lines.push(`        props.roughness = ${mat.roughness.source};`);
-        } else {
-            lines.push(`        props.roughness = ${formatFloat(mat.roughness)};`);
-        }
-
-        // transmittance — dielectric materials only (others keep the SPECTRUM_ONE default)
-        if (mat.model === 'dielectric') {
-            if (isValueParam(mat.transmittance)) {
-                lines.push(`        props.transmittance = ${paramToUniform(mat.transmittance.param)};`);
-            } else if (isGlslExpression(mat.transmittance)) {
-                lines.push(`        props.transmittance = ${mat.transmittance.source};`);
+    let arms = 0;
+    for (const mat of materials) {
+        const schemas = (mat.model === 'none' ? [] : (MATERIAL_MODELS[mat.model]?.properties ?? []))
+            .filter((f) => f.storage === 'field');
+        const body: string[] = [];
+        for (const f of schemas) {
+            const value = mat[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>;
+            const target = `        props.${f.name}`;
+            if (isValueParam(value)) {
+                body.push(`${target} = ${paramToUniform(value.param)};`);
+                if (f.name === 'emission') body.push('        props.emission_strength = 1.0;');
+            } else if (isGlslExpression(value)) {
+                body.push(`${target} = ${value.source};`);
+                if (f.name === 'emission') body.push('        props.emission_strength = 1.0;');   // an expression emitter is an emitter
+            } else if (f.name === 'emission') {
+                // Constant emission: assigned only when nonzero (the gate's `> 0` twin).
+                const rgb = value as Vec3;
+                if (rgb[0] > 0 || rgb[1] > 0 || rgb[2] > 0) {
+                    body.push(`${target} = ${formatSpectrum(rgb)};`);
+                    body.push('        props.emission_strength = 1.0;');
+                }
             } else {
-                lines.push(`        props.transmittance = ${formatSpectrum(mat.transmittance)};`);
+                body.push(`${target} = ${f.glslType === 'Spectrum' ? formatSpectrum(value as Vec3) : formatFloat(value as number)};`);
             }
         }
-
-        lines.push(`    }`);
+        if (body.length === 0) continue;   // 'none' / defaults-only materials earn no arm
+        lines.push(`    ${arms === 0 ? 'if' : 'else if'} (id == ${mat.id}) {`);
+        lines.push(...body);
+        lines.push('    }');
+        arms++;
     }
 
     lines.push('    return props;');
@@ -283,7 +279,13 @@ function generateNondeltaGuard(materials: PlannedMaterial[]): string {
 // volumetric emission is the deferred MediumProperties.emission, a different term entirely.
 
 function generateEmissiveTable(materials: PlannedMaterial[]): string {
-    const ids = materials.filter((m) => m.model !== 'none' && isEmissive(m)).map((m) => m.id);
+    // Capability ∧ value (R2): a model that cannot emit (dielectric_emission ≡ 0) never
+    // enters the gate even with an authored emission value — the Validator warns on that.
+    const ids = materials
+        .filter((m) => m.model !== 'none'
+            && (MATERIAL_MODELS[m.model]?.capabilities.emissive ?? false)
+            && isEmissive(m))
+        .map((m) => m.id);
     const lines: string[] = ['// Generated emission gate: fetch/dispatch emission only where it can exist'];
     lines.push('bool material_is_emissive(int mat) {');
     if (ids.length === 0) {

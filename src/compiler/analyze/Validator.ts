@@ -4,6 +4,7 @@ import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
+import { MATERIAL_MODELS } from '../generate/glsl/materials/index.js';
 
 /** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
 const MIN_QUAD_AREA = 1e-8;
@@ -273,6 +274,31 @@ export function validate(
             bag.warning('invalid-setting',
                 `Material '${name}': ior is ignored for model '${mat.model}' (non-transmissive regions are pinned to 1.0 in ior_of)`)
                 .add();
+        }
+
+        // Schema discipline (R2, the C5 silent-inert class): a {param}-DRIVEN property the
+        // material's model doesn't read would be a live knob wired to nothing — warn.
+        // (Constants on undeclared fields stay silent: harmless authoring slack.)
+        if (mat.model !== 'none') {
+            const declared = new Set(MATERIAL_MODELS[mat.model]?.properties.map((f) => f.source as string) ?? []);
+            for (const prop of ['albedo', 'emission', 'roughness', 'transmittance', 'ior'] as const) {
+                const value = mat[prop];
+                if (value !== undefined && isValueParam(value) && !declared.has(prop)) {
+                    bag.warning('invalid-setting',
+                        `Material '${name}': '${prop}' is {param}-driven but model '${mat.model}' does not read it — the knob would control nothing (schemas: fable-module-anatomy §3)`)
+                        .add();
+                }
+            }
+            // An emission VALUE on a model that cannot emit (its emission function ≡ 0).
+            const emissiveCapable = MATERIAL_MODELS[mat.model]?.capabilities.emissive ?? false;
+            const hasEmission = mat.emission !== undefined && !isValueParam(mat.emission) && !isGlslExpression(mat.emission)
+                ? (typeof mat.emission === 'number' ? mat.emission > 0 : (mat.emission as Vec3).some((c) => c > 0))
+                : mat.emission !== undefined;
+            if (!emissiveCapable && hasEmission) {
+                bag.warning('invalid-setting',
+                    `Material '${name}': emission is set but model '${mat.model}' cannot emit (its emission is identically zero) — the value is ignored`)
+                    .add();
+            }
         }
     }
 

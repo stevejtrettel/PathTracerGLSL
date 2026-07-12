@@ -3,6 +3,9 @@
 
 import type { RenderPlan } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
+import { unionFields, buildPropertiesStruct } from '../schema.js';
+import { MATERIAL_MODELS } from '../glsl/materials/index.js';
+import { PHASE_MODELS } from '../glsl/phase/index.js';
 
 import structsGLSL from '../glsl/core/structs.glsl?raw';
 import structsMediaGLSL from '../glsl/core/structs_media.glsl?raw';
@@ -20,7 +23,25 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     // programs contain no media structs/helpers at all; non-MIS programs contain no
     // power_heuristic. The last structural defines died with this.
     const blocks: ShaderBlock[] = [{ origin: 'glsl/core/structs.glsl', source: structsGLSL }];
-    if (plan.program.media.present) blocks.push({ origin: 'glsl/core/structs_media.glsl', source: structsMediaGLSL });
+
+    // Scene-scoped properties structs (§3.4, R2): the union of fields declared by the
+    // models PRESENT. A Lambert-only program has no transmittance field; roughness
+    // returns when GGX's schema declares it.
+    const materialFields = unionFields(
+        plan.program.materials.models.map((m) => MATERIAL_MODELS[m]?.properties ?? []),
+    );
+    blocks.push({ origin: 'generated:material-properties', source: buildPropertiesStruct('MaterialProperties', materialFields) });
+
+    if (plan.program.media.present) {
+        // MediumProperties = the RTE's own extinction fields (every medium has them —
+        // read by the volume-sampling bodies, not phase-declared) + phase-model schemas.
+        const mediumFields = unionFields([PHASE_MODELS['hg'].properties]);
+        blocks.push({
+            origin: 'generated:medium-properties',
+            source: buildPropertiesStruct('MediumProperties', mediumFields, ['Spectrum sigma_a;   // absorption', 'Spectrum sigma_s;   // scattering']),
+        });
+        blocks.push({ origin: 'glsl/core/structs_media.glsl', source: structsMediaGLSL });
+    }
     blocks.push(
         { origin: 'glsl/core/interaction.glsl', source: interactionGLSL },
         { origin: 'glsl/core/rng.glsl', source: rngGLSL },

@@ -43,10 +43,5 @@ struct LightSample {
     int light_id;
 };
 
-struct MaterialProperties {
-    Spectrum albedo;
-    Spectrum emission;
-    float emission_strength;
-    float roughness;
-    Spectrum transmittance;   // dielectric interface tint (hand-added; schema-generated struct is the reorg pass)
-};
+// MaterialProperties is GENERATED per scene (§3.4): the union of fields declared by
+// the models present (see generate/schema.ts) — emitted as the next block.

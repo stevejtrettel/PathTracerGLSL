@@ -1,13 +1,8 @@
 // Media struct family — included by core iff the program has media (commit D of the
 // item-9 split: conditional INCLUSION replaced the HAS_MEDIA preprocessor gate).
 
-// Medium of a region's interior (§3.5) — read via scene_medium_properties(mat, p); p is
-// unused-but-present under V1-C1 (homogeneous). Schema-generated struct is the reorg pass.
-struct MediumProperties {
-    Spectrum sigma_a;   // absorption
-    Spectrum sigma_s;   // scattering
-    float    phase_g;   // Henyey–Greenstein anisotropy
-};
+// MediumProperties is GENERATED per scene (§3.4/§3.5): RTE extinction fields + the
+// phase-model schemas (see generate/schema.ts) — emitted as the preceding block.
 
 // The volumetric component's segment decision (fable-volumetric-component.md §2/§3) — the
 // return of medium_sample. Mirrors the RTE's three segment terms: weight (attenuation of what
