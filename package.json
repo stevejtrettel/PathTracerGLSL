@@ -11,7 +11,9 @@
     "dump:shaders": "vite-node scripts/dump-shaders.ts"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "@vitest/ui": "^3.2.4",
+    "glslang-validator-prebuilt-predownloaded": "^0.0.2",
     "typescript": "~5.8.3",
     "vite": "^7.1.2",
     "vite-plugin-glsl": "^1.5.1",
