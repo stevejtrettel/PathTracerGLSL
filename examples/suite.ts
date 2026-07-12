@@ -58,7 +58,7 @@ for (const [id, entry] of Object.entries(sceneSuite)) {
     card.href = `lab.html?scene=${encodeURIComponent(id)}`;
 
     const strategies = entry.strategies
-        .map((s, i) => `${i + 1}: ${s.id}${s.transport.lightSelection ? ` (${s.transport.lightSelection})` : ''}`)
+        .map((s, i) => `${i + 1}: ${s.id}${s.estimator.lightSelection ? ` (${s.estimator.lightSelection})` : ''}`)
         .join('   ');
 
     card.innerHTML = `
