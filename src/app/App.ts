@@ -763,8 +763,8 @@ export class App {
 function envVariants(strategies: RenderStrategy[] | undefined): Array<{ chart: 'equirect' | 'octahedral'; compensation: boolean }> {
     const seen = new Map<string, { chart: 'equirect' | 'octahedral'; compensation: boolean }>();
     for (const st of strategies ?? []) {
-        const chart = st.transport.envSampler ?? 'equirect';
-        const compensation = st.transport.envCompensation ?? false;
+        const chart = st.estimator.envSampler ?? 'equirect';
+        const compensation = st.estimator.envCompensation ?? false;
         seen.set(`${chart}|${compensation}`, { chart, compensation });
     }
     if (seen.size === 0) seen.set('equirect|false', { chart: 'equirect', compensation: false });

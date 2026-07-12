@@ -49,12 +49,14 @@ export const mixedScene: SceneDescription = {
 
 export const analyticStrategy: RenderStrategy = {
     id: 'pathtracer',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.8 },
         maxBounces: 8,
-        directLighting: 'nee',
-        russianRoulette: { enabled: true, startDepth: 3 },
     },
-    camera: { type: 'pinhole', fov: 0.8 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'nee',
+        russianRoulette: { startDepth: 3 },
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };

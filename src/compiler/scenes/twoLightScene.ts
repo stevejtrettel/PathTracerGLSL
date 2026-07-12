@@ -58,29 +58,34 @@ export const twoLightScene: SceneDescription = {
     environment: { type: 'none' },
 };
 
-// Shared transport settings; the two strategies differ ONLY in `lightSelection`, so any
+// Shared settings; the two strategies differ ONLY in `lightSelection`, so any
 // image difference between them is attributable to the selection metric alone.
-const baseTransport = {
+const baseMeasurement = {
+    camera: { type: 'pinhole' as const, fov: 0.9 },
     maxBounces: 6,
-    directLighting: 'nee' as const,
-    // RR off: keeps the power-vs-uniform variance comparison a fair, unbiased A/B.
-    russianRoulette: { enabled: false, startDepth: 0 },
 };
 
-const baseView = {
-    camera: { type: 'pinhole' as const, fov: 0.9 },
+const baseEstimator = {
+    directLighting: 'nee' as const,
+    // RR off: keeps the power-vs-uniform variance comparison a fair, unbiased A/B.
+    russianRoulette: null,
     accumulation: { type: 'average' as const },
-    display: { type: 'reinhard' as const },
+};
+
+const baseViewSection = {
+    tonemap: { type: 'reinhard' as const },
 };
 
 export const twoLightPowerStrategy: RenderStrategy = {
     id: 'power',
-    transport: { ...baseTransport, lightSelection: 'power' },
-    ...baseView,
+    measurement: baseMeasurement,
+    estimator: { ...baseEstimator, lightSelection: 'power' },
+    view: baseViewSection,
 };
 
 export const twoLightUniformStrategy: RenderStrategy = {
     id: 'uniform',
-    transport: { ...baseTransport, lightSelection: 'uniform' },
-    ...baseView,
+    measurement: baseMeasurement,
+    estimator: { ...baseEstimator, lightSelection: 'uniform' },
+    view: baseViewSection,
 };

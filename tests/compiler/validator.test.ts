@@ -17,10 +17,9 @@ function baseScene(): SceneDescription {
 function baseStrategy(): RenderStrategy {
     return {
         id: 'pt',
-        transport: { maxBounces: 4, directLighting: 'nee', russianRoulette: { enabled: false, startDepth: 0 } },
-        camera: { type: 'pinhole', fov: 0.8 },
-        accumulation: { type: 'average' },
-        display: { type: 'reinhard' },
+        measurement: { camera: { type: 'pinhole', fov: 0.8 }, maxBounces: 4 },
+        estimator: { directLighting: 'nee', russianRoulette: null, accumulation: { type: 'average' } },
+        view: { tonemap: { type: 'reinhard' } },
     };
 }
 
@@ -96,14 +95,14 @@ describe('Validator', () => {
     });
 
     it('rejects non-average accumulation', () => {
-        const bag = run((_s, st) => { st.accumulation = { type: 'variance' }; });
+        const bag = run((_s, st) => { st.estimator.accumulation = { type: 'variance' }; });
         expect(bag.getErrors().some(e => e.code === 'invalid-setting' && /accumulation/i.test(e.message))).toBe(true);
     });
 
     it('rejects unsupported tonemap types (allows reinhard/none)', () => {
-        expect(run((_s, st) => { st.display = { type: 'aces' }; }).getErrors()
+        expect(run((_s, st) => { st.view.tonemap = { type: 'aces' }; }).getErrors()
             .some(e => e.code === 'invalid-setting' && /tonemap|display/i.test(e.message))).toBe(true);
-        expect(run((_s, st) => { st.display = { type: 'none' }; }).isEmpty()).toBe(true);
+        expect(run((_s, st) => { st.view.tonemap = { type: 'none' }; }).isEmpty()).toBe(true);
     });
 
     it('rejects an object referencing an unknown material (with a suggestion)', () => {

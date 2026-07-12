@@ -50,14 +50,16 @@ export const slabScene: SceneDescription = {
 
 export const slabStrategy: RenderStrategy = {
     id: 'pathtracer',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.6 },
         maxBounces: 4, // one surface event; null crossings don't consume bounces
-        directLighting: 'none',
-        russianRoulette: { enabled: false, startDepth: 0 }, // witness protocol: RR off
     },
-    camera: { type: 'pinhole', fov: 0.6 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none',
+        russianRoulette: null, // witness protocol: RR off
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 // ---------------------------------------------------------------------------
@@ -102,14 +104,16 @@ export const fogcubeScene: SceneDescription = {
 
 export const fogcubeStrategy: RenderStrategy = {
     id: 'pathtracer',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.8 },
         maxBounces: 6,
-        directLighting: 'none',
-        russianRoulette: { enabled: false, startDepth: 0 },
     },
-    camera: { type: 'pinhole', fov: 0.8 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none',
+        russianRoulette: null,
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 // ---------------------------------------------------------------------------
@@ -143,15 +147,17 @@ export const furnaceScatterScene: SceneDescription = {
 
 export const furnaceScatterStrategy: RenderStrategy = {
     id: 'furnace-scatter',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 1.0 },
         maxBounces: 48, // medium events count (§7.2); truncation shows as mean < 0.4
-        directLighting: 'none',
-        russianRoulette: { enabled: false, startDepth: 0 }, // witness protocol: RR off
-        volumeIntegrator: 'analytic', // explicit (derived would say the same)
     },
-    camera: { type: 'pinhole', fov: 1.0 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none',
+        russianRoulette: null, // witness protocol: RR off
+        volumeSampling: 'analytic', // explicit (derived would say the same)
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 // ---------------------------------------------------------------------------
@@ -206,26 +212,30 @@ export const hazeScene: SceneDescription = {
 // by exactly the delta-light term.
 export const hazeNeeStrategy: RenderStrategy = {
     id: 'pt-nee',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.9 },
         maxBounces: 24,
-        directLighting: 'nee',
-        russianRoulette: { enabled: true, startDepth: 4 },
-        volumeIntegrator: 'analytic',
     },
-    camera: { type: 'pinhole', fov: 0.9 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'nee',
+        russianRoulette: { startDepth: 4 },
+        volumeSampling: 'analytic',
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 export const hazePtStrategy: RenderStrategy = {
     id: 'pt',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.9 },
         maxBounces: 24,
-        directLighting: 'none',
-        russianRoulette: { enabled: true, startDepth: 4 },
-        volumeIntegrator: 'analytic',
     },
-    camera: { type: 'pinhole', fov: 0.9 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none',
+        russianRoulette: { startDepth: 4 },
+        volumeSampling: 'analytic',
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };

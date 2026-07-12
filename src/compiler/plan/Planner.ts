@@ -212,42 +212,45 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // A samplable environment is a light for NEE purposes (T3) — an env-only scene under
     // 'nee'/'mis' gets the lighting infrastructure with an env-only lighting_sample.
     const hasLights = features.lighting.totalLightCount > 0 || features.environment.samplable;
-    const wantsNEE = strategy.transport.directLighting !== 'none' && hasLights;
+    const wantsNEE = strategy.estimator.directLighting !== 'none' && hasLights;
+
+    // Taxonomy §8 (the volumeIntegrator split): whether scattering is COMPUTED is a
+    // measurement truncation (scattering 'ignored' renders scattering media absorbing-only);
+    // HOW live scattering is sampled is the estimator's volumeSampling axis. Only 'analytic'
+    // survives the Validator, so the plan-side value stays 'none' | 'analytic'.
+    const scatteringLive = features.media.hasScatteringMedia
+        && (strategy.measurement.scattering ?? 'full') === 'full';
 
     return {
         intersection: { method: 'raymarch' },
         materials: { models: brdfModels },
         lighting: wantsNEE
             ? {
-                  method: strategy.transport.directLighting === 'mis' ? 'mis' : 'nee',
-                  selection: strategy.transport.lightSelection ?? 'power',
+                  method: strategy.estimator.directLighting === 'mis' ? 'mis' : 'nee',
+                  selection: strategy.estimator.lightSelection ?? 'power',
               }
             : null,
-        camera: strategy.camera.type === 'pinhole'
-            ? { type: 'pinhole', fov: strategy.camera.fov }
+        camera: strategy.measurement.camera.type === 'pinhole'
+            ? { type: 'pinhole', fov: strategy.measurement.camera.fov }
             : { type: 'pinhole', fov: Math.PI / 4 }, // fallback, validator catches unsupported
         transport: {
             type: 'pathtracer',
-            maxBounces: strategy.transport.maxBounces,
-            russianRoulette: strategy.transport.russianRoulette.enabled
-                ? { startDepth: strategy.transport.russianRoulette.startDepth }
-                : null,
-            // Volumetric-component §5: explicit strategy value or derived from scene content.
-            // Only 'none' | 'analytic' survive the Validator.
-            volumeIntegrator: strategy.transport.volumeIntegrator === 'none' || strategy.transport.volumeIntegrator === 'analytic'
-                ? strategy.transport.volumeIntegrator
-                : (features.media.hasScatteringMedia ? 'analytic' : 'none'),
+            maxBounces: strategy.measurement.maxBounces,
+            russianRoulette: strategy.estimator.russianRoulette,
+            volumeIntegrator: scatteringLive && (strategy.estimator.volumeSampling ?? 'analytic') === 'analytic'
+                ? 'analytic'
+                : 'none',
         },
-        accumulation: strategy.accumulation.type === 'exponential'
-            ? { type: 'exponential', alpha: strategy.accumulation.alpha }
-            : { type: strategy.accumulation.type },
-        tonemap: strategy.display.type === 'none'
+        accumulation: strategy.estimator.accumulation.type === 'exponential'
+            ? { type: 'exponential', alpha: strategy.estimator.accumulation.alpha }
+            : { type: strategy.estimator.accumulation.type },
+        tonemap: strategy.view.tonemap.type === 'none'
             ? { type: 'none' }
-            : { type: strategy.display.type, exposure: strategy.display.exposure },
+            : { type: strategy.view.tonemap.type, exposure: strategy.view.tonemap.exposure },
         environment: scene.environment ?? { type: 'none' },
         envSampler: {
-            chart: strategy.transport.envSampler ?? 'equirect',
-            compensation: strategy.transport.envCompensation ?? false,
+            chart: strategy.estimator.envSampler ?? 'equirect',
+            compensation: strategy.estimator.envCompensation ?? false,
         },
     };
 }

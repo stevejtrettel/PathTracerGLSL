@@ -248,28 +248,68 @@ export interface SphereLight {
 // Render Strategy
 // ============================================================================
 
+/**
+ * The strategy's three sections (fable-strategy-taxonomy.md — PINNED, July 2026):
+ * scene + measurement define the integral; estimator defines the computation (bias-free
+ * by contract — changing an estimator field must not change the converged image); view
+ * defines the presentation (applied to the converged linear HDR quantity only).
+ * Every new field declares its section; the section is its test contract (taxonomy §6.4).
+ */
 export interface RenderStrategy {
     id: string;
-    transport: TransportDescription;
-    camera: CameraDescription;
-    accumulation: AccumulationDescription;
-    display: DisplayDescription;
+    measurement: MeasurementDescription;
+    estimator: EstimatorDescription;
+    view: ViewDescription;
 }
 
-export interface TransportDescription {
+/**
+ * Defines the integral (with the scene): camera = the measurement functional W_j; the
+ * remaining fields are TRUNCATIONS — measurement fields carrying a declared exact limit
+ * (taxonomy §4, the bias ledger). Changing any field here changes what the render
+ * converges TO; accumulation reset is mandatory on change (taxonomy §6.2).
+ */
+export interface MeasurementDescription {
+    camera: CameraDescription;
+    /** Which functional each pixel reports. 'radiance' is the sole occupant; debug
+     *  measurements (§11.3 pdf-histogram, §11.4 repair counter, AO) arrive as new values. */
+    response?: 'radiance';
+    /** Truncation — limit: ∞ (Neumann partial sum; §7.2 counts surface + medium events). */
     maxBounces: number;
+    /** Truncation — limit: 'full'. 'ignored' renders scattering media absorbing-only
+     *  (the research A/B formerly expressed as volumeIntegrator 'none' on a scattering scene). */
+    scattering?: 'full' | 'ignored';
+    /** Truncation — limit: transparent-shadow refinement (contracts §10.2). The §6.3 v1
+     *  policy (shadow rays treat dielectric interfaces as opaque), now a DECLARED bias. */
+    shadows?: 'opaque-dielectrics';
+    /** Truncation — limit: 'spectral' (contracts §8). RGB transport is a biased surrogate
+     *  of spectral transport (projection does not commute with multiplication).
+     *  'spectral' is reserved: Validator-rejected until §8 lands. */
+    color?: 'rgb' | 'spectral';
+}
+
+/**
+ * Defines the computation: an unbiased sampling scheme for the measurement. No field here
+ * may change the converged image — cross-strategy convergence (§11.2) is the enforcement.
+ * Estimator fields are provably safe as live uniforms (taxonomy §6.3).
+ */
+export interface EstimatorDescription {
     directLighting: 'none' | 'nee' | 'mis';
     /** Light-selection metric for NEE (compile-time). 'power' importance-samples brighter
      *  lights (spectrum_average(color·intensity)); 'uniform' is the naive baseline. Default 'power'. */
     lightSelection?: 'uniform' | 'power';
-    russianRoulette: { enabled: boolean; startDepth: number };
+    /** null = off. Unbiased by construction (random termination WITH compensation) — the
+     *  taxonomy's canonical estimator-side termination, vs maxBounces' measurement-side one. */
+    russianRoulette: { startDepth: number } | null;
     /**
-     * Volume-integrator axis (§7.3, as amended by fable-volumetric-component.md §5). Default
-     * DERIVED from scene content (scattering media ? 'analytic' : 'none'). 'analytic' = the v1
-     * closed-form homogeneous body (V1-C1); 'raymarch' is reserved for honest biased marching;
-     * the null-collision pair needs majorants — all three rejected-not-removed.
+     * Volume distance-sampling method (§7.3 as amended by fable-volumetric-component.md §5),
+     * consulted only when scattering is live (measurement.scattering 'full' + scattering
+     * media present). 'analytic' = the v1 closed-form homogeneous body (V1-C1); 'raymarch'
+     * is reserved for honest biased marching; the null-collision pair needs majorants —
+     * all three rejected-not-removed. Default 'analytic'.
+     * (The old volumeIntegrator 'none' override moved to measurement.scattering: 'ignored' —
+     * it changes the integral, not the sampling; taxonomy §8.)
      */
-    volumeIntegrator?: 'none' | 'analytic' | 'raymarch' | 'delta-tracking' | 'ratio-tracking';
+    volumeSampling?: 'analytic' | 'raymarch' | 'delta-tracking' | 'ratio-tracking';
     /**
      * Environment-sampler chart (T5, plan D11 — a swappable strategy axis): 'equirect' is
      * pbrt-v3's sinθ-weighted CDF (default); 'octahedral' is pbrt-v4's equal-area mapping
@@ -283,6 +323,13 @@ export interface TransportDescription {
      * the deliberate pdf-0 regions are only unbiased when BSDF sampling covers them.
      */
     envCompensation?: boolean;
+    accumulation: AccumulationDescription;
+}
+
+/** Defines the presentation — applied to the converged linear HDR quantity only
+ *  (taxonomy §10: HDR export reads pre-tonemap accumulation, which IS this line). */
+export interface ViewDescription {
+    tonemap: DisplayDescription;
 }
 
 export type CameraDescription =

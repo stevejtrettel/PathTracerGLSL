@@ -8,8 +8,8 @@
 //   region machinery exists for). Lit by an EMISSIVE panel, deliberately: shadow rays are
 //   dielectric-opaque (§6.3), so a point light cannot NEE-light a glass-shelled volume — but
 //   BSDF/phase paths refract in, scatter, exit, and hit a big emitter just fine. Key 2 runs
-//   volumeIntegrator 'none': the same marble with scattering switched off (absorbing-only) —
-//   a live A/B of what the volume integrator adds.
+//   measurement.scattering 'ignored': the same marble with scattering switched off
+//   (absorbing-only) — a live A/B truncation (taxonomy §8) of what scattering adds.
 //
 //   mist — "Standing stones in morning mist." A ground-hugging fog LAYER (bounded null-
 //   interface box — an unbounded scattering ambient would extinguish the sky over MAX_DIST),
@@ -83,15 +83,17 @@ export const marbleScene: SceneDescription = {
 // Key 1: the full thing. Interior scattering needs depth (medium events count, §7.2).
 export const marbleStrategy: RenderStrategy = {
     id: 'pt',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.7 },
         maxBounces: 32,
-        directLighting: 'none', // no explicit lights; the panel is a path-only emitter
-        russianRoulette: { enabled: true, startDepth: 4 },
-        volumeIntegrator: 'analytic',
     },
-    camera: { type: 'pinhole', fov: 0.7 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none', // no explicit lights; the panel is a path-only emitter
+        russianRoulette: { startDepth: 4 },
+        volumeSampling: 'analytic',
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 // Key 2: scattering OFF — the same marble as absorbing-only tinted glass. What the volume
@@ -99,7 +101,7 @@ export const marbleStrategy: RenderStrategy = {
 export const marbleNoScatterStrategy: RenderStrategy = {
     ...marbleStrategy,
     id: 'pt-noscatter',
-    transport: { ...marbleStrategy.transport, volumeIntegrator: 'none' },
+    measurement: { ...marbleStrategy.measurement, scattering: 'ignored' },
 };
 
 // ---------------------------------------------------------------------------
@@ -169,13 +171,15 @@ export const mistScene: SceneDescription = {
 
 export const mistStrategy: RenderStrategy = {
     id: 'pt-nee',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 1.0 },
         maxBounces: 12, // shafts are 1–2 scatter events; ground bounce adds a few
-        directLighting: 'nee',
-        russianRoulette: { enabled: true, startDepth: 3 },
-        volumeIntegrator: 'analytic',
     },
-    camera: { type: 'pinhole', fov: 1.0 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'nee',
+        russianRoulette: { startDepth: 3 },
+        volumeSampling: 'analytic',
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };

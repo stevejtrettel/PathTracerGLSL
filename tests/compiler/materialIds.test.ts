@@ -6,10 +6,9 @@ import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.
 
 const strategy: RenderStrategy = {
     id: 'pt',
-    transport: { maxBounces: 4, directLighting: 'none', russianRoulette: { enabled: false, startDepth: 0 } },
-    camera: { type: 'pinhole', fov: 0.8 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    measurement: { camera: { type: 'pinhole', fov: 0.8 }, maxBounces: 4 },
+    estimator: { directLighting: 'none', russianRoulette: null, accumulation: { type: 'average' } },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 function sceneWithMaterials(order: string[]): SceneDescription {

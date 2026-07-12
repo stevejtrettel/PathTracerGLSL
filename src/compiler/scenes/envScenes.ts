@@ -44,14 +44,16 @@ export const skyScene: SceneDescription = {
 
 export const skyPtStrategy: RenderStrategy = {
     id: 'pt',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: { param: 'camera.fov', default: 0.9, min: 0.3, max: 1.5 } },
         maxBounces: 6,
-        directLighting: 'none',
-        russianRoulette: { enabled: true, startDepth: 3 },
     },
-    camera: { type: 'pinhole', fov: { param: 'camera.fov', default: 0.9, min: 0.3, max: 1.5 } },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none',
+        russianRoulette: { startDepth: 3 },
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 // T3: the env is samplable (image default) — pt-nee and pt-mis join as the X-ENV pair.
@@ -59,13 +61,13 @@ export const skyPtStrategy: RenderStrategy = {
 export const skyNeeStrategy: RenderStrategy = {
     ...skyPtStrategy,
     id: 'pt-nee',
-    transport: { ...skyPtStrategy.transport, directLighting: 'nee' },
+    estimator: { ...skyPtStrategy.estimator, directLighting: 'nee' },
 };
 
 export const skyMisStrategy: RenderStrategy = {
     ...skyPtStrategy,
     id: 'pt-mis',
-    transport: { ...skyPtStrategy.transport, directLighting: 'mis' },
+    estimator: { ...skyPtStrategy.estimator, directLighting: 'mis' },
 };
 
 // ---------------------------------------------------------------------------
@@ -99,26 +101,28 @@ export const furnaceSkyScene: SceneDescription = {
 
 export const furnaceSkyNeeStrategy: RenderStrategy = {
     id: 'pt-nee',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: { param: 'camera.fov', default: 0.8, min: 0.3, max: 1.5 } },
         maxBounces: 32,
-        directLighting: 'nee',
-        russianRoulette: { enabled: false, startDepth: 0 },
     },
-    camera: { type: 'pinhole', fov: { param: 'camera.fov', default: 0.8, min: 0.3, max: 1.5 } },
-    accumulation: { type: 'average' },
-    display: { type: 'none' },   // §11 on-screen radiance check: sky pixels read 1.0 exactly
+    estimator: {
+        directLighting: 'nee',
+        russianRoulette: null,
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'none' } },   // §11 on-screen radiance check: sky pixels read 1.0 exactly
 };
 
 export const furnaceSkyMisStrategy: RenderStrategy = {
     ...furnaceSkyNeeStrategy,
     id: 'pt-mis',
-    transport: { ...furnaceSkyNeeStrategy.transport, directLighting: 'mis' },
+    estimator: { ...furnaceSkyNeeStrategy.estimator, directLighting: 'mis' },
 };
 
 export const furnaceSkyPtStrategy: RenderStrategy = {
     ...furnaceSkyNeeStrategy,
     id: 'pt',
-    transport: { ...furnaceSkyNeeStrategy.transport, directLighting: 'none' },
+    estimator: { ...furnaceSkyNeeStrategy.estimator, directLighting: 'none' },
 };
 
 // ---------------------------------------------------------------------------
@@ -147,13 +151,13 @@ export const skyLampScene: SceneDescription = {
 export const skyLampNeeStrategy: RenderStrategy = {
     ...skyPtStrategy,
     id: 'pt-nee',
-    transport: { ...skyPtStrategy.transport, directLighting: 'nee' },
+    estimator: { ...skyPtStrategy.estimator, directLighting: 'nee' },
 };
 
 export const skyLampMisStrategy: RenderStrategy = {
     ...skyPtStrategy,
     id: 'pt-mis',
-    transport: { ...skyPtStrategy.transport, directLighting: 'mis' },
+    estimator: { ...skyPtStrategy.estimator, directLighting: 'mis' },
 };
 
 export const skyLampPtStrategy: RenderStrategy = {
@@ -202,11 +206,11 @@ export const procSkyPtStrategy: RenderStrategy = { ...skyPtStrategy };
 export const skyMisOctStrategy: RenderStrategy = {
     ...skyMisStrategy,
     id: 'pt-mis-oct',
-    transport: { ...skyMisStrategy.transport, envSampler: 'octahedral' },
+    estimator: { ...skyMisStrategy.estimator, envSampler: 'octahedral' },
 };
 
 export const procSkyMisCompStrategy: RenderStrategy = {
     ...procSkyMisStrategy,
     id: 'pt-mis-comp',
-    transport: { ...procSkyMisStrategy.transport, envCompensation: true },
+    estimator: { ...procSkyMisStrategy.estimator, envCompensation: true },
 };

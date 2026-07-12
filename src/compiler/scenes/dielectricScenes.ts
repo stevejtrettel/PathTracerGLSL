@@ -48,14 +48,16 @@ export const etaScene: SceneDescription = {
 // cos θ ≈ 0.9997 at the center pixel — within the ±1% tolerance of the normal-incidence number.
 export const etaStrategy: RenderStrategy = {
     id: 'pathtracer',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.6 },
         maxBounces: 4,
-        directLighting: 'none',
-        russianRoulette: { enabled: false, startDepth: 0 }, // witness protocol: RR off
     },
-    camera: { type: 'pinhole', fov: 0.6 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none',
+        russianRoulette: null, // witness protocol: RR off
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 // ---------------------------------------------------------------------------
@@ -106,14 +108,16 @@ export const submergedScene: SceneDescription = {
 
 export const submergedStrategy: RenderStrategy = {
     id: 'pathtracer',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.7 },
         maxBounces: 12, // TIR chains inside the sphere; paths that TIR at the pool walls just die
-        directLighting: 'none',
-        russianRoulette: { enabled: false, startDepth: 0 }, // witness protocol: RR off
     },
-    camera: { type: 'pinhole', fov: 0.7 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none',
+        russianRoulette: null, // witness protocol: RR off
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 // ---------------------------------------------------------------------------
@@ -179,12 +183,14 @@ export const analyticGlass: SceneDescription = {
 // generated material_has_nondelta_lobes guard skipping shadow rays at glass hits).
 export const glassStrategy: RenderStrategy = {
     id: 'pathtracer',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.8 },
         maxBounces: 12,
-        directLighting: 'nee',
-        russianRoulette: { enabled: true, startDepth: 3 },
     },
-    camera: { type: 'pinhole', fov: 0.8 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'nee',
+        russianRoulette: { startDepth: 3 },
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };

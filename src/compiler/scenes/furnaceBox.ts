@@ -51,13 +51,15 @@ export const furnaceBox: SceneDescription = {
 
 export const furnaceStrategy: RenderStrategy = {
     id: 'furnace',
-    transport: {
+    measurement: {
+        // Camera INSIDE the box at the origin, looking down -z. Any interior pose works.
+        camera: { type: 'pinhole', fov: 1.0 },
         maxBounces: 16, // ρ^17 truncation ~3e-6 — negligible vs the ±0.002 tolerance
-        directLighting: 'none', // emission is found by BSDF bounces; no NEE, no lights
-        russianRoulette: { enabled: false, startDepth: 0 }, // unbiased: RR adds variance the tolerance can't absorb
     },
-    // Camera INSIDE the box at the origin, looking down -z. Any interior pose works.
-    camera: { type: 'pinhole', fov: 1.0 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'none', // emission is found by BSDF bounces; no NEE, no lights
+        russianRoulette: null, // unbiased: RR adds variance the tolerance can't absorb
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };

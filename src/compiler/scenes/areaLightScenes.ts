@@ -39,26 +39,28 @@ export const cornellArea: SceneDescription = {
 
 export const cornellAreaNeeStrategy: RenderStrategy = {
     id: 'pt-nee',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: { param: 'camera.fov', default: 0.8, min: 0.3, max: 1.5 } },
         maxBounces: 10,
-        directLighting: 'nee',
-        russianRoulette: { enabled: true, startDepth: 3 },
     },
-    camera: { type: 'pinhole', fov: { param: 'camera.fov', default: 0.8, min: 0.3, max: 1.5 } },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'nee',
+        russianRoulette: { startDepth: 3 },
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 export const cornellAreaPtStrategy: RenderStrategy = {
     ...cornellAreaNeeStrategy,
     id: 'pt',
-    transport: { ...cornellAreaNeeStrategy.transport, directLighting: 'none' },
+    estimator: { ...cornellAreaNeeStrategy.estimator, directLighting: 'none' },
 };
 
 export const cornellAreaMisStrategy: RenderStrategy = {
     ...cornellAreaNeeStrategy,
     id: 'pt-mis',
-    transport: { ...cornellAreaNeeStrategy.transport, directLighting: 'mis' },
+    estimator: { ...cornellAreaNeeStrategy.estimator, directLighting: 'mis' },
 };
 
 // ---------------------------------------------------------------------------
@@ -108,19 +110,20 @@ export const fogArea: SceneDescription = {
 export const fogAreaNeeStrategy: RenderStrategy = {
     ...cornellAreaNeeStrategy,
     id: 'pt-nee',
-    transport: { ...cornellAreaNeeStrategy.transport, maxBounces: 16, volumeIntegrator: 'analytic' },
+    measurement: { ...cornellAreaNeeStrategy.measurement, maxBounces: 16 },
+    estimator: { ...cornellAreaNeeStrategy.estimator, volumeSampling: 'analytic' },
 };
 
 export const fogAreaMisStrategy: RenderStrategy = {
     ...fogAreaNeeStrategy,
     id: 'pt-mis',
-    transport: { ...fogAreaNeeStrategy.transport, directLighting: 'mis' },
+    estimator: { ...fogAreaNeeStrategy.estimator, directLighting: 'mis' },
 };
 
 export const fogAreaPtStrategy: RenderStrategy = {
     ...fogAreaNeeStrategy,
     id: 'pt',
-    transport: { ...fogAreaNeeStrategy.transport, directLighting: 'none' },
+    estimator: { ...fogAreaNeeStrategy.estimator, directLighting: 'none' },
 };
 
 // ---------------------------------------------------------------------------
@@ -201,18 +204,20 @@ export const orbScene: SceneDescription = {
 
 export const orbNeeStrategy: RenderStrategy = {
     id: 'pt-nee',
-    transport: {
+    measurement: {
+        camera: { type: 'pinhole', fov: 0.8 },
         maxBounces: 12,
-        directLighting: 'nee',
-        russianRoulette: { enabled: true, startDepth: 3 },
     },
-    camera: { type: 'pinhole', fov: 0.8 },
-    accumulation: { type: 'average' },
-    display: { type: 'reinhard' },
+    estimator: {
+        directLighting: 'nee',
+        russianRoulette: { startDepth: 3 },
+        accumulation: { type: 'average' },
+    },
+    view: { tonemap: { type: 'reinhard' } },
 };
 
 export const orbPtStrategy: RenderStrategy = {
     ...orbNeeStrategy,
     id: 'pt',
-    transport: { ...orbNeeStrategy.transport, directLighting: 'none' },
+    estimator: { ...orbNeeStrategy.estimator, directLighting: 'none' },
 };

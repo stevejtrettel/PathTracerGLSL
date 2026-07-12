@@ -42,11 +42,11 @@ export function validate(
             .add();
     }
 
-    if (strategy.transport.directLighting !== 'none'
+    if (strategy.estimator.directLighting !== 'none'
         && features.lighting.totalLightCount === 0
         && !features.environment.samplable) {
         bag.error('incompatible-options',
-            `Direct lighting '${strategy.transport.directLighting}' requested but scene has no lights (a samplable environment counts — image env, or constant with sampleAsLight: true)`)
+            `Direct lighting '${strategy.estimator.directLighting}' requested but scene has no lights (a samplable environment counts — image env, or constant with sampleAsLight: true)`)
             .add();
     }
 
@@ -217,16 +217,23 @@ export function validate(
 
     // T5: a compensated env table deliberately has pdf = 0 where L > 0 — unbiased ONLY when
     // BSDF sampling covers those directions with MIS weighting. NEE-only would lose energy.
-    if (strategy.transport.envCompensation === true && strategy.transport.directLighting !== 'mis') {
+    if (strategy.estimator.envCompensation === true && strategy.estimator.directLighting !== 'mis') {
         bag.error('incompatible-options',
-            `envCompensation requires directLighting 'mis' — a compensated importance table has deliberate pdf-0 regions that only MIS covers unbiasedly (got '${strategy.transport.directLighting}')`)
+            `envCompensation requires directLighting 'mis' — a compensated importance table has deliberate pdf-0 regions that only MIS covers unbiasedly (got '${strategy.estimator.directLighting}')`)
             .add();
     }
 
-    const vi = strategy.transport.volumeIntegrator;
-    if (vi === 'raymarch' || vi === 'delta-tracking' || vi === 'ratio-tracking') {
+    // Reserved strategy values (reject-not-remove — the axes exist in the types so the
+    // design surface is visible; the implementations arrive later).
+    const vs = strategy.estimator.volumeSampling;
+    if (vs === 'raymarch' || vs === 'delta-tracking' || vs === 'ratio-tracking') {
         bag.error('invalid-setting',
-            `volumeIntegrator '${vi}' not yet supported — homogeneous media (V1-C1) are exact under 'analytic' (closed-form sampling); 'raymarch' is reserved for biased marching and the null-collision pair needs majorants`)
+            `volumeSampling '${vs}' not yet supported — homogeneous media (V1-C1) are exact under 'analytic' (closed-form sampling); 'raymarch' is reserved for biased marching and the null-collision pair needs majorants`)
+            .add();
+    }
+    if (strategy.measurement.color === 'spectral') {
+        bag.error('invalid-setting',
+            `color 'spectral' not yet supported — hero-wavelength transport is contracts §8; 'rgb' is the sole implemented color model (reserved-not-removed)`)
             .add();
     }
 
@@ -274,15 +281,15 @@ export function validate(
         bag.warning('empty-scene', 'Scene has no objects — nothing will be rendered').add();
     }
 
-    // Check for unsupported accumulation/display types
-    if (strategy.accumulation.type !== 'average') {
+    // Check for unsupported accumulation/tonemap types
+    if (strategy.estimator.accumulation.type !== 'average') {
         bag.error('invalid-setting',
-            `Accumulation type '${strategy.accumulation.type}' not yet supported`)
+            `Accumulation type '${strategy.estimator.accumulation.type}' not yet supported`)
             .add();
     }
-    if (strategy.display.type !== 'reinhard' && strategy.display.type !== 'none') {
+    if (strategy.view.tonemap.type !== 'reinhard' && strategy.view.tonemap.type !== 'none') {
         bag.error('invalid-setting',
-            `Display/tonemap type '${strategy.display.type}' not yet supported`)
+            `Display/tonemap type '${strategy.view.tonemap.type}' not yet supported`)
             .add();
     }
 
