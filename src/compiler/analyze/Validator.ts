@@ -277,12 +277,23 @@ export function validate(
                 .add();
         }
 
+        // GGX roughness sanity: alpha = roughness² is clamped ≥ 1e-3 in ggx.glsl — a
+        // roughness authored below ~0.032 silently renders rougher than asked; a true
+        // mirror is a delta model (§3.1), not GGX at 0.
+        if (mat.model === 'ggx' && typeof mat.roughness === 'number') {
+            if (mat.roughness < 0.032 || mat.roughness > 1.0) {
+                bag.warning('invalid-setting',
+                    `Material '${name}': ggx roughness ${mat.roughness} outside [0.032, 1] — below the alpha clamp it renders as 0.032; mirrors belong to a delta model (§3.1)`)
+                    .add();
+            }
+        }
+
         // Schema discipline (R2, the C5 silent-inert class): a {param}-DRIVEN property the
         // material's model doesn't read would be a live knob wired to nothing — warn.
         // (Constants on undeclared fields stay silent: harmless authoring slack.)
         if (mat.model !== 'none') {
             const declared = new Set(MATERIAL_MODELS[mat.model]?.properties.map((f) => f.source as string) ?? []);
-            for (const prop of ['albedo', 'emission', 'roughness', 'transmittance', 'ior'] as const) {
+            for (const prop of ['albedo', 'emission', 'roughness', 'f0', 'transmittance', 'ior'] as const) {
                 const value = mat[prop];
                 if (value !== undefined && isValueParam(value) && !declared.has(prop)) {
                     bag.warning('invalid-setting',

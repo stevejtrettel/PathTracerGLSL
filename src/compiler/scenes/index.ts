@@ -18,6 +18,7 @@ import {
     twoLightUniformStrategy,
 } from './twoLightScene.js';
 import { furnaceBox, furnaceStrategy } from './furnaceBox.js';
+import { veachMis, veachMisStrategy, veachNeeStrategy, veachPtStrategy } from './ggxScenes.js';
 import { analyticMinimal, mixedScene, analyticStrategy } from './analyticScenes.js';
 import {
     etaScene,
@@ -369,6 +370,18 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             'camera.position': [0, 1.3, 3.4],
             'camera.target': [0, 0.7, 0],
+        },
+    },
+    'veach-mis': {
+        scene: veachMis,
+        strategies: [veachMisStrategy, veachNeeStrategy, veachPtStrategy],
+        exercises:
+            'GGX (first glossy BSDF: VNDF sampling, Smith G, Schlick F) under the classic Veach MIS geometry — four roughness steps × three light sizes at ~equal power; the power heuristic at both scoring sites with a peaked non-delta pdf',
+        expected:
+            'keys 1 (pt-mis), 2 (pt-nee), 3 (pt) converge to the SAME image (§11.2); pt-mis is visibly lowest-variance on EVERY plate — pt-nee fireflies on smooth-plate × big-light, pt fireflies on rough-plate × small-light; divergence implicates ggx_pdf/ggx_sample agreement (§11.3) or the MIS weights',
+        initialParameters: {
+            'camera.position': [0, 1.3, 5.5],
+            'camera.target': [0, 0.55, 0],
         },
     },
 };

@@ -3,6 +3,7 @@
 import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
+import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
 
@@ -21,7 +22,8 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             model: mat.model,
             albedo: resolveColorProperty(mat.albedo, [0.8, 0.8, 0.8]),
             emission: resolveColorProperty(mat.emission, [0.0, 0.0, 0.0]),
-            roughness: resolveScalarProperty(mat.roughness, 1.0),
+            roughness: resolveScalarProperty(mat.roughness, 0.5),   // matches ggx's schema default
+            f0: resolveColorProperty(mat.f0, [0.9, 0.9, 0.9]),
             transmittance: resolveColorProperty(mat.transmittance, [1.0, 1.0, 1.0]),
             // Non-dielectrics default to 1.0 (vacuum-like): ior_of is only physically meaningful
             // for regions a transmitted ray can enter; opaque solids must not bend η ratios.
@@ -108,6 +110,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 albedo: [0.0, 0.0, 0.0],
                 emission: radiance,
                 roughness: 1.0,
+                f0: [0.9, 0.9, 0.9],
                 transmittance: [1.0, 1.0, 1.0],
                 ior: 1.0,
                 medium: null,
@@ -196,17 +199,17 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // ============================================================================
 
 function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[]): ProgramDescription {
-    // Surface models only — 'none' is a boundary classification (§3.6), never a dispatch arm;
-    // 'emissive' is Validator-rejected (review C4) so it can't reach here.
-    const brdfModels: MaterialModel[] = [];
-    if (features.materials.hasLambert) brdfModels.push('lambert');
-    if (features.materials.hasDisney) brdfModels.push('disney');
-    if (features.materials.hasDielectric) brdfModels.push('dielectric');
+    // Surface models only, REGISTRY-DRIVEN (the extension-cost rule: adding a model must not
+    // touch this site). 'none' is a boundary classification (§3.6) and 'emissive' is
+    // Validator-rejected (C4) — neither is a registry key, so both fall out of the filter.
+    // Registry insertion order pins the dispatch order (deterministic snapshots).
+    const present = new Set(Object.values(scene.materials).map((m) => m.model));
     // Desugared area lights synthesize lambert emitter materials — a lambert-free scene with a
     // quad light still needs the lambert arms (else the emitter dispatches to a wrong fallback).
-    if (!brdfModels.includes('lambert') && scene.lights.some((l) => l.kind === 'quad' || l.kind === 'sphere')) {
-        brdfModels.push('lambert');
+    if (scene.lights.some((l) => l.kind === 'quad' || l.kind === 'sphere')) {
+        present.add('lambert');
     }
+    const brdfModels = (Object.keys(MATERIAL_MODELS) as MaterialModel[]).filter((m) => present.has(m));
 
     // A samplable environment is a light for NEE purposes (T3) — an env-only scene under
     // 'nee'/'mis' gets the lighting infrastructure with an env-only lighting_sample.

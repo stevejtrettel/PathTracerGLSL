@@ -163,6 +163,7 @@ export interface PlannedMaterial {
     albedo: Vec3 | GlslExpression | ValueParam<Vec3>;
     emission: Vec3 | GlslExpression | ValueParam<Vec3>;
     roughness: number | GlslExpression | ValueParam<number>;
+    f0: Vec3 | GlslExpression | ValueParam<Vec3>;               // ggx normal-incidence reflectance
     transmittance: Vec3 | GlslExpression | ValueParam<Vec3>;    // dielectric interface tint
     ior: number | GlslExpression | ValueParam<number>;          // → generated ior_of table (expressions rejected)
     medium: PlannedMedium | null;                               // interior medium (§3.5); null = no medium block

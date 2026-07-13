@@ -11,7 +11,7 @@
 - §3 F-ETA (`eta`) ✓ 0.5542 (re-verified after the emission gate landed).
 - §4 X-CORNELL (`cornell-area`) ✓ three-way pt/pt-nee/pt-mis; X-GLASS (`cornell-area-glass`) ✓ three-way; X-FOG (`fog-area`) ✓ three-way — implemented with a point light REPLACED by the quad per this doc, haze per this doc.
 - §5 R-SUBMERGED (`submerged`) ✓; R-FOGCUBE (`fogcube`, absorbing variant) ✓ no rim. R-CUP: not yet built (multi-region objects unimplemented).
-- §6 H (pdf-histogram): not yet built — first customers HG, then GGX, unchanged.
+- §6 H (pdf-histogram): GGX instance ✓ in the TS-TWIN form (`src/components/materials/ggx/ggx.test.ts` — χ² over the spec grid with adaptive per-bin expected integration [plain midpoint under-resolves the roughness-0.1 lobe and fails spuriously], the weight·pdf ≈ eval·|cos| triple, sample/query pdf agreement). The generated-debug-STRATEGY form of this section stays deferred; HG's instance not yet built. Veach witness: `veach-mis` in the suite (pt/pt-nee/pt-mis; converged §11.2 equality = owner check).
 
 ---
 

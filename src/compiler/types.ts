@@ -169,7 +169,7 @@ export function isGlslExpression(v: unknown): v is GlslExpression {
 // 'none' = no optical surface (§3.6): the region's boundary is a null interface — requires a
 // medium block (an invisible object with no medium is an authoring error, Validator-enforced).
 // 'emissive' is rejected by the Validator (review C4) — use emission on a surface model instead.
-export type MaterialModel = 'lambert' | 'disney' | 'dielectric' | 'emissive' | 'none';
+export type MaterialModel = 'lambert' | 'disney' | 'dielectric' | 'ggx' | 'emissive' | 'none';
 
 /**
  * Medium of the region's INTERIOR (§3.5) — "materials of the interior". Homogeneous (V1-C1):
@@ -188,7 +188,8 @@ export interface MediumDescription {
 export interface MaterialDescription {
     model: MaterialModel;
     albedo?: MaterialProperty;
-    roughness?: MaterialProperty;
+    roughness?: MaterialProperty;    // ggx: alpha = roughness², clamped ≥ 1e-3 (mirrors are a delta model)
+    f0?: MaterialProperty;           // ggx: normal-incidence reflectance — the conductor's color
     ior?: MaterialProperty;          // dielectric: region's interior IOR (→ generated ior_of table)
     transmittance?: MaterialProperty; // dielectric: interface tint; interior absorption is the medium's job (§4.4)
     emission?: MaterialProperty;

@@ -6,10 +6,12 @@ import type { MaterialModel } from '../../compiler/types.js';
 import type { MaterialModelDescriptor } from '../descriptors.js';
 import { lambertDescriptor } from './lambert.js';
 import { dielectricDescriptor } from './dielectric.js';
+import { ggxDescriptor } from './ggx/ggx.js';
 
 export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescriptor>> = {
     lambert: lambertDescriptor,
     dielectric: dielectricDescriptor,
+    ggx: ggxDescriptor,
 };
 
 /** Lookup that throws on unregistered models — the Validator rejects them upstream
