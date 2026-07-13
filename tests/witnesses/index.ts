@@ -3,7 +3,7 @@
 //
 // This is the durable test system, NOT the demo gallery. Everything here — scenes,
 // strategies, checks, camera poses — is owned by the witness system: fixtures live in
-// ./scenes/, and nothing in src/compiler/scenes/ (the replaceable demo layer) may be
+// ./scenes/, and nothing in demos/ (the replaceable demo layer) may be
 // referenced from here. The demo gallery MERGES this registry into its own for
 // display, so every witness stays viewable/orbitable in the lab; the dependency
 // direction is demos → witnesses, never the reverse.

@@ -1,4 +1,4 @@
-// compiler/scenes/furnaceBox.ts
+// tests/witnesses/scenes/furnaceBox.ts
 // The analytic furnace — F-BOX from docs/fable-validation-scenes.md §1.
 //
 // "The single most valuable test in this document." A closed box whose every face has
@@ -21,7 +21,7 @@
 // Plane convention (matches cornellBox.ts): sdf = dot(p, normal) + offset, normals point
 // INWARD, so the interior is the intersection of six half-spaces — here the cube [-1,1]³.
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
 export const furnaceBox: SceneDescription = {
     id: 'furnace',

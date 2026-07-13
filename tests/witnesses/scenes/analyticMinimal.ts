@@ -1,7 +1,7 @@
 // witnesses/scenes/analyticMinimal.ts
 // The analytic-backend twin fixture (docs/impl-plan-analytic-backend.md).
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
 // Cross-method twin of `minimalScene`: identical geometry/materials/lights, but every object is
 // intersected ANALYTICALLY instead of by SDF marching. It must converge to the SAME image as the

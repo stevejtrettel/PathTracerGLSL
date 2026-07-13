@@ -1,14 +1,14 @@
 /**
  * Scene Lab
  *
- * Renders any scene from the suite (src/compiler/scenes/index.ts):
+ * Renders any scene from the merged suite (pages/registry.ts — witnesses + demos):
  * /lab.html?scene=furnace  (default: two-light). Strategies bind to keys 1-9; `r` resets
- * accumulation. The landing page (index.html and /suite.html) is the suite GALLERY
- * (examples/suite.ts) — every card links here.
+ * accumulation. The landing page (index.html, served at /) is the suite GALLERY
+ * (pages/suite.ts) — every card links here.
  */
 
 import { App } from '../src/app/index.js';
-import { sceneSuite, witnessSuite, DEFAULT_SCENE } from '../src/compiler/scenes/index.js';
+import { sceneSuite, witnessSuite, DEFAULT_SCENE } from './registry.js';
 import {
     OrbitControls,
     ParameterPanelExtension,
@@ -25,7 +25,7 @@ async function main() {
 
     console.log(`=== Scene Lab: ${id} ===`);
     console.log(`Exercises: ${entry.exercises}`);
-    console.log(`Available scenes: ${Object.keys(sceneSuite).join(', ')} (switch with ?scene=<id>; gallery at /suite.html)`);
+    console.log(`Available scenes: ${Object.keys(sceneSuite).join(', ')} (switch with ?scene=<id>; gallery at /)`);
 
     const app = App.create(document.body, { layout: 'fullscreen' });
 

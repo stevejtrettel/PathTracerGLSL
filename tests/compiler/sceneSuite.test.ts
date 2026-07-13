@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
-import { sceneSuite, DEFAULT_SCENE } from '../../src/compiler/scenes/index.js';
+import { sceneSuite, DEFAULT_SCENE } from '../../pages/registry.js';
 
 describe('scene suite', () => {
     it('DEFAULT_SCENE is a registered scene', () => {

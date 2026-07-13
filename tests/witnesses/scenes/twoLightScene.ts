@@ -1,4 +1,4 @@
-// compiler/scenes/twoLightScene.ts
+// tests/witnesses/scenes/twoLightScene.ts
 // Two point lights (warm + cool) over a floor with two diffuse spheres.
 //
 // Purpose: the FIRST scene to exercise the multi-light path (§10.1 item 3). With two
@@ -12,7 +12,7 @@
 // spp). Load both strategies and A/B them with keys 1 (power) / 2 (uniform); with unequal
 // light powers, `power` should be visibly cleaner at equal sample count.
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
 export const twoLightScene: SceneDescription = {
     id: 'two-light',

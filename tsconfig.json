@@ -21,7 +21,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "tests", "examples"],
-  // ui-layout-demo predates the compiler (STRATEGY_PRESETS relic) — excluded, not fixed
-  "exclude": ["examples/ui-layout-demo.ts"]
+  "include": ["src", "tests", "pages"]
 }

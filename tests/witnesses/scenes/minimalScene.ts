@@ -1,7 +1,7 @@
-// compiler/scenes/minimalScene.ts
+// tests/witnesses/scenes/minimalScene.ts
 // Minimal test scene: sphere on a ground plane, one point light, Lambert materials
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
 export const minimalScene: SceneDescription = {
     id: 'minimal',

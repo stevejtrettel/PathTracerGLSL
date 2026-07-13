@@ -1,4 +1,4 @@
-// compiler/scenes/areaLightScenes.ts
+// tests/witnesses/scenes/areaLightScenes.ts
 // Phase-A area-light witnesses (impl-plan-area-lights A5):
 //   cornell-area — X-CORNELL (validation §4): the Cornell box with the point light replaced by
 //                  a CEILING QUAD (explicit-light route → desugars to a synthesized emissive
@@ -11,7 +11,7 @@
 //                  with a matte box and a glass sphere. Same pt-nee vs pt convergence pair;
 //                  the orb must appear in the glass reflections (hittable-emitter invariant).
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 import { cornellBox } from './cornellBox.js';
 
 // ---------------------------------------------------------------------------

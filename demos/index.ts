@@ -1,17 +1,11 @@
-// compiler/scenes/index.ts
-// The DEMO registry — replaceable scenes made while testing and building. Churn freely:
-// nothing in the witness system depends on this layer. The durable GPU tests live in
-// src/witnesses/ (one-way dependency: demos may import witness fixtures, never the
-// reverse), and `sceneSuite` below is the MERGED view the gallery and lab render —
-// every witness stays viewable, keys 1-9 bind strategies in order, ?scene=<id> works
-// for both kinds. Test coverage: sceneSuite.test.ts iterates EVERY (scene, strategy)
-// pair of the merged suite (compile-smoke + ID convention); the golden snapshot test
-// keeps its own explicit case list — keep it in sync when adding pairs here.
+// demos/index.ts — the DEMO registry: replaceable scenes made while testing and
+// building. Churn freely — nothing outside this folder depends on any entry here.
+// The durable GPU tests live in tests/witnesses/ (demos may borrow witness fixtures,
+// never the reverse), and pages/registry.ts merges both suites into the view the
+// gallery and lab render.
 
-import type { SceneSuiteEntry } from '../../witnesses/types.js';
-import { witnessSuite } from '../../witnesses/index.js';
-
-import { cornellBox, cornellStrategy } from '../../witnesses/scenes/cornellBox.js';
+import type { SceneSuiteEntry } from '../tests/witnesses/types.js';
+import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBox.js';
 import { mixedScene, analyticStrategy } from './analyticScenes.js';
 import { submergedScene, submergedStrategy } from './dielectricScenes.js';
 import { fogcubeScene, fogcubeStrategy } from './mediaScenes.js';
@@ -23,11 +17,7 @@ import {
     mistStrategy,
 } from './demoScenes.js';
 
-// Re-exported so gallery/lab/tests keep one import point for the entry shape.
-export type { SceneSuiteEntry, WitnessCheck, WitnessSpec, WitnessRegion } from '../../witnesses/types.js';
-export { witnessSuite };
-
-const demoSuite: Record<string, SceneSuiteEntry> = {
+export const demoSuite: Record<string, SceneSuiteEntry> = {
     cornell: {
         scene: cornellBox,
         strategies: [cornellStrategy],
@@ -95,11 +85,3 @@ const demoSuite: Record<string, SceneSuiteEntry> = {
         },
     },
 };
-
-/** The merged suite the gallery and lab render: witnesses first, then demos. */
-export const sceneSuite: Record<string, SceneSuiteEntry> = {
-    ...witnessSuite,
-    ...demoSuite,
-};
-
-export const DEFAULT_SCENE = 'two-light';

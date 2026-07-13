@@ -1,4 +1,4 @@
-// compiler/scenes/demoScenes.ts
+// demos/demoScenes.ts
 // Photorealistic demos from simple primitives (spheres/boxes/planes) + the media features.
 // These are AESTHETIC scenes, not witnesses — their `expected` describes the look, and each
 // is designed around the v1 physics constraints rather than against them:
@@ -18,7 +18,7 @@
 //   cool constant sky. Aerial perspective fades the far stones. The camera sits INSIDE the
 //   fog volume — the scene that gave §4.4's classification-init its reader.
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 
 // ---------------------------------------------------------------------------
 // marble — storm marble on a light table

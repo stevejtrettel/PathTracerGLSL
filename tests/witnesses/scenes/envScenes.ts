@@ -1,11 +1,11 @@
-// compiler/scenes/envScenes.ts
+// tests/witnesses/scenes/envScenes.ts
 // Environment-as-light scenes (impl-plan-env-as-light):
 //   sky — T2 witness: an `image` environment (equirect HDRI via extern:env_map) as the miss
 //         radiance. BSDF-only transport (the env is not samplable until T3), so the sky lights
 //         the scene exclusively through pt paths — exactly the old reference behavior, now
 //         through the compiler + the §2.10 extern chain.
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
 export const skyScene: SceneDescription = {
     id: 'sky',

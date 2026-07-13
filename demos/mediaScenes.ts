@@ -1,10 +1,10 @@
-// compiler/scenes/mediaScenes.ts
+// demos/mediaScenes.ts
 // R-FOGCUBE (validation §5, absorbing variant): a gray absorber cube over an emissive
 // checker floor. The silhouette edge must show NO Fresnel-like rim (a rim = the null
 // interface leaked a BSDF). Eyeball-only — the numeric media witnesses (F-SLAB,
 // F-BOX-M, haze) live in src/witnesses/scenes/mediaWitness.ts.
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 
 // ---------------------------------------------------------------------------
 // R-FOGCUBE (absorbing variant) — gray absorber cube floating over an emissive

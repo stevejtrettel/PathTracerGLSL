@@ -9,7 +9,7 @@
 //                    (cross-backend convergence twin; interior far-root path).
 // (R-SUBMERGED, the eyeball-only sibling, stays in compiler/scenes/dielectricScenes.ts.)
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
 // ---------------------------------------------------------------------------
 // F-ETA — emissive plane under a flat water surface, camera in air looking down.

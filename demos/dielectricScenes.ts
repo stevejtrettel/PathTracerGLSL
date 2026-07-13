@@ -1,11 +1,11 @@
-// compiler/scenes/dielectricScenes.ts
+// demos/dielectricScenes.ts
 // R-SUBMERGED (validation §5): glass sphere inside a water pool, camera in the water.
 // Under the old deepest-wins classification the sphere gets η = 1 and is perfectly
 // invisible; under innermost-wins it visibly distorts the checker. Eyeball-only —
 // the numeric dielectric witnesses (F-ETA, the glass twins) live in
 // src/witnesses/scenes/dielectricWitness.ts.
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 
 // ---------------------------------------------------------------------------
 // R-SUBMERGED — pool box (half-extent 5, ior 1.33) + glass sphere (r 0.4, ior 1.5) at its

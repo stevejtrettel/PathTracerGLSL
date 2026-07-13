@@ -4,7 +4,7 @@ The durable, executable form of `docs/fable-validation-scenes.md`: every derived
 number and convergence equality the project has proven, as fixtures + machine-readable
 checks that `npm run witness` (tools/witness.mjs) renders headless and asserts.
 
-**This is NOT the demo gallery.** `src/compiler/scenes/` is the replaceable layer —
+**This is NOT the demo gallery.** `demos/` is the replaceable layer —
 scenes made while building and testing, free to churn or be deleted. Everything a
 witness needs (scene, strategies, checks, camera pose) is owned HERE, under
 `scenes/`, so no demo churn can silently lose a regression test. The dependency

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // tools/witness.mjs — the automated witness runner (`npm run witness`).
 //
-// Renders every suite scene that declares a `witness` spec (src/compiler/scenes/index.ts)
-// in headless Chromium (WebGL2 via SwiftShader), reads back LINEAR HDR floats from the
-// accumulation buffer, asserts the machine-readable checks, and prints a pass/fail table.
+// Renders every entry of the witness registry (tests/witnesses/index.ts — the durable
+// GPU test system) in headless Chromium (WebGL2 via SwiftShader), reads back LINEAR HDR
+// floats from the accumulation buffer, asserts the machine-readable checks, and prints
+// a pass/fail table.
 //
 // This is deliberately NOT in vitest/CI: it needs minutes and a (software) GPU. Run it
 // before/after transport-adjacent batches. glslang in vitest remains the static gate;

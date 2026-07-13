@@ -1,10 +1,10 @@
-// compiler/scenes/analyticScenes.ts
+// demos/analyticScenes.ts
 // Demo scene exercising the combined scene_intersect dispatcher — see
 // docs/impl-plan-analytic-backend.md. The analytic twin fixture (analytic-minimal)
 // lives in src/witnesses/scenes/analyticMinimal.ts; this demo borrows its strategy.
 
-import type { SceneDescription } from '../types.js';
-import { analyticStrategy } from '../../witnesses/scenes/analyticMinimal.js';
+import type { SceneDescription } from '../src/compiler/types.js';
+import { analyticStrategy } from '../tests/witnesses/scenes/analyticMinimal.js';
 
 export { analyticStrategy };
 

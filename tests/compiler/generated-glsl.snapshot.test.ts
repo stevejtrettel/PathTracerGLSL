@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
 import type { CompiledRenderer, SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
-import { minimalScene, minimalStrategy, directOnlyStrategy } from '../../src/witnesses/scenes/minimalScene.js';
-import { cornellBox, cornellStrategy } from '../../src/witnesses/scenes/cornellBox.js';
-import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '../../src/witnesses/scenes/twoLightScene.js';
-import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from '../../src/witnesses/scenes/furnaceBox.js';
-import { analyticMinimal, analyticStrategy } from '../../src/witnesses/scenes/analyticMinimal.js';
-import { mixedScene } from '../../src/compiler/scenes/analyticScenes.js';
-import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from '../../src/witnesses/scenes/dielectricWitness.js';
-import { submergedScene, submergedStrategy } from '../../src/compiler/scenes/dielectricScenes.js';
-import { slabScene, slabStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../../src/witnesses/scenes/mediaWitness.js';
-import { fogcubeScene, fogcubeStrategy } from '../../src/compiler/scenes/mediaScenes.js';
-import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistStrategy } from '../../src/compiler/scenes/demoScenes.js';
-import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy, fogPanel, orbScene, orbNeeStrategy, orbPtStrategy } from '../../src/witnesses/scenes/areaLightScenes.js';
-import { skyScene, skyPtStrategy, skyNeeStrategy, skyMisOctStrategy, furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, skyLampScene, skyLampMisStrategy, procSkyScene, procSkyNeeStrategy, procSkyMisCompStrategy } from '../../src/witnesses/scenes/envScenes.js';
+import { minimalScene, minimalStrategy, directOnlyStrategy } from '../witnesses/scenes/minimalScene.js';
+import { cornellBox, cornellStrategy } from '../witnesses/scenes/cornellBox.js';
+import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '../witnesses/scenes/twoLightScene.js';
+import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from '../witnesses/scenes/furnaceBox.js';
+import { analyticMinimal, analyticStrategy } from '../witnesses/scenes/analyticMinimal.js';
+import { mixedScene } from '../../demos/analyticScenes.js';
+import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from '../witnesses/scenes/dielectricWitness.js';
+import { submergedScene, submergedStrategy } from '../../demos/dielectricScenes.js';
+import { slabScene, slabStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../witnesses/scenes/mediaWitness.js';
+import { fogcubeScene, fogcubeStrategy } from '../../demos/mediaScenes.js';
+import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistStrategy } from '../../demos/demoScenes.js';
+import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy, fogPanel, orbScene, orbNeeStrategy, orbPtStrategy } from '../witnesses/scenes/areaLightScenes.js';
+import { skyScene, skyPtStrategy, skyNeeStrategy, skyMisOctStrategy, furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, skyLampScene, skyLampMisStrategy, procSkyScene, procSkyNeeStrategy, procSkyMisCompStrategy } from '../witnesses/scenes/envScenes.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the

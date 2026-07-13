@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { Compiler } from '../../src/compiler/Compiler.js';
-import { sceneSuite } from '../../src/compiler/scenes/index.js';
+import { witnessSuite } from '../witnesses/index.js';
+import { demoSuite } from '../../demos/index.js';
+
+// Codegen coverage spans BOTH registries: the durable witnesses and the demo layer.
+const sceneSuite = { ...witnessSuite, ...demoSuite };
 
 /**
  * Static compile check for every generated shader (impl-plan-decision-hoist T3).

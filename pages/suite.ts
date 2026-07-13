@@ -1,17 +1,17 @@
 /**
- * Scene Suite gallery — /suite.html
+ * Scene Suite gallery — the landing page (index.html, served at /)
  *
- * Lists every scene in the suite (src/compiler/scenes/index.ts) with what it exercises and
- * its pass criterion; click a card to build + render it in the lab (lab.html?scene=<id>).
- * Deliberately a plain static page: each scene opens with a fresh page load, so compiles are
- * isolated and the ErrorOverlay catches each scene's errors on its own.
+ * Lists every scene in the merged suite (pages/registry.ts — witnesses + demos)
+ * with what it exercises and its pass criterion; click a card to build + render it in the
+ * lab (lab.html?scene=<id>). Deliberately a plain static page: each scene opens with a
+ * fresh page load, so compiles are isolated and the ErrorOverlay catches each scene's
+ * errors on its own.
  *
- * This page is the seed of the §11 validation harness (fable-validation-scenes §7 "start
- * manual"): the `expected` lines shown here are the criteria a future Run-checks button will
- * assert against the HDR export, per scene, in place.
+ * The automated form of the `expected` lines lives in src/witnesses/ and runs via
+ * `npm run witness` (the §11 harness, built July 2026).
  */
 
-import { sceneSuite } from '../src/compiler/scenes/index.js';
+import { sceneSuite } from './registry.js';
 
 const style = document.createElement('style');
 style.textContent = `

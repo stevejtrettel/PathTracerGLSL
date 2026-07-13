@@ -1,10 +1,12 @@
 # PathTracerGLSL
 
-A WebGL2 path tracer with a three-layer architecture (Compiler → Engine → App) designed for flexibility and real-time experimentation.
+A WebGL2 **research path tracer** with a four-layer architecture (App → Engine → Compiler → Components) designed for swappable rendering research: exchange material models, transport techniques, and estimators from a registry, with a numeric witness suite guarding correctness.
 
 ## Status
 
-The **App** and **Engine** layers are complete. The **Compiler** layer contains a first vertical slice ("step zero"): a genuine Analyze → Validate → Plan → Generate pipeline (`src/compiler/`) that generates GLSL from scene descriptions — but only for the minimal case (Euclidean space, SDF sphere/plane/box, Lambert, point lights + NEE, pinhole, average accumulation, Reinhard). **The real compiler — volumes, swappable material/transport models, multi-region objects, curved spaces — is the work ahead**, designed and pinned in [docs/fable-compiler-contracts.md](docs/fable-compiler-contracts.md) with its §10.1 migration roadmap as the implementation sequence. The old `SimpleCompiler` (hardcoded GLSL) lives in `reference/` as source material only.
+All four layers are live. The **Compiler** (Analyze → Validate → Plan → Generate) emits a bespoke, function-shaped GLSL program per scene×strategy pair; **Components** (`src/components/`) is the swappable research library — materials (Lambert, smooth dielectric with the η² factor, GGX), homogeneous media (null interfaces, chromatic channel-MIS sampling, HG phase, equiangular NEE), area lights with full MIS, samplable environments (image + procedural, equirect/octahedral charts), and the generated transport loop. **Adding a material model or sampling technique is one folder + one registry line.** The measurement side is built too: `npm run witness` renders the durable GPU test registry (`tests/witnesses/` — furnace/Beer–Lambert/η² exact numbers, cross-strategy convergence gates, equal-spp noise comparisons) and every export embeds a reproducibility stamp (scene, strategy, parameters, spp, RNG salt, git hash).
+
+Still Euclidean-only: heterogeneous media and curved spaces (H³, black-hole metrics) are the road ahead — their seams are pinned in [docs/fable-compiler-contracts.md](docs/fable-compiler-contracts.md).
 
 See [docs/README.md](docs/README.md) for the documentation map and [CLAUDE.md](CLAUDE.md) for agent onboarding.
 
@@ -12,12 +14,13 @@ See [docs/README.md](docs/README.md) for the documentation map and [CLAUDE.md](C
 
 ```bash
 npm install
-npm run dev     # Dev server on port 3000
-npm run build   # Production build
-npm run test    # Run tests
+npm run dev      # Dev server on port 3000 — the scene-suite gallery
+npm run witness  # Numeric GPU test suite, headless (minutes; scene filters: npm run witness -- furnace eta)
+npx vitest run   # Structure tests + glslang static compile of every registry pair
+npm run build    # Production build
 ```
 
-Open the dev server and you'll see a Cornell Box path tracer with interactive controls.
+Open the dev server and you'll see the scene-suite gallery: witness scenes (each card states its derived pass criterion) plus demos. Click a card to render it in the lab — orbit controls, keys 1-9 switch estimators, `r` resets accumulation.
 
 ## Architecture
 
@@ -46,6 +49,14 @@ Open the dev server and you'll see a Cornell Box path tracer with interactive co
 │  Compiler: Analyze → Validate → Plan → Generate       │
 │  SceneDescription + RenderStrategy → CompiledRenderer │
 └──────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────┐
+│                 COMPONENTS LAYER (leaf)               │
+│  src/components/ — the swappable research library:    │
+│  materials, lights, phase, geometry, transport, env,  │
+│  sampler, camera, film — GLSL occupants + registries  │
+└──────────────────────────────────────────────────────┘
 ```
 
 `App` is a thin facade (~400 lines) delegating to internal managers. The engine is completely decoupled from scenes and rendering algorithms — it only executes `CompiledRenderer` objects, self-contained specifications of shaders, framebuffers, render passes, and uniform bindings.
@@ -54,7 +65,7 @@ Open the dev server and you'll see a Cornell Box path tracer with interactive co
 
 ```typescript
 import { App } from './src/app/index.js';
-import { cornellBox, cornellStrategy } from './src/compiler/scenes/cornellBox.js';
+import { cornellBox, cornellStrategy } from './tests/witnesses/scenes/cornellBox.js';
 import { OrbitControls, StatsPanel, AppShortcutsExtension } from './src/app/extensions/index.js';
 
 const app = App.create(document.body, { layout: 'fullscreen' });
@@ -74,7 +85,7 @@ app.use(new AppShortcutsExtension());
 app.start();
 ```
 
-(This is [examples/cornell-box.ts](examples/cornell-box.ts), the entry point `npm run dev` serves. Note: the legacy `STRATEGY_PRESETS` in `src/app/types.ts` predate the real compiler and do not produce valid strategies — see TODO.md cleanup.)
+(This is the pattern [pages/scene-lab.ts](pages/scene-lab.ts) uses for every suite entry; the fixture imported here lives in [tests/witnesses/scenes/cornellBox.ts](tests/witnesses/scenes/cornellBox.ts).)
 
 ## Keyboard Controls
 
@@ -102,12 +113,11 @@ app.start();
 
 | File | Description |
 |------|-------------|
-| [TODO.md](TODO.md) | Active task list |
-| [CLAUDE.md](CLAUDE.md) | Agent onboarding — conventions, gotchas, doc map |
+| [CLAUDE.md](CLAUDE.md) | Agent onboarding — current state, conventions, gotchas, doc map |
 | [docs/README.md](docs/README.md) | Full documentation index |
 | [docs/fable-compiler-contracts.md](docs/fable-compiler-contracts.md) | GLSL contracts governing all compiler work (+ migration roadmap) |
-| [docs/compiler-system.md](docs/compiler-system.md) | The compiler as built (vertical slice) |
 | [docs/compiler-engine-contract.md](docs/compiler-engine-contract.md) | Locked compiler-engine contract |
+| [tests/witnesses/README.md](tests/witnesses/README.md) | The GPU witness system — gate policy, adding a witness |
 
 ## Tech Stack
 

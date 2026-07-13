@@ -11,7 +11,7 @@
 //                     medium NEE, shadow_media shafts, {param}-driven phase_g).
 // (R-FOGCUBE, the eyeball-only sibling, stays in compiler/scenes/mediaScenes.ts.)
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
 // ---------------------------------------------------------------------------
 // F-SLAB — emissive backwall, absorbing-only ink slab (null interfaces), camera

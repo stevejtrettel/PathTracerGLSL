@@ -1,4 +1,4 @@
-// compiler/scenes/ggxScenes.ts
+// tests/witnesses/scenes/ggxScenes.ts
 // veach-mis — THE glossy MIS witness (Veach 1997 §9.3.1, adapted): four GGX plates of
 // increasing roughness under three sphere lights of increasing radius at ~equal power
 // (Le ∝ 1/r²). This is the regime the lambert/dielectric witnesses cannot reach — a
@@ -11,7 +11,7 @@
 // triple), the sphere light's cone pdf, or the MIS weights at either scoring site.
 // Plate normals are light↔camera bisectors (precomputed) so every highlight is visible.
 
-import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
 export const veachMis: SceneDescription = {
     id: 'veach-mis',

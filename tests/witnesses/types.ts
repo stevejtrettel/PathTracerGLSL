@@ -1,7 +1,7 @@
 // witnesses/types.ts — the witness system's check vocabulary + the suite entry shape
 // (shared with the demo gallery, which reuses SceneSuiteEntry without checks).
 
-import type { SceneDescription, RenderStrategy } from '../compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
 
 /**
  * Machine-readable pass criteria for `npm run witness` (tools/witness.mjs) — the

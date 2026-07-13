@@ -3,7 +3,11 @@ import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { validate } from '../../src/compiler/analyze/Validator.js';
 import { plan } from '../../src/compiler/plan/Planner.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
-import { sceneSuite } from '../../src/compiler/scenes/index.js';
+import { witnessSuite } from '../witnesses/index.js';
+import { demoSuite } from '../../demos/index.js';
+
+// Codegen coverage spans BOTH registries: the durable witnesses and the demo layer.
+const sceneSuite = { ...witnessSuite, ...demoSuite };
 
 /**
  * Structural snapshot of the ProgramDescription — the compiler's "link map"
