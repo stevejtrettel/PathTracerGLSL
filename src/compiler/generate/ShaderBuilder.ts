@@ -17,7 +17,7 @@ export interface ShaderBuildResult {
     sourceMaps: Map<string, BlockMapping[]>;
 }
 
-export function buildShaders(merged: MergedContributions, rendererId: string, tonemap: ProgramDescription['view']['tonemap']): ShaderBuildResult {
+export function buildShaders(merged: MergedContributions, rendererId: string, tonemap: ProgramDescription['view']['tonemap'], varianceOutputs = false): ShaderBuildResult {
     const shaders = new Map<string, ShaderProgram>();
     const sourceMaps = new Map<string, BlockMapping[]>();
 
@@ -28,7 +28,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
     ]);
 
     // Pathtracer fragment — from the feature contributions merged in section order (§2.10)
-    const ptAssembled = assembleBlocks(buildPathtracerBlocks(merged));
+    const ptAssembled = assembleBlocks(buildPathtracerBlocks(merged, varianceOutputs));
     const mainShaderId = `${rendererId}-main`;
     shaders.set(mainShaderId, {
         vertex: vertexAssembled.source,
@@ -52,10 +52,10 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
 // Pathtracer Fragment Shader (block assembly)
 // ============================================================================
 
-function buildPathtracerBlocks(merged: MergedContributions): ShaderBlock[] {
+function buildPathtracerBlocks(merged: MergedContributions, varianceOutputs: boolean): ShaderBlock[] {
     return [
-        { origin: 'generated:header', source: buildHeader(merged.defines) },
-        { origin: 'generated:uniforms', source: buildUniformDeclarations(merged.uniforms, merged.textures) },
+        { origin: 'generated:header', source: buildHeader(merged.defines, varianceOutputs) },
+        { origin: 'generated:uniforms', source: buildUniformDeclarations(merged.uniforms, merged.textures, varianceOutputs) },
         ...merged.blocks,
     ];
 }
@@ -94,11 +94,17 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
 
 const FRAGMENT_PREAMBLE = '#version 300 es\nprecision highp float;\nprecision highp int;';
 
-function buildHeader(defines: Record<string, string>): string {
+function buildHeader(defines: Record<string, string>, varianceOutputs = false): string {
     const lines: string[] = [];
     lines.push(FRAGMENT_PREAMBLE);
     lines.push('');
-    lines.push(`out vec4 fragColor;`);
+    if (varianceOutputs) {
+        // MRT for the variance accumulation occupant: mean + second moment.
+        lines.push('layout(location = 0) out vec4 fragColor;');
+        lines.push('layout(location = 1) out vec4 fragMoment;');
+    } else {
+        lines.push(`out vec4 fragColor;`);
+    }
     lines.push('');
 
     // #defines contributed by features (§2.10). A flag define has an empty value.
@@ -113,7 +119,7 @@ function buildHeader(defines: Record<string, string>): string {
 // Uniform declarations (from the merged contribution list)
 // ============================================================================
 
-function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedTexture[] = []): string {
+function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedTexture[] = [], varianceOutputs = false): string {
     const lines: string[] = [];
     lines.push('// Uniforms');
 
@@ -129,6 +135,9 @@ function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedT
 
     // Previous accumulation texture (always needed for progressive rendering)
     lines.push('uniform sampler2D u_previous;');
+    // Previous second-moment texture (variance accumulation occupant only; bound by
+    // the pathtracer pass input 'accumulation_previous:1').
+    if (varianceOutputs) lines.push('uniform sampler2D u_previousMoment;');
 
     return lines.join('\n');
 }

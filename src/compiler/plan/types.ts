@@ -118,8 +118,10 @@ export type TonemapDesc =
 // ============================================================================
 
 export interface PlannedPipeline {
-    framebuffers: Array<{ id: string; type: 'screen' | 'double_buffer' | 'texture'; format?: FramebufferFormat }>;
-    passes: Array<{ role: string; inputs: Record<string, string>; output: string }>;
+    // format array = MRT (one attachment per entry); output array = the MRT pass's
+    // draw buffers (`id:N` refs). Mirrors the engine-facing FramebufferConfig/RenderPass.
+    framebuffers: Array<{ id: string; type: 'screen' | 'double_buffer' | 'texture'; format?: FramebufferFormat | FramebufferFormat[] }>;
+    passes: Array<{ role: string; inputs: Record<string, string>; output: string | string[] }>;
     swaps: Array<{ buffers: string[] }>;
 }
 

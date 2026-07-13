@@ -1,3 +1,7 @@
+// Injected by vite.config.ts `define`: short git hash (+ '-dirty') at build/serve
+// time; 'unknown' outside a git checkout. Read by the export stamp.
+declare const __GIT_HASH__: string;
+
 // Type declarations for GLSL shader imports
 
 declare module '*.glsl' {

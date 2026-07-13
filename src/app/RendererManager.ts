@@ -273,6 +273,17 @@ export class RendererManager {
         return this.scene;
     }
 
+    /** The RenderStrategy behind the active renderer (for export stamps / tooling). */
+    getActiveStrategy(): RenderStrategy | null {
+        if (!this.activeRendererId) return null;
+        for (const [strategyId, rendererId] of this.strategyToRenderer) {
+            if (rendererId === this.activeRendererId) {
+                return this.strategies.get(strategyId) ?? null;
+            }
+        }
+        return null;
+    }
+
     /**
      * Get parameter metadata for active renderer
      *

@@ -290,21 +290,28 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
 // ============================================================================
 
 function planPipeline(program: ProgramDescription): PlannedPipeline {
-    // Currently all accumulation/tonemap types use the same 2-pass pipeline topology.
-    // This will become conditional as more types are added (e.g., variance accumulation
-    // may need additional framebuffers for moment tracking).
-    void program;
+    // Variance accumulation adds a second-moment attachment to the SAME double_buffer
+    // (MRT): mean and moment then ping-pong in lockstep by construction — one swap flips
+    // both attachments, so they can never desynchronize. The display pass still reads
+    // attachment 0 (the mean); the moment is instrumentation, exported via readBuffer.
+    const variance = program.estimator.accumulation.type === 'variance';
 
     return {
         framebuffers: [
-            { id: 'accumulation', type: 'double_buffer', format: 'rgba32f' },
+            variance
+                ? { id: 'accumulation', type: 'double_buffer', format: ['rgba32f', 'rgba32f'] }
+                : { id: 'accumulation', type: 'double_buffer', format: 'rgba32f' },
             { id: 'screen', type: 'screen' },
         ],
         passes: [
             {
                 role: 'pathtracer',
-                inputs: { 'u_previous': 'accumulation_previous' },
-                output: 'accumulation_current',
+                inputs: variance
+                    ? { 'u_previous': 'accumulation_previous', 'u_previousMoment': 'accumulation_previous:1' }
+                    : { 'u_previous': 'accumulation_previous' },
+                output: variance
+                    ? ['accumulation_current:0', 'accumulation_current:1']
+                    : 'accumulation_current',
             },
             {
                 role: 'display',

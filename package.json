@@ -8,12 +8,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "dump:shaders": "vite-node scripts/dump-shaders.ts"
+    "dump:shaders": "vite-node scripts/dump-shaders.ts",
+    "witness": "node tools/witness.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
     "@vitest/ui": "^3.2.4",
     "glslang-validator-prebuilt-predownloaded": "^0.0.2",
+    "playwright": "^1.61.1",
     "typescript": "~5.8.3",
     "vite": "^7.1.2",
     "vite-plugin-glsl": "^1.5.1",

@@ -389,7 +389,8 @@ export function validate(
     }
 
     // Check for unsupported accumulation/tonemap types
-    if (strategy.estimator.accumulation.type !== 'average') {
+    if (strategy.estimator.accumulation.type !== 'average'
+        && strategy.estimator.accumulation.type !== 'variance') {
         bag.error('invalid-setting',
             `Accumulation type '${strategy.estimator.accumulation.type}' not yet supported`)
             .add();

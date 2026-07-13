@@ -57,11 +57,14 @@ export function buildUniforms(uniforms: PlannedUniform[]): UniformBinding[] {
     return bindings;
 }
 
-export function buildExportTargets(): CompiledRenderer['exportTargets'] {
+export function buildExportTargets(variance = false): CompiledRenderer['exportTargets'] {
     return {
         // 'previous', not 'current': exports run after renderFrame(), and the postFrame
         // swap has already flipped the ping-pong index — post-swap, the freshly written
         // frame lives in 'accumulation_previous'. Reading 'current' exports frame N-1.
         'hdr': { bufferId: 'accumulation_previous', format: 'float' },
+        // The second-moment attachment (variance occupant): per-channel sample variance
+        // v = M2/n; variance of the MEAN = v/n (readers divide). Same post-swap rule.
+        ...(variance ? { 'variance': { bufferId: 'accumulation_previous', format: 'float' as const, attachment: 1 } } : {}),
     };
 }

@@ -19,11 +19,12 @@ export function generate(
     // shaders, uniform bindings, and parameter metadata are all built from.
     const merged = collectFeatures(plan, bag);
 
-    const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.view.tonemap);
+    const variance = plan.program.estimator.accumulation.type === 'variance';
+    const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.view.tonemap, variance);
     const pipeline = buildPipeline(rendererId, plan, merged.textures);
     const uniforms = buildUniforms(merged.uniforms);
     const parameters = merged.parameters;
-    const exportTargets = buildExportTargets();
+    const exportTargets = buildExportTargets(variance);
 
     // Convert BlockMapping[] to SourceMap objects, including assembled source
     const sourceMaps = new Map<string, SourceMap>();

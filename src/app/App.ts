@@ -16,7 +16,7 @@ import type { AppConfig, StrategyPreset, CreateAppOptions, SessionData } from '.
 import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
 import { AppEvents, shouldResetAccumulation } from './events.js';
-import { saveHDRFile, savePNGFile } from './utils/file-export.js';
+import { saveHDRFile, savePNGFile, type RenderStamp } from './utils/file-export.js';
 import { ExportError, SessionError } from '../errors/RenderErrors.js';
 import { ProductionOrchestrator, type ProductionOptions } from './ProductionOrchestrator.js';
 import { ErrorOverlay } from './ui/ErrorOverlay.js';
@@ -572,7 +572,7 @@ export class App {
             const [width, height] = this.getCanvasSize();
             const pixels = this.readExport('ldr') as Uint8Array;
             const name = filename || this._generateExportFilename('screenshot', 'png');
-            savePNGFile(pixels, width, height, name);
+            savePNGFile(pixels, width, height, name, this.buildRenderStamp());
             console.log(`Exported PNG: ${name}`);
         } catch (error) {
             if (error instanceof ExportError) throw error;
@@ -592,7 +592,7 @@ export class App {
             const [width, height] = this.getCanvasSize();
             const pixels = this.readExport('hdr') as Float32Array;
             const name = filename || this._generateExportFilename('radiance', 'hdr');
-            saveHDRFile(pixels, width, height, name);
+            saveHDRFile(pixels, width, height, name, this.buildRenderStamp());
             console.log(`Exported HDR: ${name}`);
         } catch (error) {
             if (error instanceof ExportError) throw error;
@@ -615,11 +615,11 @@ export class App {
             const name = filename || this._generateExportFilename(aovName, 'hdr');
 
             if (pixels instanceof Float32Array) {
-                saveHDRFile(pixels, width, height, name);
+                saveHDRFile(pixels, width, height, name, this.buildRenderStamp());
                 console.log(`Exported AOV (HDR): ${name}`);
             } else {
                 const pngName = filename || this._generateExportFilename(aovName, 'png');
-                savePNGFile(pixels, width, height, pngName);
+                savePNGFile(pixels, width, height, pngName, this.buildRenderStamp());
                 console.log(`Exported AOV (PNG): ${pngName}`);
             }
         } catch (error) {
@@ -659,6 +659,30 @@ export class App {
         }
 
         console.log('AOV export complete');
+    }
+
+    /** The reproducibility stamp embedded in every export (and readable by tooling). */
+    buildRenderStamp(): RenderStamp {
+        const [width, height] = this.getCanvasSize();
+        return {
+            scene: this.rendererManager.getScene()?.id ?? 'unknown',
+            strategy: this.rendererManager.getActiveStrategy(),
+            parameters: this.parameterStore.serialize(),
+            spp: this.coordinator.getSampleCount(),
+            resolution: [width, height],
+            resetSalt: this.engine.getResetSalt(),
+            git: typeof __GIT_HASH__ !== 'undefined' ? __GIT_HASH__ : 'unknown',
+            date: new Date().toISOString(),
+        };
+    }
+
+    /** Pin the RNG salt for reproducible renders; null unpins. See Engine.pinResetSalt. */
+    pinResetSalt(salt: number | null): void {
+        this.engine.pinResetSalt(salt);
+    }
+
+    getActiveStrategy(): RenderStrategy | null {
+        return this.rendererManager.getActiveStrategy();
     }
 
     private _generateExportFilename(prefix: string, extension: string): string {

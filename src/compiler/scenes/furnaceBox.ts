@@ -63,3 +63,16 @@ export const furnaceStrategy: RenderStrategy = {
     },
     view: { tonemap: { type: 'reinhard' } },
 };
+
+// The variance-occupant witness (key 2): identical estimator, `variance` accumulation.
+// The mean must be UNTOUCHED by instrumentation — same RNG stream, same walk, same
+// mix() update — so key 2 converges to the same 0.4 and, pixel for pixel, the same
+// image as key 1. The second-moment attachment rides along as the 'variance' export.
+export const furnaceVarianceStrategy: RenderStrategy = {
+    ...furnaceStrategy,
+    id: 'furnace-var',
+    estimator: {
+        ...furnaceStrategy.estimator,
+        accumulation: { type: 'variance' },
+    },
+};

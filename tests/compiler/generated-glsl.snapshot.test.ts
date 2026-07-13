@@ -4,7 +4,7 @@ import type { CompiledRenderer, SceneDescription, RenderStrategy } from '../../s
 import { minimalScene, minimalStrategy, directOnlyStrategy } from '../../src/compiler/scenes/minimalScene.js';
 import { cornellBox, cornellStrategy } from '../../src/compiler/scenes/cornellBox.js';
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '../../src/compiler/scenes/twoLightScene.js';
-import { furnaceBox, furnaceStrategy } from '../../src/compiler/scenes/furnaceBox.js';
+import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from '../../src/compiler/scenes/furnaceBox.js';
 import { analyticMinimal, mixedScene, analyticStrategy } from '../../src/compiler/scenes/analyticScenes.js';
 import { etaScene, etaStrategy, submergedScene, submergedStrategy, cornellGlass, analyticGlass, glassStrategy } from '../../src/compiler/scenes/dielectricScenes.js';
 import { slabScene, slabStrategy, fogcubeScene, fogcubeStrategy, furnaceScatterScene, furnaceScatterStrategy, hazeScene, hazeNeeStrategy, hazePtStrategy } from '../../src/compiler/scenes/mediaScenes.js';
@@ -57,6 +57,9 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     ['two-light + power', twoLightScene, twoLightPowerStrategy],
     ['two-light + uniform', twoLightScene, twoLightUniformStrategy],
     ['furnace + no-direct', furnaceBox, furnaceStrategy],
+    // Variance accumulation occupant (measurement bench): MRT header (fragMoment),
+    // u_previousMoment sampler, the Welford main, dual-output pipeline + variance export.
+    ['furnace + variance', furnaceBox, furnaceVarianceStrategy],
     // Analytic backend: all-analytic (cross-method twin of minimal) + mixed SDF/analytic dispatch.
     ['analytic-minimal', analyticMinimal, analyticStrategy],
     ['mixed backends', mixedScene, analyticStrategy],

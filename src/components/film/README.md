@@ -5,7 +5,7 @@ the image plane:
 
 | Subfamily | Taxonomy | Kind | Occupants |
 |---|---|---|---|
-| accumulation | **estimator** (the outer 1/N Σ of Monte Carlo) | pick-one | `accumulate_average/` (exponential, variance reserved) |
+| accumulation | **estimator** (the outer 1/N Σ of Monte Carlo) | pick-one | `accumulate_average/`, `accumulate_variance/` (exponential reserved) |
 | tonemap | **view** (display only — applied to the converged linear HDR) | pick-one | `tonemap_reinhard/`, `tonemap_none/` |
 
 `fullscreen.vert.glsl` (shared plumbing, family root): the `gl_VertexID` fullscreen
@@ -17,7 +17,9 @@ Does it change what the number converges to, how fast, or only how it's shown?
 - Plain average — estimator, unbiased, converges. Today's occupant.
 - Exponential moving average — estimator, unbiased but non-convergent (variance
   floor); the interactive-preview occupant, reserved.
-- Variance/moment buffers — estimator instrumentation (extra outputs), reserved.
+- Variance/moment buffers — estimator instrumentation (extra outputs):
+  `accumulate_variance/` (Welford; mean byte-identical to `average`, second MRT
+  attachment = per-channel sample variance, `variance` export target).
 - Firefly clamping / median-of-means — BIASED: never hides here; a declared
   measurement truncation in the bias ledger, like `shadows: 'opaque-dielectrics'`.
 - Denoising — view (a display filter); the HDR export stays the raw estimator output.

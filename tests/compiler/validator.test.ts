@@ -94,9 +94,10 @@ describe('Validator', () => {
         expect(bag.getWarnings().some(w => w.code === 'empty-scene')).toBe(true);
     });
 
-    it('rejects non-average accumulation', () => {
-        const bag = run((_s, st) => { st.estimator.accumulation = { type: 'variance' }; });
+    it('rejects unsupported accumulation (allows average/variance)', () => {
+        const bag = run((_s, st) => { st.estimator.accumulation = { type: 'exponential', alpha: 0.1 }; });
         expect(bag.getErrors().some(e => e.code === 'invalid-setting' && /accumulation/i.test(e.message))).toBe(true);
+        expect(run((_s, st) => { st.estimator.accumulation = { type: 'variance' }; }).isEmpty()).toBe(true);
     });
 
     it('rejects unsupported tonemap types (allows reinhard/none)', () => {

@@ -44,6 +44,9 @@ export class Engine {
     // Monotonic RNG salt, bumped on every accumulation reset so the seed doesn't
     // replay after a reset (kills frozen-motion noise + reset-replay). See §2.11.
     private resetSalt = 0;
+    // Reproducible mode (§2.11 deferred fixed-seed): while non-null, resets restore
+    // this value instead of bumping, so identical action sequences replay identically.
+    private pinnedResetSalt: number | null = null;
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
@@ -262,10 +265,21 @@ export class Engine {
     clearAccumulation(): void {
         if (!this.activeRendererId) return;
         this.sampleCounts.set(this.activeRendererId, 0);
-        // New RNG salt so the reset render doesn't replay the identical stream (§2.11).
-        this.resetSalt++;
+        // New RNG salt so the reset render doesn't replay the identical stream (§2.11) —
+        // unless pinned, in which case replaying identically is the point.
+        this.resetSalt = this.pinnedResetSalt ?? this.resetSalt + 1;
         this.resourceManager.clearAllBuffers();
         this.parameterManager.clearCache();
+    }
+
+    getResetSalt(): number {
+        return this.resetSalt;
+    }
+
+    /** Pin the RNG salt for reproducible renders; null unpins (resets bump again). */
+    pinResetSalt(salt: number | null): void {
+        this.pinnedResetSalt = salt;
+        if (salt !== null) this.resetSalt = salt;
     }
 
     resize(width: number, height: number): void {

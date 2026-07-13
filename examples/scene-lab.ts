@@ -48,6 +48,9 @@ async function main() {
     app.start();
 
     (window as any).app = app;
+    // The full registry (incl. witness specs) for tooling — tools/witness.mjs reads it
+    // through the page so node never needs to load TS.
+    (window as any).sceneSuite = sceneSuite;
     console.log('Ready!');
 }
 

@@ -1161,6 +1161,63 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > furnace + furnace-var 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "variance",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": 1,
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 16,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter + furnace-scatter 1`] = `
 {
   "emitters": {

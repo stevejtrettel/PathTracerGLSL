@@ -1,8 +1,37 @@
 # The measurement bench — making the instrument measure itself
 
-**Author:** Fable (July 2026) · **Status:** PROPOSAL, owner-endorsed direction — a fresh
-session will pick this up; this doc is self-contained on purpose. Read `CLAUDE.md`
-first; the memory file `components-design-discussion` has the session context.
+**Author:** Fable (July 2026) · **Status:** REVIEWED & PARTIALLY BUILT (July 13 2026).
+The owner cut this proposal down on review; the built subset is §2.1 + §2.4 + stamps:
+
+- **BUILT — witness runner** (`npm run witness`, `tools/witness.mjs`): machine-readable
+  `witness` specs beside the `expected` prose in the suite registry; headless SwiftShader
+  renders read LINEAR floats via `readExport('hdr')`; check kinds `mean` / `equality` /
+  `twin` / `noise`. All numeric witnesses reproduce (furnace 0.4000, F-ETA 0.5541, slab
+  3-channel, F-BOX-M, furnace-sky ρ·L + L). Equality gates: Δ frame-mean in linear HDR
+  (bias) + noise-normalized χ² (structure; requires the variance occupant) for arms with
+  shared event coverage, or a calibrated display-space RMSE tripwire for chance-hit pt
+  arms — see the `WitnessCheck` doc comments for why both exist.
+- **BUILT — variance occupant** (`components/film/accumulate_variance/`): Welford δ·δ′,
+  one MRT double_buffer (mean+moment swap in lockstep), `variance` export target at
+  attachment 1. Witness: mean untouched (Δmean 0.00%, display-rmse 0.02% vs `average`).
+  Powers the runner's χ² gate and `noise` checks — the equiangular halo win reproduces
+  as σ/µ 18.05% vs 21.24% at 192spp; veach measures pt-mis 4.43% < pt 9.99% < pt-nee
+  11.64% (assertFirstLowest).
+- **BUILT — reproducibility stamps**: HDR header comments + PNG tEXt chunks carrying
+  scene / strategy JSON / parameters / spp / resolution / resetSalt / git hash / date
+  (`App.buildRenderStamp`); `pinResetSalt` reproducible mode.
+- **CUT — §2.2 compare mode**: its "display composition only" premise is false — the
+  engine runs ONE active pipeline and no API lets a draw sample another renderer's
+  textures; needs a deliberate engine-surface discussion if ever wanted. The runner's
+  numbers replace most of its research value.
+- **DEFERRED — §2.3 probe integrators**: to their first consumer (heterogeneous-media
+  or camera bring-up), per owner review.
+
+Found along the way (not fixed here): `exportPNG` requires an `ldr` export target that
+`buildExportTargets` never defines — PNG export is currently dead for all standard
+renderers; the equiangular χ² vitest ("long segment") is flaky under parallel load.
+
+The original proposal follows, unedited.
 
 ## 1. Where the project stands (one paragraph)
 
