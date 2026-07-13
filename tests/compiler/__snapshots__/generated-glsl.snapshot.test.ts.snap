@@ -1204,7 +1204,7 @@ void main() {
       },
       {
         "endLine": 790,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 789,
       },
       {
@@ -1224,17 +1224,17 @@ void main() {
       },
       {
         "endLine": 807,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 797,
       },
       {
         "endLine": 825,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 808,
       },
       {
         "endLine": 831,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 826,
       },
       {
@@ -2230,7 +2230,7 @@ void main() {
       },
       {
         "endLine": 505,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 504,
       },
       {
@@ -2250,17 +2250,17 @@ void main() {
       },
       {
         "endLine": 522,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 512,
       },
       {
         "endLine": 540,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 523,
       },
       {
         "endLine": 546,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 541,
       },
       {
@@ -3417,7 +3417,7 @@ void main() {
       },
       {
         "endLine": 652,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 651,
       },
       {
@@ -3437,17 +3437,17 @@ void main() {
       },
       {
         "endLine": 669,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 659,
       },
       {
         "endLine": 687,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 670,
       },
       {
         "endLine": 693,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 688,
       },
       {
@@ -4624,7 +4624,7 @@ void main() {
       },
       {
         "endLine": 695,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 694,
       },
       {
@@ -4644,12 +4644,12 @@ void main() {
       },
       {
         "endLine": 712,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 702,
       },
       {
         "endLine": 718,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 713,
       },
       {
@@ -5973,7 +5973,7 @@ void main() {
       },
       {
         "endLine": 778,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 777,
       },
       {
@@ -5993,17 +5993,17 @@ void main() {
       },
       {
         "endLine": 803,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 785,
       },
       {
         "endLine": 827,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 804,
       },
       {
         "endLine": 835,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 828,
       },
       {
@@ -7286,7 +7286,7 @@ void main() {
       },
       {
         "endLine": 755,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 754,
       },
       {
@@ -7306,17 +7306,17 @@ void main() {
       },
       {
         "endLine": 780,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 762,
       },
       {
         "endLine": 798,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 781,
       },
       {
         "endLine": 804,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 799,
       },
       {
@@ -8573,7 +8573,7 @@ void main() {
       },
       {
         "endLine": 770,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 769,
       },
       {
@@ -8593,12 +8593,12 @@ void main() {
       },
       {
         "endLine": 787,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 777,
       },
       {
         "endLine": 793,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 788,
       },
       {
@@ -10000,7 +10000,7 @@ void main() {
       },
       {
         "endLine": 853,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 852,
       },
       {
@@ -10020,17 +10020,17 @@ void main() {
       },
       {
         "endLine": 878,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 860,
       },
       {
         "endLine": 902,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 879,
       },
       {
         "endLine": 910,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 903,
       },
       {
@@ -11391,7 +11391,7 @@ void main() {
       },
       {
         "endLine": 830,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 829,
       },
       {
@@ -11411,17 +11411,17 @@ void main() {
       },
       {
         "endLine": 855,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 837,
       },
       {
         "endLine": 873,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 856,
       },
       {
         "endLine": 879,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 874,
       },
       {
@@ -12644,7 +12644,7 @@ void main() {
       },
       {
         "endLine": 726,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 725,
       },
       {
@@ -12664,17 +12664,17 @@ void main() {
       },
       {
         "endLine": 743,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 733,
       },
       {
         "endLine": 761,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 744,
       },
       {
         "endLine": 767,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 762,
       },
       {
@@ -13740,7 +13740,7 @@ void main() {
       },
       {
         "endLine": 616,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 615,
       },
       {
@@ -13760,12 +13760,12 @@ void main() {
       },
       {
         "endLine": 633,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 623,
       },
       {
         "endLine": 639,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 634,
       },
       {
@@ -15173,9 +15173,34 @@ void main() {
         "startLine": 851,
       },
       {
-        "endLine": 881,
+        "endLine": 861,
         "origin": "generated:transport/medium",
         "startLine": 855,
+      },
+      {
+        "endLine": 865,
+        "origin": "generated:transport/medium",
+        "startLine": 862,
+      },
+      {
+        "endLine": 871,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 866,
+      },
+      {
+        "endLine": 878,
+        "origin": "generated:transport/rr",
+        "startLine": 872,
+      },
+      {
+        "endLine": 880,
+        "origin": "generated:transport/medium",
+        "startLine": 879,
+      },
+      {
+        "endLine": 881,
+        "origin": "generated:transport/medium",
+        "startLine": 881,
       },
       {
         "endLine": 882,
@@ -15184,7 +15209,7 @@ void main() {
       },
       {
         "endLine": 884,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 883,
       },
       {
@@ -15214,12 +15239,12 @@ void main() {
       },
       {
         "endLine": 915,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 905,
       },
       {
         "endLine": 921,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 916,
       },
       {
@@ -16854,9 +16879,39 @@ void main() {
         "startLine": 968,
       },
       {
-        "endLine": 1020,
+        "endLine": 978,
         "origin": "generated:transport/medium",
         "startLine": 972,
+      },
+      {
+        "endLine": 982,
+        "origin": "generated:transport/medium",
+        "startLine": 979,
+      },
+      {
+        "endLine": 1002,
+        "origin": "generated:transport/light-medium",
+        "startLine": 983,
+      },
+      {
+        "endLine": 1010,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 1003,
+      },
+      {
+        "endLine": 1017,
+        "origin": "generated:transport/rr",
+        "startLine": 1011,
+      },
+      {
+        "endLine": 1019,
+        "origin": "generated:transport/medium",
+        "startLine": 1018,
+      },
+      {
+        "endLine": 1020,
+        "origin": "generated:transport/medium",
+        "startLine": 1020,
       },
       {
         "endLine": 1021,
@@ -16865,7 +16920,7 @@ void main() {
       },
       {
         "endLine": 1023,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 1022,
       },
       {
@@ -16895,17 +16950,17 @@ void main() {
       },
       {
         "endLine": 1062,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 1044,
       },
       {
         "endLine": 1086,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 1063,
       },
       {
         "endLine": 1094,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 1087,
       },
       {
@@ -18491,9 +18546,39 @@ void main() {
         "startLine": 945,
       },
       {
-        "endLine": 989,
+        "endLine": 955,
         "origin": "generated:transport/medium",
         "startLine": 949,
+      },
+      {
+        "endLine": 959,
+        "origin": "generated:transport/medium",
+        "startLine": 956,
+      },
+      {
+        "endLine": 973,
+        "origin": "generated:transport/light-medium",
+        "startLine": 960,
+      },
+      {
+        "endLine": 979,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 974,
+      },
+      {
+        "endLine": 986,
+        "origin": "generated:transport/rr",
+        "startLine": 980,
+      },
+      {
+        "endLine": 988,
+        "origin": "generated:transport/medium",
+        "startLine": 987,
+      },
+      {
+        "endLine": 989,
+        "origin": "generated:transport/medium",
+        "startLine": 989,
       },
       {
         "endLine": 990,
@@ -18502,7 +18587,7 @@ void main() {
       },
       {
         "endLine": 992,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 991,
       },
       {
@@ -18532,17 +18617,17 @@ void main() {
       },
       {
         "endLine": 1031,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 1013,
       },
       {
         "endLine": 1049,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 1032,
       },
       {
         "endLine": 1055,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 1050,
       },
       {
@@ -19983,9 +20068,34 @@ void main() {
         "startLine": 865,
       },
       {
-        "endLine": 895,
+        "endLine": 875,
         "origin": "generated:transport/medium",
         "startLine": 869,
+      },
+      {
+        "endLine": 879,
+        "origin": "generated:transport/medium",
+        "startLine": 876,
+      },
+      {
+        "endLine": 885,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 880,
+      },
+      {
+        "endLine": 892,
+        "origin": "generated:transport/rr",
+        "startLine": 886,
+      },
+      {
+        "endLine": 894,
+        "origin": "generated:transport/medium",
+        "startLine": 893,
+      },
+      {
+        "endLine": 895,
+        "origin": "generated:transport/medium",
+        "startLine": 895,
       },
       {
         "endLine": 896,
@@ -19994,7 +20104,7 @@ void main() {
       },
       {
         "endLine": 898,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 897,
       },
       {
@@ -20024,12 +20134,12 @@ void main() {
       },
       {
         "endLine": 929,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 919,
       },
       {
         "endLine": 935,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 930,
       },
       {
@@ -21629,9 +21739,39 @@ void main() {
         "startLine": 959,
       },
       {
-        "endLine": 1003,
+        "endLine": 969,
         "origin": "generated:transport/medium",
         "startLine": 963,
+      },
+      {
+        "endLine": 973,
+        "origin": "generated:transport/medium",
+        "startLine": 970,
+      },
+      {
+        "endLine": 987,
+        "origin": "generated:transport/light-medium",
+        "startLine": 974,
+      },
+      {
+        "endLine": 993,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 988,
+      },
+      {
+        "endLine": 1000,
+        "origin": "generated:transport/rr",
+        "startLine": 994,
+      },
+      {
+        "endLine": 1002,
+        "origin": "generated:transport/medium",
+        "startLine": 1001,
+      },
+      {
+        "endLine": 1003,
+        "origin": "generated:transport/medium",
+        "startLine": 1003,
       },
       {
         "endLine": 1004,
@@ -21640,7 +21780,7 @@ void main() {
       },
       {
         "endLine": 1006,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 1005,
       },
       {
@@ -21670,17 +21810,17 @@ void main() {
       },
       {
         "endLine": 1045,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 1027,
       },
       {
         "endLine": 1063,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 1046,
       },
       {
         "endLine": 1069,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 1064,
       },
       {
@@ -22794,9 +22934,14 @@ void main() {
         "startLine": 606,
       },
       {
-        "endLine": 617,
+        "endLine": 616,
         "origin": "generated:transport/medium",
         "startLine": 610,
+      },
+      {
+        "endLine": 617,
+        "origin": "generated:transport/medium",
+        "startLine": 617,
       },
       {
         "endLine": 618,
@@ -22805,7 +22950,7 @@ void main() {
       },
       {
         "endLine": 620,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 619,
       },
       {
@@ -22835,12 +22980,12 @@ void main() {
       },
       {
         "endLine": 651,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 641,
       },
       {
         "endLine": 657,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 652,
       },
       {
@@ -23846,7 +23991,7 @@ void main() {
       },
       {
         "endLine": 577,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 576,
       },
       {
@@ -23866,12 +24011,12 @@ void main() {
       },
       {
         "endLine": 594,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 584,
       },
       {
         "endLine": 600,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 595,
       },
       {
@@ -25110,9 +25255,29 @@ void main() {
         "startLine": 733,
       },
       {
-        "endLine": 756,
+        "endLine": 743,
         "origin": "generated:transport/medium",
         "startLine": 737,
+      },
+      {
+        "endLine": 747,
+        "origin": "generated:transport/medium",
+        "startLine": 744,
+      },
+      {
+        "endLine": 753,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 748,
+      },
+      {
+        "endLine": 755,
+        "origin": "generated:transport/medium",
+        "startLine": 754,
+      },
+      {
+        "endLine": 756,
+        "origin": "generated:transport/medium",
+        "startLine": 756,
       },
       {
         "endLine": 757,
@@ -25121,7 +25286,7 @@ void main() {
       },
       {
         "endLine": 759,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 758,
       },
       {
@@ -25151,12 +25316,12 @@ void main() {
       },
       {
         "endLine": 790,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 780,
       },
       {
         "endLine": 796,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 791,
       },
       {
@@ -26157,7 +26322,7 @@ void main() {
       },
       {
         "endLine": 511,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 501,
       },
       {
@@ -26177,17 +26342,17 @@ void main() {
       },
       {
         "endLine": 528,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 518,
       },
       {
         "endLine": 552,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 529,
       },
       {
         "endLine": 560,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 553,
       },
       {
@@ -27184,7 +27349,7 @@ void main() {
       },
       {
         "endLine": 497,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 489,
       },
       {
@@ -27204,17 +27369,17 @@ void main() {
       },
       {
         "endLine": 514,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 504,
       },
       {
         "endLine": 532,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 515,
       },
       {
         "endLine": 538,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 533,
       },
       {
@@ -28521,9 +28686,34 @@ void main() {
         "startLine": 748,
       },
       {
-        "endLine": 778,
+        "endLine": 758,
         "origin": "generated:transport/medium",
         "startLine": 752,
+      },
+      {
+        "endLine": 762,
+        "origin": "generated:transport/medium",
+        "startLine": 759,
+      },
+      {
+        "endLine": 768,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 763,
+      },
+      {
+        "endLine": 775,
+        "origin": "generated:transport/rr",
+        "startLine": 769,
+      },
+      {
+        "endLine": 777,
+        "origin": "generated:transport/medium",
+        "startLine": 776,
+      },
+      {
+        "endLine": 778,
+        "origin": "generated:transport/medium",
+        "startLine": 778,
       },
       {
         "endLine": 779,
@@ -28532,7 +28722,7 @@ void main() {
       },
       {
         "endLine": 781,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 780,
       },
       {
@@ -28562,12 +28752,12 @@ void main() {
       },
       {
         "endLine": 812,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 802,
       },
       {
         "endLine": 818,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 813,
       },
       {
@@ -29993,9 +30183,39 @@ void main() {
         "startLine": 826,
       },
       {
-        "endLine": 870,
+        "endLine": 836,
         "origin": "generated:transport/medium",
         "startLine": 830,
+      },
+      {
+        "endLine": 840,
+        "origin": "generated:transport/medium",
+        "startLine": 837,
+      },
+      {
+        "endLine": 854,
+        "origin": "generated:transport/light-medium",
+        "startLine": 841,
+      },
+      {
+        "endLine": 860,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 855,
+      },
+      {
+        "endLine": 867,
+        "origin": "generated:transport/rr",
+        "startLine": 861,
+      },
+      {
+        "endLine": 869,
+        "origin": "generated:transport/medium",
+        "startLine": 868,
+      },
+      {
+        "endLine": 870,
+        "origin": "generated:transport/medium",
+        "startLine": 870,
       },
       {
         "endLine": 871,
@@ -30004,7 +30224,7 @@ void main() {
       },
       {
         "endLine": 873,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 872,
       },
       {
@@ -30034,17 +30254,17 @@ void main() {
       },
       {
         "endLine": 904,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 894,
       },
       {
         "endLine": 922,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 905,
       },
       {
         "endLine": 928,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 923,
       },
       {
@@ -31406,9 +31626,14 @@ void main() {
         "startLine": 794,
       },
       {
-        "endLine": 805,
+        "endLine": 804,
         "origin": "generated:transport/medium",
         "startLine": 798,
+      },
+      {
+        "endLine": 805,
+        "origin": "generated:transport/medium",
+        "startLine": 805,
       },
       {
         "endLine": 806,
@@ -31417,7 +31642,7 @@ void main() {
       },
       {
         "endLine": 808,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 807,
       },
       {
@@ -31442,12 +31667,12 @@ void main() {
       },
       {
         "endLine": 829,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 819,
       },
       {
         "endLine": 835,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 830,
       },
       {
@@ -32947,9 +33172,34 @@ void main() {
         "startLine": 882,
       },
       {
-        "endLine": 912,
+        "endLine": 892,
         "origin": "generated:transport/medium",
         "startLine": 886,
+      },
+      {
+        "endLine": 896,
+        "origin": "generated:transport/medium",
+        "startLine": 893,
+      },
+      {
+        "endLine": 902,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 897,
+      },
+      {
+        "endLine": 909,
+        "origin": "generated:transport/rr",
+        "startLine": 903,
+      },
+      {
+        "endLine": 911,
+        "origin": "generated:transport/medium",
+        "startLine": 910,
+      },
+      {
+        "endLine": 912,
+        "origin": "generated:transport/medium",
+        "startLine": 912,
       },
       {
         "endLine": 913,
@@ -32958,7 +33208,7 @@ void main() {
       },
       {
         "endLine": 915,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 914,
       },
       {
@@ -32983,12 +33233,12 @@ void main() {
       },
       {
         "endLine": 936,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 926,
       },
       {
         "endLine": 942,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 937,
       },
       {
@@ -34090,7 +34340,7 @@ void main() {
       },
       {
         "endLine": 585,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 584,
       },
       {
@@ -34110,17 +34360,17 @@ void main() {
       },
       {
         "endLine": 602,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 592,
       },
       {
         "endLine": 620,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 603,
       },
       {
         "endLine": 626,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 621,
       },
       {
@@ -35205,7 +35455,7 @@ void main() {
       },
       {
         "endLine": 585,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 584,
       },
       {
@@ -35225,17 +35475,17 @@ void main() {
       },
       {
         "endLine": 602,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 592,
       },
       {
         "endLine": 620,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 603,
       },
       {
         "endLine": 626,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 621,
       },
       {
@@ -36723,9 +36973,39 @@ void main() {
         "startLine": 864,
       },
       {
-        "endLine": 908,
+        "endLine": 874,
         "origin": "generated:transport/medium",
         "startLine": 868,
+      },
+      {
+        "endLine": 878,
+        "origin": "generated:transport/medium",
+        "startLine": 875,
+      },
+      {
+        "endLine": 892,
+        "origin": "generated:transport/light-medium",
+        "startLine": 879,
+      },
+      {
+        "endLine": 898,
+        "origin": "generated:transport/kernel-phase",
+        "startLine": 893,
+      },
+      {
+        "endLine": 905,
+        "origin": "generated:transport/rr",
+        "startLine": 899,
+      },
+      {
+        "endLine": 907,
+        "origin": "generated:transport/medium",
+        "startLine": 906,
+      },
+      {
+        "endLine": 908,
+        "origin": "generated:transport/medium",
+        "startLine": 908,
       },
       {
         "endLine": 909,
@@ -36734,7 +37014,7 @@ void main() {
       },
       {
         "endLine": 911,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 910,
       },
       {
@@ -36764,17 +37044,17 @@ void main() {
       },
       {
         "endLine": 942,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 932,
       },
       {
         "endLine": 960,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 943,
       },
       {
         "endLine": 966,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 961,
       },
       {
@@ -37965,7 +38245,7 @@ void main() {
       },
       {
         "endLine": 664,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 663,
       },
       {
@@ -37985,17 +38265,17 @@ void main() {
       },
       {
         "endLine": 681,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 671,
       },
       {
         "endLine": 699,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 682,
       },
       {
         "endLine": 705,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 700,
       },
       {
@@ -39204,7 +39484,7 @@ void main() {
       },
       {
         "endLine": 711,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 710,
       },
       {
@@ -39224,12 +39504,12 @@ void main() {
       },
       {
         "endLine": 728,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 718,
       },
       {
         "endLine": 734,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 729,
       },
       {
@@ -40564,7 +40844,7 @@ void main() {
       },
       {
         "endLine": 786,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 785,
       },
       {
@@ -40584,17 +40864,17 @@ void main() {
       },
       {
         "endLine": 811,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 793,
       },
       {
         "endLine": 829,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 812,
       },
       {
         "endLine": 835,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 830,
       },
       {
@@ -41868,7 +42148,7 @@ void main() {
       },
       {
         "endLine": 717,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 707,
       },
       {
@@ -41888,17 +42168,17 @@ void main() {
       },
       {
         "endLine": 734,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 724,
       },
       {
         "endLine": 758,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 735,
       },
       {
         "endLine": 766,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 759,
       },
       {
@@ -43166,7 +43446,7 @@ void main() {
       },
       {
         "endLine": 703,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 695,
       },
       {
@@ -43186,17 +43466,17 @@ void main() {
       },
       {
         "endLine": 720,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 710,
       },
       {
         "endLine": 738,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 721,
       },
       {
         "endLine": 744,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 739,
       },
       {
@@ -44413,7 +44693,7 @@ void main() {
       },
       {
         "endLine": 679,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 678,
       },
       {
@@ -44433,12 +44713,12 @@ void main() {
       },
       {
         "endLine": 696,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 686,
       },
       {
         "endLine": 702,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 697,
       },
       {
@@ -45762,7 +46042,7 @@ void main() {
       },
       {
         "endLine": 752,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 742,
       },
       {
@@ -45782,17 +46062,17 @@ void main() {
       },
       {
         "endLine": 769,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 759,
       },
       {
         "endLine": 793,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 770,
       },
       {
         "endLine": 801,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 794,
       },
       {
@@ -47067,7 +47347,7 @@ void main() {
       },
       {
         "endLine": 709,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 701,
       },
       {
@@ -47087,17 +47367,17 @@ void main() {
       },
       {
         "endLine": 726,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 716,
       },
       {
         "endLine": 744,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 727,
       },
       {
         "endLine": 750,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 745,
       },
       {
@@ -48521,7 +48801,7 @@ void main() {
       },
       {
         "endLine": 811,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 801,
       },
       {
@@ -48541,17 +48821,17 @@ void main() {
       },
       {
         "endLine": 836,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 818,
       },
       {
         "endLine": 860,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 837,
       },
       {
         "endLine": 868,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 861,
       },
       {
@@ -49686,9 +49966,14 @@ void main() {
         "startLine": 606,
       },
       {
-        "endLine": 617,
+        "endLine": 616,
         "origin": "generated:transport/medium",
         "startLine": 610,
+      },
+      {
+        "endLine": 617,
+        "origin": "generated:transport/medium",
+        "startLine": 617,
       },
       {
         "endLine": 618,
@@ -49697,7 +49982,7 @@ void main() {
       },
       {
         "endLine": 620,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 619,
       },
       {
@@ -49727,12 +50012,12 @@ void main() {
       },
       {
         "endLine": 651,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 641,
       },
       {
         "endLine": 657,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 652,
       },
       {
@@ -50809,7 +51094,7 @@ void main() {
       },
       {
         "endLine": 632,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 631,
       },
       {
@@ -50829,12 +51114,12 @@ void main() {
       },
       {
         "endLine": 649,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 639,
       },
       {
         "endLine": 655,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 650,
       },
       {
@@ -51906,7 +52191,7 @@ void main() {
       },
       {
         "endLine": 610,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 609,
       },
       {
@@ -51926,17 +52211,17 @@ void main() {
       },
       {
         "endLine": 627,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 617,
       },
       {
         "endLine": 645,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 628,
       },
       {
         "endLine": 651,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 646,
       },
       {
@@ -53003,7 +53288,7 @@ void main() {
       },
       {
         "endLine": 610,
-        "origin": "generated:transport/miss",
+        "origin": "generated:transport/kernel-miss",
         "startLine": 609,
       },
       {
@@ -53023,17 +53308,17 @@ void main() {
       },
       {
         "endLine": 627,
-        "origin": "generated:transport/emission",
+        "origin": "generated:transport/kernel-emitter",
         "startLine": 617,
       },
       {
         "endLine": 645,
-        "origin": "generated:transport/nee",
+        "origin": "generated:transport/light-surface",
         "startLine": 628,
       },
       {
         "endLine": 651,
-        "origin": "generated:transport/bsdf",
+        "origin": "generated:transport/kernel-sample",
         "startLine": 646,
       },
       {

@@ -16,9 +16,9 @@ inlined as a typed literal. The sampler slot is carved: `rng.glsl` became
 `components/sampler/pcg4d.glsl` whole (state layout, seeding, and the [0,1) mapping are
 all occupant-specific — Owen–Sobol replaced exactly this file), call-surface contract
 documented on the registry.
-**§7 (transport anatomy) remains OPEN** — agreed sequence: GGX + a Veach-style MIS
-witness first (peaked-but-non-delta pdfs are the regime where re-carving the MIS code
-could actually break something visible), then the re-carve per §7.5's proof method.
+**§7 (transport anatomy) DECIDED + BUILT** (July 12 2026, after GGX + the veach-mis
+witness landed per the agreed sequence): the technique-centric carve — see §7 for the
+pinned anatomy (techniques/ + combiner + integrators/) and the byte-identity proof.
 **Companions:** `fable-strategy-taxonomy.md` (what the inputs mean — pinned),
 `fable-module-anatomy.md` (descriptor shapes — implemented by `impl-plan-descriptor-reorg.md`),
 `docs/trace-loop-contract.md` + `fable-compiler-contracts.md` (the GLSL contracts every
@@ -93,7 +93,9 @@ src/components/
   phase/        hg.{glsl,ts}  index.ts
   geometry/     sdf_primitives.glsl  raymarch.glsl  analytic_primitives.glsl  index.ts (param schemas)
   ambient/      euclidean.glsl                                          # (h3.glsl, schwarzschild.glsl)
-  transport/    pt/ …                       # the loop generator — see §7, OPEN
+  transport/    flags.ts  combiner.ts       # §7 anatomy (DECIDED + BUILT — see §7)
+                techniques/ kernel.ts  light.ts  index.ts
+                integrators/ pt.ts  index.ts
                 volume/ analytic.glsl       # volumeSampling bodies
                 shadow/ opaque.glsl  media.glsl
   env/          equirect.glsl  octahedral/{octahedral.glsl, octahedral.ts twin, test}  sampler_cdf.glsl
@@ -137,11 +139,38 @@ documented; zero behavior change.
 
 ---
 
-## 7. OPEN — the transport loop's internal anatomy ("close to the math")
+## 7. DECIDED — the transport loop's internal anatomy ("close to the math")
 
-**This section is the discussion.** Nothing here is pinned. It explains the problem from
-first principles because the central subtlety (deferred scoring) is what makes every
-naive decomposition feel wrong.
+**PINNED (owner, July 12 2026): Cut B — the technique-centric carve — chosen by the
+owner's answer to §7.6 Q2: "new sampling techniques are cheap is what we want."**
+BUILT the same day (byte-identity proof: all 50 registry pairs' emitted texts hashed
+identical before/after; snapshot churn = provenance renames + block splits only).
+
+The shipped anatomy (see the file headers for each part's contract):
+
+```
+components/transport/
+  flags.ts                 — the decisions, read ONCE from the link map, shared by all parts
+  combiner.ts              — every weighting line; pt/pt-nee/pt-mis are configs of these functions
+  techniques/  kernel.ts   — T1: continuation draw (surface+phase) + BOTH deferred scoring
+                             sites (emitter-hit, miss) + the carried record (prevBookkeeping
+                             is the single emitter of the MIS state writes)
+               light.ts    — T2: sample-and-score locally, surface + medium sites
+               index.ts    — the registry; A NEW TECHNIQUE IS ONE FILE + ONE LINE HERE
+  integrators/ pt.ts       — the recursive walk: path advance, state, self-heal, nulls,
+                             tracking, RR, spawn; composes the roster at its event sites
+               index.ts    — pick-one registry (one-shot/Whitted/probe = new walks here,
+                             composing the SAME techniques)
+```
+
+Costs accepted knowingly: one emitted GLSL block is assembled from lines owned by
+multiple parts (T1's scoring block calls the combiner inside the surface event) —
+flow-reading the EMITTERS crosses ownership; the dump stays linear and provenance-
+annotated. The strategy schema is unchanged (`directLighting` maps onto combiner
+configs); a technique-roster axis arrives with the second T2 occupant (equiangular).
+
+The original discussion text follows, kept because the deferred-scoring account is the
+context every future technique author needs.
 
 ### 7.1 Where we are
 
