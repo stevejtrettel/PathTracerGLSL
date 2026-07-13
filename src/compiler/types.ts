@@ -312,6 +312,15 @@ export interface EstimatorDescription {
      */
     volumeSampling?: 'analytic' | 'raymarch' | 'delta-tracking' | 'ratio-tracking';
     /**
+     * WHERE the medium direct-lighting estimate places its vertex (impl-plan-equiangular):
+     * 'vertex' (default) scores NEE at the transmittance-sampled scatter vertex;
+     * 'equiangular' scores once per segment at a vertex drawn ∝ 1/d²-to-light
+     * (Kulla–Fajardo) — the variance win for small lights in fog. Estimator section:
+     * variance only, same converged image (§11.2). V1: delta lights only and nee only
+     * (Validator-enforced; area-light arms + placement-MIS are the deferred exits).
+     */
+    mediumLightSampling?: 'vertex' | 'equiangular';
+    /**
      * Environment-sampler chart (T5, plan D11 — a swappable strategy axis): 'equirect' is
      * pbrt-v3's sinθ-weighted CDF (default); 'octahedral' is pbrt-v4's equal-area mapping
      * (constant Jacobian, no pole waste). The radiance integrand is IDENTICAL under both —

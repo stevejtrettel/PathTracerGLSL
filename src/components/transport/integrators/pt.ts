@@ -25,6 +25,7 @@ import {
     kernelStateFields, kernelStateInit, kernelRecordFn, kernelBlocks, kernelRequires,
 } from '../techniques/kernel.js';
 import { lightBlocks, lightRequires } from '../techniques/light.js';
+import { equiangularBlocks, equiangularRequires } from '../techniques/equiangular.js';
 
 export function contributeTransport(plan: RenderPlan): FeatureContribution {
     const program = plan.program;
@@ -36,7 +37,7 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
         kernelRecordFn(f),
     ];
     if (f.rr) blocks.push(roulette(f));
-    blocks.push(...kernelBlocks(f), ...lightBlocks(f), walk(program, f));
+    blocks.push(...kernelBlocks(f), ...lightBlocks(f), ...equiangularBlocks(f), walk(program, f));
 
     // Explicit literal (not ...emptyContribution): the purity rule — components import
     // no compiler VALUES, only contract types. tsc keeps this in sync with the type.
@@ -48,7 +49,7 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
         parameters: {},
         textures: [],
         provides: [{ name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' }],
-        requires: [...walkRequires(f), ...kernelRequires(f), ...lightRequires(f)],
+        requires: [...walkRequires(f), ...kernelRequires(f), ...lightRequires(f), ...equiangularRequires(f)],
     };
 }
 
@@ -140,6 +141,15 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             '        // boundary or far clip; entering/exiting is the interface machinery below.',
             '        int med_mat = material_of(s.current_medium);',
             '        if (material_has_medium(med_mat)) {',
+        );
+        if (f.equiangular) {
+            lines.push(
+                '            // Per-SEGMENT direct light (equiangular placement, segment-start throughput) —',
+                '            // independent of the transmittance sample below; replaces the at-vertex site.',
+                '            equiangular_sample_direct(s, med_mat, boundary ? hit.t : MAX_DIST);',
+            );
+        }
+        lines.push(
             '            MediumSample ms = medium_sample(med_mat, s.ray, boundary ? hit.t : MAX_DIST, random2());',
             '            s.throughput *= ms.weight;',
         );
@@ -150,7 +160,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
                 '                Point p_evt = ambient_geodesic(s.ray.origin, s.ray.direction, ms.t);',
                 '                Direction wo_med = -s.ray.direction;',
             );
-            if (f.nee) lines.push('                light_sample_direct_medium(s, med_mat, p_evt, wo_med);');
+            if (f.nee && !f.equiangular) lines.push('                light_sample_direct_medium(s, med_mat, p_evt, wo_med);');
             lines.push('                kernel_sample_phase(s, med_mat, p_evt, wo_med);');
             if (f.rr) lines.push('                if (!roulette(s, bounce)) break;');
             lines.push(

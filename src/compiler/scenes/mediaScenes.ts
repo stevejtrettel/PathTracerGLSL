@@ -225,6 +225,16 @@ export const hazeNeeStrategy: RenderStrategy = {
     view: { tonemap: { type: 'reinhard' } },
 };
 
+// The equiangular placement pair (impl-plan-equiangular): same integral, same NEE
+// partition — ONLY the medium vertex placement differs (per-segment, ∝ 1/d²-to-light).
+// Converged equality with pt-nee is the §11.2 witness; the visible win is the lamp
+// halo losing its spike noise.
+export const hazeEquiangularStrategy: RenderStrategy = {
+    ...hazeNeeStrategy,
+    id: 'pt-nee-eq',
+    estimator: { ...hazeNeeStrategy.estimator, mediumLightSampling: 'equiangular' },
+};
+
 export const hazePtStrategy: RenderStrategy = {
     id: 'pt',
     measurement: {

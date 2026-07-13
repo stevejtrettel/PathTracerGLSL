@@ -38,6 +38,7 @@ import {
     furnaceScatterStrategy,
     hazeScene,
     hazeNeeStrategy,
+    hazeEquiangularStrategy,
     hazePtStrategy,
 } from './mediaScenes.js';
 import {
@@ -230,11 +231,11 @@ export const sceneSuite: Record<string, SceneSuiteEntry> = {
     },
     haze: {
         scene: hazeScene,
-        strategies: [hazeNeeStrategy, hazePtStrategy],
+        strategies: [hazeNeeStrategy, hazeEquiangularStrategy, hazePtStrategy],
         exercises:
-            'HG-sign witness + medium NEE + spectral shadow_media (light shafts); {param}-driven haze.g; key 2 (pt) sees only the emissive panel — delta lights are invisible to phase paths (the equality pair is X-FOG, deferred to area lights)',
+            'HG-sign witness + medium NEE + spectral shadow_media (light shafts); {param}-driven haze.g; the EQUIANGULAR placement pair (impl-plan-equiangular): key 1 (pt-nee, vertex placement) vs key 2 (pt-nee-eq, per-segment ∝1/d²-to-light) — the first new technique through the §7 door; key 3 (pt) sees only the emissive panel',
         expected:
-            'drag haze.g: POSITIVE g brightens the glow around the light direction, negative dims it (inverted ⇒ the +2gc HG sign bug); key 1 ≥ key 2 everywhere by exactly the point-light term; spike-noise halos near the light are EXPECTED (equiangular placement is deferred)',
+            'keys 1 and 2 converge to the SAME image (§11.2 — divergence implicates the equiangular pdf algebra or the σ_s·T factors); key 2\'s lamp-halo CORE is measurably less noisy at equal samples (~19% display-space at 4spp headless — the 1/d² term is de-spiked; the win grows as single scattering dominates: thinner haze, brighter/closer lights, and this scene is albedo-0.95 multiple-scatter-heavy); drag haze.g: POSITIVE g brightens the glow toward the light (inverted ⇒ the +2gc HG sign bug); keys 1,2 ≥ key 3 everywhere by exactly the point-light term',
         initialParameters: {
             'camera.position': [0, 1.2, 5],
             'camera.target': [0, 1.2, -1],

@@ -19,6 +19,10 @@ export function flags(p: ProgramDescription) {
         emitters: p.emitters.samplable,
         emittersPdf: p.emitters.lightingPdf,
         rr: p.estimator.russianRoulette,
+        /** T2's medium placement (impl-plan-equiangular): per-segment equiangular vs
+         *  at-the-scatter-vertex. Only ever true when nee ∧ scattering. */
+        equiangular: lighting !== null && p.media.scatteringArms
+            && p.estimator.mediumLightSampling === 'equiangular',
     };
 }
 export type Flags = ReturnType<typeof flags>;

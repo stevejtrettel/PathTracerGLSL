@@ -225,6 +225,33 @@ export function validate(
             .add();
     }
 
+    // Equiangular medium NEE — v1 scope pins (impl-plan-equiangular §3).
+    if (strategy.estimator.mediumLightSampling === 'equiangular') {
+        // Pin 2: placement-MIS is undesigned — the emitter-hit power heuristic assumes T2
+        // samples directions from the previous vertex; equiangular samples (t, light).
+        if (strategy.estimator.directLighting === 'mis') {
+            bag.error('incompatible-options',
+                `mediumLightSampling 'equiangular' with directLighting 'mis' is reserved — placement-MIS is undesigned (impl-plan-equiangular §3.2); use 'nee'`)
+                .add();
+        }
+        // Pin 1: equiangular needs the light's position BEFORE choosing t — our area
+        // samplers are solid-angle-from-p. Delta lights only until the p-independent
+        // area arms land (reject-not-degrade).
+        const hasAreaLight = scene.lights.some((l) => l.kind === 'quad' || l.kind === 'sphere')
+            || Object.values(scene.materials).some((m) => m.sampleAsLight === true);
+        if (hasAreaLight) {
+            bag.error('incompatible-options',
+                `mediumLightSampling 'equiangular' supports DELTA lights only in v1 — this scene has samplable area emitters (deferred: p-independent area arms, impl-plan-equiangular §7)`)
+                .add();
+        }
+        // The C5 silent-inert rule: the knob must control something.
+        if (strategy.estimator.directLighting === 'none' || !features.media.hasScatteringMedia) {
+            bag.warning('invalid-setting',
+                `mediumLightSampling 'equiangular' controls nothing here (needs directLighting 'nee' AND scattering media) — the knob is inert`)
+                .add();
+        }
+    }
+
     // Reserved strategy values (reject-not-remove — the axes exist in the types so the
     // design surface is visible; the implementations arrive later).
     const vs = strategy.estimator.volumeSampling;

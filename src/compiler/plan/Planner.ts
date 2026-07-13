@@ -251,6 +251,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             lighting,
             russianRoulette: strategy.estimator.russianRoulette,
             volumeSampling: scatteringArms ? 'analytic' : 'none',
+            // Placement is a decision only where a medium NEE estimate exists at all.
+            mediumLightSampling: lighting !== null && scatteringArms
+                ? (strategy.estimator.mediumLightSampling ?? 'vertex')
+                : 'vertex',
             envSampler: {
                 chart: strategy.estimator.envSampler ?? 'equirect',
                 compensation: strategy.estimator.envCompensation ?? false,

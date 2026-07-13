@@ -22,6 +22,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -90,6 +91,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -151,6 +153,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -214,6 +217,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -280,6 +284,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -346,6 +351,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -409,6 +415,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -476,6 +483,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -543,6 +551,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -610,6 +619,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -669,6 +679,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -726,6 +737,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -792,6 +804,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -858,6 +871,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -921,6 +935,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -987,6 +1002,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -1050,6 +1066,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -1106,6 +1123,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -1162,6 +1180,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "analytic",
   },
@@ -1225,6 +1244,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -1295,6 +1315,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -1365,6 +1386,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -1425,6 +1447,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 4,
     },
@@ -1486,6 +1509,69 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-eq 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "equiangular",
     "russianRoulette": {
       "startDepth": 4,
     },
@@ -1550,6 +1636,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 4,
     },
@@ -1615,6 +1702,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 4,
     },
@@ -1683,6 +1771,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -1748,6 +1837,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -1815,6 +1905,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -1882,6 +1973,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -1946,6 +2038,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2014,6 +2107,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2079,6 +2173,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2152,6 +2247,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2225,6 +2321,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2298,6 +2395,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2365,6 +2463,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2435,6 +2534,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2505,6 +2605,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2575,6 +2676,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2642,6 +2744,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2712,6 +2815,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2782,6 +2886,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -2846,6 +2951,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -2902,6 +3008,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -2962,6 +3069,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -3021,6 +3129,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
       "method": "nee",
       "selection": "uniform",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": null,
     "volumeSampling": "none",
   },
@@ -3083,6 +3192,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
       "compensation": false,
     },
     "lighting": null,
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -3151,6 +3261,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
       "method": "mis",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },
@@ -3219,6 +3330,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
       "method": "nee",
       "selection": "power",
     },
+    "mediumLightSampling": "vertex",
     "russianRoulette": {
       "startDepth": 3,
     },

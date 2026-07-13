@@ -16,7 +16,9 @@ export function lightBlocks(f: Flags): ShaderBlock[] {
     const blocks: ShaderBlock[] = [
         { origin: 'components/transport/techniques/light.glsl', source: lightGLSL },
     ];
-    if (f.scattering) {
+    // The at-vertex medium site — replaced wholesale by equiangular.glsl's per-segment
+    // site under estimator.mediumLightSampling 'equiangular' (one placement per program).
+    if (f.scattering && !f.equiangular) {
         blocks.push({ origin: 'components/transport/techniques/light_medium.glsl', source: lightMediumGLSL });
     }
     return blocks;
@@ -27,7 +29,7 @@ export function lightRequires(f: Flags): string[] {
     if (!f.nee) return [];
     const req = ['lighting_sample', 'shadow_transmittance', 'material_has_nondelta_lobes', 'interaction_surface_eval'];
     if (f.mis) req.push('interaction_surface_pdf');
-    if (f.scattering) {
+    if (f.scattering && !f.equiangular) {
         req.push('hg_eval');
         if (f.mis) req.push('hg_pdf');
     }

@@ -39,6 +39,11 @@ export interface ProgramDescription {
         /** 'analytic' iff scattering arms are live (media.scatteringArms); 'none'
          *  otherwise. Future null-collision methods are new values here. */
         volumeSampling: 'none' | 'analytic';
+        /** Medium NEE vertex placement (impl-plan-equiangular): 'vertex' = at the
+         *  transmittance-sampled scatter vertex (event site); 'equiangular' = per
+         *  segment, drawn ∝ 1/d²-to-light. Meaningful only when lighting ≠ null and
+         *  scattering arms are live; 'vertex' otherwise. */
+        mediumLightSampling: 'vertex' | 'equiangular';
         /** T5 strategy axis (plan D11): which chart the env sampler's CDF table lives
          *  in, and whether the table is MIS-compensated. Radiance is chart-independent. */
         envSampler: { chart: 'equirect' | 'octahedral'; compensation: boolean };

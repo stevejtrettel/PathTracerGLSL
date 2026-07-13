@@ -129,6 +129,7 @@ artifact's identity.
 | `transport.directLighting` | estimator | pt/nee/mis converge identically (X-witnesses) |
 | `transport.lightSelection` | estimator | |
 | `transport.envSampler`, `envCompensation` | estimator | chart choice cannot change the answer |
+| `estimator.mediumLightSampling` | estimator | vertex vs equiangular placement — same segment integral, §11.2 haze pair enforces (impl-plan-equiangular) |
 | `transport.volumeIntegrator` | **SPLIT — see §8** | mis-factored field found by this taxonomy |
 | `accumulation.*` | estimator | |
 | `display.*` | view | |

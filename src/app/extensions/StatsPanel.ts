@@ -107,10 +107,11 @@ export class StatsPanel extends UIExtension {
         lines.push(`<b>Resolution:</b> ${stats.resolution[0]}×${stats.resolution[1]}`);
         lines.push(`<b>Time:</b> ${formatTime(stats.elapsedMs)}`);
 
-        // Renderer
+        // Renderer — FULL id. (A first-two-segments truncation displayed 'pt-nee-eq-haze'
+        // and 'pt-nee-haze' identically as "pt-nee" — two renderers, one label — and cost
+        // the equiangular bring-up a false verification trail. Never abbreviate identity.)
         if (stats.rendererId) {
-            const shortId = stats.rendererId.split('-').slice(0, 2).join('-');
-            lines.push(`<b>Renderer:</b> ${shortId}`);
+            lines.push(`<b>Renderer:</b> ${stats.rendererId}`);
         }
 
         // GPU timings (if profiling enabled)

@@ -77,7 +77,7 @@ export function combinerFns(f: Flags): ShaderBlock {
         }
         lines.push('}');
 
-        if (f.scattering) {
+        if (f.scattering && !f.equiangular) {
             lines.push('float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {');
             if (f.mis) {
                 lines.push(

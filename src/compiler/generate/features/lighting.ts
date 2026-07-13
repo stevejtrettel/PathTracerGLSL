@@ -7,7 +7,7 @@
 import type { RenderPlan, PlannedLight } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat } from '../../../components/glsl-format.js';
+import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
 
 import shadowOpaqueGLSL from '../../../components/transport/shadow/opaque.glsl?raw';
@@ -78,6 +78,13 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         source: generateLightSampling(plan.lights, selectPdf, envSamplable),
     });
 
+    // Equiangular placement needs the light's POSITION before choosing t — a query the
+    // solid-angle-from-p sampler cannot answer (impl-plan-equiangular). Emitted only under
+    // the knob; the Validator has already guaranteed every light is delta (v1 pin 1).
+    if (plan.program.estimator.mediumLightSampling === 'equiangular') {
+        blocks.push({ origin: 'generated:lighting-query-delta', source: generateLightingQueryDelta(plan.lights, selectPdf) });
+    }
+
     // §6.2 registry table + the transport emission-bookkeeping gate: only when a samplable
     // NON-DELTA emitter exists (delta-only scenes preprocess to the pre-area-light program).
     // The DECISIONS are Planner-made (program.emitters, T2); the list is codegen data.
@@ -100,6 +107,9 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     }
     if (plan.program.emitters.lightingPdf) {
         provides.push({ name: 'lighting_pdf', signature: 'float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit)' });
+    }
+    if (plan.program.estimator.mediumLightSampling === 'equiangular') {
+        provides.push({ name: 'lighting_query_delta', signature: 'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity)' });
     }
     const requires: string[] = [];
     if (envSamplable) requires.push('environment_sample', 'environment_pdf');
@@ -130,8 +140,39 @@ function generateLightOf(samplable: PlannedLight[]): string {
 }
 
 // ============================================================================
-// Generated selection dispatcher (per-scene codegen)
+// Generated delta-light query — equiangular placement (impl-plan-equiangular)
 // ============================================================================
+
+/** Position + radiant intensity (color·intensity, WITHOUT 1/d² — §6.1 folds that at
+ *  the estimate site) + selection pdf, selected by the SAME compile-time CDF as
+ *  lighting_sample (one selection truth, two readers — the pitfall-11 discipline).
+ *  V1: every light is delta (Validator pin 1), so the table is total. */
+function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[]): string {
+    const lines = [
+        '// Generated delta-light query (equiangular placement): position + intensity + select pdf.',
+        'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity) {',
+    ];
+    const arm = (l: PlannedLight, i: number) => [
+        `pos = ${formatVec3(l.position!)};`,
+        `intensity = ${formatSpectrum(l.color.map((c) => c * l.intensity))};`,
+        `return ${formatFloat(selectPdf[i])};`,
+    ];
+    if (lights.length === 1) {
+        lines.push(...arm(lights[0], 0).map((s) => `    ${s}`));
+    } else {
+        let acc = 0;
+        for (let i = 0; i < lights.length; i++) {
+            acc += selectPdf[i];
+            if (i < lights.length - 1) {
+                lines.push(`    if (uc < ${formatFloat(acc)}) { ${arm(lights[i], i).join(' ')} }`);
+            } else {
+                lines.push(`    ${arm(lights[i], i).join(' ')}`);   // last arm unconditional
+            }
+        }
+    }
+    lines.push('}');
+    return lines.join('\n');
+}
 
 /** Emitted power for CDF selection — the kind descriptors carry the pbrt formulas
  *  (area-aware, pitfall 6). Exported for the H6 invariant tests. */

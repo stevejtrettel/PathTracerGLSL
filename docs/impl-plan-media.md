@@ -164,7 +164,7 @@ scenes still identical-after-preprocessing; `npx vitest run` + snapshot review.
 | Piece | Lands with |
 |---|---|
 | Heterogeneous/procedural media, majorant declaration+validation, delta/ratio tracking, honest `raymarch` | V1-C1 relaxation (§1.1) |
-| Equiangular medium-NEE placement (seam 4 — point lights in fog; Kulla–Fajardo) | own item, after area lights or when halo noise hurts |
+| ~~Equiangular medium-NEE placement (seam 4 — point lights in fog; Kulla–Fajardo)~~ | **LANDED** (impl-plan-equiangular, July 2026 — the first new technique through the §7 door): `estimator.mediumLightSampling: 'vertex' \| 'equiangular'`, haze pt-nee/pt-nee-eq equality pair. V1 = delta lights + nee only; area arms + placement-MIS on that plan's ledger |
 | Volumetric emission (`MediumProperties.emission` + the radiance capability flag's first reader) | first emissive-medium scene |
 | Analytic/approximate fog strategies (inline-radiance readers) | first approximate-strategy experiment |
 | ~~X-FOG proper (the pt/pt-nee equality pair) + medium-side MIS + `prev_bsdf_pdf` bookkeeping~~ | **LANDED** with area lights (impl-plan-area-lights phase B): the `fog-area` witness passes three-way |

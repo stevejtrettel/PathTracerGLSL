@@ -12,3 +12,4 @@
 
 export * as kernel from './kernel.js';
 export * as light from './light.js';
+export * as equiangular from './equiangular.js';
