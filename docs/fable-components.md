@@ -105,8 +105,18 @@ src/components/
 ```
 
 Rules:
-- **Occupant unit:** flat `name.{glsl,ts}` pairs; a folder per occupant only when it
-  earns it (≥3 artifacts — e.g. octahedral's GLSL + TS ground-truth twin + test).
+- **Occupant unit (owner-revised July 2026, supersedes the ≥3-artifacts rule): 1
+  component = 1 folder**, uniformly — `{name.glsl, name.ts, name.md, tests}`. The
+  `name.md` is the occupant's MATHEMATICS (derivation, sampling scheme, invariants,
+  witnesses — facts about ONE occupant) and is OPTIONAL: some components are
+  implemented first and derived post hoc. Every FAMILY root carries a `README.md`
+  contract doc (taxonomy section, kind, what occupants supply, how the compiler
+  consumes them, the add-a-component recipe) — README presence and the folder rule
+  are enforced by `tests/components/structure.test.ts`. Doc-drift rule: file headers
+  stay terse pointers; the occupant md owns the math narrative;
+  `fable-reference-implementations.md` remains the normative dev-time transcription
+  source and is CITED, never forked. (A longer derivation compendium in docs/ awaits
+  the docs-folder reorganization — deferred by owner decision.)
 - Registries at each family's `index.ts`: plain lookup records. Descriptor fields MAY be
   functions (a pdf arm is a fact-as-code); they may NOT reference other components,
   ordering, or the plan.
