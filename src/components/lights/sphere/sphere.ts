@@ -1,9 +1,9 @@
 // Sphere area-light descriptor — co-located with light_sphere.glsl (module-anatomy §2).
 // Sampled via the visible cone; inside-the-sphere the sampler punts (deferred fallback).
 
-import type { LightKindDescriptor } from '../descriptors.js';
-import { formatFloat, formatSpectrum, formatVec3 } from '../glsl-format.js';
-import { emittedScalar } from './index.js';
+import type { LightKindDescriptor } from '../../descriptors.js';
+import { formatFloat, formatSpectrum, formatVec3 } from '../../glsl-format.js';
+import { emittedScalar } from '../index.js';
 import lightSphereGLSL from './sphere.glsl?raw';
 
 export const sphereLightDescriptor: LightKindDescriptor = {

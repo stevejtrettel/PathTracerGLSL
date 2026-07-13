@@ -13,7 +13,7 @@
 
 import type { SceneDescription, CompiledRenderer } from './types.js';
 import fullscreenVertGLSL from '../components/film/fullscreen.vert.glsl?raw';
-import envChartEquirectGLSL from '../components/env/equirect.glsl?raw';
+import envChartEquirectGLSL from '../components/env/equirect/equirect.glsl?raw';
 import envChartOctahedralGLSL from '../components/env/octahedral/octahedral.glsl?raw';
 
 export const DEFAULT_ENV_TABLE_SIZE: [number, number] = [512, 256];

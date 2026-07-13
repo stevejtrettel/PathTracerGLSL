@@ -6,8 +6,8 @@
 // pinned single-emitter rule, now a single generated FUNCTION), the file inclusions,
 // and the seams T1's emitted code calls.
 
-import type { ShaderBlock } from '../../../compiler/generate/ShaderIR.js';
-import type { Flags } from '../flags.js';
+import type { ShaderBlock } from '../../../../compiler/generate/ShaderIR.js';
+import type { Flags } from '../../flags.js';
 import kernelGLSL from './kernel.glsl?raw';
 import kernelPhaseGLSL from './kernel_phase.glsl?raw';
 
@@ -54,10 +54,10 @@ export function kernelRecordFn(f: Flags): ShaderBlock {
 /** T1's static math files, included per program shape. */
 export function kernelBlocks(f: Flags): ShaderBlock[] {
     const blocks: ShaderBlock[] = [
-        { origin: 'components/transport/techniques/kernel.glsl', source: kernelGLSL },
+        { origin: 'components/transport/techniques/kernel/kernel.glsl', source: kernelGLSL },
     ];
     if (f.scattering) {
-        blocks.push({ origin: 'components/transport/techniques/kernel_phase.glsl', source: kernelPhaseGLSL });
+        blocks.push({ origin: 'components/transport/techniques/kernel/kernel_phase.glsl', source: kernelPhaseGLSL });
     }
     return blocks;
 }

@@ -12,7 +12,7 @@
 // Owen–Sobol (built once and reverted — the deferred record is the memory entry
 // rng-owen-sobol-tried-reverted; its re-arrival gets a strategy knob on this registry).
 
-import pcg4dGLSL from './pcg4d.glsl?raw';
+import pcg4dGLSL from './pcg4d/pcg4d.glsl?raw';
 
 export interface SamplerDescriptor {
     id: string;

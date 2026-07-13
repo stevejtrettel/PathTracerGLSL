@@ -3,7 +3,7 @@
 // one GLSL file + one descriptor + one line here.
 
 import type { PhaseModelDescriptor } from '../descriptors.js';
-import { hgDescriptor } from './hg.js';
+import { hgDescriptor } from './hg/hg.js';
 
 export const PHASE_MODELS: Record<string, PhaseModelDescriptor> = {
     hg: hgDescriptor,

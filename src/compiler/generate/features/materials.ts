@@ -14,7 +14,7 @@ import { MATERIAL_MODELS, materialModel } from '../../../components/materials/in
 import { PHASE_MODELS } from '../../../components/phase/index.js';
 import { unionFields } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
-import mediumAnalyticGLSL from '../../../components/transport/volume/analytic.glsl?raw';
+import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
 
 /** Capability lookup over the descriptor registry (R1a — replaces the inline
  *  MODEL_HAS_NONDELTA_LOBES map). 'none' is a boundary classification, not a model:
@@ -58,7 +58,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 
     // Model includes from the registry (R1a): one line per model PRESENT, no per-model ifs.
     for (const model of plan.program.materials.models) {
-        blocks.push({ origin: `components/materials/${model}.glsl`, source: materialModel(model).glsl });
+        blocks.push({ origin: `components/materials/${model}/${model}.glsl`, source: materialModel(model).glsl });
     }
 
     // The generated §3.3 dispatch, after the model libraries it calls.
@@ -85,11 +85,11 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         // The 'analytic' strategy bodies (volumetric-component §4) — needed by the scattering
         // arms (seam 1) and by the spectral shadow walker's per-segment form (seam 2).
         if (scatteringLive || wantsShadowMedia) {
-            blocks.push({ origin: 'components/transport/volume/analytic.glsl', source: mediumAnalyticGLSL });
+            blocks.push({ origin: 'components/transport/volume/analytic/analytic.glsl', source: mediumAnalyticGLSL });
         }
         if (scatteringLive) {
             // v1: every scattering medium phases through HG (registry-driven, R1b).
-            blocks.push({ origin: 'components/phase/hg.glsl', source: PHASE_MODELS['hg'].glsl });
+            blocks.push({ origin: 'components/phase/hg/hg.glsl', source: PHASE_MODELS['hg'].glsl });
         }
         blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan) });
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).

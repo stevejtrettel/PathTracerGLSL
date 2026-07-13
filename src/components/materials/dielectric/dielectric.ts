@@ -1,6 +1,6 @@
 // Smooth-dielectric descriptor — co-located with dielectric.glsl (module-anatomy §2).
 
-import type { MaterialModelDescriptor } from '../descriptors.js';
+import type { MaterialModelDescriptor } from '../../descriptors.js';
 import dielectricGLSL from './dielectric.glsl?raw';
 
 export const dielectricDescriptor: MaterialModelDescriptor = {

@@ -5,8 +5,8 @@
 // it carries no state — this file declares only the inclusions and seams. A placement
 // variant (equiangular medium NEE) is a second occupant: one new .glsl beside these.
 
-import type { ShaderBlock } from '../../../compiler/generate/ShaderIR.js';
-import type { Flags } from '../flags.js';
+import type { ShaderBlock } from '../../../../compiler/generate/ShaderIR.js';
+import type { Flags } from '../../flags.js';
 import lightGLSL from './light.glsl?raw';
 import lightMediumGLSL from './light_medium.glsl?raw';
 
@@ -14,12 +14,12 @@ import lightMediumGLSL from './light_medium.glsl?raw';
 export function lightBlocks(f: Flags): ShaderBlock[] {
     if (!f.nee) return [];
     const blocks: ShaderBlock[] = [
-        { origin: 'components/transport/techniques/light.glsl', source: lightGLSL },
+        { origin: 'components/transport/techniques/light/light.glsl', source: lightGLSL },
     ];
     // The at-vertex medium site — replaced wholesale by equiangular.glsl's per-segment
     // site under estimator.mediumLightSampling 'equiangular' (one placement per program).
     if (f.scattering && !f.equiangular) {
-        blocks.push({ origin: 'components/transport/techniques/light_medium.glsl', source: lightMediumGLSL });
+        blocks.push({ origin: 'components/transport/techniques/light/light_medium.glsl', source: lightMediumGLSL });
     }
     return blocks;
 }

@@ -15,7 +15,7 @@ import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../../engine/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import envChartEquirectGLSL from '../../../components/env/equirect.glsl?raw';
+import envChartEquirectGLSL from '../../../components/env/equirect/equirect.glsl?raw';
 import envChartOctahedralGLSL from '../../../components/env/octahedral/octahedral.glsl?raw';
 import envSamplerCdfGLSL from '../../../components/env/sampler_cdf.glsl?raw';
 
@@ -39,7 +39,7 @@ export function envVariantSuffix(chart: 'equirect' | 'octahedral', compensation:
 function chartBlock(chart: 'equirect' | 'octahedral') {
     return chart === 'octahedral'
         ? { origin: 'components/env/octahedral/octahedral.glsl', source: envChartOctahedralGLSL }
-        : { origin: 'components/env/equirect.glsl', source: envChartEquirectGLSL };
+        : { origin: 'components/env/equirect/equirect.glsl', source: envChartEquirectGLSL };
 }
 
 /** Per-chart table dimensions live on separate parameter paths (they differ: W×H vs N×N). */

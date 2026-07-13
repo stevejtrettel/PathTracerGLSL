@@ -1078,7 +1078,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -1110,7 +1110,7 @@ void main() {
       },
       {
         "endLine": 132,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 92,
       },
       {
@@ -1120,7 +1120,7 @@ void main() {
       },
       {
         "endLine": 188,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 165,
       },
       {
@@ -1135,7 +1135,7 @@ void main() {
       },
       {
         "endLine": 249,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -1145,12 +1145,12 @@ void main() {
       },
       {
         "endLine": 425,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 311,
       },
       {
         "endLine": 476,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 426,
       },
       {
@@ -1185,12 +1185,12 @@ void main() {
       },
       {
         "endLine": 621,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 584,
       },
       {
         "endLine": 679,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 622,
       },
       {
@@ -1210,12 +1210,12 @@ void main() {
       },
       {
         "endLine": 720,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 706,
       },
       {
         "endLine": 739,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 721,
       },
       {
@@ -1225,7 +1225,7 @@ void main() {
       },
       {
         "endLine": 767,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 747,
       },
       {
@@ -1255,12 +1255,12 @@ void main() {
       },
       {
         "endLine": 846,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 812,
       },
       {
         "endLine": 868,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 847,
       },
       {
@@ -1270,7 +1270,7 @@ void main() {
       },
       {
         "endLine": 918,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 893,
       },
     ],
@@ -2149,7 +2149,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -2181,7 +2181,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -2191,7 +2191,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -2206,7 +2206,7 @@ void main() {
       },
       {
         "endLine": 283,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -2236,7 +2236,7 @@ void main() {
       },
       {
         "endLine": 404,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 367,
       },
       {
@@ -2256,12 +2256,12 @@ void main() {
       },
       {
         "endLine": 440,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 426,
       },
       {
         "endLine": 459,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 441,
       },
       {
@@ -2271,7 +2271,7 @@ void main() {
       },
       {
         "endLine": 487,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 467,
       },
       {
@@ -2301,12 +2301,12 @@ void main() {
       },
       {
         "endLine": 564,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 530,
       },
       {
         "endLine": 586,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 565,
       },
       {
@@ -2316,7 +2316,7 @@ void main() {
       },
       {
         "endLine": 631,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 606,
       },
     ],
@@ -3356,7 +3356,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -3388,7 +3388,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -3398,7 +3398,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -3413,7 +3413,7 @@ void main() {
       },
       {
         "endLine": 249,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -3423,7 +3423,7 @@ void main() {
       },
       {
         "endLine": 433,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 319,
       },
       {
@@ -3448,7 +3448,7 @@ void main() {
       },
       {
         "endLine": 551,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 514,
       },
       {
@@ -3468,12 +3468,12 @@ void main() {
       },
       {
         "endLine": 587,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 573,
       },
       {
         "endLine": 606,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 588,
       },
       {
@@ -3483,7 +3483,7 @@ void main() {
       },
       {
         "endLine": 634,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 614,
       },
       {
@@ -3513,12 +3513,12 @@ void main() {
       },
       {
         "endLine": 711,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 677,
       },
       {
         "endLine": 733,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 712,
       },
       {
@@ -3528,7 +3528,7 @@ void main() {
       },
       {
         "endLine": 778,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 753,
       },
     ],
@@ -4585,7 +4585,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -4617,7 +4617,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -4627,7 +4627,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -4642,7 +4642,7 @@ void main() {
       },
       {
         "endLine": 246,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 230,
       },
       {
@@ -4652,12 +4652,12 @@ void main() {
       },
       {
         "endLine": 430,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 316,
       },
       {
         "endLine": 481,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 431,
       },
       {
@@ -4687,7 +4687,7 @@ void main() {
       },
       {
         "endLine": 635,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 598,
       },
       {
@@ -4707,7 +4707,7 @@ void main() {
       },
       {
         "endLine": 677,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 657,
       },
       {
@@ -4737,7 +4737,7 @@ void main() {
       },
       {
         "endLine": 751,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 717,
       },
       {
@@ -4747,7 +4747,7 @@ void main() {
       },
       {
         "endLine": 795,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 770,
       },
     ],
@@ -5921,7 +5921,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -5953,7 +5953,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -5968,7 +5968,7 @@ void main() {
       },
       {
         "endLine": 197,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 174,
       },
       {
@@ -5983,7 +5983,7 @@ void main() {
       },
       {
         "endLine": 259,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 243,
       },
       {
@@ -5993,12 +5993,12 @@ void main() {
       },
       {
         "endLine": 443,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 329,
       },
       {
         "endLine": 494,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 444,
       },
       {
@@ -6028,7 +6028,7 @@ void main() {
       },
       {
         "endLine": 648,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 611,
       },
       {
@@ -6048,12 +6048,12 @@ void main() {
       },
       {
         "endLine": 684,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 670,
       },
       {
         "endLine": 713,
-        "origin": "components/lights/quad.glsl",
+        "origin": "components/lights/quad/quad.glsl",
         "startLine": 685,
       },
       {
@@ -6073,7 +6073,7 @@ void main() {
       },
       {
         "endLine": 756,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 736,
       },
       {
@@ -6103,12 +6103,12 @@ void main() {
       },
       {
         "endLine": 845,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 811,
       },
       {
         "endLine": 867,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 846,
       },
       {
@@ -6118,7 +6118,7 @@ void main() {
       },
       {
         "endLine": 912,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 887,
       },
     ],
@@ -7265,7 +7265,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -7297,7 +7297,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -7307,7 +7307,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -7322,7 +7322,7 @@ void main() {
       },
       {
         "endLine": 250,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 234,
       },
       {
@@ -7332,12 +7332,12 @@ void main() {
       },
       {
         "endLine": 434,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 320,
       },
       {
         "endLine": 485,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 435,
       },
       {
@@ -7367,7 +7367,7 @@ void main() {
       },
       {
         "endLine": 639,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 602,
       },
       {
@@ -7387,12 +7387,12 @@ void main() {
       },
       {
         "endLine": 675,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 661,
       },
       {
         "endLine": 704,
-        "origin": "components/lights/quad.glsl",
+        "origin": "components/lights/quad/quad.glsl",
         "startLine": 676,
       },
       {
@@ -7407,7 +7407,7 @@ void main() {
       },
       {
         "endLine": 737,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 717,
       },
       {
@@ -7437,12 +7437,12 @@ void main() {
       },
       {
         "endLine": 818,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 784,
       },
       {
         "endLine": 840,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 819,
       },
       {
@@ -7452,7 +7452,7 @@ void main() {
       },
       {
         "endLine": 885,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 860,
       },
     ],
@@ -8575,7 +8575,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -8607,7 +8607,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -8617,7 +8617,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -8632,7 +8632,7 @@ void main() {
       },
       {
         "endLine": 247,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 231,
       },
       {
@@ -8642,12 +8642,12 @@ void main() {
       },
       {
         "endLine": 431,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 317,
       },
       {
         "endLine": 482,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 432,
       },
       {
@@ -8682,12 +8682,12 @@ void main() {
       },
       {
         "endLine": 642,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 605,
       },
       {
         "endLine": 700,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 643,
       },
       {
@@ -8707,7 +8707,7 @@ void main() {
       },
       {
         "endLine": 747,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 727,
       },
       {
@@ -8737,7 +8737,7 @@ void main() {
       },
       {
         "endLine": 823,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 789,
       },
       {
@@ -8747,7 +8747,7 @@ void main() {
       },
       {
         "endLine": 872,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 847,
       },
     ],
@@ -9980,7 +9980,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -10012,7 +10012,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -10027,7 +10027,7 @@ void main() {
       },
       {
         "endLine": 197,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 174,
       },
       {
@@ -10042,7 +10042,7 @@ void main() {
       },
       {
         "endLine": 260,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 244,
       },
       {
@@ -10052,12 +10052,12 @@ void main() {
       },
       {
         "endLine": 444,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 330,
       },
       {
         "endLine": 495,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 445,
       },
       {
@@ -10092,12 +10092,12 @@ void main() {
       },
       {
         "endLine": 655,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 618,
       },
       {
         "endLine": 713,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 656,
       },
       {
@@ -10117,12 +10117,12 @@ void main() {
       },
       {
         "endLine": 754,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 740,
       },
       {
         "endLine": 783,
-        "origin": "components/lights/quad.glsl",
+        "origin": "components/lights/quad/quad.glsl",
         "startLine": 755,
       },
       {
@@ -10142,7 +10142,7 @@ void main() {
       },
       {
         "endLine": 826,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 806,
       },
       {
@@ -10172,12 +10172,12 @@ void main() {
       },
       {
         "endLine": 917,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 883,
       },
       {
         "endLine": 939,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 918,
       },
       {
@@ -10187,7 +10187,7 @@ void main() {
       },
       {
         "endLine": 989,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 964,
       },
     ],
@@ -11393,7 +11393,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -11425,7 +11425,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -11435,7 +11435,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -11450,7 +11450,7 @@ void main() {
       },
       {
         "endLine": 251,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 235,
       },
       {
@@ -11460,12 +11460,12 @@ void main() {
       },
       {
         "endLine": 435,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 321,
       },
       {
         "endLine": 486,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 436,
       },
       {
@@ -11500,12 +11500,12 @@ void main() {
       },
       {
         "endLine": 646,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 609,
       },
       {
         "endLine": 704,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 647,
       },
       {
@@ -11525,12 +11525,12 @@ void main() {
       },
       {
         "endLine": 745,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 731,
       },
       {
         "endLine": 774,
-        "origin": "components/lights/quad.glsl",
+        "origin": "components/lights/quad/quad.glsl",
         "startLine": 746,
       },
       {
@@ -11545,7 +11545,7 @@ void main() {
       },
       {
         "endLine": 807,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 787,
       },
       {
@@ -11575,12 +11575,12 @@ void main() {
       },
       {
         "endLine": 890,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 856,
       },
       {
         "endLine": 912,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 891,
       },
       {
@@ -11590,7 +11590,7 @@ void main() {
       },
       {
         "endLine": 962,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 937,
       },
     ],
@@ -12677,7 +12677,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -12709,7 +12709,7 @@ void main() {
       },
       {
         "endLine": 132,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 92,
       },
       {
@@ -12719,7 +12719,7 @@ void main() {
       },
       {
         "endLine": 188,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 165,
       },
       {
@@ -12734,7 +12734,7 @@ void main() {
       },
       {
         "endLine": 249,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -12744,7 +12744,7 @@ void main() {
       },
       {
         "endLine": 433,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 319,
       },
       {
@@ -12774,12 +12774,12 @@ void main() {
       },
       {
         "endLine": 557,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 520,
       },
       {
         "endLine": 615,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 558,
       },
       {
@@ -12799,12 +12799,12 @@ void main() {
       },
       {
         "endLine": 656,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 642,
       },
       {
         "endLine": 675,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 657,
       },
       {
@@ -12814,7 +12814,7 @@ void main() {
       },
       {
         "endLine": 703,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 683,
       },
       {
@@ -12844,12 +12844,12 @@ void main() {
       },
       {
         "endLine": 782,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 748,
       },
       {
         "endLine": 804,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 783,
       },
       {
@@ -12859,7 +12859,7 @@ void main() {
       },
       {
         "endLine": 854,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 829,
       },
     ],
@@ -13794,7 +13794,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -13826,7 +13826,7 @@ void main() {
       },
       {
         "endLine": 132,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 92,
       },
       {
@@ -13836,7 +13836,7 @@ void main() {
       },
       {
         "endLine": 188,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 165,
       },
       {
@@ -13851,7 +13851,7 @@ void main() {
       },
       {
         "endLine": 246,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 230,
       },
       {
@@ -13861,7 +13861,7 @@ void main() {
       },
       {
         "endLine": 386,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 272,
       },
       {
@@ -13891,12 +13891,12 @@ void main() {
       },
       {
         "endLine": 488,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 451,
       },
       {
         "endLine": 546,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 489,
       },
       {
@@ -13916,7 +13916,7 @@ void main() {
       },
       {
         "endLine": 593,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 573,
       },
       {
@@ -13941,7 +13941,7 @@ void main() {
       },
       {
         "endLine": 661,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 627,
       },
       {
@@ -13951,7 +13951,7 @@ void main() {
       },
       {
         "endLine": 709,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 684,
       },
     ],
@@ -15195,7 +15195,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -15237,7 +15237,7 @@ void main() {
       },
       {
         "endLine": 157,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 117,
       },
       {
@@ -15252,7 +15252,7 @@ void main() {
       },
       {
         "endLine": 217,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 194,
       },
       {
@@ -15267,7 +15267,7 @@ void main() {
       },
       {
         "endLine": 281,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 265,
       },
       {
@@ -15277,12 +15277,12 @@ void main() {
       },
       {
         "endLine": 465,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 351,
       },
       {
         "endLine": 516,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 466,
       },
       {
@@ -15312,7 +15312,7 @@ void main() {
       },
       {
         "endLine": 670,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 633,
       },
       {
@@ -15342,12 +15342,12 @@ void main() {
       },
       {
         "endLine": 755,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 713,
       },
       {
         "endLine": 798,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 756,
       },
       {
@@ -15357,7 +15357,7 @@ void main() {
       },
       {
         "endLine": 831,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 811,
       },
       {
@@ -15387,12 +15387,12 @@ void main() {
       },
       {
         "endLine": 909,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 875,
       },
       {
         "endLine": 922,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 910,
       },
       {
@@ -15402,7 +15402,7 @@ void main() {
       },
       {
         "endLine": 996,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 971,
       },
     ],
@@ -16832,7 +16832,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -16874,7 +16874,7 @@ void main() {
       },
       {
         "endLine": 158,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 118,
       },
       {
@@ -16894,7 +16894,7 @@ void main() {
       },
       {
         "endLine": 226,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 203,
       },
       {
@@ -16909,7 +16909,7 @@ void main() {
       },
       {
         "endLine": 296,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 280,
       },
       {
@@ -16919,12 +16919,12 @@ void main() {
       },
       {
         "endLine": 480,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 366,
       },
       {
         "endLine": 531,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 481,
       },
       {
@@ -16954,7 +16954,7 @@ void main() {
       },
       {
         "endLine": 685,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 648,
       },
       {
@@ -16984,12 +16984,12 @@ void main() {
       },
       {
         "endLine": 770,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 728,
       },
       {
         "endLine": 813,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 771,
       },
       {
@@ -17004,12 +17004,12 @@ void main() {
       },
       {
         "endLine": 872,
-        "origin": "components/transport/shadow/media.glsl",
+        "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 833,
       },
       {
         "endLine": 901,
-        "origin": "components/lights/quad.glsl",
+        "origin": "components/lights/quad/quad.glsl",
         "startLine": 873,
       },
       {
@@ -17029,7 +17029,7 @@ void main() {
       },
       {
         "endLine": 944,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 924,
       },
       {
@@ -17059,22 +17059,22 @@ void main() {
       },
       {
         "endLine": 1042,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 1008,
       },
       {
         "endLine": 1055,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 1043,
       },
       {
         "endLine": 1077,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 1056,
       },
       {
         "endLine": 1092,
-        "origin": "components/transport/techniques/light_medium.glsl",
+        "origin": "components/transport/techniques/light/light_medium.glsl",
         "startLine": 1078,
       },
       {
@@ -17084,7 +17084,7 @@ void main() {
       },
       {
         "endLine": 1168,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 1143,
       },
     ],
@@ -18485,7 +18485,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -18527,7 +18527,7 @@ void main() {
       },
       {
         "endLine": 158,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 118,
       },
       {
@@ -18542,7 +18542,7 @@ void main() {
       },
       {
         "endLine": 218,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 195,
       },
       {
@@ -18557,7 +18557,7 @@ void main() {
       },
       {
         "endLine": 287,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 271,
       },
       {
@@ -18567,12 +18567,12 @@ void main() {
       },
       {
         "endLine": 471,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 357,
       },
       {
         "endLine": 522,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 472,
       },
       {
@@ -18602,7 +18602,7 @@ void main() {
       },
       {
         "endLine": 676,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 639,
       },
       {
@@ -18632,12 +18632,12 @@ void main() {
       },
       {
         "endLine": 761,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 719,
       },
       {
         "endLine": 804,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 762,
       },
       {
@@ -18652,12 +18652,12 @@ void main() {
       },
       {
         "endLine": 863,
-        "origin": "components/transport/shadow/media.glsl",
+        "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 824,
       },
       {
         "endLine": 892,
-        "origin": "components/lights/quad.glsl",
+        "origin": "components/lights/quad/quad.glsl",
         "startLine": 864,
       },
       {
@@ -18672,7 +18672,7 @@ void main() {
       },
       {
         "endLine": 925,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 905,
       },
       {
@@ -18702,22 +18702,22 @@ void main() {
       },
       {
         "endLine": 1013,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 979,
       },
       {
         "endLine": 1026,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 1014,
       },
       {
         "endLine": 1048,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 1027,
       },
       {
         "endLine": 1063,
-        "origin": "components/transport/techniques/light_medium.glsl",
+        "origin": "components/transport/techniques/light/light_medium.glsl",
         "startLine": 1049,
       },
       {
@@ -18727,7 +18727,7 @@ void main() {
       },
       {
         "endLine": 1139,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 1114,
       },
     ],
@@ -19999,7 +19999,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -20041,7 +20041,7 @@ void main() {
       },
       {
         "endLine": 157,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 117,
       },
       {
@@ -20056,7 +20056,7 @@ void main() {
       },
       {
         "endLine": 217,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 194,
       },
       {
@@ -20071,7 +20071,7 @@ void main() {
       },
       {
         "endLine": 281,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 265,
       },
       {
@@ -20081,12 +20081,12 @@ void main() {
       },
       {
         "endLine": 465,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 351,
       },
       {
         "endLine": 516,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 466,
       },
       {
@@ -20116,7 +20116,7 @@ void main() {
       },
       {
         "endLine": 684,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 647,
       },
       {
@@ -20146,12 +20146,12 @@ void main() {
       },
       {
         "endLine": 769,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 727,
       },
       {
         "endLine": 812,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 770,
       },
       {
@@ -20161,7 +20161,7 @@ void main() {
       },
       {
         "endLine": 845,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 825,
       },
       {
@@ -20191,12 +20191,12 @@ void main() {
       },
       {
         "endLine": 923,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 889,
       },
       {
         "endLine": 936,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 924,
       },
       {
@@ -20206,7 +20206,7 @@ void main() {
       },
       {
         "endLine": 1010,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 985,
       },
     ],
@@ -21621,7 +21621,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -21663,7 +21663,7 @@ void main() {
       },
       {
         "endLine": 158,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 118,
       },
       {
@@ -21678,7 +21678,7 @@ void main() {
       },
       {
         "endLine": 218,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 195,
       },
       {
@@ -21693,7 +21693,7 @@ void main() {
       },
       {
         "endLine": 287,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 271,
       },
       {
@@ -21703,12 +21703,12 @@ void main() {
       },
       {
         "endLine": 471,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 357,
       },
       {
         "endLine": 522,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 472,
       },
       {
@@ -21738,7 +21738,7 @@ void main() {
       },
       {
         "endLine": 690,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 653,
       },
       {
@@ -21768,12 +21768,12 @@ void main() {
       },
       {
         "endLine": 775,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 733,
       },
       {
         "endLine": 818,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 776,
       },
       {
@@ -21788,12 +21788,12 @@ void main() {
       },
       {
         "endLine": 877,
-        "origin": "components/transport/shadow/media.glsl",
+        "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 838,
       },
       {
         "endLine": 906,
-        "origin": "components/lights/quad.glsl",
+        "origin": "components/lights/quad/quad.glsl",
         "startLine": 878,
       },
       {
@@ -21808,7 +21808,7 @@ void main() {
       },
       {
         "endLine": 939,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 919,
       },
       {
@@ -21838,22 +21838,22 @@ void main() {
       },
       {
         "endLine": 1027,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 993,
       },
       {
         "endLine": 1040,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 1028,
       },
       {
         "endLine": 1062,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 1041,
       },
       {
         "endLine": 1077,
-        "origin": "components/transport/techniques/light_medium.glsl",
+        "origin": "components/transport/techniques/light/light_medium.glsl",
         "startLine": 1063,
       },
       {
@@ -21863,7 +21863,7 @@ void main() {
       },
       {
         "endLine": 1153,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 1128,
       },
     ],
@@ -22824,7 +22824,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -22866,7 +22866,7 @@ void main() {
       },
       {
         "endLine": 155,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 115,
       },
       {
@@ -22881,7 +22881,7 @@ void main() {
       },
       {
         "endLine": 215,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 192,
       },
       {
@@ -22896,7 +22896,7 @@ void main() {
       },
       {
         "endLine": 276,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 260,
       },
       {
@@ -22906,7 +22906,7 @@ void main() {
       },
       {
         "endLine": 417,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 303,
       },
       {
@@ -22931,7 +22931,7 @@ void main() {
       },
       {
         "endLine": 510,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 473,
       },
       {
@@ -22966,7 +22966,7 @@ void main() {
       },
       {
         "endLine": 586,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 566,
       },
       {
@@ -22991,7 +22991,7 @@ void main() {
       },
       {
         "endLine": 656,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 622,
       },
       {
@@ -23001,7 +23001,7 @@ void main() {
       },
       {
         "endLine": 721,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 696,
       },
     ],
@@ -23895,7 +23895,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -23927,7 +23927,7 @@ void main() {
       },
       {
         "endLine": 131,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 91,
       },
       {
@@ -23937,7 +23937,7 @@ void main() {
       },
       {
         "endLine": 187,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 164,
       },
       {
@@ -23952,7 +23952,7 @@ void main() {
       },
       {
         "endLine": 244,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 228,
       },
       {
@@ -23962,7 +23962,7 @@ void main() {
       },
       {
         "endLine": 412,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 298,
       },
       {
@@ -23987,7 +23987,7 @@ void main() {
       },
       {
         "endLine": 517,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 480,
       },
       {
@@ -24007,7 +24007,7 @@ void main() {
       },
       {
         "endLine": 559,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 539,
       },
       {
@@ -24032,7 +24032,7 @@ void main() {
       },
       {
         "endLine": 625,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 591,
       },
       {
@@ -24042,7 +24042,7 @@ void main() {
       },
       {
         "endLine": 668,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 643,
       },
     ],
@@ -25136,7 +25136,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -25178,7 +25178,7 @@ void main() {
       },
       {
         "endLine": 155,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 115,
       },
       {
@@ -25193,7 +25193,7 @@ void main() {
       },
       {
         "endLine": 215,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 192,
       },
       {
@@ -25208,7 +25208,7 @@ void main() {
       },
       {
         "endLine": 279,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 263,
       },
       {
@@ -25218,7 +25218,7 @@ void main() {
       },
       {
         "endLine": 447,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 333,
       },
       {
@@ -25243,7 +25243,7 @@ void main() {
       },
       {
         "endLine": 552,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 515,
       },
       {
@@ -25273,12 +25273,12 @@ void main() {
       },
       {
         "endLine": 637,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 595,
       },
       {
         "endLine": 680,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 638,
       },
       {
@@ -25288,7 +25288,7 @@ void main() {
       },
       {
         "endLine": 713,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 693,
       },
       {
@@ -25313,12 +25313,12 @@ void main() {
       },
       {
         "endLine": 783,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 749,
       },
       {
         "endLine": 796,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 784,
       },
       {
@@ -25328,7 +25328,7 @@ void main() {
       },
       {
         "endLine": 868,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 843,
       },
     ],
@@ -26201,7 +26201,7 @@ void main() {
       },
       {
         "endLine": 27,
-        "origin": "components/film/tonemap_none.glsl",
+        "origin": "components/film/tonemap_none/tonemap_none.glsl",
         "startLine": 9,
       },
     ],
@@ -26233,7 +26233,7 @@ void main() {
       },
       {
         "endLine": 135,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 95,
       },
       {
@@ -26248,7 +26248,7 @@ void main() {
       },
       {
         "endLine": 199,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 176,
       },
       {
@@ -26263,7 +26263,7 @@ void main() {
       },
       {
         "endLine": 295,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 245,
       },
       {
@@ -26293,7 +26293,7 @@ void main() {
       },
       {
         "endLine": 402,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 365,
       },
       {
@@ -26313,7 +26313,7 @@ void main() {
       },
       {
         "endLine": 438,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 424,
       },
       {
@@ -26323,7 +26323,7 @@ void main() {
       },
       {
         "endLine": 463,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 443,
       },
       {
@@ -26353,12 +26353,12 @@ void main() {
       },
       {
         "endLine": 561,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 527,
       },
       {
         "endLine": 583,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 562,
       },
       {
@@ -26368,7 +26368,7 @@ void main() {
       },
       {
         "endLine": 627,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 602,
       },
     ],
@@ -27251,7 +27251,7 @@ void main() {
       },
       {
         "endLine": 27,
-        "origin": "components/film/tonemap_none.glsl",
+        "origin": "components/film/tonemap_none/tonemap_none.glsl",
         "startLine": 9,
       },
     ],
@@ -27283,7 +27283,7 @@ void main() {
       },
       {
         "endLine": 135,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 95,
       },
       {
@@ -27293,7 +27293,7 @@ void main() {
       },
       {
         "endLine": 191,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 168,
       },
       {
@@ -27308,7 +27308,7 @@ void main() {
       },
       {
         "endLine": 287,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 237,
       },
       {
@@ -27338,7 +27338,7 @@ void main() {
       },
       {
         "endLine": 394,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 357,
       },
       {
@@ -27358,7 +27358,7 @@ void main() {
       },
       {
         "endLine": 430,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 416,
       },
       {
@@ -27368,7 +27368,7 @@ void main() {
       },
       {
         "endLine": 455,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 435,
       },
       {
@@ -27398,12 +27398,12 @@ void main() {
       },
       {
         "endLine": 543,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 509,
       },
       {
         "endLine": 565,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 544,
       },
       {
@@ -27413,7 +27413,7 @@ void main() {
       },
       {
         "endLine": 609,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 584,
       },
     ],
@@ -28571,7 +28571,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -28613,7 +28613,7 @@ void main() {
       },
       {
         "endLine": 156,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 116,
       },
       {
@@ -28628,7 +28628,7 @@ void main() {
       },
       {
         "endLine": 216,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 193,
       },
       {
@@ -28643,7 +28643,7 @@ void main() {
       },
       {
         "endLine": 280,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 264,
       },
       {
@@ -28653,7 +28653,7 @@ void main() {
       },
       {
         "endLine": 456,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 342,
       },
       {
@@ -28678,7 +28678,7 @@ void main() {
       },
       {
         "endLine": 567,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 530,
       },
       {
@@ -28708,12 +28708,12 @@ void main() {
       },
       {
         "endLine": 652,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 610,
       },
       {
         "endLine": 695,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 653,
       },
       {
@@ -28723,7 +28723,7 @@ void main() {
       },
       {
         "endLine": 728,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 708,
       },
       {
@@ -28753,12 +28753,12 @@ void main() {
       },
       {
         "endLine": 806,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 772,
       },
       {
         "endLine": 819,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 807,
       },
       {
@@ -28768,7 +28768,7 @@ void main() {
       },
       {
         "endLine": 893,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 868,
       },
     ],
@@ -30028,7 +30028,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -30070,7 +30070,7 @@ void main() {
       },
       {
         "endLine": 157,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 117,
       },
       {
@@ -30085,7 +30085,7 @@ void main() {
       },
       {
         "endLine": 217,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 194,
       },
       {
@@ -30100,7 +30100,7 @@ void main() {
       },
       {
         "endLine": 285,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 269,
       },
       {
@@ -30110,7 +30110,7 @@ void main() {
       },
       {
         "endLine": 461,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 347,
       },
       {
@@ -30135,7 +30135,7 @@ void main() {
       },
       {
         "endLine": 572,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 535,
       },
       {
@@ -30165,12 +30165,12 @@ void main() {
       },
       {
         "endLine": 657,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 615,
       },
       {
         "endLine": 700,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 658,
       },
       {
@@ -30185,12 +30185,12 @@ void main() {
       },
       {
         "endLine": 759,
-        "origin": "components/transport/shadow/media.glsl",
+        "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 720,
       },
       {
         "endLine": 778,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 760,
       },
       {
@@ -30200,7 +30200,7 @@ void main() {
       },
       {
         "endLine": 806,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 786,
       },
       {
@@ -30230,22 +30230,22 @@ void main() {
       },
       {
         "endLine": 890,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 856,
       },
       {
         "endLine": 903,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 891,
       },
       {
         "endLine": 925,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 904,
       },
       {
         "endLine": 940,
-        "origin": "components/transport/techniques/light_medium.glsl",
+        "origin": "components/transport/techniques/light/light_medium.glsl",
         "startLine": 926,
       },
       {
@@ -30255,7 +30255,7 @@ void main() {
       },
       {
         "endLine": 1016,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 991,
       },
     ],
@@ -31442,7 +31442,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -31484,7 +31484,7 @@ void main() {
       },
       {
         "endLine": 160,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 120,
       },
       {
@@ -31499,7 +31499,7 @@ void main() {
       },
       {
         "endLine": 220,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 197,
       },
       {
@@ -31514,7 +31514,7 @@ void main() {
       },
       {
         "endLine": 282,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 266,
       },
       {
@@ -31524,12 +31524,12 @@ void main() {
       },
       {
         "endLine": 439,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 325,
       },
       {
         "endLine": 490,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 440,
       },
       {
@@ -31564,12 +31564,12 @@ void main() {
       },
       {
         "endLine": 632,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 595,
       },
       {
         "endLine": 690,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 633,
       },
       {
@@ -31604,7 +31604,7 @@ void main() {
       },
       {
         "endLine": 770,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 750,
       },
       {
@@ -31634,7 +31634,7 @@ void main() {
       },
       {
         "endLine": 848,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 814,
       },
       {
@@ -31644,7 +31644,7 @@ void main() {
       },
       {
         "endLine": 910,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 885,
       },
     ],
@@ -32961,7 +32961,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -33003,7 +33003,7 @@ void main() {
       },
       {
         "endLine": 160,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 120,
       },
       {
@@ -33018,7 +33018,7 @@ void main() {
       },
       {
         "endLine": 220,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 197,
       },
       {
@@ -33033,7 +33033,7 @@ void main() {
       },
       {
         "endLine": 285,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 269,
       },
       {
@@ -33043,12 +33043,12 @@ void main() {
       },
       {
         "endLine": 442,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 328,
       },
       {
         "endLine": 493,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 443,
       },
       {
@@ -33083,12 +33083,12 @@ void main() {
       },
       {
         "endLine": 635,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 598,
       },
       {
         "endLine": 693,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 636,
       },
       {
@@ -33118,12 +33118,12 @@ void main() {
       },
       {
         "endLine": 782,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 740,
       },
       {
         "endLine": 825,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 783,
       },
       {
@@ -33133,7 +33133,7 @@ void main() {
       },
       {
         "endLine": 858,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 838,
       },
       {
@@ -33163,12 +33163,12 @@ void main() {
       },
       {
         "endLine": 936,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 902,
       },
       {
         "endLine": 949,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 937,
       },
       {
@@ -33178,7 +33178,7 @@ void main() {
       },
       {
         "endLine": 1019,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 994,
       },
     ],
@@ -34156,7 +34156,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -34188,7 +34188,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -34198,7 +34198,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -34213,7 +34213,7 @@ void main() {
       },
       {
         "endLine": 249,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -34223,7 +34223,7 @@ void main() {
       },
       {
         "endLine": 390,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 276,
       },
       {
@@ -34248,7 +34248,7 @@ void main() {
       },
       {
         "endLine": 484,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 447,
       },
       {
@@ -34268,12 +34268,12 @@ void main() {
       },
       {
         "endLine": 520,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 506,
       },
       {
         "endLine": 539,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 521,
       },
       {
@@ -34283,7 +34283,7 @@ void main() {
       },
       {
         "endLine": 567,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 547,
       },
       {
@@ -34308,12 +34308,12 @@ void main() {
       },
       {
         "endLine": 636,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 602,
       },
       {
         "endLine": 658,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 637,
       },
       {
@@ -34323,7 +34323,7 @@ void main() {
       },
       {
         "endLine": 702,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 677,
       },
     ],
@@ -35296,7 +35296,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -35328,7 +35328,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -35338,7 +35338,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -35353,7 +35353,7 @@ void main() {
       },
       {
         "endLine": 249,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -35363,7 +35363,7 @@ void main() {
       },
       {
         "endLine": 390,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 276,
       },
       {
@@ -35388,7 +35388,7 @@ void main() {
       },
       {
         "endLine": 484,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 447,
       },
       {
@@ -35408,12 +35408,12 @@ void main() {
       },
       {
         "endLine": 520,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 506,
       },
       {
         "endLine": 539,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 521,
       },
       {
@@ -35423,7 +35423,7 @@ void main() {
       },
       {
         "endLine": 567,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 547,
       },
       {
@@ -35453,12 +35453,12 @@ void main() {
       },
       {
         "endLine": 644,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 610,
       },
       {
         "endLine": 666,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 645,
       },
       {
@@ -35468,7 +35468,7 @@ void main() {
       },
       {
         "endLine": 711,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 686,
       },
     ],
@@ -36795,7 +36795,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -36837,7 +36837,7 @@ void main() {
       },
       {
         "endLine": 159,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 119,
       },
       {
@@ -36852,7 +36852,7 @@ void main() {
       },
       {
         "endLine": 219,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 196,
       },
       {
@@ -36867,7 +36867,7 @@ void main() {
       },
       {
         "endLine": 287,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 271,
       },
       {
@@ -36877,7 +36877,7 @@ void main() {
       },
       {
         "endLine": 492,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 378,
       },
       {
@@ -36902,7 +36902,7 @@ void main() {
       },
       {
         "endLine": 610,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 573,
       },
       {
@@ -36932,12 +36932,12 @@ void main() {
       },
       {
         "endLine": 695,
-        "origin": "components/transport/volume/analytic.glsl",
+        "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 653,
       },
       {
         "endLine": 738,
-        "origin": "components/phase/hg.glsl",
+        "origin": "components/phase/hg/hg.glsl",
         "startLine": 696,
       },
       {
@@ -36952,12 +36952,12 @@ void main() {
       },
       {
         "endLine": 797,
-        "origin": "components/transport/shadow/media.glsl",
+        "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 758,
       },
       {
         "endLine": 816,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 798,
       },
       {
@@ -36967,7 +36967,7 @@ void main() {
       },
       {
         "endLine": 844,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 824,
       },
       {
@@ -36997,22 +36997,22 @@ void main() {
       },
       {
         "endLine": 928,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 894,
       },
       {
         "endLine": 941,
-        "origin": "components/transport/techniques/kernel_phase.glsl",
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 929,
       },
       {
         "endLine": 963,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 942,
       },
       {
         "endLine": 978,
-        "origin": "components/transport/techniques/light_medium.glsl",
+        "origin": "components/transport/techniques/light/light_medium.glsl",
         "startLine": 964,
       },
       {
@@ -37022,7 +37022,7 @@ void main() {
       },
       {
         "endLine": 1054,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 1029,
       },
     ],
@@ -38081,7 +38081,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -38113,7 +38113,7 @@ void main() {
       },
       {
         "endLine": 133,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 93,
       },
       {
@@ -38123,7 +38123,7 @@ void main() {
       },
       {
         "endLine": 189,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 166,
       },
       {
@@ -38138,7 +38138,7 @@ void main() {
       },
       {
         "endLine": 249,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 233,
       },
       {
@@ -38148,12 +38148,12 @@ void main() {
       },
       {
         "endLine": 383,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 269,
       },
       {
         "endLine": 434,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 384,
       },
       {
@@ -38183,7 +38183,7 @@ void main() {
       },
       {
         "endLine": 563,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 526,
       },
       {
@@ -38203,12 +38203,12 @@ void main() {
       },
       {
         "endLine": 599,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 585,
       },
       {
         "endLine": 618,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 600,
       },
       {
@@ -38218,7 +38218,7 @@ void main() {
       },
       {
         "endLine": 646,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 626,
       },
       {
@@ -38248,12 +38248,12 @@ void main() {
       },
       {
         "endLine": 723,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 689,
       },
       {
         "endLine": 745,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 724,
       },
       {
@@ -38263,7 +38263,7 @@ void main() {
       },
       {
         "endLine": 790,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 765,
       },
     ],
@@ -39338,7 +39338,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -39370,7 +39370,7 @@ void main() {
       },
       {
         "endLine": 134,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 94,
       },
       {
@@ -39380,7 +39380,7 @@ void main() {
       },
       {
         "endLine": 190,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 167,
       },
       {
@@ -39395,7 +39395,7 @@ void main() {
       },
       {
         "endLine": 248,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 232,
       },
       {
@@ -39405,12 +39405,12 @@ void main() {
       },
       {
         "endLine": 397,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 283,
       },
       {
         "endLine": 448,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 398,
       },
       {
@@ -39445,12 +39445,12 @@ void main() {
       },
       {
         "endLine": 583,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 546,
       },
       {
         "endLine": 641,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 584,
       },
       {
@@ -39470,7 +39470,7 @@ void main() {
       },
       {
         "endLine": 688,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 668,
       },
       {
@@ -39500,7 +39500,7 @@ void main() {
       },
       {
         "endLine": 764,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 730,
       },
       {
@@ -39510,7 +39510,7 @@ void main() {
       },
       {
         "endLine": 813,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 788,
       },
     ],
@@ -40690,7 +40690,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -40722,7 +40722,7 @@ void main() {
       },
       {
         "endLine": 134,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 94,
       },
       {
@@ -40732,7 +40732,7 @@ void main() {
       },
       {
         "endLine": 190,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 167,
       },
       {
@@ -40747,7 +40747,7 @@ void main() {
       },
       {
         "endLine": 252,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 236,
       },
       {
@@ -40757,12 +40757,12 @@ void main() {
       },
       {
         "endLine": 401,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 287,
       },
       {
         "endLine": 452,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 402,
       },
       {
@@ -40797,12 +40797,12 @@ void main() {
       },
       {
         "endLine": 587,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 550,
       },
       {
         "endLine": 645,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 588,
       },
       {
@@ -40822,12 +40822,12 @@ void main() {
       },
       {
         "endLine": 686,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 672,
       },
       {
         "endLine": 730,
-        "origin": "components/lights/sphere.glsl",
+        "origin": "components/lights/sphere/sphere.glsl",
         "startLine": 687,
       },
       {
@@ -40842,7 +40842,7 @@ void main() {
       },
       {
         "endLine": 763,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 743,
       },
       {
@@ -40872,12 +40872,12 @@ void main() {
       },
       {
         "endLine": 846,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 812,
       },
       {
         "endLine": 868,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 847,
       },
       {
@@ -40887,7 +40887,7 @@ void main() {
       },
       {
         "endLine": 918,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 893,
       },
     ],
@@ -42006,7 +42006,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -42038,7 +42038,7 @@ void main() {
       },
       {
         "endLine": 139,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 99,
       },
       {
@@ -42053,7 +42053,7 @@ void main() {
       },
       {
         "endLine": 203,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 180,
       },
       {
@@ -42068,7 +42068,7 @@ void main() {
       },
       {
         "endLine": 300,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 250,
       },
       {
@@ -42103,12 +42103,12 @@ void main() {
       },
       {
         "endLine": 441,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 404,
       },
       {
         "endLine": 499,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 442,
       },
       {
@@ -42128,7 +42128,7 @@ void main() {
       },
       {
         "endLine": 540,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 526,
       },
       {
@@ -42138,7 +42138,7 @@ void main() {
       },
       {
         "endLine": 565,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 545,
       },
       {
@@ -42148,7 +42148,7 @@ void main() {
       },
       {
         "endLine": 605,
-        "origin": "components/env/equirect.glsl",
+        "origin": "components/env/equirect/equirect.glsl",
         "startLine": 571,
       },
       {
@@ -42183,12 +42183,12 @@ void main() {
       },
       {
         "endLine": 772,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 738,
       },
       {
         "endLine": 794,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 773,
       },
       {
@@ -42198,7 +42198,7 @@ void main() {
       },
       {
         "endLine": 844,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 819,
       },
     ],
@@ -43320,7 +43320,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -43352,7 +43352,7 @@ void main() {
       },
       {
         "endLine": 139,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 99,
       },
       {
@@ -43362,7 +43362,7 @@ void main() {
       },
       {
         "endLine": 195,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 172,
       },
       {
@@ -43377,7 +43377,7 @@ void main() {
       },
       {
         "endLine": 292,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 242,
       },
       {
@@ -43412,12 +43412,12 @@ void main() {
       },
       {
         "endLine": 433,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 396,
       },
       {
         "endLine": 491,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 434,
       },
       {
@@ -43437,7 +43437,7 @@ void main() {
       },
       {
         "endLine": 532,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 518,
       },
       {
@@ -43447,7 +43447,7 @@ void main() {
       },
       {
         "endLine": 557,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 537,
       },
       {
@@ -43457,7 +43457,7 @@ void main() {
       },
       {
         "endLine": 597,
-        "origin": "components/env/equirect.glsl",
+        "origin": "components/env/equirect/equirect.glsl",
         "startLine": 563,
       },
       {
@@ -43492,12 +43492,12 @@ void main() {
       },
       {
         "endLine": 754,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 720,
       },
       {
         "endLine": 776,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 755,
       },
       {
@@ -43507,7 +43507,7 @@ void main() {
       },
       {
         "endLine": 826,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 801,
       },
     ],
@@ -44585,7 +44585,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -44617,7 +44617,7 @@ void main() {
       },
       {
         "endLine": 139,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 99,
       },
       {
@@ -44627,7 +44627,7 @@ void main() {
       },
       {
         "endLine": 195,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 172,
       },
       {
@@ -44642,7 +44642,7 @@ void main() {
       },
       {
         "endLine": 289,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 239,
       },
       {
@@ -44677,12 +44677,12 @@ void main() {
       },
       {
         "endLine": 430,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 393,
       },
       {
         "endLine": 488,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 431,
       },
       {
@@ -44702,7 +44702,7 @@ void main() {
       },
       {
         "endLine": 535,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 515,
       },
       {
@@ -44712,7 +44712,7 @@ void main() {
       },
       {
         "endLine": 575,
-        "origin": "components/env/equirect.glsl",
+        "origin": "components/env/equirect/equirect.glsl",
         "startLine": 541,
       },
       {
@@ -44747,7 +44747,7 @@ void main() {
       },
       {
         "endLine": 732,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 698,
       },
       {
@@ -44757,7 +44757,7 @@ void main() {
       },
       {
         "endLine": 781,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 756,
       },
     ],
@@ -45926,7 +45926,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -45958,7 +45958,7 @@ void main() {
       },
       {
         "endLine": 140,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 100,
       },
       {
@@ -45973,7 +45973,7 @@ void main() {
       },
       {
         "endLine": 204,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 181,
       },
       {
@@ -45988,7 +45988,7 @@ void main() {
       },
       {
         "endLine": 301,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 251,
       },
       {
@@ -46023,12 +46023,12 @@ void main() {
       },
       {
         "endLine": 442,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 405,
       },
       {
         "endLine": 500,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 443,
       },
       {
@@ -46048,7 +46048,7 @@ void main() {
       },
       {
         "endLine": 541,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 527,
       },
       {
@@ -46058,7 +46058,7 @@ void main() {
       },
       {
         "endLine": 566,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 546,
       },
       {
@@ -46103,12 +46103,12 @@ void main() {
       },
       {
         "endLine": 807,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 773,
       },
       {
         "endLine": 829,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 808,
       },
       {
@@ -46118,7 +46118,7 @@ void main() {
       },
       {
         "endLine": 879,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 854,
       },
     ],
@@ -47247,7 +47247,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -47279,7 +47279,7 @@ void main() {
       },
       {
         "endLine": 140,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 100,
       },
       {
@@ -47289,7 +47289,7 @@ void main() {
       },
       {
         "endLine": 196,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 173,
       },
       {
@@ -47304,7 +47304,7 @@ void main() {
       },
       {
         "endLine": 293,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 243,
       },
       {
@@ -47339,12 +47339,12 @@ void main() {
       },
       {
         "endLine": 434,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 397,
       },
       {
         "endLine": 492,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 435,
       },
       {
@@ -47364,7 +47364,7 @@ void main() {
       },
       {
         "endLine": 533,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 519,
       },
       {
@@ -47374,7 +47374,7 @@ void main() {
       },
       {
         "endLine": 558,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 538,
       },
       {
@@ -47384,7 +47384,7 @@ void main() {
       },
       {
         "endLine": 598,
-        "origin": "components/env/equirect.glsl",
+        "origin": "components/env/equirect/equirect.glsl",
         "startLine": 564,
       },
       {
@@ -47419,12 +47419,12 @@ void main() {
       },
       {
         "endLine": 760,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 726,
       },
       {
         "endLine": 782,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 761,
       },
       {
@@ -47434,7 +47434,7 @@ void main() {
       },
       {
         "endLine": 832,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 807,
       },
     ],
@@ -48684,7 +48684,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -48716,7 +48716,7 @@ void main() {
       },
       {
         "endLine": 140,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 100,
       },
       {
@@ -48731,7 +48731,7 @@ void main() {
       },
       {
         "endLine": 204,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 181,
       },
       {
@@ -48746,7 +48746,7 @@ void main() {
       },
       {
         "endLine": 303,
-        "origin": "components/geometry/analytic_primitives.glsl",
+        "origin": "components/geometry/analytic/analytic_primitives.glsl",
         "startLine": 253,
       },
       {
@@ -48781,12 +48781,12 @@ void main() {
       },
       {
         "endLine": 467,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 430,
       },
       {
         "endLine": 525,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 468,
       },
       {
@@ -48806,12 +48806,12 @@ void main() {
       },
       {
         "endLine": 566,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 552,
       },
       {
         "endLine": 595,
-        "origin": "components/lights/quad.glsl",
+        "origin": "components/lights/quad/quad.glsl",
         "startLine": 567,
       },
       {
@@ -48831,7 +48831,7 @@ void main() {
       },
       {
         "endLine": 654,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 634,
       },
       {
@@ -48841,7 +48841,7 @@ void main() {
       },
       {
         "endLine": 694,
-        "origin": "components/env/equirect.glsl",
+        "origin": "components/env/equirect/equirect.glsl",
         "startLine": 660,
       },
       {
@@ -48876,12 +48876,12 @@ void main() {
       },
       {
         "endLine": 870,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 836,
       },
       {
         "endLine": 892,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 871,
       },
       {
@@ -48891,7 +48891,7 @@ void main() {
       },
       {
         "endLine": 942,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 917,
       },
     ],
@@ -49873,7 +49873,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -49915,7 +49915,7 @@ void main() {
       },
       {
         "endLine": 155,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 115,
       },
       {
@@ -49930,7 +49930,7 @@ void main() {
       },
       {
         "endLine": 215,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 192,
       },
       {
@@ -49945,7 +49945,7 @@ void main() {
       },
       {
         "endLine": 276,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 260,
       },
       {
@@ -49955,7 +49955,7 @@ void main() {
       },
       {
         "endLine": 417,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 303,
       },
       {
@@ -49980,7 +49980,7 @@ void main() {
       },
       {
         "endLine": 510,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 473,
       },
       {
@@ -50015,7 +50015,7 @@ void main() {
       },
       {
         "endLine": 586,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 566,
       },
       {
@@ -50040,7 +50040,7 @@ void main() {
       },
       {
         "endLine": 656,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 622,
       },
       {
@@ -50050,7 +50050,7 @@ void main() {
       },
       {
         "endLine": 721,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 696,
       },
     ],
@@ -51001,7 +51001,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -51033,7 +51033,7 @@ void main() {
       },
       {
         "endLine": 132,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 92,
       },
       {
@@ -51043,7 +51043,7 @@ void main() {
       },
       {
         "endLine": 188,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 165,
       },
       {
@@ -51058,7 +51058,7 @@ void main() {
       },
       {
         "endLine": 246,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 230,
       },
       {
@@ -51068,7 +51068,7 @@ void main() {
       },
       {
         "endLine": 395,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 281,
       },
       {
@@ -51098,12 +51098,12 @@ void main() {
       },
       {
         "endLine": 504,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 467,
       },
       {
         "endLine": 562,
-        "origin": "components/materials/dielectric.glsl",
+        "origin": "components/materials/dielectric/dielectric.glsl",
         "startLine": 505,
       },
       {
@@ -51123,7 +51123,7 @@ void main() {
       },
       {
         "endLine": 609,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 589,
       },
       {
@@ -51148,7 +51148,7 @@ void main() {
       },
       {
         "endLine": 677,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 643,
       },
       {
@@ -51158,7 +51158,7 @@ void main() {
       },
       {
         "endLine": 725,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 700,
       },
     ],
@@ -52111,7 +52111,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -52143,7 +52143,7 @@ void main() {
       },
       {
         "endLine": 131,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 91,
       },
       {
@@ -52153,7 +52153,7 @@ void main() {
       },
       {
         "endLine": 187,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 164,
       },
       {
@@ -52168,7 +52168,7 @@ void main() {
       },
       {
         "endLine": 247,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 231,
       },
       {
@@ -52178,7 +52178,7 @@ void main() {
       },
       {
         "endLine": 403,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 289,
       },
       {
@@ -52203,7 +52203,7 @@ void main() {
       },
       {
         "endLine": 503,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 466,
       },
       {
@@ -52223,12 +52223,12 @@ void main() {
       },
       {
         "endLine": 539,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 525,
       },
       {
         "endLine": 558,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 540,
       },
       {
@@ -52238,7 +52238,7 @@ void main() {
       },
       {
         "endLine": 592,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 572,
       },
       {
@@ -52263,12 +52263,12 @@ void main() {
       },
       {
         "endLine": 661,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 627,
       },
       {
         "endLine": 683,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 662,
       },
       {
@@ -52278,7 +52278,7 @@ void main() {
       },
       {
         "endLine": 727,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 702,
       },
     ],
@@ -53231,7 +53231,7 @@ void main() {
       },
       {
         "endLine": 40,
-        "origin": "components/film/tonemap_reinhard.glsl",
+        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
         "startLine": 9,
       },
     ],
@@ -53263,7 +53263,7 @@ void main() {
       },
       {
         "endLine": 131,
-        "origin": "components/sampler/pcg4d.glsl",
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
         "startLine": 91,
       },
       {
@@ -53273,7 +53273,7 @@ void main() {
       },
       {
         "endLine": 187,
-        "origin": "components/ambient/euclidean.glsl",
+        "origin": "components/ambient/euclidean/euclidean.glsl",
         "startLine": 164,
       },
       {
@@ -53288,7 +53288,7 @@ void main() {
       },
       {
         "endLine": 247,
-        "origin": "components/geometry/sdf_primitives.glsl",
+        "origin": "components/geometry/sdf/sdf_primitives.glsl",
         "startLine": 231,
       },
       {
@@ -53298,7 +53298,7 @@ void main() {
       },
       {
         "endLine": 403,
-        "origin": "components/geometry/raymarch.glsl",
+        "origin": "components/geometry/sdf/raymarch.glsl",
         "startLine": 289,
       },
       {
@@ -53323,7 +53323,7 @@ void main() {
       },
       {
         "endLine": 503,
-        "origin": "components/materials/lambert.glsl",
+        "origin": "components/materials/lambert/lambert.glsl",
         "startLine": 466,
       },
       {
@@ -53343,12 +53343,12 @@ void main() {
       },
       {
         "endLine": 539,
-        "origin": "components/transport/shadow/opaque.glsl",
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 525,
       },
       {
         "endLine": 558,
-        "origin": "components/lights/point.glsl",
+        "origin": "components/lights/point/point.glsl",
         "startLine": 540,
       },
       {
@@ -53358,7 +53358,7 @@ void main() {
       },
       {
         "endLine": 592,
-        "origin": "components/camera/pinhole.glsl",
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 572,
       },
       {
@@ -53383,12 +53383,12 @@ void main() {
       },
       {
         "endLine": 661,
-        "origin": "components/transport/techniques/kernel.glsl",
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
         "startLine": 627,
       },
       {
         "endLine": 683,
-        "origin": "components/transport/techniques/light.glsl",
+        "origin": "components/transport/techniques/light/light.glsl",
         "startLine": 662,
       },
       {
@@ -53398,7 +53398,7 @@ void main() {
       },
       {
         "endLine": 727,
-        "origin": "components/film/accumulate_average.glsl",
+        "origin": "components/film/accumulate_average/accumulate_average.glsl",
         "startLine": 702,
       },
     ],

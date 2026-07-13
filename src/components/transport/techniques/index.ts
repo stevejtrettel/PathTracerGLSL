@@ -10,6 +10,6 @@
 // Known next occupant: equiangular medium NEE — a light-sampling placement variant
 // (impl-plan-media deferred table); it lands as one file beside light.ts.
 
-export * as kernel from './kernel.js';
-export * as light from './light.js';
-export * as equiangular from './equiangular.js';
+export * as kernel from './kernel/kernel.js';
+export * as light from './light/light.js';
+export * as equiangular from './equiangular/equiangular.js';

@@ -5,9 +5,9 @@
 // descriptor + one line here.
 
 import type { LightKindDescriptor } from '../descriptors.js';
-import { pointLightDescriptor } from './point.js';
-import { quadLightDescriptor } from './quad.js';
-import { sphereLightDescriptor } from './sphere.js';
+import { pointLightDescriptor } from './point/point.js';
+import { quadLightDescriptor } from './quad/quad.js';
+import { sphereLightDescriptor } from './sphere/sphere.js';
 
 export const LIGHT_KINDS: Record<'point' | 'quad' | 'sphere', LightKindDescriptor> = {
     point: pointLightDescriptor,

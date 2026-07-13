@@ -16,16 +16,16 @@
 // core (ray/throughput/radiance); every program-dependent field is behind generated
 // functions. The WALK is generated, so it may touch its own fields freely.
 
-import type { RenderPlan, ProgramDescription } from '../../../compiler/plan/types.js';
-import type { ShaderBlock } from '../../../compiler/generate/ShaderIR.js';
-import type { FeatureContribution } from '../../../compiler/generate/features/types.js';
-import { flags, type Flags } from '../flags.js';
-import { combinerFns } from '../combiner.js';
+import type { RenderPlan, ProgramDescription } from '../../../../compiler/plan/types.js';
+import type { ShaderBlock } from '../../../../compiler/generate/ShaderIR.js';
+import type { FeatureContribution } from '../../../../compiler/generate/features/types.js';
+import { flags, type Flags } from '../../flags.js';
+import { combinerFns } from '../../combiner.js';
 import {
     kernelStateFields, kernelStateInit, kernelRecordFn, kernelBlocks, kernelRequires,
-} from '../techniques/kernel.js';
-import { lightBlocks, lightRequires } from '../techniques/light.js';
-import { equiangularBlocks, equiangularRequires } from '../techniques/equiangular.js';
+} from '../../techniques/kernel/kernel.js';
+import { lightBlocks, lightRequires } from '../../techniques/light/light.js';
+import { equiangularBlocks, equiangularRequires } from '../../techniques/equiangular/equiangular.js';
 
 export function contributeTransport(plan: RenderPlan): FeatureContribution {
     const program = plan.program;

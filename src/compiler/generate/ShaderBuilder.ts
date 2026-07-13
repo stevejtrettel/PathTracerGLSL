@@ -9,8 +9,8 @@ import type { MergedContributions } from './features/merge.js';
 
 // Film components assembled by the Generator itself (not a swappable feature)
 import fullscreenVertGLSL from '../../components/film/fullscreen.vert.glsl?raw';
-import tonemapReinhardGLSL from '../../components/film/tonemap_reinhard.glsl?raw';
-import tonemapNoneGLSL from '../../components/film/tonemap_none.glsl?raw';
+import tonemapReinhardGLSL from '../../components/film/tonemap_reinhard/tonemap_reinhard.glsl?raw';
+import tonemapNoneGLSL from '../../components/film/tonemap_none/tonemap_none.glsl?raw';
 
 export interface ShaderBuildResult {
     shaders: Map<string, ShaderProgram>;
@@ -83,8 +83,8 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
     return [
         { origin: 'generated:display-header', source: header },
         tonemap.type === 'none'
-            ? { origin: 'components/film/tonemap_none.glsl', source: tonemapNoneGLSL }
-            : { origin: 'components/film/tonemap_reinhard.glsl', source: tonemapReinhardGLSL },
+            ? { origin: 'components/film/tonemap_none/tonemap_none.glsl', source: tonemapNoneGLSL }
+            : { origin: 'components/film/tonemap_reinhard/tonemap_reinhard.glsl', source: tonemapReinhardGLSL },
     ];
 }
 

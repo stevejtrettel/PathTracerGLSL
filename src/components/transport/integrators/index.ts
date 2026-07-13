@@ -3,7 +3,7 @@
 // Whitted, and debug probes are new walks COMPOSING the existing techniques — see pt.ts's
 // header for what an integrator owns vs what techniques own).
 
-import { contributeTransport } from './pt.js';
+import { contributeTransport } from './pt/pt.js';
 
 export const INTEGRATORS = {
     pt: contributeTransport,

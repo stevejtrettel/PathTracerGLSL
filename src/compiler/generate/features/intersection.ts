@@ -14,9 +14,9 @@ import { formatFloat, formatVec3, paramToUniform } from '../../../components/gls
 import { modelTransmission } from '../../../components/materials/index.js';
 import { quadNormal } from '../../../components/geometry/index.js';
 
-import sdfPrimitivesGLSL from '../../../components/geometry/sdf_primitives.glsl?raw';
-import raymarchGLSL from '../../../components/geometry/raymarch.glsl?raw';
-import analyticPrimitivesGLSL from '../../../components/geometry/analytic_primitives.glsl?raw';
+import sdfPrimitivesGLSL from '../../../components/geometry/sdf/sdf_primitives.glsl?raw';
+import raymarchGLSL from '../../../components/geometry/sdf/raymarch.glsl?raw';
+import analyticPrimitivesGLSL from '../../../components/geometry/analytic/analytic_primitives.glsl?raw';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     if (plan.program.intersection.method !== 'raymarch') {
@@ -29,14 +29,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
 
     // SDF backend: primitives + per-scene march-bound dispatch + the marcher (sdf_intersect*).
     if (hasSDF) {
-        blocks.push({ origin: 'components/geometry/sdf_primitives.glsl', source: sdfPrimitivesGLSL });
+        blocks.push({ origin: 'components/geometry/sdf/sdf_primitives.glsl', source: sdfPrimitivesGLSL });
         blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects) });
-        blocks.push({ origin: 'components/geometry/raymarch.glsl', source: raymarchGLSL });
+        blocks.push({ origin: 'components/geometry/sdf/raymarch.glsl', source: raymarchGLSL });
     }
 
     // Analytic backend: closed-form primitives + per-scene analytic_intersect* dispatch.
     if (hasAnalytic) {
-        blocks.push({ origin: 'components/geometry/analytic_primitives.glsl', source: analyticPrimitivesGLSL });
+        blocks.push({ origin: 'components/geometry/analytic/analytic_primitives.glsl', source: analyticPrimitivesGLSL });
         blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects) });
     }
 

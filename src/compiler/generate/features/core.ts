@@ -14,7 +14,7 @@ import interactionGLSL from '../glsl/core/interaction.glsl?raw';
 import mathGLSL from '../glsl/core/math.glsl?raw';
 import mathMediaGLSL from '../glsl/core/math_media.glsl?raw';
 import mathMisGLSL from '../glsl/core/math_mis.glsl?raw';
-import euclideanGLSL from '../../../components/ambient/euclidean.glsl?raw';
+import euclideanGLSL from '../../../components/ambient/euclidean/euclidean.glsl?raw';
 import rayGLSL from '../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
 
@@ -46,13 +46,13 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         { origin: 'glsl/core/interaction.glsl', source: interactionGLSL },
         // Sampler slot (pick-one): sole occupant today; a strategy knob arrives with the
         // second occupant (fable-components §3 — the Owen–Sobol record).
-        { origin: 'components/sampler/pcg4d.glsl', source: SAMPLERS.pcg4d.glsl },
+        { origin: 'components/sampler/pcg4d/pcg4d.glsl', source: SAMPLERS.pcg4d.glsl },
         { origin: 'glsl/core/math.glsl', source: mathGLSL },
     );
     if (plan.program.media.present) blocks.push({ origin: 'glsl/core/math_media.glsl', source: mathMediaGLSL });
     if (plan.program.estimator.lighting?.method === 'mis') blocks.push({ origin: 'glsl/core/math_mis.glsl', source: mathMisGLSL });
     blocks.push(
-        { origin: 'components/ambient/euclidean.glsl', source: euclideanGLSL },
+        { origin: 'components/ambient/euclidean/euclidean.glsl', source: euclideanGLSL },
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
 
