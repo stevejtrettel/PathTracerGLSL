@@ -9,9 +9,9 @@ import { isValueParam } from '../../types.js';
 import type { RenderPlan, ProgramDescription } from '../../plan/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import { formatFloat } from './glsl-format.js';
+import { formatFloat } from '../../../components/glsl-format.js';
 
-import cameraPinholeGLSL from '../glsl/camera/camera_pinhole.glsl?raw';
+import cameraPinholeGLSL from '../../../components/camera/pinhole.glsl?raw';
 
 export function contributeCamera(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
     const program = plan.program;
@@ -61,7 +61,7 @@ export function contributeCamera(plan: RenderPlan, bag: DiagnosticBag): FeatureC
 }
 
 function cameraOrigin(program: ProgramDescription): string {
-    if (program.measurement.camera.type === 'pinhole') return 'glsl/camera/camera_pinhole.glsl';
+    if (program.measurement.camera.type === 'pinhole') return 'components/camera/pinhole.glsl';
     return `generated:camera-${program.measurement.camera.type}`;
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatFloat, formatVec3 } from '../../src/compiler/generate/features/glsl-format.js';
+import { formatFloat, formatVec3 } from '../../src/components/glsl-format.js';
 
 describe('formatFloat', () => {
     it('appends .0 to integer-valued numbers so GLSL reads them as floats', () => {

@@ -4,8 +4,8 @@ import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { MATERIAL_MODELS } from '../generate/glsl/materials/index.js';
-import { PRIMITIVE_PARAMS } from '../generate/glsl/geometry/index.js';
+import { MATERIAL_MODELS } from '../../components/materials/index.js';
+import { PRIMITIVE_PARAMS } from '../../components/geometry/index.js';
 
 /** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
 const MIN_QUAD_AREA = 1e-8;

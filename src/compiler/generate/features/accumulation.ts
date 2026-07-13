@@ -5,7 +5,7 @@ import type { RenderPlan, ProgramDescription } from '../../plan/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 
-import mainAccumulateGLSL from '../glsl/film/main_accumulate.glsl?raw';
+import mainAccumulateGLSL from '../../../components/film/accumulate_average.glsl?raw';
 
 export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
     const program = plan.program;
@@ -26,7 +26,7 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
 }
 
 function accumulationOrigin(program: ProgramDescription): string {
-    if (program.estimator.accumulation.type === 'average') return 'glsl/film/main_accumulate.glsl';
+    if (program.estimator.accumulation.type === 'average') return 'components/film/accumulate_average.glsl';
     return `generated:main-${program.estimator.accumulation.type}`;
 }
 

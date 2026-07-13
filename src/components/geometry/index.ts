@@ -12,6 +12,18 @@ export interface PrimitiveParam {
     required: boolean;
 }
 
+/** Unit cross(edge1, edge2) — a quad's emitting-side normal, precomputed at compile
+ *  time. Quad math shared by the analytic backend's arms and the quad light descriptor
+ *  (the one-sided pin requires hit side and sample side to agree — one formula, two
+ *  readers). */
+export function quadNormal(edge1: number[], edge2: number[]): [number, number, number] {
+    const cx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
+    const cy = edge1[2] * edge2[0] - edge1[0] * edge2[2];
+    const cz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
+    const len = Math.hypot(cx, cy, cz);
+    return [cx / len, cy / len, cz / len];
+}
+
 export const PRIMITIVE_PARAMS: Record<string, PrimitiveParam[]> = {
     // SDF backend
     'sdf:sphere': [

@@ -2,7 +2,7 @@
 // transcription of these functions — these tests are the ground truth for both.
 
 import { describe, it, expect } from 'vitest';
-import { equalAreaSquareToSphere, equalAreaSphereToSquare, resampleEquirectToOctahedral } from '../../src/engine/loaders/octahedral.js';
+import { equalAreaSquareToSphere, equalAreaSphereToSquare, resampleEquirectToOctahedral } from './octahedral.js';
 
 // deterministic LCG (no Math.random in tests — reproducible failures)
 function lcg(seed: number) {

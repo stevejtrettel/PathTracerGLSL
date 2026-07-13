@@ -12,7 +12,7 @@ import { contributeMaterials } from './materials.js';
 import { contributeLighting } from './lighting.js';
 import { contributeCamera } from './camera.js';
 import { contributeEnvironment } from './environment.js';
-import { contributeTransport } from './transport.js';
+import { contributeTransport } from '../../../components/transport/pt/transport.js';
 import { contributeAccumulation } from './accumulation.js';
 
 export type { FeatureContribution, PlannedTexture } from './types.js';

@@ -1,5 +1,7 @@
-// compiler/generate/features/transport.ts
-// The transport loop GENERATOR (§10.1 item 9, impl-plan-transport-split.md).
+// components/transport/pt/transport.ts
+// The transport loop GENERATOR (§10.1 item 9, impl-plan-transport-split.md) — the `pt`
+// occupant of the transport-integrator family (fable-components §3). Segment joints are
+// template-shaped pending the §7 re-carve (a separate batch with its own proof).
 //
 // The loop is assembled from segment emitters — the emitted program contains only the
 // code that runs (no preprocessor conditionals; specialization happens HERE, not in the
@@ -15,10 +17,10 @@
 // - Emission quality bar: the output reads as a bespoke tracer for THIS program;
 //   comments are emitted conditionally and describe only what is emitted.
 
-import type { RenderPlan, ProgramDescription } from '../../plan/types.js';
-import type { ShaderBlock } from '../ShaderIR.js';
-import { emptyContribution, type FeatureContribution } from './types.js';
-import { modelTransmission } from '../glsl/materials/index.js';
+import type { RenderPlan, ProgramDescription } from '../../../compiler/plan/types.js';
+import type { ShaderBlock } from '../../../compiler/generate/ShaderIR.js';
+import type { FeatureContribution } from '../../../compiler/generate/features/types.js';
+import { modelTransmission } from '../../materials/index.js';
 
 export function contributeTransport(plan: RenderPlan): FeatureContribution {
     const program = plan.program;
@@ -49,9 +51,15 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
     if (program.materials.models.some(modelTransmission)) requires.push('ior_of');
     if (program.environmentSamplable && lighting?.method === 'mis') requires.push('environment_pdf');
 
+    // Explicit literal (not ...emptyContribution): the purity rule — components import
+    // no compiler VALUES, only contract types. tsc keeps this in sync with the type.
     return {
-        ...emptyContribution('transport'),
+        feature: 'transport',
         blocks: emitTransportTrace(program),
+        defines: {},
+        uniforms: [],
+        parameters: {},
+        textures: [],
         provides: [{ name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' }],
         requires,
     };

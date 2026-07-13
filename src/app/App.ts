@@ -3,7 +3,7 @@
 import { Compiler } from '../compiler/Compiler.js';
 import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '../compiler/EnvironmentBake.js';
 import { envVariantSuffix } from '../compiler/generate/features/environment.js';
-import { resampleEquirectToOctahedral } from '../engine/loaders/octahedral.js';
+import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';

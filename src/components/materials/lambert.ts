@@ -1,7 +1,7 @@
 // Lambert descriptor — co-located with lambert.glsl (module-anatomy §2: a model is one
-// GLSL file + one descriptor; the pair moves together in the R1c file reorg).
+// GLSL file + one descriptor; the pair moves together).
 
-import type { MaterialModelDescriptor } from '../../descriptors.js';
+import type { MaterialModelDescriptor } from '../descriptors.js';
 import lambertGLSL from './lambert.glsl?raw';
 
 export const lambertDescriptor: MaterialModelDescriptor = {

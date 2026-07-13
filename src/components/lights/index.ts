@@ -3,9 +3,8 @@
 // descriptors; lighting.ts composes them and owns everything cross-kind (selection CDF,
 // cdf_rescale, the two-stage env wrapper). Adding a kind = one GLSL file + one
 // descriptor + one line here.
-// (Temporary location: moves to glsl/lights/index.ts in the R1c family-folder reorg.)
 
-import type { LightKindDescriptor } from '../../descriptors.js';
+import type { LightKindDescriptor } from '../descriptors.js';
 import { pointLightDescriptor } from './point.js';
 import { quadLightDescriptor } from './quad.js';
 import { sphereLightDescriptor } from './sphere.js';

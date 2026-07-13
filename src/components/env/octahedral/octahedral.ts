@@ -1,4 +1,5 @@
-// engine/loaders/octahedral.ts
+// components/env/octahedral/octahedral.ts — the equal-area chart's TS ground-truth twin
+// (co-located with octahedral.glsl + its test; the engine's env loaders import it).
 // EQUAL-AREA octahedral square↔sphere mapping (Clarberg 2008, as adopted by pbrt-v4's
 // ImageInfiniteLight) — every texel of an N×N table subtends exactly 4π/N² steradians,
 // so the chart Jacobian is constant: no sinθ table weighting, no pole singularity, no
@@ -6,8 +7,8 @@
 // encoding (Cigolle et al.) — the radial warp is what buys equal area.
 //
 // Convention: Y-up (pbrt's z-up swizzled: our (x, z) span the square, y is the pole axis).
-// The GLSL chart (env_chart_octahedral.glsl) is a line-for-line transcription of these two
-// functions — change one, change both (the sampler's pdf depends on the pair agreeing).
+// The GLSL chart (octahedral.glsl, this folder) is a line-for-line transcription of these
+// two functions — change one, change both (the sampler's pdf depends on the pair agreeing).
 
 export type Vec3Tuple = [number, number, number];
 

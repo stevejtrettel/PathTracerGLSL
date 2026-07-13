@@ -4,17 +4,17 @@
 import type { RenderPlan } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { unionFields, buildPropertiesStruct } from '../schema.js';
-import { MATERIAL_MODELS } from '../glsl/materials/index.js';
-import { PHASE_MODELS } from '../glsl/phase/index.js';
+import { MATERIAL_MODELS } from '../../../components/materials/index.js';
+import { PHASE_MODELS } from '../../../components/phase/index.js';
+import { SAMPLERS } from '../../../components/sampler/index.js';
 
 import structsGLSL from '../glsl/core/structs.glsl?raw';
 import structsMediaGLSL from '../glsl/core/structs_media.glsl?raw';
 import interactionGLSL from '../glsl/core/interaction.glsl?raw';
-import rngGLSL from '../glsl/core/rng.glsl?raw';
 import mathGLSL from '../glsl/core/math.glsl?raw';
 import mathMediaGLSL from '../glsl/core/math_media.glsl?raw';
 import mathMisGLSL from '../glsl/core/math_mis.glsl?raw';
-import euclideanGLSL from '../glsl/ambient/euclidean.glsl?raw';
+import euclideanGLSL from '../../../components/ambient/euclidean.glsl?raw';
 import rayGLSL from '../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
 
@@ -44,13 +44,15 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     }
     blocks.push(
         { origin: 'glsl/core/interaction.glsl', source: interactionGLSL },
-        { origin: 'glsl/core/rng.glsl', source: rngGLSL },
+        // Sampler slot (pick-one): sole occupant today; a strategy knob arrives with the
+        // second occupant (fable-components §3 — the Owen–Sobol record).
+        { origin: 'components/sampler/pcg4d.glsl', source: SAMPLERS.pcg4d.glsl },
         { origin: 'glsl/core/math.glsl', source: mathGLSL },
     );
     if (plan.program.media.present) blocks.push({ origin: 'glsl/core/math_media.glsl', source: mathMediaGLSL });
     if (plan.program.estimator.lighting?.method === 'mis') blocks.push({ origin: 'glsl/core/math_mis.glsl', source: mathMisGLSL });
     blocks.push(
-        { origin: 'glsl/ambient/euclidean.glsl', source: euclideanGLSL },
+        { origin: 'components/ambient/euclidean.glsl', source: euclideanGLSL },
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
 

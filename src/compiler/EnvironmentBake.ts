@@ -12,9 +12,9 @@
 // const 0 here) and WITHOUT intensity (a uniform scale cancels in the normalized CDF).
 
 import type { SceneDescription, CompiledRenderer } from './types.js';
-import fullscreenVertGLSL from './generate/glsl/film/fullscreen.vert.glsl?raw';
-import envChartEquirectGLSL from './generate/glsl/env/env_chart_equirect.glsl?raw';
-import envChartOctahedralGLSL from './generate/glsl/env/env_chart_octahedral.glsl?raw';
+import fullscreenVertGLSL from '../components/film/fullscreen.vert.glsl?raw';
+import envChartEquirectGLSL from '../components/env/equirect.glsl?raw';
+import envChartOctahedralGLSL from '../components/env/octahedral/octahedral.glsl?raw';
 
 export const DEFAULT_ENV_TABLE_SIZE: [number, number] = [512, 256];
 

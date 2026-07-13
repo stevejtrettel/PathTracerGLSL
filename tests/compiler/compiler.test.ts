@@ -197,7 +197,7 @@ describe('Compiler', () => {
             expect(origins).toContain('glsl/core/structs.glsl');
             expect(origins).toContain('generated:sdf-dispatch');
             expect(origins).toContain('generated:material-lookup');
-            expect(origins).toContain('glsl/geometry/raymarch.glsl');
+            expect(origins).toContain('components/geometry/raymarch.glsl');
         });
     });
 

@@ -1,10 +1,9 @@
 // Material-model registry (mix-many family, module-anatomy §5). Feature planners iterate
 // the models PRESENT in the plan and look descriptors up here — adding a model is one
 // GLSL file + one descriptor + one line below, and nothing else (the extension-cost test).
-// (Temporary location: moves to glsl/materials/index.ts in the R1c family-folder reorg.)
 
-import type { MaterialModel } from '../../../types.js';
-import type { MaterialModelDescriptor } from '../../descriptors.js';
+import type { MaterialModel } from '../../compiler/types.js';
+import type { MaterialModelDescriptor } from '../descriptors.js';
 import { lambertDescriptor } from './lambert.js';
 import { dielectricDescriptor } from './dielectric.js';
 

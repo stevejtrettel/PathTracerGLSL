@@ -1,15 +1,18 @@
-// compiler/generate/descriptors.ts
+// components/descriptors.ts
 // Descriptor types for mix-many families (impl-plan-descriptor-reorg R1; shapes from
 // fable-module-anatomy.md §2, adjusted to current reality — (uc,u) samplers, the
-// region-table storage kind from the ior lesson).
+// region-table storage kind from the ior lesson). These interfaces define what a
+// component IS, so they live with the component library; the resolved-data types they
+// reference (PlannedLight/PlannedMaterial/PlannedMedium) stay compiler-owned and cross
+// type-only (the components purity rule: contract TYPES may cross, values may not).
 //
 // THE GUARDRAIL (module-anatomy §2, "the archive's grave"): a descriptor declares facts
 // about ONE model — never composition, ordering, passes, or pipeline structure. Fields
 // may be functions (a pdf arm is kind-specific math, a fact expressed as code); they may
 // NOT reference other descriptors or the plan. All decisions stay in feature-planner code.
 
-import type { MaterialModel } from '../types.js';
-import type { PlannedLight, PlannedMaterial, PlannedMedium } from '../plan/types.js';
+import type { MaterialModel } from '../compiler/types.js';
+import type { PlannedLight, PlannedMaterial, PlannedMedium } from '../compiler/plan/types.js';
 
 /**
  * A field of a scene-scoped properties struct (MaterialProperties / MediumProperties)

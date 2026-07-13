@@ -10,12 +10,13 @@ import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMateri
 import { isGlslExpression, isValueParam } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatVec3, paramToUniform } from './glsl-format.js';
-import { modelTransmission } from '../glsl/materials/index.js';
+import { formatFloat, formatVec3, paramToUniform } from '../../../components/glsl-format.js';
+import { modelTransmission } from '../../../components/materials/index.js';
+import { quadNormal } from '../../../components/geometry/index.js';
 
-import sdfPrimitivesGLSL from '../glsl/geometry/sdf_primitives.glsl?raw';
-import raymarchGLSL from '../glsl/geometry/raymarch.glsl?raw';
-import analyticPrimitivesGLSL from '../glsl/geometry/analytic_primitives.glsl?raw';
+import sdfPrimitivesGLSL from '../../../components/geometry/sdf_primitives.glsl?raw';
+import raymarchGLSL from '../../../components/geometry/raymarch.glsl?raw';
+import analyticPrimitivesGLSL from '../../../components/geometry/analytic_primitives.glsl?raw';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     if (plan.program.intersection.method !== 'raymarch') {
@@ -28,14 +29,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
 
     // SDF backend: primitives + per-scene march-bound dispatch + the marcher (sdf_intersect*).
     if (hasSDF) {
-        blocks.push({ origin: 'glsl/geometry/sdf_primitives.glsl', source: sdfPrimitivesGLSL });
+        blocks.push({ origin: 'components/geometry/sdf_primitives.glsl', source: sdfPrimitivesGLSL });
         blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects) });
-        blocks.push({ origin: 'glsl/geometry/raymarch.glsl', source: raymarchGLSL });
+        blocks.push({ origin: 'components/geometry/raymarch.glsl', source: raymarchGLSL });
     }
 
     // Analytic backend: closed-form primitives + per-scene analytic_intersect* dispatch.
     if (hasAnalytic) {
-        blocks.push({ origin: 'glsl/geometry/analytic_primitives.glsl', source: analyticPrimitivesGLSL });
+        blocks.push({ origin: 'components/geometry/analytic_primitives.glsl', source: analyticPrimitivesGLSL });
         blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects) });
     }
 
@@ -181,15 +182,6 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[]): string {
     lines.push('}');
 
     return lines.join('\n');
-}
-
-/** Unit cross(edge1, edge2) — a quad's emitting-side normal, precomputed at compile time. */
-export function quadNormal(edge1: number[], edge2: number[]): [number, number, number] {
-    const cx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
-    const cy = edge1[2] * edge2[0] - edge1[0] * edge2[2];
-    const cz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
-    const len = Math.hypot(cx, cy, cz);
-    return [cx / len, cy / len, cz / len];
 }
 
 /** GLSL boolean test call that writes `t` for object `obj`. */

@@ -10,11 +10,12 @@ npx vitest run       # run tests ONCE (plain `npm run test` starts watch mode)
 npx tsc --noEmit     # typecheck
 ```
 
-## Architecture (three layers, dependency direction App → Engine → Compiler)
+## Architecture (four layers, dependency direction App → Engine → Compiler → Components)
 
 - **App** (`src/app/`) — facade + managers (RendererManager, RenderCoordinator, ProductionOrchestrator, ParameterStore, EventBus) + extensions + UI library.
 - **Engine** (`src/engine/`) — executes `CompiledRenderer` objects **blindly**. It must never know about scenes, materials, or algorithms. Do not leak compiler/scene concepts into the engine — this boundary is load-bearing.
-- **Compiler** (`src/compiler/`) — Analyze → Validate → Plan → Generate. Turns `SceneDescription + RenderStrategy` into `CompiledRenderer` (shaders + pipeline + uniform bindings). GLSL library lives in `src/compiler/generate/glsl/`, loaded via Vite `?raw` imports; assembly goes through `ShaderIR.ts` blocks so source maps track provenance.
+- **Compiler** (`src/compiler/`) — Analyze → Validate → Plan → Generate. Turns `SceneDescription + RenderStrategy` into `CompiledRenderer` (shaders + pipeline + uniform bindings). Assembly goes through `ShaderIR.ts` blocks so source maps track provenance. Only the GLSL contract spine (`generate/glsl/core/` — structs, interaction, math, ray) lives here; everything swappable is in components.
+- **Components** (`src/components/`) — the LEAF library of swappable research code (`docs/fable-components.md`): materials, lights, phase, geometry, ambient, transport (incl. the pt loop generator), env, sampler, camera, film — GLSL occupants (Vite `?raw`) + descriptors + per-family registries. Components import NOTHING from app/engine/compiler except contract types (`import type` only — enforced by `tests/components/purity.test.ts`); everyone imports from components. Adding an occupant = one GLSL file + one descriptor + one registry line.
 
 ## Design authority — read before designing anything
 
@@ -45,7 +46,9 @@ npx tsc --noEmit     # typecheck
 
 **The descriptor/schema reorg is BUILT** (July 2026, `docs/impl-plan-descriptor-reorg.md` R1–R3): mix-many families are descriptor pairs in family folders (`glsl/materials/lambert.{glsl,ts}`, `glsl/lights/point.{glsl,ts}`, `glsl/phase/hg.{glsl,ts}`, registries at each `index.ts`); `MaterialProperties`/`MediumProperties` are schema-generated per scene (§3.4 literal — **no roughness field exists until GGX's schema declares it**; a driven param with no reader is a Validator warning); primitive parameters are schema-checked (C7). **Adding a material model = one GLSL file + one descriptor + one registry line.**
 
-**Still Euclidean-only** — no GGX yet (reference §7 transcription-ready; NEXT BUILD — `glsl/materials/ggx.{glsl,ts}` + the §11.3 pdf-histogram harness alongside), no heterogeneous media/majorants/equiangular NEE (deferred table in `impl-plan-media.md`), no spherical-rectangle quad sampling / two-sided quads / `Value<T>` light params (deferred table in `impl-plan-area-lights.md`), no curved spaces (the `ambient_*` seam is ready but H³/Schwarzschild are unbuilt). Glass *shadow rays* remain opaque — a DECLARED truncation (`measurement.shadows: 'opaque-dielectrics'`). Don't describe deferred items as built. **Discuss loop/interface structure before implementing** (owner preference); don't mix refactors with feature work.
+**The components library is BUILT** (July 2026, `docs/fable-components.md` §§1–6): everything swappable moved to the top-level `src/components/` leaf layer — byte-identical emitted GLSL across all 47 registry pairs (hash-verified), snapshot churn = provenance renames only, GPU spot-checked. The sampler slot is carved (`components/sampler/pcg4d.glsl` + registry — Owen–Sobol is the known second occupant); `descriptors.ts`/`glsl-format.ts`/`quadNormal`/the octahedral TS twin resolved into components; the transport pt generator lives at `components/transport/pt/transport.ts` (moved AS-IS — segments still template-shaped). **§7 of fable-components (transport anatomy re-carve at mathematical joints) is the remaining OPEN discussion**; agreed sequence: GGX + a Veach-style MIS witness FIRST, then the re-carve with the token-identity proof method (§7.5).
+
+**Still Euclidean-only** — no GGX yet (reference §7 transcription-ready; NEXT BUILD — `components/materials/ggx.{glsl,ts}` + the §11.3 pdf-histogram harness alongside), no heterogeneous media/majorants/equiangular NEE (deferred table in `impl-plan-media.md`), no spherical-rectangle quad sampling / two-sided quads / `Value<T>` light params (deferred table in `impl-plan-area-lights.md`), no curved spaces (the `ambient_*` seam is ready but H³/Schwarzschild are unbuilt). Glass *shadow rays* remain opaque — a DECLARED truncation (`measurement.shadows: 'opaque-dielectrics'`). Don't describe deferred items as built. **Discuss loop/interface structure before implementing** (owner preference); don't mix refactors with feature work.
 
 ## Critical conventions
 

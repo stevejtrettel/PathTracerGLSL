@@ -5,7 +5,7 @@
 // handful of models), never with library size; a single-model scene's struct IS that
 // model's struct (module-anatomy §1's degeneracy, where the numeric witnesses live).
 
-import type { PropertySchema } from './descriptors.js';
+import type { PropertySchema } from '../../components/descriptors.js';
 
 /**
  * Union of 'field'-storage schemas across the models present, deduped by name in

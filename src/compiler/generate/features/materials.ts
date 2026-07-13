@@ -8,13 +8,13 @@ import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from 
 import type { ParameterMetadata } from '../../../engine/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatSpectrum, paramToUniform } from './glsl-format.js';
+import { formatFloat, formatSpectrum, paramToUniform } from '../../../components/glsl-format.js';
 
-import { MATERIAL_MODELS, materialModel } from '../glsl/materials/index.js';
-import { PHASE_MODELS } from '../glsl/phase/index.js';
+import { MATERIAL_MODELS, materialModel } from '../../../components/materials/index.js';
+import { PHASE_MODELS } from '../../../components/phase/index.js';
 import { unionFields } from '../schema.js';
-import type { PropertySchema } from '../descriptors.js';
-import mediumAnalyticGLSL from '../glsl/transport/medium_analytic.glsl?raw';
+import type { PropertySchema } from '../../../components/descriptors.js';
+import mediumAnalyticGLSL from '../../../components/transport/volume/analytic.glsl?raw';
 
 /** Capability lookup over the descriptor registry (R1a — replaces the inline
  *  MODEL_HAS_NONDELTA_LOBES map). 'none' is a boundary classification, not a model:
@@ -58,7 +58,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 
     // Model includes from the registry (R1a): one line per model PRESENT, no per-model ifs.
     for (const model of plan.program.materials.models) {
-        blocks.push({ origin: `glsl/materials/${model}.glsl`, source: materialModel(model).glsl });
+        blocks.push({ origin: `components/materials/${model}.glsl`, source: materialModel(model).glsl });
     }
 
     // The generated §3.3 dispatch, after the model libraries it calls.
@@ -85,11 +85,11 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         // The 'analytic' strategy bodies (volumetric-component §4) — needed by the scattering
         // arms (seam 1) and by the spectral shadow walker's per-segment form (seam 2).
         if (scatteringLive || wantsShadowMedia) {
-            blocks.push({ origin: 'glsl/transport/medium_analytic.glsl', source: mediumAnalyticGLSL });
+            blocks.push({ origin: 'components/transport/volume/analytic.glsl', source: mediumAnalyticGLSL });
         }
         if (scatteringLive) {
             // v1: every scattering medium phases through HG (registry-driven, R1b).
-            blocks.push({ origin: 'glsl/phase/hg.glsl', source: PHASE_MODELS['hg'].glsl });
+            blocks.push({ origin: 'components/phase/hg.glsl', source: PHASE_MODELS['hg'].glsl });
         }
         blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan) });
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).

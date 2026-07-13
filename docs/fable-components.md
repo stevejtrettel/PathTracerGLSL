@@ -1,11 +1,24 @@
 # Components — the top-level library of swappable research code
 
 **Author:** Fable (July 2026)
-**Status:** DRAFT for owner discussion (a fresh session will pick this up — this doc is
-self-contained on purpose). §§1–6 record decisions ALREADY MADE in the July 12 discussion
-(root-level folder, the name, the dependency rule, the sampler slot); they are settled
-unless reopened. **§7 (transport anatomy) is genuinely OPEN** — it presents alternatives
-without pinning one; it is the thing to discuss.
+**Status:** §§1–6 BUILT (July 12 2026 — the migration landed byte-identical: all 47
+registry pairs hash-verified, snapshot churn = provenance renames only, GPU spot-checked;
+purity enforced by `tests/components/purity.test.ts`). Three calls the draft left
+implicit, resolved in the migration: (1) the leaf rule distinguishes types from values —
+components may `import type` contract types from the compiler (PlannedLight,
+ProgramDescription, ShaderBlock, FeatureContribution — moving those types is a separate
+cleanup, not batch-1 work), but may import NO values; (2) `descriptors.ts` and
+`glsl-format.ts` moved INTO components (what a component IS belongs to the library),
+`quadNormal` moved to `components/geometry/`, the octahedral TS twin + test co-located
+per §4's tree; (3) the transport pt generator moved AS-IS to
+`components/transport/pt/transport.ts` with its one value import (`emptyContribution`)
+inlined as a typed literal. The sampler slot is carved: `rng.glsl` became
+`components/sampler/pcg4d.glsl` whole (state layout, seeding, and the [0,1) mapping are
+all occupant-specific — Owen–Sobol replaced exactly this file), call-surface contract
+documented on the registry.
+**§7 (transport anatomy) remains OPEN** — agreed sequence: GGX + a Veach-style MIS
+witness first (peaked-but-non-delta pdfs are the regime where re-carving the MIS code
+could actually break something visible), then the re-carve per §7.5's proof method.
 **Companions:** `fable-strategy-taxonomy.md` (what the inputs mean — pinned),
 `fable-module-anatomy.md` (descriptor shapes — implemented by `impl-plan-descriptor-reorg.md`),
 `docs/trace-loop-contract.md` + `fable-compiler-contracts.md` (the GLSL contracts every

@@ -1,5 +1,7 @@
-// compiler/generate/features/glsl-format.ts
-// Shared GLSL literal formatting used by the per-scene code generators.
+// components/glsl-format.ts
+// Shared GLSL literal formatting used by descriptor emit-code and the per-scene code
+// generators. Pure leaf util (no imports) — lives in components so descriptors never
+// reach into the compiler for it.
 
 export function formatFloat(v: number): string {
     if (!Number.isFinite(v)) {
