@@ -398,14 +398,16 @@ async function main() {
     });
 
     try {
-        // Pull the registry (witness specs + strategy ids) straight from the lab page —
-        // one source of truth, no TS loading in node.
+        // Pull the WITNESS registry (src/witnesses/ — the durable GPU test system,
+        // not the demo gallery) straight from the lab page — one source of truth,
+        // no TS loading in node. Fixture-partner entries (no checks) ride along so
+        // twin references resolve.
         const bootstrap = await browser.newPage();
         await bootstrap.goto(`${BASE_URL}/lab.html`, { waitUntil: 'domcontentloaded' });
-        await bootstrap.waitForFunction(() => window.sceneSuite !== undefined, null, { timeout: 120_000 });
+        await bootstrap.waitForFunction(() => window.witnessSuite !== undefined, null, { timeout: 120_000 });
         const registry = await bootstrap.evaluate(() => {
             const out = {};
-            for (const [id, entry] of Object.entries(window.sceneSuite)) {
+            for (const [id, entry] of Object.entries(window.witnessSuite)) {
                 out[id] = {
                     witness: entry.witness ?? null,
                     strategyIds: entry.strategies.map(s => s.id),

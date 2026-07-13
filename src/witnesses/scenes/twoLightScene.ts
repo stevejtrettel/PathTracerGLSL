@@ -12,7 +12,7 @@
 // spp). Load both strategies and A/B them with keys 1 (power) / 2 (uniform); with unequal
 // light powers, `power` should be visibly cleaner at equal sample count.
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
 
 export const twoLightScene: SceneDescription = {
     id: 'two-light',

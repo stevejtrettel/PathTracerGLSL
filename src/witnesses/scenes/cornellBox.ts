@@ -1,7 +1,7 @@
 // compiler/scenes/cornellBox.ts
 // Cornell box: 5 walls (planes), tall box, sphere, ceiling point light
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
 
 export const cornellBox: SceneDescription = {
     id: 'cornell',

@@ -21,7 +21,7 @@
 // Plane convention (matches cornellBox.ts): sdf = dot(p, normal) + offset, normals point
 // INWARD, so the interior is the intersection of six half-spaces — here the cube [-1,1]³.
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
 
 export const furnaceBox: SceneDescription = {
     id: 'furnace',

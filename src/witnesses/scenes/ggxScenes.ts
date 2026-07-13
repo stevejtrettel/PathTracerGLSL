@@ -11,7 +11,7 @@
 // triple), the sphere light's cone pdf, or the MIS weights at either scoring site.
 // Plate normals are light↔camera bisectors (precomputed) so every highlight is visible.
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
 
 export const veachMis: SceneDescription = {
     id: 'veach-mis',

@@ -11,7 +11,7 @@
 //                  with a matte box and a glass sphere. Same pt-nee vs pt convergence pair;
 //                  the orb must appear in the glass reflections (hittable-emitter invariant).
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
 import { cornellBox } from './cornellBox.js';
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 //         the scene exclusively through pt paths — exactly the old reference behavior, now
 //         through the compiler + the §2.10 extern chain.
 
-import type { SceneDescription, RenderStrategy } from '../types.js';
+import type { SceneDescription, RenderStrategy } from '../../compiler/types.js';
 
 export const skyScene: SceneDescription = {
     id: 'sky',

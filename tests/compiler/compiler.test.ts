@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
 import type { SceneDescription } from '../../src/compiler/types.js';
-import { minimalScene, minimalStrategy, directOnlyStrategy } from '../../src/compiler/scenes/minimalScene.js';
-import { cornellBox, cornellStrategy } from '../../src/compiler/scenes/cornellBox.js';
+import { minimalScene, minimalStrategy, directOnlyStrategy } from '../../src/witnesses/scenes/minimalScene.js';
+import { cornellBox, cornellStrategy } from '../../src/witnesses/scenes/cornellBox.js';
 
 const compiler = new Compiler();
 

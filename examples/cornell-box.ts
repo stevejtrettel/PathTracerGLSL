@@ -10,7 +10,7 @@
  */
 
 import { App } from '../src/app/index.js';
-import { cornellBox, cornellStrategy } from '../src/compiler/scenes/cornellBox.js';
+import { cornellBox, cornellStrategy } from '../src/witnesses/scenes/cornellBox.js';
 import {
     OrbitControls,
     ParameterPanelExtension,

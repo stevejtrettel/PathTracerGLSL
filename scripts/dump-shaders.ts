@@ -12,8 +12,8 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { Compiler } from '../src/compiler/Compiler.js';
 import { annotateWithProvenance } from '../src/compiler/generate/ShaderProvenance.js';
 import type { CompiledRenderer, SceneDescription, RenderStrategy } from '../src/compiler/types.js';
-import { minimalScene, minimalStrategy, directOnlyStrategy } from '../src/compiler/scenes/minimalScene.js';
-import { cornellBox, cornellStrategy } from '../src/compiler/scenes/cornellBox.js';
+import { minimalScene, minimalStrategy, directOnlyStrategy } from '../src/witnesses/scenes/minimalScene.js';
+import { cornellBox, cornellStrategy } from '../src/witnesses/scenes/cornellBox.js';
 
 const CASES: Array<[string, SceneDescription, RenderStrategy]> = [
     ['cornell-pathtracer', cornellBox, cornellStrategy],
