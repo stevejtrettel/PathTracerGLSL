@@ -1,53 +1,54 @@
 // components/transport/integrators/pt.ts
-// The `pt` INTEGRATOR — the recursive path-tracing walk (fable-components §7, pinned
-// July 2026: the technique-centric carve).
+// The `pt` INTEGRATOR — the recursive path-tracing walk, emitted FUNCTION-SHAPED per
+// fable-transport-glsl-target.md (owner-approved July 2026): the walk reads as the
+// estimator's table of contents; technique math arrives from static .glsl files
+// (techniques/*.glsl); every decision is a small generated body (combiner, record,
+// roulette, PathState).
 //
-// An integrator is a walk skeleton: it owns path advance (intersect, medium segments,
-// self-heal, null crossings), state, termination (RR, bounce budget), and ray spawning.
-// It does NO sampling itself — at each scattering event it hands the estimator work to
-// its technique roster: T1 kernel sampling (techniques/kernel.ts, with its deferred
-// scoring sites at emitter-hit and miss) and T2 light sampling (techniques/light.ts,
-// local scoring). The combiner (../combiner.ts) owns every weighting line, so
-// pt/pt-nee/pt-mis are combiner configurations of this ONE walk. A new integrator
-// (one-shot, Whitted, debug probe) is a new file here composing the same techniques
-// with different walk rules — techniques and combiner untouched.
+// An integrator owns path advance (intersect, medium segments, self-heal, nulls),
+// state, termination (RR, bounce budget), and ray spawning. It does NO sampling — at
+// each event it calls the technique functions. A new integrator (one-shot, Whitted,
+// probe) is a new file here composing the same static functions with different rules.
 //
-// The emitted program contains only the code that runs (no preprocessor conditionals;
-// specialization happens HERE). Emitters are pure functions of ProgramDescription —
-// never of scene data, which lives behind the seams the loop calls.
-//
-// PINNED (owner, July 2026): any invariant spanning emission sites has exactly ONE
-// emitter — rr() below (both RR sites), prevBookkeeping in kernel.ts (both sampling
-// sites). Emission quality bar: the output reads as a bespoke tracer for THIS program.
+// PINNED: single-emitter invariants are now single generated FUNCTIONS — roulette()
+// (both call sites), kernel_record() (both sampling sites, owned by kernel.ts).
+// The static-file rule (target doc §1): static files touch only PathState's pinned
+// core (ray/throughput/radiance); every program-dependent field is behind generated
+// functions. The WALK is generated, so it may touch its own fields freely.
 
 import type { RenderPlan, ProgramDescription } from '../../../compiler/plan/types.js';
 import type { ShaderBlock } from '../../../compiler/generate/ShaderIR.js';
 import type { FeatureContribution } from '../../../compiler/generate/features/types.js';
 import { flags, type Flags } from '../flags.js';
+import { combinerFns } from '../combiner.js';
 import {
-    kernelStateDecls, kernelSampleSurface, kernelSamplePhase,
-    kernelScoreEmitterHit, kernelScoreMiss, kernelRequires,
+    kernelStateFields, kernelStateInit, kernelRecordFn, kernelBlocks, kernelRequires,
 } from '../techniques/kernel.js';
-import { lightSurfaceSite, lightMediumSite, lightRequires } from '../techniques/light.js';
+import { lightBlocks, lightRequires } from '../techniques/light.js';
 
 export function contributeTransport(plan: RenderPlan): FeatureContribution {
     const program = plan.program;
     const f = flags(program);
 
-    // T4 seams: what the emitted code calls — each part declares its own, merged here.
-    const requires = [...walkRequires(f), ...kernelRequires(f), ...lightRequires(f)];
+    const blocks: ShaderBlock[] = [
+        pathState(f),
+        combinerFns(f),
+        kernelRecordFn(f),
+    ];
+    if (f.rr) blocks.push(roulette(f));
+    blocks.push(...kernelBlocks(f), ...lightBlocks(f), walk(program, f));
 
     // Explicit literal (not ...emptyContribution): the purity rule — components import
     // no compiler VALUES, only contract types. tsc keeps this in sync with the type.
     return {
         feature: 'transport',
-        blocks: emitTransportTrace(program, f),
+        blocks,
         defines: {},
         uniforms: [],
         parameters: {},
         textures: [],
         provides: [{ name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' }],
-        requires,
+        requires: [...walkRequires(f), ...kernelRequires(f), ...lightRequires(f)],
     };
 }
 
@@ -62,190 +63,153 @@ function walkRequires(f: Flags): string[] {
 }
 
 // ============================================================================
-// The walk — owns the skeleton; techniques fill the estimator sites.
+// Generated state — the union of fields the included parts declare (§3.4 pattern).
 // ============================================================================
 
-function emitTransportTrace(p: ProgramDescription, f: Flags): ShaderBlock[] {
-    const blocks: ShaderBlock[] = [];
-    const seg = (name: string, lines: string[]) => {
-        if (lines.length > 0) blocks.push({ origin: `generated:transport/${name}`, source: lines.join('\n') });
-    };
-
-    seg('init', [...stateInit(f), ...kernelStateDecls(f), '']);
-
-    if (f.media) {
-        // Media skeleton: one trace per iteration; the medium decides what happens on
-        // the segment BEFORE the boundary is honored (fable-volumetric-component §2).
-        seg('loop', [
-            `    for (int bounce = 0; bounce < ${p.measurement.maxBounces}; bounce++) {`,
-            '        Hit hit;',
-            '        bool boundary = scene_intersect(current_ray, hit);',
-            '',
-        ]);
-        seg('medium', [
-            '        // The volumetric component\'s call site (fable-volumetric-component §2): one segment,',
-            '        // ending at the boundary or the far clip. medium_sample never sees a boundary;',
-            '        // entering/exiting is the interface machinery\'s job below.',
-            '        int med_mat = material_of(current_medium);',
-            '        if (material_has_medium(med_mat)) {',
-            '            MediumSample ms = medium_sample(med_mat, current_ray, boundary ? hit.t : MAX_DIST, random2());',
-            '            throughput *= ms.weight;',
-        ]);
-        if (f.scattering) {
-            seg('medium', [
-                '            if (ms.scattered) {',
-                '                // ---- MEDIUM EVENT (§7.2 step 2) ----',
-                '                Point p_evt = ambient_geodesic(current_ray.origin, current_ray.direction, ms.t);',
-                '                Direction wo_med = -current_ray.direction;',
-            ]);
-            seg('light-medium', lightMediumSite(f));
-            seg('kernel-phase', kernelSamplePhase(f));
-            seg('rr', f.rr ? rr(f, 'medium') : []);
-            seg('medium', [
-                '                continue;   // loop-header bounce++: medium events COUNT toward the budget (§7.2)',
-                '            }',
-            ]);
-        }
-        seg('medium', ['        }']);
-        seg('loop', ['        if (!boundary) {']);
-    } else {
-        seg('loop', [
-            `    for (int bounce = 0; bounce < ${p.measurement.maxBounces}; bounce++) {`,
-            '        Hit hit;',
-            '        if (!scene_intersect(current_ray, hit)) {',
-        ]);
-    }
-    seg('kernel-miss', kernelScoreMiss(f));
-    seg('loop', ['        }', '']);
-
-    seg('self-heal', selfHeal(f));
-    seg('surface', [
-        '        int mat = material_of(hit.region_owner);        // §4.1: the boundary OWNER\'s BSDF shades (≠ region_to at exits)',
-    ]);
-    seg('null', nullCrossing(f));
-    seg('surface', [
-        '        MaterialProperties props = scene_material_properties(mat, hit.p);',
-        '        Direction wo = -current_ray.direction;',
-        '',
-    ]);
-    seg('kernel-emitter', kernelScoreEmitterHit(f));
-    seg('light-surface', lightSurfaceSite(f));
-    seg('kernel-sample', kernelSampleSurface(f));
-    seg('tracking', tracking(f));
-    seg('rr', f.rr ? rr(f, 'surface') : []);
-    seg('spawn', [
-        '        // Continuation ray: ray_spawn escapes the origin to wi\'s side of the surface along the',
-        '        // geodesic (self-intersection; transmission gets the far side). See docs/trace-loop-contract.md.',
-        '        current_ray = ray_spawn(hit, bs.wi);',
-        '    }',
-        '',
-        '    return radiance;',
-        '}',
-    ]);
-
-    return blocks;
-}
-
-// ============================================================================
-// Walk-owned segments — state, path advance, termination.
-// ============================================================================
-
-function stateInit(f: Flags): string[] {
+function pathState(f: Flags): ShaderBlock {
     const lines = [
-        '// Path trace loop — generated for this scene and strategy (item-9 transport generator).',
-        'Radiance transport_trace(Ray ray) {',
-        '    Spectrum throughput = SPECTRUM_ONE;',
-        '    Radiance radiance   = SPECTRUM_ZERO;',
-        '    Ray current_ray = ray;',
+        '// ── Path state (generated §3.4-style: the union of fields the included parts declare) ──',
+        'struct PathState {',
+        '    Ray ray;',
+        '    Spectrum throughput;',
+        '    Radiance radiance;',
+        ...kernelStateFields(f),
     ];
-    if (f.transmission) {
-        lines.push(
-            '',
-            '    // §7.2 etaScale: transmission compresses radiance by η² (restored on exit), so RR keyed on',
-            '    // raw throughput over-kills inside dense media — this factor divides the compression back',
-            '    // out of the survival metric only. Efficiency, not bias.',
-            '    float eta_scale = 1.0;',
-        );
-    }
-    if (f.media) {
-        lines.push(
-            '',
-            '    // §4.4: THE medium variable — a single int ground-truthed by classification (self-heal',
-            '    // at each hit), never a stack. Initialized by classifying the camera origin, so a camera',
-            '    // inside a bounded medium tracks its primary segment correctly.',
-            '    int current_medium = scene_region_at(ray.origin);',
-        );
-    }
-    if (f.nulls) {
-        lines.push('    int null_crossings = 0;   // §3.6: nulls are bookkeeping with their own safety counter');
-    }
-    return lines;
-}
-
-function selfHeal(f: Flags): string[] {
-    if (!f.media) return [];
-    return [
-        '        // §4.4 self-heal (free — the operand was already classified): a missed boundary event',
-        '        // mistracks exactly one segment and repairs here, instead of corrupting the path.',
-        '        if (hit.region_from != current_medium) current_medium = hit.region_from;',
+    if (f.media) lines.push('    int current_medium;      // walk, §4.4: THE medium variable — classified, never a stack');
+    if (f.nulls) lines.push('    int null_crossings;      // walk, §3.6: nulls have their own safety counter');
+    if (f.transmission) lines.push('    float eta_scale;         // walk, §7.2: η² compression divided out of the RR metric only');
+    lines.push(
+        '};',
         '',
-    ];
+        'PathState path_state_init(Ray ray) {',
+        '    PathState s;',
+        '    s.ray = ray;',
+        '    s.throughput = SPECTRUM_ONE;',
+        '    s.radiance = SPECTRUM_ZERO;',
+        ...kernelStateInit(f),
+    );
+    if (f.media) lines.push('    s.current_medium = scene_region_at(ray.origin);   // camera may start inside a medium');
+    if (f.nulls) lines.push('    s.null_crossings = 0;');
+    if (f.transmission) lines.push('    s.eta_scale = 1.0;');
+    lines.push('    return s;', '}');
+    return { origin: 'generated:transport/state', source: lines.join('\n') };
 }
 
-function nullCrossing(f: Flags): string[] {
-    if (!f.nulls) return [];
-    return [
-        '        // §3.6 null interface: the boundary is not an optical event — pass through in the same',
-        '        // direction; no emission, no NEE, no bounce consumed (nulls have their own safety counter).',
-        '        if (is_null_interface(mat)) {',
-        '            current_medium = hit.region_to;',
-        '            current_ray = ray_spawn(hit, current_ray.direction);   // far side by sign(dir·n)',
-        '            null_crossings++;',
-        '            if (null_crossings > 32) break;',
-        '            bounce--;',
-        '            continue;',
-        '        }',
-    ];
+// ============================================================================
+// Generated termination — §7.2: once per iteration, post-weight, ONE function
+// for both call sites (surface and medium).
+// ============================================================================
+
+function roulette(f: Flags): ShaderBlock {
+    const metric = f.transmission
+        ? 'spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)'
+        : 'spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights';
+    return {
+        origin: 'generated:transport/roulette',
+        source: [
+            '// ── Russian roulette (generated): §7.2 — once per iteration, post-weight, both sites ──',
+            'bool roulette(inout PathState s, int bounce) {',
+            `    if (bounce < ${f.rr!.startDepth}) return true;`,
+            `    float p_survive = min(0.95, ${metric}`,
+            '    if (random() > p_survive) return false;',
+            '    s.throughput /= p_survive;',
+            '    return true;',
+            '}',
+        ].join('\n'),
+    };
 }
 
-function tracking(f: Flags): string[] {
-    const lines: string[] = [];
+// ============================================================================
+// The walk — the estimator's table of contents.
+// ============================================================================
+
+function walk(p: ProgramDescription, f: Flags): ShaderBlock {
+    const lines = [
+        `// ── The walk (generated): pt${f.media ? ' over media' : ''} — the estimator's table of contents ──`,
+        'Radiance transport_trace(Ray ray) {',
+        '    PathState s = path_state_init(ray);',
+        `    for (int bounce = 0; bounce < ${p.measurement.maxBounces}; bounce++) {`,
+        '        Hit hit;',
+    ];
+
     if (f.media) {
         lines.push(
-            '        // §4.4: transmission moves the path into the far region\'s medium.',
-            '        if ((bs.flags & LOBE_TRANSMISSION) != 0u) current_medium = hit.region_to;',
+            '        bool boundary = scene_intersect(s.ray, hit);',
             '',
+            '        // The volumetric component\'s call site (§2): one segment, ending at the',
+            '        // boundary or far clip; entering/exiting is the interface machinery below.',
+            '        int med_mat = material_of(s.current_medium);',
+            '        if (material_has_medium(med_mat)) {',
+            '            MediumSample ms = medium_sample(med_mat, s.ray, boundary ? hit.t : MAX_DIST, random2());',
+            '            s.throughput *= ms.weight;',
+        );
+        if (f.scattering) {
+            lines.push(
+                '            if (ms.scattered) {',
+                '                // ---- MEDIUM EVENT ----',
+                '                Point p_evt = ambient_geodesic(s.ray.origin, s.ray.direction, ms.t);',
+                '                Direction wo_med = -s.ray.direction;',
+            );
+            if (f.nee) lines.push('                light_sample_direct_medium(s, med_mat, p_evt, wo_med);');
+            lines.push('                kernel_sample_phase(s, med_mat, p_evt, wo_med);');
+            if (f.rr) lines.push('                if (!roulette(s, bounce)) break;');
+            lines.push(
+                '                continue;   // medium events COUNT toward the bounce budget (§7.2)',
+                '            }',
+            );
+        }
+        lines.push(
+            '        }',
+            '        if (!boundary) { kernel_score_miss(s); break; }',
+            '',
+            '        // §4.4 self-heal: a missed boundary event mistracks one segment and repairs here.',
+            '        if (hit.region_from != s.current_medium) s.current_medium = hit.region_from;',
+        );
+    } else {
+        lines.push('        if (!scene_intersect(s.ray, hit)) { kernel_score_miss(s); break; }');
+    }
+
+    lines.push('        int mat = material_of(hit.region_owner);   // §4.1: the boundary OWNER\'s BSDF shades');
+    if (f.nulls) {
+        lines.push(
+            '        // §3.6 null interface: not an optical event — pass through, no bounce consumed.',
+            '        if (is_null_interface(mat)) {',
+            '            s.current_medium = hit.region_to;',
+            '            s.ray = ray_spawn(hit, s.ray.direction);',
+            '            s.null_crossings++;',
+            '            if (s.null_crossings > 32) break;',
+            '            bounce--;',
+            '            continue;',
+            '        }',
         );
     }
+    lines.push(
+        '        MaterialProperties props = scene_material_properties(mat, hit.p);',
+        '        Direction wo = -s.ray.direction;',
+        '',
+        '        kernel_score_emitter_hit(s, hit, mat, wo, props);   // settle last bounce\'s deferred estimate',
+    );
+    if (f.nee) lines.push('        light_sample_direct(s, hit, mat, wo, props);        // NEE: sample + score locally');
+    lines.push(
+        '        InteractionSample bs;',
+        '        if (!kernel_sample_continuation(s, hit, mat, wo, props, bs)) break;',
+    );
+    if (f.media) lines.push('        if ((bs.flags & LOBE_TRANSMISSION) != 0u) s.current_medium = hit.region_to;   // §4.4 tracking');
     if (f.transmission) {
         lines.push(
-            '        // Accumulate the η² compression this crossing added (derivable from the hit\'s regions).',
+            '        // Accumulate the η² compression this crossing added (§7.2).',
             '        if ((bs.flags & LOBE_TRANSMISSION) != 0u) {',
             '            float r = ior_of(hit.region_to) / ior_of(hit.region_from);',
-            '            eta_scale *= r * r;',
+            '            s.eta_scale *= r * r;',
             '        }',
-            '',
         );
     }
-    return lines;
-}
-
-/** Russian roulette — §7.2 pin: once per iteration, AFTER throughput *= weight, survival
- *  keyed on post-weight throughput. Two integrators (or two sites) with subtly different
- *  RR are un-diffable — hence ONE emitter (this cashes the template's item-9 IOU). */
-function rr(f: Flags, site: 'medium' | 'surface'): string[] {
-    const sfx = site === 'medium' ? '_med' : '';
-    const indent = site === 'medium' ? '                ' : '        ';
-    const metric = f.transmission
-        ? `spectrum_max(throughput) * eta_scale;   // η²-corrected (§7.2 note)`
-        : `spectrum_max(throughput);   // §2.5: basis-agnostic, no Rec.709 weights`;
-    return [
-        `${indent}// Russian roulette — §7.2 pin: once per iteration, post-weight${site === 'medium' ? ' (medium events included)' : ''}.`,
-        `${indent}float rr_metric${sfx} = ${metric}`,
-        `${indent}if (bounce >= ${f.rr!.startDepth}) {`,
-        `${indent}    float p_survive${sfx} = min(0.95, rr_metric${sfx});`,
-        `${indent}    if (random() > p_survive${sfx}) break;`,
-        `${indent}    throughput /= p_survive${sfx};`,
-        `${indent}}`,
-    ];
+    if (f.rr) lines.push('        if (!roulette(s, bounce)) break;');
+    lines.push(
+        '        s.ray = ray_spawn(hit, bs.wi);   // escape wi\'s side along the geodesic',
+        '    }',
+        '    return s.radiance;',
+        '}',
+    );
+    return { origin: 'generated:transport/walk', source: lines.join('\n') };
 }

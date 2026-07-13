@@ -1,74 +1,103 @@
 // components/transport/combiner.ts
-// The COMBINER (fable-components §7, pinned July 2026: the technique-centric carve).
+// The COMBINER (fable-components §7 pinned; emitted shape per fable-transport-glsl-target.md).
 //
 // Two techniques (kernel sampling T1, light sampling T2) estimate the SAME direct-
-// lighting term; run both at full weight and every samplable emitter is counted twice.
-// The combiner is the partition of unity that keeps them honest — it owns every line
-// where a technique's estimate is weighted and added. The three directLighting
-// strategies are three configurations of THESE functions and nothing else (§11.2's
-// "pt/pt-nee/pt-mis differ only in weights", now structural):
+// lighting term; the combiner is the partition of unity that keeps them honest. It now
+// emits GENERATED GLSL FUNCTIONS — the static technique files call them by pinned name,
+// and the three directLighting strategies are three sets of function bodies:
 //
-//   strategy | T2 (light sample)         | T1 (kernel-found emitter / env)
-//   pt       | technique absent          | 1 (no weight code emitted)
-//   pt-nee   | 1                         | 0 for samplable, 1 post-delta (support rule)
-//   pt-mis   | power_heuristic(pL, pK)   | power_heuristic(pK, pL)
+//   strategy | combiner_w_light[_medium] (T2)  | combiner_w_emitter / combiner_w_env (T1)
+//   pt       | not emitted (T2 absent)         | return 1.0
+//   pt-nee   | return 1.0                      | 0 for samplable/non-delta, 1 otherwise
+//   pt-mis   | power heuristic vs T1's density | power heuristic vs T2's density
 //
-// T1's weights are evaluated at its DEFERRED scoring sites (emitter-hit, miss) using the
-// sampling record it carried forward (prev_bsdf_pdf/prev_p) — see techniques/kernel.ts.
+// Every existence-dependent call (light_of, lighting_pdf, environment_pdf,
+// interaction_surface_pdf, hg_pdf, u_envSelectProb) lives INSIDE these generated
+// bodies — that is what lets the static files stay static (the flexibility rule).
+// Deferred (owner-ratified): an identity-weight elision pass may later fold trivial
+// bodies out of the emitted text entirely; uniform emission is the deliberate v1.
 
+import type { ShaderBlock } from '../../compiler/generate/ShaderIR.js';
 import type { Flags } from './flags.js';
 
-/** T1's weight at the surface emitter-hit site (inside the `lid_emit ≥ 0 && !prev_was_delta`
- *  guard — the support rule already handled: delta-preceded hits keep weight 1). */
-export function t1EmitterWeight(f: Flags): string[] {
-    if (f.mis) {
-        return ['                w_emit = power_heuristic(prev_bsdf_pdf, lighting_pdf(prev_p, current_ray.direction, lid_emit, hit));'];
+export function combinerFns(f: Flags): ShaderBlock {
+    const lines: string[] = [combinerHeader(f)];
+
+    // T1's emitter-hit weight (kernel.glsl calls it whenever emission can exist).
+    lines.push('float combiner_w_emitter(PathState s, Hit hit) {');
+    if (f.nee && f.emitters) {
+        lines.push(
+            '    // §6.2: a SAMPLABLE emitter found by a non-delta bounce competes with last',
+            '    // vertex\'s light sample. Path-only emitters and post-delta hits stay full-weight.',
+            '    int lid = light_of(hit.region_to);',
+            '    if (lid < 0 || s.prev_was_delta) return 1.0;',
+        );
+        if (f.mis) {
+            lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_p, s.ray.direction, lid, hit));');
+        } else {
+            lines.push('    return 0.0;   // NEE already counted it at the previous vertex');
+        }
+    } else {
+        lines.push('    return 1.0;   // T1 owns the emitter term outright in this program');
     }
-    return ['                w_emit = 0.0;'];
+    lines.push('}');
+
+    // T1's miss weight (the environment is the boundary case of the same term).
+    lines.push('float combiner_w_env(PathState s) {');
+    if (f.envSamplable && f.nee) {
+        lines.push(
+            '    // Camera-direct and post-delta misses show the sky at full weight (§5/§8 line 3).',
+            '    if (s.prev_was_delta) return 1.0;',
+        );
+        if (f.mis) {
+            lines.push(
+                '    // The selection factor (u_envSelectProb) mirrors lighting_sample\'s stage 0 —',
+                '    // total pdf symmetry (§6.1).',
+                '    return power_heuristic(s.prev_bsdf_pdf, u_envSelectProb * environment_pdf(s.ray.direction));',
+            );
+        } else {
+            lines.push('    return 0.0;   // NEE already counted the samplable environment');
+        }
+    } else {
+        lines.push('    return 1.0;   // environment not samplable in this program — T1 owns the sky term');
+    }
+    lines.push('}');
+
+    // T2's weights — emitted only when the light technique is included.
+    if (f.nee) {
+        lines.push('float combiner_w_light(int mat, LightSample ls, Direction wo, Hit hit, MaterialProperties props) {');
+        if (f.mis) {
+            lines.push(
+                '    // Delta lights get weight 1 — BSDF sampling can never hit them (§6.4).',
+                '    if ((ls.flags & LIGHT_DELTA) != 0u) return 1.0;',
+                '    return power_heuristic(ls.pdf, interaction_surface_pdf(mat, ls.wi, wo, hit, props));',
+            );
+        } else {
+            lines.push('    return 1.0;   // plain NEE: the light sample carries full weight');
+        }
+        lines.push('}');
+
+        if (f.scattering) {
+            lines.push('float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {');
+            if (f.mis) {
+                lines.push(
+                    '    // Balances against the phase density — no cosine anywhere (§2.2).',
+                    '    if ((ls.flags & LIGHT_DELTA) != 0u) return 1.0;',
+                    '    return power_heuristic(ls.pdf, hg_pdf(ls.wi, wo_med, m_evt));',
+                );
+            } else {
+                lines.push('    return 1.0;   // plain NEE at the medium site');
+            }
+            lines.push('}');
+        }
+    }
+
+    return { origin: 'generated:transport/combiner', source: lines.join('\n') };
 }
 
-/** T1's weight at the miss site (samplable environment — same table, boundary row). */
-export function t1MissWeight(f: Flags): string[] {
-    if (f.mis) {
-        return [
-            '                // The selection factor (u_envSelectProb) mirrors lighting_sample\'s stage 0 —',
-            '                // total pdf symmetry (§6.1).',
-            '                w_env = power_heuristic(prev_bsdf_pdf, u_envSelectProb * environment_pdf(current_ray.direction));',
-        ];
-    }
-    return ['                w_env = 0.0;'];
-}
-
-/** T2's weighted score at the surface site: balance against the kernel's density
- *  (reference §8 line 2); delta lights get weight 1 — T1 can never hit them (§6.4). */
-export function t2SurfaceScore(f: Flags): string[] {
-    if (f.mis) {
-        return [
-            '                    // Reference §8 line 2: balance the light sample against the BSDF\'s density.',
-            '                    // Delta lights get weight 1 — BSDF sampling can never hit them (§6.4).',
-            '                    float w_l = 1.0;',
-            '                    if ((ls.flags & LIGHT_DELTA) == 0u) {',
-            '                        w_l = power_heuristic(ls.pdf, interaction_surface_pdf(mat, ls.wi, wo, hit, props));',
-            '                    }',
-            '                    radiance += throughput * ls.radiance * f * cos_i * vis * w_l / ls.pdf;',
-        ];
-    }
-    return ['                    radiance += throughput * ls.radiance * f * cos_i * vis / ls.pdf;'];
-}
-
-/** T2's weighted score at the medium site: balance against the phase density — no
- *  cosine anywhere (§2.2: the cosine is a surface Jacobian). */
-export function t2MediumScore(f: Flags): string[] {
-    if (f.mis) {
-        return [
-            '                            // Reference §8\'s closing line: the medium-side NEE weight balances',
-            '                            // against the phase density (hg_pdf) — no cosine anywhere (§2.2).',
-            '                            float w_m = 1.0;',
-            '                            if ((ls.flags & LIGHT_DELTA) == 0u) {',
-            '                                w_m = power_heuristic(ls.pdf, hg_pdf(ls.wi, wo_med, m_evt));',
-            '                            }',
-            '                            radiance += throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis * w_m / ls.pdf;',
-        ];
-    }
-    return ['                            radiance += throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis / ls.pdf;'];
+function combinerHeader(f: Flags): string {
+    const strategy = !f.nee ? 'pt — T1 is the only technique; every weight is 1 (this IS the strategy)'
+        : f.mis ? 'pt-mis — the power heuristic at every shared term'
+        : 'pt-nee — T2 at weight 1; T1\'s shared-term weight is the binary rule';
+    return `// ── Combiner (generated): ${strategy} ──`;
 }

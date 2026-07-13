@@ -1,10 +1,15 @@
 # Transport GLSL target — the emitted loop, function-shaped
 
 **Author:** Fable (July 2026)
-**Status:** DRAFT for owner review — this document IS the spec. The three dumps below
-are hand-written targets for what the compiler must emit for three representative
-programs; the emitters change to produce them only after the owner has read these like
-a paper and agreed. Until then nothing is built.
+**Status:** BUILT (July 13 2026, owner-approved). The emitters now produce exactly the
+dumps below (verified line-for-line on all three spec pairs); technique bodies live in
+`components/transport/techniques/*.glsl`. Gates at build time: glslang 50/50 pairs,
+492 tests green, snapshots re-goldened against this spec, GPU witness sweep clean
+(furnace interior uniform to std 1e-4 with display value = linear 0.400 through
+reinhard+sRGB within 0.4%; veach three-strategy means within 6% at ~20spp; fog-area /
+slab / cornell-area-glass render clean), perf a wash on SwiftShader (cornell 29→29,
+fog-area 18→18, veach 135→130 samples/12s — and SwiftShader is the most call-sensitive
+backend we have). Converged witness equality remains the owner's standing check.
 **Context:** follows the §7 re-carve (`fable-components.md` §7, DECIDED + BUILT). That
 batch moved *emitter ownership* to the mathematical joints while keeping the emitted
 GLSL byte-identical. This batch changes the emitted GLSL itself to express the same
@@ -388,6 +393,11 @@ Radiance transport_trace(Ray ray) {
    static text, so the *body* must exist. Drivers constant-fold them to nothing; the
    dump gains a few honest lines that state the strategy explicitly. (Arguably a
    readability WIN: dump B says "every weight is 1" instead of implying it by absence.)
+   *Deferred optimization (owner-ratified July 2026): because the calls go through
+   pinned seam names in a pinned form, a Generate-stage identity-weight elision pass
+   can later delete the trivial function AND fold the call out of the included text —
+   purely mechanical, no static file changes, proof = witness equality. Uniform
+   emission is the deliberate v1 choice; the fold stays on the ledger.*
 2. **`prev_was_delta` is written but unweighted in pt programs** — exactly as today
    (the record writes are uniform; the pt combiner ignores them). Unchanged, just
    now visible in one place (`kernel_record`).
