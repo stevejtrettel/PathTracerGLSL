@@ -6,6 +6,7 @@ import { isGlslExpression, isValueParam } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { PRIMITIVE_PARAMS } from '../../components/geometry/index.js';
+import { CAMERA_MODELS } from '../../components/camera/index.js';
 
 /** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
 const MIN_QUAD_AREA = 1e-8;
@@ -258,6 +259,14 @@ export function validate(
     if (vs === 'raymarch' || vs === 'delta-tracking' || vs === 'ratio-tracking') {
         bag.error('invalid-setting',
             `volumeSampling '${vs}' not yet supported — homogeneous media (V1-C1) are exact under 'analytic' (closed-form sampling); 'raymarch' is reserved for biased marching and the null-collision pair needs majorants`)
+            .add();
+    }
+    const cameraType = strategy.measurement.camera.type;
+    if (CAMERA_MODELS[cameraType] === undefined) {
+        const registered = Object.keys(CAMERA_MODELS).filter((t) => CAMERA_MODELS[t as keyof typeof CAMERA_MODELS] !== undefined);
+        bag.error('invalid-setting',
+            `Camera type '${cameraType}' not yet supported — no occupant in the camera registry (reserved-not-removed)`)
+            .suggest(`Registered cameras: ${registered.join(', ')}`)
             .add();
     }
     if (strategy.measurement.color === 'spectral') {

@@ -95,12 +95,17 @@ bool sdf_intersect_any(Ray ray, float maxDist) {
         vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
         float bound = scene_march_bound(p, region);   // unsigned: valid from inside media/solids too
 
-        if (bound < march_epsilon(t)) {
-            return true;
-        }
-
+        // Reached the light distance BEFORE testing for an occluder: geometry at or beyond
+        // the light must never shadow the point. A near-ceiling lamp (light y=1.9, ceiling
+        // y=2.0) is the witness — the straight-up shadow ray overshoots the light and its
+        // next step lands on the ceiling (bound≈0) at t≈2.0 > maxDist≈1.9; accepting that as
+        // an occluder self-shadows the floor directly under the light (jagged dark blob).
         if (t > maxDist) {
             return false;   // cleared the light distance: unoccluded
+        }
+
+        if (bound < march_epsilon(t)) {
+            return true;    // occluder strictly before the light
         }
 
         t += bound;

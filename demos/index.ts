@@ -6,6 +6,7 @@
 
 import type { SceneSuiteEntry } from '../tests/witnesses/types.js';
 import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBox.js';
+import { cornellThinlensStrategy, cornellEquirectStrategy } from './cameraScenes.js';
 import { mixedScene, analyticStrategy } from './analyticScenes.js';
 import { submergedScene, submergedStrategy } from './dielectricScenes.js';
 import { fogcubeScene, fogcubeStrategy } from './mediaScenes.js';
@@ -22,6 +23,26 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
         scene: cornellBox,
         strategies: [cornellStrategy],
         exercises: 'region disambiguation (5 white walls → 1 material); {param} albedo; fov uniform',
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
+    },
+    'cornell-equirect': {
+        scene: cornellBox,
+        strategies: [cornellEquirectStrategy],
+        exercises: 'equirectangular camera: full-sphere direction map (no fov/aperture, ignores xiLens); the Ray seed + ambient_* seam is camera-agnostic',
+        expected: 'a 360°×180° panorama from inside the box: red wall left, green right, white back/floor/ceiling wrap across; image center = forward, top = straight up, bottom = down',
+        initialParameters: {
+            'camera.position': [0, 1, 0],
+            'camera.target': [0, 1, -1],
+        },
+    },
+    'cornell-thinlens': {
+        scene: cornellBox,
+        strategies: [cornellThinlensStrategy],
+        exercises: 'thin-lens camera (defocus): aperture + focusDistance params, concentric-disk lens sample from xiLens; measurement change (no pinhole convergence)',
+        expected: 'the focus plane (focusDistance ≈ 4) is sharp; near/far walls blur with aperture > 0; aperture = 0 collapses to the pinhole image',
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],

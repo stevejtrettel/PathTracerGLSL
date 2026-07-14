@@ -345,7 +345,10 @@ export interface ViewDescription {
 export type CameraDescription =
     | { type: 'pinhole'; fov: Value<number> }
     | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
+    | { type: 'equirect' }
     | { type: 'orthographic'; scale: number };
+
+export type CameraType = CameraDescription['type'];
 
 export type AccumulationDescription =
     | { type: 'average' }

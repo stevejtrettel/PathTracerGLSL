@@ -40,8 +40,26 @@ import {
     skyMisOctStrategy, procSkyMisCompStrategy,
 } from './scenes/envScenes.js';
 import { veachMis, veachMisStrategy, veachNeeStrategy, veachPtStrategy } from './scenes/ggxScenes.js';
+import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
 
 export const witnessSuite: Record<string, SceneSuiteEntry> = {
+    'thinlens-zero': {
+        scene: camCornell,
+        strategies: [camPinholeStrategy, camThinlensZeroStrategy],
+        exercises:
+            'thin-lens correctness anchor: aperture = 0 (key 2) must reproduce the pinhole image (key 1) exactly — the lens disk collapses to a point. Both cameras draw xiLens, so the arms share the RNG stream.',
+        expected: 'key 1 (pinhole) and key 2 (thin-lens, aperture 0) are the same image; any visible difference is a frame/focus-math bug',
+        witness: {
+            spp: 64,
+            // Identical-stream arms (only thin-lens\'s normalize(dir·k) round-trip differs
+            // in the last fp bits) → the display-space RMSE gate, not χ².
+            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'thin-lens aperture-0 ≡ pinhole' }],
+        },
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
+    },
     'two-light': {
         scene: twoLightScene,
         strategies: [twoLightPowerStrategy, twoLightUniformStrategy],

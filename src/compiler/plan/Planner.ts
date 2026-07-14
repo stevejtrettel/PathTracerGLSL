@@ -238,9 +238,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
 
     return {
         measurement: {
-            camera: strategy.measurement.camera.type === 'pinhole'
-                ? { type: 'pinhole', fov: strategy.measurement.camera.fov }
-                : { type: 'pinhole', fov: Math.PI / 4 }, // fallback, validator catches unsupported
+            // Straight-through: unregistered camera types are Validator-rejected upstream
+            // (reject-not-remove), so the Planner never coerces — CameraDesc mirrors the
+            // strategy's CameraDescription exactly.
+            camera: strategy.measurement.camera,
             response: strategy.measurement.response ?? 'radiance',
             maxBounces: strategy.measurement.maxBounces,
             scattering,

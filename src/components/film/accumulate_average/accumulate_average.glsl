@@ -9,8 +9,9 @@ void main() {
     // accumulation reset) decorrelates across resets (§2.11).
     rng_init(uvec2(pixel), uint(u_sampleCount), uint(u_resetSalt));
 
-    vec2 xi = random2();
-    Ray ray = camera_generateRay(pixel, xi);
+    vec2 xiPixel = random2();   // sub-pixel jitter (Category A)
+    vec2 xiLens = random2();    // lens-disk sample (Category A) — pinhole ignores it
+    Ray ray = camera_generateRay(pixel, xiPixel, xiLens);
     vec3 color = transport_trace(ray);
 
     if (u_sampleCount == 0) {

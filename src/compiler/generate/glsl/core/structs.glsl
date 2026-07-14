@@ -9,6 +9,12 @@
 // A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
 // interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
 // occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
+//
+// The seed is where Category-B camera dimensions land when they arrive (camera/README.md):
+// shutter time (motion blur) and wavelength (spectral sensor) are seeded once at the sensor
+// and read by the whole path — they belong here as carried fields, NOT as generateRay args.
+// A time coordinate here also serves relativistic geodesics (Point may become vec4). Both
+// are prepared-for, not built.
 struct Ray {
     Point origin;
     Direction direction;

@@ -99,8 +99,15 @@ export interface MaterialsDesc {
 export type LightingDesc =
     | { method: 'nee' | 'mis'; selection: 'uniform' | 'power' };
 
+// Mirrors CameraDescription (compiler/types.ts) — the ProgramDescription is the complete
+// link map, so every strategy-side camera variant must exist here for Generate to read.
+// Registered occupants (camera/index.ts) are pinhole + thinlens; orthographic is
+// type-declared but unregistered → Validator-rejected (reserved-not-removed).
 export type CameraDesc =
-    | { type: 'pinhole'; fov: Value<number> };
+    | { type: 'pinhole'; fov: Value<number> }
+    | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
+    | { type: 'equirect' }
+    | { type: 'orthographic'; scale: number };
 
 export type AccumulationDesc =
     | { type: 'average' }
