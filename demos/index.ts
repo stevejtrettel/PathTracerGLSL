@@ -18,6 +18,7 @@ import {
     mistScene,
     mistStrategy,
 } from './demoScenes.js';
+import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js';
 
 // Non-accumulating (oneshot) tracer — each frame is the current sample, live & noisy (no
 // convergence). Same scene/camera as `cornell`, only the accumulation occupant differs.
@@ -117,6 +118,19 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             'camera.position': [0, 1.7, 6],
             'camera.target': [0, 1.6, -8],
+        },
+    },
+    tonemap: {
+        scene: tonemapScene,
+        strategies: tonemapStrategies,
+        exercises:
+            'DEMO — the tonemap roster on one scene (keys 1-7): agx · aces · khronos · reinhard · hable · gt · none. A matte + a glass ball under an outdoor HDRI sky. Every strategy shares the IDENTICAL linear HDR estimate — only view.tonemap differs, so this isolates the display transfer (the bright sun is what pulls the curves apart)',
+        expected:
+            'same scene, different highlight roll-off + hue: 1 agx (neutral, highlights desaturate to white) · 2 aces (filmic, slight hue skew on saturated hues) · 3 khronos (material-neutral, low contrast) · 4 reinhard (soft, washes highlights) · 5 hable (contrasty filmic) · 6 gt (linear midsection) · 7 none (raw linear — sky/sun CLIP to white, showing why tonemapping is needed)',
+        initialParameters: {
+            'camera.position': [0, 1.3, 5],
+            'camera.target': [0.4, 0.8, 0],
+            'camera.fov': 0.9,
         },
     },
 };

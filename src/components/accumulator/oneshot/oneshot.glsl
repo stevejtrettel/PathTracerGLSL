@@ -19,5 +19,5 @@ void main() {
     vec2 xiLens = random2();                        // lens-disk sample — cameras without aperture ignore it
     Ray ray = camera_generateRay(film, xiLens);
 
-    fragColor = vec4(transport_trace(ray), 1.0);    // current frame only — no accumulation
+    fragColor = vec4(sensor_response(film, ray.direction) * transport_trace(ray), 1.0);   // We · L, current frame only
 }

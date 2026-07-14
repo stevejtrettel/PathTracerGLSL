@@ -5,8 +5,9 @@ import type { RenderPlan } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { unionFields, buildPropertiesStruct } from '../schema.js';
 import { MATERIAL_MODELS } from '../../../components/materials/index.js';
-import { PHASE_MODELS } from '../../../components/phase/index.js';
+import { PHASE_MODELS } from '../../../components/volume_scattering/index.js';
 import { SAMPLERS } from '../../../components/sampler/index.js';
+import { SENSORS } from '../../../components/sensor/index.js';
 
 import structsGLSL from '../glsl/core/structs.glsl?raw';
 import structsMediaGLSL from '../glsl/core/structs_media.glsl?raw';
@@ -52,6 +53,10 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     if (plan.program.media.present) blocks.push({ origin: 'glsl/core/math_media.glsl', source: mathMediaGLSL });
     if (plan.program.estimator.lighting?.method === 'mis') blocks.push({ origin: 'glsl/core/math_mis.glsl', source: mathMisGLSL });
     blocks.push(
+        // Sensor slot (measurement pick-one, We ≡ 1 today): the measurement importance the
+        // accumulator main() multiplies into the traced radiance. Sole occupant — a strategy
+        // knob arrives with the first real sensor (exposure/vignette/spectral).
+        { origin: 'components/sensor/ideal/ideal.glsl', source: SENSORS.ideal.glsl },
         { origin: 'components/ambient/euclidean/euclidean.glsl', source: euclideanGLSL },
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );

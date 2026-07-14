@@ -13,6 +13,7 @@ import type { MergedContributions } from './features/merge.js';
 // sRGB OETF. Tonemap occupants (the tone CURVE only) come from the tonemap registry.
 import fullscreenVertGLSL from './glsl/fullscreen.vert.glsl?raw';
 import displayMathGLSL from './glsl/display.glsl?raw';
+import blueNoiseGLSL from './glsl/noise.glsl?raw';
 import { tonemapModel, type TonemapDescriptor } from '../../components/tonemap/index.js';
 
 export interface ShaderBuildResult {
@@ -78,27 +79,37 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
     // The display pass's resources are declared HERE, not in the tonemap occupants:
     // u_radiance is the pass's texture input, u_resolution the engine builtin — occupants
     // contain the tone CURVE only. safe_color + the sRGB OETF are the shared display math.
+    // Blue-noise dither is applied only when we quantize to display bytes (the encode
+    // path). 'none' (the §11 probe path) stays bit-exact — no dither, no u_blueNoise.
+    const dither = model.encodesToDisplay;
     const header = [
         FRAGMENT_PREAMBLE,
         '',
         'out vec4 fragColor;',
         'uniform vec2 u_resolution;',
         'uniform sampler2D u_radiance;',
+        ...(dither ? ['uniform sampler2D u_blueNoise;'] : []),
         `#define DISPLAY_EXPOSURE ${exposure.toPrecision(8)}`,
     ].join('\n');
     return [
         { origin: 'generated:display-header', source: header },
         { origin: 'generate/glsl/display.glsl', source: displayMathGLSL },
+        ...(dither ? [{ origin: 'generate/glsl/noise.glsl', source: blueNoiseGLSL }] : []),
         { origin: model.origin, source: model.glsl },
         { origin: 'generated:display-main', source: buildDisplayMain(model) },
     ];
 }
 
 /** The composed display main() — policy/plumbing (generated), calling the occupant's
- *  static curve: exposure → curve → (sRGB encode + clamp, iff the occupant encodes). */
+ *  static curve: exposure → curve → (sRGB encode + clamp + blue-noise dither, iff the
+ *  occupant encodes to display bytes). */
 function buildDisplayMain(model: TonemapDescriptor): string {
+    // Dither in display-code space, right before the implicit 8-bit write: ±½ LSB of
+    // blue noise, INDEPENDENT per channel (blue_noise returns a decorrelated RGB triple),
+    // turns quantization banding into imperceptible high-frequency grain.
     const encode = model.encodesToDisplay
         ? '    color = clamp(linear_to_srgb(color), 0.0, 1.0);\n'
+        + '    color += (blue_noise(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);\n'
         : '';
     return [
         'void main() {',

@@ -16,7 +16,7 @@ void main() {
     vec2 film = pixel_sample(pixel, random2());   // sub-pixel placement (pixel/ footprint)
     vec2 xiLens = random2();                       // lens-disk sample — cameras without aperture ignore it
     Ray ray = camera_generateRay(film, xiLens);
-    vec3 color = transport_trace(ray);
+    vec3 color = sensor_response(film, ray.direction) * transport_trace(ray);   // We · L (measurement)
 
     if (u_sampleCount == 0) {
         fragColor = vec4(color, 1.0);

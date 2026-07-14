@@ -4,6 +4,13 @@
 occupants coexist per program, selected per hit; the compiler generates the dispatch,
 the scene-scoped `MaterialProperties` struct, and the capability tables.
 
+**Unification (see also `volume_scattering/README.md`):** a surface BRDF and a medium
+phase function are the SAME mathematical object — the angular scattering kernel. The
+surface instance carries the cosine **Jacobian** (this family returns bare `f`; transport
+multiplies `|cosθ|`, §2.2) and a `Hit` (hemisphere, two-sided); the volume instance carries
+neither. Same `eval`/`sample`/`pdf` triple and §11.3 obligation — do NOT fold them into one
+family (folding would carry a meaningless `Hit` and re-introduce the cosine confusion).
+
 ## What an occupant supplies
 
 **GLSL** (`<id>.glsl`), four functions in the `(uc, u)` sampler form:

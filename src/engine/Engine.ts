@@ -7,6 +7,7 @@ import { GPUProfiler } from './GPUProfiler.js';
 import { TextureRegistry } from './TextureRegistry.js';
 import { HDREnvironmentLoader } from './HDREnvironmentLoader.js';
 import { buildEnvironmentSampler } from './loaders/build-environment-sampler.js';
+import { registerBlueNoise } from './loaders/blueNoise.js';
 import {
     validateCompiledRenderer,
     ConsoleReporter
@@ -52,6 +53,7 @@ export class Engine {
         this.gl = gl;
         this.resourceManager = new ResourceManager(gl);
         this.textureRegistry = new TextureRegistry(gl);   // dumb store; executor owns units (§2.10)
+        registerBlueNoise(gl, this.textureRegistry);       // global blue-noise tile (dither + sampler)
         this.renderExecutor = new RenderExecutor(gl, this.resourceManager, this.textureRegistry);
         this.parameterManager = new ParameterManager(gl);
         this.hdrLoader = new HDREnvironmentLoader(gl, this.textureRegistry);
@@ -193,6 +195,29 @@ export class Engine {
         const parameters = this._buildParameters(sampleCount);
         this.renderExecutor.executePipeline(renderer.pipeline, parameters);
         this.sampleCounts.set(this.activeRendererId, sampleCount + 1);
+    }
+
+    /**
+     * Render the display pass on demand into the 'ldr' scratch buffer, reading
+     * `accumulation_previous` (post-swap — the same frame HDR export reads), so
+     * `readExport('ldr')` returns the tonemapped + dithered LDR bytes. This is the ONLY
+     * cost of PNG export (impl-plan-display Stage 4 / Option B) — the normal render loop
+     * is untouched (display still → screen). Call immediately before readExport('ldr').
+     */
+    renderLdr(): void {
+        if (this.state !== 'running') throw new Error(`Cannot render LDR in state: ${this.state}`);
+        if (!this.activeRendererId) throw new Error('No active renderer');
+        const renderer = this.renderers.get(this.activeRendererId)!;
+        const displayPass = renderer.pipeline.passes.find(p => p.id === 'display-pass');
+        if (!displayPass) throw new Error('renderLdr: active renderer has no display pass');
+
+        const sampleCount = this.sampleCounts.get(this.activeRendererId)!;
+        const parameters = this._buildParameters(sampleCount);
+        this.renderExecutor.executePass({
+            ...displayPass,
+            output: 'ldr',
+            inputs: { textures: { ...(displayPass.inputs?.textures ?? {}), u_radiance: 'accumulation_previous' } },
+        }, parameters);
     }
 
     private _buildParameters(sampleCount: number): Record<string, any> {

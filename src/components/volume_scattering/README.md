@@ -1,8 +1,16 @@
-# phase/ — medium phase functions
+# volume_scattering/ — medium phase functions
 
 **Taxonomy:** scene (the RTE's angular scattering kernel). **Kind:** mix-many by
 design (one occupant today — HG serves every scattering medium; Mie/Rayleigh arrive
 as new occupants).
+
+**Unification (see also `materials/README.md`):** a phase function and a surface BRDF are
+the SAME mathematical object — the angular scattering kernel — with two differences that
+are real and load-bearing, which is why they stay separate families rather than merging:
+the surface instance carries the cosine **Jacobian** (transport multiplies `|cosθ|`, §2.2)
+and a `Hit` (hemisphere, two-sided); the volume instance carries **neither** (a phase
+function already integrates to 1 over the full sphere). The `eval`/`sample`/`pdf` triple
+and the §11.3 pdf-histogram obligation are shared.
 
 ## What an occupant supplies
 

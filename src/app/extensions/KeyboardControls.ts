@@ -2,7 +2,7 @@
 import type { App } from '../App.js';
 import type { EventBus } from '../EventBus.js';
 import type { Extension } from '../types.js';
-import { vec3Normalize, vec3Cross, vec3IsZero, vec3Rotate, type Vec3 } from '../../math/vector3.js';
+import { vec3Normalize, vec3Cross, vec3IsZero, vec3Rotate, type Vec3 } from '../utils/vector3.js';
 import { isTypingInInput } from '../utils/dom.js';
 import { AppEvents } from '../events.js';
 

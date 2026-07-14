@@ -3861,6 +3861,502 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "intensity": 1,
+    "rotation": 0,
+    "type": "image",
+    "url": "/hdri/table_mountain_2_puresky_1k.hdr",
+  },
+  "environmentSamplable": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "aces",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "intensity": 1,
+    "rotation": 0,
+    "type": "image",
+    "url": "/hdri/table_mountain_2_puresky_1k.hdr",
+  },
+  "environmentSamplable": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "intensity": 1,
+    "rotation": 0,
+    "type": "image",
+    "url": "/hdri/table_mountain_2_puresky_1k.hdr",
+  },
+  "environmentSamplable": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "gt",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "intensity": 1,
+    "rotation": 0,
+    "type": "image",
+    "url": "/hdri/table_mountain_2_puresky_1k.hdr",
+  },
+  "environmentSamplable": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "hable",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > tonemap + khronos 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "intensity": 1,
+    "rotation": 0,
+    "type": "image",
+    "url": "/hdri/table_mountain_2_puresky_1k.hdr",
+  },
+  "environmentSamplable": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "khronos",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "intensity": 1,
+    "rotation": 0,
+    "type": "image",
+    "url": "/hdri/table_mountain_2_puresky_1k.hdr",
+  },
+  "environmentSamplable": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinhard 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "intensity": 1,
+    "rotation": 0,
+    "type": "image",
+    "url": "/hdri/table_mountain_2_puresky_1k.hdr",
+  },
+  "environmentSamplable": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > two-light + power 1`] = `
 {
   "emitters": {

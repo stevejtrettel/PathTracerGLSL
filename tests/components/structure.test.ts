@@ -15,8 +15,8 @@ import { join, resolve } from 'node:path';
 const ROOT = resolve(__dirname, '../../src/components');
 
 const FAMILIES = [
-    'materials', 'lights', 'phase', 'geometry', 'ambient',
-    'sampler', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport',
+    'materials', 'lights', 'volume_scattering', 'geometry', 'ambient',
+    'sampler', 'sensor', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport',
 ];
 
 // Family-root files that are NOT occupant folders (shared parts + registries + docs).

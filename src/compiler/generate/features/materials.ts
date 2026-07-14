@@ -11,7 +11,7 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, paramToUniform } from '../../../components/glsl-format.js';
 
 import { MATERIAL_MODELS, materialModel } from '../../../components/materials/index.js';
-import { PHASE_MODELS } from '../../../components/phase/index.js';
+import { PHASE_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
 import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
@@ -89,7 +89,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
         if (scatteringLive) {
             // v1: every scattering medium phases through HG (registry-driven, R1b).
-            blocks.push({ origin: 'components/phase/hg/hg.glsl', source: PHASE_MODELS['hg'].glsl });
+            blocks.push({ origin: 'components/volume_scattering/hg/hg.glsl', source: PHASE_MODELS['hg'].glsl });
         }
         blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan) });
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).

@@ -4,6 +4,7 @@ import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, Analytic
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
+import { tonemapModel } from '../../components/tonemap/index.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
 
@@ -303,6 +304,10 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
                 ? { id: 'accumulation', type: 'double_buffer', format: ['rgba32f', 'rgba32f'] }
                 : { id: 'accumulation', type: 'double_buffer', format: 'rgba32f' },
             { id: 'screen', type: 'screen' },
+            // On-demand LDR export target (impl-plan-display Stage 4 / Option B): the
+            // display pass is re-run into this rgba8 buffer ONLY when exporting a PNG —
+            // zero cost on the normal display→screen path (allocated, not rendered).
+            { id: 'ldr', type: 'texture', format: 'rgba8' },
         ],
         passes: [
             {
@@ -316,7 +321,11 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
             },
             {
                 role: 'display',
-                inputs: { 'u_radiance': 'accumulation_current' },
+                // Encoding tonemaps dither the 8-bit write → they bind the global
+                // blue-noise tile; 'none' (raw probe path) does not.
+                inputs: tonemapModel(program.view.tonemap.type).encodesToDisplay
+                    ? { 'u_radiance': 'accumulation_current', 'u_blueNoise': 'extern:blue_noise' }
+                    : { 'u_radiance': 'accumulation_current' },
                 output: 'screen',
             },
         ],

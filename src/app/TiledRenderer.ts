@@ -420,6 +420,7 @@ export class TiledRenderer {
 
         if (config.format === 'png' || config.format === 'both') {
             if (exports.includes('ldr')) {
+                this.app.renderLdr();   // tonemap + dither this tile → 'ldr' before reading
                 const rgb = this.app.readExport('ldr') as Uint8Array;
                 savePNGFile(rgb, rect.width, rect.height, `${filename}.png`);
             } else {

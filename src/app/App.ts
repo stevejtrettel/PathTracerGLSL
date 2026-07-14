@@ -557,6 +557,8 @@ export class App {
 
     getAvailableExports(): string[] { return this.engine.getExportNames(); }
     readExport(name: string): Float32Array | Uint8Array { return this.engine.readExport(name); }
+    /** Render the display on demand into the 'ldr' buffer; call before readExport('ldr'). */
+    renderLdr(): void { this.engine.renderLdr(); }
     getCanvasSize(): [number, number] { return this.engine.getCanvasSize(); }
     getCanvas(): HTMLCanvasElement { return this.gl.canvas as HTMLCanvasElement; }
 
@@ -570,6 +572,7 @@ export class App {
 
         try {
             const [width, height] = this.getCanvasSize();
+            this.renderLdr();   // on-demand: tonemap + dither → 'ldr' buffer (impl-plan-display B)
             const pixels = this.readExport('ldr') as Uint8Array;
             const name = filename || this._generateExportFilename('screenshot', 'png');
             savePNGFile(pixels, width, height, name, this.buildRenderStamp());
