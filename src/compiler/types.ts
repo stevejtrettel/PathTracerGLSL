@@ -342,11 +342,15 @@ export interface ViewDescription {
     tonemap: DisplayDescription;
 }
 
+export type FisheyeProjection = 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic';
+
 export type CameraDescription =
     | { type: 'pinhole'; fov: Value<number> }
     | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
     | { type: 'equirect' }
-    | { type: 'orthographic'; scale: number };
+    | { type: 'orthographic'; scale: number }
+    | { type: 'fisheye'; projection: FisheyeProjection; fov: number }   // fov = full angular field (radians)
+    | { type: 'cylindrical'; hfov: number };                            // panorama: horizontal sweep (DEGREES); vertical follows the window (square pixels)
 
 export type CameraType = CameraDescription['type'];
 

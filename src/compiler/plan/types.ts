@@ -107,7 +107,9 @@ export type CameraDesc =
     | { type: 'pinhole'; fov: Value<number> }
     | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
     | { type: 'equirect' }
-    | { type: 'orthographic'; scale: number };
+    | { type: 'orthographic'; scale: number }
+    | { type: 'fisheye'; projection: 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic'; fov: number }
+    | { type: 'cylindrical'; hfov: number };
 
 export type AccumulationDesc =
     | { type: 'average' }

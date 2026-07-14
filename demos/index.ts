@@ -6,7 +6,7 @@
 
 import type { SceneSuiteEntry } from '../tests/witnesses/types.js';
 import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBox.js';
-import { cornellThinlensStrategy, cornellEquirectStrategy } from './cameraScenes.js';
+import { cornellThinlensStrategy, cornellEquirectStrategy, cornellOrthoStrategy, cornellCylindricalStrategy, fisheyeStrategy } from './cameraScenes.js';
 import { mixedScene, analyticStrategy } from './analyticScenes.js';
 import { submergedScene, submergedStrategy } from './dielectricScenes.js';
 import { fogcubeScene, fogcubeStrategy } from './mediaScenes.js';
@@ -19,30 +19,24 @@ import {
 } from './demoScenes.js';
 
 export const demoSuite: Record<string, SceneSuiteEntry> = {
+    // One scene, the whole camera family on keys 1-4 (all differ ONLY by camera — the
+    // measurement axis). 1 pinhole · 2 thin-lens (defocus) · 3 orthographic · 4 equirect.
+    // Shared pose frames the box for 1-3; equirect (4) renders a valid 360 pano from it.
     cornell: {
         scene: cornellBox,
-        strategies: [cornellStrategy],
-        exercises: 'region disambiguation (5 white walls → 1 material); {param} albedo; fov uniform',
+        strategies: [cornellStrategy, cornellThinlensStrategy, cornellOrthoStrategy, cornellEquirectStrategy, fisheyeStrategy('equidistant'), cornellCylindricalStrategy],
+        exercises: 'the camera family on one scene (keys 1-6): pinhole · thin-lens (aperture/focusDistance) · orthographic (parallel) · equirect (360) · fisheye (equidistant) · cylindrical (240° panorama). Each is a measurement change — they do NOT converge to each other. Also: region disambiguation (5 walls → 1 material), {param} albedo/fov',
+        expected: '1 perspective · 2 defocus blur (aperture>0; 0 ≡ pinhole) · 3 no perspective convergence (parallel walls) · 4 full-sphere panorama · 5 circular 180° fisheye · 6 wide cylindrical panorama (straight verticals)',
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],
         },
     },
-    'cornell-equirect': {
+    'cornell-fisheye': {
         scene: cornellBox,
-        strategies: [cornellEquirectStrategy],
-        exercises: 'equirectangular camera: full-sphere direction map (no fov/aperture, ignores xiLens); the Ray seed + ambient_* seam is camera-agnostic',
-        expected: 'a 360°×180° panorama from inside the box: red wall left, green right, white back/floor/ceiling wrap across; image center = forward, top = straight up, bottom = down',
-        initialParameters: {
-            'camera.position': [0, 1, 0],
-            'camera.target': [0, 1, -1],
-        },
-    },
-    'cornell-thinlens': {
-        scene: cornellBox,
-        strategies: [cornellThinlensStrategy],
-        exercises: 'thin-lens camera (defocus): aperture + focusDistance params, concentric-disk lens sample from xiLens; measurement change (no pinhole convergence)',
-        expected: 'the focus plane (focusDistance ≈ 4) is sharp; near/far walls blur with aperture > 0; aperture = 0 collapses to the pinhole image',
+        strategies: [fisheyeStrategy('equidistant'), fisheyeStrategy('equisolid'), fisheyeStrategy('stereographic'), fisheyeStrategy('orthographic')],
+        exercises: 'the four fisheye sub-projections (keys 1-4) — same occupant, one radial map θ(ρ) each, compiler-selected: equidistant · equisolid · stereographic · orthographic. 180° fov',
+        expected: 'same scene, four radial distortions: 1 angle-linear · 2 solid-angle-true (edges compressed) · 3 conformal (shapes preserved, "little planet") · 4 hemisphere-flat (heaviest edge compression)',
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],

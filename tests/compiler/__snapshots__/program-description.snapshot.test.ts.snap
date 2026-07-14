@@ -131,6 +131,254 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > cornell + cylindrical 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "hfov": 240,
+      "type": "cylindrical",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell + equirect 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "type": "equirect",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell + fisheye-equidistant 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": 3.141592653589793,
+      "projection": "equidistant",
+      "type": "fisheye",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell + orthographic 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "scale": 1.6,
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > cornell + pathtracer 1`] = `
 {
   "emitters": {
@@ -176,6 +424,75 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
         "param": "camera.fov",
       },
       "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell + thinlens 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "aperture": 0.15,
+      "focusDistance": 4,
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "type": "thinlens",
     },
     "color": "rgb",
     "maxBounces": 10,
@@ -597,7 +914,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
 }
 `;
 
-exports[`ProgramDescription structural snapshot (the link map) > cornell-equirect + equirect 1`] = `
+exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-equidistant 1`] = `
 {
   "emitters": {
     "lightingPdf": false,
@@ -635,7 +952,198 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-equirec
   },
   "measurement": {
     "camera": {
-      "type": "equirect",
+      "fov": 3.141592653589793,
+      "projection": "equidistant",
+      "type": "fisheye",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-equisolid 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": 3.141592653589793,
+      "projection": "equisolid",
+      "type": "fisheye",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-orthographic 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": 3.141592653589793,
+      "projection": "orthographic",
+      "type": "fisheye",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-stereographic 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": 3.141592653589793,
+      "projection": "stereographic",
+      "type": "fisheye",
     },
     "color": "rgb",
     "maxBounces": 10,
@@ -702,75 +1210,6 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     },
     "color": "rgb",
     "maxBounces": 12,
-    "response": "radiance",
-    "scattering": "full",
-    "shadows": "opaque-dielectrics",
-  },
-  "media": {
-    "nullInterfaces": false,
-    "present": false,
-    "scatteringArms": false,
-    "shadowWalker": false,
-  },
-  "view": {
-    "tonemap": {
-      "exposure": undefined,
-      "type": "reinhard",
-    },
-  },
-}
-`;
-
-exports[`ProgramDescription structural snapshot (the link map) > cornell-thinlens + thinlens 1`] = `
-{
-  "emitters": {
-    "lightingPdf": false,
-    "samplable": false,
-  },
-  "environment": {
-    "type": "none",
-  },
-  "environmentSamplable": false,
-  "estimator": {
-    "accumulation": {
-      "type": "average",
-    },
-    "envSampler": {
-      "chart": "equirect",
-      "compensation": false,
-    },
-    "lighting": {
-      "method": "nee",
-      "selection": "power",
-    },
-    "mediumLightSampling": "vertex",
-    "russianRoulette": {
-      "startDepth": 3,
-    },
-    "volumeSampling": "none",
-  },
-  "intersection": {
-    "method": "raymarch",
-  },
-  "materials": {
-    "models": [
-      "lambert",
-    ],
-  },
-  "measurement": {
-    "camera": {
-      "aperture": 0.15,
-      "focusDistance": 4,
-      "fov": {
-        "default": 0.8,
-        "max": 1.5,
-        "min": 0.3,
-        "param": "camera.fov",
-      },
-      "type": "thinlens",
-    },
-    "color": "rgb",
-    "maxBounces": 10,
     "response": "radiance",
     "scattering": "full",
     "shadows": "opaque-dielectrics",

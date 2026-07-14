@@ -17,6 +17,9 @@ import type { CameraDesc } from '../../compiler/plan/types.js';
 import { pinholeDescriptor } from './pinhole/pinhole.js';
 import { thinlensDescriptor } from './thinlens/thinlens.js';
 import { equirectDescriptor } from './equirect/equirect.js';
+import { orthographicDescriptor } from './orthographic/orthographic.js';
+import { fisheyeDescriptor } from './fisheye/fisheye.js';
+import { cylindricalDescriptor } from './cylindrical/cylindrical.js';
 
 /** A model-unique live uniform (thin-lens aperture/focusDistance). Always a slider that
  *  triggers accumulation reset — these change the INTEGRAL (measurement §6.2). fov is NOT
@@ -35,19 +38,25 @@ export interface CameraParam {
 
 export interface CameraModelDescriptor {
     type: CameraType;
-    /** ?raw source providing `Ray camera_generateRay(vec2 pixel, vec2 xiPixel, vec2 xiLens)`. */
+    /** ?raw source providing `Ray camera_generateRay(vec2 film, vec2 xiLens)`. */
     glsl: string;
     /** Provenance origin string for source maps (the occupant's path). */
     origin: string;
     /** Model-unique scalar params read from the camera desc (empty for pinhole). */
     params(cam: CameraDesc): CameraParam[];
+    /** Model-unique compile-time #defines — the same value-define mechanism as TAN_FOV
+     *  (a literal or an alias, NOT structural gating). fisheye uses it to alias
+     *  FISHEYE_THETA to the one radial-map function its `projection` selects. */
+    defines?(cam: CameraDesc): Record<string, string>;
 }
 
 export const CAMERA_MODELS: Record<CameraType, CameraModelDescriptor | undefined> = {
     pinhole: pinholeDescriptor,
     thinlens: thinlensDescriptor,
     equirect: equirectDescriptor,
-    orthographic: undefined, // type-declared, unregistered — Validator-rejected
+    orthographic: orthographicDescriptor,
+    fisheye: fisheyeDescriptor,
+    cylindrical: cylindricalDescriptor,
 };
 
 /** Lookup that throws on unregistered types — the Validator rejects them upstream

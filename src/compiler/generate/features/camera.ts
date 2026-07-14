@@ -34,9 +34,11 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
         },
     };
 
-    // fov is shared across projective cameras (pinhole + thin-lens); the Value<number>
-    // treatment (const → define, param → live uniform) is identical for both.
-    if ('fov' in cam) {
+    // TAN_FOV is the PERSPECTIVE half-angle (pinhole + thin-lens) — the Value<number>
+    // treatment (const → define, param → live uniform) is identical for both. Other cameras
+    // that carry a `fov` (fisheye's full angular field) mean something different and emit
+    // their own uniform via the descriptor's params(), so they are NOT handled here.
+    if (cam.type === 'pinhole' || cam.type === 'thinlens') {
         const fov = cam.fov;
         if (isValueParam(fov)) {
             const path = fov.param;
@@ -75,6 +77,9 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
             ...(p.range ? { range: p.range } : {}),
         };
     }
+
+    // Model-unique compile-time defines (fisheye's FISHEYE_THETA alias — the TAN_FOV kind).
+    Object.assign(contribution.defines, model.defines?.(cam) ?? {});
 
     return contribution;
 }
