@@ -21,7 +21,7 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
 
     const contribution: FeatureContribution = {
         ...emptyContribution('camera'),
-        provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 pixel, vec2 xiPixel, vec2 xiLens)' }],
+        provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 film, vec2 xiLens)' }],
         blocks: [{ origin: model.origin, source: model.glsl }],
         uniforms: [
             { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: [0, 0, 8] },

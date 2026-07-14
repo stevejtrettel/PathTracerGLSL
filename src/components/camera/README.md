@@ -8,11 +8,12 @@
 One GLSL file providing:
 
 ```glsl
-Ray camera_generateRay(vec2 pixel, vec2 xiPixel, vec2 xiLens);
+Ray camera_generateRay(vec2 film, vec2 xiLens);
 ```
 
-returning a pure geodesic seed (`Ray` = origin + unit direction, no interval — the
-trace-loop contract). Camera parameters arrive as uniforms/defines the compiler's
+where `film` is the continuous sub-pixel point (the `pixel/` family owns the footprint /
+sub-pixel jitter — the camera is a pure film-point → ray map, no RNG of its own). Returns a
+pure geodesic seed (`Ray` = origin + unit direction, no interval — the trace-loop contract). Camera parameters arrive as uniforms/defines the compiler's
 camera feature owns (`u_cameraPosition/Target`, `TAN_FOV` — a constant fov bakes to a
 literal define; a `{param}` fov becomes a live uniform aliased through the same
 define, so the GLSL is unchanged either way — the §2.8 Value<T> pattern). Model-unique
@@ -22,16 +23,17 @@ descriptor (`params(cam)`) and merged in by the feature; the registry is
 
 ## Camera randomness — two categories, two seams (owner-decided July 2026)
 
-The two sub-samples are **Category A**: consumed *inside* `generateRay` to produce the
-geometric ray, and this is the complete list — realistic multi-element lenses, polygonal
-bokeh, and fisheye all still bottom out at pixel + lens:
+**Category A** is the geometric randomness — the complete list, and realistic
+multi-element lenses, polygonal bokeh, and fisheye all still bottom out at pixel + lens:
 
-- `xiPixel` — sub-pixel jitter (box filter over the pixel footprint; QMC-stratified —
-  antialiasing is part of the measurement).
-- `xiLens` — lens-disk sample (thin-lens aperture; pinhole/panoramic ignore it).
+- the **pixel footprint** — sub-pixel placement. This is NOT a camera concern: it lives in
+  the `pixel/` family (the reconstruction kernel `h_j`), which hands the camera a continuous
+  `film` point. The camera never sees `xiPixel`.
+- `xiLens` — lens-disk sample (thin-lens aperture; pinhole/panoramic/equirect ignore it).
 
-The film occupant draws both from the sampler stream and hands them in, keeping the
-camera a pure, stratifiable, TS-twin-able function.
+The film occupant draws the samples from the stream (`pixel_sample` for the footprint,
+`xiLens` for the aperture) and hands the camera a `film` point + `xiLens`, keeping the
+camera a pure, stratifiable, TS-twin-able map.
 
 **Category B — shutter time (motion blur) and wavelength (spectral sensor) — are NOT
 `generateRay` arguments.** They are seeded once at the sensor and *carried through the

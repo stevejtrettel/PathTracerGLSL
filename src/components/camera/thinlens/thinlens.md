@@ -9,8 +9,8 @@ same image, by design.
 
 The construction reuses the pinhole look-at frame and `TAN_FOV`:
 
-- Build the pinhole primary direction `dir` through the jittered pixel (identical to
-  `pinhole.glsl`).
+- Build the pinhole primary direction `dir` through the `film` point (identical to
+  `pinhole.glsl`; the `pixel/` family already placed the sub-pixel sample).
 - **Focus point:** the primary ray crosses the focus plane at
   `t = u_focusDistance / dot(dir, forward)` (the plane is perpendicular to `forward` at
   `u_focusDistance`), so `focus_point = position + dir·t`.
@@ -30,5 +30,5 @@ it. `aperture` and `focusDistance` are live sliders that trigger accumulation re
 change what the render converges to.
 
 Randomness note (the camera A/B split, see `../README.md`): thin-lens consumes exactly the
-Category-A dimensions — `xiPixel` + `xiLens`. Motion blur (shutter time) and spectral
+Category-A dimensions — the `film` footprint (pixel/) + `xiLens`. Motion blur (shutter time) and spectral
 sensor response (wavelength) are Category-B seed fields, not `generateRay` arguments.

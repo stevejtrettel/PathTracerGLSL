@@ -14,7 +14,7 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
     const contribution: FeatureContribution = {
         ...emptyContribution('accumulation'),
         blocks: [{ origin: accumulationOrigin(program), source: buildAccumulationSource(program, bag) }],
-        requires: ['camera_generateRay', 'transport_trace'],
+        requires: ['pixel_sample', 'camera_generateRay', 'transport_trace'],
     };
 
     if (type === 'average' || type === 'variance') {

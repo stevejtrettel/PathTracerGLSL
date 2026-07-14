@@ -4,9 +4,10 @@ The measurement functional for a full-sphere panorama: every direction on the un
 gets a pixel, laid out on the equirectangular (lat-long) grid. This is a **measurement**
 change like every camera — pinhole and equirect do not converge to the same image.
 
-The map, from the (jittered) pixel:
+The map, from the continuous `film` point (the `pixel/` family already placed the sub-pixel
+sample):
 
-- `uv = jittered_pixel / u_imageSize` ∈ [0,1]².
+- `uv = film / u_imageSize` ∈ [0,1]².
 - **azimuth** `phi = (uv.x − 0.5)·2π` ∈ [−π, π] — 0 at the image center (along `forward`),
   wrapping toward `right`; the ±π seam is directly behind the camera.
 - **elevation** `theta = (uv.y − 0.5)·π` ∈ [−π/2, π/2] — 0 at the horizon, +π/2 (top of
@@ -20,7 +21,8 @@ orthonormal the spherical combination is already unit; `normalize` only guards f
 
 No `TAN_FOV`, no aperture: the whole sphere is the frame, so `xiLens` is ignored and there
 are no model-unique params — the look-at pose (owned by the feature) is the entire
-configuration. Sub-pixel jitter (`xiPixel`) still applies, so antialiasing is unchanged.
+configuration. Sub-pixel placement (the `pixel/` footprint) still applies upstream, so
+antialiasing is unchanged.
 The image is naturally 2:1 (azimuth 2π, elevation π); other aspect ratios stretch rather
 than crop.
 

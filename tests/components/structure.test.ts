@@ -16,7 +16,7 @@ const ROOT = resolve(__dirname, '../../src/components');
 
 const FAMILIES = [
     'materials', 'lights', 'phase', 'geometry', 'ambient',
-    'sampler', 'camera', 'film', 'env', 'transport',
+    'sampler', 'pixel', 'camera', 'film', 'env', 'transport',
 ];
 
 // Family-root files that are NOT occupant folders (shared parts + registries + docs).

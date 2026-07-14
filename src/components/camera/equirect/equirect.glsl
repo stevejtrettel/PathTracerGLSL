@@ -6,9 +6,9 @@
 // stretch, they don't crop. Center pixel looks along `forward`; +x wraps toward `right`
 // with the seam behind, +y tilts toward `up` (top of image = straight up).
 
-Ray camera_generateRay(vec2 pixel, vec2 xiPixel, vec2 xiLens) {
-    vec2 jittered_pixel = pixel + (xiPixel - 0.5);
-    vec2 uv = jittered_pixel / u_imageSize;   // [0,1]²
+Ray camera_generateRay(vec2 film, vec2 xiLens) {
+    // film = continuous sub-pixel point (pixel/ owns the footprint); xiLens unused.
+    vec2 uv = film / u_imageSize;   // [0,1]²
 
     float phi   = (uv.x - 0.5) * TWO_PI;      // azimuth   [-π, π],   0 = forward
     float theta = (uv.y - 0.5) * PI;          // elevation [-π/2, π/2], 0 = horizon

@@ -10,6 +10,7 @@ import { contributeCore } from './core.js';
 import { contributeIntersection } from './intersection.js';
 import { contributeMaterials } from './materials.js';
 import { contributeLighting } from './lighting.js';
+import { contributePixel } from './pixel.js';
 import { contributeCamera } from './camera.js';
 import { contributeEnvironment } from './environment.js';
 import { contributeTransport } from '../../../components/transport/integrators/pt/pt.js';
@@ -36,6 +37,7 @@ export function collectFeatures(plan: RenderPlan, bag: DiagnosticBag): MergedCon
         contributeIntersection(plan),
         contributeMaterials(plan),
         contributeLighting(plan),
+        contributePixel(plan),
         contributeCamera(plan, bag),
         contributeEnvironment(plan, bag),
         contributeTransport(plan),

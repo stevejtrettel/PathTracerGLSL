@@ -1,9 +1,9 @@
 // Pinhole camera
 // Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraTarget
 
-Ray camera_generateRay(vec2 pixel, vec2 xiPixel, vec2 xiLens) {
-    vec2 jittered_pixel = pixel + (xiPixel - 0.5);   // xiLens unused: pinhole has no aperture
-    vec2 ndc = (2.0 * jittered_pixel / u_imageSize) - 1.0;
+Ray camera_generateRay(vec2 film, vec2 xiLens) {
+    // film = continuous sub-pixel point (pixel/ owns the footprint); xiLens unused (no aperture).
+    vec2 ndc = (2.0 * film / u_imageSize) - 1.0;
     float aspect = u_imageSize.x / u_imageSize.y;
     ndc.x *= aspect;
 

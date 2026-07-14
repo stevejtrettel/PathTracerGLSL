@@ -1,10 +1,9 @@
 # Pinhole camera — what it computes and why
 
 The measurement functional: which ray each pixel integrates over. `camera_generateRay`
-jitters the pixel by `xi − 0.5` (box filter over the pixel footprint — the sub-pixel
-integral is part of the measurement, and `xi` comes from the sampler stream so QMC
-stratifies it), maps to NDC with aspect correction, and assembles the direction in a
-look-at frame:
+receives a continuous `film` point (the `pixel/` family owns the sub-pixel footprint now —
+the camera is a pure film-point → ray map), maps it to NDC with aspect correction, and
+assembles the direction in a look-at frame:
 
 - `forward = normalize(target − position)`; `right/up` by cross products with an
   up-reference that falls back from +Y to +Z when `|forward.y| > 0.999999` — a camera
