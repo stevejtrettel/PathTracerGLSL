@@ -196,9 +196,9 @@ interface CompiledRenderer {
 }
 ```
 
-### Previous Implementation: SimpleCompiler (superseded — now in `reference/`)
+### Previous Implementation: SimpleCompiler (superseded — DELETED July 2026)
 
-> The real Compiler replaced this; see [compiler-system.md](compiler-system.md). Kept for historical context:
+> The real Compiler replaced this; see [compiler-system.md](compiler-system.md). `reference/SimpleCompiler.ts` was removed once the compiler + `docs/fable-*` docs became the living record. Kept below for historical context:
 
 The SimpleCompiler was a temporary validation tool that generated hardcoded GLSL for five strategies:
 - `debug`: UV visualization
@@ -1338,7 +1338,7 @@ src/
 │
 └── glsl.d.ts                      # TypeScript declarations for GLSL imports
 
-reference/                         # Old implementation kept as source material (incl. SimpleCompiler.ts — not compiled)
-├── optics/                        # Camera, BRDF, transport, tonemapping, accumulation
-└── world/                         # Scene SDF, environment, lighting, ambient geometry
+reference/                         # Old-implementation GLSL kept ONLY as reference for unbuilt work (not compiled)
+├── optics/                        # aces/gamma tonemap, albedo material (concept reminders — not yet occupants)
+└── world/                         # menger-sponge SDF (fractal — no equivalent built)
 ```

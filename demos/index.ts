@@ -5,6 +5,7 @@
 // gallery and lab render.
 
 import type { SceneSuiteEntry } from '../tests/witnesses/types.js';
+import type { RenderStrategy } from '../src/compiler/types.js';
 import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBox.js';
 import { cornellThinlensStrategy, cornellEquirectStrategy, cornellOrthoStrategy, cornellCylindricalStrategy, fisheyeStrategy } from './cameraScenes.js';
 import { mixedScene, analyticStrategy } from './analyticScenes.js';
@@ -17,6 +18,15 @@ import {
     mistScene,
     mistStrategy,
 } from './demoScenes.js';
+
+// Non-accumulating (oneshot) tracer — each frame is the current sample, live & noisy (no
+// convergence). Same scene/camera as `cornell`, only the accumulation occupant differs.
+const cornellOneshotStrategy: RenderStrategy = {
+    id: 'oneshot',
+    measurement: { camera: { type: 'pinhole', fov: 0.8 }, maxBounces: 8 },
+    estimator: { directLighting: 'nee', russianRoulette: { startDepth: 3 }, accumulation: { type: 'oneshot' } },
+    view: { tonemap: { type: 'reinhard' } },
+};
 
 export const demoSuite: Record<string, SceneSuiteEntry> = {
     // One scene, the whole camera family on keys 1-4 (all differ ONLY by camera — the
@@ -37,6 +47,16 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
         strategies: [fisheyeStrategy('equidistant'), fisheyeStrategy('equisolid'), fisheyeStrategy('stereographic'), fisheyeStrategy('orthographic')],
         exercises: 'the four fisheye sub-projections (keys 1-4) — same occupant, one radial map θ(ρ) each, compiler-selected: equidistant · equisolid · stereographic · orthographic. 180° fov',
         expected: 'same scene, four radial distortions: 1 angle-linear · 2 solid-angle-true (edges compressed) · 3 conformal (shapes preserved, "little planet") · 4 hemisphere-flat (heaviest edge compression)',
+        initialParameters: {
+            'camera.position': [0, 1, 4],
+            'camera.target': [0, 1, 0],
+        },
+    },
+    'cornell-oneshot': {
+        scene: cornellBox,
+        strategies: [cornellOneshotStrategy],
+        exercises: 'non-accumulating (oneshot) accumulation occupant — writes the current sample each frame, no history blend; reuses the average pipeline (never reads u_previous)',
+        expected: 'a live, noisy image that does NOT converge (grain animates every frame); contrast the accumulating cornell card which cleans up over time',
         initialParameters: {
             'camera.position': [0, 1, 4],
             'camera.target': [0, 1, 0],

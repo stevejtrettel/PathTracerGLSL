@@ -21,7 +21,6 @@ export {
 } from './TiledRenderer.js';
 
 export {
-    STRATEGY_PRESETS,
     type AppConfig,
     type CreateAppOptions,
     type StrategyPreset,

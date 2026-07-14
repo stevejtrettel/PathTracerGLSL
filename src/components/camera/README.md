@@ -46,7 +46,13 @@ geodesics — `Point`→vec4). **Do not add a `xiTime`/`xiLambda` argument to
 
 ## Status
 
-Occupant: `pinhole/`. Known next: thin-lens (aperture + focus distance — two more
-schema fields and a lens sample from `xi`; NO transport changes, defocus is part of
-the measurement). Changing camera type changes the INTEGRAL — cross-camera images do
-not converge to each other, by design (contrast with everything estimator-side).
+Six occupants: `pinhole/`, `thinlens/` (defocus — aperture + focusDistance, lens sample
+from `xiLens`; `aperture = 0 ≡ pinhole` witness), `orthographic/` (parallel projection),
+`equirect/` (360×180), `fisheye/` (one occupant, four `θ(ρ)` sub-projections behind a
+`projection` sub-parameter, selected by the value `#define FISHEYE_THETA`), `cylindrical/`
+(wide panorama — one `hfov` Width° dial, one focal length → square pixels, vertical follows
+the window). Model-unique params come from each descriptor's `params(cam)`; model-unique
+compile-time selections from `defines(cam)` (the TAN_FOV mechanism, e.g. fisheye's radial
+map). Changing camera type changes the INTEGRAL — cross-camera images do not converge to
+each other, by design (contrast with everything estimator-side). Deferred: realistic
+multi-element lens, tilt-shift, anamorphic, polygonal bokeh, the fisheye circular mask.

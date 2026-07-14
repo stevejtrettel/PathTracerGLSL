@@ -11,7 +11,7 @@ Two conventions that are load-bearing:
 
 - **Rotation asymmetry**: `env_chart_uv` ADDS `u_envRotation`, `env_chart_dir`
   SUBTRACTS it — the pair must be exact inverses or sample↔pdf and sample↔radiance
-  silently disagree whenever rotation ≠ 0 (the reference hdri-importance.glsl had
+  silently disagree whenever rotation ≠ 0 (an earlier reference implementation had
   them BOTH adding — env-plan pitfall 1; the asymmetry is the fix, don't "repair" it).
 - The φ seam at ±π wraps via the texture's REPEAT mode — no seam handling in code.
 

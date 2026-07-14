@@ -356,13 +356,17 @@ export type CameraType = CameraDescription['type'];
 
 export type AccumulationDescription =
     | { type: 'average' }
+    | { type: 'oneshot' }   // no accumulation — each frame shows the current sample (live preview / single-frame)
     | { type: 'exponential'; alpha: number }
     | { type: 'variance' };
 
 export type DisplayDescription =
     | { type: 'reinhard'; exposure?: number }
     | { type: 'aces'; exposure?: number }
-    | { type: 'filmic'; exposure?: number }
+    | { type: 'agx'; exposure?: number }
+    | { type: 'khronos'; exposure?: number }
+    | { type: 'hable'; exposure?: number }
+    | { type: 'gt'; exposure?: number }
     | { type: 'none' };
 
 /**

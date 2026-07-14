@@ -28,4 +28,6 @@ the two-stage `u_envSelectProb` wrapper, and the miss-branch bookkeeping seams.
 sky (X-ENV + X-CHART: charts agree to 4 digits), sky-lamp (two-stage selection),
 proc-sky (bake + W9 compensation: same image, −27% noise), furnace-sky (convex ρ·L).
 Compensation requires `directLighting 'mis'` (Validator: pdf-0 regions are only
-covered unbiasedly by MIS). Deferred: hierarchical warp, tabulated-env T1.
+covered unbiasedly by MIS). Tabulated environments (image HDRI + procedural) are BUILT
+(the env-as-light batch — real `.hdr` loading, CDF importance sampling as a NEE/MIS
+light). Deferred: hierarchical sample warping (an alternative sampler on the chart axis).

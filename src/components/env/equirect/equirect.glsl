@@ -4,7 +4,7 @@
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
-// (The reference hdri-importance.glsl had them BOTH adding — env-plan pitfall 1. Do not "fix"
+// (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
 // Convention: v = 0 at the +Y pole (θ = acos(y)); the u seam at φ = ±π wraps via the env
 // map's REPEAT wrap mode. Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the

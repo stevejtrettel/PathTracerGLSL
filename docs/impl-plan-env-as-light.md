@@ -1,12 +1,13 @@
 # Implementation Plan — Environment as a Samplable Light
 
 **Author:** Fable (July 2026)
-**Status:** proposed — pending owner review of the flagged decisions (§1)
-**Supersedes:** `impl-plan-tabulated-env.md` (keeps its T1–T4 phasing and its three open
-decisions, now resolved or flagged below). Contracts §2.10/§6.2 and reference §5/§8 remain
-the authorities; `reference/world/environment/hdri-importance.glsl` remains the normative
-transcription source *with two bug fixes* (§4, pitfalls 1–2).
-**Prerequisite:** `impl-plan-audit-hardening.md` (one session; independent of this build).
+**Status:** BUILT & GPU-verified (T1–T5). Real `.hdr` loading + procedural bake, CDF
+importance sampling as a NEE/MIS light, the equirect/octahedral chart axis + MIS
+compensation. Witnesses: sky, sky-lamp, proc-sky, furnace-sky.
+**Supersedes:** `impl-plan-tabulated-env.md`. The `reference/world/environment/hdri*.glsl`
+transcription sources were folded into `components/env/` + `environment.ts` (the two pitfall
+fixes in §4 applied) and then DELETED (July 2026) — the built code is the record now.
+**Prerequisite:** `impl-plan-audit-hardening.md` (built).
 
 ## 0. What the renderer survey established (pbrt-v3/v4, Mitsuba, Arnold)
 

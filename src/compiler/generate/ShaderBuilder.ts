@@ -7,10 +7,13 @@ import type { ShaderBlock, BlockMapping } from './ShaderIR.js';
 import { assembleBlocks } from './ShaderIR.js';
 import type { MergedContributions } from './features/merge.js';
 
-// Film components assembled by the Generator itself (not a swappable feature)
-import fullscreenVertGLSL from '../../components/film/fullscreen.vert.glsl?raw';
-import tonemapReinhardGLSL from '../../components/film/tonemap_reinhard/tonemap_reinhard.glsl?raw';
-import tonemapNoneGLSL from '../../components/film/tonemap_none/tonemap_none.glsl?raw';
+// Display components assembled by the Generator itself (not a swappable feature).
+// fullscreen.vert + display.glsl are compiler-owned plumbing/math: fullscreen.vert is
+// used by every pass (main/display/bake); display.glsl holds the shared safe_color +
+// sRGB OETF. Tonemap occupants (the tone CURVE only) come from the tonemap registry.
+import fullscreenVertGLSL from './glsl/fullscreen.vert.glsl?raw';
+import displayMathGLSL from './glsl/display.glsl?raw';
+import { tonemapModel, type TonemapDescriptor } from '../../components/tonemap/index.js';
 
 export interface ShaderBuildResult {
     shaders: Map<string, ShaderProgram>;
@@ -24,7 +27,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
     // Vertex shader (shared)
     const vertexAssembled = assembleBlocks([
         { origin: 'generated:version', source: '#version 300 es' },
-        { origin: 'components/film/fullscreen.vert.glsl', source: fullscreenVertGLSL },
+        { origin: 'generate/glsl/fullscreen.vert.glsl', source: fullscreenVertGLSL },
     ]);
 
     // Pathtracer fragment — from the feature contributions merged in section order (§2.10)
@@ -68,10 +71,13 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
     // The display shader is plan-driven (audit C2: it used to emit Reinhard unconditionally,
     // silently ignoring `display: { type: 'none' }` and `exposure`). Exposure is strategy
     // data, so it bakes as a constant — a strategy change recompiles anyway.
+    const model = tonemapModel(tonemap.type);
+    // 'none' is the raw probe path: exposure forced to 1.0 so a pixel IS the accumulator
+    // value (§11). Every encoding occupant applies the requested exposure.
     const exposure = tonemap.type === 'none' ? 1.0 : (tonemap.exposure ?? 1.0);
-    // The display pass's resources are declared HERE, not in the tonemap templates
-    // (bundle i-b): u_radiance is the pass's texture input, u_resolution the engine
-    // builtin — templates only contain the tonemap math.
+    // The display pass's resources are declared HERE, not in the tonemap occupants:
+    // u_radiance is the pass's texture input, u_resolution the engine builtin — occupants
+    // contain the tone CURVE only. safe_color + the sRGB OETF are the shared display math.
     const header = [
         FRAGMENT_PREAMBLE,
         '',
@@ -82,10 +88,26 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
     ].join('\n');
     return [
         { origin: 'generated:display-header', source: header },
-        tonemap.type === 'none'
-            ? { origin: 'components/film/tonemap_none/tonemap_none.glsl', source: tonemapNoneGLSL }
-            : { origin: 'components/film/tonemap_reinhard/tonemap_reinhard.glsl', source: tonemapReinhardGLSL },
+        { origin: 'generate/glsl/display.glsl', source: displayMathGLSL },
+        { origin: model.origin, source: model.glsl },
+        { origin: 'generated:display-main', source: buildDisplayMain(model) },
     ];
+}
+
+/** The composed display main() — policy/plumbing (generated), calling the occupant's
+ *  static curve: exposure → curve → (sRGB encode + clamp, iff the occupant encodes). */
+function buildDisplayMain(model: TonemapDescriptor): string {
+    const encode = model.encodesToDisplay
+        ? '    color = clamp(linear_to_srgb(color), 0.0, 1.0);\n'
+        : '';
+    return [
+        'void main() {',
+        '    vec2 uv = gl_FragCoord.xy / u_resolution;',
+        '    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;',
+        `    color = ${model.curveFn}(color);`,
+        `${encode}    fragColor = vec4(color, 1.0);`,
+        '}',
+    ].join('\n');
 }
 
 // ============================================================================

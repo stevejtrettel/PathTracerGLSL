@@ -16,7 +16,7 @@ const ROOT = resolve(__dirname, '../../src/components');
 
 const FAMILIES = [
     'materials', 'lights', 'phase', 'geometry', 'ambient',
-    'sampler', 'pixel', 'camera', 'film', 'env', 'transport',
+    'sampler', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport',
 ];
 
 // Family-root files that are NOT occupant folders (shared parts + registries + docs).
@@ -24,7 +24,6 @@ const ALLOWED_ROOT_FILES = new Set([
     'index.ts', 'README.md',
     'combiner.ts', 'flags.ts',            // transport shared parts
     'sampler_cdf.glsl',                    // env shared CDF walk
-    'fullscreen.vert.glsl',                // film shared plumbing
 ]);
 
 describe('components structure', () => {

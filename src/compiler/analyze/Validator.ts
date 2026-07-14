@@ -7,6 +7,7 @@ import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { PRIMITIVE_PARAMS } from '../../components/geometry/index.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
+import { isTonemapSupported } from '../../components/tonemap/index.js';
 
 /** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
 const MIN_QUAD_AREA = 1e-8;
@@ -399,12 +400,13 @@ export function validate(
 
     // Check for unsupported accumulation/tonemap types
     if (strategy.estimator.accumulation.type !== 'average'
-        && strategy.estimator.accumulation.type !== 'variance') {
+        && strategy.estimator.accumulation.type !== 'variance'
+        && strategy.estimator.accumulation.type !== 'oneshot') {
         bag.error('invalid-setting',
             `Accumulation type '${strategy.estimator.accumulation.type}' not yet supported`)
             .add();
     }
-    if (strategy.view.tonemap.type !== 'reinhard' && strategy.view.tonemap.type !== 'none') {
+    if (!isTonemapSupported(strategy.view.tonemap.type)) {
         bag.error('invalid-setting',
             `Display/tonemap type '${strategy.view.tonemap.type}' not yet supported`)
             .add();

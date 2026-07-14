@@ -1,7 +1,14 @@
 # Implementation Plan — Tabulated Environments (§2.10 proving case c, tabulated half)
 
 **Author:** Opus (implementing Fable's §2.10 external-texture ruling)
-**Status:** planned (analytic half — none/constant — already done)
+**Status:** BUILT — superseded by the env-as-light batch (`docs/impl-plan-env-as-light.md`
+T1–T5, GPU-verified). All of T1–T4 below shipped: the `extern:` chain, `image` (real `.hdr`
+via `Engine.loadEnvironmentHDR`) + `procedural` (GPU bake) environments, the CDF importance
+sampler (`components/env/sampler_cdf.glsl` — `environment_sample`/`environment_pdf`), and env
+as a NEE/MIS light. The `reference/world/environment/hdri*.glsl` files this plan cited were
+transcribed into `components/env/` + `compiler/generate/features/environment.ts` and DELETED
+(July 2026). Witnesses: `sky` (real HDRI), `sky-lamp`, `proc-sky`, `furnace-sky`. Kept below
+as the design record.
 
 The **analytic** environments (`none`, `constant`) are built. This plan covers the
 **tabulated** environments — `image` (HDRI) and `procedural` (a sky shader) — which

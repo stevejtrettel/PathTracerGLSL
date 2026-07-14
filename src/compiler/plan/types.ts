@@ -113,13 +113,17 @@ export type CameraDesc =
 
 export type AccumulationDesc =
     | { type: 'average' }
+    | { type: 'oneshot' }
     | { type: 'exponential'; alpha: number }
     | { type: 'variance' };
 
 export type TonemapDesc =
     | { type: 'reinhard'; exposure?: number }
     | { type: 'aces'; exposure?: number }
-    | { type: 'filmic'; exposure?: number }
+    | { type: 'agx'; exposure?: number }
+    | { type: 'khronos'; exposure?: number }
+    | { type: 'hable'; exposure?: number }
+    | { type: 'gt'; exposure?: number }
     | { type: 'none' };
 
 // ============================================================================

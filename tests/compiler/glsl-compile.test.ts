@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { Compiler } from '../../src/compiler/Compiler.js';
+import { TONEMAP_MODELS } from '../../src/components/tonemap/index.js';
 import { witnessSuite } from '../witnesses/index.js';
 import { demoSuite } from '../../demos/index.js';
 
@@ -77,5 +78,21 @@ describe('generated GLSL compiles (glslang static check)', () => {
                 }
             });
         }
+    }
+});
+
+// Every tonemap occupant's display shader compiles — the (scene, strategy) pairs above
+// only exercise reinhard/none, so the production roster (aces/agx/khronos/hable/gt) is
+// otherwise never parsed. One base scene, swap the tonemap type, check the display frag.
+describe('every tonemap occupant compiles (glslang static check)', () => {
+    const [base] = Object.values(sceneSuite);
+    for (const type of Object.keys(TONEMAP_MODELS)) {
+        it(`tonemap ${type}`, () => {
+            const strategy = { ...base.strategies[0], id: `tonemap-${type}`, view: { tonemap: { type } } } as typeof base.strategies[0];
+            const renderer = compiler.compile(base.scene, strategy);
+            for (const [shaderId, prog] of renderer.shaders) {
+                if (shaderId.endsWith('-display')) check(prog.fragment, 'frag', `${shaderId} [display ${type}]`);
+            }
+        });
     }
 });

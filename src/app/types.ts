@@ -12,7 +12,9 @@ export type {
 import type { RenderStrategy, SceneDescription } from '../compiler/types.js';
 
 /**
- * Strategy preset - maps strategy ID to strategy configuration
+ * Strategy preset — maps a name to a strategy configuration. Consumed by
+ * App.initializeWithPresets (facade convenience API; the built-in pages use the direct
+ * initialize({strategies}) form instead).
  */
 export interface StrategyPreset {
     name: string;
@@ -52,39 +54,6 @@ export interface RenderProgress {
     state: 'rendering' | 'paused' | 'complete' | 'stopped';
     percentComplete?: number;
 }
-
-/**
- * Built-in strategy presets
- */
-// Legacy presets for SimpleCompiler — will be removed when real Compiler replaces it
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const STRATEGY_PRESETS: Record<string, StrategyPreset> = {
-    'pathtracer': {
-        name: 'Path Tracer',
-        description: 'Full path tracing with global illumination',
-        strategy: { id: 'pathtracer', settings: { maxBounces: 8, samplesPerFrame: 1 } } as any
-    },
-    'pathtracer-aovs': {
-        name: 'Path Tracer + AOVs',
-        description: 'Path tracing with Arbitrary Output Variables',
-        strategy: { id: 'pathtracer-aovs', settings: { maxBounces: 8, samplesPerFrame: 1 } } as any
-    },
-    'debug': {
-        name: 'Debug',
-        description: 'Debug visualization mode',
-        strategy: { id: 'debug', settings: { debugOutput: 'normal' } } as any
-    },
-    'pathtracer-full': {
-        name: 'Full Path Tracer',
-        description: 'Multi-bounce path tracing with Cornell box scene',
-        strategy: { id: 'pathtracer-full', settings: { maxBounces: 8, samplesPerFrame: 1 } } as any
-    },
-    'debug-aovs': {
-        name: 'Debug AOVs',
-        description: 'Debug visualization with albedo, distance, and march steps',
-        strategy: { id: 'debug-aovs', settings: { defaultOutput: 'albedo' } } as any
-    }
-};
 
 /**
  * Single parameter change

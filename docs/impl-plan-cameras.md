@@ -1,12 +1,38 @@
 # Camera models — carving the measurement axis + thin-lens
 
-**Author:** Fable (July 2026) · **Status:** PLANNED
+**Author:** Fable (July 2026) · **Status:** BUILT (July 13 2026)
 **Authority context:** `fable-strategy-taxonomy.md` (camera = the measurement functional W_j;
 changing it changes the integral — no cross-camera convergence), `fable-components.md`
 (1 component = 1 folder; a new occupant = one folder + one registry line), the camera
 family contract `src/components/camera/README.md`, the trace-loop contract (`Ray` = pure
 geodesic seed). This plan carves the camera axis to match materials/lights/phase, then
 ships thin-lens as the first occupant through the new door.
+
+## 0. What landed (BUILT — supersedes the plan below where they differ)
+
+The carve shipped as planned (registry, minimal `CameraModelDescriptor`, type reconcile,
+zero-churn pinhole proof), then five occupants beyond pinhole:
+
+- **thin-lens** (defocus; concentric-disk lens sample from `xiLens`) + the **`aperture = 0 ≡
+  pinhole` witness** (`tests/witnesses/scenes/cameraWitness.ts`, `thinlens-zero`).
+- **orthographic** (parallel projection, `scale`), **equirect** (full-sphere 360×180),
+  **fisheye** (one occupant, four `θ(ρ)` sub-projections behind a `projection`
+  sub-parameter — equidistant/equisolid/stereographic/orthographic, selected by a value
+  `#define FISHEYE_THETA`, the TAN_FOV mechanism), **cylindrical** (wide panorama; single
+  `hfov` Width° dial, one focal length → square pixels, vertical follows the window).
+
+Two things changed vs the plan text:
+
+1. **The sub-pixel jitter was hoisted OUT of the camera** into a new `pixel/` family (the
+   reconstruction kernel `h_j(u)`; box occupant). So the **final signature is
+   `Ray camera_generateRay(vec2 film, vec2 xiLens)`** — the camera is a pure film-point →
+   ray map, and the film draws `film = pixel_sample(coord, xi)` then `xiLens`. This
+   supersedes the `(pixel, xiPixel, xiLens)` signature written throughout §2–§4 below.
+2. Bring-up surfaced and fixed an **unrelated shadow-ray bug** (`sdf_intersect_any` accepted
+   occluders past `maxDist` — a jagged dark blob on the Cornell floor under a near-ceiling
+   lamp; see memory `shadow-ray-behind-light-bug`).
+
+All cameras switch live on the `cornell` demo card (keys 1-6). 574 vitest green.
 
 ## 1. What is already true
 
@@ -32,12 +58,15 @@ ships thin-lens as the first occupant through the new door.
 ray. Complete list, and it is the ceiling: **pixel (2D) + lens (2D)**. Realistic
 multi-element lenses, polygonal bokeh, and fisheye all still bottom out here.
 
-> **Geometric signature (COMMITTED):**
+> **Geometric signature (COMMITTED — later refined, see §0):**
 > `Ray camera_generateRay(vec2 pixel, vec2 xiPixel, vec2 xiLens)`
 > Film draws both; pinhole/panoramic ignore `xiLens`. Explicit two-vec2 (not
 > camera-pulls-its-own-`random2`) keeps the camera a pure, stratifiable, TS-twin-able
 > function — the taxonomy's "xi from the sampler stream" applied to every camera
 > dimension, not just the pixel.
+> **Refinement (BUILT):** the pixel jitter moved to the `pixel/` family, so the shipped
+> signature is `camera_generateRay(vec2 film, vec2 xiLens)` — `xiPixel` is gone from the
+> camera entirely (§0.1).
 
 **Category B — seeded at the sensor, carried through the whole path** (NOT `generateRay`
 args): **shutter time (1D, motion blur)** — read by `scene_intersect` for moving
@@ -182,10 +211,16 @@ lat/long test pattern, and that a 90°-fov crop of the equirect matches a pinhol
   needs animated scene transforms — its own batch, seam prepared here.
 - **Spectral sensor** (Category B): wavelength on the seed; rides the `color: 'spectral'`
   axis (contracts §8).
-- **Orthographic camera** — trivial third occupant once the axis is carved (direction
-  constant, origin varies over the film plane); folded in when wanted.
-- **Realistic lens** (pbrt multi-element), **polygonal/cat's-eye aperture** — still
-  Category-A (pixel+lens); occupants when research calls.
+- ~~**Orthographic camera**~~ — BUILT. ~~equirect / fisheye / cylindrical~~ — BUILT (§0).
+- **Realistic lens** (pbrt multi-element), **polygonal/cat's-eye aperture**, **tilt-shift**,
+  **anamorphic** — still Category-A (pixel+lens); occupants when research calls.
+- **Fisheye circular mask** — v1 fills the frame; a black mask needs a "no-contribution"
+  channel the `Ray` contract lacks. **Cylindrical letterbox** (exact vertical fov + bars) —
+  option B, deliberately not the default (§0 / cylindrical.md).
 - **Curved-space cameras** — the equirect/fisheye in H³/Schwarzschild; the `ambient_*`
-  seam is ready, the spaces are not.
-- **Wider reconstruction filter** (tent/Gaussian) — film-side, not camera.
+  seam is ready, the spaces are not. (Not "cameras" — they come with the ambient geodesic
+  integrator; the existing occupants light up unchanged once it lands.)
+- **Wider reconstruction filter** (tent/Gaussian/Mitchell) — the `pixel/` family's second
+  occupant (§0.1 carved the axis; box is occupant #1).
+- **Category B** (motion-blur shutter time, spectral wavelength) — carried seed fields, not
+  `generateRay` args; gated on scene animation / spectral transport respectively.

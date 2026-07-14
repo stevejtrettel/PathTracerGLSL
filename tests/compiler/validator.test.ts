@@ -100,10 +100,14 @@ describe('Validator', () => {
         expect(run((_s, st) => { st.estimator.accumulation = { type: 'variance' }; }).isEmpty()).toBe(true);
     });
 
-    it('rejects unsupported tonemap types (allows reinhard/none)', () => {
-        expect(run((_s, st) => { st.view.tonemap = { type: 'aces' }; }).getErrors()
+    it('rejects unsupported tonemap types (allows the built roster)', () => {
+        // Registry-driven gate: an out-of-registry type is rejected (cast past the union).
+        expect(run((_s, st) => { st.view.tonemap = { type: 'spectral' } as any; }).getErrors()
             .some(e => e.code === 'invalid-setting' && /tonemap|display/i.test(e.message))).toBe(true);
-        expect(run((_s, st) => { st.view.tonemap = { type: 'none' }; }).isEmpty()).toBe(true);
+        // Every built occupant is accepted (the roster: none/reinhard + aces/agx/khronos/hable/gt).
+        for (const type of ['none', 'reinhard', 'aces', 'agx', 'khronos', 'hable', 'gt'] as const) {
+            expect(run((_s, st) => { st.view.tonemap = { type }; }).isEmpty(), `tonemap '${type}' should be accepted`).toBe(true);
+        }
     });
 
     it('rejects an object referencing an unknown material (with a suggestion)', () => {

@@ -95,10 +95,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -114,19 +115,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -1099,9 +1103,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-analytic-glass-main": [
@@ -1297,7 +1311,7 @@ void main() {
       },
       {
         "endLine": 940,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 914,
       },
     ],
@@ -1480,10 +1494,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -1499,19 +1514,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -2192,9 +2210,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-analytic-minimal-main": [
@@ -2365,7 +2393,7 @@ void main() {
       },
       {
         "endLine": 648,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 622,
       },
     ],
@@ -2562,10 +2590,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -2581,19 +2610,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -3426,9 +3458,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-cornell-main": [
@@ -3604,7 +3646,7 @@ void main() {
       },
       {
         "endLine": 800,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 774,
       },
     ],
@@ -3801,10 +3843,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -3820,19 +3863,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -4682,9 +4728,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-cornell-area-main": [
@@ -4850,7 +4906,7 @@ void main() {
       },
       {
         "endLine": 817,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 791,
       },
     ],
@@ -5047,10 +5103,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -5066,19 +5123,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -6045,9 +6105,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-mis-cornell-area-main": [
@@ -6248,7 +6318,7 @@ void main() {
       },
       {
         "endLine": 934,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 908,
       },
     ],
@@ -6445,10 +6515,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -6464,19 +6535,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -7416,9 +7490,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-cornell-area-main": [
@@ -7609,7 +7693,7 @@ void main() {
       },
       {
         "endLine": 907,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 881,
       },
     ],
@@ -7795,10 +7879,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -7814,19 +7899,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -8753,9 +8841,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-cornell-area-glass-main": [
@@ -8931,7 +9029,7 @@ void main() {
       },
       {
         "endLine": 894,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 868,
       },
     ],
@@ -9110,10 +9208,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -9129,19 +9228,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -10185,9 +10287,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-mis-cornell-area-glass-main": [
@@ -10398,7 +10510,7 @@ void main() {
       },
       {
         "endLine": 1011,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 985,
       },
     ],
@@ -10577,10 +10689,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -10596,19 +10709,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -11625,9 +11741,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-cornell-area-glass-main": [
@@ -11828,7 +11954,7 @@ void main() {
       },
       {
         "endLine": 984,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 958,
       },
     ],
@@ -11996,10 +12122,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -12015,19 +12142,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -12936,9 +13066,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-cornell-glass-main": [
@@ -13124,7 +13264,7 @@ void main() {
       },
       {
         "endLine": 876,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 850,
       },
     ],
@@ -13285,10 +13425,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -13304,19 +13445,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -14080,9 +14224,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-eta-main": [
@@ -14243,7 +14397,7 @@ void main() {
       },
       {
         "endLine": 731,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 705,
       },
     ],
@@ -14426,10 +14580,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -14445,19 +14600,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -15508,9 +15666,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-fog-area-main": [
@@ -15721,7 +15889,7 @@ void main() {
       },
       {
         "endLine": 1018,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 992,
       },
     ],
@@ -15918,10 +16086,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -15937,19 +16106,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -17172,9 +17344,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-mis-fog-area-main": [
@@ -17430,7 +17612,7 @@ void main() {
       },
       {
         "endLine": 1190,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 1164,
       },
     ],
@@ -17627,10 +17809,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -17646,19 +17829,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -18852,9 +19038,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-fog-area-main": [
@@ -19100,7 +19296,7 @@ void main() {
       },
       {
         "endLine": 1161,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 1135,
       },
     ],
@@ -19297,10 +19493,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -19316,19 +19513,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -20393,9 +20593,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-fog-panel-main": [
@@ -20606,7 +20816,7 @@ void main() {
       },
       {
         "endLine": 1032,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 1006,
       },
     ],
@@ -20803,10 +21013,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -20822,19 +21033,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -22042,9 +22256,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-fog-panel-main": [
@@ -22290,7 +22514,7 @@ void main() {
       },
       {
         "endLine": 1175,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 1149,
       },
     ],
@@ -22465,10 +22689,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -22484,19 +22709,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -23272,9 +23500,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-fogcube-main": [
@@ -23455,7 +23693,7 @@ void main() {
       },
       {
         "endLine": 743,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 717,
       },
     ],
@@ -23616,10 +23854,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -23635,19 +23874,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -24370,9 +24612,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "furnace-furnace-main": [
@@ -24523,7 +24775,7 @@ void main() {
       },
       {
         "endLine": 690,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 664,
       },
     ],
@@ -24696,10 +24948,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -24715,19 +24968,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -25467,9 +25723,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "furnace-var-furnace-main": [
@@ -25620,7 +25886,7 @@ void main() {
       },
       {
         "endLine": 707,
-        "origin": "components/film/accumulate_variance/accumulate_variance.glsl",
+        "origin": "components/accumulator/variance/variance.glsl",
         "startLine": 666,
       },
     ],
@@ -25781,10 +26047,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -25800,19 +26067,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -26735,9 +27005,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "furnace-scatter-furnace-scatter-main": [
@@ -26933,7 +27213,7 @@ void main() {
       },
       {
         "endLine": 890,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 864,
       },
     ],
@@ -27127,11 +27407,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Raw Display Pass (tonemap: 'none')
-// Linear radiance straight to the canvas — no tonemap, no sRGB. This is the display mode
-// the §11 on-screen radiance checks need: what you probe is what the accumulator holds
-// (clamped to [0,1] only by the 8-bit target itself). NaN/Inf sanitized like the tonemapped path.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated display header.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -27140,12 +27420,29 @@ vec3 safe_color(vec3 c) {
     return c;
 }
 
+vec3 linear_to_srgb(vec3 c) {
+    vec3 lo = 12.92 * c;
+    vec3 hi = 1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055;
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    return mix(hi, lo, vec3(cutoff));
+}
+
+// tonemap 'none' — identity curve (raw linear passthrough).
+// The display main() applies NO sRGB encode for this occupant (encodesToDisplay=false)
+// and exposure is forced to 1.0, so what §11 on-screen radiance probes read is exactly
+// what the accumulator holds (clamped to [0,1] only by the 8-bit target). NaN/Inf and
+// negatives are sanitized by the shared safe_color() in the display glue.
+
+vec3 none_curve(vec3 x) {
+    return x;
+}
+
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    fragColor = vec4(safe_color(radiance) * DISPLAY_EXPOSURE, 1.0);
-}
-",
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = none_curve(color);
+    fragColor = vec4(color, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -27822,9 +28119,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 27,
-        "origin": "components/film/tonemap_none/tonemap_none.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 38,
+        "origin": "components/tonemap/none/none.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 39,
       },
     ],
     "pt-mis-furnace-sky-main": [
@@ -27995,7 +28302,7 @@ void main() {
       },
       {
         "endLine": 644,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 618,
       },
     ],
@@ -28217,11 +28524,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Raw Display Pass (tonemap: 'none')
-// Linear radiance straight to the canvas — no tonemap, no sRGB. This is the display mode
-// the §11 on-screen radiance checks need: what you probe is what the accumulator holds
-// (clamped to [0,1] only by the 8-bit target itself). NaN/Inf sanitized like the tonemapped path.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated display header.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -28230,12 +28537,29 @@ vec3 safe_color(vec3 c) {
     return c;
 }
 
+vec3 linear_to_srgb(vec3 c) {
+    vec3 lo = 12.92 * c;
+    vec3 hi = 1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055;
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    return mix(hi, lo, vec3(cutoff));
+}
+
+// tonemap 'none' — identity curve (raw linear passthrough).
+// The display main() applies NO sRGB encode for this occupant (encodesToDisplay=false)
+// and exposure is forced to 1.0, so what §11 on-screen radiance probes read is exactly
+// what the accumulator holds (clamped to [0,1] only by the 8-bit target). NaN/Inf and
+// negatives are sanitized by the shared safe_color() in the display glue.
+
+vec3 none_curve(vec3 x) {
+    return x;
+}
+
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    fragColor = vec4(safe_color(radiance) * DISPLAY_EXPOSURE, 1.0);
-}
-",
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = none_curve(color);
+    fragColor = vec4(color, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -28894,9 +29218,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 27,
-        "origin": "components/film/tonemap_none/tonemap_none.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 38,
+        "origin": "components/tonemap/none/none.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 39,
       },
     ],
     "pt-nee-furnace-sky-main": [
@@ -29062,7 +29396,7 @@ void main() {
       },
       {
         "endLine": 626,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 600,
       },
     ],
@@ -29262,10 +29596,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -29281,19 +29616,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -30241,9 +30579,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-haze-main": [
@@ -30444,7 +30792,7 @@ void main() {
       },
       {
         "endLine": 915,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 889,
       },
     ],
@@ -30623,10 +30971,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -30642,19 +30991,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -31725,9 +32077,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-haze-main": [
@@ -31958,7 +32320,7 @@ void main() {
       },
       {
         "endLine": 1038,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 1012,
       },
     ],
@@ -32170,10 +32532,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -32189,19 +32552,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -33166,9 +33532,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-noscatter-marble-main": [
@@ -33374,7 +33750,7 @@ void main() {
       },
       {
         "endLine": 932,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 906,
       },
     ],
@@ -33607,10 +33983,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -33626,19 +34003,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -34712,9 +35092,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-marble-main": [
@@ -34935,7 +35325,7 @@ void main() {
       },
       {
         "endLine": 1041,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 1015,
       },
     ],
@@ -35146,10 +35536,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -35165,19 +35556,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -35934,9 +36328,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "direct-minimal-main": [
@@ -36107,7 +36511,7 @@ void main() {
       },
       {
         "endLine": 724,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 698,
       },
     ],
@@ -36304,10 +36708,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -36323,19 +36728,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -37101,9 +37509,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-minimal-main": [
@@ -37279,7 +37697,7 @@ void main() {
       },
       {
         "endLine": 733,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 707,
       },
     ],
@@ -37487,10 +37905,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -37506,19 +37925,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -38627,9 +39049,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-mist-main": [
@@ -38860,7 +39292,7 @@ void main() {
       },
       {
         "endLine": 1076,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 1050,
       },
     ],
@@ -39064,10 +39496,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -39083,19 +39516,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -39940,9 +40376,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-mixed-main": [
@@ -40128,7 +40574,7 @@ void main() {
       },
       {
         "endLine": 812,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 786,
       },
     ],
@@ -40325,10 +40771,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -40344,19 +40791,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -41224,9 +41674,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-orb-main": [
@@ -41402,7 +41862,7 @@ void main() {
       },
       {
         "endLine": 835,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 809,
       },
     ],
@@ -41599,10 +42059,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -41618,19 +42079,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -42603,9 +43067,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-orb-main": [
@@ -42806,7 +43280,7 @@ void main() {
       },
       {
         "endLine": 940,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 914,
       },
     ],
@@ -43016,10 +43490,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -43035,19 +43510,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -43652,7 +44130,7 @@ vec3 env_rotate_y(vec3 d, float a) {
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
-// (The reference hdri-importance.glsl had them BOTH adding — env-plan pitfall 1. Do not "fix"
+// (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
 // Convention: v = 0 at the +Y pole (θ = acos(y)); the u seam at φ = ±π wraps via the env
 // map's REPEAT wrap mode. Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the
@@ -43941,9 +44419,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-mis-comp-proc-sky-main": [
@@ -44139,7 +44627,7 @@ void main() {
       },
       {
         "endLine": 861,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 835,
       },
     ],
@@ -44370,10 +44858,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -44389,19 +44878,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -44998,7 +45490,7 @@ vec3 env_rotate_y(vec3 d, float a) {
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
-// (The reference hdri-importance.glsl had them BOTH adding — env-plan pitfall 1. Do not "fix"
+// (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
 // Convention: v = 0 at the +Y pole (θ = acos(y)); the u seam at φ = ±π wraps via the env
 // map's REPEAT wrap mode. Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the
@@ -45277,9 +45769,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-proc-sky-main": [
@@ -45470,7 +45972,7 @@ void main() {
       },
       {
         "endLine": 843,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 817,
       },
     ],
@@ -45702,10 +46204,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -45721,19 +46224,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -46308,7 +46814,7 @@ vec3 env_rotate_y(vec3 d, float a) {
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
-// (The reference hdri-importance.glsl had them BOTH adding — env-plan pitfall 1. Do not "fix"
+// (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
 // Convention: v = 0 at the +Y pole (θ = acos(y)); the u seam at φ = ±π wraps via the env
 // map's REPEAT wrap mode. Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the
@@ -46564,9 +47070,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-sky-main": [
@@ -46742,7 +47258,7 @@ void main() {
       },
       {
         "endLine": 798,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 772,
       },
     ],
@@ -46967,10 +47483,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -46986,19 +47503,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -47927,9 +48447,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-mis-oct-sky-main": [
@@ -48125,7 +48655,7 @@ void main() {
       },
       {
         "endLine": 896,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 870,
       },
     ],
@@ -48357,10 +48887,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -48376,19 +48907,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -48986,7 +49520,7 @@ vec3 env_rotate_y(vec3 d, float a) {
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
-// (The reference hdri-importance.glsl had them BOTH adding — env-plan pitfall 1. Do not "fix"
+// (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
 // Convention: v = 0 at the +Y pole (θ = acos(y)); the u seam at φ = ±π wraps via the env
 // map's REPEAT wrap mode. Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the
@@ -49270,9 +49804,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-nee-sky-main": [
@@ -49463,7 +50007,7 @@ void main() {
       },
       {
         "endLine": 849,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 823,
       },
     ],
@@ -49706,10 +50250,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -49725,19 +50270,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -50431,7 +50979,7 @@ vec3 env_rotate_y(vec3 d, float a) {
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
-// (The reference hdri-importance.glsl had them BOTH adding — env-plan pitfall 1. Do not "fix"
+// (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
 // Convention: v = 0 at the +Y pole (θ = acos(y)); the u seam at φ = ±π wraps via the env
 // map's REPEAT wrap mode. Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the
@@ -50729,9 +51277,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pt-mis-sky-lamp-main": [
@@ -50942,7 +51500,7 @@ void main() {
       },
       {
         "endLine": 959,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 933,
       },
     ],
@@ -51138,10 +51696,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -51157,19 +51716,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -51945,9 +52507,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-slab-main": [
@@ -52128,7 +52700,7 @@ void main() {
       },
       {
         "endLine": 743,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 717,
       },
     ],
@@ -52289,10 +52861,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -52308,19 +52881,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -53100,9 +53676,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "pathtracer-submerged-main": [
@@ -53263,7 +53849,7 @@ void main() {
       },
       {
         "endLine": 747,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 721,
       },
     ],
@@ -53424,10 +54010,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -53443,19 +54030,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -54237,9 +54827,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "power-two-light-main": [
@@ -54410,7 +55010,7 @@ void main() {
       },
       {
         "endLine": 749,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 723,
       },
     ],
@@ -54571,10 +55171,11 @@ out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
 #define DISPLAY_EXPOSURE 1.0000000
-// Reinhard Tonemapping Display Pass
-// Reads HDR radiance, applies exposure + Reinhard + sRGB, outputs LDR.
-// u_resolution / u_radiance / DISPLAY_EXPOSURE are declared by the generated
-// display header (ShaderBuilder) — this template is tonemap math only.
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
 
 vec3 safe_color(vec3 c) {
     c = max(c, vec3(0.0));
@@ -54590,19 +55191,22 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(hi, lo, vec3(cutoff));
 }
 
-vec3 tonemap_reinhard(vec3 x) {
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
     return x / (1.0 + x);
 }
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 radiance = texture(u_radiance, uv).rgb;
-    vec3 color = safe_color(radiance) * DISPLAY_EXPOSURE;
-    color = tonemap_reinhard(color);
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     fragColor = vec4(color, 1.0);
-}
-",
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -55384,9 +55988,19 @@ void main() {
         "startLine": 1,
       },
       {
-        "endLine": 40,
-        "origin": "components/film/tonemap_reinhard/tonemap_reinhard.glsl",
+        "endLine": 28,
+        "origin": "generate/glsl/display.glsl",
         "startLine": 9,
+      },
+      {
+        "endLine": 37,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 29,
+      },
+      {
+        "endLine": 44,
+        "origin": "generated:display-main",
+        "startLine": 38,
       },
     ],
     "uniform-two-light-main": [
@@ -55557,7 +56171,7 @@ void main() {
       },
       {
         "endLine": 749,
-        "origin": "components/film/accumulate_average/accumulate_average.glsl",
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 723,
       },
     ],
