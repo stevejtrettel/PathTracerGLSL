@@ -12,7 +12,7 @@
 
 import type { RenderPlan } from '../../plan/types.js';
 import type { PlannedUniform } from '../../plan/types.js';
-import type { ParameterMetadata } from '../../../engine/types.js';
+import type { ParameterMetadata } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import envChartEquirectGLSL from '../../../components/env/equirect/equirect.glsl?raw';

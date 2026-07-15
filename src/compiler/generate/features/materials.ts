@@ -5,7 +5,7 @@
 
 import { isGlslExpression, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
-import type { ParameterMetadata } from '../../../engine/types.js';
+import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, paramToUniform } from '../../../components/glsl-format.js';

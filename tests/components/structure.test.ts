@@ -4,7 +4,7 @@
 //   recipe. Documentation of the contract is not optional; it can't silently rot.
 // - 1 component = 1 folder: occupant code files live inside occupant folders, not
 //   loose at family roots (shared family parts — registries, combiner/flags,
-//   sampler_cdf, fullscreen.vert — are the allowed root files).
+//   math_mis, sampler_cdf — are the allowed root files).
 // Per-occupant math docs (<name>.md) are OPTIONAL by decision — some components are
 // implemented first and derived post hoc — so they are deliberately NOT asserted.
 

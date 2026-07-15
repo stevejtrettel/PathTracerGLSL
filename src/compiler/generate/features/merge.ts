@@ -8,7 +8,7 @@
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import type { PlannedUniform } from '../../plan/types.js';
-import type { ParameterMetadata } from '../../../engine/types.js';
+import type { ParameterMetadata } from '../../types.js';
 import type { FeatureContribution, PlannedTexture } from './types.js';
 
 export interface MergedContributions {

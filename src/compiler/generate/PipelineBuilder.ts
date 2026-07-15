@@ -3,7 +3,7 @@
 import type { RenderPipeline, CompiledRenderer } from '../types.js';
 import type { RenderPlan, PlannedUniform } from '../plan/types.js';
 import type { PlannedTexture } from './features/types.js';
-import type { UniformBinding } from '../../engine/types.js';
+import type { UniformBinding } from '../types.js';
 
 export function buildPipeline(rendererId: string, plan: RenderPlan, externTextures: PlannedTexture[] = []): RenderPipeline {
     const planned = plan.pipeline;

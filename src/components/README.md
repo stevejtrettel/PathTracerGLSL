@@ -19,7 +19,7 @@ computes exactly that and nothing else.
 
 - **1 component = 1 folder**: `{name.glsl, name.ts (descriptor/glue), name.md (the
   mathematics — optional, encouraged), tests}`. Shared family parts (registries,
-  combiner/flags, sampler_cdf, fullscreen.vert) sit at family roots.
+  combiner/flags, math_mis, sampler_cdf) sit at family roots.
 - **Leaf layer**: components import NOTHING from app/engine/compiler except contract
   types (`import type` only) — enforced by `tests/components/purity.test.ts`.
 - **THE GUARDRAIL**: a descriptor (and a math doc) states facts about ONE occupant —

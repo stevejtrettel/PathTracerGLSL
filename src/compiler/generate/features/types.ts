@@ -8,7 +8,7 @@
 
 import type { ShaderBlock } from '../ShaderIR.js';
 import type { PlannedUniform } from '../../plan/types.js';
-import type { ParameterMetadata } from '../../../engine/types.js';
+import type { ParameterMetadata } from '../../types.js';
 
 /** An external texture a feature's shader needs (e.g. an environment map). */
 export interface PlannedTexture {
