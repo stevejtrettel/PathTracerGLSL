@@ -3247,6 +3247,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "models": [
       "hg",
       "rayleigh",
+      "draine",
     ],
     "nullInterfaces": true,
     "present": true,

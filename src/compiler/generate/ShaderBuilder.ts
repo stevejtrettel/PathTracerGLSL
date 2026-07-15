@@ -8,12 +8,12 @@ import { assembleBlocks } from './ShaderIR.js';
 import type { MergedContributions } from './features/merge.js';
 
 // Display components assembled by the Generator itself (not a swappable feature).
-// fullscreen.vert + display.glsl are compiler-owned plumbing/math: fullscreen.vert is
-// used by every pass (main/display/bake); display.glsl holds the shared safe_color +
+// fullscreen.vert + display.glsl are fixed plumbing/math (glsl/shared/): fullscreen.vert
+// is used by every pass (main/display/bake); display.glsl holds the shared safe_color +
 // sRGB OETF. Tonemap occupants (the tone CURVE only) come from the tonemap registry.
-import fullscreenVertGLSL from './glsl/fullscreen.vert.glsl?raw';
-import displayMathGLSL from './glsl/display.glsl?raw';
-import blueNoiseGLSL from './glsl/noise.glsl?raw';
+import fullscreenVertGLSL from '../../glsl/shared/fullscreen.vert.glsl?raw';
+import displayMathGLSL from '../../glsl/shared/display.glsl?raw';
+import blueNoiseGLSL from '../../glsl/shared/noise.glsl?raw';
 import { tonemapModel, type TonemapDescriptor } from '../../components/tonemap/index.js';
 
 export interface ShaderBuildResult {
@@ -28,7 +28,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
     // Vertex shader (shared)
     const vertexAssembled = assembleBlocks([
         { origin: 'generated:version', source: '#version 300 es' },
-        { origin: 'generate/glsl/fullscreen.vert.glsl', source: fullscreenVertGLSL },
+        { origin: 'glsl/shared/fullscreen.vert.glsl', source: fullscreenVertGLSL },
     ]);
 
     // Pathtracer fragment — from the feature contributions merged in section order (§2.10)
@@ -93,8 +93,8 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
     ].join('\n');
     return [
         { origin: 'generated:display-header', source: header },
-        { origin: 'generate/glsl/display.glsl', source: displayMathGLSL },
-        ...(dither ? [{ origin: 'generate/glsl/noise.glsl', source: blueNoiseGLSL }] : []),
+        { origin: 'glsl/shared/display.glsl', source: displayMathGLSL },
+        ...(dither ? [{ origin: 'glsl/shared/noise.glsl', source: blueNoiseGLSL }] : []),
         { origin: model.origin, source: model.glsl },
         { origin: 'generated:display-main', source: buildDisplayMain(model) },
     ];

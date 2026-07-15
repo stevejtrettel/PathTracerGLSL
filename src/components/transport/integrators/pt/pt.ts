@@ -16,7 +16,7 @@
 // core (ray/throughput/radiance); every program-dependent field is behind generated
 // functions. The WALK is generated, so it may touch its own fields freely.
 
-import type { RenderPlan, ProgramDescription } from '../../../../compiler/plan/types.js';
+import type { ProgramDescription } from '../../../../compiler/plan/types.js';
 import type { ShaderBlock } from '../../../../compiler/generate/ShaderIR.js';
 import type { FeatureContribution } from '../../../../compiler/generate/features/types.js';
 import { flags, type Flags } from '../../flags.js';
@@ -26,9 +26,9 @@ import {
 } from '../../techniques/kernel/kernel.js';
 import { lightBlocks, lightRequires } from '../../techniques/light/light.js';
 import { equiangularBlocks, equiangularRequires } from '../../techniques/equiangular/equiangular.js';
+import mathMisGLSL from '../../math_mis.glsl?raw';
 
-export function contributeTransport(plan: RenderPlan): FeatureContribution {
-    const program = plan.program;
+export function contributeTransport(program: ProgramDescription): FeatureContribution {
     const f = flags(program);
 
     const blocks: ShaderBlock[] = [
@@ -36,6 +36,10 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
         combinerFns(f),
         kernelRecordFn(f),
     ];
+    // MIS math (β=2 power heuristic) — transport family property: its only callers are
+    // the combiner-emitted weights. Included iff the estimator is 'mis'; position-safe
+    // because `provides` forward-declares it in the generated interface header.
+    if (f.mis) blocks.push({ origin: 'components/transport/math_mis.glsl', source: mathMisGLSL });
     if (f.rr) blocks.push(roulette(f));
     blocks.push(...kernelBlocks(f), ...lightBlocks(f), ...equiangularBlocks(f), walk(program, f));
 
@@ -48,7 +52,10 @@ export function contributeTransport(plan: RenderPlan): FeatureContribution {
         uniforms: [],
         parameters: {},
         textures: [],
-        provides: [{ name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' }],
+        provides: [
+            { name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' },
+            ...(f.mis ? [{ name: 'power_heuristic', signature: 'float power_heuristic(float pf, float pg)' }] : []),
+        ],
         requires: [...walkRequires(f), ...kernelRequires(f), ...lightRequires(f), ...equiangularRequires(f)],
     };
 }

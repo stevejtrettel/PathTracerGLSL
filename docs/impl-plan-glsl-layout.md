@@ -1,7 +1,17 @@
-# NOTE — GLSL/math layout cleanup (deferred)
+# NOTE — GLSL/math layout cleanup
 
-**Status:** PARKED (Jul 14 2026). Captured mid-blue-noise so we don't lose it; do NOT
-act now. Revisit as a standalone cleanup, not mixed with feature work.
+**Status:** BUILT (Jul 15 2026), with one owner-decided deviation from the sketch below:
+`math_mis.glsl` went to the **transport family root** (its only callers are
+combiner-emitted weights; conditional inclusion + the `power_heuristic` `provides` seam
+moved into `contributeTransport`), NOT to `glsl/core/` — after the audit showed it was
+one estimator's math misfiled in core. Also landed: `contributeTransport(plan)` narrowed
+to `(program: ProgramDescription)` (it read only `plan.program`), so no component imports
+`RenderPlan` anymore. The `src/math/` items below had already been resolved separately
+(vector3 → `app/utils/`, dead RNG GLSL deleted). Proof: dump diff token-identical except
+provenance strings + the interface-header forward declaration; 623 vitest green
+(glslang on all pairs); snapshots re-goldened.
+
+The original parked note, for provenance:
 
 ## What feels wrong
 

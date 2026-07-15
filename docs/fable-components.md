@@ -81,8 +81,10 @@ has a `UIComponent` base class — different tree, no confusion expected.
 **What is deliberately NOT a component:** `glsl/core/` (structs, interaction, math, rng
 plumbing, ray) — the contract spine every component is written against. It has no
 alternatives by construction; placing it under components would suggest otherwise. It
-stays in the compiler. *(The rng GENERATOR body moves out into the sampler family; the
-rng call-surface `rng_init/random/random2` is core contract.)*
+lives at top-level `src/glsl/core/` (July 2026 layout reorg — fixed GLSL is data the
+compiler assembles, not generation logic; `src/glsl/shared/` holds the non-spine fixed
+plumbing). *(The rng GENERATOR body moves out into the sampler family; the rng
+call-surface `rng_init/random/random2` is core contract.)*
 
 ## 4. The tree
 

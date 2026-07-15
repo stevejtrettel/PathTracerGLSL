@@ -40,7 +40,7 @@ export function collectFeatures(plan: RenderPlan, bag: DiagnosticBag): MergedCon
         contributePixel(plan),
         contributeCamera(plan, bag),
         contributeEnvironment(plan, bag),
-        contributeTransport(plan),
+        contributeTransport(plan.program),
         contributeAccumulation(plan, bag),
     ];
     // Interface header after core (its prototypes reference core's struct types).

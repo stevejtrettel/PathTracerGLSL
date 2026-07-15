@@ -40,5 +40,5 @@ test caught a missed second gate once; keep both in sync when adding an occupant
 
 The downstream display transfer (tonemap curve → screen/PNG) is a SEPARATE family,
 `tonemap/` (view). The shared `gl_VertexID` fullscreen-triangle vertex shader is
-compiler-owned plumbing at `src/compiler/generate/glsl/fullscreen.vert.glsl` (every pass
+fixed plumbing at `src/glsl/shared/fullscreen.vert.glsl` (every pass
 uses it — main/display/bake), no longer a family-root file here.

@@ -344,7 +344,10 @@ function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Ve
 
 function generateMediumProperties(materials: PlannedMaterial[], models: string[]): string {
     const withMedium = materials.filter((m) => m.medium !== null);
-    const hasModel = models.length > 0;   // the `model` field exists only when scattering is live
+    const hasModel = models.length > 0;         // the `model` field exists only when scattering is live
+    const hasDraine = models.includes('draine'); // draine_d field exists only when draine is present
+    // NOTE: field-set is hardcoded per known schema field (phase_g/draine_d), matching the
+    // current style; generalizing to iterate present models' schemas is the clean follow-up.
     const lines: string[] = ['// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)'];
     lines.push('MediumProperties scene_medium_properties(int mat, vec3 p) {');
     lines.push('    MediumProperties m;');
@@ -352,6 +355,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
     lines.push('    m.sigma_s = SPECTRUM_ZERO;');
     lines.push('    m.phase_g = 0.0;');
     if (hasModel) lines.push('    m.model = 0;');
+    if (hasDraine) lines.push('    m.draine_d = 10.0;');
     for (let i = 0; i < withMedium.length; i++) {
         const mat = withMedium[i];
         const med = mat.medium!;
@@ -360,6 +364,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
         lines.push(`        m.sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatSpectrum)};`);
         lines.push(`        m.sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatSpectrum)};`);
         lines.push(`        m.phase_g = ${mediumPropertyExpr(med.phase_g, 'phase_g', formatFloat)};`);
+        if (hasDraine) lines.push(`        m.draine_d = ${mediumPropertyExpr(med.draine_d, 'draine_d', formatFloat)};`);
         if (hasModel) lines.push(`        m.model = ${models.indexOf(med.model)};   // '${med.model}'`);
         lines.push('    }');
     }

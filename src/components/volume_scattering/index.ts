@@ -5,10 +5,12 @@
 import type { PhaseModelDescriptor } from '../descriptors.js';
 import { hgDescriptor } from './hg/hg.js';
 import { rayleighDescriptor } from './rayleigh/rayleigh.js';
+import { draineDescriptor } from './draine/draine.js';
 
 export const PHASE_MODELS: Record<string, PhaseModelDescriptor> = {
     hg: hgDescriptor,
     rayleigh: rayleighDescriptor,
+    draine: draineDescriptor,
 };
 
 /** True iff the volume scattering model has a live occupant — the Validator's gate. */

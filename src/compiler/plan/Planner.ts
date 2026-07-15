@@ -34,6 +34,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 sigma_a: resolveColorProperty(mat.medium.sigma_a, [0.0, 0.0, 0.0]),
                 sigma_s: resolveColorProperty(mat.medium.sigma_s, [0.0, 0.0, 0.0]),
                 phase_g: resolveScalarProperty(mat.medium.phase_g, 0.0),
+                draine_d: resolveScalarProperty(mat.medium.draine_d, 10.0),
                 model: mat.medium.model ?? 'hg',
             },
         });

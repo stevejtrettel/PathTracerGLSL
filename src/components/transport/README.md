@@ -9,6 +9,7 @@ fable-transport-glsl-target.md, owner-approved) — four kinds of parts:
 |---|---|---|
 | `techniques/` | **the one-file research axis** | one way of putting samples on a term of the integral |
 | `combiner.ts` (root) | generated glue | every weighting line — the partition of unity between techniques; pt/pt-nee/pt-mis are configs of it |
+| `math_mis.glsl` (root) | static shared math | the β=2 power heuristic — called only by combiner-emitted weights; included iff the estimator is `mis`, forward-declared via the `provides` seam |
 | `integrators/` | pick-one | walk skeletons: path advance, state, termination; NO sampling — they compose techniques at event sites |
 | `volume/`, `shadow/` | pick-one bodies | distance sampling (`medium_sample` seam) and shadow-query policies (`shadow_transmittance` seam) |
 

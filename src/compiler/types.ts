@@ -183,9 +183,13 @@ export interface MediumDescription {
     sigma_s?: MaterialProperty;
     /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). Read only by 'hg'. */
     phase_g?: MaterialProperty;
+    /** Water-droplet diameter (µm), read only by 'draine' (HG–Draine approx-Mie). Drives the
+     *  fitted lobe parameters; valid ~5–50µm. Default 10. */
+    draine_d?: MaterialProperty;
     /** The volume's scattering model (which phase function). Default 'hg'. 'rayleigh' is
-     *  parameter-free (molecular/sky; its λ⁻⁴ color is σ_s). Registry: volume_scattering/. */
-    model?: 'hg' | 'rayleigh';
+     *  parameter-free (molecular/sky; its λ⁻⁴ color is σ_s); 'draine' is approx-Mie for
+     *  fog/cloud droplets. Registry: volume_scattering/. */
+    model?: 'hg' | 'rayleigh' | 'draine';
 }
 
 export interface MaterialDescription {

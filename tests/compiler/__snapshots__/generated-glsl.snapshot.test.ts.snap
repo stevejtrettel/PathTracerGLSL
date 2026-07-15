@@ -131,8 +131,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -1142,23 +1141,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-analytic-glass-main": [
@@ -1578,8 +1577,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -2297,23 +2295,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-analytic-minimal-main": [
@@ -2722,8 +2720,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -3593,23 +3590,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-cornell-main": [
@@ -4023,8 +4020,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -4911,23 +4907,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-cornell-area-main": [
@@ -5331,8 +5327,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -5538,14 +5533,6 @@ vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
     return local_dir.x * t + local_dir.y * b + local_dir.z * n;
 }
 
-// MIS math — included by core iff the estimator is 'mis' (commit D of the item-9 split:
-// conditional INCLUSION replaced the ENABLE_MIS preprocessor gate).
-// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
-float power_heuristic(float pf, float pg) {
-    float f2 = pf * pf;
-    return f2 / max(1e-20, f2 + pg * pg);
-}
-
 // sensor 'ideal' — the measurement functional's importance We ≡ 1.
 // We is the ADJOINT of a light's Le: it weights the measured radiance by the sensor's
 // response, so a pixel integrates ∫ h_j · We · L. v1 is the identity sensor (unit
@@ -5631,6 +5618,7 @@ Ray camera_generateRay(vec2 film, vec2 xiLens);
 vec3 environment_radiance(vec3 dir);
 // transport:
 Radiance transport_trace(Ray ray);
+float power_heuristic(float pf, float pg);
 // SDF Primitive Library
 // Provides: sdf_sphere(), sdf_plane(), sdf_box()
 // These are library functions — scene-specific SDF dispatch is generated by the compiler
@@ -6204,6 +6192,15 @@ void kernel_record(inout PathState s, float pdf, Point p, bool is_delta) {
     s.prev_bsdf_pdf = pdf;
     s.prev_p = p;
 }
+// MIS math — transport shared part, included by the integrator iff the estimator is
+// 'mis' (conditional INCLUSION, not preprocessor gating — item-9 commit D). Called only
+// by combiner-emitted weights; forward-declared via the transport \`provides\` seam.
+// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
+float power_heuristic(float pf, float pg) {
+    float f2 = pf * pf;
+    return f2 / max(1e-20, f2 + pg * pg);
+}
+
 // ── Russian roulette (generated): §7.2 — once per iteration, post-weight, both sites ──
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
@@ -6336,23 +6333,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-mis-cornell-area-main": [
@@ -6392,174 +6389,174 @@ void main() {
         "startLine": 140,
       },
       {
-        "endLine": 179,
-        "origin": "glsl/core/math_mis.glsl",
+        "endLine": 185,
+        "origin": "components/sensor/ideal/ideal.glsl",
         "startLine": 172,
       },
       {
-        "endLine": 193,
-        "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 180,
-      },
-      {
-        "endLine": 217,
+        "endLine": 209,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 194,
+        "startLine": 186,
       },
       {
-        "endLine": 237,
+        "endLine": 229,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 218,
+        "startLine": 210,
       },
       {
-        "endLine": 264,
+        "endLine": 257,
         "origin": "generated:interfaces",
-        "startLine": 238,
+        "startLine": 230,
       },
       {
-        "endLine": 281,
+        "endLine": 274,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 265,
+        "startLine": 258,
       },
       {
-        "endLine": 350,
+        "endLine": 343,
         "origin": "generated:sdf-dispatch",
-        "startLine": 282,
+        "startLine": 275,
       },
       {
-        "endLine": 470,
+        "endLine": 463,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 351,
+        "startLine": 344,
       },
       {
-        "endLine": 521,
+        "endLine": 514,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 471,
+        "startLine": 464,
       },
       {
-        "endLine": 540,
+        "endLine": 533,
         "origin": "generated:analytic-dispatch",
-        "startLine": 522,
+        "startLine": 515,
       },
       {
-        "endLine": 553,
+        "endLine": 546,
         "origin": "generated:material-of",
-        "startLine": 541,
+        "startLine": 534,
       },
       {
-        "endLine": 578,
+        "endLine": 571,
         "origin": "generated:scene-region-at",
-        "startLine": 554,
+        "startLine": 547,
       },
       {
-        "endLine": 611,
+        "endLine": 604,
         "origin": "generated:scene-intersect",
-        "startLine": 579,
+        "startLine": 572,
       },
       {
-        "endLine": 637,
+        "endLine": 630,
         "origin": "generated:material-lookup",
-        "startLine": 612,
+        "startLine": 605,
       },
       {
-        "endLine": 675,
+        "endLine": 668,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 638,
+        "startLine": 631,
       },
       {
-        "endLine": 688,
+        "endLine": 681,
         "origin": "generated:interaction-dispatch",
-        "startLine": 676,
+        "startLine": 669,
       },
       {
-        "endLine": 692,
+        "endLine": 685,
         "origin": "generated:nondelta-guard",
-        "startLine": 689,
+        "startLine": 682,
       },
       {
-        "endLine": 696,
+        "endLine": 689,
         "origin": "generated:emissive-table",
-        "startLine": 693,
+        "startLine": 686,
       },
       {
-        "endLine": 711,
+        "endLine": 704,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 697,
+        "startLine": 690,
+      },
+      {
+        "endLine": 733,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 705,
       },
       {
         "endLine": 740,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 712,
+        "origin": "generated:light-sampling",
+        "startLine": 734,
       },
       {
-        "endLine": 747,
-        "origin": "generated:light-sampling",
+        "endLine": 745,
+        "origin": "generated:light-of",
         "startLine": 741,
       },
       {
-        "endLine": 752,
-        "origin": "generated:light-of",
-        "startLine": 748,
-      },
-      {
-        "endLine": 762,
+        "endLine": 755,
         "origin": "generated:lighting-pdf",
-        "startLine": 753,
+        "startLine": 746,
       },
       {
-        "endLine": 770,
+        "endLine": 763,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 763,
+        "startLine": 756,
       },
       {
-        "endLine": 791,
+        "endLine": 784,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 771,
+        "startLine": 764,
       },
       {
-        "endLine": 795,
+        "endLine": 788,
         "origin": "generated:environment",
-        "startLine": 792,
+        "startLine": 785,
       },
       {
-        "endLine": 815,
+        "endLine": 808,
         "origin": "generated:transport/state",
-        "startLine": 796,
+        "startLine": 789,
       },
       {
-        "endLine": 831,
+        "endLine": 824,
         "origin": "generated:transport/combiner",
-        "startLine": 816,
+        "startLine": 809,
       },
       {
-        "endLine": 837,
+        "endLine": 830,
         "origin": "generated:transport/kernel-record",
-        "startLine": 832,
+        "startLine": 825,
       },
       {
-        "endLine": 845,
+        "endLine": 839,
+        "origin": "components/transport/math_mis.glsl",
+        "startLine": 831,
+      },
+      {
+        "endLine": 847,
         "origin": "generated:transport/roulette",
-        "startLine": 838,
+        "startLine": 840,
       },
       {
-        "endLine": 880,
+        "endLine": 882,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 846,
+        "startLine": 848,
       },
       {
-        "endLine": 902,
+        "endLine": 904,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 881,
+        "startLine": 883,
       },
       {
-        "endLine": 921,
+        "endLine": 923,
         "origin": "generated:transport/walk",
-        "startLine": 903,
+        "startLine": 905,
       },
       {
-        "endLine": 948,
+        "endLine": 950,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 922,
+        "startLine": 924,
       },
     ],
   },
@@ -6791,8 +6788,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -7769,23 +7765,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-cornell-area-main": [
@@ -8203,8 +8199,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -9168,23 +9163,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-cornell-area-glass-main": [
@@ -9580,8 +9575,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -9787,14 +9781,6 @@ vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
     return local_dir.x * t + local_dir.y * b + local_dir.z * n;
 }
 
-// MIS math — included by core iff the estimator is 'mis' (commit D of the item-9 split:
-// conditional INCLUSION replaced the ENABLE_MIS preprocessor gate).
-// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
-float power_heuristic(float pf, float pg) {
-    float f2 = pf * pf;
-    return f2 / max(1e-20, f2 + pg * pg);
-}
-
 // sensor 'ideal' — the measurement functional's importance We ≡ 1.
 // We is the ADJOINT of a light's Le: it weights the measured radiance by the sensor's
 // response, so a pixel integrates ∫ h_j · We · L. v1 is the identity sensor (unit
@@ -9881,6 +9867,7 @@ Ray camera_generateRay(vec2 film, vec2 xiLens);
 vec3 environment_radiance(vec3 dir);
 // transport:
 Radiance transport_trace(Ray ray);
+float power_heuristic(float pf, float pg);
 // SDF Primitive Library
 // Provides: sdf_sphere(), sdf_plane(), sdf_box()
 // These are library functions — scene-specific SDF dispatch is generated by the compiler
@@ -10525,6 +10512,15 @@ void kernel_record(inout PathState s, float pdf, Point p, bool is_delta) {
     s.prev_bsdf_pdf = pdf;
     s.prev_p = p;
 }
+// MIS math — transport shared part, included by the integrator iff the estimator is
+// 'mis' (conditional INCLUSION, not preprocessor gating — item-9 commit D). Called only
+// by combiner-emitted weights; forward-declared via the transport \`provides\` seam.
+// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
+float power_heuristic(float pf, float pg) {
+    float f2 = pf * pf;
+    return f2 / max(1e-20, f2 + pg * pg);
+}
+
 // ── Russian roulette (generated): §7.2 — once per iteration, post-weight, both sites ──
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
@@ -10662,23 +10658,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-mis-cornell-area-glass-main": [
@@ -10718,184 +10714,184 @@ void main() {
         "startLine": 140,
       },
       {
-        "endLine": 179,
-        "origin": "glsl/core/math_mis.glsl",
+        "endLine": 185,
+        "origin": "components/sensor/ideal/ideal.glsl",
         "startLine": 172,
       },
       {
-        "endLine": 193,
-        "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 180,
-      },
-      {
-        "endLine": 217,
+        "endLine": 209,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 194,
+        "startLine": 186,
       },
       {
-        "endLine": 237,
+        "endLine": 229,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 218,
+        "startLine": 210,
       },
       {
-        "endLine": 265,
+        "endLine": 258,
         "origin": "generated:interfaces",
-        "startLine": 238,
+        "startLine": 230,
       },
       {
-        "endLine": 282,
+        "endLine": 275,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 266,
+        "startLine": 259,
       },
       {
-        "endLine": 351,
+        "endLine": 344,
         "origin": "generated:sdf-dispatch",
-        "startLine": 283,
+        "startLine": 276,
       },
       {
-        "endLine": 471,
+        "endLine": 464,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 352,
+        "startLine": 345,
       },
       {
-        "endLine": 522,
+        "endLine": 515,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 472,
+        "startLine": 465,
       },
       {
-        "endLine": 541,
+        "endLine": 534,
         "origin": "generated:analytic-dispatch",
-        "startLine": 523,
+        "startLine": 516,
       },
       {
-        "endLine": 554,
+        "endLine": 547,
         "origin": "generated:material-of",
-        "startLine": 542,
+        "startLine": 535,
       },
       {
-        "endLine": 559,
+        "endLine": 552,
         "origin": "generated:ior-of",
-        "startLine": 555,
+        "startLine": 548,
       },
       {
-        "endLine": 584,
+        "endLine": 577,
         "origin": "generated:scene-region-at",
-        "startLine": 560,
+        "startLine": 553,
       },
       {
-        "endLine": 617,
+        "endLine": 610,
         "origin": "generated:scene-intersect",
-        "startLine": 585,
+        "startLine": 578,
       },
       {
-        "endLine": 644,
+        "endLine": 637,
         "origin": "generated:material-lookup",
-        "startLine": 618,
+        "startLine": 611,
       },
       {
-        "endLine": 682,
+        "endLine": 675,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 645,
+        "startLine": 638,
       },
       {
-        "endLine": 740,
+        "endLine": 733,
         "origin": "components/materials/dielectric/dielectric.glsl",
-        "startLine": 683,
+        "startLine": 676,
       },
       {
-        "endLine": 757,
+        "endLine": 750,
         "origin": "generated:interaction-dispatch",
-        "startLine": 741,
+        "startLine": 734,
       },
       {
-        "endLine": 762,
+        "endLine": 755,
         "origin": "generated:nondelta-guard",
-        "startLine": 758,
+        "startLine": 751,
       },
       {
-        "endLine": 766,
+        "endLine": 759,
         "origin": "generated:emissive-table",
-        "startLine": 763,
+        "startLine": 756,
       },
       {
-        "endLine": 781,
+        "endLine": 774,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 767,
+        "startLine": 760,
+      },
+      {
+        "endLine": 803,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 775,
       },
       {
         "endLine": 810,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 782,
+        "origin": "generated:light-sampling",
+        "startLine": 804,
       },
       {
-        "endLine": 817,
-        "origin": "generated:light-sampling",
+        "endLine": 815,
+        "origin": "generated:light-of",
         "startLine": 811,
       },
       {
-        "endLine": 822,
-        "origin": "generated:light-of",
-        "startLine": 818,
-      },
-      {
-        "endLine": 832,
+        "endLine": 825,
         "origin": "generated:lighting-pdf",
-        "startLine": 823,
+        "startLine": 816,
       },
       {
-        "endLine": 840,
+        "endLine": 833,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 833,
+        "startLine": 826,
       },
       {
-        "endLine": 861,
+        "endLine": 854,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 841,
+        "startLine": 834,
       },
       {
-        "endLine": 865,
+        "endLine": 858,
         "origin": "generated:environment",
-        "startLine": 862,
+        "startLine": 855,
       },
       {
-        "endLine": 887,
+        "endLine": 880,
         "origin": "generated:transport/state",
-        "startLine": 866,
+        "startLine": 859,
       },
       {
-        "endLine": 903,
+        "endLine": 896,
         "origin": "generated:transport/combiner",
-        "startLine": 888,
+        "startLine": 881,
       },
       {
-        "endLine": 909,
+        "endLine": 902,
         "origin": "generated:transport/kernel-record",
-        "startLine": 904,
+        "startLine": 897,
       },
       {
-        "endLine": 917,
+        "endLine": 911,
+        "origin": "components/transport/math_mis.glsl",
+        "startLine": 903,
+      },
+      {
+        "endLine": 919,
         "origin": "generated:transport/roulette",
-        "startLine": 910,
+        "startLine": 912,
       },
       {
-        "endLine": 952,
+        "endLine": 954,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 918,
+        "startLine": 920,
       },
       {
-        "endLine": 974,
+        "endLine": 976,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 953,
+        "startLine": 955,
       },
       {
-        "endLine": 998,
+        "endLine": 1000,
         "origin": "generated:transport/walk",
-        "startLine": 975,
+        "startLine": 977,
       },
       {
-        "endLine": 1025,
+        "endLine": 1027,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 999,
+        "startLine": 1001,
       },
     ],
   },
@@ -11109,8 +11105,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -12164,23 +12159,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-cornell-area-glass-main": [
@@ -12590,8 +12585,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -13537,23 +13531,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-cornell-glass-main": [
@@ -13941,8 +13935,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -14743,23 +14736,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-eta-main": [
@@ -15144,8 +15137,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -16246,23 +16238,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-fog-area-main": [
@@ -16716,8 +16708,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -16953,14 +16944,6 @@ vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
 // the item-9 split: conditional INCLUSION replaced the HAS_MEDIA preprocessor gate).
 Spectrum spectrum_exp(Spectrum s) { return exp(s); }   // Beer–Lambert per channel (§2.5: named, no ad-hoc exp(vec3))
 
-// MIS math — included by core iff the estimator is 'mis' (commit D of the item-9 split:
-// conditional INCLUSION replaced the ENABLE_MIS preprocessor gate).
-// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
-float power_heuristic(float pf, float pg) {
-    float f2 = pf * pf;
-    return f2 / max(1e-20, f2 + pg * pg);
-}
-
 // sensor 'ideal' — the measurement functional's importance We ≡ 1.
 // We is the ADJOINT of a light's Le: it weights the measured radiance by the sensor's
 // response, so a pixel integrates ∫ h_j · We · L. v1 is the identity sensor (unit
@@ -17054,6 +17037,7 @@ Ray camera_generateRay(vec2 film, vec2 xiLens);
 vec3 environment_radiance(vec3 dir);
 // transport:
 Radiance transport_trace(Ray ray);
+float power_heuristic(float pf, float pg);
 // SDF Primitive Library
 // Provides: sdf_sphere(), sdf_plane(), sdf_box()
 // These are library functions — scene-specific SDF dispatch is generated by the compiler
@@ -17799,6 +17783,15 @@ void kernel_record(inout PathState s, float pdf, Point p, bool is_delta) {
     s.prev_bsdf_pdf = pdf;
     s.prev_p = p;
 }
+// MIS math — transport shared part, included by the integrator iff the estimator is
+// 'mis' (conditional INCLUSION, not preprocessor gating — item-9 commit D). Called only
+// by combiner-emitted weights; forward-declared via the transport \`provides\` seam.
+// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
+float power_heuristic(float pf, float pg) {
+    float f2 = pf * pf;
+    return f2 / max(1e-20, f2 + pg * pg);
+}
+
 // ── Russian roulette (generated): §7.2 — once per iteration, post-weight, both sites ──
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
@@ -17990,23 +17983,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-mis-fog-area-main": [
@@ -18061,219 +18054,219 @@ void main() {
         "startLine": 198,
       },
       {
-        "endLine": 209,
-        "origin": "glsl/core/math_mis.glsl",
+        "endLine": 215,
+        "origin": "components/sensor/ideal/ideal.glsl",
         "startLine": 202,
       },
       {
-        "endLine": 223,
-        "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 210,
-      },
-      {
-        "endLine": 247,
+        "endLine": 239,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 224,
+        "startLine": 216,
       },
       {
-        "endLine": 267,
+        "endLine": 259,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 248,
+        "startLine": 240,
       },
       {
-        "endLine": 302,
+        "endLine": 295,
         "origin": "generated:interfaces",
-        "startLine": 268,
+        "startLine": 260,
       },
       {
-        "endLine": 319,
+        "endLine": 312,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 303,
+        "startLine": 296,
       },
       {
-        "endLine": 388,
+        "endLine": 381,
         "origin": "generated:sdf-dispatch",
-        "startLine": 320,
+        "startLine": 313,
       },
       {
-        "endLine": 508,
+        "endLine": 501,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 389,
+        "startLine": 382,
       },
       {
-        "endLine": 559,
+        "endLine": 552,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 509,
+        "startLine": 502,
       },
       {
-        "endLine": 578,
+        "endLine": 571,
         "origin": "generated:analytic-dispatch",
-        "startLine": 560,
+        "startLine": 553,
       },
       {
-        "endLine": 591,
+        "endLine": 584,
         "origin": "generated:material-of",
-        "startLine": 579,
+        "startLine": 572,
       },
       {
-        "endLine": 616,
+        "endLine": 609,
         "origin": "generated:scene-region-at",
-        "startLine": 592,
+        "startLine": 585,
       },
       {
-        "endLine": 649,
+        "endLine": 642,
         "origin": "generated:scene-intersect",
-        "startLine": 617,
+        "startLine": 610,
       },
       {
-        "endLine": 675,
+        "endLine": 668,
         "origin": "generated:material-lookup",
-        "startLine": 650,
+        "startLine": 643,
       },
       {
-        "endLine": 713,
+        "endLine": 706,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 676,
+        "startLine": 669,
       },
       {
-        "endLine": 726,
+        "endLine": 719,
         "origin": "generated:interaction-dispatch",
-        "startLine": 714,
+        "startLine": 707,
       },
       {
-        "endLine": 731,
+        "endLine": 724,
         "origin": "generated:nondelta-guard",
-        "startLine": 727,
+        "startLine": 720,
+      },
+      {
+        "endLine": 728,
+        "origin": "generated:emissive-table",
+        "startLine": 725,
       },
       {
         "endLine": 735,
-        "origin": "generated:emissive-table",
-        "startLine": 732,
+        "origin": "generated:media-tables",
+        "startLine": 729,
       },
       {
-        "endLine": 742,
-        "origin": "generated:media-tables",
+        "endLine": 750,
+        "origin": "generated:medium-properties",
         "startLine": 736,
       },
       {
-        "endLine": 757,
-        "origin": "generated:medium-properties",
-        "startLine": 743,
-      },
-      {
-        "endLine": 800,
+        "endLine": 793,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 758,
+        "startLine": 751,
       },
       {
-        "endLine": 843,
+        "endLine": 836,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 801,
+        "startLine": 794,
       },
       {
-        "endLine": 853,
+        "endLine": 846,
         "origin": "generated:medium-dispatch",
-        "startLine": 844,
+        "startLine": 837,
+      },
+      {
+        "endLine": 858,
+        "origin": "generated:medium-sample",
+        "startLine": 847,
       },
       {
         "endLine": 865,
-        "origin": "generated:medium-sample",
-        "startLine": 854,
+        "origin": "generated:medium-transmittance",
+        "startLine": 859,
       },
       {
-        "endLine": 872,
-        "origin": "generated:medium-transmittance",
+        "endLine": 905,
+        "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 866,
       },
       {
-        "endLine": 912,
-        "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 873,
+        "endLine": 934,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 906,
       },
       {
         "endLine": 941,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 913,
+        "origin": "generated:light-sampling",
+        "startLine": 935,
       },
       {
-        "endLine": 948,
-        "origin": "generated:light-sampling",
+        "endLine": 946,
+        "origin": "generated:light-of",
         "startLine": 942,
       },
       {
-        "endLine": 953,
-        "origin": "generated:light-of",
-        "startLine": 949,
-      },
-      {
-        "endLine": 963,
+        "endLine": 956,
         "origin": "generated:lighting-pdf",
-        "startLine": 954,
+        "startLine": 947,
       },
       {
-        "endLine": 971,
+        "endLine": 964,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 964,
+        "startLine": 957,
       },
       {
-        "endLine": 992,
+        "endLine": 985,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 972,
+        "startLine": 965,
       },
       {
-        "endLine": 996,
+        "endLine": 989,
         "origin": "generated:environment",
-        "startLine": 993,
+        "startLine": 986,
       },
       {
-        "endLine": 1020,
+        "endLine": 1013,
         "origin": "generated:transport/state",
-        "startLine": 997,
+        "startLine": 990,
       },
       {
-        "endLine": 1041,
+        "endLine": 1034,
         "origin": "generated:transport/combiner",
-        "startLine": 1021,
+        "startLine": 1014,
       },
       {
-        "endLine": 1047,
+        "endLine": 1040,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1042,
+        "startLine": 1035,
       },
       {
-        "endLine": 1055,
+        "endLine": 1049,
+        "origin": "components/transport/math_mis.glsl",
+        "startLine": 1041,
+      },
+      {
+        "endLine": 1057,
         "origin": "generated:transport/roulette",
-        "startLine": 1048,
+        "startLine": 1050,
       },
       {
-        "endLine": 1090,
+        "endLine": 1092,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1056,
+        "startLine": 1058,
       },
       {
-        "endLine": 1103,
+        "endLine": 1105,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1091,
+        "startLine": 1093,
       },
       {
-        "endLine": 1125,
+        "endLine": 1127,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1104,
+        "startLine": 1106,
       },
       {
-        "endLine": 1140,
+        "endLine": 1142,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1126,
+        "startLine": 1128,
       },
       {
-        "endLine": 1190,
+        "endLine": 1192,
         "origin": "generated:transport/walk",
-        "startLine": 1141,
+        "startLine": 1143,
       },
       {
-        "endLine": 1217,
+        "endLine": 1219,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1191,
+        "startLine": 1193,
       },
     ],
   },
@@ -18505,8 +18498,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -19750,23 +19742,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-fog-area-main": [
@@ -20255,8 +20247,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -21371,23 +21362,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-fog-panel-main": [
@@ -21841,8 +21832,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -23100,23 +23090,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-fog-panel-main": [
@@ -23583,8 +23573,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -24397,23 +24386,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-fogcube-main": [
@@ -24796,8 +24785,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -25557,23 +25545,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "furnace-furnace-main": [
@@ -25938,8 +25926,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -26716,23 +26703,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "furnace-var-furnace-main": [
@@ -27085,8 +27072,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -28059,23 +28045,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "furnace-scatter-furnace-scatter-main": [
@@ -28705,14 +28691,6 @@ vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
     return local_dir.x * t + local_dir.y * b + local_dir.z * n;
 }
 
-// MIS math — included by core iff the estimator is 'mis' (commit D of the item-9 split:
-// conditional INCLUSION replaced the ENABLE_MIS preprocessor gate).
-// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
-float power_heuristic(float pf, float pg) {
-    float f2 = pf * pf;
-    return f2 / max(1e-20, f2 + pg * pg);
-}
-
 // sensor 'ideal' — the measurement functional's importance We ≡ 1.
 // We is the ADJOINT of a light's Le: it weights the measured radiance by the sensor's
 // response, so a pixel integrates ∫ h_j · We · L. v1 is the identity sensor (unit
@@ -28798,6 +28776,7 @@ LightSample environment_sample(Point p, vec2 xi);
 float environment_pdf(vec3 dir);
 // transport:
 Radiance transport_trace(Ray ray);
+float power_heuristic(float pf, float pg);
 // Closed-form ray–primitive intersection — the analytic geometry backend.
 // Straight-ray algebra because the tracer is Euclidean FOR NOW; closed-form geodesic–surface
 // intersection in curved spaces is a later job, not precluded (the abstraction doesn't assume
@@ -29088,6 +29067,15 @@ void kernel_record(inout PathState s, float pdf, Point p, bool is_delta) {
     s.prev_bsdf_pdf = pdf;
     s.prev_p = p;
 }
+// MIS math — transport shared part, included by the integrator iff the estimator is
+// 'mis' (conditional INCLUSION, not preprocessor gating — item-9 commit D). Called only
+// by combiner-emitted weights; forward-declared via the transport \`provides\` seam.
+// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
+float power_heuristic(float pf, float pg) {
+    float f2 = pf * pf;
+    return f2 / max(1e-20, f2 + pg * pg);
+}
+
 // T1 — KERNEL SAMPLING (fable-components §7; emitted shape per fable-transport-glsl-target §3).
 // One draw serves two estimator terms: the recursion's next segment AND a direct-
 // lighting sample scored where it LANDS (the deferred sites below), with the record
@@ -29211,7 +29199,7 @@ void main() {
       },
       {
         "endLine": 28,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 9,
       },
       {
@@ -29262,144 +29250,144 @@ void main() {
         "startLine": 142,
       },
       {
-        "endLine": 181,
-        "origin": "glsl/core/math_mis.glsl",
+        "endLine": 187,
+        "origin": "components/sensor/ideal/ideal.glsl",
         "startLine": 174,
       },
       {
-        "endLine": 195,
-        "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 182,
-      },
-      {
-        "endLine": 219,
+        "endLine": 211,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 196,
+        "startLine": 188,
       },
       {
-        "endLine": 239,
+        "endLine": 231,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 220,
+        "startLine": 212,
       },
       {
-        "endLine": 266,
+        "endLine": 259,
         "origin": "generated:interfaces",
-        "startLine": 240,
+        "startLine": 232,
       },
       {
-        "endLine": 317,
+        "endLine": 310,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 267,
+        "startLine": 260,
       },
       {
-        "endLine": 336,
+        "endLine": 329,
         "origin": "generated:analytic-dispatch",
-        "startLine": 318,
+        "startLine": 311,
       },
       {
-        "endLine": 341,
+        "endLine": 334,
         "origin": "generated:material-of",
-        "startLine": 337,
+        "startLine": 330,
       },
       {
-        "endLine": 350,
+        "endLine": 343,
         "origin": "generated:scene-region-at",
-        "startLine": 342,
+        "startLine": 335,
       },
       {
-        "endLine": 374,
+        "endLine": 367,
         "origin": "generated:scene-intersect",
-        "startLine": 351,
+        "startLine": 344,
       },
       {
-        "endLine": 386,
+        "endLine": 379,
         "origin": "generated:material-lookup",
-        "startLine": 375,
+        "startLine": 368,
       },
       {
-        "endLine": 424,
+        "endLine": 417,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 387,
+        "startLine": 380,
       },
       {
-        "endLine": 437,
+        "endLine": 430,
         "origin": "generated:interaction-dispatch",
-        "startLine": 425,
+        "startLine": 418,
       },
       {
-        "endLine": 441,
+        "endLine": 434,
         "origin": "generated:nondelta-guard",
-        "startLine": 438,
+        "startLine": 431,
       },
       {
-        "endLine": 445,
+        "endLine": 438,
         "origin": "generated:emissive-table",
-        "startLine": 442,
+        "startLine": 435,
       },
       {
-        "endLine": 460,
+        "endLine": 453,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 446,
+        "startLine": 439,
       },
       {
-        "endLine": 464,
+        "endLine": 457,
         "origin": "generated:light-sampling",
-        "startLine": 461,
+        "startLine": 454,
       },
       {
-        "endLine": 472,
+        "endLine": 465,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 465,
+        "startLine": 458,
       },
       {
-        "endLine": 493,
+        "endLine": 486,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 473,
+        "startLine": 466,
       },
       {
-        "endLine": 497,
+        "endLine": 490,
         "origin": "generated:environment",
-        "startLine": 494,
+        "startLine": 487,
       },
       {
-        "endLine": 514,
+        "endLine": 507,
         "origin": "generated:environment-sampler",
-        "startLine": 498,
+        "startLine": 491,
       },
       {
-        "endLine": 534,
+        "endLine": 527,
         "origin": "generated:transport/state",
-        "startLine": 515,
+        "startLine": 508,
       },
       {
-        "endLine": 550,
+        "endLine": 543,
         "origin": "generated:transport/combiner",
-        "startLine": 535,
+        "startLine": 528,
       },
       {
-        "endLine": 556,
+        "endLine": 549,
         "origin": "generated:transport/kernel-record",
-        "startLine": 551,
+        "startLine": 544,
       },
       {
-        "endLine": 591,
+        "endLine": 558,
+        "origin": "components/transport/math_mis.glsl",
+        "startLine": 550,
+      },
+      {
+        "endLine": 593,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 557,
+        "startLine": 559,
       },
       {
-        "endLine": 613,
+        "endLine": 615,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 592,
+        "startLine": 594,
       },
       {
-        "endLine": 631,
+        "endLine": 633,
         "origin": "generated:transport/walk",
-        "startLine": 614,
+        "startLine": 616,
       },
       {
-        "endLine": 658,
+        "endLine": 660,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 632,
+        "startLine": 634,
       },
     ],
   },
@@ -30338,7 +30326,7 @@ void main() {
       },
       {
         "endLine": 28,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 9,
       },
       {
@@ -30756,8 +30744,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -31755,23 +31742,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-haze-main": [
@@ -32197,8 +32184,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -33319,23 +33305,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-haze-main": [
@@ -33824,8 +33810,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -34827,23 +34812,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-noscatter-marble-main": [
@@ -35323,8 +35308,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -36448,23 +36432,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-marble-main": [
@@ -36942,8 +36926,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -37737,23 +37720,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "direct-minimal-main": [
@@ -38162,8 +38145,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -38966,23 +38948,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-minimal-main": [
@@ -39407,8 +39389,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -40567,23 +40548,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-mist-main": [
@@ -41064,8 +41045,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -41947,23 +41927,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-mixed-main": [
@@ -42387,8 +42367,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -43293,23 +43272,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-orb-main": [
@@ -43723,8 +43702,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -44734,23 +44712,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-orb-main": [
@@ -45202,8 +45180,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -45415,14 +45392,6 @@ vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
     return local_dir.x * t + local_dir.y * b + local_dir.z * n;
 }
 
-// MIS math — included by core iff the estimator is 'mis' (commit D of the item-9 split:
-// conditional INCLUSION replaced the ENABLE_MIS preprocessor gate).
-// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
-float power_heuristic(float pf, float pg) {
-    float f2 = pf * pf;
-    return f2 / max(1e-20, f2 + pg * pg);
-}
-
 // sensor 'ideal' — the measurement functional's importance We ≡ 1.
 // We is the ADJOINT of a light's Le: it weights the measured radiance by the sensor's
 // response, so a pixel integrates ∫ h_j · We · L. v1 is the identity sensor (unit
@@ -45509,6 +45478,7 @@ LightSample environment_sample(Point p, vec2 xi);
 float environment_pdf(vec3 dir);
 // transport:
 Radiance transport_trace(Ray ray);
+float power_heuristic(float pf, float pg);
 // Closed-form ray–primitive intersection — the analytic geometry backend.
 // Straight-ray algebra because the tracer is Euclidean FOR NOW; closed-form geodesic–surface
 // intersection in curved spaces is a later job, not precluded (the abstraction doesn't assume
@@ -45997,6 +45967,15 @@ void kernel_record(inout PathState s, float pdf, Point p, bool is_delta) {
     s.prev_bsdf_pdf = pdf;
     s.prev_p = p;
 }
+// MIS math — transport shared part, included by the integrator iff the estimator is
+// 'mis' (conditional INCLUSION, not preprocessor gating — item-9 commit D). Called only
+// by combiner-emitted weights; forward-declared via the transport \`provides\` seam.
+// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
+float power_heuristic(float pf, float pg) {
+    float f2 = pf * pf;
+    return f2 / max(1e-20, f2 + pg * pg);
+}
+
 // ── Russian roulette (generated): §7.2 — once per iteration, post-weight, both sites ──
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
@@ -46134,23 +46113,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-mis-comp-proc-sky-main": [
@@ -46190,169 +46169,169 @@ void main() {
         "startLine": 146,
       },
       {
-        "endLine": 185,
-        "origin": "glsl/core/math_mis.glsl",
+        "endLine": 191,
+        "origin": "components/sensor/ideal/ideal.glsl",
         "startLine": 178,
       },
       {
-        "endLine": 199,
-        "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 186,
-      },
-      {
-        "endLine": 223,
+        "endLine": 215,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 200,
+        "startLine": 192,
       },
       {
-        "endLine": 243,
+        "endLine": 235,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 224,
+        "startLine": 216,
       },
       {
-        "endLine": 271,
+        "endLine": 264,
         "origin": "generated:interfaces",
-        "startLine": 244,
+        "startLine": 236,
       },
       {
-        "endLine": 322,
+        "endLine": 315,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 272,
+        "startLine": 265,
+      },
+      {
+        "endLine": 350,
+        "origin": "generated:analytic-dispatch",
+        "startLine": 316,
       },
       {
         "endLine": 357,
-        "origin": "generated:analytic-dispatch",
-        "startLine": 323,
+        "origin": "generated:material-of",
+        "startLine": 351,
       },
       {
-        "endLine": 364,
-        "origin": "generated:material-of",
+        "endLine": 362,
+        "origin": "generated:ior-of",
         "startLine": 358,
       },
       {
-        "endLine": 369,
-        "origin": "generated:ior-of",
-        "startLine": 365,
-      },
-      {
-        "endLine": 382,
+        "endLine": 375,
         "origin": "generated:scene-region-at",
-        "startLine": 370,
+        "startLine": 363,
       },
       {
-        "endLine": 406,
+        "endLine": 399,
         "origin": "generated:scene-intersect",
-        "startLine": 383,
+        "startLine": 376,
       },
       {
-        "endLine": 425,
+        "endLine": 418,
         "origin": "generated:material-lookup",
-        "startLine": 407,
+        "startLine": 400,
       },
       {
-        "endLine": 463,
+        "endLine": 456,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 426,
+        "startLine": 419,
       },
       {
-        "endLine": 521,
+        "endLine": 514,
         "origin": "components/materials/dielectric/dielectric.glsl",
-        "startLine": 464,
+        "startLine": 457,
       },
       {
-        "endLine": 538,
+        "endLine": 531,
         "origin": "generated:interaction-dispatch",
-        "startLine": 522,
+        "startLine": 515,
       },
       {
-        "endLine": 543,
+        "endLine": 536,
         "origin": "generated:nondelta-guard",
-        "startLine": 539,
+        "startLine": 532,
       },
       {
-        "endLine": 547,
+        "endLine": 540,
         "origin": "generated:emissive-table",
-        "startLine": 544,
+        "startLine": 537,
       },
       {
-        "endLine": 562,
+        "endLine": 555,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 548,
+        "startLine": 541,
       },
       {
-        "endLine": 566,
+        "endLine": 559,
         "origin": "generated:light-sampling",
-        "startLine": 563,
+        "startLine": 556,
       },
       {
-        "endLine": 574,
+        "endLine": 567,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 567,
+        "startLine": 560,
       },
       {
-        "endLine": 595,
+        "endLine": 588,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 575,
+        "startLine": 568,
       },
       {
-        "endLine": 600,
+        "endLine": 593,
         "origin": "generated:env-rotate",
-        "startLine": 596,
+        "startLine": 589,
       },
       {
-        "endLine": 635,
+        "endLine": 628,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 601,
+        "startLine": 594,
       },
       {
-        "endLine": 640,
+        "endLine": 633,
         "origin": "generated:environment",
-        "startLine": 636,
+        "startLine": 629,
       },
       {
-        "endLine": 715,
+        "endLine": 708,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 641,
+        "startLine": 634,
       },
       {
-        "endLine": 737,
+        "endLine": 730,
         "origin": "generated:transport/state",
-        "startLine": 716,
+        "startLine": 709,
       },
       {
-        "endLine": 753,
+        "endLine": 746,
         "origin": "generated:transport/combiner",
-        "startLine": 738,
+        "startLine": 731,
       },
       {
-        "endLine": 759,
+        "endLine": 752,
         "origin": "generated:transport/kernel-record",
-        "startLine": 754,
+        "startLine": 747,
       },
       {
-        "endLine": 767,
+        "endLine": 761,
+        "origin": "components/transport/math_mis.glsl",
+        "startLine": 753,
+      },
+      {
+        "endLine": 769,
         "origin": "generated:transport/roulette",
-        "startLine": 760,
+        "startLine": 762,
       },
       {
-        "endLine": 802,
+        "endLine": 804,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 768,
+        "startLine": 770,
       },
       {
-        "endLine": 824,
+        "endLine": 826,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 803,
+        "startLine": 805,
       },
       {
-        "endLine": 848,
+        "endLine": 850,
         "origin": "generated:transport/walk",
-        "startLine": 825,
+        "startLine": 827,
       },
       {
-        "endLine": 875,
+        "endLine": 877,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 849,
+        "startLine": 851,
       },
     ],
   },
@@ -46618,8 +46597,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -47532,23 +47510,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-proc-sky-main": [
@@ -48012,8 +47990,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -48881,23 +48858,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-sky-main": [
@@ -49339,8 +49316,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -49553,14 +49529,6 @@ vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
     return local_dir.x * t + local_dir.y * b + local_dir.z * n;
 }
 
-// MIS math — included by core iff the estimator is 'mis' (commit D of the item-9 split:
-// conditional INCLUSION replaced the ENABLE_MIS preprocessor gate).
-// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
-float power_heuristic(float pf, float pg) {
-    float f2 = pf * pf;
-    return f2 / max(1e-20, f2 + pg * pg);
-}
-
 // sensor 'ideal' — the measurement functional's importance We ≡ 1.
 // We is the ADJOINT of a light's Le: it weights the measured radiance by the sensor's
 // response, so a pixel integrates ∫ h_j · We · L. v1 is the identity sensor (unit
@@ -49647,6 +49615,7 @@ LightSample environment_sample(Point p, vec2 xi);
 float environment_pdf(vec3 dir);
 // transport:
 Radiance transport_trace(Ray ray);
+float power_heuristic(float pf, float pg);
 // Closed-form ray–primitive intersection — the analytic geometry backend.
 // Straight-ray algebra because the tracer is Euclidean FOR NOW; closed-form geodesic–surface
 // intersection in curved spaces is a later job, not precluded (the abstraction doesn't assume
@@ -50169,6 +50138,15 @@ void kernel_record(inout PathState s, float pdf, Point p, bool is_delta) {
     s.prev_bsdf_pdf = pdf;
     s.prev_p = p;
 }
+// MIS math — transport shared part, included by the integrator iff the estimator is
+// 'mis' (conditional INCLUSION, not preprocessor gating — item-9 commit D). Called only
+// by combiner-emitted weights; forward-declared via the transport \`provides\` seam.
+// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
+float power_heuristic(float pf, float pg) {
+    float f2 = pf * pf;
+    return f2 / max(1e-20, f2 + pg * pg);
+}
+
 // ── Russian roulette (generated): §7.2 — once per iteration, post-weight, both sites ──
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
@@ -50306,23 +50284,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-mis-oct-sky-main": [
@@ -50362,169 +50340,169 @@ void main() {
         "startLine": 147,
       },
       {
-        "endLine": 186,
-        "origin": "glsl/core/math_mis.glsl",
+        "endLine": 192,
+        "origin": "components/sensor/ideal/ideal.glsl",
         "startLine": 179,
       },
       {
-        "endLine": 200,
-        "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 187,
-      },
-      {
-        "endLine": 224,
+        "endLine": 216,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 201,
+        "startLine": 193,
       },
       {
-        "endLine": 244,
+        "endLine": 236,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 225,
+        "startLine": 217,
       },
       {
-        "endLine": 272,
+        "endLine": 265,
         "origin": "generated:interfaces",
-        "startLine": 245,
+        "startLine": 237,
       },
       {
-        "endLine": 323,
+        "endLine": 316,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 273,
+        "startLine": 266,
+      },
+      {
+        "endLine": 351,
+        "origin": "generated:analytic-dispatch",
+        "startLine": 317,
       },
       {
         "endLine": 358,
-        "origin": "generated:analytic-dispatch",
-        "startLine": 324,
+        "origin": "generated:material-of",
+        "startLine": 352,
       },
       {
-        "endLine": 365,
-        "origin": "generated:material-of",
+        "endLine": 363,
+        "origin": "generated:ior-of",
         "startLine": 359,
       },
       {
-        "endLine": 370,
-        "origin": "generated:ior-of",
-        "startLine": 366,
-      },
-      {
-        "endLine": 383,
+        "endLine": 376,
         "origin": "generated:scene-region-at",
-        "startLine": 371,
+        "startLine": 364,
       },
       {
-        "endLine": 407,
+        "endLine": 400,
         "origin": "generated:scene-intersect",
-        "startLine": 384,
+        "startLine": 377,
       },
       {
-        "endLine": 426,
+        "endLine": 419,
         "origin": "generated:material-lookup",
-        "startLine": 408,
+        "startLine": 401,
       },
       {
-        "endLine": 464,
+        "endLine": 457,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 427,
+        "startLine": 420,
       },
       {
-        "endLine": 522,
+        "endLine": 515,
         "origin": "components/materials/dielectric/dielectric.glsl",
-        "startLine": 465,
+        "startLine": 458,
       },
       {
-        "endLine": 539,
+        "endLine": 532,
         "origin": "generated:interaction-dispatch",
-        "startLine": 523,
+        "startLine": 516,
       },
       {
-        "endLine": 544,
+        "endLine": 537,
         "origin": "generated:nondelta-guard",
-        "startLine": 540,
+        "startLine": 533,
       },
       {
-        "endLine": 548,
+        "endLine": 541,
         "origin": "generated:emissive-table",
-        "startLine": 545,
+        "startLine": 538,
       },
       {
-        "endLine": 563,
+        "endLine": 556,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 549,
+        "startLine": 542,
       },
       {
-        "endLine": 567,
+        "endLine": 560,
         "origin": "generated:light-sampling",
-        "startLine": 564,
+        "startLine": 557,
       },
       {
-        "endLine": 575,
+        "endLine": 568,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 568,
+        "startLine": 561,
       },
       {
-        "endLine": 596,
+        "endLine": 589,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 576,
+        "startLine": 569,
       },
       {
-        "endLine": 601,
+        "endLine": 594,
         "origin": "generated:env-rotate",
-        "startLine": 597,
+        "startLine": 590,
       },
       {
-        "endLine": 665,
+        "endLine": 658,
         "origin": "components/env/octahedral/octahedral.glsl",
-        "startLine": 602,
+        "startLine": 595,
       },
       {
-        "endLine": 675,
+        "endLine": 668,
         "origin": "generated:environment",
-        "startLine": 666,
+        "startLine": 659,
       },
       {
-        "endLine": 750,
+        "endLine": 743,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 676,
+        "startLine": 669,
       },
       {
-        "endLine": 772,
+        "endLine": 765,
         "origin": "generated:transport/state",
-        "startLine": 751,
+        "startLine": 744,
       },
       {
-        "endLine": 788,
+        "endLine": 781,
         "origin": "generated:transport/combiner",
-        "startLine": 773,
+        "startLine": 766,
       },
       {
-        "endLine": 794,
+        "endLine": 787,
         "origin": "generated:transport/kernel-record",
-        "startLine": 789,
+        "startLine": 782,
       },
       {
-        "endLine": 802,
+        "endLine": 796,
+        "origin": "components/transport/math_mis.glsl",
+        "startLine": 788,
+      },
+      {
+        "endLine": 804,
         "origin": "generated:transport/roulette",
-        "startLine": 795,
+        "startLine": 797,
       },
       {
-        "endLine": 837,
+        "endLine": 839,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 803,
+        "startLine": 805,
       },
       {
-        "endLine": 859,
+        "endLine": 861,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 838,
+        "startLine": 840,
       },
       {
-        "endLine": 883,
+        "endLine": 885,
         "origin": "generated:transport/walk",
-        "startLine": 860,
+        "startLine": 862,
       },
       {
-        "endLine": 910,
+        "endLine": 912,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 884,
+        "startLine": 886,
       },
     ],
   },
@@ -50791,8 +50769,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -51711,23 +51688,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-nee-sky-main": [
@@ -52202,8 +52179,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -52416,14 +52392,6 @@ vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
     return local_dir.x * t + local_dir.y * b + local_dir.z * n;
 }
 
-// MIS math — included by core iff the estimator is 'mis' (commit D of the item-9 split:
-// conditional INCLUSION replaced the ENABLE_MIS preprocessor gate).
-// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
-float power_heuristic(float pf, float pg) {
-    float f2 = pf * pf;
-    return f2 / max(1e-20, f2 + pg * pg);
-}
-
 // sensor 'ideal' — the measurement functional's importance We ≡ 1.
 // We is the ADJOINT of a light's Le: it weights the measured radiance by the sensor's
 // response, so a pixel integrates ∫ h_j · We · L. v1 is the identity sensor (unit
@@ -52512,6 +52480,7 @@ LightSample environment_sample(Point p, vec2 xi);
 float environment_pdf(vec3 dir);
 // transport:
 Radiance transport_trace(Ray ray);
+float power_heuristic(float pf, float pg);
 // Closed-form ray–primitive intersection — the analytic geometry backend.
 // Straight-ray algebra because the tracer is Euclidean FOR NOW; closed-form geodesic–surface
 // intersection in curved spaces is a later job, not precluded (the abstraction doesn't assume
@@ -53095,6 +53064,15 @@ void kernel_record(inout PathState s, float pdf, Point p, bool is_delta) {
     s.prev_bsdf_pdf = pdf;
     s.prev_p = p;
 }
+// MIS math — transport shared part, included by the integrator iff the estimator is
+// 'mis' (conditional INCLUSION, not preprocessor gating — item-9 commit D). Called only
+// by combiner-emitted weights; forward-declared via the transport \`provides\` seam.
+// Power heuristic, β = 2 (§6.4) — ONE definition; both MIS sides use it (reference §8).
+float power_heuristic(float pf, float pg) {
+    float f2 = pf * pf;
+    return f2 / max(1e-20, f2 + pg * pg);
+}
+
 // ── Russian roulette (generated): §7.2 — once per iteration, post-weight, both sites ──
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
@@ -53232,23 +53210,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pt-mis-sky-lamp-main": [
@@ -53288,184 +53266,184 @@ void main() {
         "startLine": 147,
       },
       {
-        "endLine": 186,
-        "origin": "glsl/core/math_mis.glsl",
+        "endLine": 192,
+        "origin": "components/sensor/ideal/ideal.glsl",
         "startLine": 179,
       },
       {
-        "endLine": 200,
-        "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 187,
-      },
-      {
-        "endLine": 224,
+        "endLine": 216,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 201,
+        "startLine": 193,
       },
       {
-        "endLine": 244,
+        "endLine": 236,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 225,
+        "startLine": 217,
       },
       {
-        "endLine": 274,
+        "endLine": 267,
         "origin": "generated:interfaces",
-        "startLine": 245,
+        "startLine": 237,
       },
       {
-        "endLine": 325,
+        "endLine": 318,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 275,
+        "startLine": 268,
       },
       {
-        "endLine": 368,
+        "endLine": 361,
         "origin": "generated:analytic-dispatch",
-        "startLine": 326,
+        "startLine": 319,
       },
       {
-        "endLine": 376,
+        "endLine": 369,
         "origin": "generated:material-of",
-        "startLine": 369,
+        "startLine": 362,
       },
       {
-        "endLine": 381,
+        "endLine": 374,
         "origin": "generated:ior-of",
-        "startLine": 377,
+        "startLine": 370,
       },
       {
-        "endLine": 396,
+        "endLine": 389,
         "origin": "generated:scene-region-at",
-        "startLine": 382,
+        "startLine": 375,
       },
       {
-        "endLine": 427,
+        "endLine": 420,
         "origin": "generated:scene-intersect",
-        "startLine": 397,
+        "startLine": 390,
       },
       {
-        "endLine": 451,
+        "endLine": 444,
         "origin": "generated:material-lookup",
-        "startLine": 428,
+        "startLine": 421,
       },
       {
-        "endLine": 489,
+        "endLine": 482,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 452,
+        "startLine": 445,
       },
       {
-        "endLine": 547,
+        "endLine": 540,
         "origin": "components/materials/dielectric/dielectric.glsl",
-        "startLine": 490,
+        "startLine": 483,
       },
       {
-        "endLine": 564,
+        "endLine": 557,
         "origin": "generated:interaction-dispatch",
-        "startLine": 548,
+        "startLine": 541,
       },
       {
-        "endLine": 569,
+        "endLine": 562,
         "origin": "generated:nondelta-guard",
-        "startLine": 565,
+        "startLine": 558,
       },
       {
-        "endLine": 573,
+        "endLine": 566,
         "origin": "generated:emissive-table",
-        "startLine": 570,
+        "startLine": 563,
       },
       {
-        "endLine": 588,
+        "endLine": 581,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 574,
+        "startLine": 567,
       },
       {
-        "endLine": 617,
+        "endLine": 610,
         "origin": "components/lights/quad/quad.glsl",
-        "startLine": 589,
+        "startLine": 582,
       },
       {
-        "endLine": 640,
+        "endLine": 633,
         "origin": "generated:light-sampling",
-        "startLine": 618,
+        "startLine": 611,
       },
       {
-        "endLine": 645,
+        "endLine": 638,
         "origin": "generated:light-of",
-        "startLine": 641,
+        "startLine": 634,
       },
       {
-        "endLine": 655,
+        "endLine": 648,
         "origin": "generated:lighting-pdf",
-        "startLine": 646,
+        "startLine": 639,
       },
       {
-        "endLine": 663,
+        "endLine": 656,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 656,
+        "startLine": 649,
       },
       {
-        "endLine": 684,
+        "endLine": 677,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 664,
+        "startLine": 657,
       },
       {
-        "endLine": 689,
+        "endLine": 682,
         "origin": "generated:env-rotate",
-        "startLine": 685,
+        "startLine": 678,
       },
       {
-        "endLine": 724,
+        "endLine": 717,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 690,
+        "startLine": 683,
       },
       {
-        "endLine": 734,
+        "endLine": 727,
         "origin": "generated:environment",
-        "startLine": 725,
+        "startLine": 718,
       },
       {
-        "endLine": 809,
+        "endLine": 802,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 735,
+        "startLine": 728,
       },
       {
-        "endLine": 831,
+        "endLine": 824,
         "origin": "generated:transport/state",
-        "startLine": 810,
+        "startLine": 803,
       },
       {
-        "endLine": 851,
+        "endLine": 844,
         "origin": "generated:transport/combiner",
-        "startLine": 832,
+        "startLine": 825,
       },
       {
-        "endLine": 857,
+        "endLine": 850,
         "origin": "generated:transport/kernel-record",
-        "startLine": 852,
+        "startLine": 845,
       },
       {
-        "endLine": 865,
+        "endLine": 859,
+        "origin": "components/transport/math_mis.glsl",
+        "startLine": 851,
+      },
+      {
+        "endLine": 867,
         "origin": "generated:transport/roulette",
-        "startLine": 858,
+        "startLine": 860,
       },
       {
-        "endLine": 900,
+        "endLine": 902,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 866,
+        "startLine": 868,
       },
       {
-        "endLine": 922,
+        "endLine": 924,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 901,
+        "startLine": 903,
       },
       {
-        "endLine": 946,
+        "endLine": 948,
         "origin": "generated:transport/walk",
-        "startLine": 923,
+        "startLine": 925,
       },
       {
-        "endLine": 973,
+        "endLine": 975,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 947,
+        "startLine": 949,
       },
     ],
   },
@@ -53696,8 +53674,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -54510,23 +54487,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-slab-main": [
@@ -54909,8 +54886,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -55727,23 +55703,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "pathtracer-submerged-main": [
@@ -56106,8 +56082,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -56926,23 +56901,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "power-two-light-main": [
@@ -57315,8 +57290,7 @@ vec3 linear_to_srgb(vec3 c) {
 // wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
 // blue-noise values (one per color channel), each spectrally blue (energy at high
 // frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
-// the channels' quantization error. Consumed by the display dither (view). (Parks to
-// src/glsl/shared/ with the layout reorg — see docs/impl-plan-glsl-layout.md.)
+// the channels' quantization error. Consumed by the display dither (view).
 
 vec3 blue_noise(vec2 fragCoord) {
     return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
@@ -58135,23 +58109,23 @@ void main() {
       },
       {
         "endLine": 29,
-        "origin": "generate/glsl/display.glsl",
+        "origin": "glsl/shared/display.glsl",
         "startLine": 10,
       },
       {
-        "endLine": 41,
-        "origin": "generate/glsl/noise.glsl",
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
         "startLine": 30,
       },
       {
-        "endLine": 50,
+        "endLine": 49,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 42,
+        "startLine": 41,
       },
       {
-        "endLine": 58,
+        "endLine": 57,
         "origin": "generated:display-main",
-        "startLine": 51,
+        "startLine": 50,
       },
     ],
     "uniform-two-light-main": [

@@ -9,20 +9,19 @@ import { PHASE_MODELS } from '../../../components/volume_scattering/index.js';
 import { SAMPLERS } from '../../../components/sampler/index.js';
 import { SENSORS } from '../../../components/sensor/index.js';
 
-import structsGLSL from '../glsl/core/structs.glsl?raw';
-import structsMediaGLSL from '../glsl/core/structs_media.glsl?raw';
-import interactionGLSL from '../glsl/core/interaction.glsl?raw';
-import mathGLSL from '../glsl/core/math.glsl?raw';
-import mathMediaGLSL from '../glsl/core/math_media.glsl?raw';
-import mathMisGLSL from '../glsl/core/math_mis.glsl?raw';
+import structsGLSL from '../../../glsl/core/structs.glsl?raw';
+import structsMediaGLSL from '../../../glsl/core/structs_media.glsl?raw';
+import interactionGLSL from '../../../glsl/core/interaction.glsl?raw';
+import mathGLSL from '../../../glsl/core/math.glsl?raw';
+import mathMediaGLSL from '../../../glsl/core/math_media.glsl?raw';
 import euclideanGLSL from '../../../components/ambient/euclidean/euclidean.glsl?raw';
-import rayGLSL from '../glsl/core/ray.glsl?raw';
+import rayGLSL from '../../../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
 
 export function contributeCore(plan: RenderPlan): FeatureContribution {
     // Conditional INCLUSION, not preprocessor gating (item-9 commit D): media-free
-    // programs contain no media structs/helpers at all; non-MIS programs contain no
-    // power_heuristic. The last structural defines died with this.
+    // programs contain no media structs/helpers at all. The last structural defines
+    // died with this. (MIS math lives with its only caller: transport/math_mis.glsl.)
     const blocks: ShaderBlock[] = [{ origin: 'glsl/core/structs.glsl', source: structsGLSL }];
 
     // Scene-scoped properties structs (§3.4, R2): the union of fields declared by the
@@ -57,7 +56,6 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         { origin: 'glsl/core/math.glsl', source: mathGLSL },
     );
     if (plan.program.media.present) blocks.push({ origin: 'glsl/core/math_media.glsl', source: mathMediaGLSL });
-    if (plan.program.estimator.lighting?.method === 'mis') blocks.push({ origin: 'glsl/core/math_mis.glsl', source: mathMisGLSL });
     blocks.push(
         // Sensor slot (measurement pick-one, We ≡ 1 today): the measurement importance the
         // accumulator main() multiplies into the traced radiance. Sole occupant — a strategy

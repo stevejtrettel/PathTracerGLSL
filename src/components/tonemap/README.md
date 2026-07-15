@@ -24,7 +24,7 @@ vec3 <id>_curve(vec3 x);   // HDR-linear → display-linear [0,1]
 `none`'s curve is the identity. Everything else — exposure (`DISPLAY_EXPOSURE`),
 `u_resolution`/`u_radiance`, `safe_color`, the sRGB OETF (`linear_to_srgb`), and the
 composed `main()` — is shared/generated glue (`safe_color` + OETF live in the
-compiler-owned `generate/glsl/display.glsl`; the `main()` is generated per occupant).
+fixed `glsl/shared/display.glsl`; the `main()` is generated per occupant).
 
 **Descriptor** (`<id>.ts`): `type`, `glsl` (?raw), `origin`, `curveFn` (the curve's name),
 and `encodesToDisplay` — `true` runs `curve → sRGB → clamp`; `false` is the raw

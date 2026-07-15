@@ -70,7 +70,7 @@ export const fogcubeStrategy: RenderStrategy = {
 
 export const rayleighScene: SceneDescription = {
     id: 'rayleigh',
-    name: 'Rayleigh vs HG scattering media',
+    name: 'Volume scattering models: rayleigh · hg · draine',
     ambientSpace: { type: 'euclidean' },
     objects: [
         {
@@ -80,13 +80,18 @@ export const rayleighScene: SceneDescription = {
         },
         {
             kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [-0.7, 1.0, 0], halfSize: [0.5, 0.5, 0.5] } },
+            sdf: { type: 'box', parameters: { center: [-1.3, 1.0, 0], halfSize: [0.45, 0.45, 0.45] } },
             material: 'rayleigh_fog',
         },
         {
             kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [0.7, 1.0, 0], halfSize: [0.5, 0.5, 0.5] } },
+            sdf: { type: 'box', parameters: { center: [0.0, 1.0, 0], halfSize: [0.45, 0.45, 0.45] } },
             material: 'hg_fog',
+        },
+        {
+            kind: 'sdf',
+            sdf: { type: 'box', parameters: { center: [1.3, 1.0, 0], halfSize: [0.45, 0.45, 0.45] } },
+            material: 'draine_fog',
         },
     ],
     materials: {
@@ -102,6 +107,8 @@ export const rayleighScene: SceneDescription = {
         rayleigh_fog: { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [0.7, 1.0, 1.6], model: 'rayleigh' } },
         // HG: neutral σ_s, forward-scattering (g = 0.6).
         hg_fog: { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [1.1, 1.1, 1.1], model: 'hg', phase_g: 0.6 } },
+        // Draine (approx-Mie): 10µm water droplets — strong physical forward peak.
+        draine_fog: { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [1.1, 1.1, 1.1], model: 'draine', draine_d: 10.0 } },
     },
     lights: [],
 };

@@ -173,7 +173,9 @@ export interface PlannedMedium {
     sigma_a: Vec3 | GlslExpression | ValueParam<Vec3>;
     sigma_s: Vec3 | GlslExpression | ValueParam<Vec3>;
     phase_g: number | GlslExpression | ValueParam<number>;
-    /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh'. */
+    /** Droplet diameter µm, read only by 'draine'. */
+    draine_d: number | GlslExpression | ValueParam<number>;
+    /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh' | 'draine'. */
     model: string;
 }
 

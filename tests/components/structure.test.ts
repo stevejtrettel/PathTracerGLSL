@@ -23,6 +23,7 @@ const FAMILIES = [
 const ALLOWED_ROOT_FILES = new Set([
     'index.ts', 'README.md',
     'combiner.ts', 'flags.ts',            // transport shared parts
+    'math_mis.glsl',                       // transport shared part (β=2 power heuristic)
     'sampler_cdf.glsl',                    // env shared CDF walk
 ]);
 

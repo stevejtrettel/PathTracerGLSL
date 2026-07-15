@@ -124,11 +124,11 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
         scene: rayleighScene,
         strategies: [rayleighStrategy],
         exercises:
-            'DEMO — the multi-model volume dispatch (interaction_medium_* over mp.model): LEFT box = rayleigh scattering (parameter-free, λ⁻⁴ color in σ_s), RIGHT box = hg (g=0.6). Same extinction; only medium.model differs',
+            'DEMO — the multi-model volume dispatch (interaction_medium_* over mp.model), all 3 occupants side by side: L rayleigh (parameter-free, λ⁻⁴ color in σ_s) · C hg (g=0.6) · R draine (approx-Mie, 10µm droplets). Same extinction; only medium.model differs',
         expected:
-            'two fog boxes lit from the emissive checker below: LEFT a cool/bluish evenly-scattering haze (rayleigh), RIGHT a warmer forward-scattering glow (hg). If they look identical the dispatch isn\'t selecting the model',
+            'three fog boxes lit from the emissive checker: L cool evenly-scattering haze (rayleigh) · C warm forward glow (hg) · R a sharper, more physical forward peak/brightness (draine). If they look identical the dispatch isn\'t selecting the model',
         initialParameters: {
-            'camera.position': [0, 1.4, 4.5],
+            'camera.position': [0, 1.5, 5.5],
             'camera.target': [0, 0.9, 0],
         },
     },
