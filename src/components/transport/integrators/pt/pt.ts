@@ -31,15 +31,12 @@ import mathMisGLSL from '../../math_mis.glsl?raw';
 export function contributeTransport(program: ProgramDescription): FeatureContribution {
     const f = flags(program);
 
-    const blocks: ShaderBlock[] = [
-        pathState(f),
-        combinerFns(f),
-        kernelRecordFn(f),
-    ];
+    const blocks: ShaderBlock[] = [pathState(f)];
     // MIS math (β=2 power heuristic) — transport family property: its only callers are
-    // the combiner-emitted weights. Included iff the estimator is 'mis'; position-safe
-    // because `provides` forward-declares it in the generated interface header.
+    // the combiner-emitted weights, so it precedes them (definition-before-use keeps it
+    // out of the interface header: an internal helper, not a cross-feature seam).
     if (f.mis) blocks.push({ origin: 'components/transport/math_mis.glsl', source: mathMisGLSL });
+    blocks.push(combinerFns(f), kernelRecordFn(f));
     if (f.rr) blocks.push(roulette(f));
     blocks.push(...kernelBlocks(f), ...lightBlocks(f), ...equiangularBlocks(f), walk(program, f));
 
@@ -54,7 +51,6 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
         textures: [],
         provides: [
             { name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' },
-            ...(f.mis ? [{ name: 'power_heuristic', signature: 'float power_heuristic(float pf, float pg)' }] : []),
         ],
         requires: [...walkRequires(f), ...kernelRequires(f), ...lightRequires(f), ...equiangularRequires(f)],
     };

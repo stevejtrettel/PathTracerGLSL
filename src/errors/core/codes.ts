@@ -303,6 +303,11 @@ export const VALIDATION_ERRORS = {
         code: 'seam-missing',
         category: 'validation' as const,
         description: 'A feature requires a GLSL seam no feature provides (T4 structural link check)'
+    },
+    'seam-unused': {
+        code: 'seam-unused',
+        category: 'validation' as const,
+        description: 'A provided GLSL seam nothing requires — dead generated code (exact-linkage check, the dual of seam-missing)'
     }
 };
 

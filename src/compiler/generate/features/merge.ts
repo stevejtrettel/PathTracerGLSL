@@ -56,12 +56,33 @@ export function mergeContributions(
             providedBy.set(p.name, c.feature);
         }
     }
+    const required = new Set<string>();
     for (const c of contributions) {
         for (const r of c.requires) {
+            required.add(r);
             if (!providedBy.has(r)) {
                 bag.addError(
                     'seam-missing',
                     `Feature '${c.feature}' requires seam '${r}' but no feature provides it`,
+                );
+            }
+        }
+    }
+
+    // seam-unused — the dual link check (impl-plan-exact-linkage): a provided seam no
+    // contribution requires is dead generated code, which the exact-linkage rule forbids.
+    // The enforcement that keeps the emitted program equal to its own link map: features
+    // gate emission on the Planner's seam decisions, and this check catches any gate that
+    // drifts. Component-scoped provides are exempt — they ride inside whole self-authored
+    // component files (the pinned wholesale-inclusion cost), so their presence is not
+    // individually gated. Roots (main's calls) are ordinary requires: the accumulation
+    // feature emits main() and requires pixel_sample/camera_generateRay/transport_trace.
+    for (const c of contributions) {
+        for (const p of c.provides) {
+            if (!p.componentScoped && !required.has(p.name)) {
+                bag.addWarning(
+                    'seam-unused',
+                    `Feature '${c.feature}' provides seam '${p.name}' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)`,
                 );
             }
         }

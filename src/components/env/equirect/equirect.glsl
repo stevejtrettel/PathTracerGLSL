@@ -1,6 +1,7 @@
 // Equirect environment CHART (env-as-light D11: a sampler = a chart × a weight policy).
-// Provides: env_chart_uv(), env_chart_dir(), env_rotate_y(). This file is the chart seam —
-// T5's octahedral chart is a drop-in replacement behind the same names.
+// Provides: env_chart_uv(), env_chart_dir(), env_texel_dOmega(). This file is the chart seam —
+// T5's octahedral chart is a drop-in replacement behind the same names. (Unlike octahedral,
+// this chart applies u_envRotation inline — it does not call the shared env_rotate_y block.)
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.

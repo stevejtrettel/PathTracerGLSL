@@ -62,8 +62,19 @@ export interface ProgramDescription {
     emitters: EmittersDesc;
     environment: EnvironmentDescription;
     /** The env participates in NEE/MIS as a light (env-as-light T3/D6) — drives the
-     *  selection codegen, the miss-branch w-bookkeeping, and env sampler emission. */
+     *  selection codegen, the miss-branch w-bookkeeping, and env sampler emission.
+     *  A DECISION, not the analyzer's kind-fact (impl-plan-exact-linkage): under
+     *  directLighting 'none' there is no NEE machinery, so the env is not a light —
+     *  no sampler, no CDF machinery, however samplable its kind. */
     environmentSamplable: boolean;
+    /** The MIS env-pdf query exists (samplable ∧ mis) — its only readers are the miss
+     *  weight and lighting_pdf's env branch. The environmentSamplable twin of
+     *  emitters.lightingPdf. */
+    environmentPdf: boolean;
+    /** The env-vs-finite selection draw is LIVE (u_envSelectProb exists): samplable env
+     *  AND finite lights to split mass with. Env-only programs fold selection to the
+     *  constant 1 — sampler and pdf sides fold together (structural symmetry, §6.1). */
+    environmentSelectionLive: boolean;
 }
 
 /** What media machinery this program contains (volumetric-component seams). */
@@ -82,6 +93,12 @@ export interface MediaDesc {
     /** Distinct volume scattering models present (registry order), for the MediumProperties
      *  field union + the generated interaction_medium_* dispatch. Empty if no scattering. */
     models: string[];
+    /** The interaction_medium_eval dispatch exists (scattering arms ∧ NEE) — its only
+     *  callers are the medium light-sampling sites (light_medium / equiangular). */
+    mediumEval: boolean;
+    /** The interaction_medium_pdf dispatch exists (scattering arms ∧ mis) — its only
+     *  caller is the medium MIS weight. */
+    mediumPdf: boolean;
 }
 
 /** What samplable-emitter machinery this program contains (§6.2). */
@@ -93,10 +110,23 @@ export interface EmittersDesc {
 }
 
 export type IntersectionDesc =
-    | { method: 'raymarch' };
+    | {
+        method: 'raymarch';
+        /** The generated scene_intersect_any occlusion query exists — its only caller is
+         *  the opaque shadow fast path (NEE without media; shadow_media re-spawns
+         *  scene_intersect instead). The static backend walkers (sdf_intersect_any) ride
+         *  along inside their component files regardless — the declared wholesale cost. */
+        anyQuery: boolean;
+    };
 
 export interface MaterialsDesc {
     models: MaterialModel[];
+    /** The interaction_surface_eval dispatch (+ material_has_nondelta_lobes guard)
+     *  exists — their only caller is the light technique (NEE). */
+    surfaceEval: boolean;
+    /** The interaction_surface_pdf dispatch exists — its only caller is the surface
+     *  MIS weight. The surface twin of emitters.lightingPdf. */
+    surfacePdf: boolean;
 }
 
 export type LightingDesc =

@@ -49,10 +49,12 @@ function sizeParamPath(chart: 'equirect' | 'octahedral'): string {
 
 // Constant env, samplable (D6 opt-in): uniform-sphere sampling, pdf = 1/(4π) exactly.
 // The cheap path to the miss-MIS bookkeeping witnesses — no textures anywhere.
-const CONSTANT_SAMPLER = `// Constant environment as a light (uniform sphere, T3)
-float environment_pdf(vec3 dir) {
+// The pdf query is a separate generated block: its only readers are the MIS sites
+// (environmentPdf decision); the sampler carries its own ls.pdf inline.
+const CONSTANT_PDF = `float environment_pdf(vec3 dir) {
     return 1.0 / (4.0 * PI);
-}
+}`;
+const CONSTANT_SAMPLER = `// Constant environment as a light (uniform sphere, T3)
 LightSample environment_sample(Point p, vec2 xi) {
     LightSample ls;
     float z = 1.0 - 2.0 * xi.x;
@@ -67,14 +69,22 @@ LightSample environment_sample(Point p, vec2 xi) {
     return ls;
 }`;
 
-/** T4 seams: every env kind provides the radiance body; samplable envs add the §6.1 pair. */
-function envProvides(samplable: boolean): Array<{ name: string; signature: string }> {
-    const provides = [{ name: 'environment_radiance', signature: 'vec3 environment_radiance(vec3 dir)' }];
+/** T4 seams: every env kind provides the radiance body; samplable envs add the §6.1 pair.
+ *  The pdf query: 'generated' = emitted iff the environmentPdf decision (constant env),
+ *  'component' = it rides inside sampler_cdf.glsl regardless (wholesale inclusion) so the
+ *  provide is declared component-scoped for the seam-unused check. */
+function envProvides(samplable: boolean, pdf: 'none' | 'generated' | 'component'): Array<{ name: string; signature: string; componentScoped?: boolean }> {
+    const provides: Array<{ name: string; signature: string; componentScoped?: boolean }> =
+        [{ name: 'environment_radiance', signature: 'vec3 environment_radiance(vec3 dir)' }];
     if (samplable) {
-        provides.push(
-            { name: 'environment_sample', signature: 'LightSample environment_sample(Point p, vec2 xi)' },
-            { name: 'environment_pdf', signature: 'float environment_pdf(vec3 dir)' },
-        );
+        provides.push({ name: 'environment_sample', signature: 'LightSample environment_sample(Point p, vec2 xi)' });
+        if (pdf !== 'none') {
+            provides.push({
+                name: 'environment_pdf',
+                signature: 'float environment_pdf(vec3 dir)',
+                ...(pdf === 'component' ? { componentScoped: true } : {}),
+            });
+        }
     }
     return provides;
 }
@@ -99,12 +109,13 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         };
         const blocks = [{ origin: ORIGIN, source: radianceFn('return u_environment_color * u_environment_intensity;') }];
         if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: CONSTANT_SAMPLER });
+        if (plan.program.environmentPdf) blocks.push({ origin: 'generated:environment-pdf', source: CONSTANT_PDF });
         return {
             ...emptyContribution('environment'),
             blocks,
             uniforms,
             parameters,
-            provides: envProvides(samplable),
+            provides: envProvides(samplable, plan.program.environmentPdf ? 'generated' : 'none'),
         };
     }
 
@@ -124,7 +135,6 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         // swappable env_chart_* seam belongs exclusively to the SAMPLER below.
         const { chart, compensation } = plan.program.estimator.envSampler;
         const blocks = [
-            ROTATE_BLOCK,
             { origin: ORIGIN, source: '// Fixed equirect map lookup (sampler-chart-independent)\n'
                 + 'vec2 env_map_uv(vec3 dir) {\n'
                 + '    vec3 n = normalize(dir);\n'
@@ -136,7 +146,10 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         const textures = [{ name: 'u_envMap', source: 'extern:env_map' }];
         if (samplable) {
             const suffix = envVariantSuffix(chart, compensation);
-            blocks.splice(1, 0, chartBlock(chart));   // chart before radiance/sampler
+            // env_rotate_y's only image-env caller is the octahedral chart (the equirect
+            // chart and the fixed map lookup apply u_envRotation inline).
+            blocks.unshift(chartBlock(chart));   // chart before radiance/sampler
+            if (chart === 'octahedral') blocks.unshift(ROTATE_BLOCK);   // rotate before its caller
             blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: envSamplerCdfGLSL });
             textures.push(
                 { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },
@@ -150,7 +163,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             uniforms,
             parameters,
             textures,
-            provides: envProvides(samplable),
+            provides: envProvides(samplable, samplable ? 'component' : 'none'),
         };
     }
 
@@ -170,7 +183,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         };
         const { chart, compensation } = plan.program.estimator.envSampler;
         const blocks = [
-            ROTATE_BLOCK,
+            ROTATE_BLOCK,   // the radiance body below always calls env_rotate_y
             // env_rotate_y(dir, +rot) evaluates the formula at the TABLE azimuth — the exact
             // direction-space form of the chart's rotation term, so the direct-eval'd field
             // and the CDF (baked unrotated, sampled through the chart) agree under rotation.
@@ -195,7 +208,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             uniforms,
             parameters,
             textures,
-            provides: envProvides(samplable),
+            provides: envProvides(samplable, samplable ? 'component' : 'none'),
         };
     }
 
@@ -203,7 +216,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
     return {
         ...emptyContribution('environment'),
         blocks: [{ origin: ORIGIN, source: radianceFn('return SPECTRUM_ZERO;') }],  // §2.5: radiometric, not raw vec3
-        provides: envProvides(false),
+        provides: envProvides(false, 'none'),
     };
 }
 

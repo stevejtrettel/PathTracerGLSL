@@ -50,11 +50,12 @@ export function combinerFns(f: Flags): ShaderBlock {
             '    if (s.prev_was_delta) return 1.0;',
         );
         if (f.mis) {
-            lines.push(
-                '    // The selection factor (u_envSelectProb) mirrors lighting_sample\'s stage 0 —',
-                '    // total pdf symmetry (§6.1).',
-                '    return power_heuristic(s.prev_bsdf_pdf, u_envSelectProb * environment_pdf(s.ray.direction));',
-            );
+            // The selection factor mirrors lighting_sample's stage 0 — total pdf symmetry
+            // (§6.1). Env-only programs fold it to 1 on BOTH sides (structurally, not by
+            // binding — the environmentSelectionLive decision).
+            lines.push(f.envSelectLive
+                ? '    return power_heuristic(s.prev_bsdf_pdf, u_envSelectProb * environment_pdf(s.ray.direction));   // stage-0 selection × per-light density'
+                : '    return power_heuristic(s.prev_bsdf_pdf, environment_pdf(s.ray.direction));   // env-only: selection folded to 1 (§6.1)');
         } else {
             lines.push('    return 0.0;   // NEE already counted the samplable environment');
         }
@@ -83,7 +84,9 @@ export function combinerFns(f: Flags): ShaderBlock {
                 lines.push(
                     '    // Balances against the phase density — no cosine anywhere (§2.2).',
                     '    if ((ls.flags & LIGHT_DELTA) != 0u) return 1.0;',
-                    '    return power_heuristic(ls.pdf, hg_pdf(ls.wi, wo_med, m_evt));',
+                    // The DISPATCH is the seam (matches light.ts's requires) — calling a
+                    // per-model pdf here broke any non-hg medium under mis (unlinkable).
+                    '    return power_heuristic(ls.pdf, interaction_medium_pdf(ls.wi, wo_med, m_evt));',
                 );
             } else {
                 lines.push('    return 1.0;   // plain NEE at the medium site');

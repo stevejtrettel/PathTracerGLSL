@@ -28,6 +28,10 @@ export interface PlannedTexture {
 export interface ProvidedSeam {
     name: string;
     signature: string;
+    /** The definition arrives inside a whole self-authored component file (wholesale
+     *  inclusion — the pinned declared cost), so its presence is not individually gated:
+     *  the seam-unused check skips it. Generated seams never set this. */
+    componentScoped?: boolean;
 }
 
 export interface FeatureContribution {

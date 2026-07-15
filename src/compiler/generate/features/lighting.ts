@@ -31,23 +31,22 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // is the precedent for the two-stage shape.
     const envSamplable = plan.program.environmentSamplable;
     const env = plan.program.environment;
-    const envSelectDefault = plan.lights.length === 0
-        ? 1.0                                                            // env-only: certainty
-        : ((env.type === 'constant' || env.type === 'image') && env.selectWeight !== undefined
+    // The uniform exists iff the selection draw is LIVE (finite lights split mass with
+    // the env — the environmentSelectionLive decision). Env-only programs fold the
+    // selection to the constant 1 on BOTH sides (sampler here, pdf in the combiner):
+    // there is no other technique to absorb the remaining mass — changing 1.0 would be
+    // bias, so no dead uniform is declared either.
+    if (plan.program.environmentSelectionLive) {
+        const envSelectDefault = (env.type === 'constant' || env.type === 'image') && env.selectWeight !== undefined
             ? env.selectWeight
-            : 0.5);                                                      // plan O1 default
-    if (envSamplable) {
+            : 0.5;                                                       // plan O1 default
         // environment_sample/environment_pdf are declared by the T4 interface header even
         // though the environment feature's definitions assemble AFTER lighting.
         uniforms.push({ name: 'u_envSelectProb', type: 'float', parameterPath: 'env.selectProb', default: envSelectDefault });
-        if (plan.lights.length > 0) {
-            // Live-tunable ONLY when finite lights exist: in an env-only scene there is no
-            // other technique to absorb the remaining mass — changing 1.0 would be bias.
-            parameters['env.selectProb'] = {
-                type: 'float', default: envSelectDefault, range: [0.05, 0.95],
-                name: 'Env select P', group: 'Environment', triggersReset: true,
-            };
-        }
+        parameters['env.selectProb'] = {
+            type: 'float', default: envSelectDefault, range: [0.05, 0.95],
+            name: 'Env select P', group: 'Environment', triggersReset: true,
+        };
     }
     // Shadow query behind the §6.3 contract — the compiler specializes: the boolean-fast-path
     // opaque form for media-free scenes, the spectral segment walker (composing the generated
@@ -112,7 +111,10 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         provides.push({ name: 'lighting_query_delta', signature: 'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity)' });
     }
     const requires: string[] = [];
-    if (envSamplable) requires.push('environment_sample', 'environment_pdf');
+    if (envSamplable) requires.push('environment_sample');
+    // The env pdf query links only from the MIS sites (the environmentPdf decision):
+    // under plain NEE the sampler carries its own ls.pdf and nothing queries by direction.
+    if (plan.program.environmentPdf) requires.push('environment_pdf');
     if (plan.program.media.shadowWalker) {
         // shadow_media walks segments: re-spawned scene_intersect + the generated seams.
         requires.push('scene_intersect', 'material_of', 'material_has_medium', 'is_null_interface', 'medium_transmittance');

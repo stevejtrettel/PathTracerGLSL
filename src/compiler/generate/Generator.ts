@@ -22,7 +22,14 @@ export function generate(
     const variance = plan.program.estimator.accumulation.type === 'variance';
     const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.view.tonemap, variance);
     const pipeline = buildPipeline(rendererId, plan, merged.textures);
-    const uniforms = buildUniforms(merged.uniforms);
+    // The display pass's own resources ride here, not in a feature: the main program no
+    // longer declares u_resolution (nothing in it reads the builtin — exact linkage), but
+    // the display fragment ShaderBuilder emits does (gl_FragCoord → uv). ParameterManager
+    // binds per-shader by location, so this binding is inert for the main program.
+    const uniforms = buildUniforms([
+        ...merged.uniforms,
+        { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },
+    ]);
     const parameters = merged.parameters;
     const exportTargets = buildExportTargets(variance);
 

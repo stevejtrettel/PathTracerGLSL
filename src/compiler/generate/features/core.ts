@@ -34,12 +34,12 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
 
     if (plan.program.media.present) {
         // MediumProperties = the RTE's own extinction fields (every medium has them —
-        // read by the volume-sampling bodies) + the scattering-model schemas. hg's fields
-        // are always included (scene_medium_properties sets phase_g unconditionally); the
-        // other present models add theirs. `model` (registry index) drives the dispatch and
-        // exists only when scattering models are live.
+        // read by the volume-sampling bodies) + the PRESENT scattering models' schema
+        // union (§3.4 literal: no field exists until a present model's schema declares
+        // it — an absorbing-only program has no phase fields at all). `model` (registry
+        // index) drives the dispatch and exists only when scattering models are live.
         const models = plan.program.media.models;
-        const mediumFields = unionFields([PHASE_MODELS['hg'].properties, ...models.map((m) => PHASE_MODELS[m]?.properties ?? [])]);
+        const mediumFields = unionFields(models.map((m) => PHASE_MODELS[m]?.properties ?? []));
         const extra = ['Spectrum sigma_a;   // absorption', 'Spectrum sigma_s;   // scattering'];
         if (models.length > 0) extra.push('int model;   // volume_scattering registry index (interaction_medium_* dispatch)');
         blocks.push({
@@ -69,8 +69,10 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         ...emptyContribution('core'),
         blocks,
         uniforms: [
-            { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },
-            { name: 'u_time', type: 'float', parameterPath: 'engine.time' },
+            // Engine builtins are declared where READ (exact linkage): nothing in the main
+            // program reads u_resolution (pixel/camera use u_imageSize) or u_time today —
+            // the display pass declares its own u_resolution, bound by the Generator.
+            // An animated feature declares u_time when it arrives.
             // RNG salt: bumped per accumulation reset so the seed doesn't replay (§2.11).
             { name: 'u_resetSalt', type: 'int', parameterPath: 'engine.resetSalt' },
         ],

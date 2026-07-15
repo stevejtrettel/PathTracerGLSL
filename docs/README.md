@@ -14,6 +14,7 @@
 | [fable-module-anatomy.md](fable-module-anatomy.md) | Module anatomy & property machinery — descriptor/schema shapes for §3.3/§3.4, property pins, family taxonomy, deferred file layout, drift ledger |
 | [architecture-decisions.md](architecture-decisions.md) | Summary of locked architectural decisions |
 | [fable-review.md](fable-review.md) | Fable's full code review (July 2026) — bugs by layer, design recommendations |
+| [impl-plan-exact-linkage.md](impl-plan-exact-linkage.md) | Exact-linkage batch record (July 2026, BUILT) — wholesale component inclusion pin (contracts §2.12), seam decisions, the seam-unused diagnostic |
 
 ## Guides
 

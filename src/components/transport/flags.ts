@@ -16,6 +16,9 @@ export function flags(p: ProgramDescription) {
         nulls: p.media.nullInterfaces,
         transmission: p.materials.models.some(modelTransmission),
         envSamplable: p.environmentSamplable,
+        /** The env-vs-finite selection draw is live (u_envSelectProb exists); false in
+         *  env-only programs, where BOTH selection sides fold to the constant 1. */
+        envSelectLive: p.environmentSelectionLive,
         emitters: p.emitters.samplable,
         emittersPdf: p.emitters.lightingPdf,
         rr: p.estimator.russianRoulette,

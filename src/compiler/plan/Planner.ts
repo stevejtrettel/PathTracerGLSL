@@ -217,8 +217,11 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
 
     // A samplable environment is a light for NEE purposes (T3) — an env-only scene under
     // 'nee'/'mis' gets the lighting infrastructure with an env-only lighting_sample.
-    const envSamplable = features.environment.samplable;
-    const hasLights = features.lighting.totalLightCount > 0 || envSamplable;
+    // `envKindSamplable` is the analyzer's SCENE FACT (the kind supports sampling); the
+    // program DECISION (`environmentSamplable` below) also needs the NEE machinery to
+    // exist at all (impl-plan-exact-linkage: under 'none' nothing can call the sampler).
+    const envKindSamplable = features.environment.samplable;
+    const hasLights = features.lighting.totalLightCount > 0 || envKindSamplable;
     const wantsNEE = strategy.estimator.directLighting !== 'none' && hasLights;
     const lighting = wantsNEE
         ? {
@@ -226,6 +229,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
               selection: strategy.estimator.lightSelection ?? 'power',
           }
         : null;
+    const envSamplable = envKindSamplable && lighting !== null;
+    const mis = lighting?.method === 'mis';
 
     // Taxonomy §8 (the volumeIntegrator split): whether scattering is COMPUTED is a
     // measurement truncation (scattering 'ignored' renders scattering media absorbing-only);
@@ -273,13 +278,27 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
                 ? { type: 'none' }
                 : { type: strategy.view.tonemap.type, exposure: strategy.view.tonemap.exposure },
         },
-        intersection: { method: 'raymarch' },
-        materials: { models: brdfModels },
+        // Seam decisions (impl-plan-exact-linkage): each generated dispatch/query exists
+        // iff some included technique links it — the same conditions the techniques'
+        // `requires` lists state, written down ONCE where the providers read them.
+        intersection: {
+            method: 'raymarch',
+            // The opaque shadow fast path is scene_intersect_any's only caller; the
+            // media shadow walker re-spawns scene_intersect instead (§6.3).
+            anyQuery: lighting !== null && !features.media.hasMedia,
+        },
+        materials: {
+            models: brdfModels,
+            surfaceEval: lighting !== null,
+            surfacePdf: mis,
+        },
         media: {
             present: features.media.hasMedia,
             scatteringArms,
             nullInterfaces: features.media.hasNullInterfaces,
             shadowWalker: features.media.hasMedia && lighting !== null,
+            mediumEval: scatteringArms && lighting !== null,
+            mediumPdf: scatteringArms && mis,
             // Distinct scattering models present → the MediumProperties field union + the
             // generated interaction_medium_* dispatch. Only meaningful when scattering is
             // live (the phase is invoked only at scatter events); [] otherwise.
@@ -294,6 +313,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         },
         environment: scene.environment ?? { type: 'none' },
         environmentSamplable: envSamplable,
+        environmentPdf: envSamplable && mis,
+        // Selection is live only when finite lights split mass with the env; env-only
+        // programs fold the draw to certainty (changing it would be bias — plan O1).
+        environmentSelectionLive: envSamplable && lights.length > 0,
     };
 }
 

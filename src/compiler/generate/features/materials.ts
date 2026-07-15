@@ -61,12 +61,18 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: `components/materials/${model}/${model}.glsl`, source: materialModel(model).glsl });
     }
 
-    // The generated §3.3 dispatch, after the model libraries it calls.
-    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials) });
+    // The generated §3.3 dispatch, after the model libraries it calls. Ops are seam
+    // decisions (impl-plan-exact-linkage): eval's only caller is the light technique,
+    // pdf's the surface MIS weight — a dispatch nothing links is not emitted.
+    const { surfaceEval, surfacePdf } = plan.program.materials;
+    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials, surfaceEval, surfacePdf) });
 
     // NEE guard (§6.2 / reference loop): at a pure-delta hit the eval is zero — transport skips
     // the shadow march. Constant-folds when the scene's materials are uniform in delta-ness.
-    blocks.push({ origin: 'generated:nondelta-guard', source: generateNondeltaGuard(plan.materials) });
+    // Rides the eval decision: its only caller is the same light technique.
+    if (surfaceEval) {
+        blocks.push({ origin: 'generated:nondelta-guard', source: generateNondeltaGuard(plan.materials) });
+    }
 
     // Emission gate (§6.2 / impl-plan-media M1.2): the emission fetch+dispatch sits behind this
     // compile-time table — the reference-loop pattern, and the fix for the review's
@@ -79,9 +85,16 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     const media = plan.program.media;
     const scatteringLive = media.scatteringArms;
     const wantsShadowMedia = media.shadowWalker;
+    // Phase-parameter fields = the union of the PRESENT scattering models' schemas (§3.4)
+    // — shared by the lookup codegen and the {param} scan below (one truth, two readers;
+    // core.ts builds the MediumProperties struct from the same union).
+    const phaseFields = unionFields(media.models.map((m) => PHASE_MODELS[m]?.properties ?? []));
+    // is_null_interface has two callers: the walk's null branch (nullInterfaces) and the
+    // static shadow_media walker, which probes it unconditionally (shadowWalker).
+    const wantsNullTable = media.nullInterfaces || media.shadowWalker;
     if (media.present) {
-        blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials) });
-        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models) });
+        blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials, wantsNullTable) });
+        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models, phaseFields) });
         // The 'analytic' strategy bodies (volumetric-component §4) — needed by the scattering
         // arms (seam 1) and by the spectral shadow walker's per-segment form (seam 2).
         if (scatteringLive || wantsShadowMedia) {
@@ -89,11 +102,12 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
         if (scatteringLive) {
             // Emit each present scattering model's GLSL, then the dispatch that routes by
-            // mp.model (twin of the surface interaction dispatch).
+            // mp.model (twin of the surface interaction dispatch; eval/pdf are seam
+            // decisions like the surface ops).
             for (const m of plan.program.media.models) {
                 blocks.push({ origin: `components/volume_scattering/${m}/${m}.glsl`, source: PHASE_MODELS[m].glsl });
             }
-            blocks.push({ origin: 'generated:medium-dispatch', source: generateMediumDispatch(plan.program.media.models) });
+            blocks.push({ origin: 'generated:medium-dispatch', source: generateMediumDispatch(plan.program.media.models, media.mediumEval, media.mediumPdf) });
         }
         blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan) });
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).
@@ -123,7 +137,16 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         if (mat.medium !== null) {
             addParamUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen);
             addParamUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen);
-            addParamUniform(mat.medium.phase_g, 'float', 'float', uniforms, parameters, seen);
+            // Phase params follow the schemas: a driven phase_g in an absorbing-only
+            // program has no reader, so it earns no uniform (the C5 silent-inert rule).
+            for (const f of phaseFields) {
+                addParamUniform(
+                    mat.medium[f.source as keyof PlannedMedium] as number | ValueParam<number>,
+                    f.glslType === 'Spectrum' ? 'vec3' : 'float',
+                    f.semantic === 'radiometric' ? 'color' : 'float',
+                    uniforms, parameters, seen,
+                );
+            }
         }
     }
 
@@ -132,22 +155,35 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     const defines: Record<string, string> = {};
 
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
+    // Each entry mirrors its emission condition above — the interface header is truthful.
     const provides = [
         { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p)' },
         { name: 'interaction_surface_sample', signature: 'InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u)' },
-        { name: 'interaction_surface_eval', signature: 'Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp)' },
-        { name: 'interaction_surface_pdf', signature: 'float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp)' },
         { name: 'interaction_surface_emission', signature: 'Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp)' },
-        { name: 'material_has_nondelta_lobes', signature: 'bool material_has_nondelta_lobes(int mat)' },
         { name: 'material_is_emissive', signature: 'bool material_is_emissive(int mat)' },
     ];
+    if (surfaceEval) {
+        provides.push(
+            { name: 'interaction_surface_eval', signature: 'Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp)' },
+            { name: 'material_has_nondelta_lobes', signature: 'bool material_has_nondelta_lobes(int mat)' },
+        );
+    }
+    if (surfacePdf) {
+        provides.push({ name: 'interaction_surface_pdf', signature: 'float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp)' });
+    }
+    // Self-requires: the generated medium_sample/medium_transmittance bodies call the
+    // properties lookup themselves — honest linkage for the seam-unused check.
+    const requires: string[] = [];
     if (media.present) {
+        requires.push('scene_medium_properties');
         provides.push(
             { name: 'material_has_medium', signature: 'bool material_has_medium(int mat)' },
-            { name: 'is_null_interface', signature: 'bool is_null_interface(int mat)' },
             { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, vec3 p)' },
             { name: 'medium_sample', signature: 'MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi)' },
         );
+        if (wantsNullTable) {
+            provides.push({ name: 'is_null_interface', signature: 'bool is_null_interface(int mat)' });
+        }
         if (wantsShadowMedia) {
             provides.push({ name: 'medium_transmittance', signature: 'Spectrum medium_transmittance(int med, Ray ray, float len)' });
         }
@@ -155,14 +191,18 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             // The dispatch is the public seam (transport calls it); the per-model funcs
             // (hg_*/rayleigh_*) are internal, called only by the dispatch in this feature.
             provides.push(
-                { name: 'interaction_medium_eval', signature: 'Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp)' },
                 { name: 'interaction_medium_sample', signature: 'InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi)' },
-                { name: 'interaction_medium_pdf', signature: 'float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp)' },
             );
+            if (media.mediumEval) {
+                provides.push({ name: 'interaction_medium_eval', signature: 'Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp)' });
+            }
+            if (media.mediumPdf) {
+                provides.push({ name: 'interaction_medium_pdf', signature: 'float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp)' });
+            }
         }
     }
 
-    return { ...emptyContribution('materials'), blocks, defines, uniforms, parameters, provides };
+    return { ...emptyContribution('materials'), blocks, defines, uniforms, parameters, provides, requires };
 }
 
 function addParamUniform(
@@ -310,16 +350,20 @@ function generateEmissiveTable(materials: PlannedMaterial[]): string {
 // (fable-volumetric-component §2; media are "materials of the interior", §3.5)
 // ============================================================================
 
-function generateMediaTables(materials: PlannedMaterial[]): string {
+function generateMediaTables(materials: PlannedMaterial[], wantsNullTable: boolean): string {
     const lines: string[] = ['// Generated media capability tables (§3.5/§3.6)'];
 
     // Null interfaces: model 'none' — transport passes through, no optical event.
-    const nullIds = materials.filter((m) => m.model === 'none').map((m) => m.id);
-    lines.push('bool is_null_interface(int mat) {');
-    lines.push(nullIds.length === 0
-        ? '    return false;'
-        : `    return ${nullIds.map((id) => `mat == ${id}`).join(' || ')};`);
-    lines.push('}');
+    // Emitted for the walk's null branch OR the shadow_media walker (its static body
+    // probes it even in scenes with no 'none' material — the constant-false fold).
+    if (wantsNullTable) {
+        const nullIds = materials.filter((m) => m.model === 'none').map((m) => m.id);
+        lines.push('bool is_null_interface(int mat) {');
+        lines.push(nullIds.length === 0
+            ? '    return false;'
+            : `    return ${nullIds.map((id) => `mat == ${id}`).join(' || ')};`);
+        lines.push('}');
+    }
 
     // Media presence: gates the per-segment volumetric call site so it constant-folds away
     // whenever current_medium's material has no medium block (vacuum, plain solids' interiors).
@@ -342,20 +386,19 @@ function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Ve
     return format(prop as never);
 }
 
-function generateMediumProperties(materials: PlannedMaterial[], models: string[]): string {
+function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema<Extract<keyof PlannedMedium, string>>[]): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const hasModel = models.length > 0;         // the `model` field exists only when scattering is live
-    const hasDraine = models.includes('draine'); // draine_d field exists only when draine is present
-    // NOTE: field-set is hardcoded per known schema field (phase_g/draine_d), matching the
-    // current style; generalizing to iterate present models' schemas is the clean follow-up.
+    // Field set = the PRESENT scattering models' schema union (§3.4 literal — the same
+    // union core.ts builds the struct from). An absorbing-only program has extinction
+    // fields and nothing else.
     const lines: string[] = ['// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)'];
     lines.push('MediumProperties scene_medium_properties(int mat, vec3 p) {');
     lines.push('    MediumProperties m;');
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');
     lines.push('    m.sigma_s = SPECTRUM_ZERO;');
-    lines.push('    m.phase_g = 0.0;');
+    for (const f of phaseFields) lines.push(`    m.${f.name} = ${f.default};`);
     if (hasModel) lines.push('    m.model = 0;');
-    if (hasDraine) lines.push('    m.draine_d = 10.0;');
     for (let i = 0; i < withMedium.length; i++) {
         const mat = withMedium[i];
         const med = mat.medium!;
@@ -363,8 +406,11 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
         lines.push(`    ${cond} (mat == ${mat.id}) {   // '${mat.name}'`);
         lines.push(`        m.sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatSpectrum)};`);
         lines.push(`        m.sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatSpectrum)};`);
-        lines.push(`        m.phase_g = ${mediumPropertyExpr(med.phase_g, 'phase_g', formatFloat)};`);
-        if (hasDraine) lines.push(`        m.draine_d = ${mediumPropertyExpr(med.draine_d, 'draine_d', formatFloat)};`);
+        for (const f of phaseFields) {
+            const value = med[f.source as keyof PlannedMedium] as number | GlslExpression | ValueParam<number>;
+            const format = f.glslType === 'Spectrum' ? formatSpectrum : formatFloat;
+            lines.push(`        m.${f.name} = ${mediumPropertyExpr(value, f.name, format as (v: never) => string)};`);
+        }
         if (hasModel) lines.push(`        m.model = ${models.indexOf(med.model)};   // '${med.model}'`);
         lines.push('    }');
     }
@@ -377,7 +423,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
 // interaction_medium_{sample,eval,pdf} route to the medium's model (hg_*/rayleigh_*/…) by
 // mp.model (the registry index set in scene_medium_properties). One arm ⇒ a direct call,
 // no branch. Called by the transport techniques (kernel/light/equiangular).
-function generateMediumDispatch(models: string[]): string {
+function generateMediumDispatch(models: string[], wantsEval: boolean, wantsPdf: boolean): string {
     const arms = (call: (m: string) => string): string[] => {
         const out: string[] = [];
         for (let i = 0; i < models.length - 1; i++) out.push(`    if (mp.model == ${i}) return ${call(models[i])};`);
@@ -388,12 +434,16 @@ function generateMediumDispatch(models: string[]): string {
     lines.push('InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {');
     lines.push(...arms((m) => `${m}_sample(wo, mp, xi)`));
     lines.push('}');
-    lines.push('Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {');
-    lines.push(...arms((m) => `${m}_eval(wi, wo, mp)`));
-    lines.push('}');
-    lines.push('float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {');
-    lines.push(...arms((m) => `${m}_pdf(wi, wo, mp)`));
-    lines.push('}');
+    if (wantsEval) {
+        lines.push('Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {');
+        lines.push(...arms((m) => `${m}_eval(wi, wo, mp)`));
+        lines.push('}');
+    }
+    if (wantsPdf) {
+        lines.push('float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {');
+        lines.push(...arms((m) => `${m}_pdf(wi, wo, mp)`));
+        lines.push('}');
+    }
     return lines.join('\n');
 }
 
@@ -452,7 +502,7 @@ function generateMediumTransmittance(materials: PlannedMaterial[]): string {
 // present. Lambert-only collapses to a passthrough; a second model (dielectric)
 // is additive — it just adds `if (mat == <ids>) return <model>_<op>(...)`.
 
-function generateInteractionDispatch(materials: PlannedMaterial[]): string {
+function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: boolean, wantsPdf: boolean): string {
     // Group SURFACE material ids by model, preserving first-appearance order. 'none' materials
     // never reach this dispatch: transport's null-interface branch continues before any surface
     // op (§3.6), so they contribute no arm.
@@ -465,10 +515,12 @@ function generateInteractionDispatch(materials: PlannedMaterial[]): string {
     }
     const fallback = order[order.length - 1]; // the default arm
 
+    // sample + emission are the kernel technique's unconditional surface; eval links only
+    // from the light technique, pdf only from the surface MIS weight (seam decisions).
     const ops = [
         { name: 'sample',   ret: 'InteractionSample', params: 'int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u', args: 'wo, hit, mp, uc, u', zero: 'InteractionSample s; s.wi = wo; s.weight = SPECTRUM_ZERO; s.pdf = 0.0; s.flags = 0u; return s;' },
-        { name: 'eval',     ret: 'Spectrum',          params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp',    args: 'wi, wo, hit, mp', zero: 'return SPECTRUM_ZERO;' },
-        { name: 'pdf',      ret: 'float',             params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp',    args: 'wi, wo, hit, mp', zero: 'return 0.0;' },
+        ...(wantsEval ? [{ name: 'eval', ret: 'Spectrum', params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp', args: 'wi, wo, hit, mp', zero: 'return SPECTRUM_ZERO;' }] : []),
+        ...(wantsPdf ? [{ name: 'pdf', ret: 'float', params: 'int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp', args: 'wi, wo, hit, mp', zero: 'return 0.0;' }] : []),
         { name: 'emission', ret: 'Spectrum',          params: 'int mat, Direction wo, Hit hit, MaterialProperties mp',                 args: 'wo, hit, mp', zero: 'return SPECTRUM_ZERO;' },
     ];
 

@@ -215,9 +215,15 @@ The engine **drops the `frameIndex` builtin** (it was `== sampleCount`); `engine
 
 **Deferred: fixed-seed reproducibility.** `resetSalt` as a plain reset counter is already deterministic across identical action sequences while never replaying within a session. A pin-the-salt "reproducible render" mode is a trivial future add and is *not* required by the §11 harness — furnace, cross-strategy convergence, and pdf-histogram all check converged quantities that are seed-independent.
 
----
+### 2.12 Inclusion granularity and exact linkage — PINNED (owner-decided July 2026)
 
-## 3. Contract 1 — Interaction (surface and medium unified)
+What the July 2026 shader-cleanliness audit resolved: how much of the emitted program must be *exactly* what the (scene, strategy) pair uses.
+
+**Self-authored component files are included wholesale.** A component occupant's `.glsl` file is its complete contract implementation and the unit we optimize by hand — the compiler trusts it as written and never carves inside it. A `pt` program that includes lambert therefore carries `lambert_pdf` (inert, a few lines); a nee program's `sampler_cdf.glsl` carries its pdf half; `raymarch.glsl` carries `sdf_intersect_any` even when no shadow ray exists. This is a **declared cost** (the bias-ledger pattern applied to code size): known, bounded (tens of lines per program), and paid to keep "1 component = 1 folder" and *math is static* — the axes that make authoring cheap. The same applies to the `glsl/core/` spine (the vocabulary every component is written against). Do not split occupant files per-operation to chase these lines.
+
+**Generated code has no such license.** Policy/plumbing the compiler emits (dispatches, tables, wrappers, uniform declarations) must be *exactly linked*: every generated seam has a caller in the assembled program, every declared uniform a reader. The Planner records each seam's existence as an explicit ProgramDescription decision, following the `emitters.lightingPdf` precedent — `materials.surfaceEval`/`surfacePdf`, `media.mediumEval`/`mediumPdf`, `intersection.anyQuery`, `environmentSamplable` (a *decision*, ∧ NEE — not the analyzer's kind-fact), `environmentPdf`, `environmentSelectionLive`. Features gate emission on these fields and mirror them in `provides`.
+
+**Enforcement is structural, not audit-based:** merge's `seam-unused` warning (the dual of `seam-missing`) fires when a provided seam has no requirer. Provides that ride inside wholesale component files are declared `componentScoped` and exempted. Features whose *generated* bodies call their own provided seams (or another feature's) list them in `requires` — self-requires are legitimate and keep the ledger honest.
 
 The path tracer's central abstraction is the **scattering event**, with exactly two implementations: surface (BSDF) and medium (phase function). Both produce the same sample type.
 

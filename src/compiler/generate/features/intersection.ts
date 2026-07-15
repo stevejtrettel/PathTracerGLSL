@@ -34,10 +34,16 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'components/geometry/sdf/raymarch.glsl', source: raymarchGLSL });
     }
 
+    // The occlusion query chain is a seam decision (impl-plan-exact-linkage): the opaque
+    // shadow fast path is its only caller. The generated walkers (analytic_intersect_any,
+    // scene_intersect_any) are gated together; sdf_intersect_any rides inside raymarch.glsl
+    // regardless (whole-component inclusion — the declared cost).
+    const anyQuery = plan.program.intersection.anyQuery;
+
     // Analytic backend: closed-form primitives + per-scene analytic_intersect* dispatch.
     if (hasAnalytic) {
         blocks.push({ origin: 'components/geometry/analytic/analytic_primitives.glsl', source: analyticPrimitivesGLSL });
-        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects) });
+        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects, anyQuery) });
     }
 
     // region → material table spans BOTH backends (regions are globally unique).
@@ -56,20 +62,24 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Zero-thickness regions (analytic quads): their SDF never claims containment, so the
     // dispatcher's owner-covers-own-side shortcut is invalid for them (audit H2).
     const thinRegions = plan.analyticObjects.filter((o) => o.shapeType === 'quad').map((o) => o.index);
-    blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic, thinRegions) });
+    blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic, thinRegions, anyQuery) });
 
     // T4 seams: the geometry/region contract surface (§2.3 tables + the trace-loop queries).
     const provides = [
         { name: 'scene_intersect', signature: 'bool scene_intersect(Ray ray, out Hit hit)' },
-        { name: 'scene_intersect_any', signature: 'bool scene_intersect_any(Ray ray, float maxDist)' },
         { name: 'scene_region_at', signature: 'int scene_region_at(vec3 p)' },
         { name: 'material_of', signature: 'int material_of(int region)' },
     ];
+    if (anyQuery) {
+        provides.push({ name: 'scene_intersect_any', signature: 'bool scene_intersect_any(Ray ray, float maxDist)' });
+    }
     if (plan.materials.some((m) => modelTransmission(m.model))) {
         provides.push({ name: 'ior_of', signature: 'float ior_of(int region)' });
     }
 
-    return { ...emptyContribution('intersection'), blocks, provides };
+    // Self-require: the generated scene_intersect classifies its boundary through
+    // scene_region_at (§4.2) — honest linkage for the seam-unused check.
+    return { ...emptyContribution('intersection'), blocks, provides, requires: ['scene_region_at'] };
 }
 
 // ============================================================================
@@ -149,7 +159,7 @@ function generateSDFCall(obj: PlannedSDFObject): string {
 // Nearest-hit over the analytic objects, and a first-blocker any-hit. p and the shading frame
 // come from ambient_geodesic/ambient_frame so they agree with the SDF path (cross-method match).
 
-function generateAnalyticDispatch(objects: PlannedAnalyticObject[]): string {
+function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: boolean): string {
     const lines: string[] = ['// Generated analytic dispatch'];
 
     // Nearest-hit bounded by the incoming hit.t (the running nearest — set by the caller / a prior
@@ -173,13 +183,15 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[]): string {
     lines.push('}');
     lines.push('');
 
-    lines.push('bool analytic_intersect_any(Ray ray, float maxDist) {');
-    lines.push('    float t;');
-    for (const obj of objects) {
-        lines.push(`    if (${analyticTest(obj)} && t < maxDist) return true;`);
+    if (anyQuery) {
+        lines.push('bool analytic_intersect_any(Ray ray, float maxDist) {');
+        lines.push('    float t;');
+        for (const obj of objects) {
+            lines.push(`    if (${analyticTest(obj)} && t < maxDist) return true;`);
+        }
+        lines.push('    return false;');
+        lines.push('}');
     }
-    lines.push('    return false;');
-    lines.push('}');
 
     return lines.join('\n');
 }
@@ -335,7 +347,7 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
 // residual (EPS_INTERFACE = 10× MARCH_EPSILON). Entering ⇒ region_to = owner; exiting ⇒
 // region_from = owner and the frame flips so n faces region_from (§4.1).
 
-function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, thinRegions: number[]): string {
+function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, thinRegions: number[], anyQuery: boolean): string {
     const lines: string[] = ['// Generated scene_intersect dispatcher'];
 
     // Zero-thickness owners (quads) never claim containment in scene_region_at, so
@@ -378,12 +390,15 @@ function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, thinRegio
     lines.push('}');
     lines.push('');
 
-    // scene_intersect_any — occlusion within maxDist
-    lines.push('bool scene_intersect_any(Ray ray, float maxDist) {');
-    if (hasAnalytic) lines.push('    if (analytic_intersect_any(ray, maxDist)) return true;');
-    if (hasSDF) lines.push('    if (sdf_intersect_any(ray, maxDist)) return true;');
-    lines.push('    return false;');
-    lines.push('}');
+    // scene_intersect_any — occlusion within maxDist (only when the opaque shadow
+    // fast path links it; the media shadow walker re-spawns scene_intersect instead).
+    if (anyQuery) {
+        lines.push('bool scene_intersect_any(Ray ray, float maxDist) {');
+        if (hasAnalytic) lines.push('    if (analytic_intersect_any(ray, maxDist)) return true;');
+        if (hasSDF) lines.push('    if (sdf_intersect_any(ray, maxDist)) return true;');
+        lines.push('    return false;');
+        lines.push('}');
+    }
 
     return lines.join('\n');
 }

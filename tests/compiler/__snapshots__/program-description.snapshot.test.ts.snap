@@ -9,7 +9,9 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -29,6 +31,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -36,6 +39,8 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -49,6 +54,8 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -79,7 +86,9 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -99,12 +108,15 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -118,6 +130,8 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -142,7 +156,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -162,12 +178,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -181,6 +200,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -205,7 +226,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -225,12 +248,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -243,6 +269,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -267,7 +295,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -287,12 +317,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -307,6 +340,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -331,7 +366,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -351,12 +388,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -370,6 +410,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -394,7 +436,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -414,12 +458,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -438,6 +485,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -462,7 +511,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -482,12 +533,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -508,6 +562,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -532,7 +588,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -549,12 +607,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -573,6 +634,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -597,7 +660,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -617,12 +682,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -641,6 +709,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -665,7 +735,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -685,12 +757,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -709,6 +784,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -733,7 +810,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -750,6 +829,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -757,6 +837,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -775,6 +857,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -799,7 +883,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -819,6 +905,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -826,6 +913,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -844,6 +933,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -868,7 +959,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -888,6 +981,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -895,6 +989,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -913,6 +1009,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -937,7 +1035,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -957,12 +1057,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -977,6 +1080,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1001,7 +1106,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1021,12 +1128,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1041,6 +1151,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1065,7 +1177,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1085,12 +1199,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1105,6 +1222,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1129,7 +1248,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1149,12 +1270,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1169,6 +1293,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1193,7 +1319,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1213,6 +1341,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -1220,6 +1349,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1233,6 +1364,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1257,7 +1390,9 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "oneshot",
@@ -1277,12 +1412,15 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1296,6 +1434,8 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1320,7 +1460,9 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1335,6 +1477,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1342,6 +1485,8 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1355,6 +1500,8 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1379,7 +1526,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1396,12 +1545,15 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1420,6 +1572,8 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -1446,7 +1600,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1466,12 +1622,15 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -1490,6 +1649,8 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": true,
+    "mediumPdf": true,
     "models": [
       "hg",
     ],
@@ -1516,7 +1677,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1536,12 +1699,15 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1560,6 +1726,8 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": true,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -1586,7 +1754,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1603,12 +1773,15 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1627,6 +1800,8 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -1653,7 +1828,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1673,12 +1850,15 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1697,6 +1877,8 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": true,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -1723,7 +1905,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1738,12 +1922,15 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1757,6 +1944,8 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": true,
     "present": true,
@@ -1781,7 +1970,9 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1796,12 +1987,15 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1815,6 +2009,8 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1839,7 +2035,9 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "variance",
@@ -1854,12 +2052,15 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1873,6 +2074,8 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -1897,7 +2100,9 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1912,12 +2117,15 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -1931,6 +2139,8 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -1964,7 +2174,9 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "sampleAsLight": true,
     "type": "constant",
   },
-  "environmentSamplable": true,
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -1979,12 +2191,15 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2003,6 +2218,8 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2033,7 +2250,9 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "sampleAsLight": true,
     "type": "constant",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2051,12 +2270,15 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -2075,6 +2297,8 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2105,7 +2329,9 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "sampleAsLight": true,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2123,12 +2349,15 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2147,6 +2376,8 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2170,7 +2401,9 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2187,12 +2420,15 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2206,6 +2442,8 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -2232,7 +2470,9 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2252,12 +2492,15 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2271,6 +2514,8 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": true,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -2297,7 +2542,9 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2317,12 +2564,15 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2336,6 +2586,8 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": true,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -2368,7 +2620,9 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2385,6 +2639,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2392,6 +2647,8 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2405,6 +2662,8 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -2437,7 +2696,9 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2454,6 +2715,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2461,6 +2723,8 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2474,6 +2738,8 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": true,
@@ -2504,7 +2770,9 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2522,12 +2790,15 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2541,6 +2812,8 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2571,7 +2844,9 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2591,12 +2866,15 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2610,6 +2888,8 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2640,7 +2920,9 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2660,12 +2942,15 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2679,6 +2964,8 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": true,
+    "mediumPdf": false,
     "models": [
       "hg",
     ],
@@ -2711,7 +2998,9 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2731,12 +3020,15 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2750,6 +3042,8 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2780,7 +3074,9 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2797,6 +3093,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2804,6 +3101,8 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2817,6 +3116,8 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2847,7 +3148,9 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2867,6 +3170,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -2874,6 +3178,8 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2887,6 +3193,8 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2917,7 +3225,9 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "rotation": 0,
     "type": "procedural",
   },
-  "environmentSamplable": true,
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -2934,6 +3244,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2941,6 +3252,8 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -2959,6 +3272,8 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -2989,7 +3304,9 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "rotation": 0,
     "type": "procedural",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3009,6 +3326,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -3016,6 +3334,8 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -3034,6 +3354,8 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3064,7 +3386,9 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "rotation": 0,
     "type": "procedural",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3084,6 +3408,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -3091,6 +3416,8 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -3109,6 +3436,8 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3139,7 +3468,9 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "rotation": 0,
     "type": "procedural",
   },
+  "environmentPdf": false,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3159,6 +3490,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -3166,6 +3498,8 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3184,6 +3518,8 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3208,7 +3544,9 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3225,12 +3563,15 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "volumeSampling": "analytic",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3244,6 +3585,8 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [
       "hg",
       "rayleigh",
@@ -3275,7 +3618,9 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
-  "environmentSamplable": true,
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3292,6 +3637,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3299,6 +3645,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3317,6 +3665,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3344,7 +3694,9 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3364,6 +3716,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -3371,6 +3724,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -3389,6 +3744,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3416,7 +3773,9 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3436,6 +3795,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -3443,6 +3803,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -3461,6 +3823,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3488,7 +3852,9 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": false,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3508,6 +3874,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -3515,6 +3882,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3533,6 +3902,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3560,7 +3931,9 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
-  "environmentSamplable": true,
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3577,6 +3950,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3584,6 +3958,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3602,6 +3978,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3629,7 +4007,9 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": true,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3649,6 +4029,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -3656,6 +4037,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -3674,6 +4057,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3701,7 +4086,9 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": false,
   "environmentSamplable": true,
+  "environmentSelectionLive": true,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3721,6 +4108,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -3728,6 +4116,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3746,6 +4136,8 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3770,7 +4162,9 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3785,12 +4179,15 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3804,6 +4201,8 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": true,
     "present": true,
@@ -3828,7 +4227,9 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3843,6 +4244,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3850,6 +4252,8 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3863,6 +4267,8 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3887,7 +4293,9 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3907,12 +4315,15 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3926,6 +4337,8 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -3950,7 +4363,9 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -3970,12 +4385,15 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -3991,6 +4409,8 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4018,7 +4438,9 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4038,6 +4460,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4045,6 +4468,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -4063,6 +4488,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4090,7 +4517,9 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4110,6 +4539,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4117,6 +4547,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -4135,6 +4567,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4162,7 +4596,9 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4182,6 +4618,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4189,6 +4626,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -4207,6 +4646,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4234,7 +4675,9 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4254,6 +4697,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4261,6 +4705,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -4279,6 +4725,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4306,7 +4754,9 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4326,6 +4776,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4333,6 +4784,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -4351,6 +4804,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4378,7 +4833,9 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4398,6 +4855,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4405,6 +4863,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -4423,6 +4883,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4449,7 +4911,9 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "type": "image",
     "url": "/hdri/table_mountain_2_puresky_1k.hdr",
   },
+  "environmentPdf": true,
   "environmentSamplable": true,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4469,6 +4933,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4476,6 +4941,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
       "lambert",
       "dielectric",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -4494,6 +4961,8 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4518,7 +4987,9 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4536,12 +5007,15 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -4555,6 +5029,8 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4579,7 +5055,9 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
   "environment": {
     "type": "none",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4597,12 +5075,15 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
     "models": [
       "lambert",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -4616,6 +5097,8 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4646,7 +5129,9 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4663,6 +5148,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4670,6 +5156,8 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
       "lambert",
       "ggx",
     ],
+    "surfaceEval": false,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -4683,6 +5171,8 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4713,7 +5203,9 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4733,6 +5225,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4740,6 +5233,8 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
       "lambert",
       "ggx",
     ],
+    "surfaceEval": true,
+    "surfacePdf": true,
   },
   "measurement": {
     "camera": {
@@ -4753,6 +5248,8 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
@@ -4783,7 +5280,9 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "intensity": 1,
     "type": "constant",
   },
+  "environmentPdf": false,
   "environmentSamplable": false,
+  "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
       "type": "average",
@@ -4803,6 +5302,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "volumeSampling": "none",
   },
   "intersection": {
+    "anyQuery": true,
     "method": "raymarch",
   },
   "materials": {
@@ -4810,6 +5310,8 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
       "lambert",
       "ggx",
     ],
+    "surfaceEval": true,
+    "surfacePdf": false,
   },
   "measurement": {
     "camera": {
@@ -4823,6 +5325,8 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
