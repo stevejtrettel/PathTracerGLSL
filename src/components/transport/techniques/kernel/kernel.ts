@@ -67,7 +67,7 @@ export function kernelRequires(f: Flags): string[] {
     const req = ['interaction_surface_sample', 'interaction_surface_emission', 'material_is_emissive', 'environment_radiance'];
     if (f.nee && f.emitters) req.push('light_of');
     if (f.emittersPdf) req.push('lighting_pdf');
-    if (f.scattering) req.push('hg_sample');
+    if (f.scattering) req.push('interaction_medium_sample');
     if (f.envSamplable && f.mis) req.push('environment_pdf');
     return req;
 }

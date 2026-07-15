@@ -30,8 +30,8 @@ export function lightRequires(f: Flags): string[] {
     const req = ['lighting_sample', 'shadow_transmittance', 'material_has_nondelta_lobes', 'interaction_surface_eval'];
     if (f.mis) req.push('interaction_surface_pdf');
     if (f.scattering && !f.equiangular) {
-        req.push('hg_eval');
-        if (f.mis) req.push('hg_pdf');
+        req.push('interaction_medium_eval');
+        if (f.mis) req.push('interaction_medium_pdf');
     }
     return req;
 }

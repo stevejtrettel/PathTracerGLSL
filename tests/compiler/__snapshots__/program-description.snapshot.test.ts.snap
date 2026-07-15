@@ -49,6 +49,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -117,6 +118,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -179,6 +181,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -240,6 +243,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -303,6 +307,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -365,6 +370,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -432,6 +438,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -501,6 +508,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -565,6 +573,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -632,6 +641,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -699,6 +709,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -764,6 +775,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -832,6 +844,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -900,6 +913,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -963,6 +977,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1026,6 +1041,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1089,6 +1105,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1152,6 +1169,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1215,6 +1233,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1277,6 +1296,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1335,6 +1355,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1399,6 +1420,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -1466,6 +1490,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -1533,6 +1560,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -1597,6 +1627,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -1664,6 +1697,9 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -1721,6 +1757,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": false,
@@ -1778,6 +1815,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1835,6 +1873,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -1892,6 +1931,9 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -1961,6 +2003,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2032,6 +2075,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2103,6 +2147,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2161,6 +2206,9 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -2223,6 +2271,9 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -2285,6 +2336,9 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -2351,6 +2405,9 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": false,
     "present": true,
     "scatteringArms": true,
@@ -2417,6 +2474,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": true,
     "scatteringArms": false,
@@ -2483,6 +2541,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2551,6 +2610,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2619,6 +2679,9 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [
+      "hg",
+    ],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": true,
@@ -2687,6 +2750,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2753,6 +2817,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2822,6 +2887,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2893,6 +2959,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -2967,6 +3034,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3041,6 +3109,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3115,9 +3184,73 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rayleigh + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentSamplable": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "models": [
+      "hg",
+      "rayleigh",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
     "shadowWalker": false,
   },
   "view": {
@@ -3183,6 +3316,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3254,6 +3388,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3325,6 +3460,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3396,6 +3532,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3464,6 +3601,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3535,6 +3673,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3606,6 +3745,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3663,6 +3803,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": true,
     "present": true,
     "scatteringArms": false,
@@ -3721,6 +3862,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3783,6 +3925,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3847,6 +3990,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3918,6 +4062,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -3989,6 +4134,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4060,6 +4206,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4131,6 +4278,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4202,6 +4350,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4273,6 +4422,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4343,6 +4493,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4403,6 +4554,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4463,6 +4615,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4529,6 +4682,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4598,6 +4752,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,
@@ -4667,6 +4822,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "models": [],
     "nullInterfaces": false,
     "present": false,
     "scatteringArms": false,

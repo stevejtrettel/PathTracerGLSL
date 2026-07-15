@@ -181,8 +181,11 @@ export interface MediumDescription {
     sigma_a: MaterialProperty;
     /** Scattering coefficient σ_s. Default 0 (absorbing-only, e.g. tinted glass interior). */
     sigma_s?: MaterialProperty;
-    /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). */
+    /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). Read only by 'hg'. */
     phase_g?: MaterialProperty;
+    /** The volume's scattering model (which phase function). Default 'hg'. 'rayleigh' is
+     *  parameter-free (molecular/sky; its λ⁻⁴ color is σ_s). Registry: volume_scattering/. */
+    model?: 'hg' | 'rayleigh';
 }
 
 export interface MaterialDescription {

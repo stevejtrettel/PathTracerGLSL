@@ -48,6 +48,6 @@ void equiangular_sample_direct(inout PathState s, int med_mat, float t_max) {
     // Delta convention (§6.1): 1/d² folds into the incident radiance here. Phase EVAL,
     // NO cosine (§2.2). σ_s is explicit — this estimate rides no medium_sample weight.
     Direction wo_med = -d;
-    s.radiance += s.throughput * T_seg * m_evt.sigma_s * hg_eval(wi, wo_med, m_evt)
+    s.radiance += s.throughput * T_seg * m_evt.sigma_s * interaction_medium_eval(wi, wo_med, m_evt)
         * (intensity / d2) * vis / (pdf_t * select_pdf);
 }

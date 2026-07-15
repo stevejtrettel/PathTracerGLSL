@@ -81,15 +81,19 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     const wantsShadowMedia = media.shadowWalker;
     if (media.present) {
         blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials) });
-        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials) });
+        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models) });
         // The 'analytic' strategy bodies (volumetric-component §4) — needed by the scattering
         // arms (seam 1) and by the spectral shadow walker's per-segment form (seam 2).
         if (scatteringLive || wantsShadowMedia) {
             blocks.push({ origin: 'components/transport/volume/analytic/analytic.glsl', source: mediumAnalyticGLSL });
         }
         if (scatteringLive) {
-            // v1: every scattering medium phases through HG (registry-driven, R1b).
-            blocks.push({ origin: 'components/volume_scattering/hg/hg.glsl', source: PHASE_MODELS['hg'].glsl });
+            // Emit each present scattering model's GLSL, then the dispatch that routes by
+            // mp.model (twin of the surface interaction dispatch).
+            for (const m of plan.program.media.models) {
+                blocks.push({ origin: `components/volume_scattering/${m}/${m}.glsl`, source: PHASE_MODELS[m].glsl });
+            }
+            blocks.push({ origin: 'generated:medium-dispatch', source: generateMediumDispatch(plan.program.media.models) });
         }
         blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan) });
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).
@@ -148,10 +152,12 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             provides.push({ name: 'medium_transmittance', signature: 'Spectrum medium_transmittance(int med, Ray ray, float len)' });
         }
         if (scatteringLive) {
+            // The dispatch is the public seam (transport calls it); the per-model funcs
+            // (hg_*/rayleigh_*) are internal, called only by the dispatch in this feature.
             provides.push(
-                { name: 'hg_eval', signature: 'Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp)' },
-                { name: 'hg_sample', signature: 'InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi)' },
-                { name: 'hg_pdf', signature: 'float hg_pdf(Direction wi, Direction wo, MediumProperties mp)' },
+                { name: 'interaction_medium_eval', signature: 'Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp)' },
+                { name: 'interaction_medium_sample', signature: 'InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi)' },
+                { name: 'interaction_medium_pdf', signature: 'float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp)' },
             );
         }
     }
@@ -336,14 +342,16 @@ function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Ve
     return format(prop as never);
 }
 
-function generateMediumProperties(materials: PlannedMaterial[]): string {
+function generateMediumProperties(materials: PlannedMaterial[], models: string[]): string {
     const withMedium = materials.filter((m) => m.medium !== null);
+    const hasModel = models.length > 0;   // the `model` field exists only when scattering is live
     const lines: string[] = ['// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)'];
     lines.push('MediumProperties scene_medium_properties(int mat, vec3 p) {');
     lines.push('    MediumProperties m;');
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');
     lines.push('    m.sigma_s = SPECTRUM_ZERO;');
     lines.push('    m.phase_g = 0.0;');
+    if (hasModel) lines.push('    m.model = 0;');
     for (let i = 0; i < withMedium.length; i++) {
         const mat = withMedium[i];
         const med = mat.medium!;
@@ -352,9 +360,34 @@ function generateMediumProperties(materials: PlannedMaterial[]): string {
         lines.push(`        m.sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatSpectrum)};`);
         lines.push(`        m.sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatSpectrum)};`);
         lines.push(`        m.phase_g = ${mediumPropertyExpr(med.phase_g, 'phase_g', formatFloat)};`);
+        if (hasModel) lines.push(`        m.model = ${models.indexOf(med.model)};   // '${med.model}'`);
         lines.push('    }');
     }
     lines.push('    return m;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// Generated volume-scattering dispatch — the twin of the surface interaction dispatch.
+// interaction_medium_{sample,eval,pdf} route to the medium's model (hg_*/rayleigh_*/…) by
+// mp.model (the registry index set in scene_medium_properties). One arm ⇒ a direct call,
+// no branch. Called by the transport techniques (kernel/light/equiangular).
+function generateMediumDispatch(models: string[]): string {
+    const arms = (call: (m: string) => string): string[] => {
+        const out: string[] = [];
+        for (let i = 0; i < models.length - 1; i++) out.push(`    if (mp.model == ${i}) return ${call(models[i])};`);
+        out.push(`    return ${call(models[models.length - 1])};`);
+        return out;
+    };
+    const lines: string[] = ['// Generated volume-scattering dispatch (interaction_medium_* over mp.model)'];
+    lines.push('InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {');
+    lines.push(...arms((m) => `${m}_sample(wo, mp, xi)`));
+    lines.push('}');
+    lines.push('Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {');
+    lines.push(...arms((m) => `${m}_eval(wi, wo, mp)`));
+    lines.push('}');
+    lines.push('float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {');
+    lines.push(...arms((m) => `${m}_pdf(wi, wo, mp)`));
     lines.push('}');
     return lines.join('\n');
 }

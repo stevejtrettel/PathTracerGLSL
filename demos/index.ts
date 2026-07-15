@@ -10,7 +10,7 @@ import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBo
 import { cornellThinlensStrategy, cornellEquirectStrategy, cornellOrthoStrategy, cornellCylindricalStrategy, fisheyeStrategy } from './cameraScenes.js';
 import { mixedScene, analyticStrategy } from './analyticScenes.js';
 import { submergedScene, submergedStrategy } from './dielectricScenes.js';
-import { fogcubeScene, fogcubeStrategy } from './mediaScenes.js';
+import { fogcubeScene, fogcubeStrategy, rayleighScene, rayleighStrategy } from './mediaScenes.js';
 import {
     marbleScene,
     marbleStrategy,
@@ -118,6 +118,18 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             'camera.position': [0, 1.7, 6],
             'camera.target': [0, 1.6, -8],
+        },
+    },
+    rayleigh: {
+        scene: rayleighScene,
+        strategies: [rayleighStrategy],
+        exercises:
+            'DEMO — the multi-model volume dispatch (interaction_medium_* over mp.model): LEFT box = rayleigh scattering (parameter-free, λ⁻⁴ color in σ_s), RIGHT box = hg (g=0.6). Same extinction; only medium.model differs',
+        expected:
+            'two fog boxes lit from the emissive checker below: LEFT a cool/bluish evenly-scattering haze (rayleigh), RIGHT a warmer forward-scattering glow (hg). If they look identical the dispatch isn\'t selecting the model',
+        initialParameters: {
+            'camera.position': [0, 1.4, 4.5],
+            'camera.target': [0, 0.9, 0],
         },
     },
     tonemap: {

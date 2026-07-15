@@ -5,6 +5,7 @@ import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
+import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
 
@@ -33,6 +34,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 sigma_a: resolveColorProperty(mat.medium.sigma_a, [0.0, 0.0, 0.0]),
                 sigma_s: resolveColorProperty(mat.medium.sigma_s, [0.0, 0.0, 0.0]),
                 phase_g: resolveScalarProperty(mat.medium.phase_g, 0.0),
+                model: mat.medium.model ?? 'hg',
             },
         });
     }
@@ -277,6 +279,13 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             scatteringArms,
             nullInterfaces: features.media.hasNullInterfaces,
             shadowWalker: features.media.hasMedia && lighting !== null,
+            // Distinct scattering models present → the MediumProperties field union + the
+            // generated interaction_medium_* dispatch. Only meaningful when scattering is
+            // live (the phase is invoked only at scatter events); [] otherwise.
+            models: scatteringArms
+                ? Object.keys(PHASE_MODELS).filter((k) =>
+                    Object.values(scene.materials).some((m) => m.medium !== undefined && (m.medium.model ?? 'hg') === k))
+                : [],
         },
         emitters: {
             samplable: samplableEmitters,

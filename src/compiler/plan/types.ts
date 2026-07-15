@@ -79,6 +79,9 @@ export interface MediaDesc {
     /** Media AND NEE: the spectral segment walker (shadow_media) replaces the boolean
      *  fast path (shadow_opaque) behind the §6.3 contract. */
     shadowWalker: boolean;
+    /** Distinct volume scattering models present (registry order), for the MediumProperties
+     *  field union + the generated interaction_medium_* dispatch. Empty if no scattering. */
+    models: string[];
 }
 
 /** What samplable-emitter machinery this program contains (§6.2). */
@@ -170,6 +173,8 @@ export interface PlannedMedium {
     sigma_a: Vec3 | GlslExpression | ValueParam<Vec3>;
     sigma_s: Vec3 | GlslExpression | ValueParam<Vec3>;
     phase_g: number | GlslExpression | ValueParam<number>;
+    /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh'. */
+    model: string;
 }
 
 /**

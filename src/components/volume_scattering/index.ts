@@ -4,7 +4,14 @@
 
 import type { PhaseModelDescriptor } from '../descriptors.js';
 import { hgDescriptor } from './hg/hg.js';
+import { rayleighDescriptor } from './rayleigh/rayleigh.js';
 
 export const PHASE_MODELS: Record<string, PhaseModelDescriptor> = {
     hg: hgDescriptor,
+    rayleigh: rayleighDescriptor,
 };
+
+/** True iff the volume scattering model has a live occupant — the Validator's gate. */
+export function isMediumModelSupported(id: string): boolean {
+    return PHASE_MODELS[id] !== undefined;
+}

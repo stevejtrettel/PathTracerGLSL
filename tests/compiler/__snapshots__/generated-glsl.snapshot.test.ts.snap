@@ -15263,6 +15263,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -15455,9 +15456,9 @@ bool material_has_medium(int mat);
 bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -15912,10 +15913,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 2) {   // 'haze'
         m.sigma_a = vec3(0.05, 0.05, 0.05);
         m.sigma_s = vec3(0.4, 0.4, 0.4);
         m.phase_g = 0.6;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -16005,6 +16008,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -16131,7 +16144,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -16274,199 +16287,204 @@ void main() {
         "startLine": 74,
       },
       {
-        "endLine": 85,
+        "endLine": 86,
         "origin": "generated:medium-properties",
         "startLine": 80,
       },
       {
-        "endLine": 103,
+        "endLine": 104,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 86,
+        "startLine": 87,
       },
       {
-        "endLine": 122,
+        "endLine": 123,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 104,
+        "startLine": 105,
       },
       {
-        "endLine": 163,
+        "endLine": 164,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 123,
+        "startLine": 124,
       },
       {
-        "endLine": 195,
+        "endLine": 196,
         "origin": "glsl/core/math.glsl",
-        "startLine": 164,
+        "startLine": 165,
       },
       {
-        "endLine": 199,
+        "endLine": 200,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 196,
+        "startLine": 197,
       },
       {
-        "endLine": 213,
+        "endLine": 214,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 200,
+        "startLine": 201,
       },
       {
-        "endLine": 237,
+        "endLine": 238,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 214,
+        "startLine": 215,
       },
       {
-        "endLine": 257,
+        "endLine": 258,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 238,
+        "startLine": 239,
       },
       {
-        "endLine": 286,
+        "endLine": 287,
         "origin": "generated:interfaces",
-        "startLine": 258,
+        "startLine": 259,
       },
       {
-        "endLine": 303,
+        "endLine": 304,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 287,
+        "startLine": 288,
       },
       {
-        "endLine": 372,
+        "endLine": 373,
         "origin": "generated:sdf-dispatch",
-        "startLine": 304,
+        "startLine": 305,
       },
       {
-        "endLine": 492,
+        "endLine": 493,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 373,
+        "startLine": 374,
       },
       {
-        "endLine": 543,
+        "endLine": 544,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 493,
+        "startLine": 494,
       },
       {
-        "endLine": 562,
+        "endLine": 563,
         "origin": "generated:analytic-dispatch",
-        "startLine": 544,
+        "startLine": 545,
       },
       {
-        "endLine": 575,
+        "endLine": 576,
         "origin": "generated:material-of",
-        "startLine": 563,
+        "startLine": 564,
       },
       {
-        "endLine": 600,
+        "endLine": 601,
         "origin": "generated:scene-region-at",
-        "startLine": 576,
+        "startLine": 577,
       },
       {
-        "endLine": 633,
+        "endLine": 634,
         "origin": "generated:scene-intersect",
-        "startLine": 601,
+        "startLine": 602,
       },
       {
-        "endLine": 659,
+        "endLine": 660,
         "origin": "generated:material-lookup",
-        "startLine": 634,
+        "startLine": 635,
       },
       {
-        "endLine": 697,
+        "endLine": 698,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 660,
+        "startLine": 661,
       },
       {
-        "endLine": 710,
+        "endLine": 711,
         "origin": "generated:interaction-dispatch",
-        "startLine": 698,
+        "startLine": 699,
       },
       {
-        "endLine": 715,
+        "endLine": 716,
         "origin": "generated:nondelta-guard",
-        "startLine": 711,
+        "startLine": 712,
       },
       {
-        "endLine": 719,
+        "endLine": 720,
         "origin": "generated:emissive-table",
-        "startLine": 716,
+        "startLine": 717,
       },
       {
-        "endLine": 726,
+        "endLine": 727,
         "origin": "generated:media-tables",
-        "startLine": 720,
+        "startLine": 721,
       },
       {
-        "endLine": 739,
+        "endLine": 742,
         "origin": "generated:medium-properties",
-        "startLine": 727,
+        "startLine": 728,
       },
       {
-        "endLine": 782,
+        "endLine": 785,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 740,
+        "startLine": 743,
       },
       {
-        "endLine": 825,
+        "endLine": 828,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 783,
+        "startLine": 786,
       },
       {
-        "endLine": 837,
+        "endLine": 838,
+        "origin": "generated:medium-dispatch",
+        "startLine": 829,
+      },
+      {
+        "endLine": 850,
         "origin": "generated:medium-sample",
-        "startLine": 826,
+        "startLine": 839,
       },
       {
-        "endLine": 845,
+        "endLine": 858,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 838,
+        "startLine": 851,
       },
       {
-        "endLine": 866,
+        "endLine": 879,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 846,
+        "startLine": 859,
       },
       {
-        "endLine": 870,
+        "endLine": 883,
         "origin": "generated:environment",
-        "startLine": 867,
+        "startLine": 880,
       },
       {
-        "endLine": 890,
+        "endLine": 903,
         "origin": "generated:transport/state",
-        "startLine": 871,
+        "startLine": 884,
       },
       {
-        "endLine": 897,
+        "endLine": 910,
         "origin": "generated:transport/combiner",
-        "startLine": 891,
+        "startLine": 904,
       },
       {
-        "endLine": 901,
+        "endLine": 914,
         "origin": "generated:transport/kernel-record",
-        "startLine": 898,
+        "startLine": 911,
       },
       {
-        "endLine": 909,
+        "endLine": 922,
         "origin": "generated:transport/roulette",
-        "startLine": 902,
-      },
-      {
-        "endLine": 944,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 910,
+        "startLine": 915,
       },
       {
         "endLine": 957,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 945,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 923,
       },
       {
-        "endLine": 1005,
-        "origin": "generated:transport/walk",
+        "endLine": 970,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 958,
       },
       {
-        "endLine": 1032,
+        "endLine": 1018,
+        "origin": "generated:transport/walk",
+        "startLine": 971,
+      },
+      {
+        "endLine": 1045,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1006,
+        "startLine": 1019,
       },
     ],
   },
@@ -16818,6 +16836,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -17019,9 +17038,9 @@ bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
 Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
@@ -17481,10 +17500,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 2) {   // 'haze'
         m.sigma_a = vec3(0.05, 0.05, 0.05);
         m.sigma_s = vec3(0.4, 0.4, 0.4);
         m.phase_g = 0.6;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -17574,6 +17595,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -17818,7 +17849,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -17858,7 +17889,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     if (ls.pdf <= 0.0) return;
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -18000,244 +18031,249 @@ void main() {
         "startLine": 75,
       },
       {
-        "endLine": 86,
+        "endLine": 87,
         "origin": "generated:medium-properties",
         "startLine": 81,
       },
       {
-        "endLine": 104,
+        "endLine": 105,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 87,
+        "startLine": 88,
       },
       {
-        "endLine": 123,
+        "endLine": 124,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 105,
+        "startLine": 106,
       },
       {
-        "endLine": 164,
+        "endLine": 165,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 124,
+        "startLine": 125,
       },
       {
-        "endLine": 196,
+        "endLine": 197,
         "origin": "glsl/core/math.glsl",
-        "startLine": 165,
+        "startLine": 166,
       },
       {
-        "endLine": 200,
+        "endLine": 201,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 197,
+        "startLine": 198,
       },
       {
-        "endLine": 208,
+        "endLine": 209,
         "origin": "glsl/core/math_mis.glsl",
-        "startLine": 201,
+        "startLine": 202,
       },
       {
-        "endLine": 222,
+        "endLine": 223,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 209,
+        "startLine": 210,
       },
       {
-        "endLine": 246,
+        "endLine": 247,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 223,
+        "startLine": 224,
       },
       {
-        "endLine": 266,
+        "endLine": 267,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 247,
+        "startLine": 248,
       },
       {
-        "endLine": 301,
+        "endLine": 302,
         "origin": "generated:interfaces",
-        "startLine": 267,
+        "startLine": 268,
       },
       {
-        "endLine": 318,
+        "endLine": 319,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 302,
+        "startLine": 303,
       },
       {
-        "endLine": 387,
+        "endLine": 388,
         "origin": "generated:sdf-dispatch",
-        "startLine": 319,
+        "startLine": 320,
       },
       {
-        "endLine": 507,
+        "endLine": 508,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 388,
+        "startLine": 389,
       },
       {
-        "endLine": 558,
+        "endLine": 559,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 508,
+        "startLine": 509,
       },
       {
-        "endLine": 577,
+        "endLine": 578,
         "origin": "generated:analytic-dispatch",
-        "startLine": 559,
+        "startLine": 560,
       },
       {
-        "endLine": 590,
+        "endLine": 591,
         "origin": "generated:material-of",
-        "startLine": 578,
+        "startLine": 579,
       },
       {
-        "endLine": 615,
+        "endLine": 616,
         "origin": "generated:scene-region-at",
-        "startLine": 591,
+        "startLine": 592,
       },
       {
-        "endLine": 648,
+        "endLine": 649,
         "origin": "generated:scene-intersect",
-        "startLine": 616,
+        "startLine": 617,
       },
       {
-        "endLine": 674,
+        "endLine": 675,
         "origin": "generated:material-lookup",
-        "startLine": 649,
+        "startLine": 650,
       },
       {
-        "endLine": 712,
+        "endLine": 713,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 675,
+        "startLine": 676,
       },
       {
-        "endLine": 725,
+        "endLine": 726,
         "origin": "generated:interaction-dispatch",
-        "startLine": 713,
+        "startLine": 714,
       },
       {
-        "endLine": 730,
+        "endLine": 731,
         "origin": "generated:nondelta-guard",
-        "startLine": 726,
+        "startLine": 727,
       },
       {
-        "endLine": 734,
+        "endLine": 735,
         "origin": "generated:emissive-table",
-        "startLine": 731,
+        "startLine": 732,
       },
       {
-        "endLine": 741,
+        "endLine": 742,
         "origin": "generated:media-tables",
-        "startLine": 735,
+        "startLine": 736,
       },
       {
-        "endLine": 754,
+        "endLine": 757,
         "origin": "generated:medium-properties",
-        "startLine": 742,
+        "startLine": 743,
       },
       {
-        "endLine": 797,
+        "endLine": 800,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 755,
+        "startLine": 758,
       },
       {
-        "endLine": 840,
+        "endLine": 843,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 798,
+        "startLine": 801,
       },
       {
-        "endLine": 852,
+        "endLine": 853,
+        "origin": "generated:medium-dispatch",
+        "startLine": 844,
+      },
+      {
+        "endLine": 865,
         "origin": "generated:medium-sample",
-        "startLine": 841,
+        "startLine": 854,
       },
       {
-        "endLine": 859,
+        "endLine": 872,
         "origin": "generated:medium-transmittance",
-        "startLine": 853,
+        "startLine": 866,
       },
       {
-        "endLine": 899,
+        "endLine": 912,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 860,
+        "startLine": 873,
       },
       {
-        "endLine": 928,
+        "endLine": 941,
         "origin": "components/lights/quad/quad.glsl",
-        "startLine": 900,
+        "startLine": 913,
       },
       {
-        "endLine": 935,
+        "endLine": 948,
         "origin": "generated:light-sampling",
-        "startLine": 929,
+        "startLine": 942,
       },
       {
-        "endLine": 940,
+        "endLine": 953,
         "origin": "generated:light-of",
-        "startLine": 936,
+        "startLine": 949,
       },
       {
-        "endLine": 950,
+        "endLine": 963,
         "origin": "generated:lighting-pdf",
-        "startLine": 941,
+        "startLine": 954,
       },
       {
-        "endLine": 958,
+        "endLine": 971,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 951,
+        "startLine": 964,
       },
       {
-        "endLine": 979,
+        "endLine": 992,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 959,
+        "startLine": 972,
       },
       {
-        "endLine": 983,
+        "endLine": 996,
         "origin": "generated:environment",
-        "startLine": 980,
+        "startLine": 993,
       },
       {
-        "endLine": 1007,
+        "endLine": 1020,
         "origin": "generated:transport/state",
-        "startLine": 984,
+        "startLine": 997,
       },
       {
-        "endLine": 1028,
+        "endLine": 1041,
         "origin": "generated:transport/combiner",
-        "startLine": 1008,
+        "startLine": 1021,
       },
       {
-        "endLine": 1034,
+        "endLine": 1047,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1029,
+        "startLine": 1042,
       },
       {
-        "endLine": 1042,
+        "endLine": 1055,
         "origin": "generated:transport/roulette",
-        "startLine": 1035,
-      },
-      {
-        "endLine": 1077,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1043,
+        "startLine": 1048,
       },
       {
         "endLine": 1090,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1078,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 1056,
       },
       {
-        "endLine": 1112,
-        "origin": "components/transport/techniques/light/light.glsl",
+        "endLine": 1103,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 1091,
       },
       {
-        "endLine": 1127,
+        "endLine": 1125,
+        "origin": "components/transport/techniques/light/light.glsl",
+        "startLine": 1104,
+      },
+      {
+        "endLine": 1140,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1113,
+        "startLine": 1126,
       },
       {
-        "endLine": 1177,
+        "endLine": 1190,
         "origin": "generated:transport/walk",
-        "startLine": 1128,
+        "startLine": 1141,
       },
       {
-        "endLine": 1204,
+        "endLine": 1217,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1178,
+        "startLine": 1191,
       },
     ],
   },
@@ -18589,6 +18625,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -18782,9 +18819,9 @@ bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
 Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
@@ -19243,10 +19280,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 2) {   // 'haze'
         m.sigma_a = vec3(0.05, 0.05, 0.05);
         m.sigma_s = vec3(0.4, 0.4, 0.4);
         m.phase_g = 0.6;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -19336,6 +19375,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -19560,7 +19609,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -19600,7 +19649,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     if (ls.pdf <= 0.0) return;
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -19742,234 +19791,239 @@ void main() {
         "startLine": 75,
       },
       {
-        "endLine": 86,
+        "endLine": 87,
         "origin": "generated:medium-properties",
         "startLine": 81,
       },
       {
-        "endLine": 104,
+        "endLine": 105,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 87,
+        "startLine": 88,
       },
       {
-        "endLine": 123,
+        "endLine": 124,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 105,
+        "startLine": 106,
       },
       {
-        "endLine": 164,
+        "endLine": 165,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 124,
+        "startLine": 125,
       },
       {
-        "endLine": 196,
+        "endLine": 197,
         "origin": "glsl/core/math.glsl",
-        "startLine": 165,
+        "startLine": 166,
       },
       {
-        "endLine": 200,
+        "endLine": 201,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 197,
+        "startLine": 198,
       },
       {
-        "endLine": 214,
+        "endLine": 215,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 201,
+        "startLine": 202,
       },
       {
-        "endLine": 238,
+        "endLine": 239,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 215,
+        "startLine": 216,
       },
       {
-        "endLine": 258,
+        "endLine": 259,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 239,
+        "startLine": 240,
       },
       {
-        "endLine": 292,
+        "endLine": 293,
         "origin": "generated:interfaces",
-        "startLine": 259,
+        "startLine": 260,
       },
       {
-        "endLine": 309,
+        "endLine": 310,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 293,
+        "startLine": 294,
       },
       {
-        "endLine": 378,
+        "endLine": 379,
         "origin": "generated:sdf-dispatch",
-        "startLine": 310,
+        "startLine": 311,
       },
       {
-        "endLine": 498,
+        "endLine": 499,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 379,
+        "startLine": 380,
       },
       {
-        "endLine": 549,
+        "endLine": 550,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 499,
+        "startLine": 500,
       },
       {
-        "endLine": 568,
+        "endLine": 569,
         "origin": "generated:analytic-dispatch",
-        "startLine": 550,
+        "startLine": 551,
       },
       {
-        "endLine": 581,
+        "endLine": 582,
         "origin": "generated:material-of",
-        "startLine": 569,
+        "startLine": 570,
       },
       {
-        "endLine": 606,
+        "endLine": 607,
         "origin": "generated:scene-region-at",
-        "startLine": 582,
+        "startLine": 583,
       },
       {
-        "endLine": 639,
+        "endLine": 640,
         "origin": "generated:scene-intersect",
-        "startLine": 607,
+        "startLine": 608,
       },
       {
-        "endLine": 665,
+        "endLine": 666,
         "origin": "generated:material-lookup",
-        "startLine": 640,
+        "startLine": 641,
       },
       {
-        "endLine": 703,
+        "endLine": 704,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 666,
+        "startLine": 667,
       },
       {
-        "endLine": 716,
+        "endLine": 717,
         "origin": "generated:interaction-dispatch",
-        "startLine": 704,
+        "startLine": 705,
       },
       {
-        "endLine": 721,
+        "endLine": 722,
         "origin": "generated:nondelta-guard",
-        "startLine": 717,
+        "startLine": 718,
       },
       {
-        "endLine": 725,
+        "endLine": 726,
         "origin": "generated:emissive-table",
-        "startLine": 722,
+        "startLine": 723,
       },
       {
-        "endLine": 732,
+        "endLine": 733,
         "origin": "generated:media-tables",
-        "startLine": 726,
+        "startLine": 727,
       },
       {
-        "endLine": 745,
+        "endLine": 748,
         "origin": "generated:medium-properties",
-        "startLine": 733,
+        "startLine": 734,
       },
       {
-        "endLine": 788,
+        "endLine": 791,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 746,
+        "startLine": 749,
       },
       {
-        "endLine": 831,
+        "endLine": 834,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 789,
+        "startLine": 792,
       },
       {
-        "endLine": 843,
+        "endLine": 844,
+        "origin": "generated:medium-dispatch",
+        "startLine": 835,
+      },
+      {
+        "endLine": 856,
         "origin": "generated:medium-sample",
-        "startLine": 832,
+        "startLine": 845,
       },
       {
-        "endLine": 850,
+        "endLine": 863,
         "origin": "generated:medium-transmittance",
-        "startLine": 844,
+        "startLine": 857,
       },
       {
-        "endLine": 890,
+        "endLine": 903,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 851,
+        "startLine": 864,
       },
       {
-        "endLine": 919,
+        "endLine": 932,
         "origin": "components/lights/quad/quad.glsl",
-        "startLine": 891,
-      },
-      {
-        "endLine": 926,
-        "origin": "generated:light-sampling",
-        "startLine": 920,
-      },
-      {
-        "endLine": 931,
-        "origin": "generated:light-of",
-        "startLine": 927,
+        "startLine": 904,
       },
       {
         "endLine": 939,
-        "origin": "components/pixel/box/box.glsl",
-        "startLine": 932,
+        "origin": "generated:light-sampling",
+        "startLine": 933,
       },
       {
-        "endLine": 960,
-        "origin": "components/camera/pinhole/pinhole.glsl",
+        "endLine": 944,
+        "origin": "generated:light-of",
         "startLine": 940,
       },
       {
-        "endLine": 964,
+        "endLine": 952,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 945,
+      },
+      {
+        "endLine": 973,
+        "origin": "components/camera/pinhole/pinhole.glsl",
+        "startLine": 953,
+      },
+      {
+        "endLine": 977,
         "origin": "generated:environment",
-        "startLine": 961,
+        "startLine": 974,
       },
       {
-        "endLine": 984,
+        "endLine": 997,
         "origin": "generated:transport/state",
-        "startLine": 965,
+        "startLine": 978,
       },
       {
-        "endLine": 1001,
+        "endLine": 1014,
         "origin": "generated:transport/combiner",
-        "startLine": 985,
+        "startLine": 998,
       },
       {
-        "endLine": 1005,
+        "endLine": 1018,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1002,
+        "startLine": 1015,
       },
       {
-        "endLine": 1013,
+        "endLine": 1026,
         "origin": "generated:transport/roulette",
-        "startLine": 1006,
-      },
-      {
-        "endLine": 1048,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1014,
+        "startLine": 1019,
       },
       {
         "endLine": 1061,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1049,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 1027,
       },
       {
-        "endLine": 1083,
-        "origin": "components/transport/techniques/light/light.glsl",
+        "endLine": 1074,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 1062,
       },
       {
-        "endLine": 1098,
+        "endLine": 1096,
+        "origin": "components/transport/techniques/light/light.glsl",
+        "startLine": 1075,
+      },
+      {
+        "endLine": 1111,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1084,
+        "startLine": 1097,
       },
       {
-        "endLine": 1148,
+        "endLine": 1161,
         "origin": "generated:transport/walk",
-        "startLine": 1099,
+        "startLine": 1112,
       },
       {
-        "endLine": 1175,
+        "endLine": 1188,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1149,
+        "startLine": 1162,
       },
     ],
   },
@@ -20320,6 +20374,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -20512,9 +20567,9 @@ bool material_has_medium(int mat);
 bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -20983,10 +21038,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 2) {   // 'haze'
         m.sigma_a = vec3(0.05, 0.05, 0.05);
         m.sigma_s = vec3(0.4, 0.4, 0.4);
         m.phase_g = 0.6;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -21076,6 +21133,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -21202,7 +21269,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -21345,199 +21412,204 @@ void main() {
         "startLine": 74,
       },
       {
-        "endLine": 85,
+        "endLine": 86,
         "origin": "generated:medium-properties",
         "startLine": 80,
       },
       {
-        "endLine": 103,
+        "endLine": 104,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 86,
+        "startLine": 87,
       },
       {
-        "endLine": 122,
+        "endLine": 123,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 104,
+        "startLine": 105,
       },
       {
-        "endLine": 163,
+        "endLine": 164,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 123,
+        "startLine": 124,
       },
       {
-        "endLine": 195,
+        "endLine": 196,
         "origin": "glsl/core/math.glsl",
-        "startLine": 164,
+        "startLine": 165,
       },
       {
-        "endLine": 199,
+        "endLine": 200,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 196,
+        "startLine": 197,
       },
       {
-        "endLine": 213,
+        "endLine": 214,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 200,
+        "startLine": 201,
       },
       {
-        "endLine": 237,
+        "endLine": 238,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 214,
+        "startLine": 215,
       },
       {
-        "endLine": 257,
+        "endLine": 258,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 238,
+        "startLine": 239,
       },
       {
-        "endLine": 286,
+        "endLine": 287,
         "origin": "generated:interfaces",
-        "startLine": 258,
+        "startLine": 259,
       },
       {
-        "endLine": 303,
+        "endLine": 304,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 287,
+        "startLine": 288,
       },
       {
-        "endLine": 372,
+        "endLine": 373,
         "origin": "generated:sdf-dispatch",
-        "startLine": 304,
+        "startLine": 305,
       },
       {
-        "endLine": 492,
+        "endLine": 493,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 373,
+        "startLine": 374,
       },
       {
-        "endLine": 543,
+        "endLine": 544,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 493,
+        "startLine": 494,
       },
       {
-        "endLine": 570,
+        "endLine": 571,
         "origin": "generated:analytic-dispatch",
-        "startLine": 544,
+        "startLine": 545,
       },
       {
-        "endLine": 584,
+        "endLine": 585,
         "origin": "generated:material-of",
-        "startLine": 571,
+        "startLine": 572,
       },
       {
-        "endLine": 611,
+        "endLine": 612,
         "origin": "generated:scene-region-at",
-        "startLine": 585,
+        "startLine": 586,
       },
       {
-        "endLine": 644,
+        "endLine": 645,
         "origin": "generated:scene-intersect",
-        "startLine": 612,
+        "startLine": 613,
       },
       {
-        "endLine": 673,
+        "endLine": 674,
         "origin": "generated:material-lookup",
-        "startLine": 645,
+        "startLine": 646,
       },
       {
-        "endLine": 711,
+        "endLine": 712,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 674,
+        "startLine": 675,
       },
       {
-        "endLine": 724,
+        "endLine": 725,
         "origin": "generated:interaction-dispatch",
-        "startLine": 712,
+        "startLine": 713,
       },
       {
-        "endLine": 729,
+        "endLine": 730,
         "origin": "generated:nondelta-guard",
-        "startLine": 725,
+        "startLine": 726,
       },
       {
-        "endLine": 733,
+        "endLine": 734,
         "origin": "generated:emissive-table",
-        "startLine": 730,
+        "startLine": 731,
       },
       {
-        "endLine": 740,
+        "endLine": 741,
         "origin": "generated:media-tables",
-        "startLine": 734,
+        "startLine": 735,
       },
       {
-        "endLine": 753,
+        "endLine": 756,
         "origin": "generated:medium-properties",
-        "startLine": 741,
+        "startLine": 742,
       },
       {
-        "endLine": 796,
+        "endLine": 799,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 754,
+        "startLine": 757,
       },
       {
-        "endLine": 839,
+        "endLine": 842,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 797,
+        "startLine": 800,
       },
       {
-        "endLine": 851,
+        "endLine": 852,
+        "origin": "generated:medium-dispatch",
+        "startLine": 843,
+      },
+      {
+        "endLine": 864,
         "origin": "generated:medium-sample",
-        "startLine": 840,
+        "startLine": 853,
       },
       {
-        "endLine": 859,
+        "endLine": 872,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 852,
+        "startLine": 865,
       },
       {
-        "endLine": 880,
+        "endLine": 893,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 860,
+        "startLine": 873,
       },
       {
-        "endLine": 884,
+        "endLine": 897,
         "origin": "generated:environment",
-        "startLine": 881,
+        "startLine": 894,
       },
       {
-        "endLine": 904,
+        "endLine": 917,
         "origin": "generated:transport/state",
-        "startLine": 885,
+        "startLine": 898,
       },
       {
-        "endLine": 911,
+        "endLine": 924,
         "origin": "generated:transport/combiner",
-        "startLine": 905,
+        "startLine": 918,
       },
       {
-        "endLine": 915,
+        "endLine": 928,
         "origin": "generated:transport/kernel-record",
-        "startLine": 912,
+        "startLine": 925,
       },
       {
-        "endLine": 923,
+        "endLine": 936,
         "origin": "generated:transport/roulette",
-        "startLine": 916,
-      },
-      {
-        "endLine": 958,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 924,
+        "startLine": 929,
       },
       {
         "endLine": 971,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 959,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 937,
       },
       {
-        "endLine": 1019,
-        "origin": "generated:transport/walk",
+        "endLine": 984,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 972,
       },
       {
-        "endLine": 1046,
+        "endLine": 1032,
+        "origin": "generated:transport/walk",
+        "startLine": 985,
+      },
+      {
+        "endLine": 1059,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1020,
+        "startLine": 1033,
       },
     ],
   },
@@ -21889,6 +21961,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -22082,9 +22155,9 @@ bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
 Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
@@ -22557,10 +22630,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 2) {   // 'haze'
         m.sigma_a = vec3(0.05, 0.05, 0.05);
         m.sigma_s = vec3(0.4, 0.4, 0.4);
         m.phase_g = 0.6;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -22650,6 +22725,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -22874,7 +22959,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -22914,7 +22999,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     if (ls.pdf <= 0.0) return;
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -23056,234 +23141,239 @@ void main() {
         "startLine": 75,
       },
       {
-        "endLine": 86,
+        "endLine": 87,
         "origin": "generated:medium-properties",
         "startLine": 81,
       },
       {
-        "endLine": 104,
+        "endLine": 105,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 87,
+        "startLine": 88,
       },
       {
-        "endLine": 123,
+        "endLine": 124,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 105,
+        "startLine": 106,
       },
       {
-        "endLine": 164,
+        "endLine": 165,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 124,
+        "startLine": 125,
       },
       {
-        "endLine": 196,
+        "endLine": 197,
         "origin": "glsl/core/math.glsl",
-        "startLine": 165,
+        "startLine": 166,
       },
       {
-        "endLine": 200,
+        "endLine": 201,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 197,
+        "startLine": 198,
       },
       {
-        "endLine": 214,
+        "endLine": 215,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 201,
+        "startLine": 202,
       },
       {
-        "endLine": 238,
+        "endLine": 239,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 215,
+        "startLine": 216,
       },
       {
-        "endLine": 258,
+        "endLine": 259,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 239,
+        "startLine": 240,
       },
       {
-        "endLine": 292,
+        "endLine": 293,
         "origin": "generated:interfaces",
-        "startLine": 259,
+        "startLine": 260,
       },
       {
-        "endLine": 309,
+        "endLine": 310,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 293,
+        "startLine": 294,
       },
       {
-        "endLine": 378,
+        "endLine": 379,
         "origin": "generated:sdf-dispatch",
-        "startLine": 310,
+        "startLine": 311,
       },
       {
-        "endLine": 498,
+        "endLine": 499,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 379,
+        "startLine": 380,
       },
       {
-        "endLine": 549,
+        "endLine": 550,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 499,
+        "startLine": 500,
       },
       {
-        "endLine": 576,
+        "endLine": 577,
         "origin": "generated:analytic-dispatch",
-        "startLine": 550,
+        "startLine": 551,
       },
       {
-        "endLine": 590,
+        "endLine": 591,
         "origin": "generated:material-of",
-        "startLine": 577,
+        "startLine": 578,
       },
       {
-        "endLine": 617,
+        "endLine": 618,
         "origin": "generated:scene-region-at",
-        "startLine": 591,
+        "startLine": 592,
       },
       {
-        "endLine": 650,
+        "endLine": 651,
         "origin": "generated:scene-intersect",
-        "startLine": 618,
+        "startLine": 619,
       },
       {
-        "endLine": 679,
+        "endLine": 680,
         "origin": "generated:material-lookup",
-        "startLine": 651,
+        "startLine": 652,
       },
       {
-        "endLine": 717,
+        "endLine": 718,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 680,
+        "startLine": 681,
       },
       {
-        "endLine": 730,
+        "endLine": 731,
         "origin": "generated:interaction-dispatch",
-        "startLine": 718,
+        "startLine": 719,
       },
       {
-        "endLine": 735,
+        "endLine": 736,
         "origin": "generated:nondelta-guard",
-        "startLine": 731,
+        "startLine": 732,
       },
       {
-        "endLine": 739,
+        "endLine": 740,
         "origin": "generated:emissive-table",
-        "startLine": 736,
+        "startLine": 737,
       },
       {
-        "endLine": 746,
+        "endLine": 747,
         "origin": "generated:media-tables",
-        "startLine": 740,
+        "startLine": 741,
       },
       {
-        "endLine": 759,
+        "endLine": 762,
         "origin": "generated:medium-properties",
-        "startLine": 747,
+        "startLine": 748,
       },
       {
-        "endLine": 802,
+        "endLine": 805,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 760,
+        "startLine": 763,
       },
       {
-        "endLine": 845,
+        "endLine": 848,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 803,
+        "startLine": 806,
       },
       {
-        "endLine": 857,
+        "endLine": 858,
+        "origin": "generated:medium-dispatch",
+        "startLine": 849,
+      },
+      {
+        "endLine": 870,
         "origin": "generated:medium-sample",
-        "startLine": 846,
+        "startLine": 859,
       },
       {
-        "endLine": 864,
+        "endLine": 877,
         "origin": "generated:medium-transmittance",
-        "startLine": 858,
+        "startLine": 871,
       },
       {
-        "endLine": 904,
+        "endLine": 917,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 865,
+        "startLine": 878,
       },
       {
-        "endLine": 933,
+        "endLine": 946,
         "origin": "components/lights/quad/quad.glsl",
-        "startLine": 905,
-      },
-      {
-        "endLine": 940,
-        "origin": "generated:light-sampling",
-        "startLine": 934,
-      },
-      {
-        "endLine": 945,
-        "origin": "generated:light-of",
-        "startLine": 941,
+        "startLine": 918,
       },
       {
         "endLine": 953,
-        "origin": "components/pixel/box/box.glsl",
-        "startLine": 946,
+        "origin": "generated:light-sampling",
+        "startLine": 947,
       },
       {
-        "endLine": 974,
-        "origin": "components/camera/pinhole/pinhole.glsl",
+        "endLine": 958,
+        "origin": "generated:light-of",
         "startLine": 954,
       },
       {
-        "endLine": 978,
+        "endLine": 966,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 959,
+      },
+      {
+        "endLine": 987,
+        "origin": "components/camera/pinhole/pinhole.glsl",
+        "startLine": 967,
+      },
+      {
+        "endLine": 991,
         "origin": "generated:environment",
-        "startLine": 975,
+        "startLine": 988,
       },
       {
-        "endLine": 998,
+        "endLine": 1011,
         "origin": "generated:transport/state",
-        "startLine": 979,
+        "startLine": 992,
       },
       {
-        "endLine": 1015,
+        "endLine": 1028,
         "origin": "generated:transport/combiner",
-        "startLine": 999,
+        "startLine": 1012,
       },
       {
-        "endLine": 1019,
+        "endLine": 1032,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1016,
+        "startLine": 1029,
       },
       {
-        "endLine": 1027,
+        "endLine": 1040,
         "origin": "generated:transport/roulette",
-        "startLine": 1020,
-      },
-      {
-        "endLine": 1062,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1028,
+        "startLine": 1033,
       },
       {
         "endLine": 1075,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1063,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 1041,
       },
       {
-        "endLine": 1097,
-        "origin": "components/transport/techniques/light/light.glsl",
+        "endLine": 1088,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 1076,
       },
       {
-        "endLine": 1112,
+        "endLine": 1110,
+        "origin": "components/transport/techniques/light/light.glsl",
+        "startLine": 1089,
+      },
+      {
+        "endLine": 1125,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1098,
+        "startLine": 1111,
       },
       {
-        "endLine": 1162,
+        "endLine": 1175,
         "origin": "generated:transport/walk",
-        "startLine": 1113,
+        "startLine": 1126,
       },
       {
-        "endLine": 1189,
+        "endLine": 1202,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1163,
+        "startLine": 1176,
       },
     ],
   },
@@ -27112,6 +27202,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -27304,9 +27395,9 @@ bool material_has_medium(int mat);
 bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -27645,10 +27736,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 1) {   // 'haze'
         m.sigma_a = vec3(0.0, 0.0, 0.0);
         m.sigma_s = vec3(0.5, 1.0, 2.0);
         m.phase_g = 0.7;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -27738,6 +27831,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -27856,7 +27959,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -27997,184 +28100,189 @@ void main() {
         "startLine": 72,
       },
       {
-        "endLine": 83,
+        "endLine": 84,
         "origin": "generated:medium-properties",
         "startLine": 78,
       },
       {
-        "endLine": 101,
+        "endLine": 102,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 84,
+        "startLine": 85,
       },
       {
-        "endLine": 120,
+        "endLine": 121,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 102,
+        "startLine": 103,
       },
       {
-        "endLine": 161,
+        "endLine": 162,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 121,
+        "startLine": 122,
       },
       {
-        "endLine": 193,
+        "endLine": 194,
         "origin": "glsl/core/math.glsl",
-        "startLine": 162,
+        "startLine": 163,
       },
       {
-        "endLine": 197,
+        "endLine": 198,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 194,
+        "startLine": 195,
       },
       {
-        "endLine": 211,
+        "endLine": 212,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 198,
+        "startLine": 199,
       },
       {
-        "endLine": 235,
+        "endLine": 236,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 212,
+        "startLine": 213,
       },
       {
-        "endLine": 255,
+        "endLine": 256,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 236,
+        "startLine": 237,
       },
       {
-        "endLine": 284,
+        "endLine": 285,
         "origin": "generated:interfaces",
-        "startLine": 256,
+        "startLine": 257,
       },
       {
-        "endLine": 301,
+        "endLine": 302,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 285,
+        "startLine": 286,
       },
       {
-        "endLine": 354,
+        "endLine": 355,
         "origin": "generated:sdf-dispatch",
-        "startLine": 302,
+        "startLine": 303,
       },
       {
-        "endLine": 474,
+        "endLine": 475,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 355,
+        "startLine": 356,
       },
       {
-        "endLine": 484,
+        "endLine": 485,
         "origin": "generated:material-of",
-        "startLine": 475,
+        "startLine": 476,
       },
       {
-        "endLine": 503,
+        "endLine": 504,
         "origin": "generated:scene-region-at",
-        "startLine": 485,
+        "startLine": 486,
       },
       {
-        "endLine": 527,
+        "endLine": 528,
         "origin": "generated:scene-intersect",
-        "startLine": 504,
+        "startLine": 505,
       },
       {
-        "endLine": 541,
+        "endLine": 542,
         "origin": "generated:material-lookup",
-        "startLine": 528,
+        "startLine": 529,
       },
       {
-        "endLine": 579,
+        "endLine": 580,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 542,
+        "startLine": 543,
       },
       {
-        "endLine": 592,
+        "endLine": 593,
         "origin": "generated:interaction-dispatch",
-        "startLine": 580,
+        "startLine": 581,
       },
       {
-        "endLine": 597,
+        "endLine": 598,
         "origin": "generated:nondelta-guard",
-        "startLine": 593,
+        "startLine": 594,
       },
       {
-        "endLine": 601,
+        "endLine": 602,
         "origin": "generated:emissive-table",
-        "startLine": 598,
+        "startLine": 599,
       },
       {
-        "endLine": 608,
+        "endLine": 609,
         "origin": "generated:media-tables",
-        "startLine": 602,
+        "startLine": 603,
       },
       {
-        "endLine": 621,
+        "endLine": 624,
         "origin": "generated:medium-properties",
-        "startLine": 609,
+        "startLine": 610,
       },
       {
-        "endLine": 664,
+        "endLine": 667,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 622,
+        "startLine": 625,
       },
       {
-        "endLine": 707,
+        "endLine": 710,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 665,
+        "startLine": 668,
       },
       {
-        "endLine": 719,
+        "endLine": 720,
+        "origin": "generated:medium-dispatch",
+        "startLine": 711,
+      },
+      {
+        "endLine": 732,
         "origin": "generated:medium-sample",
-        "startLine": 708,
+        "startLine": 721,
       },
       {
-        "endLine": 727,
+        "endLine": 740,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 720,
+        "startLine": 733,
       },
       {
-        "endLine": 748,
+        "endLine": 761,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 728,
+        "startLine": 741,
       },
       {
-        "endLine": 752,
+        "endLine": 765,
         "origin": "generated:environment",
-        "startLine": 749,
+        "startLine": 762,
       },
       {
-        "endLine": 772,
+        "endLine": 785,
         "origin": "generated:transport/state",
-        "startLine": 753,
+        "startLine": 766,
       },
       {
-        "endLine": 779,
+        "endLine": 792,
         "origin": "generated:transport/combiner",
-        "startLine": 773,
+        "startLine": 786,
       },
       {
-        "endLine": 783,
+        "endLine": 796,
         "origin": "generated:transport/kernel-record",
-        "startLine": 780,
-      },
-      {
-        "endLine": 818,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 784,
+        "startLine": 793,
       },
       {
         "endLine": 831,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 819,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 797,
       },
       {
-        "endLine": 877,
-        "origin": "generated:transport/walk",
+        "endLine": 844,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 832,
       },
       {
-        "endLine": 904,
+        "endLine": 890,
+        "origin": "generated:transport/walk",
+        "startLine": 845,
+      },
+      {
+        "endLine": 917,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 878,
+        "startLine": 891,
       },
     ],
   },
@@ -30766,6 +30874,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -30958,9 +31067,9 @@ bool material_has_medium(int mat);
 bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -31313,10 +31422,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 0) {   // 'fog'
         m.sigma_a = vec3(0.02, 0.02, 0.02);
         m.sigma_s = vec3(0.4, 0.4, 0.4);
         m.phase_g = u_haze_g;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -31406,6 +31517,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -31532,7 +31653,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -31675,189 +31796,194 @@ void main() {
         "startLine": 73,
       },
       {
-        "endLine": 84,
+        "endLine": 85,
         "origin": "generated:medium-properties",
         "startLine": 79,
       },
       {
-        "endLine": 102,
+        "endLine": 103,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 85,
+        "startLine": 86,
       },
       {
-        "endLine": 121,
+        "endLine": 122,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 103,
+        "startLine": 104,
       },
       {
-        "endLine": 162,
+        "endLine": 163,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 122,
+        "startLine": 123,
       },
       {
-        "endLine": 194,
+        "endLine": 195,
         "origin": "glsl/core/math.glsl",
-        "startLine": 163,
+        "startLine": 164,
       },
       {
-        "endLine": 198,
+        "endLine": 199,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 195,
+        "startLine": 196,
       },
       {
-        "endLine": 212,
+        "endLine": 213,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 199,
+        "startLine": 200,
       },
       {
-        "endLine": 236,
+        "endLine": 237,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 213,
+        "startLine": 214,
       },
       {
-        "endLine": 256,
+        "endLine": 257,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 237,
+        "startLine": 238,
       },
       {
-        "endLine": 285,
+        "endLine": 286,
         "origin": "generated:interfaces",
-        "startLine": 257,
+        "startLine": 258,
       },
       {
-        "endLine": 302,
+        "endLine": 303,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 286,
+        "startLine": 287,
       },
       {
-        "endLine": 363,
+        "endLine": 364,
         "origin": "generated:sdf-dispatch",
-        "startLine": 303,
+        "startLine": 304,
       },
       {
-        "endLine": 483,
+        "endLine": 484,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 364,
+        "startLine": 365,
       },
       {
-        "endLine": 494,
+        "endLine": 495,
         "origin": "generated:material-of",
-        "startLine": 484,
+        "startLine": 485,
       },
       {
-        "endLine": 515,
+        "endLine": 516,
         "origin": "generated:scene-region-at",
-        "startLine": 495,
+        "startLine": 496,
       },
       {
-        "endLine": 539,
+        "endLine": 540,
         "origin": "generated:scene-intersect",
-        "startLine": 516,
+        "startLine": 517,
       },
       {
-        "endLine": 556,
+        "endLine": 557,
         "origin": "generated:material-lookup",
-        "startLine": 540,
+        "startLine": 541,
       },
       {
-        "endLine": 594,
+        "endLine": 595,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 557,
+        "startLine": 558,
       },
       {
-        "endLine": 607,
+        "endLine": 608,
         "origin": "generated:interaction-dispatch",
-        "startLine": 595,
+        "startLine": 596,
       },
       {
-        "endLine": 612,
+        "endLine": 613,
         "origin": "generated:nondelta-guard",
-        "startLine": 608,
+        "startLine": 609,
       },
       {
-        "endLine": 616,
+        "endLine": 617,
         "origin": "generated:emissive-table",
-        "startLine": 613,
+        "startLine": 614,
       },
       {
-        "endLine": 623,
+        "endLine": 624,
         "origin": "generated:media-tables",
-        "startLine": 617,
+        "startLine": 618,
       },
       {
-        "endLine": 636,
+        "endLine": 639,
         "origin": "generated:medium-properties",
-        "startLine": 624,
+        "startLine": 625,
       },
       {
-        "endLine": 679,
+        "endLine": 682,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 637,
+        "startLine": 640,
       },
       {
-        "endLine": 722,
+        "endLine": 725,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 680,
+        "startLine": 683,
       },
       {
-        "endLine": 734,
+        "endLine": 735,
+        "origin": "generated:medium-dispatch",
+        "startLine": 726,
+      },
+      {
+        "endLine": 747,
         "origin": "generated:medium-sample",
-        "startLine": 723,
+        "startLine": 736,
       },
       {
-        "endLine": 742,
+        "endLine": 755,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 735,
+        "startLine": 748,
       },
       {
-        "endLine": 763,
+        "endLine": 776,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 743,
+        "startLine": 756,
       },
       {
-        "endLine": 767,
+        "endLine": 780,
         "origin": "generated:environment",
-        "startLine": 764,
+        "startLine": 777,
       },
       {
-        "endLine": 787,
+        "endLine": 800,
         "origin": "generated:transport/state",
-        "startLine": 768,
+        "startLine": 781,
       },
       {
-        "endLine": 794,
+        "endLine": 807,
         "origin": "generated:transport/combiner",
-        "startLine": 788,
+        "startLine": 801,
       },
       {
-        "endLine": 798,
+        "endLine": 811,
         "origin": "generated:transport/kernel-record",
-        "startLine": 795,
+        "startLine": 808,
       },
       {
-        "endLine": 806,
+        "endLine": 819,
         "origin": "generated:transport/roulette",
-        "startLine": 799,
-      },
-      {
-        "endLine": 841,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 807,
+        "startLine": 812,
       },
       {
         "endLine": 854,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 842,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 820,
       },
       {
-        "endLine": 902,
-        "origin": "generated:transport/walk",
+        "endLine": 867,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 855,
       },
       {
-        "endLine": 929,
+        "endLine": 915,
+        "origin": "generated:transport/walk",
+        "startLine": 868,
+      },
+      {
+        "endLine": 942,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 903,
+        "startLine": 916,
       },
     ],
   },
@@ -32190,6 +32316,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -32383,9 +32510,9 @@ bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
 Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
@@ -32741,10 +32868,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 0) {   // 'fog'
         m.sigma_a = vec3(0.02, 0.02, 0.02);
         m.sigma_s = vec3(0.4, 0.4, 0.4);
         m.phase_g = u_haze_g;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -32834,6 +32963,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -33039,7 +33178,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -33079,7 +33218,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     if (ls.pdf <= 0.0) return;
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -33221,219 +33360,224 @@ void main() {
         "startLine": 74,
       },
       {
-        "endLine": 85,
+        "endLine": 86,
         "origin": "generated:medium-properties",
         "startLine": 80,
       },
       {
-        "endLine": 103,
+        "endLine": 104,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 86,
+        "startLine": 87,
       },
       {
-        "endLine": 122,
+        "endLine": 123,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 104,
+        "startLine": 105,
       },
       {
-        "endLine": 163,
+        "endLine": 164,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 123,
+        "startLine": 124,
       },
       {
-        "endLine": 195,
+        "endLine": 196,
         "origin": "glsl/core/math.glsl",
-        "startLine": 164,
+        "startLine": 165,
       },
       {
-        "endLine": 199,
+        "endLine": 200,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 196,
+        "startLine": 197,
       },
       {
-        "endLine": 213,
+        "endLine": 214,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 200,
+        "startLine": 201,
       },
       {
-        "endLine": 237,
+        "endLine": 238,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 214,
+        "startLine": 215,
       },
       {
-        "endLine": 257,
+        "endLine": 258,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 238,
+        "startLine": 239,
       },
       {
-        "endLine": 290,
+        "endLine": 291,
         "origin": "generated:interfaces",
-        "startLine": 258,
+        "startLine": 259,
       },
       {
-        "endLine": 307,
+        "endLine": 308,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 291,
+        "startLine": 292,
       },
       {
-        "endLine": 368,
+        "endLine": 369,
         "origin": "generated:sdf-dispatch",
-        "startLine": 308,
+        "startLine": 309,
       },
       {
-        "endLine": 488,
+        "endLine": 489,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 369,
+        "startLine": 370,
       },
       {
-        "endLine": 499,
+        "endLine": 500,
         "origin": "generated:material-of",
-        "startLine": 489,
+        "startLine": 490,
       },
       {
-        "endLine": 520,
+        "endLine": 521,
         "origin": "generated:scene-region-at",
-        "startLine": 500,
+        "startLine": 501,
       },
       {
-        "endLine": 544,
+        "endLine": 545,
         "origin": "generated:scene-intersect",
-        "startLine": 521,
+        "startLine": 522,
       },
       {
-        "endLine": 561,
+        "endLine": 562,
         "origin": "generated:material-lookup",
-        "startLine": 545,
+        "startLine": 546,
       },
       {
-        "endLine": 599,
+        "endLine": 600,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 562,
+        "startLine": 563,
       },
       {
-        "endLine": 612,
+        "endLine": 613,
         "origin": "generated:interaction-dispatch",
-        "startLine": 600,
+        "startLine": 601,
       },
       {
-        "endLine": 617,
+        "endLine": 618,
         "origin": "generated:nondelta-guard",
-        "startLine": 613,
+        "startLine": 614,
       },
       {
-        "endLine": 621,
+        "endLine": 622,
         "origin": "generated:emissive-table",
-        "startLine": 618,
+        "startLine": 619,
       },
       {
-        "endLine": 628,
+        "endLine": 629,
         "origin": "generated:media-tables",
-        "startLine": 622,
+        "startLine": 623,
       },
       {
-        "endLine": 641,
+        "endLine": 644,
         "origin": "generated:medium-properties",
-        "startLine": 629,
+        "startLine": 630,
       },
       {
-        "endLine": 684,
+        "endLine": 687,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 642,
+        "startLine": 645,
       },
       {
-        "endLine": 727,
+        "endLine": 730,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 685,
+        "startLine": 688,
       },
       {
-        "endLine": 739,
+        "endLine": 740,
+        "origin": "generated:medium-dispatch",
+        "startLine": 731,
+      },
+      {
+        "endLine": 752,
         "origin": "generated:medium-sample",
-        "startLine": 728,
+        "startLine": 741,
       },
       {
-        "endLine": 746,
+        "endLine": 759,
         "origin": "generated:medium-transmittance",
-        "startLine": 740,
+        "startLine": 753,
       },
       {
-        "endLine": 786,
+        "endLine": 799,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 747,
+        "startLine": 760,
       },
       {
-        "endLine": 805,
+        "endLine": 818,
         "origin": "components/lights/point/point.glsl",
-        "startLine": 787,
+        "startLine": 800,
       },
       {
-        "endLine": 812,
+        "endLine": 825,
         "origin": "generated:light-sampling",
-        "startLine": 806,
+        "startLine": 819,
       },
       {
-        "endLine": 820,
+        "endLine": 833,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 813,
+        "startLine": 826,
       },
       {
-        "endLine": 841,
+        "endLine": 854,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 821,
+        "startLine": 834,
       },
       {
-        "endLine": 845,
+        "endLine": 858,
         "origin": "generated:environment",
-        "startLine": 842,
-      },
-      {
-        "endLine": 865,
-        "origin": "generated:transport/state",
-        "startLine": 846,
+        "startLine": 855,
       },
       {
         "endLine": 878,
-        "origin": "generated:transport/combiner",
-        "startLine": 866,
+        "origin": "generated:transport/state",
+        "startLine": 859,
       },
       {
-        "endLine": 882,
-        "origin": "generated:transport/kernel-record",
+        "endLine": 891,
+        "origin": "generated:transport/combiner",
         "startLine": 879,
       },
       {
-        "endLine": 890,
-        "origin": "generated:transport/roulette",
-        "startLine": 883,
+        "endLine": 895,
+        "origin": "generated:transport/kernel-record",
+        "startLine": 892,
       },
       {
-        "endLine": 925,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 891,
+        "endLine": 903,
+        "origin": "generated:transport/roulette",
+        "startLine": 896,
       },
       {
         "endLine": 938,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 926,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 904,
       },
       {
-        "endLine": 960,
-        "origin": "components/transport/techniques/light/light.glsl",
+        "endLine": 951,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 939,
       },
       {
-        "endLine": 975,
+        "endLine": 973,
+        "origin": "components/transport/techniques/light/light.glsl",
+        "startLine": 952,
+      },
+      {
+        "endLine": 988,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 961,
+        "startLine": 974,
       },
       {
-        "endLine": 1025,
+        "endLine": 1038,
         "origin": "generated:transport/walk",
-        "startLine": 976,
+        "startLine": 989,
       },
       {
-        "endLine": 1052,
+        "endLine": 1065,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1026,
+        "startLine": 1039,
       },
     ],
   },
@@ -35301,6 +35445,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -35494,9 +35639,9 @@ bool material_has_medium(int mat);
 bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -35974,10 +36119,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 4) {   // 'stormglass'
         m.sigma_a = vec3(0.02, 0.06, 0.14);
         m.sigma_s = u_marble_smoke;
         m.phase_g = u_marble_g;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -36067,6 +36214,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -36193,7 +36350,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -36332,209 +36489,214 @@ void main() {
         "startLine": 76,
       },
       {
-        "endLine": 88,
+        "endLine": 89,
         "origin": "generated:medium-properties",
         "startLine": 83,
       },
       {
-        "endLine": 106,
+        "endLine": 107,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 89,
+        "startLine": 90,
       },
       {
-        "endLine": 125,
+        "endLine": 126,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 107,
+        "startLine": 108,
       },
       {
-        "endLine": 166,
+        "endLine": 167,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 126,
+        "startLine": 127,
       },
       {
-        "endLine": 198,
+        "endLine": 199,
         "origin": "glsl/core/math.glsl",
-        "startLine": 167,
+        "startLine": 168,
       },
       {
-        "endLine": 202,
+        "endLine": 203,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 199,
+        "startLine": 200,
       },
       {
-        "endLine": 216,
+        "endLine": 217,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 203,
+        "startLine": 204,
       },
       {
-        "endLine": 240,
+        "endLine": 241,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 217,
+        "startLine": 218,
       },
       {
-        "endLine": 260,
+        "endLine": 261,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 241,
+        "startLine": 242,
       },
       {
-        "endLine": 290,
+        "endLine": 291,
         "origin": "generated:interfaces",
-        "startLine": 261,
+        "startLine": 262,
       },
       {
-        "endLine": 307,
+        "endLine": 308,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 291,
+        "startLine": 292,
       },
       {
-        "endLine": 349,
+        "endLine": 350,
         "origin": "generated:sdf-dispatch",
-        "startLine": 308,
+        "startLine": 309,
       },
       {
-        "endLine": 469,
+        "endLine": 470,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 350,
+        "startLine": 351,
       },
       {
-        "endLine": 520,
+        "endLine": 521,
         "origin": "components/geometry/analytic/analytic_primitives.glsl",
-        "startLine": 470,
+        "startLine": 471,
       },
       {
-        "endLine": 539,
+        "endLine": 540,
         "origin": "generated:analytic-dispatch",
-        "startLine": 521,
+        "startLine": 522,
       },
       {
-        "endLine": 548,
+        "endLine": 549,
         "origin": "generated:material-of",
-        "startLine": 540,
+        "startLine": 541,
       },
       {
-        "endLine": 554,
+        "endLine": 555,
         "origin": "generated:ior-of",
-        "startLine": 549,
+        "startLine": 550,
       },
       {
-        "endLine": 571,
+        "endLine": 572,
         "origin": "generated:scene-region-at",
-        "startLine": 555,
+        "startLine": 556,
       },
       {
-        "endLine": 597,
+        "endLine": 598,
         "origin": "generated:scene-intersect",
-        "startLine": 572,
+        "startLine": 573,
       },
       {
-        "endLine": 624,
+        "endLine": 625,
         "origin": "generated:material-lookup",
-        "startLine": 598,
+        "startLine": 599,
       },
       {
-        "endLine": 662,
+        "endLine": 663,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 625,
+        "startLine": 626,
       },
       {
-        "endLine": 720,
+        "endLine": 721,
         "origin": "components/materials/dielectric/dielectric.glsl",
-        "startLine": 663,
+        "startLine": 664,
       },
       {
-        "endLine": 737,
+        "endLine": 738,
         "origin": "generated:interaction-dispatch",
-        "startLine": 721,
+        "startLine": 722,
       },
       {
-        "endLine": 742,
+        "endLine": 743,
         "origin": "generated:nondelta-guard",
-        "startLine": 738,
+        "startLine": 739,
       },
       {
-        "endLine": 746,
+        "endLine": 747,
         "origin": "generated:emissive-table",
-        "startLine": 743,
+        "startLine": 744,
       },
       {
-        "endLine": 753,
+        "endLine": 754,
         "origin": "generated:media-tables",
-        "startLine": 747,
+        "startLine": 748,
       },
       {
-        "endLine": 766,
+        "endLine": 769,
         "origin": "generated:medium-properties",
-        "startLine": 754,
+        "startLine": 755,
       },
       {
-        "endLine": 809,
+        "endLine": 812,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 767,
+        "startLine": 770,
       },
       {
-        "endLine": 852,
+        "endLine": 855,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 810,
+        "startLine": 813,
       },
       {
-        "endLine": 864,
+        "endLine": 865,
+        "origin": "generated:medium-dispatch",
+        "startLine": 856,
+      },
+      {
+        "endLine": 877,
         "origin": "generated:medium-sample",
-        "startLine": 853,
+        "startLine": 866,
       },
       {
-        "endLine": 872,
+        "endLine": 885,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 865,
+        "startLine": 878,
       },
       {
-        "endLine": 893,
+        "endLine": 906,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 873,
+        "startLine": 886,
       },
       {
-        "endLine": 897,
+        "endLine": 910,
         "origin": "generated:environment",
-        "startLine": 894,
+        "startLine": 907,
       },
       {
-        "endLine": 917,
+        "endLine": 930,
         "origin": "generated:transport/state",
-        "startLine": 898,
+        "startLine": 911,
       },
       {
-        "endLine": 924,
+        "endLine": 937,
         "origin": "generated:transport/combiner",
-        "startLine": 918,
+        "startLine": 931,
       },
       {
-        "endLine": 928,
+        "endLine": 941,
         "origin": "generated:transport/kernel-record",
-        "startLine": 925,
+        "startLine": 938,
       },
       {
-        "endLine": 936,
+        "endLine": 949,
         "origin": "generated:transport/roulette",
-        "startLine": 929,
-      },
-      {
-        "endLine": 971,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 937,
+        "startLine": 942,
       },
       {
         "endLine": 984,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 972,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 950,
       },
       {
-        "endLine": 1028,
-        "origin": "generated:transport/walk",
+        "endLine": 997,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 985,
       },
       {
-        "endLine": 1055,
+        "endLine": 1041,
+        "origin": "generated:transport/walk",
+        "startLine": 998,
+      },
+      {
+        "endLine": 1068,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1029,
+        "startLine": 1042,
       },
     ],
   },
@@ -39366,6 +39528,7 @@ struct MaterialProperties {
 struct MediumProperties {
     Spectrum sigma_a;   // absorption
     Spectrum sigma_s;   // scattering
+    int model;   // volume_scattering registry index (interaction_medium_* dispatch)
     float phase_g;
 };
 // Media struct family — included by core iff the program has media (commit D of the
@@ -39559,9 +39722,9 @@ bool is_null_interface(int mat);
 MediumProperties scene_medium_properties(int mat, vec3 p);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp);
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi);
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
 Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
@@ -39953,10 +40116,12 @@ MediumProperties scene_medium_properties(int mat, vec3 p) {
     m.sigma_a = SPECTRUM_ZERO;
     m.sigma_s = SPECTRUM_ZERO;
     m.phase_g = 0.0;
+    m.model = 0;
     if (mat == 2) {   // 'mist'
         m.sigma_a = vec3(0.002, 0.002, 0.002);
         m.sigma_s = u_mist_density;
         m.phase_g = 0.55;
+        m.model = 0;   // 'hg'
     }
     return m;
 }
@@ -40046,6 +40211,16 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
     return spectrum_average(hg_eval(wi, wo, mp));
 }
 
+// Generated volume-scattering dispatch (interaction_medium_* over mp.model)
+InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, mp, xi);
+}
+Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_eval(wi, wo, mp);
+}
+float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
+    return hg_pdf(wi, wo, mp);
+}
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
@@ -40251,7 +40426,7 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
 
 void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase sample (§3.5): weight is SPECTRUM_ONE exactly — HG sampling is exact.
-    InteractionSample ps = hg_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, p_evt, false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
@@ -40291,7 +40466,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     if (ls.pdf <= 0.0) return;
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -40433,219 +40608,224 @@ void main() {
         "startLine": 76,
       },
       {
-        "endLine": 87,
+        "endLine": 88,
         "origin": "generated:medium-properties",
         "startLine": 82,
       },
       {
-        "endLine": 105,
+        "endLine": 106,
         "origin": "glsl/core/structs_media.glsl",
-        "startLine": 88,
+        "startLine": 89,
       },
       {
-        "endLine": 124,
+        "endLine": 125,
         "origin": "glsl/core/interaction.glsl",
-        "startLine": 106,
+        "startLine": 107,
       },
       {
-        "endLine": 165,
+        "endLine": 166,
         "origin": "components/sampler/pcg4d/pcg4d.glsl",
-        "startLine": 125,
+        "startLine": 126,
       },
       {
-        "endLine": 197,
+        "endLine": 198,
         "origin": "glsl/core/math.glsl",
-        "startLine": 166,
+        "startLine": 167,
       },
       {
-        "endLine": 201,
+        "endLine": 202,
         "origin": "glsl/core/math_media.glsl",
-        "startLine": 198,
+        "startLine": 199,
       },
       {
-        "endLine": 215,
+        "endLine": 216,
         "origin": "components/sensor/ideal/ideal.glsl",
-        "startLine": 202,
+        "startLine": 203,
       },
       {
-        "endLine": 239,
+        "endLine": 240,
         "origin": "components/ambient/euclidean/euclidean.glsl",
-        "startLine": 216,
+        "startLine": 217,
       },
       {
-        "endLine": 259,
+        "endLine": 260,
         "origin": "glsl/core/ray.glsl",
-        "startLine": 240,
+        "startLine": 241,
       },
       {
-        "endLine": 292,
+        "endLine": 293,
         "origin": "generated:interfaces",
-        "startLine": 260,
+        "startLine": 261,
       },
       {
-        "endLine": 309,
+        "endLine": 310,
         "origin": "components/geometry/sdf/sdf_primitives.glsl",
-        "startLine": 293,
+        "startLine": 294,
       },
       {
-        "endLine": 399,
+        "endLine": 400,
         "origin": "generated:sdf-dispatch",
-        "startLine": 310,
+        "startLine": 311,
       },
       {
-        "endLine": 519,
+        "endLine": 520,
         "origin": "components/geometry/sdf/raymarch.glsl",
-        "startLine": 400,
+        "startLine": 401,
       },
       {
-        "endLine": 533,
+        "endLine": 534,
         "origin": "generated:material-of",
-        "startLine": 520,
+        "startLine": 521,
       },
       {
-        "endLine": 560,
+        "endLine": 561,
         "origin": "generated:scene-region-at",
-        "startLine": 534,
+        "startLine": 535,
       },
       {
-        "endLine": 584,
+        "endLine": 585,
         "origin": "generated:scene-intersect",
-        "startLine": 561,
+        "startLine": 562,
       },
       {
-        "endLine": 599,
+        "endLine": 600,
         "origin": "generated:material-lookup",
-        "startLine": 585,
+        "startLine": 586,
       },
       {
-        "endLine": 637,
+        "endLine": 638,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 600,
+        "startLine": 601,
       },
       {
-        "endLine": 650,
+        "endLine": 651,
         "origin": "generated:interaction-dispatch",
-        "startLine": 638,
+        "startLine": 639,
       },
       {
-        "endLine": 655,
+        "endLine": 656,
         "origin": "generated:nondelta-guard",
-        "startLine": 651,
+        "startLine": 652,
       },
       {
-        "endLine": 659,
+        "endLine": 660,
         "origin": "generated:emissive-table",
-        "startLine": 656,
+        "startLine": 657,
       },
       {
-        "endLine": 666,
+        "endLine": 667,
         "origin": "generated:media-tables",
-        "startLine": 660,
+        "startLine": 661,
       },
       {
-        "endLine": 679,
+        "endLine": 682,
         "origin": "generated:medium-properties",
-        "startLine": 667,
+        "startLine": 668,
       },
       {
-        "endLine": 722,
+        "endLine": 725,
         "origin": "components/transport/volume/analytic/analytic.glsl",
-        "startLine": 680,
+        "startLine": 683,
       },
       {
-        "endLine": 765,
+        "endLine": 768,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 723,
+        "startLine": 726,
       },
       {
-        "endLine": 777,
+        "endLine": 778,
+        "origin": "generated:medium-dispatch",
+        "startLine": 769,
+      },
+      {
+        "endLine": 790,
         "origin": "generated:medium-sample",
-        "startLine": 766,
+        "startLine": 779,
       },
       {
-        "endLine": 784,
+        "endLine": 797,
         "origin": "generated:medium-transmittance",
-        "startLine": 778,
+        "startLine": 791,
       },
       {
-        "endLine": 824,
+        "endLine": 837,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 785,
+        "startLine": 798,
       },
       {
-        "endLine": 843,
+        "endLine": 856,
         "origin": "components/lights/point/point.glsl",
-        "startLine": 825,
+        "startLine": 838,
       },
       {
-        "endLine": 850,
+        "endLine": 863,
         "origin": "generated:light-sampling",
-        "startLine": 844,
+        "startLine": 857,
       },
       {
-        "endLine": 858,
+        "endLine": 871,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 851,
+        "startLine": 864,
       },
       {
-        "endLine": 879,
+        "endLine": 892,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 859,
+        "startLine": 872,
       },
       {
-        "endLine": 883,
+        "endLine": 896,
         "origin": "generated:environment",
-        "startLine": 880,
-      },
-      {
-        "endLine": 903,
-        "origin": "generated:transport/state",
-        "startLine": 884,
+        "startLine": 893,
       },
       {
         "endLine": 916,
-        "origin": "generated:transport/combiner",
-        "startLine": 904,
+        "origin": "generated:transport/state",
+        "startLine": 897,
       },
       {
-        "endLine": 920,
-        "origin": "generated:transport/kernel-record",
+        "endLine": 929,
+        "origin": "generated:transport/combiner",
         "startLine": 917,
       },
       {
-        "endLine": 928,
-        "origin": "generated:transport/roulette",
-        "startLine": 921,
+        "endLine": 933,
+        "origin": "generated:transport/kernel-record",
+        "startLine": 930,
       },
       {
-        "endLine": 963,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 929,
+        "endLine": 941,
+        "origin": "generated:transport/roulette",
+        "startLine": 934,
       },
       {
         "endLine": 976,
-        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 964,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 942,
       },
       {
-        "endLine": 998,
-        "origin": "components/transport/techniques/light/light.glsl",
+        "endLine": 989,
+        "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
         "startLine": 977,
       },
       {
-        "endLine": 1013,
+        "endLine": 1011,
+        "origin": "components/transport/techniques/light/light.glsl",
+        "startLine": 990,
+      },
+      {
+        "endLine": 1026,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 999,
+        "startLine": 1012,
       },
       {
-        "endLine": 1063,
+        "endLine": 1076,
         "origin": "generated:transport/walk",
-        "startLine": 1014,
+        "startLine": 1027,
       },
       {
-        "endLine": 1090,
+        "endLine": 1103,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1064,
+        "startLine": 1077,
       },
     ],
   },

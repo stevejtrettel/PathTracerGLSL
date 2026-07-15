@@ -8,6 +8,7 @@ import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { PRIMITIVE_PARAMS } from '../../components/geometry/index.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
+import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
 
 /** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
 const MIN_QUAD_AREA = 1e-8;
@@ -194,6 +195,11 @@ export function validate(
                         `Material '${name}': medium.${prop} is a GLSL expression — procedural media not yet supported (V1-C1); declare a majorant when they are (§3.5). Use a constant or {param}`)
                         .add();
                 }
+            }
+            if (mat.medium.model !== undefined && !isMediumModelSupported(mat.medium.model)) {
+                bag.error('invalid-setting',
+                    `Material '${name}': medium.model '${mat.medium.model}' is not a registered volume scattering model`)
+                    .add();
             }
             // |g| = 1 exactly is deterministic NaN in the HG sampler (d = 0 at the sampled pole)
             // → NaN prev_bsdf_pdf → NaN frame under MIS. Require a real margin.

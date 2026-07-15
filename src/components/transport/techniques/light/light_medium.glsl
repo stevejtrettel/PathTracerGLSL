@@ -10,5 +10,5 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     if (ls.pdf <= 0.0) return;
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * hg_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }

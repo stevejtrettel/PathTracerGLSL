@@ -35,11 +35,17 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
 
     if (plan.program.media.present) {
         // MediumProperties = the RTE's own extinction fields (every medium has them —
-        // read by the volume-sampling bodies, not phase-declared) + phase-model schemas.
-        const mediumFields = unionFields([PHASE_MODELS['hg'].properties]);
+        // read by the volume-sampling bodies) + the scattering-model schemas. hg's fields
+        // are always included (scene_medium_properties sets phase_g unconditionally); the
+        // other present models add theirs. `model` (registry index) drives the dispatch and
+        // exists only when scattering models are live.
+        const models = plan.program.media.models;
+        const mediumFields = unionFields([PHASE_MODELS['hg'].properties, ...models.map((m) => PHASE_MODELS[m]?.properties ?? [])]);
+        const extra = ['Spectrum sigma_a;   // absorption', 'Spectrum sigma_s;   // scattering'];
+        if (models.length > 0) extra.push('int model;   // volume_scattering registry index (interaction_medium_* dispatch)');
         blocks.push({
             origin: 'generated:medium-properties',
-            source: buildPropertiesStruct('MediumProperties', mediumFields, ['Spectrum sigma_a;   // absorption', 'Spectrum sigma_s;   // scattering']),
+            source: buildPropertiesStruct('MediumProperties', mediumFields, extra),
         });
         blocks.push({ origin: 'glsl/core/structs_media.glsl', source: structsMediaGLSL });
     }

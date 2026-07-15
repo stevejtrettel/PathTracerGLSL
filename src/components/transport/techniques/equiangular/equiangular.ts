@@ -17,5 +17,5 @@ export function equiangularBlocks(f: Flags): ShaderBlock[] {
 
 export function equiangularRequires(f: Flags): string[] {
     if (!f.equiangular) return [];
-    return ['lighting_query_delta', 'shadow_transmittance', 'scene_medium_properties', 'hg_eval'];
+    return ['lighting_query_delta', 'shadow_transmittance', 'scene_medium_properties', 'interaction_medium_eval'];
 }
