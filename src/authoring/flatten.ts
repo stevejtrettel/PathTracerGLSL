@@ -17,6 +17,7 @@ import type { ObjectDescription, Transform, Quaternion, Vec3 } from '../compiler
 import {
     IDENTITY_SIMILARITY,
     classifySimilarity,
+    isDrivenTransform,
     isIdentityRotation,
     isIdentityScale,
     isIdentityTranslation,
@@ -112,17 +113,5 @@ export function transformFromSimilarity(g: Similarity): Transform | undefined {
     return t;
 }
 
-/** Defensive detection of `{param}` (Value<>) fields. The stage-2 `Transform` type is
- *  constant-only, but authored JS can hand us anything, and stage 4 will widen the
- *  type — this rule is pinned NOW so the §4 semantics don't shift under it. */
-function isDrivenTransform(transform: Transform | undefined): boolean {
-    if (transform === undefined) return false;
-    const t = transform as Record<string, unknown>;
-    if (isParamRef(t.position) || isParamRef(t.scale) || isParamRef(t.rotation)) return true;
-    const r = t.rotation as Record<string, unknown> | undefined;
-    return r !== undefined && !Array.isArray(r) && typeof r === 'object' && isParamRef(r.angle);
-}
-
-function isParamRef(v: unknown): boolean {
-    return typeof v === 'object' && v !== null && !Array.isArray(v) && 'param' in v;
-}
+// Driven detection (`isDrivenTransform`) is shared from components/geometry/similarity —
+// one implementation for the Planner, the Validator, and this flatten.

@@ -403,7 +403,14 @@ export class App {
 
     setParameter(path: string, value: any): void { this.parameterStore.set(path, value); }
     setParameters(params: Record<string, any>): void { this.parameterStore.batch(params); }
-    getParameter(path: string): any { return this.parameterStore.get(path); }
+    /** Effective value: store (anything ever set) else the compiled metadata default —
+     *  authored defaults (e.g. a strategy's camera pose) are real values even before
+     *  any extension or slider touches the parameter. */
+    getParameter(path: string): any {
+        const stored = this.parameterStore.get(path);
+        if (stored !== undefined) return stored;
+        return this.rendererManager.getParameterMetadata().get(path)?.default;
+    }
     getAllParameters(): Record<string, any> { return this.parameterStore.serialize(); }
     getParameterMetadata(): Map<string, import('../app/types.js').ParameterMetadata> { return this.rendererManager.getParameterMetadata(); }
 

@@ -18,6 +18,9 @@
 // Exit code: number of failed checks (0 = all green).
 
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 
 const BASE_URL = 'http://localhost:3000';
@@ -33,7 +36,78 @@ const WITNESS_SALT = 1234;
 // CLI
 const argv = process.argv.slice(2);
 const listOnly = argv.includes('--list');
+const noCache = argv.includes('--no-cache');
 const sceneFilter = argv.filter(a => !a.startsWith('--'));
+
+// ---------------------------------------------------------------------------
+// Render cache: the pinned salt makes every witness render DETERMINISTIC, so a
+// frame is a pure function of (compiled shader sources + scene/strategy/params
+// JSON [the per-pair digest, computed in-page], global TS hash [closures and app/
+// engine code the shaders can't see], size, spp, salt, mode). Cache FRAMES, never
+// verdicts — check/gate edits re-evaluate against cached pixels without any
+// invalidation. `--no-cache` skips reads (still writes). Granularity: a .glsl edit
+// invalidates exactly the scenes whose EMITTED shaders change; any .ts edit under
+// src/ invalidates everything (coarse but sound — compute closures live there).
+const CACHE_DIR = new URL('../.witness-cache/', import.meta.url).pathname;
+let cacheCtx = null;   // { digests: {'<scene>#<idx>': {base, variance}}, globalHash }
+
+function hashTree(roots, exts) {
+    const h = createHash('sha256');
+    const walk = (dir) => {
+        let entries;
+        try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+            const p = join(dir, e.name);
+            if (e.isDirectory()) walk(p);
+            else if (exts.some(x => e.name.endsWith(x))) {
+                h.update(p);
+                h.update(readFileSync(p));
+            }
+        }
+    };
+    for (const r of roots) walk(r);
+    return h.digest('hex');
+}
+
+function cacheKey(sceneId, strategyIdx, [W, H], spp, mode) {
+    const digest = cacheCtx.digests[`${sceneId}#${strategyIdx}`];
+    if (!digest) return null;
+    return createHash('sha256')
+        .update(`${mode === 'variance' ? digest.variance : digest.base}|${cacheCtx.globalHash}|${W}x${H}|${spp}|${WITNESS_SALT}|${mode}`)
+        .digest('hex');
+}
+
+const b64 = (f32) => Buffer.from(f32.buffer, f32.byteOffset, f32.byteLength).toString('base64');
+const fromB64 = (s) => new Float32Array(new Uint8Array(Buffer.from(s, 'base64')).slice().buffer);
+
+/** The once-per-sweep app race can hand back a garbage accumulation (seen as NaN
+ *  pixels / a wrong frame). Never make that STICKY: refuse to cache non-finite
+ *  frames and say so — the check then fails loudly on this run's bad frame and a
+ *  rerun re-renders instead of replaying the corruption forever. */
+function finiteFrame(label, ...arrays) {
+    for (const a of arrays) {
+        for (let i = 0; i < a.length; i++) {
+            if (!Number.isFinite(a[i])) {
+                process.stdout.write(`  WARNING: ${label} contains non-finite values — not cached (corrupted render? rerun)\n`);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function cacheRead(key) {
+    if (noCache || !key) return null;
+    try { return JSON.parse(readFileSync(join(CACHE_DIR, `${key}.json`), 'utf8')); } catch { return null; }
+}
+
+function cacheWrite(key, obj) {
+    if (!key) return;
+    try {
+        mkdirSync(CACHE_DIR, { recursive: true });
+        writeFileSync(join(CACHE_DIR, `${key}.json`), JSON.stringify(obj));
+    } catch (e) { process.stdout.write(`  (cache write failed: ${e})\n`); }
+}
 
 // ---------------------------------------------------------------------------
 // Dev server: reuse a running one, else spawn `npm run dev` and kill it on exit.
@@ -212,6 +286,16 @@ const varianceCache = new Map(); // same key → {mean, variance, W, H, spp}
 async function renderVarianceFrame(browser, registry, sceneId, strategyIdx, size, spp) {
     const key = `${sceneId}#${strategyIdx}#${size[0]}x${size[1]}#${spp}`;
     if (varianceCache.has(key)) return varianceCache.get(key);
+
+    const diskKey = cacheCtx ? cacheKey(sceneId, strategyIdx, size, spp, 'variance') : null;
+    const hit = cacheRead(diskKey);
+    if (hit) {
+        process.stdout.write(`  cached  ${sceneId} / strategy ${strategyIdx} +variance @ ${size[0]}×${size[1]} ×${spp}spp\n`);
+        const frame = { mean: fromB64(hit.mean), variance: fromB64(hit.variance), W: hit.W, H: hit.H, spp: hit.spp };
+        varianceCache.set(key, frame);
+        return frame;
+    }
+
     let frame;
     try {
         frame = await renderVarianceOnce(browser, sceneId, strategyIdx, size, spp);
@@ -221,6 +305,9 @@ async function renderVarianceFrame(browser, registry, sceneId, strategyIdx, size
         frame = await renderVarianceOnce(browser, sceneId, strategyIdx, size, spp);
     }
     varianceCache.set(key, frame);
+    if (finiteFrame(`${sceneId}#${strategyIdx}+variance`, frame.mean, frame.variance)) {
+        cacheWrite(diskKey, { mean: b64(frame.mean), variance: b64(frame.variance), W: frame.W, H: frame.H, spp: frame.spp });
+    }
     return frame;
 }
 
@@ -290,6 +377,15 @@ async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp)
     const strategyId = entry.strategyIds[strategyIdx];
     if (!strategyId) throw new Error(`${sceneId}: no strategy at index ${strategyIdx}`);
 
+    const diskKey = cacheCtx ? cacheKey(sceneId, strategyIdx, [W, H], spp, 'frame') : null;
+    const hit = cacheRead(diskKey);
+    if (hit) {
+        process.stdout.write(`  cached  ${sceneId} / ${strategyId} @ ${W}×${H} ×${spp}spp\n`);
+        const frame = { px: fromB64(hit.px), W: hit.W, H: hit.H };
+        frameCache.set(key, frame);
+        return frame;
+    }
+
     const page = await browser.newPage();
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(String(e)));
@@ -339,6 +435,7 @@ async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp)
 
         const frame = { px, W, H };
         frameCache.set(key, frame);
+        if (finiteFrame(`${sceneId}/${strategyId}`, px)) cacheWrite(diskKey, { px: b64(px), W, H });
         return frame;
     } finally {
         await page.close();
@@ -466,6 +563,29 @@ async function main() {
             }
             return out;
         });
+        // Render-cache digests: per-pair sha256 over compiled shaders + scene/strategy/
+        // params JSON (computed in-page — the page has the compiler; compiles are ms).
+        // Failure degrades gracefully to cacheless rendering.
+        if (!listOnly) {
+            try {
+                const t0 = Date.now();
+                const digests = await bootstrap.evaluate(() => window.__witnessDigest());
+                // Global invalidators: ALL .ts under src/ (compute closures, engine,
+                // app — invisible to shader sources; coarse but sound) + glsl/shared/
+                // (the env-bake template renders through a SEPARATE compile the
+                // per-pair digests don't see). Component/core .glsl deliberately NOT
+                // here: it reaches frames only via emitted shader sources, so those
+                // edits invalidate exactly the affected scenes.
+                const src = new URL('../src/', import.meta.url).pathname;
+                const globalHash = hashTree([src], ['.ts'])
+                    + hashTree([join(src, 'glsl', 'shared')], ['.glsl'])
+                    + hashTree([new URL('../public/', import.meta.url).pathname], ['.hdr', '.png']);
+                cacheCtx = { digests, globalHash };
+                process.stdout.write(`cache: ${Object.keys(digests).length} pair digests in ${((Date.now() - t0) / 1000).toFixed(1)}s${noCache ? ' (reads disabled by --no-cache)' : ''}\n`);
+            } catch (e) {
+                process.stdout.write(`cache: disabled (digest failed: ${String(e).slice(0, 120)})\n`);
+            }
+        }
         await bootstrap.close();
 
         const scenes = Object.keys(registry)

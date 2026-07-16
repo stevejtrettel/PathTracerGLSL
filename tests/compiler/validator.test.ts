@@ -156,6 +156,49 @@ describe('Validator', () => {
         expect(bag.getWarnings().some(w => /extreme/i.test(w.message))).toBe(true);
     });
 
+    it('accepts driven transform fields (fable-transforms §6)', () => {
+        const bag = run(s => {
+            s.objects[0].transform = {
+                position: { param: 'rig.pos', default: [0, 1, 0] },
+                rotation: { axis: [0, 1, 0], angle: { param: 'rig.angle', default: 0, min: 0, max: 6.3 } },
+                scale: { param: 'rig.scale', default: 1, min: 0.1, max: 10 },
+            };
+        });
+        expect(bag.getErrors().length).toBe(0);
+    });
+
+    it('accepts a driven quaternion (the graph port); rejects a degenerate default', () => {
+        expect(run(s => { s.objects[0].transform = { rotation: { param: 'rig.q', default: [0, 0, 0, 1] } }; }).getErrors().length).toBe(0);
+        expect(run(s => { s.objects[0].transform = { rotation: { param: 'rig.q', default: [0, 0, 0, 0] } }; }).getErrors()
+            .some(e => /degenerate/i.test(e.message))).toBe(true);
+    });
+
+    it('rejects GLSL expressions in transform fields (§6.1: deformation is not a placement)', () => {
+        const bag = run(s => { s.objects[0].transform = { position: { kind: 'glsl', source: 'vec3(sin(p.x))' } as any }; });
+        expect(bag.getErrors().some(e => e.code === 'invalid-transform' && /deformation/i.test(e.message))).toBe(true);
+    });
+
+    it('warns when driven scale has no positive min (runtime floor policy)', () => {
+        const bag = run(s => { s.objects[0].transform = { scale: { param: 'rig.s', default: 1 } }; });
+        expect(bag.getErrors().length).toBe(0);
+        expect(bag.getWarnings().some(w => /min/i.test(w.message))).toBe(true);
+    });
+
+    it('rejects a driven transform on a SAMPLABLE emitter; accepts with sampleAsLight false', () => {
+        const lamp = (sampleAsLight: boolean | undefined) => (s: SceneDescription) => {
+            s.materials.glow = { model: 'lambert', albedo: [0, 0, 0], emission: [5, 5, 5], ...(sampleAsLight !== undefined ? { sampleAsLight } : {}) };
+            s.objects.push({
+                kind: 'analytic',
+                shape: { type: 'quad', parameters: { corner: [0, 2, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] } },
+                material: 'glow',
+                transform: { position: { param: 'lamp.pos', default: [0, 0, 0] } },
+            });
+        };
+        expect(run(lamp(undefined)).getErrors()
+            .some(e => e.code === 'invalid-transform' && /samplable emitter/i.test(e.message))).toBe(true);
+        expect(run(lamp(false)).getErrors().length).toBe(0);
+    });
+
     it('accumulates multiple independent errors in one pass', () => {
         const bag = run(s => {
             s.ambientSpace = { type: 'spherical' };

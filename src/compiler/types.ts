@@ -131,10 +131,11 @@ export interface StandardAnalytic {
     parameters: Record<string, number | number[]>;
 }
 
-/** Axis-angle rotation (radians). The axis need not be unit; zero axis is rejected. */
+/** Axis-angle rotation (radians). The axis need not be unit; zero axis is rejected.
+ *  The angle may be `{param}`-driven (stage 4) — the slider-friendly driven rotation. */
 export interface AxisAngle {
     axis: Vec3;
-    angle: number;
+    angle: Value<number>;
 }
 
 /** Unit quaternion [x, y, z, w] (normalized by the compiler within tolerance). */
@@ -145,12 +146,18 @@ export type Quaternion = [number, number, number, number];
  * TRS with local→parent = T·R·S (scale, then rotate, then translate). PINNED (§1):
  * `scale` is a strictly positive scalar — reflections are rejected and nonuniform scale
  * is unrepresentable (an ellipsoid is a primitive, not a transform).
+ *
+ * Stage 4 (§6): every field is a `Value<>` — a constant bakes/folds away; any `{param}`
+ * makes the leaf's placement LIVE (per-object uniforms, recomputed on parameter change).
+ * `Value<Quaternion>` on rotation is the graph runtime's port (decomposed similarities
+ * arrive as quat params). Transforms NEVER accept GlslExpression (§6.1 pin 4): a
+ * spatially-varying transform is deformation — a different feature with different math.
  */
 export interface Transform {
-    position?: Vec3;
-    /** Axis-angle (radians) or a quaternion. Euler sugar deliberately omitted. */
-    rotation?: AxisAngle | Quaternion;
-    scale?: number;
+    position?: Value<Vec3>;
+    /** Axis-angle (radians, angle may be driven) or a quaternion (constant or driven). */
+    rotation?: AxisAngle | Value<Quaternion>;
+    scale?: Value<number>;
 }
 
 // --- Value<T>: constant or uniform-driven parameter (contracts §2.8) ---
@@ -381,13 +388,31 @@ export interface ViewDescription {
 
 export type FisheyeProjection = 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic';
 
-export type CameraDescription =
+/**
+ * Camera pose — part of the MEASUREMENT (the camera is W_j; without the pose,
+ * (scene, strategy) does not determine the converged image). Shared by every
+ * camera model: all occupants are look-at maps over the same frame.
+ *
+ * Pose is deliberately NOT a Value<>: it is ALWAYS live, as the fixed parameters
+ * `camera.position` / `camera.target` (the OrbitControls/KeyboardControls contract —
+ * orbiting must never recompile). Authored values here are those parameters'
+ * DEFAULTS; a `{param}` spelling would only rename paths the app layer hardcodes.
+ */
+export interface CameraPose {
+    /** Eye point. Default [0, 0, 8]. */
+    position?: Vec3;
+    /** Look-at point. Default [0, 0, 0]. Must differ from position. */
+    target?: Vec3;
+}
+
+export type CameraDescription = CameraPose & (
     | { type: 'pinhole'; fov: Value<number> }
     | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
     | { type: 'equirect' }
     | { type: 'orthographic'; scale: number }
     | { type: 'fisheye'; projection: FisheyeProjection; fov: number }   // fov = full angular field (radians)
-    | { type: 'cylindrical'; hfov: number };                            // panorama: horizontal sweep (DEGREES); vertical follows the window (square pixels)
+    | { type: 'cylindrical'; hfov: number }                             // panorama: horizontal sweep (DEGREES); vertical follows the window (square pixels)
+);
 
 export type CameraType = CameraDescription['type'];
 

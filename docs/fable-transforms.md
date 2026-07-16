@@ -263,6 +263,70 @@ closure means every composed placement decomposes back to TRS (§3).
 - **Scale hygiene**: the compile-time extreme-scale warning cannot see runtime values;
   the param's `min`/`max` metadata is the clamp point.
 
+### §6.1 Stage-4 design pins (decided July 16 2026, before build)
+
+1. **The Placement contract (refined July 16 2026 — derived from what each backend
+   consumes, not from a matrix habit).** GLSL-side, placement is an opaque 2-vec4
+   payload behind FOUR static core helpers — backends never touch its anatomy:
+
+   *Refined at build time (stage 4): the RIGID-frame form — strictly better numerics,
+   zero reciprocals.* Queries run in the placement's rigid frame (rotation +
+   translation only, an isometry of world space), and the similarity-closed
+   primitive PARAMETERS absorb s in-shader (s·center, s·radius, s·halfSize,
+   s·offset — directions never scale):
+
+   ```glsl
+   // glsl/core/placement.glsl — payload: q = inverse quat; ts = (t_rigid = −Rᵀt, s)
+   vec3  placement_rigid (vec4 q, vec4 ts, vec3 p); // world → rigid frame (isometric)
+   vec3  placement_dir   (vec4 q, vec3 d);          // world → rigid, stays unit
+   vec3  placement_normal(vec4 q, vec3 n);          // rigid → world (conj is free)
+   float placement_scale (vec4 ts);                 // s — scales PARAMS in-shader
+   ```
+
+   Consequences, all exact: distances and ray-t are WORLD values (no rescaling, no
+   rcp anywhere — the earlier "one rcp per wrapper call" cost is GONE); every
+   EPSILON guard inside the primitives stays world-correct under driven scale
+   (the pre-refinement local-frame form silently rescaled the primitives' internal
+   near-hit guards by s); SDF marching sees an exact world-distance field. SDF
+   consumes {rigid, scale} (finite-difference normals are world-space
+   automatically); analytic and mesh consume all four (ray conjugated ONCE at
+   entry; BVHs live in local space forever; TLAS world-AABBs are host-computed, so
+   no GPU forward point map exists). A future non-similarity-closed primitive
+   (custom SDF) reintroduces a true local-frame `placement_point` + s·d correction
+   — one helper + one rcp, added when needed, never before. The payload is
+   precomposed host-side in fp64. Slot cost 2.25 vec4/object vs a mat4's 5 (cliff
+   ~40 → ~90 driven objects); instance TABLES store the same 8-float record
+   (2 RGBA32F texels vs a mat4's 4). The 2-vec4 footprint does not privilege
+   Euclid: H³'s compact isometry representation (SL(2,ℂ)) is also 8 reals — a
+   curved-space occupant swaps payload semantics + helper bodies, keeping the ABI
+   footprint, plumbing, factor lists, and table format.
+2. **The wrapper emitter takes a placement EXPRESSION** — a short factor list, each
+   factor a `Placement` from a constant literal, a uniform pair, or (later) a table
+   fetch; lowering = successive helper applications, NEVER materialized products
+   ("GLSL never composes matrices", literally). Stage 4 emits length-1 lists; shared
+   frames (4b), mesh instancing, and the batch-codegen UBO/texture tables are then
+   mechanical retrofits.
+3. **Shared frames (stage 4b, shape pinned now)**: `transform.frame: { param }` — a
+   leaf references a NAMED live frame composed outside its constant local TRS
+   (`world = frame ∘ TRS(local)`); local constants fold to literals, the frame is ONE
+   uniform shared by every leaf naming it. Sharing without hierarchy — the "N
+   consumers, one named param" pattern materials already use; it does not crack the
+   flat-forever door. This is the runtime graph's port for compound objects: 50
+   leaves on a rig = 1 uniform, not 50.
+4. **Compute-closure guard rails**: renormalize the quat, clamp scale away from zero
+   (param range as policy), warn-once — the Validator cannot see runtime values and a
+   singular upload is a silently black object. And a prohibition: **transform fields
+   never accept `GlslExpression`** — a spatially-varying transform is DEFORMATION
+   (breaks the similarity contract and the SDF distance bound), a different feature
+   with different math; Validator-rejected, not deferred.
+
+Explicitly NOT designed now: UBO/texture transform tables (the many-objects pressure
+valve — belongs to the batch-codegen batch; pin 2 keeps the door open), per-field
+specialized driven tiers (optimization; measure first), time-driven animation (an
+App-side extension driving params — no compiler surface), camera rigs (camera params
+are already live), large-world fp32 precision (orthogonal; camera-relative rendering
+someday if needed).
+
 ---
 
 ## 7. Validation (all compile-time)
@@ -338,6 +402,18 @@ their diffs are exactly the removed no-op lines + shifted source-map line number
 4. **Driven placement** — per-field `Value<>` on `Transform`, multi-path
    `PlannedUniform` + TRS compute, the §5.2/§5.3 general uniform tiers, the
    no-driven-emitters Validator pin, driven-equals-baked witness.
+   *BUILT July 16 2026*: `glsl/core/placement.glsl` (the §6.1 rigid-frame contract);
+   `buildDrivenPlacement` in the Planner (fp64 closures, §6.1 guard rails: quat
+   renormalize, scale floor from the param's `min`, warn-once); `parameterPaths` on
+   `PlannedUniform` (the only plumbing change — engine untouched); driven tiers in
+   the intersection generator (SDF rigid wrapper; analytic conjugation arms for
+   nearest-hit, any-hit, and `scene_region_at` — regions/media stay coherent through
+   the same uniforms); Validator rules incl. the samplable-emitter pin and the
+   GlslExpression prohibition. Proof: 698 vitest green (snapshot churn = the new
+   `drivenPlacement` decision field only), glslang on the driven programs, and the
+   **driven ≡ baked twins at BOTH parameter points** — θ from ValueParam defaults
+   and θ′ set through the ParameterStore post-init — each 0.00%/≤0.01% vs the
+   constant-authored reference. Sliders move objects live with zero recompiles.
 5. **Deferred ledger** (named, not built): the live graph runtime / authoring DSL
    (grows around `flattenGroups`; drives leaf placement params per §4), driven/
    `Value<T>` light geometry (rigid-only constraint documented in §6), mesh backend +

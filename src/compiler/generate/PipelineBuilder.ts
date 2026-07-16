@@ -47,9 +47,11 @@ export function buildUniforms(uniforms: PlannedUniform[]): UniformBinding[] {
     for (const u of uniforms) {
         bindings.push({
             uniform: u.name,
-            parameters: [u.parameterPath],
+            // Multi-path uniforms (driven placement: one vec4 ← several params) list
+            // every path so ParameterManager re-computes on ANY of them changing.
+            parameters: u.parameterPaths ?? [u.parameterPath],
             type: u.type as UniformBinding['type'],
-            // A uniform may be a transform of its parameter (e.g. u_tanFov = tan(fov/2)).
+            // A uniform may be a transform of its parameter(s) (e.g. u_tanFov = tan(fov/2)).
             compute: u.compute ?? ((params) => params[u.parameterPath] ?? u.default),
         });
     }

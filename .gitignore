@@ -25,3 +25,4 @@ generated-shaders/
 *.njsproj
 *.sln
 *.sw?
+.witness-cache/

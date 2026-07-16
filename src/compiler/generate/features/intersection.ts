@@ -6,7 +6,8 @@
 // so "swapping the details of intersect" is exactly what the codegen does. Region ids are
 // globally unique across both backends (§2.3), so material_of() spans them.
 
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial } from '../../plan/types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, DrivenPlacement } from '../../plan/types.js';
+import { isDrivenPlacement } from '../../plan/types.js';
 import { isGlslExpression, isValueParam } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -26,6 +27,7 @@ import {
 import sdfPrimitivesGLSL from '../../../components/geometry/sdf/sdf_primitives.glsl?raw';
 import raymarchGLSL from '../../../components/geometry/sdf/raymarch.glsl?raw';
 import analyticPrimitivesGLSL from '../../../components/geometry/analytic/analytic_primitives.glsl?raw';
+import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     if (plan.program.intersection.method !== 'raymarch') {
@@ -35,6 +37,23 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const hasSDF = plan.objects.length > 0;
     const hasAnalytic = plan.analyticObjects.length > 0;
     const blocks: ShaderBlock[] = [];
+
+    // Driven placement (fable-transforms §6/§6.1): the rigid-frame query helpers +
+    // per-object uniform pairs + slider metadata. Gated on the Planner's decision —
+    // constant-only scenes carry ZERO placement machinery (exact linkage).
+    const drivenRecords: DrivenPlacement[] = [
+        ...plan.objects.map((o) => o.placement).filter(isDrivenPlacement),
+        ...plan.analyticObjects.map((o) => o.placement).filter((p): p is DrivenPlacement => p !== undefined),
+    ];
+    const uniforms: FeatureContribution['uniforms'] = [];
+    const parameters: FeatureContribution['parameters'] = {};
+    if (plan.program.intersection.drivenPlacement) {
+        blocks.push({ origin: 'glsl/core/placement.glsl', source: placementGLSL });
+        for (const rec of drivenRecords) {
+            uniforms.push(...rec.uniforms);
+            Object.assign(parameters, rec.parameters);
+        }
+    }
 
     // SDF backend: primitives + per-scene march-bound dispatch + the marcher (sdf_intersect*).
     if (hasSDF) {
@@ -87,8 +106,26 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     }
 
     // Self-require: the generated scene_intersect classifies its boundary through
-    // scene_region_at (§4.2) — honest linkage for the seam-unused check.
-    return { ...emptyContribution('intersection'), blocks, provides, requires: ['scene_region_at'] };
+    // scene_region_at (§4.2) — honest linkage for the seam-unused check. The placement
+    // helpers follow the same pattern: provided by the included core file, consumed by
+    // the generated wrappers/arms of this same feature.
+    const requires = ['scene_region_at'];
+    if (plan.program.intersection.drivenPlacement) {
+        // Only the helpers the EMITTED code calls (dir/normal are analytic-arm
+        // vocabulary; a driven-SDF-only program leaves them as unlisted wholesale
+        // residue of the core file, like sdf_intersect_any inside raymarch.glsl).
+        const anaDriven = plan.analyticObjects.some((o) => o.placement !== undefined);
+        const used = ['placement_rigid', 'placement_scale', ...(anaDriven ? ['placement_dir', 'placement_normal'] : [])];
+        const sigs: Record<string, string> = {
+            placement_rigid: 'vec3 placement_rigid(vec4 q, vec4 ts, vec3 p)',
+            placement_dir: 'vec3 placement_dir(vec4 q, vec3 d)',
+            placement_normal: 'vec3 placement_normal(vec4 q, vec3 n)',
+            placement_scale: 'float placement_scale(vec4 ts)',
+        };
+        provides.push(...used.map((name) => ({ name, signature: sigs[name] })));
+        requires.push(...used);
+    }
+    return { ...emptyContribution('intersection'), blocks, uniforms, parameters, provides, requires };
 }
 
 // ============================================================================
@@ -101,12 +138,22 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
 
     for (const obj of objects) {
         lines.push(`float sdf_object_${obj.index}(vec3 p) {`);
-        lines.push(...emitPlacementQuery(obj.placement));
-        // s·d_local keeps the wrapper a WORLD-SPACE distance field — what keeps the
-        // marcher's stepping and the epsilon discipline (march_epsilon/EPS_INTERFACE/
-        // ray_spawn) valid unchanged (fable-transforms §5.2). s > 0 by Validator pin.
-        const scalePrefix = isIdentityScale(obj.placement.scale) ? '' : `${formatFloat(obj.placement.scale)} * `;
-        lines.push(`    return ${scalePrefix}${generateSDFCall(obj)};`);
+        if (isDrivenPlacement(obj.placement)) {
+            // Driven (§6.1): query in the RIGID frame; the similarity-closed primitive
+            // params absorb s in-shader — distances stay exact WORLD values, so the
+            // marcher's stepping and every epsilon guard hold under live scale.
+            const g = obj.placement;
+            lines.push(`    p = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p);`);
+            lines.push(`    float s = placement_scale(${g.uniformTS});`);
+            lines.push(`    return ${generateSDFCall(obj, 's')};`);
+        } else {
+            lines.push(...emitPlacementQuery(obj.placement));
+            // s·d_local keeps the wrapper a WORLD-SPACE distance field — what keeps the
+            // marcher's stepping and the epsilon discipline (march_epsilon/EPS_INTERFACE/
+            // ray_spawn) valid unchanged (fable-transforms §5.2). s > 0 by Validator pin.
+            const scalePrefix = isIdentityScale(obj.placement.scale) ? '' : `${formatFloat(obj.placement.scale)} * `;
+            lines.push(`    return ${scalePrefix}${generateSDFCall(obj)};`);
+        }
         lines.push(`}`);
         lines.push('');
     }
@@ -167,22 +214,26 @@ function emitPlacementQuery(g: Similarity): string[] {
     return [`    p = ${formatMat3(m)} * ${centered};`];
 }
 
-function generateSDFCall(obj: PlannedSDFObject): string {
+/** The primitive call. With `scaleExpr` (driven tier), the similarity-closed LENGTH
+ *  parameters are multiplied by s in-shader (center/radius/halfSize/offset — plane
+ *  normals are directions and never scale). Without it, literals as folded. */
+function generateSDFCall(obj: PlannedSDFObject, scaleExpr?: string): string {
     const p = obj.parameters;
+    const sized = (lit: string) => (scaleExpr ? `${scaleExpr} * ${lit}` : lit);
     switch (obj.sdfType) {
         case 'sphere': {
-            const center = formatVec3(p.center as number[] ?? [0, 0, 0]);
-            const radius = formatFloat(p.radius as number ?? 1.0);
+            const center = sized(formatVec3(p.center as number[] ?? [0, 0, 0]));
+            const radius = sized(formatFloat(p.radius as number ?? 1.0));
             return `sdf_sphere(p, ${center}, ${radius})`;
         }
         case 'plane': {
             const normal = formatVec3(p.normal as number[] ?? [0, 1, 0]);
-            const offset = formatFloat(p.offset as number ?? 0.0);
+            const offset = sized(formatFloat(p.offset as number ?? 0.0));
             return `sdf_plane(p, ${normal}, ${offset})`;
         }
         case 'box': {
-            const center = formatVec3(p.center as number[] ?? [0, 0, 0]);
-            const halfSize = formatVec3(p.halfSize as number[] ?? [1, 1, 1]);
+            const center = sized(formatVec3(p.center as number[] ?? [0, 0, 0]));
+            const halfSize = sized(formatVec3(p.halfSize as number[] ?? [1, 1, 1]));
             return `sdf_box(p, ${center}, ${halfSize})`;
         }
         default:
@@ -206,7 +257,25 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
     lines.push('    bool found = false;');
     lines.push('    float t;');
     for (const obj of objects) {
-        const test = analyticTest(obj);
+        if (obj.placement !== undefined) {
+            // Driven (§6.1): conjugate into the RIGID frame once; params absorb s
+            // in-shader, so t is a WORLD value — comparable on hit.t unchanged, and
+            // the primitives' internal EPSILON guards stay world-correct.
+            const g = obj.placement;
+            lines.push(`    {`);
+            lines.push(`        Ray lray = make_ray(placement_rigid(${g.uniformQ}, ${g.uniformTS}, ray.origin), placement_dir(${g.uniformQ}, ray.direction));`);
+            lines.push(`        float s = placement_scale(${g.uniformTS});`);
+            lines.push(`        if (${analyticTest(obj, 'lray', 's')} && t < hit.t) {`);
+            lines.push(`            hit.t = t; found = true;`);
+            lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
+            lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${g.uniformQ}, ${drivenLocalNormal(obj)}));`);
+            lines.push(`            hit.region_owner = ${obj.index};`);
+            lines.push(`            hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);`);
+            lines.push(`        }`);
+            lines.push(`    }`);
+            continue;
+        }
+        const test = analyticTest(obj, 'ray');
         const normal = analyticNormal(obj); // GLSL expr for the OUTWARD surface normal at hit.p
         lines.push(`    if (${test} && t < hit.t) {`);
         lines.push(`        hit.t = t; found = true;`);
@@ -224,7 +293,16 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
         lines.push('bool analytic_intersect_any(Ray ray, float maxDist) {');
         lines.push('    float t;');
         for (const obj of objects) {
-            lines.push(`    if (${analyticTest(obj)} && t < maxDist) return true;`);
+            if (obj.placement !== undefined) {
+                const g = obj.placement;
+                lines.push(`    {`);
+                lines.push(`        Ray lray = make_ray(placement_rigid(${g.uniformQ}, ${g.uniformTS}, ray.origin), placement_dir(${g.uniformQ}, ray.direction));`);
+                lines.push(`        float s = placement_scale(${g.uniformTS});`);
+                lines.push(`        if (${analyticTest(obj, 'lray', 's')} && t < maxDist) return true;`);
+                lines.push(`    }`);
+                continue;
+            }
+            lines.push(`    if (${analyticTest(obj, 'ray')} && t < maxDist) return true;`);
         }
         lines.push('    return false;');
         lines.push('}');
@@ -233,26 +311,47 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
     return lines.join('\n');
 }
 
-/** GLSL boolean test call that writes `t` for object `obj`. */
-function analyticTest(obj: PlannedAnalyticObject): string {
+/** GLSL boolean test call that writes `t` for object `obj`, against ray var `rayVar`.
+ *  With `scaleExpr` (driven §6.1), the similarity-closed LENGTH parameters are
+ *  multiplied by s in-shader (directions — plane/quad normals — never scale). */
+function analyticTest(obj: PlannedAnalyticObject, rayVar: string, scaleExpr?: string): string {
     const p = obj.parameters;
+    const sized = (lit: string) => (scaleExpr ? `${scaleExpr} * ${lit}` : lit);
     switch (obj.shapeType) {
         case 'sphere': {
-            const center = formatVec3(p.center as number[] ?? [0, 0, 0]);
-            const radius = formatFloat(p.radius as number ?? 1.0);
-            return `ray_sphere(ray, ${center}, ${radius}, t)`;
+            const center = sized(formatVec3(p.center as number[] ?? [0, 0, 0]));
+            const radius = sized(formatFloat(p.radius as number ?? 1.0));
+            return `ray_sphere(${rayVar}, ${center}, ${radius}, t)`;
         }
         case 'plane': {
             const normal = formatVec3(p.normal as number[] ?? [0, 1, 0]);
-            const offset = formatFloat(p.offset as number ?? 0.0);
-            return `ray_plane(ray, ${normal}, ${offset}, t)`;
+            const offset = sized(formatFloat(p.offset as number ?? 0.0));
+            return `ray_plane(${rayVar}, ${normal}, ${offset}, t)`;
         }
         case 'quad': {
-            const corner = formatVec3(p.corner as number[] ?? [0, 0, 0]);
+            const corner = sized(formatVec3(p.corner as number[] ?? [0, 0, 0]));
             const edge1 = p.edge1 as number[] ?? [1, 0, 0];
             const edge2 = p.edge2 as number[] ?? [0, 0, 1];
-            return `ray_quad(ray, ${corner}, ${formatVec3(edge1)}, ${formatVec3(edge2)}, ${formatVec3(quadNormal(edge1, edge2))}, t)`;
+            return `ray_quad(${rayVar}, ${corner}, ${sized(formatVec3(edge1))}, ${sized(formatVec3(edge2))}, ${formatVec3(quadNormal(edge1, edge2))}, t)`;
         }
+        default:
+            throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
+    }
+}
+
+/** Rigid-frame OUTWARD normal expr at the driven hit (world normal = placement_normal
+ *  of this). Scale-invariant shapes: plane/quad normals are unit directions; the
+ *  sphere normal renormalizes against the scaled center/radius. */
+function drivenLocalNormal(obj: PlannedAnalyticObject): string {
+    const p = obj.parameters;
+    switch (obj.shapeType) {
+        case 'sphere':
+            return `normalize((lray.origin + t * lray.direction) - s * ${formatVec3(p.center as number[] ?? [0, 0, 0])})`;
+        case 'plane':
+            return formatVec3(p.normal as number[] ?? [0, 1, 0]);
+        case 'quad':
+            // Emitting side (one-sided pin) — local edges' unit cross; unchanged by s>0.
+            return formatVec3(quadNormal(p.edge1 as number[] ?? [1, 0, 0], p.edge2 as number[] ?? [0, 0, 1]));
         default:
             throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
     }
@@ -316,12 +415,36 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
     for (const obj of analytic) {
-        lines.push(`    d = ${analyticSignedDistance(obj)};`);
+        if (obj.placement !== undefined && obj.shapeType !== 'quad') {
+            // Driven (§6.1): classify in the rigid frame with s-scaled params — d stays
+            // an exact WORLD signed distance, so innermost-wins compares correctly
+            // across constant and driven objects. (Driven quads fall through: zero
+            // thickness never claims containment, placement irrelevant.)
+            const g = obj.placement;
+            lines.push(`    { vec3 lp = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p); float s = placement_scale(${g.uniformTS});`);
+            lines.push(`      d = ${drivenSignedDistance(obj)}; }`);
+        } else {
+            lines.push(`    d = ${analyticSignedDistance(obj)};`);
+        }
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
     lines.push('    return region;');
     lines.push('}');
     return lines.join('\n');
+}
+
+/** Rigid-frame signed distance for a DRIVEN analytic object (reads `lp` and `s` from
+ *  the enclosing block). Exact world values — similarity-closed params absorb s. */
+function drivenSignedDistance(obj: PlannedAnalyticObject): string {
+    const p = obj.parameters;
+    switch (obj.shapeType) {
+        case 'sphere':
+            return `length(lp - s * ${formatVec3(p.center as number[] ?? [0, 0, 0])}) - s * ${formatFloat(p.radius as number ?? 1.0)}`;
+        case 'plane':
+            return `dot(lp, ${formatVec3(p.normal as number[] ?? [0, 1, 0])}) + s * ${formatFloat(p.offset as number ?? 0.0)}`;
+        default:
+            throw new Error(`intersection: driven signed distance unsupported for '${obj.shapeType}'`);
+    }
 }
 
 // ============================================================================

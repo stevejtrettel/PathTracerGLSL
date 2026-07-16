@@ -5,9 +5,16 @@ import {
     resolveColorProperty,
     resolveScalarProperty,
 } from '../../src/compiler/plan/Planner.js';
+import { isDrivenPlacement, type PlannedPlacement } from '../../src/compiler/plan/types.js';
 import { foldAnalyticParameters } from '../../src/components/geometry/index.js';
-import { classifySimilarity, similarityApplyPoint } from '../../src/components/geometry/similarity.js';
+import { classifySimilarity, similarityApplyPoint, type Similarity } from '../../src/components/geometry/similarity.js';
 import type { StandardSDF, GlslExpression, ValueParam, Vec3 } from '../../src/compiler/types.js';
+
+/** Narrow a constant placement (throws on driven — these tests author constants). */
+function sim(p: PlannedPlacement): Similarity {
+    if (isDrivenPlacement(p)) throw new Error('expected a constant placement');
+    return p;
+}
 
 const glsl: GlslExpression = { kind: 'glsl', source: 'vec3(1.0)' };
 const param: ValueParam<Vec3> = { param: 'mat.albedo' };
@@ -35,40 +42,57 @@ describe('placementOf', () => {
 describe('resolveSDFPlacement', () => {
     it('folds a sphere center into the placement and zeroes center in parameters', () => {
         const sdf: StandardSDF = { type: 'sphere', parameters: { center: [1, 2, 3], radius: 1 } };
-        const { parameters, placement } = resolveSDFPlacement(sdf, undefined);
-        expect(placement.translation).toEqual([1, 2, 3]);
-        expect(classifySimilarity(placement)).toBe('translation');
+        const { parameters, placement } = resolveSDFPlacement(sdf, undefined, 0);
+        expect(sim(placement).translation).toEqual([1, 2, 3]);
+        expect(classifySimilarity(sim(placement))).toBe('translation');
         expect(parameters.center).toEqual([0, 0, 0]);
         expect(parameters.radius).toBe(1);
     });
 
     it('sums transform.position and center into a single translation', () => {
         const sdf: StandardSDF = { type: 'box', parameters: { center: [1, 1, 1], half: [0.5, 0.5, 0.5] } };
-        const { placement } = resolveSDFPlacement(sdf, { position: [10, 20, 30] });
-        expect(placement.translation).toEqual([11, 21, 31]);
+        const { placement } = resolveSDFPlacement(sdf, { position: [10, 20, 30] }, 0);
+        expect(sim(placement).translation).toEqual([11, 21, 31]);
     });
 
     it('center is a PRE-translation: the object rotates about its local origin carrying center', () => {
         const sdf: StandardSDF = { type: 'box', parameters: { center: [1, 0, 0], halfSize: [0.5, 0.5, 0.5] } };
-        const { placement } = resolveSDFPlacement(sdf, { rotation: { axis: [0, 0, 1], angle: Math.PI / 2 } });
+        const { placement } = resolveSDFPlacement(sdf, { rotation: { axis: [0, 0, 1], angle: Math.PI / 2 } }, 0);
         // local origin maps to R·center = (0,1,0)
-        expect(placement.translation[0]).toBeCloseTo(0, 12);
-        expect(placement.translation[1]).toBeCloseTo(1, 12);
+        expect(sim(placement).translation[0]).toBeCloseTo(0, 12);
+        expect(sim(placement).translation[1]).toBeCloseTo(1, 12);
     });
 
     it('normalizes plane normal+offset together and keeps the whole placement for the wrapper', () => {
         const sdf: StandardSDF = { type: 'plane', parameters: { normal: [0, 2, 0], offset: 2 } };
-        const { parameters, placement } = resolveSDFPlacement(sdf, { position: [1, 0, 0] });
+        const { parameters, placement } = resolveSDFPlacement(sdf, { position: [1, 0, 0] }, 0);
         expect(parameters.normal).toEqual([0, 1, 0]);
         expect(parameters.offset).toBe(1);
-        expect(placement.translation).toEqual([1, 0, 0]);
+        expect(sim(placement).translation).toEqual([1, 0, 0]);
     });
 
     it('passes parameters through when there is no center', () => {
         const sdf: StandardSDF = { type: 'sphere', parameters: { radius: 2 } };
-        const { parameters, placement } = resolveSDFPlacement(sdf, { position: [1, 2, 3] });
+        const { parameters, placement } = resolveSDFPlacement(sdf, { position: [1, 2, 3] }, 0);
         expect(parameters).toBe(sdf.parameters);
-        expect(placement.translation).toEqual([1, 2, 3]);
+        expect(sim(placement).translation).toEqual([1, 2, 3]);
+    });
+
+    it('DRIVEN: keeps parameters local (no center fold) and builds the uniform record', () => {
+        const sdf: StandardSDF = { type: 'sphere', parameters: { center: [1, 2, 3], radius: 1 } };
+        const { parameters, placement } = resolveSDFPlacement(
+            sdf, { position: { param: 'rig.pos', default: [5, 0, 0] }, scale: 2 }, 7);
+        expect(parameters.center).toEqual([1, 2, 3]);   // LOCAL — untouched
+        expect(isDrivenPlacement(placement)).toBe(true);
+        if (isDrivenPlacement(placement)) {
+            expect(placement.uniformQ).toBe('u_object7PlacementQ');
+            expect(placement.uniforms[0].parameterPaths).toEqual(['rig.pos']);
+            // defaults: identity rotation, t_rigid = −Rᵀt = −default, s = 2
+            expect(placement.uniforms[0].default).toEqual([-0, -0, -0, 1]);
+            expect(placement.uniforms[1].default).toEqual([-5, -0, -0, 2]);
+            // live recompute: position moves, scale constant baked in
+            expect(placement.uniforms[1].compute!({ 'rig.pos': [1, 1, 0] })).toEqual([-1, -1, -0, 2]);
+        }
     });
 });
 

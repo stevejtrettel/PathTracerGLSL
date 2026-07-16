@@ -14,6 +14,8 @@
 // See ./README.md for the gate policy (χ² vs rmse) and how to add a witness.
 
 import type { SceneSuiteEntry } from './types.js';
+import type { RenderStrategy, Vec3 } from '../../src/compiler/types.js';
+import { withPose } from '../../src/authoring/strategy.js';
 
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from './scenes/twoLightScene.js';
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
@@ -46,11 +48,18 @@ import {
     conjugationScene, conjugationBase, CONJ_CAMERA_BASE, CONJ_CAMERA_G,
     regionsTransformed, regionsTransformedRef, regionsNeeStrategy,
 } from './scenes/transformWitness.js';
+import { drivenScene, drivenBakedTheta, drivenBakedTheta2, drivenNeeStrategy, THETA2 } from './scenes/drivenWitness.js';
+
+/** Camera pose is MEASUREMENT data: strategy literals are shared across scenes, so
+ *  each entry stamps its pose onto its strategies here (no more pose-as-loose-
+ *  initialParameters — (scene, strategy) alone determines the converged image). */
+const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
+    strategies.map((s) => withPose(s, position, target));
 
 export const witnessSuite: Record<string, SceneSuiteEntry> = {
     'thinlens-zero': {
         scene: camCornell,
-        strategies: [camPinholeStrategy, camThinlensZeroStrategy],
+        strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy),
         exercises:
             'thin-lens correctness anchor: aperture = 0 (key 2) must reproduce the pinhole image (key 1) exactly — the lens disk collapses to a point. Both cameras draw xiLens, so the arms share the RNG stream.',
         expected: 'key 1 (pinhole) and key 2 (thin-lens, aperture 0) are the same image; any visible difference is a frame/focus-math bug',
@@ -60,14 +69,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // in the last fp bits) → the display-space RMSE gate, not χ².
             checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'thin-lens aperture-0 ≡ pinhole' }],
         },
-        initialParameters: {
-            'camera.position': [0, 1, 4],
-            'camera.target': [0, 1, 0],
-        },
     },
     'two-light': {
         scene: twoLightScene,
-        strategies: [twoLightPowerStrategy, twoLightUniformStrategy],
+        strategies: posed([0, 1.2, 4], [0, 0.5, 0], twoLightPowerStrategy, twoLightUniformStrategy),
         exercises:
             'multi-light CDF dispatcher (lights.length>1); lightSelection power (key 1) vs uniform (key 2)',
         expected: 'power (key 1) and uniform (key 2) converge to the SAME image; power is lower-variance',
@@ -75,14 +80,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             spp: 192,
             checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'power ≡ uniform' }],
         },
-        initialParameters: {
-            'camera.position': [0, 1.2, 4],
-            'camera.target': [0, 0.5, 0],
-        },
     },
     furnace: {
         scene: furnaceBox,
-        strategies: [furnaceStrategy, furnaceVarianceStrategy],
+        strategies: posed([0, 0, 0], [0, 0, -1], furnaceStrategy, furnaceVarianceStrategy),
         exercises:
             'emission + energy conservation (F-BOX); expect linear-HDR mean = 0.4 everywhere. Key 2 = the VARIANCE accumulation occupant (Welford MRT): same walk, same mean, plus the second-moment buffer',
         expected: 'every pixel = EXACTLY 0.4 in linear HDR (F-BOX: Le/(1−ρ) = 0.2/0.5); key 2 identical (the variance occupant must not touch the mean)',
@@ -96,25 +97,17 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.001, rmse: 0.002, label: 'variance occupant mean untouched' },
             ],
         },
-        initialParameters: {
-            'camera.position': [0, 0, 0],
-            'camera.target': [0, 0, -1],
-        },
     },
     // Fixture partner: the SDF half of the analytic-minimal twin (and the direct-only
     // strategy demo rides along on key 2).
     minimal: {
         scene: minimalScene,
-        strategies: [minimalStrategy, directOnlyStrategy],
+        strategies: posed([0, 1, 5], [0, 0, 0], minimalStrategy, directOnlyStrategy),
         exercises: 'constant environment; pathtracer vs direct-only strategy from one scene; twin partner of analytic-minimal',
-        initialParameters: {
-            'camera.position': [0, 1, 5],
-            'camera.target': [0, 0, 0],
-        },
     },
     'analytic-minimal': {
         scene: analyticMinimal,
-        strategies: [analyticStrategy],
+        strategies: posed([0, 1, 5], [0, 0, 0], analyticStrategy),
         exercises: 'analytic backend (closed-form sphere+plane); cross-method twin of `minimal` — same image',
         expected: 'converges to the same image as `minimal` (strategy 1)',
         witness: {
@@ -125,14 +118,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // even though the converged IMAGES agree. Measured 3.5% at this budget.
             checks: [{ kind: 'twin', other: { scene: 'minimal' }, meanTol: 0.02, rmse: 0.08, label: 'analytic ≡ SDF backend' }],
         },
-        initialParameters: {
-            'camera.position': [0, 1, 5],
-            'camera.target': [0, 0, 0],
-        },
     },
     eta: {
         scene: etaScene,
-        strategies: [etaStrategy],
+        strategies: posed([0, 1, 0.05], [0, -1, 0], etaStrategy),
         exercises:
             'F-ETA η² witness (validation §3): center pixel = 0.5540 ± 1% linear HDR; omitting η² renders 0.980',
         expected: 'converged CENTER pixel = 0.5540 ± 1% in the linear HDR export (0.98 ⇒ η² factor missing)',
@@ -144,27 +133,19 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 label: 'F-ETA η² 0.5540',
             }],
         },
-        initialParameters: {
-            'camera.position': [0, 1, 0.05],
-            'camera.target': [0, -1, 0],
-        },
     },
     // Fixture partner: the SDF half of the analytic-glass twin (and the dielectric
     // eyeball scene — Fresnel rim, TIR, inverted image; dark shadow is correct v1).
     'cornell-glass': {
         scene: cornellGlass,
-        strategies: [glassStrategy],
+        strategies: posed([0, 1, 4], [0, 1, 0], glassStrategy),
         exercises:
             'dielectric eyeball scene: Fresnel rim, TIR, inverted image; RR-on exercises etaScale; NEE guard skips shadow rays at glass. Dark shadow under the sphere is CORRECT v1 (§6.3 shadow-opaque + delta light — caustics need area lights); twin partner of analytic-glass',
         expected: 'Fresnel rim + inverted Cornell through the sphere; DARK shadow under it is correct v1; converges to the same image as analytic-glass',
-        initialParameters: {
-            'camera.position': [0, 1, 4],
-            'camera.target': [0, 1, 0],
-        },
     },
     'analytic-glass': {
         scene: analyticGlass,
-        strategies: [glassStrategy],
+        strategies: posed([0, 1, 4], [0, 1, 0], glassStrategy),
         exercises:
             'cross-backend twin of cornell-glass (analytic glass sphere, interior far-root) — must converge to the same image',
         expected: 'converged image identical to cornell-glass',
@@ -175,14 +156,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // but the gate shouldn't depend on that). Measured 0.97% at this budget.
             checks: [{ kind: 'twin', other: { scene: 'cornell-glass' }, meanTol: 0.03, rmse: 0.08, label: 'glass analytic ≡ SDF backend' }],
         },
-        initialParameters: {
-            'camera.position': [0, 1, 4],
-            'camera.target': [0, 1, 0],
-        },
     },
     slab: {
         scene: slabScene,
-        strategies: [slabStrategy],
+        strategies: posed([0, 0, 2], [0, 0, -2], slabStrategy),
         exercises:
             'F-SLAB Beer–Lambert witness (validation §2): null interfaces (model none), spectral σ_a, current_medium across two null crossings',
         expected:
@@ -195,14 +172,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 label: 'F-SLAB Beer–Lambert e^{-σt}',
             }],
         },
-        initialParameters: {
-            'camera.position': [0, 0, 2],
-            'camera.target': [0, 0, -2],
-        },
     },
     'furnace-scatter': {
         scene: furnaceScatterScene,
-        strategies: [furnaceScatterStrategy],
+        strategies: posed([0, 0, 0], [0, 0, -1], furnaceScatterStrategy),
         exercises:
             'F-BOX-M chromatic scattering furnace (validation §1b): channel-MIS medium sampling, HG normalization, medium-event weights, §7.2 bounce accounting',
         expected:
@@ -211,14 +184,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             spp: 96,
             checks: [{ kind: 'mean', value: 0.4, tol: 0.006, label: 'F-BOX-M 0.4/channel' }],
         },
-        initialParameters: {
-            'camera.position': [0, 0, 0],
-            'camera.target': [0, 0, -1],
-        },
     },
     haze: {
         scene: hazeScene,
-        strategies: [hazeNeeStrategy, hazeEquiangularStrategy, hazePtStrategy],
+        strategies: posed([0, 1.2, 5], [0, 1.2, -1], hazeNeeStrategy, hazeEquiangularStrategy, hazePtStrategy),
         exercises:
             'HG-sign witness + medium NEE + spectral shadow_media (light shafts); {param}-driven haze.g; the EQUIANGULAR placement pair (impl-plan-equiangular): key 1 (pt-nee, vertex placement) vs key 2 (pt-nee-eq, per-segment ∝1/d²-to-light) — the first new technique through the §7 door; key 3 (pt) sees only the emissive panel',
         expected:
@@ -237,14 +206,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 },
             ],
         },
-        initialParameters: {
-            'camera.position': [0, 1.2, 5],
-            'camera.target': [0, 1.2, -1],
-        },
     },
     'cornell-area': {
         scene: cornellArea,
-        strategies: [cornellAreaNeeStrategy, cornellAreaMisStrategy, cornellAreaPtStrategy],
+        strategies: posed([0, 1, 4], [0, 1, 0], cornellAreaNeeStrategy, cornellAreaMisStrategy, cornellAreaPtStrategy),
         exercises:
             'X-CORNELL (validation §4): explicit quad light desugared to an emissive region; quad solid-angle pdf; §6.2 emission w-bookkeeping; the reference-§8 MIS diff (key 2)',
         expected:
@@ -261,14 +226,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [0, 2], meanTol: 0.02, rmse: 0.4, label: 'X-CORNELL pt tripwire' },
             ],
         },
-        initialParameters: {
-            'camera.position': [0, 1, 4],
-            'camera.target': [0, 1, 0],
-        },
     },
     'cornell-area-glass': {
         scene: cornellAreaGlass,
-        strategies: [cornellAreaNeeStrategy, cornellAreaMisStrategy, cornellAreaPtStrategy],
+        strategies: posed([0, 1, 4], [0, 1, 0], cornellAreaNeeStrategy, cornellAreaMisStrategy, cornellAreaPtStrategy),
         exercises:
             'X-GLASS (validation §4): delta bookkeeping under a samplable emitter — prev_was_delta through specular chains, NEE skipped at glass, full-weight emission after delta, MIS emitter weight = 1 there',
         expected:
@@ -280,14 +241,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.4, label: 'X-GLASS pt tripwire' },
             ],
         },
-        initialParameters: {
-            'camera.position': [0, 1, 4],
-            'camera.target': [0, 1, 0],
-        },
     },
     'fog-area': {
         scene: fogArea,
-        strategies: [fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy],
+        strategies: posed([0, 1, 4], [0, 1, 0], fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy),
         exercises:
             'X-FOG proper (validation §4) — the resurrected haze equality pair: medium-NEE toward a hittable quad through haze; hg_eval/hg_sample consistency; the medium-side MIS weight (hg_pdf); spectral shadow_media segments',
         expected:
@@ -299,14 +256,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [0, 2], meanTol: 0.02, rmse: 0.65, label: 'X-FOG pt tripwire' },
             ],
         },
-        initialParameters: {
-            'camera.position': [0, 1, 4],
-            'camera.target': [0, 1, 0],
-        },
     },
     'fog-panel': {
         scene: fogPanel,
-        strategies: [fogAreaNeeStrategy, fogAreaPtStrategy],
+        strategies: posed([0, 1, 4], [0, 1, 0], fogAreaNeeStrategy, fogAreaPtStrategy),
         exercises:
             'audit-H2 witness: back-face hits on a zero-thickness DIFFUSE quad (nonzero albedo) in ambient fog — the scene_region_thin entering-side probe vs the fabricated region_from that poisoned current_medium for one segment',
         expected:
@@ -315,14 +268,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             spp: 192,
             checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.65, label: 'audit-H2 nee ≡ pt tripwire' }],
         },
-        initialParameters: {
-            'camera.position': [0, 1, 4],
-            'camera.target': [0, 1, 0],
-        },
     },
     sky: {
         scene: skyScene,
-        strategies: [skyNeeStrategy, skyMisStrategy, skyPtStrategy, skyMisOctStrategy],
+        strategies: posed([0, 1.4, 5], [0, 0.9, 0], skyNeeStrategy, skyMisStrategy, skyPtStrategy, skyMisOctStrategy),
         exercises:
             'X-ENV (T3): the tabulated env as a samplable light — CDF inversion (env_sampler_cdf), pdf-from-CDF-differences, the sinθ Jacobian, miss-branch w-bookkeeping, env-only selection (probability 1). Plus T2: extern chain, rotation-sign chart fix, scene-driven HDR load',
         expected:
@@ -337,14 +286,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [1, 3], meanTol: 0.015, label: 'X-CHART equirect ≡ octahedral' },
             ],
         },
-        initialParameters: {
-            'camera.position': [0, 1.4, 5],
-            'camera.target': [0, 0.9, 0],
-        },
     },
     'furnace-sky': {
         scene: furnaceSkyScene,
-        strategies: [furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy],
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy),
         exercises:
             'W1/W2 (T3): the OPEN furnace — constant SAMPLABLE env (uniform-sphere sampler, pdf 1/4π), miss-branch bookkeeping in its purest form (no textures anywhere). RR off; display tonemap NONE for on-screen radiance checks',
         expected:
@@ -364,14 +309,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 },
             ]),
         },
-        initialParameters: {
-            'camera.position': [0, 0, 3.5],
-            'camera.target': [0, 0, 0],
-        },
     },
     'sky-lamp': {
         scene: skyLampScene,
-        strategies: [skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy],
+        strategies: posed([0, 1.4, 5], [0, 0.9, 0], skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy),
         exercises:
             'TWO-STAGE selection (T3, plan D3): image env AND a quad light — u_envSelectProb stage 0, the wrapped lighting_sample_finite CDF, the (1−P) factor in lighting_pdf, and the P factor in the miss-MIS weight. The full §6.1 pdf symmetry across techniques',
         expected:
@@ -383,14 +324,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [1, 2], meanTol: 0.02, rmse: 0.7, label: 'two-stage pt tripwire' },
             ],
         },
-        initialParameters: {
-            'camera.position': [0, 1.4, 5],
-            'camera.target': [0, 0.9, 0],
-        },
     },
     'proc-sky': {
         scene: procSkyScene,
-        strategies: [procSkyNeeStrategy, procSkyMisStrategy, procSkyPtStrategy, procSkyMisCompStrategy],
+        strategies: posed([0, 1.4, 5], [0, 0.9, 0], procSkyNeeStrategy, procSkyMisStrategy, procSkyPtStrategy, procSkyMisCompStrategy),
         exercises:
             'T4 procedural environment: the one-shot GPU bake (fixed-size framebuffer + readExport, app-orchestrated), formula direct-eval at lookup (sharp sun), CDF from the baked table, the sampler-radiance unification (ls.radiance ≡ environment_radiance)',
         expected:
@@ -404,14 +341,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [1, 3], meanTol: 0.02, label: 'W9 plain ≡ compensated table' },
             ],
         },
-        initialParameters: {
-            'camera.position': [0, 1.4, 5],
-            'camera.target': [0, 0.9, 0],
-        },
     },
     orb: {
         scene: orbScene,
-        strategies: [orbNeeStrategy, orbPtStrategy],
+        strategies: posed([0, 1.3, 3.4], [0, 0.7, 0], orbNeeStrategy, orbPtStrategy),
         exercises:
             'sphere light via the sampleAsLight route (emissive analytic sphere, default-true registry entry); visible-cone sampling; delta bookkeeping (glass keeps full-weight emission after specular chains)',
         expected:
@@ -420,24 +353,16 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             spp: 192,
             checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.6, label: 'sampleAsLight nee ≡ pt tripwire' }],
         },
-        initialParameters: {
-            'camera.position': [0, 1.3, 3.4],
-            'camera.target': [0, 0.7, 0],
-        },
     },
     // Fixture partner: the hand-folded arm of the transform-bake twin.
     'transform-bake-ref': {
         scene: transformBakeRef,
-        strategies: [transformNeeStrategy],
+        strategies: posed([0, 1.0, 4.2], [0, -0.2, 0], transformNeeStrategy),
         exercises: 'hand-folded reference arm of the transform-bake twin (fable-transforms §8) — placement baked into primitive parameters, no transform fields',
-        initialParameters: {
-            'camera.position': [0, 1.0, 4.2],
-            'camera.target': [0, -0.2, 0],
-        },
     },
     'transform-bake': {
         scene: transformBake,
-        strategies: [transformNeeStrategy],
+        strategies: posed([0, 1.0, 4.2], [0, -0.2, 0], transformNeeStrategy),
         exercises:
             'twin-bake (fable-transforms §8): every object placed via `transform` — SDF scale tier (s·d), SDF translation tier, analytic translate fold, and the analytic ROTATION fold on a sampleAsLight quad (folded params feed the desugar, power CDF, and sampler) — vs the same world geometry hand-folded into parameters',
         expected: 'converges to the same image as transform-bake-ref; divergence implicates the similarity fold or a wrapper tier; a dark/misplaced lamp implicates the fold→desugar ordering or the one-sided normal under rotation',
@@ -448,14 +373,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // near-zero gates like thinlens-zero (measured 0.00%/0.00% at this budget).
             checks: [{ kind: 'twin', other: { scene: 'transform-bake-ref' }, meanTol: 0.002, rmse: 0.01, label: 'transform ≡ hand-fold' }],
         },
-        initialParameters: {
-            'camera.position': [0, 1.0, 4.2],
-            'camera.target': [0, -0.2, 0],
-        },
     },
     'flatten-tree': {
         scene: flattenTree,
-        strategies: [transformNeeStrategy],
+        strategies: posed([0, 1.0, 4.2], [0, -0.2, 0], transformNeeStrategy),
         exercises:
             'light-under-flatten (fable-transforms §4/§8): the transform-bake scene authored as a TREE and composed by the authoring layer’s flattenGroups at fixture-definition time — group∘leaf composition (T∘S, nested T∘T, [T·R]∘id), the sampleAsLight LAMP inside a transformed group (composition → desugar → power CDF → sampler/pdf), depth-0 pass-through leaves',
         expected: 'converges to the same image as transform-bake-ref; divergence implicates flattenGroups composition or the TRS re-expression, not the stage-2 machinery (transform-bake already gates that)',
@@ -465,24 +386,16 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // authored transforms → near-bit-exact gates like transform-bake.
             checks: [{ kind: 'twin', other: { scene: 'transform-bake-ref' }, meanTol: 0.002, rmse: 0.01, label: 'flattened tree ≡ hand-fold' }],
         },
-        initialParameters: {
-            'camera.position': [0, 1.0, 4.2],
-            'camera.target': [0, -0.2, 0],
-        },
     },
     // Fixture partner: the untransformed arm of the conjugation witness.
     'conjugation-base': {
         scene: conjugationBase,
-        strategies: [transformNeeStrategy],
+        strategies: posed(CONJ_CAMERA_BASE.position, CONJ_CAMERA_BASE.target, transformNeeStrategy),
         exercises: 'untransformed arm of the conjugation witness (fable-transforms §8)',
-        initialParameters: {
-            'camera.position': CONJ_CAMERA_BASE.position,
-            'camera.target': CONJ_CAMERA_BASE.target,
-        },
     },
     conjugation: {
         scene: conjugationScene,
-        strategies: [transformNeeStrategy],
+        strategies: posed(CONJ_CAMERA_G.position, CONJ_CAMERA_G.target, transformNeeStrategy),
         exercises:
             'the global-similarity witness (fable-transforms §8): ONE g = T·Ry(0.7)·(s=1.6) on every object AND the camera — path tracing g·scene from g·camera is the same integral. Exercises arbitrary-angle mat3 wrapper tiers, plane s·d, analytic folds, and the radiance-invariant emissive quad through the CDF/sampler chain, all in one number',
         expected: 'converges to the same image as conjugation-base; divergence anywhere in the chain (fold, wrapper, desugar, power CDF, quad pdf) breaks the equality',
@@ -493,24 +406,16 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // 0.04%/0.91% at this budget → ~1.5× calibration.
             checks: [{ kind: 'twin', other: { scene: 'conjugation-base' }, meanTol: 0.01, rmse: 0.02, label: 'g·scene ≡ scene (conjugation)' }],
         },
-        initialParameters: {
-            'camera.position': CONJ_CAMERA_G.position,
-            'camera.target': CONJ_CAMERA_G.target,
-        },
     },
     // Fixture partner: the hand-folded arm of the regions-under-transform twin.
     'regions-transformed-ref': {
         scene: regionsTransformedRef,
-        strategies: [regionsNeeStrategy],
+        strategies: posed([0, 0.8, 4], [0.3, -0.3, 0], regionsNeeStrategy),
         exercises: 'hand-folded reference arm of the regions-under-transform twin',
-        initialParameters: {
-            'camera.position': [0, 0.8, 4],
-            'camera.target': [0.3, -0.3, 0],
-        },
     },
     'regions-transformed': {
         scene: regionsTransformed,
-        strategies: [regionsNeeStrategy],
+        strategies: posed([0, 0.8, 4], [0.3, -0.3, 0], regionsNeeStrategy),
         exercises:
             'nesting under a similarity (fable-transforms §8): glass sphere (analytic, folded) strictly inside an absorbing water box (SDF, mat3+s·d wrapper), both under Ry(90°)·1.25 + translate — innermost-wins classification, scaled signed distances, interface epsilons, and current_medium tracking through transformed boundaries',
         expected: 'converges to the same image as regions-transformed-ref (tinted water, refracted sphere); divergence implicates scaled-field classification (scene_region_at over s·d) or the analytic signed distance after folding',
@@ -519,14 +424,49 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // Measured 0.24%/1.13% at this budget → ~1.5–2× calibration.
             checks: [{ kind: 'twin', other: { scene: 'regions-transformed-ref' }, meanTol: 0.01, rmse: 0.025, label: 'regions transform ≡ hand-fold' }],
         },
+    },
+    // Fixture partners: the baked (constant-transform) references of the driven witness.
+    'driven-baked-theta': {
+        scene: drivenBakedTheta,
+        strategies: posed([0, 1.1, 4.2], [0, -0.2, 0], drivenNeeStrategy),
+        exercises: 'baked reference arm of the driven witness at parameter point θ (stage-2 constant lowering)',
+    },
+    'driven-baked-theta2': {
+        scene: drivenBakedTheta2,
+        strategies: posed([0, 1.1, 4.2], [0, -0.2, 0], drivenNeeStrategy),
+        exercises: 'baked reference arm of the driven witness at parameter point θ′',
+    },
+    driven: {
+        scene: drivenScene,
+        strategies: posed([0, 1.1, 4.2], [0, -0.2, 0], drivenNeeStrategy),
+        exercises:
+            'driven-equals-baked at θ (fable-transforms §6/§8): {param}-driven placements rendered from the ValueParam DEFAULTS — the driven SDF box (rigid-frame wrapper: position+angle+scale) and driven analytic sphere (conjugation arm, live s·center/s·radius) must reproduce the constant-authored twin; the box is a live occluder under NEE (shadow via the same uniforms). Drag the rig.* sliders in the lab — accumulation resets and the object moves without recompiling',
+        expected: 'converges to the same image as driven-baked-theta; divergence implicates the fp64 compute closures, the vec4 ABI upload, or a rigid-frame arm',
+        witness: {
+            spp: 96,
+            // Different codegen (uniform rigid-frame vs folded constants), same values →
+            // near-identical fp32 streams (measured 0.00%/0.00% at this budget).
+            checks: [{ kind: 'twin', other: { scene: 'driven-baked-theta' }, meanTol: 0.002, rmse: 0.01, label: 'driven ≡ baked @θ' }],
+        },
+    },
+    'driven-theta2': {
+        scene: drivenScene,
+        strategies: posed([0, 1.1, 4.2], [0, -0.2, 0], drivenNeeStrategy),
+        exercises:
+            'driven-equals-baked at θ′: the SAME driven scene with every rig.* param SET through the ParameterStore after initialization (the slider/graph-runtime path) — covers recompute-on-change + re-upload, not just defaults',
+        expected: 'converges to the same image as driven-baked-theta2 (a visibly different pose than `driven`); divergence implicates the multi-path binding recompute',
+        witness: {
+            spp: 96,
+            // Measured 0.00%/0.01% at this budget.
+            checks: [{ kind: 'twin', other: { scene: 'driven-baked-theta2' }, meanTol: 0.002, rmse: 0.01, label: 'driven ≡ baked @θ′ (post-set)' }],
+        },
         initialParameters: {
-            'camera.position': [0, 0.8, 4],
-            'camera.target': [0.3, -0.3, 0],
+            ...THETA2,
         },
     },
     'veach-mis': {
         scene: veachMis,
-        strategies: [veachMisStrategy, veachNeeStrategy, veachPtStrategy],
+        strategies: posed([0, 1.3, 5.5], [0, 0.55, 0], veachMisStrategy, veachNeeStrategy, veachPtStrategy),
         exercises:
             'GGX (first glossy BSDF: VNDF sampling, Smith G, Schlick F) under the classic Veach MIS geometry — four roughness steps × three light sizes at ~equal power; the power heuristic at both scoring sites with a peaked non-delta pdf',
         expected:
@@ -540,10 +480,6 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // at equal spp (it is visibly lowest-variance on every plate).
                 { kind: 'noise', strategies: [0, 1, 2], assertFirstLowest: true, label: 'σ at equal spp: mis lowest' },
             ],
-        },
-        initialParameters: {
-            'camera.position': [0, 1.3, 5.5],
-            'camera.target': [0, 0.55, 0],
         },
     },
 };

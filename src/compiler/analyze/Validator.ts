@@ -6,6 +6,7 @@ import { isGlslExpression, isValueParam } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { PRIMITIVE_PARAMS, type PrimitiveParam } from '../../components/geometry/index.js';
+import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
@@ -272,6 +273,25 @@ export function validate(
             .suggest(`Registered cameras: ${registered.join(', ')}`)
             .add();
     }
+    // Camera pose (CameraPose): authored defaults of the always-live
+    // camera.position/camera.target parameters. The strategy is outside the scene
+    // finiteness sweep, so check shape here; a coincident pose has no view direction.
+    {
+        const cam = strategy.measurement.camera;
+        for (const field of ['position', 'target'] as const) {
+            if (cam[field] !== undefined && !isVec3(cam[field])) {
+                bag.error('invalid-setting',
+                    `measurement.camera.${field} must be a vec3 of finite numbers`)
+                    .add();
+            }
+        }
+        if (isVec3(cam.position) && isVec3(cam.target)
+            && Math.hypot(cam.position[0] - cam.target[0], cam.position[1] - cam.target[1], cam.position[2] - cam.target[2]) < 1e-8) {
+            bag.error('invalid-setting',
+                `measurement.camera position and target coincide — the look-at frame is degenerate (no view direction)`)
+                .add();
+        }
+    }
     if (strategy.measurement.color === 'spectral') {
         bag.error('invalid-setting',
             `color 'spectral' not yet supported — hero-wavelength transport is contracts §8; 'rgb' is the sole implemented color model (reserved-not-removed)`)
@@ -428,17 +448,35 @@ export function validate(
         }
     }
 
-    // Placement validation (docs/fable-transforms.md §7). The Transform type is the
-    // first validator (scalar scale, axis-angle|quat rotation), but authored JS can
-    // hand us anything — every rule re-checks at runtime with a diagnostic.
+    // Placement validation (docs/fable-transforms.md §7 + §6.1). The Transform type is
+    // the first validator (scalar scale, axis-angle|quat rotation), but authored JS
+    // can hand us anything — every rule re-checks at runtime with a diagnostic.
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
         const t = obj.transform;
         if (!t) continue;
-        if (t.position !== undefined && !isVec3(t.position)) {
-            bag.error('invalid-transform', `Object ${i}: transform.position must be a vec3 of finite numbers`)
-                .withOriginal('scene', [`objects[${i}]`, `transform.position`])
-                .add();
+
+        // §6.1 pin 4: transforms NEVER accept GLSL expressions — a spatially-varying
+        // transform is deformation (breaks the similarity contract and the SDF
+        // distance bound), a different feature with different math.
+        for (const [field, value] of Object.entries(t)) {
+            if (isGlslExpression(value) || (typeof value === 'object' && value !== null && !Array.isArray(value)
+                && isGlslExpression((value as { angle?: unknown }).angle))) {
+                bag.error('invalid-transform',
+                    `Object ${i}: transform.${field} cannot be a GLSL expression — a spatially-varying `
+                    + `transform is deformation, not a placement (fable-transforms §6.1)`)
+                    .withOriginal('scene', [`objects[${i}]`, `transform.${field}`])
+                    .add();
+            }
+        }
+
+        if (t.position !== undefined) {
+            const pos = isValueParam(t.position) ? t.position.default : t.position;
+            if (pos !== undefined && !isVec3(pos)) {
+                bag.error('invalid-transform', `Object ${i}: transform.position${isValueParam(t.position) ? ' default' : ''} must be a vec3 of finite numbers`)
+                    .withOriginal('scene', [`objects[${i}]`, `transform.position`])
+                    .add();
+            }
         }
         if (t.rotation !== undefined) {
             validateRotation(t.rotation, i, bag);
@@ -446,44 +484,82 @@ export function validate(
         if (t.scale !== undefined) {
             validateScale(t.scale, i, bag);
         }
+
+        // §6 pin: driven placement excludes SAMPLABLE emitters — their geometry is
+        // baked as literals into the sampler/pdf arms and the compile-time power CDF.
+        // Live light geometry is the deferred Value<T>-light-params batch (and must be
+        // RIGID there — driven scale would silently stale the CDF).
+        if (isDrivenTransform(t) && obj.kind === 'analytic') {
+            const shapeType = obj.shape.type;
+            if (shapeType === 'quad' || shapeType === 'sphere') {
+                const mat = scene.materials[obj.material];
+                if (mat !== undefined && mat.sampleAsLight !== false && hasConstantNonzeroEmission(mat.emission)) {
+                    bag.error('invalid-transform',
+                        `Object ${i}: a {param}-driven transform on a samplable emitter is not supported — `
+                        + `light geometry is compiled into the sampler/pdf/power-CDF as constants. `
+                        + `Set sampleAsLight: false to keep it path-traced only, or wait for the `
+                        + `Value<T> light-params batch (rigid-only)`)
+                        .withOriginal('scene', [`objects[${i}]`, 'transform'])
+                        .add();
+                }
+            }
+        }
     }
 }
 
+/** Constant nonzero emission — mirrors the Planner's sampleAsLight registry condition. */
+function hasConstantNonzeroEmission(emission: unknown): boolean {
+    if (typeof emission === 'number') return emission !== 0;
+    if (Array.isArray(emission)) return emission.some((c) => typeof c === 'number' && c !== 0);
+    return false;   // absent, param-driven, or GLSL: not a v1 samplable emitter
+}
+
 /** §7 rules 2: quaternion normalized-within-tolerance (warn + the Planner normalizes),
- *  error near zero; axis-angle rejects a zero axis. */
+ *  error near zero; axis-angle rejects a zero axis. §6: quaternion and angle may be
+ *  `{param}`-driven — their DEFAULTS get the same checks. */
 function validateRotation(rotation: unknown, index: number, bag: DiagnosticBag): void {
     const at = (field: string) => [`objects[${index}]`, `transform.rotation${field}`] as [string, string];
-    if (Array.isArray(rotation)) {
-        if (rotation.length !== 4 || rotation.some((c) => typeof c !== 'number' || !Number.isFinite(c))) {
-            bag.error('invalid-transform', `Object ${index}: quaternion rotation must be 4 finite numbers [x, y, z, w]`)
+    const checkQuat = (q: unknown, what: string): void => {
+        if (!Array.isArray(q) || q.length !== 4 || q.some((c) => typeof c !== 'number' || !Number.isFinite(c))) {
+            bag.error('invalid-transform', `Object ${index}: ${what} must be 4 finite numbers [x, y, z, w]`)
                 .withOriginal('scene', at('')).add();
             return;
         }
-        const norm = Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
+        const norm = Math.hypot(q[0], q[1], q[2], q[3]);
         if (norm < 1e-6) {
-            bag.error('invalid-transform', `Object ${index}: rotation quaternion is degenerate (norm ${norm})`)
+            bag.error('invalid-transform', `Object ${index}: ${what} is degenerate (norm ${norm})`)
                 .withOriginal('scene', at('')).add();
         } else if (Math.abs(norm - 1) > 1e-3) {
             bag.warning('invalid-transform',
-                `Object ${index}: rotation quaternion is not unit (norm ${norm.toFixed(4)}) — normalizing`)
+                `Object ${index}: ${what} is not unit (norm ${norm.toFixed(4)}) — normalizing`)
                 .withOriginal('scene', at('')).add();
         }
+    };
+
+    if (Array.isArray(rotation)) {
+        checkQuat(rotation, 'quaternion rotation');
+        return;
+    }
+    if (isValueParam(rotation)) {
+        // Driven quaternion (the graph runtime's port): validate the default if given.
+        if (rotation.default !== undefined) checkQuat(rotation.default, `rotation param '${rotation.param}' default`);
         return;
     }
     if (typeof rotation === 'object' && rotation !== null && 'axis' in rotation && 'angle' in rotation) {
         const aa = rotation as { axis: unknown; angle: unknown };
         if (!isVec3(aa.axis) || Math.hypot(...(aa.axis as Vec3)) < 1e-8) {
-            bag.error('invalid-transform', `Object ${index}: rotation axis must be a nonzero vec3 of finite numbers`)
+            bag.error('invalid-transform', `Object ${index}: rotation axis must be a nonzero vec3 of finite numbers (the axis is always constant — drive the angle)`)
                 .withOriginal('scene', at('.axis')).add();
         }
-        if (typeof aa.angle !== 'number' || !Number.isFinite(aa.angle)) {
-            bag.error('invalid-transform', `Object ${index}: rotation angle must be a finite number (radians)`)
+        const angle = isValueParam(aa.angle) ? (aa.angle.default ?? 0) : aa.angle;
+        if (typeof angle !== 'number' || !Number.isFinite(angle)) {
+            bag.error('invalid-transform', `Object ${index}: rotation angle${isValueParam(aa.angle) ? ' default' : ''} must be a finite number (radians)`)
                 .withOriginal('scene', at('.angle')).add();
         }
         return;
     }
     bag.error('invalid-transform',
-        `Object ${index}: rotation must be axis-angle { axis, angle } or a quaternion [x, y, z, w]`)
+        `Object ${index}: rotation must be axis-angle { axis, angle }, a quaternion [x, y, z, w], or a {param} quaternion`)
         .withOriginal('scene', at('')).add();
 }
 
@@ -497,6 +573,22 @@ function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void 
             `Object ${index}: nonuniform scale is not a transform — a similarity has one scale. `
             + `Shape stretching belongs in primitive parameters (e.g. box halfSize), not placement`)
             .withOriginal('scene', at).add();
+        return;
+    }
+    if (isValueParam(scale)) {
+        // Driven scale (§6): compile-time rules apply to the DEFAULT; runtime values
+        // are floored by the compute guard rail (§6.1 pin 4), with the param's `min`
+        // as the policy source — warn when it can't serve that role.
+        if (scale.default !== undefined && (typeof scale.default !== 'number' || !(scale.default > 0))) {
+            bag.error('invalid-transform', `Object ${index}: transform.scale param default must be > 0`)
+                .withOriginal('scene', at).add();
+        }
+        if (scale.min === undefined || scale.min <= 0) {
+            bag.warning('invalid-transform',
+                `Object ${index}: driven transform.scale has no positive 'min' — runtime values `
+                + `will be floored at 1e-6; set min > 0 to define the clamp policy`)
+                .withOriginal('scene', at).add();
+        }
         return;
     }
     if (typeof scale !== 'number' || !Number.isFinite(scale)) {

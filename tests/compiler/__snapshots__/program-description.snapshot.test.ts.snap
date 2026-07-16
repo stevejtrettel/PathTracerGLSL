@@ -32,6 +32,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -45,6 +46,16 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -109,6 +120,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -121,6 +133,16 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -185,6 +207,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -197,6 +220,16 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        6.741442178069406,
+        2.58,
+        4.6292384984138355,
+      ],
+      "target": [
+        2,
+        0.33999999999999997,
+        -1,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -261,6 +294,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -273,6 +307,16 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.3,
+        4.6,
+      ],
+      "target": [
+        0,
+        -0.1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -331,6 +375,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -343,6 +388,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
   "measurement": {
     "camera": {
       "hfov": 240,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "cylindrical",
     },
     "color": "rgb",
@@ -401,6 +456,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -412,6 +468,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
   },
   "measurement": {
     "camera": {
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "equirect",
     },
     "color": "rgb",
@@ -470,6 +536,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -482,7 +549,17 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
   "measurement": {
     "camera": {
       "fov": 3.141592653589793,
+      "position": [
+        0,
+        1,
+        4,
+      ],
       "projection": "equidistant",
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "fisheye",
     },
     "color": "rgb",
@@ -541,6 +618,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -552,7 +630,17 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
   },
   "measurement": {
     "camera": {
+      "position": [
+        0,
+        1,
+        4,
+      ],
       "scale": 1.6,
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "orthographic",
     },
     "color": "rgb",
@@ -611,6 +699,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -628,6 +717,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -686,6 +785,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -705,6 +805,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "thinlens",
     },
     "color": "rgb",
@@ -760,6 +870,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -777,6 +888,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -835,6 +956,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -852,6 +974,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -910,6 +1042,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -927,6 +1060,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -982,6 +1125,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1000,6 +1144,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1058,6 +1212,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1076,6 +1231,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1134,6 +1299,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1152,6 +1318,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1210,6 +1386,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1222,7 +1399,17 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   "measurement": {
     "camera": {
       "fov": 3.141592653589793,
+      "position": [
+        0,
+        1,
+        4,
+      ],
       "projection": "equidistant",
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "fisheye",
     },
     "color": "rgb",
@@ -1281,6 +1468,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1293,7 +1481,17 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   "measurement": {
     "camera": {
       "fov": 3.141592653589793,
+      "position": [
+        0,
+        1,
+        4,
+      ],
       "projection": "equisolid",
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "fisheye",
     },
     "color": "rgb",
@@ -1352,6 +1550,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1364,7 +1563,17 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   "measurement": {
     "camera": {
       "fov": 3.141592653589793,
+      "position": [
+        0,
+        1,
+        4,
+      ],
       "projection": "orthographic",
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "fisheye",
     },
     "color": "rgb",
@@ -1423,6 +1632,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1435,7 +1645,17 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
   "measurement": {
     "camera": {
       "fov": 3.141592653589793,
+      "position": [
+        0,
+        1,
+        4,
+      ],
       "projection": "stereographic",
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "fisheye",
     },
     "color": "rgb",
@@ -1494,6 +1714,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1507,6 +1728,16 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1565,6 +1796,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1577,6 +1809,364 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > driven + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.05,
+      0.07,
+      0.1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": true,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1.1,
+        4.2,
+      ],
+      "target": [
+        0,
+        -0.2,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > driven-baked-theta + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.05,
+      0.07,
+      0.1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1.1,
+        4.2,
+      ],
+      "target": [
+        0,
+        -0.2,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > driven-baked-theta2 + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.05,
+      0.07,
+      0.1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1.1,
+        4.2,
+      ],
+      "target": [
+        0,
+        -0.2,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.05,
+      0.07,
+      0.1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": true,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1.1,
+        4.2,
+      ],
+      "target": [
+        0,
+        -0.2,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1630,6 +2220,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1643,6 +2234,16 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
   "measurement": {
     "camera": {
       "fov": 0.6,
+      "position": [
+        0,
+        1,
+        0.05,
+      ],
+      "target": [
+        0,
+        -1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1707,6 +2308,7 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1719,6 +2321,16 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4.2,
+      ],
+      "target": [
+        0,
+        -0.2,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1774,6 +2386,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1791,6 +2404,16 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1851,6 +2474,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1868,6 +2492,16 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -1928,6 +2562,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -1945,6 +2580,16 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2002,6 +2647,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2019,6 +2665,16 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2079,6 +2735,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2096,6 +2753,16 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2151,6 +2818,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2163,6 +2831,16 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.6,
+        3,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2216,6 +2894,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2228,6 +2907,16 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
   "measurement": {
     "camera": {
       "fov": 1,
+      "position": [
+        0,
+        0,
+        0,
+      ],
+      "target": [
+        0,
+        0,
+        -1,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2281,6 +2970,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2293,6 +2983,16 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
   "measurement": {
     "camera": {
       "fov": 1,
+      "position": [
+        0,
+        0,
+        0,
+      ],
+      "target": [
+        0,
+        0,
+        -1,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2346,6 +3046,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2358,6 +3059,16 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
   "measurement": {
     "camera": {
       "fov": 1,
+      "position": [
+        0,
+        0,
+        0,
+      ],
+      "target": [
+        0,
+        0,
+        -1,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2420,6 +3131,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2437,6 +3149,16 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2499,6 +3221,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2516,6 +3239,16 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2578,6 +3311,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2595,6 +3329,16 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2649,6 +3393,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2661,6 +3406,16 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
   "measurement": {
     "camera": {
       "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        5,
+      ],
+      "target": [
+        0,
+        1.2,
+        -1,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2721,6 +3476,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2733,6 +3489,16 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
   "measurement": {
     "camera": {
       "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        5,
+      ],
+      "target": [
+        0,
+        1.2,
+        -1,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2793,6 +3559,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2805,6 +3572,16 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
   "measurement": {
     "camera": {
       "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        5,
+      ],
+      "target": [
+        0,
+        1.2,
+        -1,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2868,6 +3645,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2881,6 +3659,16 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
   "measurement": {
     "camera": {
       "fov": 0.7,
+      "position": [
+        0.4,
+        1.15,
+        3.2,
+      ],
+      "target": [
+        0,
+        0.55,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -2944,6 +3732,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -2957,6 +3746,16 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
   "measurement": {
     "camera": {
       "fov": 0.7,
+      "position": [
+        0.4,
+        1.15,
+        3.2,
+      ],
+      "target": [
+        0,
+        0.55,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3019,6 +3818,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3031,6 +3831,16 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3095,6 +3905,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3107,6 +3918,16 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3171,6 +3992,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3183,6 +4005,16 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
   "measurement": {
     "camera": {
       "fov": 1,
+      "position": [
+        0,
+        1.7,
+        6,
+      ],
+      "target": [
+        0,
+        1.6,
+        -8,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3249,6 +4081,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3261,6 +4094,16 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.5,
+        6,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3322,6 +4165,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3335,6 +4179,16 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.3,
+        3.4,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3399,6 +4253,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3412,6 +4267,16 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.3,
+        3.4,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3473,6 +4338,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3491,6 +4357,16 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3555,6 +4431,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3573,6 +4450,16 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3637,6 +4524,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3655,6 +4543,16 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3719,6 +4617,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3737,6 +4636,16 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3792,6 +4701,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3804,6 +4714,16 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.5,
+        5.5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3872,6 +4792,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3885,6 +4806,16 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        0.8,
+        4,
+      ],
+      "target": [
+        0.3,
+        -0.3,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -3949,6 +4880,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -3962,6 +4894,16 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        0.8,
+        4,
+      ],
+      "target": [
+        0.3,
+        -0.3,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4020,6 +4962,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4038,6 +4981,16 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4099,6 +5052,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4117,6 +5071,16 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4178,6 +5142,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4196,6 +5161,16 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4257,6 +5232,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4275,6 +5251,16 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4333,6 +5319,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4351,6 +5338,16 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4412,6 +5409,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4430,6 +5428,16 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4491,6 +5499,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4509,6 +5518,16 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4562,6 +5581,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4574,6 +5594,16 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
   "measurement": {
     "camera": {
       "fov": 0.6,
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "target": [
+        0,
+        0,
+        -2,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4627,6 +5657,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4640,6 +5671,16 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
   "measurement": {
     "camera": {
       "fov": 0.7,
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4698,6 +5739,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4710,6 +5752,16 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4768,6 +5820,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4782,6 +5835,16 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
       "aperture": 0,
       "focusDistance": 4,
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
       "type": "thinlens",
     },
     "color": "rgb",
@@ -4843,6 +5906,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4861,6 +5925,16 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.3,
+        5,
+      ],
+      "target": [
+        0.4,
+        0.8,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -4922,6 +5996,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -4940,6 +6015,16 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.3,
+        5,
+      ],
+      "target": [
+        0.4,
+        0.8,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5001,6 +6086,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5019,6 +6105,16 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.3,
+        5,
+      ],
+      "target": [
+        0.4,
+        0.8,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5080,6 +6176,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5098,6 +6195,16 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.3,
+        5,
+      ],
+      "target": [
+        0.4,
+        0.8,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5159,6 +6266,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5177,6 +6285,16 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.3,
+        5,
+      ],
+      "target": [
+        0.4,
+        0.8,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5238,6 +6356,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5256,6 +6375,16 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.3,
+        5,
+      ],
+      "target": [
+        0.4,
+        0.8,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5316,6 +6445,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5334,6 +6464,16 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
         "min": 0.3,
         "param": "camera.fov",
       },
+      "position": [
+        0,
+        1.3,
+        5,
+      ],
+      "target": [
+        0.4,
+        0.8,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5398,6 +6538,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5410,6 +6551,16 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4.2,
+      ],
+      "target": [
+        0,
+        -0.2,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5474,6 +6625,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5486,6 +6638,16 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4.2,
+      ],
+      "target": [
+        0,
+        -0.2,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5542,6 +6704,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5554,6 +6717,16 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
   "measurement": {
     "camera": {
       "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4,
+      ],
+      "target": [
+        0,
+        0.5,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5610,6 +6783,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5622,6 +6796,16 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
   "measurement": {
     "camera": {
       "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4,
+      ],
+      "target": [
+        0,
+        0.5,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5683,6 +6867,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
   },
   "intersection": {
     "anyQuery": false,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5696,6 +6881,16 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.3,
+        5.5,
+      ],
+      "target": [
+        0,
+        0.55,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5760,6 +6955,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5773,6 +6969,16 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.3,
+        5.5,
+      ],
+      "target": [
+        0,
+        0.55,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",
@@ -5837,6 +7043,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
   },
   "intersection": {
     "anyQuery": true,
+    "drivenPlacement": false,
     "method": "raymarch",
   },
   "materials": {
@@ -5850,6 +7057,16 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
   "measurement": {
     "camera": {
       "fov": 0.8,
+      "position": [
+        0,
+        1.3,
+        5.5,
+      ],
+      "target": [
+        0,
+        0.55,
+        0,
+      ],
       "type": "pinhole",
     },
     "color": "rgb",

@@ -98,6 +98,8 @@ export interface SceneSuiteEntry {
      * have one; an entry without checks is a fixture partner (a twin's other half).
      */
     witness?: WitnessSpec;
-    /** Default camera pose (and any other live params) for viewing. */
+    /** Parameter POINTS beyond the compiled defaults (e.g. the driven witness θ′).
+     *  Camera pose is NOT set here — it is measurement data, authored on each
+     *  strategy's `measurement.camera` (the registries' `posed(...)` wrap). */
     initialParameters?: Record<string, unknown>;
 }

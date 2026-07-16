@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value, ValueParam, EnvironmentDescription } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value, ValueParam, EnvironmentDescription, ParameterMetadata } from '../types.js';
 import type { Similarity } from '../../components/geometry/similarity.js';
 
 // ============================================================================
@@ -118,6 +118,9 @@ export type IntersectionDesc =
          *  scene_intersect instead). The static backend walkers (sdf_intersect_any) ride
          *  along inside their component files regardless — the declared wholesale cost. */
         anyQuery: boolean;
+        /** Any leaf has a live ({param}-driven) placement (fable-transforms §6) —
+         *  gates glsl/core/placement.glsl and the rigid-frame query tiers. */
+        drivenPlacement: boolean;
     };
 
 export interface MaterialsDesc {
@@ -137,13 +140,16 @@ export type LightingDesc =
 // link map, so every strategy-side camera variant must exist here for Generate to read.
 // Registered occupants (camera/index.ts) are pinhole + thinlens; orthographic is
 // type-declared but unregistered → Validator-rejected (reserved-not-removed).
-export type CameraDesc =
+// The pose fields ride along: authored defaults for the always-live
+// camera.position/camera.target parameters (compiler/types.ts CameraPose).
+export type CameraDesc = { position?: Vec3; target?: Vec3 } & (
     | { type: 'pinhole'; fov: Value<number> }
     | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
     | { type: 'equirect' }
     | { type: 'orthographic'; scale: number }
     | { type: 'fisheye'; projection: 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic'; fov: number }
-    | { type: 'cylindrical'; hfov: number };
+    | { type: 'cylindrical'; hfov: number }
+);
 
 export type AccumulationDesc =
     | { type: 'average' }
@@ -181,10 +187,11 @@ export interface PlannedSDFObject {
     materialId: number;
     sdfType: 'sphere' | 'plane' | 'box' | 'torus' | 'capsule';
     parameters: Record<string, number | number[]>;
-    /** Composed local→world similarity (fable-transforms §5.2); any local 'center' is
-     *  already folded in as a pre-translation. The generator lowers this to wrapper
-     *  tiers (identity → nothing, translation → subtraction, rigid/similarity → mat3). */
-    placement: Similarity;
+    /** Constant: composed local→world similarity (fable-transforms §5.2; any local
+     *  'center' folded in as a pre-translation) lowered to wrapper tiers. Driven
+     *  (§6): the uniform record — parameters stay LOCAL (center NOT folded; the
+     *  rigid-frame query scales params in-shader). */
+    placement: PlannedPlacement;
 }
 
 /**
@@ -197,6 +204,10 @@ export interface PlannedAnalyticObject {
     materialId: number;
     shapeType: 'sphere' | 'plane' | 'quad';
     parameters: Record<string, number | number[]>;
+    /** Present ONLY for driven placement (§6): parameters are then LOCAL (unfolded)
+     *  and the generated arm conjugates the ray into the rigid frame. Constant
+     *  placements fold entirely into `parameters` and this stays undefined. */
+    placement?: DrivenPlacement;
 }
 
 /**
@@ -258,6 +269,11 @@ export interface PlannedUniform {
     name: string;
     type: 'float' | 'int' | 'vec2' | 'vec3' | 'vec4' | 'mat4' | 'sampler2D';
     parameterPath: string;
+    /** Additional parameter paths when the uniform is a function of SEVERAL params
+     *  (driven placement: one uniform ← position + rotation + scale paths). The
+     *  binding's parameter list is [parameterPath, ...parameterPaths]; `compute`
+     *  receives the whole value map (fable-transforms §6). */
+    parameterPaths?: string[];
     default?: number | number[];
     /**
      * Optional transform from parameter values to the uniform value — used when the
@@ -265,6 +281,31 @@ export interface PlannedUniform {
      * When absent, the uniform value is `params[parameterPath] ?? default`.
      */
     compute?: (params: Record<string, unknown>) => number | number[];
+}
+
+/**
+ * Live (uniform-driven) placement of one object (fable-transforms §6/§6.1). Built by
+ * the Planner (decisions + closures); the intersection feature forwards the uniforms/
+ * metadata and emits the rigid-frame query against the §6.1 ABI:
+ *   q  = inverse rotation quat;  ts = (t_rigid = −Rᵀt, s)
+ * The primitive's parameters stay LOCAL (never folded); s scales them in-shader.
+ */
+export interface DrivenPlacement {
+    kind: 'driven';
+    /** vec4 uniform names: the inverse quat and (t_rigid, s). */
+    uniformQ: string;
+    uniformTS: string;
+    /** Ready-to-forward uniform declarations (multi-path, fp64 compute, guard rails). */
+    uniforms: [PlannedUniform, PlannedUniform];
+    /** Slider metadata for the authored `{param}` fields, keyed by param path. */
+    parameters: Record<string, ParameterMetadata>;
+}
+
+/** A leaf's placement: a constant similarity (folds/wrapper tiers) or a live one. */
+export type PlannedPlacement = Similarity | DrivenPlacement;
+
+export function isDrivenPlacement(p: PlannedPlacement): p is DrivenPlacement {
+    return (p as DrivenPlacement).kind === 'driven';
 }
 
 /**

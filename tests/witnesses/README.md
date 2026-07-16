@@ -44,6 +44,25 @@ LINEAR HDR (`meanTol`) — plus exactly one **structure gate**:
   A pt tripwire is deliberately loose: it catches gross breaks; converged pt
   equality remains the owner's GPU check (say so on the card).
 
+## The render cache
+
+Because renders are deterministic (pinned salt, below), a frame is a pure function of
+its inputs, and the runner memoizes it: `.witness-cache/` (gitignored) stores FRAMES
+keyed by sha256 of (per-pair compiled-shader digest + scene/strategy/initialParameters
+JSON [computed in-page by `__witnessDigest`] + a global hash of `src/**/*.ts`,
+`src/glsl/shared/*.glsl`, and `public/` assets + size + spp + salt + mode).
+
+- **Frames are cached, never verdicts** — editing a check/gate re-evaluates against
+  cached pixels with no invalidation needed.
+- **Granularity**: a component/core `.glsl` edit invalidates exactly the scenes whose
+  EMITTED shaders change; any `.ts` edit under `src/` invalidates everything (coarse
+  but sound — uniform compute closures live in TS and are invisible to shader
+  sources); `glsl/shared/` is globally hashed because the env-bake template compiles
+  outside the per-pair digests.
+- `--no-cache` skips reads (still writes) for a paranoid full re-render.
+- A no-change sweep re-renders nothing; a post-batch sweep re-renders only affected
+  scenes.
+
 ## Determinism: the pinned salt
 
 The runner pins `resetSalt` (`WITNESS_SALT` in tools/witness.mjs) for EVERY render —

@@ -97,7 +97,10 @@ estimator = the numerical method.
 
 **No workflow change follows.** Camera pose and fov are frame-bound (`Value<T>` → uniforms),
 so the compiled program is a *family* of measurements parameterized at runtime; orbiting is
-motion through measurement-space, not a recompile. The general rule: a measurement field may
+motion through measurement-space, not a recompile. Since July 2026 the pose is also
+*authored* here (`CameraPose` on `measurement.camera`: `position`/`target`, the defaults of
+the always-live `camera.position`/`camera.target` parameters) — closing the gap where
+(scene, strategy) did not determine the converged image without loose parameter state. The general rule: a measurement field may
 bind at frame time for workflow convenience — its section records what it *means*; its
 binding time records when it takes *effect*. Only compile-bound fields are baked into the
 artifact's identity.

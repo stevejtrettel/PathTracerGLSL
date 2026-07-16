@@ -19,18 +19,23 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     const cam = plan.program.measurement.camera;
     const model = cameraModel(cam.type);
 
+    // Authored pose (CameraPose — measurement data) seeds the DEFAULTS of the
+    // always-live camera.position/camera.target parameters; OrbitControls drives
+    // the same paths, so orbiting never recompiles.
+    const pose = { position: cam.position ?? [0, 0, 8], target: cam.target ?? [0, 0, 0] };
+
     const contribution: FeatureContribution = {
         ...emptyContribution('camera'),
         provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 film, vec2 xiLens)' }],
         blocks: [{ origin: model.origin, source: model.glsl }],
         uniforms: [
-            { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: [0, 0, 8] },
-            { name: 'u_cameraTarget', type: 'vec3', parameterPath: 'camera.target', default: [0, 0, 0] },
+            { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: pose.position },
+            { name: 'u_cameraTarget', type: 'vec3', parameterPath: 'camera.target', default: pose.target },
             { name: 'u_imageSize', type: 'vec2', parameterPath: 'engine.imageSize' },
         ],
         parameters: {
-            'camera.position': { type: 'vec3', default: [0, 0, 8], name: 'Position', group: 'Camera', triggersReset: true },
-            'camera.target': { type: 'vec3', default: [0, 0, 0], name: 'Target', group: 'Camera', triggersReset: true },
+            'camera.position': { type: 'vec3', default: pose.position, name: 'Position', group: 'Camera', triggersReset: true },
+            'camera.target': { type: 'vec3', default: pose.target, name: 'Target', group: 'Camera', triggersReset: true },
         },
     };
 

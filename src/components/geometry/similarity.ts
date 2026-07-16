@@ -149,22 +149,42 @@ export function similarityFromTRS(translation: Vec3Tuple, rotation: Quat, scale:
     return { rotation: quatNormalize(rotation), translation, scale };
 }
 
-/** Authored `Transform` (TRS sugar: axis-angle | quaternion) → the canonical Similarity
- *  (fable-transforms §2). The Validator has already diagnosed degenerate axes and
- *  quaternions, so this only normalizes. Shared by the Planner (constant folds) and
- *  the authoring layer's `flattenGroups` — one lowering, two binding sites. */
+/** True when any transform field is `{param}`-driven (stage 4). Lives HERE (not in
+ *  compiler types) so the Planner, Validator, AND the authoring layer share one
+ *  implementation — components may not import compiler VALUES, but everyone imports
+ *  from components. Defensive on shape: authored JS can hand us anything. */
+export function isDrivenTransform(transform: Transform | undefined): boolean {
+    if (transform === undefined) return false;
+    if (isParamRef(transform.position) || isParamRef(transform.scale) || isParamRef(transform.rotation)) return true;
+    const r = transform.rotation;
+    return r !== undefined && !Array.isArray(r) && typeof r === 'object' && isParamRef((r as { angle?: unknown }).angle);
+}
+
+function isParamRef(v: unknown): boolean {
+    return typeof v === 'object' && v !== null && !Array.isArray(v) && 'param' in v;
+}
+
+/** Authored CONSTANT `Transform` (TRS sugar: axis-angle | quaternion) → the canonical
+ *  Similarity (fable-transforms §2). The Validator has already diagnosed degenerate
+ *  axes and quaternions, so this only normalizes. Shared by the Planner (constant
+ *  folds) and the authoring layer's `flattenGroups` — one lowering, two binding sites.
+ *  Driven transforms take the uniform tier instead (§6); the throw is a backstop for
+ *  callers that skipped their classification step. */
 export function similarityFromTransform(transform: Transform | undefined): Similarity {
     if (transform === undefined) return IDENTITY_SIMILARITY;
+    if (isDrivenTransform(transform)) {
+        throw new Error('similarityFromTransform: driven transform reached the constant lowering — classify with isDrivenTransform first');
+    }
     let rotation = IDENTITY_QUAT;
     if (transform.rotation !== undefined) {
-        rotation = Array.isArray(transform.rotation)
-            ? quatNormalize(transform.rotation)
-            : quatFromAxisAngle(transform.rotation.axis, transform.rotation.angle);
+        // Driven forms are excluded above, so the object form IS constant axis-angle.
+        const aa = transform.rotation as { axis: Vec3Tuple; angle: number } | Quat;
+        rotation = Array.isArray(aa) ? quatNormalize(aa) : quatFromAxisAngle(aa.axis, aa.angle);
     }
     return similarityFromTRS(
         (transform.position ?? [0, 0, 0]) as Vec3Tuple,
         rotation,
-        transform.scale ?? 1,
+        (transform.scale ?? 1) as number,
     );
 }
 

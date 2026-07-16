@@ -1,6 +1,6 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform } from '../types.js';
+import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -9,12 +9,18 @@ import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
 import { canonicalPlane, foldAnalyticParameters } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
+    isDrivenTransform,
+    quatConjugate,
+    quatFromAxisAngle,
+    quatNormalize,
+    quatRotate,
     similarityCompose,
     similarityFromTransform,
-    type Similarity,
+    type Quat,
+    type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement } from './types.js';
 
 /** SDF primitives the generator has arms for — anything else must diagnose here, not throw there. */
 const IMPLEMENTED_SDF_TYPES = new Set<string>(['sphere', 'plane', 'box']);
@@ -74,10 +80,10 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             }
             const matId = materialIdMap.get(sdfObj.material)!;   // validated by Validator
 
-            // Placement (fable-transforms §5.2): center folds into the placement as a
-            // pre-translation; the generated per-object wrapper owns all positioning and
-            // the SDF call is origin-centered.
-            const { parameters, placement } = resolveSDFPlacement(sdf, sdfObj.transform);
+            // Placement (fable-transforms §5.2/§6): constant → center folds into the
+            // placement as a pre-translation and the wrapper owns all positioning;
+            // driven → the uniform record with LOCAL parameters.
+            const { parameters, placement } = resolveSDFPlacement(sdf, sdfObj.transform, objectIndex);
 
             objects.push({ index: objectIndex++, materialId: matId, sdfType: sdf.type, parameters, placement });
         } else if (obj.kind === 'analytic') {
@@ -85,16 +91,31 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             const shape = anaObj.shape as StandardAnalytic;
             const matId = materialIdMap.get(anaObj.material)!;
 
-            analyticObjects.push({
-                index: objectIndex++,
-                materialId: matId,
-                shapeType: shape.type,
-                // Constant transforms fold ENTIRELY into canonical parameters (the
-                // analytic primitive set is similarity-closed — fable-transforms §5.1).
-                // Keeping the light registry on these same resolved parameters ensures a
-                // sampleAsLight emitter cannot drift away from its hittable geometry.
-                parameters: foldAnalyticParameters(shape.type, shape.parameters, placementOf(anaObj.transform)),
-            });
+            if (isDrivenTransform(anaObj.transform)) {
+                // Driven (§6): parameters stay LOCAL (plane still canonicalized); the
+                // generated arm conjugates the ray into the rigid frame. The Validator
+                // has already rejected driven SAMPLABLE emitters, so the light registry
+                // never sees these.
+                const regionId = objectIndex++;
+                analyticObjects.push({
+                    index: regionId,
+                    materialId: matId,
+                    shapeType: shape.type,
+                    parameters: shape.type === 'plane' ? normalizePlaneParameters(shape.parameters) : shape.parameters,
+                    placement: buildDrivenPlacement(anaObj.transform!, regionId),
+                });
+            } else {
+                analyticObjects.push({
+                    index: objectIndex++,
+                    materialId: matId,
+                    shapeType: shape.type,
+                    // Constant transforms fold ENTIRELY into canonical parameters (the
+                    // analytic primitive set is similarity-closed — fable-transforms §5.1).
+                    // Keeping the light registry on these same resolved parameters ensures a
+                    // sampleAsLight emitter cannot drift away from its hittable geometry.
+                    parameters: foldAnalyticParameters(shape.type, shape.parameters, placementOf(anaObj.transform)),
+                });
+            }
         }
         // mesh objects are not yet supported (deferred — see impl-plan-analytic-backend.md)
     }
@@ -168,6 +189,10 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         const mat = materials[planned.materialId];
         if (mat === undefined || mat.name.startsWith('__light_')) continue;   // synthesized: already registered
         if (planned.shapeType !== 'quad' && planned.shapeType !== 'sphere') continue;
+        // Driven placement (§6): parameters are LOCAL and the geometry is live — the
+        // registry bakes literals, so driven emitters are Validator-rejected upstream;
+        // this skip is the backstop that keeps a stale-literal light out of the CDF.
+        if (planned.placement !== undefined) continue;
         const sceneMat = scene.materials[mat.name];
         if (sceneMat === undefined || sceneMat.sampleAsLight === false) continue;
         if (!Array.isArray(mat.emission) || !mat.emission.some((c) => c !== 0)) continue;
@@ -298,6 +323,9 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // The opaque shadow fast path is scene_intersect_any's only caller; the
             // media shadow walker re-spawns scene_intersect instead (§6.3).
             anyQuery: lighting !== null && !features.media.hasMedia,
+            // Any leaf with a {param} transform field (fable-transforms §6) — gates
+            // glsl/core/placement.glsl + the rigid-frame query tiers.
+            drivenPlacement: scene.objects.some((o) => isDrivenTransform(o.transform)),
         },
         materials: {
             models: brdfModels,
@@ -383,6 +411,130 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
  *  this fold share ONE implementation; the alias keeps the Planner's vocabulary. */
 export const placementOf = similarityFromTransform;
 
+// ============================================================================
+// Driven placement (fable-transforms §6/§6.1)
+// ============================================================================
+// A leaf with any {param} transform field takes the uniform tier: two vec4 uniforms
+// per object carrying the INVERSE similarity in rigid form — q_inv and (t_rigid=−Rᵀt, s)
+// — recomputed host-side in fp64 from the parameter map on every change. Constants
+// mix freely with params; they are baked into the closures. Guard rails (§6.1 pin 4):
+// the Validator cannot see runtime values, so the closure renormalizes rotations,
+// clamps scale away from zero, and warns ONCE instead of uploading a singular payload.
+
+/** Reader of one TRS field from the live parameter map (constants baked in). */
+type FieldReader<T> = (params: Record<string, unknown>) => T;
+
+export function buildDrivenPlacement(transform: Transform, index: number): DrivenPlacement {
+    const paths: string[] = [];
+    const parameters: Record<string, ParameterMetadata> = {};
+    let warned = false;
+    const warnOnce = (msg: string) => {
+        if (!warned) { warned = true; console.warn(`driven placement (object ${index}): ${msg}`); }
+    };
+    const label = (path: string) => path.split('.').pop() ?? path;
+
+    // -- position --
+    let readPosition: FieldReader<Vec3Tuple>;
+    const pos = transform.position;
+    if (isValueParam(pos)) {
+        const def = (pos.default ?? [0, 0, 0]) as Vec3Tuple;
+        paths.push(pos.param);
+        parameters[pos.param] = { type: 'vec3', default: def, name: label(pos.param), group: 'Placement', triggersReset: true };
+        readPosition = (p) => {
+            const v = p[pos.param] as number[] | undefined;
+            return Array.isArray(v) && v.length === 3 && v.every(Number.isFinite) ? (v as Vec3Tuple) : def;
+        };
+    } else {
+        const c = (pos ?? [0, 0, 0]) as Vec3Tuple;
+        readPosition = () => c;
+    }
+
+    // -- rotation: quaternion (const | param) or axis-angle (angle const | param) --
+    let readRotation: FieldReader<Quat>;
+    const rot = transform.rotation;
+    const safeQuat = (q: number[] | undefined, fallback: Quat): Quat => {
+        if (!Array.isArray(q) || q.length !== 4 || !q.every(Number.isFinite)) return fallback;
+        const norm = Math.hypot(q[0], q[1], q[2], q[3]);
+        if (norm < 1e-6) { warnOnce('degenerate quaternion — using identity'); return IDENTITY_QUAT; }
+        return quatNormalize(q as Quat);
+    };
+    if (rot === undefined) {
+        readRotation = () => IDENTITY_QUAT;
+    } else if (isValueParam(rot)) {
+        const def = safeQuat(rot.default as number[] | undefined, IDENTITY_QUAT);
+        paths.push(rot.param);
+        parameters[rot.param] = { type: 'vec4', default: def, name: label(rot.param), group: 'Placement', triggersReset: true };
+        readRotation = (p) => safeQuat(p[rot.param] as number[] | undefined, def);
+    } else if (Array.isArray(rot)) {
+        const c = quatNormalize(rot);
+        readRotation = () => c;
+    } else {
+        // axis-angle; the axis is constant (Validator-checked non-zero), the angle may drive.
+        const axis = rot.axis as Vec3Tuple;
+        const angle = rot.angle;
+        if (isValueParam(angle)) {
+            const def = typeof angle.default === 'number' && Number.isFinite(angle.default) ? angle.default : 0;
+            paths.push(angle.param);
+            parameters[angle.param] = {
+                type: 'float', default: def, name: label(angle.param), group: 'Placement', triggersReset: true,
+                ...(angle.min !== undefined && angle.max !== undefined ? { range: [angle.min, angle.max] as [number, number] } : {}),
+            };
+            readRotation = (p) => {
+                const a = p[angle.param];
+                return quatFromAxisAngle(axis, typeof a === 'number' && Number.isFinite(a) ? a : def);
+            };
+        } else {
+            const c = quatFromAxisAngle(axis, angle);
+            readRotation = () => c;
+        }
+    }
+
+    // -- scale (strictly positive; runtime floor per §6.1 pin 4) --
+    let readScale: FieldReader<number>;
+    const scl = transform.scale;
+    if (isValueParam(scl)) {
+        const floor = scl.min !== undefined && scl.min > 0 ? scl.min : 1e-6;
+        const def = typeof scl.default === 'number' && scl.default > 0 ? scl.default : 1;
+        paths.push(scl.param);
+        parameters[scl.param] = {
+            type: 'float', default: def, name: label(scl.param), group: 'Placement', triggersReset: true,
+            ...(scl.min !== undefined && scl.max !== undefined ? { range: [scl.min, scl.max] as [number, number] } : {}),
+        };
+        readScale = (p) => {
+            const s = p[scl.param];
+            if (typeof s !== 'number' || !Number.isFinite(s) || s < floor) {
+                if (typeof s === 'number') warnOnce(`scale ${s} clamped to ${floor} (must stay > 0)`);
+                return typeof s === 'number' && Number.isFinite(s) ? floor : def;
+            }
+            return s;
+        };
+    } else {
+        const c = (scl ?? 1) as number;
+        readScale = () => c;
+    }
+
+    // The §6.1 rigid-form inverse, computed fp64 host-side: q_inv, t_rigid = −Rᵀt, s.
+    const evalQ = (p: Record<string, unknown>): number[] => quatConjugate(readRotation(p));
+    const evalTS = (p: Record<string, unknown>): number[] => {
+        const qInv = quatConjugate(readRotation(p));
+        const tr = quatRotate(qInv, readPosition(p));
+        return [-tr[0], -tr[1], -tr[2], readScale(p)];
+    };
+
+    const uniformQ = `u_object${index}PlacementQ`;
+    const uniformTS = `u_object${index}PlacementTS`;
+    return {
+        kind: 'driven',
+        uniformQ,
+        uniformTS,
+        uniforms: [
+            { name: uniformQ, type: 'vec4', parameterPath: paths[0], parameterPaths: paths, default: evalQ({}), compute: evalQ },
+            { name: uniformTS, type: 'vec4', parameterPath: paths[0], parameterPaths: paths, default: evalTS({}), compute: evalTS },
+        ],
+        parameters,
+    };
+}
+
 /**
  * SDF placement (fable-transforms §5.2): a local 'center' parameter is a PRE-translation
  * of the placement (the object rotates/scales about its own origin, carrying the center
@@ -393,23 +545,28 @@ export const placementOf = similarityFromTransform;
 export function resolveSDFPlacement(
     sdf: StandardSDF,
     transform: Transform | undefined,
-): { parameters: Record<string, number | number[]>; placement: Similarity } {
-    const placement = placementOf(transform);
+    index: number,
+): { parameters: Record<string, number | number[]>; placement: PlannedPlacement } {
+    // Plane normalization applies on BOTH paths: a plane expression is a conservative
+    // SDF bound only when its normal is unit. The Validator rejects the zero vector;
+    // normalizing (n, offset) together preserves the authored plane while making both
+    // marching and shading frames well-defined.
+    const parameters = sdf.type === 'plane' ? normalizePlaneParameters(sdf.parameters) : sdf.parameters;
 
-    // A plane expression is a conservative SDF bound only when its normal is unit.
-    // The Validator rejects the zero vector; normalizing (n, offset) together preserves
-    // the authored plane while making both marching and shading frames well-defined.
-    if (sdf.type === 'plane') {
-        return { parameters: normalizePlaneParameters(sdf.parameters), placement };
+    // Driven (§6): parameters stay LOCAL — the rigid-frame query scales them in-shader,
+    // so there is no center fold (the wrapper handles ALL placement, live).
+    if (isDrivenTransform(transform)) {
+        return { parameters, placement: buildDrivenPlacement(transform!, index) };
     }
 
-    const center = sdf.parameters.center as number[] | undefined;
-    if (!center) {
-        return { parameters: sdf.parameters, placement };
+    const placement = placementOf(transform);
+    const center = parameters.center as number[] | undefined;
+    if (sdf.type === 'plane' || !center) {
+        return { parameters, placement };
     }
 
     return {
-        parameters: { ...sdf.parameters, center: [0, 0, 0] },
+        parameters: { ...parameters, center: [0, 0, 0] },
         placement: similarityCompose(placement, {
             rotation: IDENTITY_QUAT,
             translation: center as [number, number, number],
