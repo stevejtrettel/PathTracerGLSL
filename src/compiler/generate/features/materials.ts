@@ -223,6 +223,14 @@ function addParamUniform(
         type: glslType,
         parameterPath: path,
         default: prop.default as number | number[] | undefined,
+        // Spectrum properties deliberately accept achromatic scalar parameters. Preserve
+        // that broadcast for live programmatic updates, not only for the planned default.
+        ...(glslType === 'vec3' ? {
+            compute: (params: Record<string, unknown>) => {
+                const value = params[path] ?? prop.default;
+                return typeof value === 'number' ? [value, value, value] : value as number[];
+            },
+        } : {}),
     });
 
     const seg = path.split('.');

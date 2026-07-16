@@ -28,6 +28,9 @@ export interface PropertySchema<TSource extends string = Extract<keyof PlannedMa
     glslType: 'float' | 'Spectrum';
     /** radiometric constants format via formatSpectrum (§2.5); geometric via formatFloat. */
     semantic: 'radiometric' | 'geometric';
+    /** Mathematical input domain required by the implementation. Omitted means the model
+     *  accepts the full numeric range; this is not a general artistic-policy clamp. */
+    domain?: 'nonnegative' | 'positive';
     /** Which resolved data field feeds it. */
     source: TSource;
     /** GLSL default expression for materials that don't set it. */

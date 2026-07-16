@@ -25,6 +25,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'combiner.ts', 'flags.ts',            // transport shared parts
     'math_mis.glsl',                       // transport shared part (β=2 power heuristic)
     'sampler_cdf.glsl',                    // env shared CDF walk
+    'similarity.ts',                       // geometry shared part (placement algebra — fable-transforms §2)
 ]);
 
 describe('components structure', () => {

@@ -10,9 +10,18 @@ import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMateri
 import { isGlslExpression, isValueParam } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatVec3, paramToUniform } from '../../../components/glsl-format.js';
+import { formatFloat, formatMat3, formatVec3, paramToUniform } from '../../../components/glsl-format.js';
 import { modelTransmission } from '../../../components/materials/index.js';
 import { quadNormal } from '../../../components/geometry/index.js';
+import {
+    classifySimilarity,
+    isIdentityRotation,
+    isIdentityScale,
+    isIdentityTranslation,
+    quatConjugate,
+    quatToMat3,
+    type Similarity,
+} from '../../../components/geometry/similarity.js';
 
 import sdfPrimitivesGLSL from '../../../components/geometry/sdf/sdf_primitives.glsl?raw';
 import raymarchGLSL from '../../../components/geometry/sdf/raymarch.glsl?raw';
@@ -92,10 +101,12 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
 
     for (const obj of objects) {
         lines.push(`float sdf_object_${obj.index}(vec3 p) {`);
-        if (obj.translation) {
-            lines.push(`    p = p - ${formatVec3(obj.translation)};`);
-        }
-        lines.push(`    return ${generateSDFCall(obj)};`);
+        lines.push(...emitPlacementQuery(obj.placement));
+        // s·d_local keeps the wrapper a WORLD-SPACE distance field — what keeps the
+        // marcher's stepping and the epsilon discipline (march_epsilon/EPS_INTERFACE/
+        // ray_spawn) valid unchanged (fable-transforms §5.2). s > 0 by Validator pin.
+        const scalePrefix = isIdentityScale(obj.placement.scale) ? '' : `${formatFloat(obj.placement.scale)} * `;
+        lines.push(`    return ${scalePrefix}${generateSDFCall(obj)};`);
         lines.push(`}`);
         lines.push('');
     }
@@ -128,6 +139,32 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
     lines.push('}');
 
     return lines.join('\n');
+}
+
+/**
+ * World→local query-point lines for one placement (fable-transforms §5.2 tiers).
+ * Emits ONLY what the authored transform needs: identity = nothing (byte gate),
+ * translation = the historical subtraction (byte gate), rigid = a folded mat3
+ * constant (Rᵀ), similarity = Rᵀ/s folded into one mat3 (or a plain division when
+ * the rotation is trivial). The caller applies the matching s·d distance correction.
+ */
+function emitPlacementQuery(g: Similarity): string[] {
+    const kind = classifySimilarity(g);
+    if (kind === 'identity') return [];
+    const t = g.translation;
+    const centered = isIdentityTranslation(t) ? 'p' : `(p - ${formatVec3(t)})`;
+    if (kind === 'translation') {
+        return [`    p = p - ${formatVec3(t)};`];
+    }
+    if (kind === 'rigid') {
+        return [`    p = ${formatMat3(quatToMat3(quatConjugate(g.rotation)))} * ${centered};`];
+    }
+    // similarity: fold 1/s into the constant so the query costs one mat3-multiply.
+    if (isIdentityRotation(g.rotation)) {
+        return [`    p = ${centered} / ${formatFloat(g.scale)};`];
+    }
+    const m = quatToMat3(quatConjugate(g.rotation)).map((v) => v / g.scale);
+    return [`    p = ${formatMat3(m)} * ${centered};`];
 }
 
 function generateSDFCall(obj: PlannedSDFObject): string {

@@ -44,6 +44,22 @@ LINEAR HDR (`meanTol`) — plus exactly one **structure gate**:
   A pt tripwire is deliberately loose: it catches gross breaks; converged pt
   equality remains the owner's GPU check (say so on the card).
 
+## Determinism: the pinned salt
+
+The runner pins `resetSalt` (`WITNESS_SALT` in tools/witness.mjs) for EVERY render —
+§2.11 reproducible mode. Two consequences:
+
+- **Identical-stream checks are valid.** Unpinned, each page's salt depends on how many
+  accumulation clears its lifecycle happened to run (selecting the already-active
+  strategy-0 renderer vs switching renderers differ), so two arms of a near-zero-rmse
+  check could silently land on different salts — thinlens-zero once read 26% rmse of
+  pure decorrelated noise while the pinned arms are bit-identical at 512spp.
+- **Chance-hit pt frame means are ONE fixed realization.** They are heavy-tailed
+  (a single firefly can move a 160×120 frame mean by ~2%; sky's pt arm ranged 2–13%
+  across salts), so their `meanTol` gates are calibrated AT the pinned salt and mean
+  nothing at any other salt. Changing `WITNESS_SALT` re-rolls every pt tripwire —
+  recalibrate them if you touch it.
+
 ## Adding a witness
 
 One fixture file (or a new export in an existing family file) under `scenes/` with

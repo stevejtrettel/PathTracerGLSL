@@ -1,6 +1,7 @@
 // compiler/plan/types.ts
 
 import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value, ValueParam, EnvironmentDescription } from '../types.js';
+import type { Similarity } from '../../components/geometry/similarity.js';
 
 // ============================================================================
 // Program Description — what the generated program does
@@ -180,7 +181,10 @@ export interface PlannedSDFObject {
     materialId: number;
     sdfType: 'sphere' | 'plane' | 'box' | 'torus' | 'capsule';
     parameters: Record<string, number | number[]>;
-    translation?: Vec3;
+    /** Composed local→world similarity (fable-transforms §5.2); any local 'center' is
+     *  already folded in as a pre-translation. The generator lowers this to wrapper
+     *  tiers (identity → nothing, translation → subtraction, rigid/similarity → mat3). */
+    placement: Similarity;
 }
 
 /**

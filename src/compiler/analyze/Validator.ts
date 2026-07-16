@@ -5,10 +5,11 @@ import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
-import { PRIMITIVE_PARAMS } from '../../components/geometry/index.js';
+import { PRIMITIVE_PARAMS, type PrimitiveParam } from '../../components/geometry/index.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
+import { validateSceneProperties } from './propertyValidation.js';
 
 /** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
 const MIN_QUAD_AREA = 1e-8;
@@ -102,14 +103,6 @@ export function validate(
                     .add();
             }
         }
-        if (shape.type === 'sphere') {
-            const r = shape.parameters.radius;
-            if (typeof r !== 'number' || r <= 0) {
-                bag.error('invalid-setting', `Object ${i}: analytic sphere radius must be a number > 0`)
-                    .withOriginal('scene', [`objects[${i}]`])
-                    .add();
-            }
-        }
     }
 
     // --- Finiteness (audit C6): a NaN/Inf anywhere in the scene reaches the GLSL number
@@ -119,6 +112,9 @@ export function validate(
     validateFinite(scene.materials, 'materials', bag);
     validateFinite(scene.lights, 'lights', bag);
     validateFinite(scene.environment, 'environment', bag);
+    // Descriptor schemas choose scalar/spectrum shape today; their future domain metadata can
+    // feed the same reusable validator without changing its behavior (propertyValidation.ts).
+    validateSceneProperties(scene, bag);
 
     // sampleAsLight (§6.2 / V1-C2): explicit true demands an analytically samplable emitter —
     // an analytic quad/sphere object with CONSTANT nonzero emission. SDF emitters stay
@@ -395,6 +391,8 @@ export function validate(
                 bag.error('invalid-setting',
                     `Object ${i} (${obj.kind} ${type}): parameter '${s.name}' must be a ${s.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
                     .add();
+            } else {
+                validatePrimitiveConstraint(s, v, `Object ${i} (${obj.kind} ${type}): parameter '${s.name}'`, bag);
             }
         }
     }
@@ -430,19 +428,111 @@ export function validate(
         }
     }
 
-    // Check for unsupported transform features
+    // Placement validation (docs/fable-transforms.md §7). The Transform type is the
+    // first validator (scalar scale, axis-angle|quat rotation), but authored JS can
+    // hand us anything — every rule re-checks at runtime with a diagnostic.
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
-        if (obj.transform?.rotation) {
-            bag.error('invalid-transform', `Object ${i}: rotation transforms not yet supported`)
-                .withOriginal('scene', [`objects[${i}]`, `transform.rotation`])
+        const t = obj.transform;
+        if (!t) continue;
+        if (t.position !== undefined && !isVec3(t.position)) {
+            bag.error('invalid-transform', `Object ${i}: transform.position must be a vec3 of finite numbers`)
+                .withOriginal('scene', [`objects[${i}]`, `transform.position`])
                 .add();
         }
-        if (obj.transform?.scale) {
-            bag.error('invalid-transform', `Object ${i}: scale transforms not yet supported`)
-                .withOriginal('scene', [`objects[${i}]`, `transform.scale`])
-                .add();
+        if (t.rotation !== undefined) {
+            validateRotation(t.rotation, i, bag);
         }
+        if (t.scale !== undefined) {
+            validateScale(t.scale, i, bag);
+        }
+    }
+}
+
+/** §7 rules 2: quaternion normalized-within-tolerance (warn + the Planner normalizes),
+ *  error near zero; axis-angle rejects a zero axis. */
+function validateRotation(rotation: unknown, index: number, bag: DiagnosticBag): void {
+    const at = (field: string) => [`objects[${index}]`, `transform.rotation${field}`] as [string, string];
+    if (Array.isArray(rotation)) {
+        if (rotation.length !== 4 || rotation.some((c) => typeof c !== 'number' || !Number.isFinite(c))) {
+            bag.error('invalid-transform', `Object ${index}: quaternion rotation must be 4 finite numbers [x, y, z, w]`)
+                .withOriginal('scene', at('')).add();
+            return;
+        }
+        const norm = Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
+        if (norm < 1e-6) {
+            bag.error('invalid-transform', `Object ${index}: rotation quaternion is degenerate (norm ${norm})`)
+                .withOriginal('scene', at('')).add();
+        } else if (Math.abs(norm - 1) > 1e-3) {
+            bag.warning('invalid-transform',
+                `Object ${index}: rotation quaternion is not unit (norm ${norm.toFixed(4)}) — normalizing`)
+                .withOriginal('scene', at('')).add();
+        }
+        return;
+    }
+    if (typeof rotation === 'object' && rotation !== null && 'axis' in rotation && 'angle' in rotation) {
+        const aa = rotation as { axis: unknown; angle: unknown };
+        if (!isVec3(aa.axis) || Math.hypot(...(aa.axis as Vec3)) < 1e-8) {
+            bag.error('invalid-transform', `Object ${index}: rotation axis must be a nonzero vec3 of finite numbers`)
+                .withOriginal('scene', at('.axis')).add();
+        }
+        if (typeof aa.angle !== 'number' || !Number.isFinite(aa.angle)) {
+            bag.error('invalid-transform', `Object ${index}: rotation angle must be a finite number (radians)`)
+                .withOriginal('scene', at('.angle')).add();
+        }
+        return;
+    }
+    bag.error('invalid-transform',
+        `Object ${index}: rotation must be axis-angle { axis, angle } or a quaternion [x, y, z, w]`)
+        .withOriginal('scene', at('')).add();
+}
+
+/** §7 rules 1/3/5: strictly positive scalar scale — reflections (s < 0) rejected, not
+ *  deferred; nonuniform scale is unrepresentable; extreme scale warns (scene-scale
+ *  hygiene against the fixed world-space epsilons, not bias). */
+function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void {
+    const at = [`objects[${index}]`, 'transform.scale'] as [string, string];
+    if (Array.isArray(scale)) {
+        bag.error('invalid-transform',
+            `Object ${index}: nonuniform scale is not a transform — a similarity has one scale. `
+            + `Shape stretching belongs in primitive parameters (e.g. box halfSize), not placement`)
+            .withOriginal('scene', at).add();
+        return;
+    }
+    if (typeof scale !== 'number' || !Number.isFinite(scale)) {
+        bag.error('invalid-transform', `Object ${index}: transform.scale must be a finite number`)
+            .withOriginal('scene', at).add();
+        return;
+    }
+    if (scale <= 0) {
+        bag.error('invalid-transform',
+            `Object ${index}: transform.scale must be > 0 (reflections are rejected — a mirror `
+            + `would silently flip the one-sided quad pin and frame handedness)`)
+            .withOriginal('scene', at).add();
+        return;
+    }
+    if (Math.abs(Math.log10(scale)) > 2) {
+        bag.warning('invalid-transform',
+            `Object ${index}: transform.scale ${scale} is extreme — world-space epsilons `
+            + `(EPSILON, MARCH_EPSILON, EPS_INTERFACE) are fixed; consider rescaling the scene`)
+            .withOriginal('scene', at).add();
+    }
+}
+
+function validatePrimitiveConstraint(
+    schema: PrimitiveParam,
+    value: unknown,
+    label: string,
+    bag: DiagnosticBag,
+): void {
+    const constraint = schema.constraint;
+    if (constraint === undefined) return;
+    if (constraint.kind === 'positive' && (value as number) <= 0) {
+        bag.error('invalid-setting', `${label} must be > 0`).add();
+    } else if (constraint.kind === 'positive-components' && (value as number[]).some((v) => v <= 0)) {
+        bag.error('invalid-setting', `${label} components must be > 0`).add();
+    } else if (constraint.kind === 'min-length' && Math.hypot(...value as number[]) < constraint.value) {
+        bag.error('invalid-setting', `${label} length must be >= ${constraint.value}`).add();
     }
 }
 

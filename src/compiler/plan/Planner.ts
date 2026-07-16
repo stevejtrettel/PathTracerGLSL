@@ -1,11 +1,21 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam } from '../types.js';
+import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
 import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
+import { canonicalPlane, foldAnalyticParameters } from '../../components/geometry/index.js';
+import {
+    IDENTITY_QUAT,
+    IDENTITY_SIMILARITY,
+    quatFromAxisAngle,
+    quatNormalize,
+    similarityCompose,
+    similarityFromTRS,
+    type Similarity,
+} from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline } from './types.js';
 
@@ -67,11 +77,12 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             }
             const matId = materialIdMap.get(sdfObj.material)!;   // validated by Validator
 
-            // Fold center parameter into translation to avoid double-offset. The generated
-            // per-object wrapper handles positioning via translation; the SDF call is origin-centered.
-            const { parameters, translation } = resolveSDFPositioning(sdf, sdfObj.transform?.position);
+            // Placement (fable-transforms §5.2): center folds into the placement as a
+            // pre-translation; the generated per-object wrapper owns all positioning and
+            // the SDF call is origin-centered.
+            const { parameters, placement } = resolveSDFPlacement(sdf, sdfObj.transform);
 
-            objects.push({ index: objectIndex++, materialId: matId, sdfType: sdf.type, parameters, translation });
+            objects.push({ index: objectIndex++, materialId: matId, sdfType: sdf.type, parameters, placement });
         } else if (obj.kind === 'analytic') {
             const anaObj = obj as AnalyticObject;
             const shape = anaObj.shape as StandardAnalytic;
@@ -81,7 +92,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 index: objectIndex++,
                 materialId: matId,
                 shapeType: shape.type,
-                parameters: shape.parameters,
+                // Constant transforms fold ENTIRELY into canonical parameters (the
+                // analytic primitive set is similarity-closed — fable-transforms §5.1).
+                // Keeping the light registry on these same resolved parameters ensures a
+                // sampleAsLight emitter cannot drift away from its hittable geometry.
+                parameters: foldAnalyticParameters(shape.type, shape.parameters, placementOf(anaObj.transform)),
             });
         }
         // mesh objects are not yet supported (deferred — see impl-plan-analytic-backend.md)
@@ -366,41 +381,75 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
     };
 }
 
-/**
- * Fold any 'center' parameter from the SDF primitive into the translation vector.
- * This ensures the generated per-object wrapper handles all positioning, and the
- * SDF call is always origin-centered — preventing double-offset when both
- * parameters.center and transform.position are set.
- */
-export function resolveSDFPositioning(
-    sdf: StandardSDF,
-    transformPosition: Vec3 | undefined,
-): { parameters: Record<string, number | number[]>; translation?: Vec3 } {
-    const center = sdf.parameters.center as number[] | undefined;
+/** Authored TRS → the canonical Similarity (fable-transforms §2; T·R·S pin).
+ *  Rotation sugar (axis-angle | quaternion) lowers here; the Validator has already
+ *  diagnosed degenerate axes/quaternions, so this only normalizes. */
+export function placementOf(transform: Transform | undefined): Similarity {
+    if (transform === undefined) return IDENTITY_SIMILARITY;
+    let rotation = IDENTITY_QUAT;
+    if (transform.rotation !== undefined) {
+        rotation = Array.isArray(transform.rotation)
+            ? quatNormalize(transform.rotation)
+            : quatFromAxisAngle(transform.rotation.axis, transform.rotation.angle);
+    }
+    return similarityFromTRS(transform.position ?? [0, 0, 0], rotation, transform.scale ?? 1);
+}
 
-    // Planes use normal+offset, not center — pass through unchanged
-    if (!center || sdf.type === 'plane') {
-        return {
-            parameters: sdf.parameters,
-            translation: transformPosition,
-        };
+/**
+ * SDF placement (fable-transforms §5.2): a local 'center' parameter is a PRE-translation
+ * of the placement (the object rotates/scales about its own origin, carrying the center
+ * offset along) — folded so the generated wrapper owns ALL positioning and the SDF call
+ * stays origin-centered, preventing double-offset when both center and transform are set.
+ * For pure translations this reduces exactly to the old position+center sum (byte gate).
+ */
+export function resolveSDFPlacement(
+    sdf: StandardSDF,
+    transform: Transform | undefined,
+): { parameters: Record<string, number | number[]>; placement: Similarity } {
+    const placement = placementOf(transform);
+
+    // A plane expression is a conservative SDF bound only when its normal is unit.
+    // The Validator rejects the zero vector; normalizing (n, offset) together preserves
+    // the authored plane while making both marching and shading frames well-defined.
+    if (sdf.type === 'plane') {
+        return { parameters: normalizePlaneParameters(sdf.parameters), placement };
     }
 
-    // Merge center into translation, zero out center in parameters
-    const tx = (transformPosition?.[0] ?? 0) + center[0];
-    const ty = (transformPosition?.[1] ?? 0) + center[1];
-    const tz = (transformPosition?.[2] ?? 0) + center[2];
+    const center = sdf.parameters.center as number[] | undefined;
+    if (!center) {
+        return { parameters: sdf.parameters, placement };
+    }
 
-    const parameters = { ...sdf.parameters, center: [0, 0, 0] };
-    const translation: Vec3 = [tx, ty, tz];
+    return {
+        parameters: { ...sdf.parameters, center: [0, 0, 0] },
+        placement: similarityCompose(placement, {
+            rotation: IDENTITY_QUAT,
+            translation: center as [number, number, number],
+            scale: 1,
+        }),
+    };
+}
 
-    return { parameters, translation };
+function normalizePlaneParameters(parameters: Record<string, number | number[]>): Record<string, number | number[]> {
+    const normal = parameters.normal as number[];
+    const plane = canonicalPlane(normal, parameters.offset as number | undefined);
+    return {
+        ...parameters,
+        ...plane,
+    };
 }
 
 export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> {
     if (value === undefined) return fallback;
     if (isGlslExpression(value)) return value;
-    if (isValueParam(value)) return value as ValueParam<Vec3>;  // preserve — emitted as a uniform (§2.8)
+    if (isValueParam(value)) {
+        // Scalar spectra intentionally broadcast. Do the same for a parameter default so
+        // the generated vec3 uniform can never receive a scalar on its initial upload.
+        if (typeof value.default === 'number') {
+            return { ...value, default: [value.default, value.default, value.default] } as ValueParam<Vec3>;
+        }
+        return value as ValueParam<Vec3>;  // preserve — emitted as a uniform (§2.8)
+    }
     if (typeof value === 'number') return [value, value, value] as Vec3;
     return value;
 }
@@ -410,6 +459,7 @@ export function resolveScalarProperty(value: MaterialProperty | undefined, fallb
     if (isGlslExpression(value)) return value;
     if (isValueParam(value)) return value as ValueParam<number>;  // preserve — emitted as a uniform (§2.8)
     if (typeof value === 'number') return value;
-    // Vec3 passed for a scalar property — take first component (silent truncation)
-    return value[0];
+    // Validator reports this before planning. Keep a hard backstop for direct helper use
+    // and for untyped JavaScript callers so a malformed scalar can never compile silently.
+    throw new Error('Scalar material property cannot be a vector');
 }

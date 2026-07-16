@@ -41,6 +41,11 @@ import {
 } from './scenes/envScenes.js';
 import { veachMis, veachMisStrategy, veachNeeStrategy, veachPtStrategy } from './scenes/ggxScenes.js';
 import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
+import {
+    transformBake, transformBakeRef, transformNeeStrategy,
+    conjugationScene, conjugationBase, CONJ_CAMERA_BASE, CONJ_CAMERA_G,
+    regionsTransformed, regionsTransformedRef, regionsNeeStrategy,
+} from './scenes/transformWitness.js';
 
 export const witnessSuite: Record<string, SceneSuiteEntry> = {
     'thinlens-zero': {
@@ -418,6 +423,88 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             'camera.position': [0, 1.3, 3.4],
             'camera.target': [0, 0.7, 0],
+        },
+    },
+    // Fixture partner: the hand-folded arm of the transform-bake twin.
+    'transform-bake-ref': {
+        scene: transformBakeRef,
+        strategies: [transformNeeStrategy],
+        exercises: 'hand-folded reference arm of the transform-bake twin (fable-transforms §8) — placement baked into primitive parameters, no transform fields',
+        initialParameters: {
+            'camera.position': [0, 1.0, 4.2],
+            'camera.target': [0, -0.2, 0],
+        },
+    },
+    'transform-bake': {
+        scene: transformBake,
+        strategies: [transformNeeStrategy],
+        exercises:
+            'twin-bake (fable-transforms §8): every object placed via `transform` — SDF scale tier (s·d), SDF translation tier, analytic translate fold, and the analytic ROTATION fold on a sampleAsLight quad (folded params feed the desugar, power CDF, and sampler) — vs the same world geometry hand-folded into parameters',
+        expected: 'converges to the same image as transform-bake-ref; divergence implicates the similarity fold or a wrapper tier; a dark/misplaced lamp implicates the fold→desugar ordering or the one-sided normal under rotation',
+        witness: {
+            spp: 96,
+            // Same world geometry through different codegen paths (wrapper vs baked
+            // params): folds are fp-exact here, so the arms share streams in practice —
+            // near-zero gates like thinlens-zero (measured 0.00%/0.00% at this budget).
+            checks: [{ kind: 'twin', other: { scene: 'transform-bake-ref' }, meanTol: 0.002, rmse: 0.01, label: 'transform ≡ hand-fold' }],
+        },
+        initialParameters: {
+            'camera.position': [0, 1.0, 4.2],
+            'camera.target': [0, -0.2, 0],
+        },
+    },
+    // Fixture partner: the untransformed arm of the conjugation witness.
+    'conjugation-base': {
+        scene: conjugationBase,
+        strategies: [transformNeeStrategy],
+        exercises: 'untransformed arm of the conjugation witness (fable-transforms §8)',
+        initialParameters: {
+            'camera.position': CONJ_CAMERA_BASE.position,
+            'camera.target': CONJ_CAMERA_BASE.target,
+        },
+    },
+    conjugation: {
+        scene: conjugationScene,
+        strategies: [transformNeeStrategy],
+        exercises:
+            'the global-similarity witness (fable-transforms §8): ONE g = T·Ry(0.7)·(s=1.6) on every object AND the camera — path tracing g·scene from g·camera is the same integral. Exercises arbitrary-angle mat3 wrapper tiers, plane s·d, analytic folds, and the radiance-invariant emissive quad through the CDF/sampler chain, all in one number',
+        expected: 'converges to the same image as conjugation-base; divergence anywhere in the chain (fold, wrapper, desugar, power CDF, quad pdf) breaks the equality',
+        witness: {
+            spp: 192,
+            // Arms differ in every float op (rotated frames) → decorrelated streams;
+            // same-integrand display-space gate, like the backend twins. Measured
+            // 0.04%/0.91% at this budget → ~1.5× calibration.
+            checks: [{ kind: 'twin', other: { scene: 'conjugation-base' }, meanTol: 0.01, rmse: 0.02, label: 'g·scene ≡ scene (conjugation)' }],
+        },
+        initialParameters: {
+            'camera.position': CONJ_CAMERA_G.position,
+            'camera.target': CONJ_CAMERA_G.target,
+        },
+    },
+    // Fixture partner: the hand-folded arm of the regions-under-transform twin.
+    'regions-transformed-ref': {
+        scene: regionsTransformedRef,
+        strategies: [regionsNeeStrategy],
+        exercises: 'hand-folded reference arm of the regions-under-transform twin',
+        initialParameters: {
+            'camera.position': [0, 0.8, 4],
+            'camera.target': [0.3, -0.3, 0],
+        },
+    },
+    'regions-transformed': {
+        scene: regionsTransformed,
+        strategies: [regionsNeeStrategy],
+        exercises:
+            'nesting under a similarity (fable-transforms §8): glass sphere (analytic, folded) strictly inside an absorbing water box (SDF, mat3+s·d wrapper), both under Ry(90°)·1.25 + translate — innermost-wins classification, scaled signed distances, interface epsilons, and current_medium tracking through transformed boundaries',
+        expected: 'converges to the same image as regions-transformed-ref (tinted water, refracted sphere); divergence implicates scaled-field classification (scene_region_at over s·d) or the analytic signed distance after folding',
+        witness: {
+            spp: 256,
+            // Measured 0.24%/1.13% at this budget → ~1.5–2× calibration.
+            checks: [{ kind: 'twin', other: { scene: 'regions-transformed-ref' }, meanTol: 0.01, rmse: 0.025, label: 'regions transform ≡ hand-fold' }],
+        },
+        initialParameters: {
+            'camera.position': [0, 0.8, 4],
+            'camera.target': [0.3, -0.3, 0],
         },
     },
     'veach-mis': {

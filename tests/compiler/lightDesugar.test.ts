@@ -110,6 +110,18 @@ describe('sampleAsLight route (§6.2)', () => {
         expect(new Set(p.lights.map((l) => l.regionId)).size).toBe(2);
     });
 
+    it('uses the translated analytic geometry for both intersection and light sampling', () => {
+        const scene = emissiveQuadScene(undefined);
+        const quad = scene.objects[1];
+        if (quad.kind !== 'analytic') throw new Error('fixture must be analytic');
+        quad.transform = { position: [2, 3, 4] };
+
+        const p = runPlan(scene);
+        const region = p.analyticObjects.find((o) => o.index === p.lights[0].regionId)!;
+        expect(region.parameters.corner).toEqual([2, 7, 4]);
+        expect(p.lights[0].corner).toEqual([2, 7, 4]);
+    });
+
     it('desugared __light_n materials are not re-registered by the sampleAsLight sweep', () => {
         const scene = baseScene();
         scene.lights = [{ kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], intensity: 1 }];

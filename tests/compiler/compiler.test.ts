@@ -84,6 +84,21 @@ describe('Compiler', () => {
         });
     });
 
+    it('broadcasts an achromatic spectrum parameter on default and live updates', () => {
+        const scene: SceneDescription = {
+            ...minimalScene,
+            id: 'scalar-spectrum-param',
+            materials: {
+                ...minimalScene.materials,
+                ground: { model: 'lambert', albedo: { param: 'ground.albedo', default: 0.5 } },
+            },
+        };
+        const result = compiler.compile(scene, minimalStrategy);
+        const binding = result.uniforms.find((u) => u.parameters.includes('ground.albedo'))!;
+        expect(binding.compute({})).toEqual([0.5, 0.5, 0.5]);
+        expect(binding.compute({ 'ground.albedo': 0.25 })).toEqual([0.25, 0.25, 0.25]);
+    });
+
     describe('validation rejects unsupported features', () => {
         it('rejects non-euclidean ambient space', () => {
             const badScene: SceneDescription = {

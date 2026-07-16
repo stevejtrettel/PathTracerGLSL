@@ -26,6 +26,14 @@ export function formatSpectrum(v: number[]): string {
     return formatVec3(v);
 }
 
+/** Column-major mat3 literal (GLSL constructor order) from 9 numbers. */
+export function formatMat3(m: number[]): string {
+    if (m.length !== 9) {
+        throw new Error(`GLSL format: mat3 needs 9 numbers, got ${m.length}`);
+    }
+    return `mat3(${m.map(formatFloat).join(', ')})`;
+}
+
 /** Uniform name from a parameter path (§2.8): 'clay.albedo' → 'u_clay_albedo'. */
 export function paramToUniform(path: string): string {
     return 'u_' + path.replace(/\./g, '_');

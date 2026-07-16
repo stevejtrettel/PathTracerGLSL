@@ -117,11 +117,43 @@ describe('Validator', () => {
         expect(err!.suggestions?.length).toBeGreaterThan(0);
     });
 
-    it('rejects rotation and scale transforms', () => {
-        expect(run(s => { s.objects[0].transform = { rotation: [0, 1, 0] }; }).getErrors()
-            .some(e => e.code === 'invalid-transform' && /rotation/i.test(e.message))).toBe(true);
-        expect(run(s => { s.objects[0].transform = { scale: 2 }; }).getErrors()
-            .some(e => e.code === 'invalid-transform' && /scale/i.test(e.message))).toBe(true);
+    it('accepts rotation and scale transforms (fable-transforms §7)', () => {
+        expect(run(s => { s.objects[0].transform = { rotation: { axis: [0, 1, 0], angle: 1.2 } }; }).isEmpty()).toBe(true);
+        expect(run(s => { s.objects[0].transform = { rotation: [0, 0, 0, 1] }; }).isEmpty()).toBe(true);
+        expect(run(s => { s.objects[0].transform = { scale: 2 }; }).isEmpty()).toBe(true);
+    });
+
+    it('rejects a malformed rotation (3-vector Euler is not in the language)', () => {
+        expect(run(s => { s.objects[0].transform = { rotation: [0, 1, 0] as any }; }).getErrors()
+            .some(e => e.code === 'invalid-transform' && /axis-angle|quaternion/i.test(e.message))).toBe(true);
+    });
+
+    it('rejects a degenerate quaternion and a zero rotation axis', () => {
+        expect(run(s => { s.objects[0].transform = { rotation: [0, 0, 0, 0] }; }).getErrors()
+            .some(e => e.code === 'invalid-transform' && /degenerate/i.test(e.message))).toBe(true);
+        expect(run(s => { s.objects[0].transform = { rotation: { axis: [0, 0, 0], angle: 1 } }; }).getErrors()
+            .some(e => e.code === 'invalid-transform' && /axis/i.test(e.message))).toBe(true);
+    });
+
+    it('warns on a non-unit quaternion (compiler normalizes)', () => {
+        const bag = run(s => { s.objects[0].transform = { rotation: [0, 0, 0, 2] }; });
+        expect(bag.getErrors().length).toBe(0);
+        expect(bag.getWarnings().some(w => /normalizing/i.test(w.message))).toBe(true);
+    });
+
+    it('rejects reflections (s <= 0) and nonuniform scale (§1 one-way doors)', () => {
+        expect(run(s => { s.objects[0].transform = { scale: -1 }; }).getErrors()
+            .some(e => e.code === 'invalid-transform' && /reflection/i.test(e.message))).toBe(true);
+        expect(run(s => { s.objects[0].transform = { scale: 0 }; }).getErrors()
+            .some(e => e.code === 'invalid-transform')).toBe(true);
+        expect(run(s => { s.objects[0].transform = { scale: [1, 2, 1] as any }; }).getErrors()
+            .some(e => e.code === 'invalid-transform' && /nonuniform/i.test(e.message))).toBe(true);
+    });
+
+    it('warns on extreme scale (fixed world-space epsilons)', () => {
+        const bag = run(s => { s.objects[0].transform = { scale: 1000 }; });
+        expect(bag.getErrors().length).toBe(0);
+        expect(bag.getWarnings().some(w => /extreme/i.test(w.message))).toBe(true);
     });
 
     it('accumulates multiple independent errors in one pass', () => {
@@ -211,7 +243,7 @@ describe('Validator — hardening pack (H1)', () => {
         const bag = run(s => {
             s.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 0 } }, material: 'm' });
         });
-        expect(bag.getErrors().some(e => /sphere radius/.test(e.message))).toBe(true);
+        expect(bag.getErrors().some(e => /sphere.*radius/.test(e.message))).toBe(true);
     });
 });
 
@@ -251,5 +283,54 @@ describe('Validator — schema discipline warnings (R2)', () => {
             s.materials['m'] = { model: 'dielectric', ior: 1.5, emission: [1, 1, 1] };
         });
         expect(bag.getWarnings().some(w => /model 'dielectric' cannot emit/.test(w.message))).toBe(true);
+    });
+});
+
+describe('Validator — correctness domains', () => {
+    it('rejects non-positive SDF radii and box half-sizes', () => {
+        expect(run(s => {
+            s.objects = [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 0 } }, material: 'm' }];
+        }).getErrors().some(e => /parameter 'radius' must be > 0/.test(e.message))).toBe(true);
+        expect(run(s => {
+            s.objects = [{ kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: [1, 0, 1] } }, material: 'm' }];
+        }).getErrors().some(e => /parameter 'halfSize' components must be > 0/.test(e.message))).toBe(true);
+    });
+
+    it('rejects zero plane normals but accepts non-unit normals for canonical normalization', () => {
+        expect(run(s => {
+            s.objects = [{ kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, 0], offset: 1 } }, material: 'm' }];
+        }).getErrors().some(e => /parameter 'normal' length/.test(e.message))).toBe(true);
+        expect(run(s => {
+            s.objects = [{ kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 2, 0], offset: 2 } }, material: 'm' }];
+        }).hasErrors()).toBe(false);
+    });
+
+    it('rejects negative extinction and non-positive dielectric IOR', () => {
+        expect(run(s => {
+            s.materials.fog = { model: 'none', medium: { sigma_a: [-0.1, 0, 0] } };
+        }).getErrors().some(e => /medium\.sigma_a components must be >= 0/.test(e.message))).toBe(true);
+        expect(run(s => {
+            s.materials.m = { model: 'dielectric', ior: 0 };
+        }).getErrors().some(e => /ior must be > 0/.test(e.message))).toBe(true);
+        expect(run(s => {
+            s.materials.m = { model: 'dielectric', ior: { param: 'glass.ior', default: 1.5, min: 0, max: 3 } };
+        }).getErrors().some(e => /ior parameter min must be > 0/.test(e.message))).toBe(true);
+    });
+
+    it('rejects scalar/vector property mismatches, including ValueParam defaults', () => {
+        expect(run(s => {
+            s.materials.m = { model: 'ggx', roughness: [0.2, 0.3, 0.4] as never };
+        }).getErrors().some(e => /roughness must be a finite number/.test(e.message))).toBe(true);
+        expect(run(s => {
+            s.materials.m = { model: 'lambert', albedo: { param: 'm.albedo', default: 0.5 } };
+        }).hasErrors()).toBe(false); // scalar-to-spectrum broadcast remains intentional
+        expect(run(s => {
+            s.materials.m = { model: 'lambert', albedo: { param: 'm.albedo', default: [0.5, 0.5] as never } };
+        }).getErrors().some(e => /albedo must be a finite number or vec3/.test(e.message))).toBe(true);
+    });
+
+    it('rejects malformed transform.position values from untyped scene input', () => {
+        const bag = run(s => { s.objects[0].transform = { position: [1, 2] as never }; });
+        expect(bag.getErrors().some(e => /transform\.position must be a vec3/.test(e.message))).toBe(true);
     });
 });

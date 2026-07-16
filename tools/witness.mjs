@@ -24,6 +24,10 @@ const BASE_URL = 'http://localhost:3000';
 const DEFAULT_SIZE = [160, 120];
 const DEFAULT_SPP = 64;
 const RENDER_TIMEOUT_MS = 8 * 60 * 1000; // per (scene, strategy) render
+/** Pinned RNG salt for every witness render (§2.11 reproducible mode) — see renderFrame.
+ *  Changing this re-rolls every heavy-tailed (chance-hit pt) frame: recalibrate the
+ *  pt-tripwire meanTol/rmse gates if you touch it. */
+const WITNESS_SALT = 1234;
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -197,21 +201,41 @@ const varianceCache = new Map(); // same key → {mean, variance, W, H, spp}
  * Render one strategy with accumulation FORCED to the 'variance' occupant (a cloned
  * strategy re-initialized in-page — the registry entry holds the live scene object),
  * and read back both the mean and the second-moment attachment.
+ *
+ * RETRIES ONCE on a fresh page: an intermittent app-layer race (~once per full
+ * sweep, scene varies — seen on haze, fog-area, proc-sky) flips the engine's active
+ * renderer back to the page's ORIGINAL renderer sometime around the production
+ * render, surfacing as "Export target 'variance' not defined in renderer '…'".
+ * A stolen selection mid-render also corrupts the accumulation, so re-rendering
+ * from scratch is the only safe recovery — never retry just the readback.
  */
-async function renderVarianceFrame(browser, registry, sceneId, strategyIdx, [W, H], spp) {
-    const key = `${sceneId}#${strategyIdx}#${W}x${H}#${spp}`;
+async function renderVarianceFrame(browser, registry, sceneId, strategyIdx, size, spp) {
+    const key = `${sceneId}#${strategyIdx}#${size[0]}x${size[1]}#${spp}`;
     if (varianceCache.has(key)) return varianceCache.get(key);
+    let frame;
+    try {
+        frame = await renderVarianceOnce(browser, sceneId, strategyIdx, size, spp);
+    } catch (e) {
+        if (!/Export target 'variance'/.test(String(e))) throw e;
+        process.stdout.write(`  RETRY ${sceneId} / strategy ${strategyIdx} +variance (active-renderer race: ${String(e).slice(0, 80)}…)\n`);
+        frame = await renderVarianceOnce(browser, sceneId, strategyIdx, size, spp);
+    }
+    varianceCache.set(key, frame);
+    return frame;
+}
 
+async function renderVarianceOnce(browser, sceneId, strategyIdx, [W, H], spp) {
     const page = await browser.newPage();
     try {
         await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
 
         const t0 = Date.now();
-        await page.evaluate(async ([sid, idx, w, h]) => {
+        await page.evaluate(async ([sid, idx, w, h, salt]) => {
             const app = window.app;
             const entry = window.sceneSuite[sid];
             app.stop();
+            app.pinResetSalt(salt);   // WITNESS_SALT — see the renderFrame comment
             const strategy = JSON.parse(JSON.stringify(entry.strategies[idx]));
             strategy.estimator.accumulation = { type: 'variance' };
             strategy.id = `${strategy.id}__var`;
@@ -219,7 +243,21 @@ async function renderVarianceFrame(browser, registry, sceneId, strategyIdx, [W, 
             // nothing already loaded is clobbered.
             await app.initialize({ scene: entry.scene, strategies: [strategy], initialParameters: entry.initialParameters });
             app.resize(w, h);
-        }, [sceneId, strategyIdx, W, H]);
+            // initialize() selects the new renderer, but that selection is
+            // INTERMITTENTLY lost (~once per full sweep, scene varies: readExport
+            // ('variance') after the render hit the ORIGINAL renderer — "Export
+            // target 'variance' not defined in renderer 'pt-nee-…'"). Probe the
+            // variance export BEFORE the expensive render; on failure force a
+            // selection toggle — selecting an already-"active" id is a manager
+            // no-op, so go through the base renderer to defeat the idempotence
+            // guard — and only then fail loudly.
+            const varianceReady = () => { try { app.readExport('variance'); return true; } catch { return false; } };
+            if (!varianceReady()) {
+                app.selectRendererByStrategy(entry.strategies[idx].id);
+                app.selectRendererByStrategy(strategy.id);
+                if (!varianceReady()) throw new Error(`variance renderer '${strategy.id}' not selectable (export probe failed twice)`);
+            }
+        }, [sceneId, strategyIdx, W, H, WITNESS_SALT]);
         await page.evaluate(n => {
             window.__witnessDone = false; window.__witnessError = null;
             window.app.renderProduction(n)
@@ -237,9 +275,7 @@ async function renderVarianceFrame(browser, registry, sceneId, strategyIdx, [W, 
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         process.stdout.write(`  rendered ${sceneId} / strategy ${strategyIdx} +variance @ ${W}×${H} ×${spp}spp (${secs}s)\n`);
 
-        const frame = { mean: new Float32Array(mean), variance: new Float32Array(variance), W, H, spp };
-        varianceCache.set(key, frame);
-        return frame;
+        return { mean: new Float32Array(mean), variance: new Float32Array(variance), W, H, spp };
     } finally {
         await page.close();
     }
@@ -261,13 +297,27 @@ async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp)
         await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
 
+        // scene-lab silently falls back to DEFAULT_SCENE for unknown ids — under a
+        // stale dev-server module graph BOTH twin arms then render the default scene
+        // and a twin check passes vacuously (bit-identical). Fail loudly instead.
+        const known = await page.evaluate(sid => sid in (window.sceneSuite ?? {}), sceneId);
+        if (!known) throw new Error(`scene '${sceneId}' not in the page's registry (stale dev server? restart it) — lab would fall back to DEFAULT_SCENE`);
+
         const t0 = Date.now();
-        await page.evaluate(([w, h, sid]) => {
+        await page.evaluate(([w, h, sid, salt]) => {
             const app = window.app;
             app.stop();
+            // Pin the RNG salt (§2.11 reproducible mode). Without this, resetSalt
+            // depends on how many accumulation clears each page happened to run
+            // (selecting the ALREADY-ACTIVE strategy-0 renderer clears differently
+            // than switching), so two arms of an "identical streams" check can land
+            // on different salts — thinlens-zero read 26% rmse of pure decorrelated
+            // noise while the pinned arms are bit-identical even at 512spp. Pinning
+            // also makes every witness number reproducible run-to-run.
+            app.pinResetSalt(salt);
             app.selectRendererByStrategy(sid);
             app.resize(w, h); // small framebuffer = SwiftShader speed; also clears accumulation
-        }, [W, H, strategyId]);
+        }, [W, H, strategyId, WITNESS_SALT]);
         // Fire the production render, then poll from node so we own the timeout.
         // A REJECTION must surface too — otherwise the poll hangs the full timeout.
         await page.evaluate(n => {

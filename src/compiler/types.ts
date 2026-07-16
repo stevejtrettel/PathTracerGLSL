@@ -124,10 +124,26 @@ export interface StandardAnalytic {
     parameters: Record<string, number | number[]>;
 }
 
+/** Axis-angle rotation (radians). The axis need not be unit; zero axis is rejected. */
+export interface AxisAngle {
+    axis: Vec3;
+    angle: number;
+}
+
+/** Unit quaternion [x, y, z, w] (normalized by the compiler within tolerance). */
+export type Quaternion = [number, number, number, number];
+
+/**
+ * Object placement (docs/fable-transforms.md §2): a Euclidean similarity, authored as
+ * TRS with local→parent = T·R·S (scale, then rotate, then translate). PINNED (§1):
+ * `scale` is a strictly positive scalar — reflections are rejected and nonuniform scale
+ * is unrepresentable (an ellipsoid is a primitive, not a transform).
+ */
 export interface Transform {
     position?: Vec3;
-    rotation?: Vec3;
-    scale?: number | Vec3;
+    /** Axis-angle (radians) or a quaternion. Euler sugar deliberately omitted. */
+    rotation?: AxisAngle | Quaternion;
+    scale?: number;
 }
 
 // --- Value<T>: constant or uniform-driven parameter (contracts §2.8) ---
@@ -158,7 +174,16 @@ export interface GlslExpression {
     source: string;
 }
 
-export type MaterialProperty = number | Vec3 | GlslExpression | ValueParam<number | Vec3>;
+/** Scalar-valued authored property. Kept distinct from spectra so TypeScript catches a
+ * vector roughness/IOR before the runtime Validator has to report serialized JS input. */
+export type ScalarProperty = Value<number> | GlslExpression;
+
+/** Spectrum-valued authored property. A scalar is an intentional achromatic broadcast,
+ * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
+export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3>;
+
+/** Union used by generic planner helpers. Public fields use the narrower aliases above. */
+export type MaterialProperty = ScalarProperty | SpectrumProperty;
 
 export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';
@@ -176,14 +201,14 @@ export type MaterialModel = 'lambert' | 'disney' | 'dielectric' | 'ggx' | 'emiss
  */
 export interface MediumDescription {
     /** Absorption coefficient σ_a (per unit arc length). */
-    sigma_a: MaterialProperty;
+    sigma_a: SpectrumProperty;
     /** Scattering coefficient σ_s. Default 0 (absorbing-only, e.g. tinted glass interior). */
-    sigma_s?: MaterialProperty;
+    sigma_s?: SpectrumProperty;
     /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). Read only by 'hg'. */
-    phase_g?: MaterialProperty;
+    phase_g?: ScalarProperty;
     /** Water-droplet diameter (µm), read only by 'draine' (HG–Draine approx-Mie). Drives the
      *  fitted lobe parameters; valid ~5–50µm. Default 10. */
-    draine_d?: MaterialProperty;
+    draine_d?: ScalarProperty;
     /** The volume's scattering model (which phase function). Default 'hg'. 'rayleigh' is
      *  parameter-free (molecular/sky; its λ⁻⁴ color is σ_s); 'draine' is approx-Mie for
      *  fog/cloud droplets. Registry: volume_scattering/. */
@@ -192,12 +217,12 @@ export interface MediumDescription {
 
 export interface MaterialDescription {
     model: MaterialModel;
-    albedo?: MaterialProperty;
-    roughness?: MaterialProperty;    // ggx: alpha = roughness², clamped ≥ 1e-3 (mirrors are a delta model)
-    f0?: MaterialProperty;           // ggx: normal-incidence reflectance — the conductor's color
-    ior?: MaterialProperty;          // dielectric: region's interior IOR (→ generated ior_of table)
-    transmittance?: MaterialProperty; // dielectric: interface tint; interior absorption is the medium's job (§4.4)
-    emission?: MaterialProperty;
+    albedo?: SpectrumProperty;
+    roughness?: ScalarProperty;       // ggx: alpha = roughness², clamped ≥ 1e-3 (mirrors are a delta model)
+    f0?: SpectrumProperty;            // ggx: normal-incidence reflectance — the conductor's color
+    ior?: ScalarProperty;             // dielectric: region's interior IOR (→ generated ior_of table)
+    transmittance?: SpectrumProperty; // dielectric: interface tint; interior absorption is the medium's job (§4.4)
+    emission?: SpectrumProperty;
     /** Interior medium (§3.5/§4.4). Composes with any surface model; required for model 'none'. */
     medium?: MediumDescription;
     /**
