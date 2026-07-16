@@ -1,8 +1,10 @@
 # Transforms, Groups, and Geometry Placement
 
-**Status:** design authority (owner-approved July 15 2026); stages 1–2 in build
+**Status:** design authority (owner-approved July 15 2026; stages 1–2 BUILT and
+GPU-verified July 15; **§3/§4/§6 revised July 16 2026, owner-decided: SceneDescription
+stays FLAT — groups live in the authoring layer only**)
 **Scope:** object placement for all geometry backends (SDF, analytic, future mesh),
-scene-graph groups, and uniform-driven transforms
+the authoring-layer scene graph, and uniform-driven transforms
 **Supersedes:** `docs/design-scene-graph-transforms.md` (external draft; kept for history,
 its affine-matrix representation and staging are replaced by this document)
 
@@ -68,59 +70,83 @@ Planner imports from components, per the dependency direction; `canonicalPlane` 
 
 ---
 
-## 3. Scene language: leaves and groups
+## 3. The three layers — SceneDescription stays FLAT (owner-decided July 16 2026)
 
-```ts
-type SceneNode = ObjectDescription | GroupNode;   // leaves = today's objects, unchanged
+Groups are **not** part of SceneDescription. The decisive test is the pinned taxonomy:
+scene + measurement = *the integral*, and groups are not part of the integral — two
+trees that flatten to the same leaves define the same integral. Keeping the description
+flat keeps it quasi-canonical, keeps every consumer (Analyzer/Validator/Planner, stamps,
+tooling) tree-free, and keeps the authoring-language boundary sharp instead of letting
+SceneDescription become a de-facto authoring surface.
 
-interface GroupNode {
-    kind: 'group';
-    name?: string;                    // diagnostics/provenance only, never identity
-    transform?: TransformDescription;
-    children: SceneNode[];
-}
-```
+The argument that once pointed the other way — "driven transforms need the root→leaf
+factor chains to reach the Planner" — is FALSE, and the reason is the §1 similarity
+commitment itself: **similarities are closed under composition, so any composed chain,
+however deep and however driven, re-expresses as a single TRS**. The compiler only ever
+needs to know, per leaf: constant (fold it away) or live (uniform tier). Composition is
+the job of whoever owns the graph — which should exist exactly once, in the authoring
+layer, never echoed as a ghost chain inside the compiled artifact.
 
-- Existing flat scenes are already valid trees (all leaves at depth 0) — no fixture churn.
-- **Lights join the tree** as children (desugar makes them objects anyway; §5 ordering
-  makes this nearly free). **Camera stays out** — it is a pure film→ray map with its own
-  live-driven placement (`u_cameraPosition` is already the "driven placement" pattern).
-- Strictly a tree in the type. A JS-aliased node appearing twice flattens to two
-  independent leaves (two regions, two lights) — legal, documented, *not* instancing.
-  Real instancing arrives with meshes and shared BVHs.
-- Every `TransformDescription` scalar field is a `Value<>` — constant or `{param}` (§6).
+| Layer | Owns | Never contains |
+|---|---|---|
+| **Authoring language** (future; seeded by `flattenGroups`, §4) | trees, groups, names, live manipulation, the `updateMatrixWorld` equivalent | radiometry decisions |
+| **SceneDescription** | flat leaves: local primitive params + material + one `Transform` whose fields are `Value<>` (§6) | trees, parents, chains |
+| **Exported GLSL** | folded constants or per-object uniforms | traversal, runtime composition |
+
+The runtime channel between the authoring layer and the running renderer is the
+**ParameterStore and nothing else** — the boundary that already carries the camera's
+live placement.
+
+Notes carried over from the tree design:
+- **Camera stays out** of placement entirely — it is a pure film→ray map with its own
+  live-driven parameters.
+- `scene.lights` entries have no transform fields; the transformable emitter route is
+  an emissive **object** (`sampleAsLight`), constant-placed until the `Value<T>`
+  light-params batch (§6).
+- Optional provenance: `ObjectDescription.name?: string` — stamped by `flattenGroups`
+  with the node path (`'outer/inner/sphere'`), read only by diagnostics.
 
 ---
 
-## 4. Flattening — a front pass
+## 4. The authoring-layer seed: `flattenGroups`
 
-A compiler front pass (before Analyze) walks the tree and produces the flat scene the
-rest of the pipeline already speaks, with per leaf:
+The authoring language starts life as one pure function (outside the compiler — the
+compiler never sees trees):
 
 ```ts
-interface PlacedLeaf {
-    object: ObjectDescription;      // untouched authored leaf
-    factors: TransformFactor[];     // root→leaf chain; each field constant or {param}
-    path: string;                   // 'outer/inner/sphere' — diagnostics + provenance
-}
+flattenGroups(tree: SceneNode[]): ObjectDescription[]
+// composes each leaf's root→leaf similarity chain into ONE Transform,
+// stamps `name` with the node path, emits leaves in document order
+// (region-id stability), and leaves primitive params LOCAL (untouched).
 ```
 
-- **All factors constant** (the common case): fold immediately to one `Similarity`;
-  the factor list is discarded.
-- **Any factor driven**: keep the chain; constant segments around each driven factor
-  still precompose (a driven angle between two constant groups compiles to
-  `C₂ · R(θ) · C₁`).
-- **Region-id stability pin**: flatten order = document order, so region ids and
-  snapshots stay deterministic.
-
-Analyzer/Validator/Planner see flat objects carrying `placement: Similarity | FactorChain`;
-the tree never reaches them.
+- All-constant chains (the common case) compose via the §2 algebra at build time; the
+  output is an ordinary flat scene — stage-2 machinery handles everything from there.
+- **Static-composition rule**: `flattenGroups` composes CONSTANT transforms. A
+  `{param}`-driven field under a non-identity ancestor is a build-time ERROR in v1
+  (`C₂·R(θ)·C₁` is not a fixed TRS over the raw param — composing it per change is
+  exactly the runtime graph's job, and the error says so); a driven field under
+  all-identity ancestors passes through unchanged. The static flatten and the future
+  live graph are the SAME operation at two binding times — static composes once and
+  emits a scene description; dynamic mints param paths for driven-influenced leaves at
+  description time, then re-composes and pushes TRS values through the ParameterStore
+  on every change.
+- A JS-aliased node appearing under two parents flattens to two independent leaves
+  (two regions, two lights) — legal, documented, *not* instancing. Real instancing
+  arrives with meshes and shared BVHs.
+- **Driven groups are the authoring RUNTIME's job** (the future live graph / DSL): on a
+  parameter change it recomposes the affected leaves' similarities, decomposes each
+  back to TRS (always possible — closure), and pushes the leaf's placement params
+  through the ParameterStore. That is the three.js `updateMatrixWorld` loop, host-side,
+  touching only the driven subtree. The compiler and the scene description never know
+  the graph existed.
 
 ---
 
 ## 5. Lowering, per backend
 
-**Ordering pin (load-bearing): flatten → fold → light desugar.** The desugar and the
+**Ordering pin (load-bearing): compose (authoring layer, §4) → fold (plan) → light
+desugar.** Inside the compiler this is simply fold-before-desugar. The desugar and the
 `sampleAsLight` registry read **post-fold** parameters, exactly as they read
 post-`resolveAnalyticPositioning` parameters today. Every downstream consumer — power
 CDF, `emitSampleCall`, `emitPdfArm`, `lighting_query_delta`, `analyticSignedDistance`,
@@ -186,29 +212,56 @@ instances).
 
 ---
 
-## 6. Driven transforms (the uniform-controlled axis)
+## 6. Driven placement: per-field `Value<>` (the uniform-controlled axis)
 
-- A leaf whose factor chain contains any `{param}` lowers to per-object uniforms —
-  `u_object<i>_w2l` (mat4) + `u_object<i>_scale` (float) — consumed by the §5.2/§5.3
-  general tiers. GLSL never composes matrices; per-frame CPU cost is a handful of
-  quaternion multiplies for the driven subtree only.
-- The Planner emits one `PlannedUniform` per driven object with
-  `parameters: [every {param} path in the chain]` and a `compute` that evaluates the
-  chain (constant segments precomposed at plan time). The engine plumbing already
-  supports this shape (`ParameterManager` loops `binding.parameters` and hands the
-  whole value map to `compute`); the only extension is multi-path `PlannedUniform` in
+**One mechanism** — transform fields take `Value<>` exactly like every other numeric
+property in the language (§2.8):
+
+```ts
+transform: {
+    position: { param: 'crane.tip' },                                 // Value<Vec3>
+    rotation: { axis: [0,1,0], angle: { param: 'turntable.angle' } }, // angle: Value<number>
+    scale: 2,                                                          // constants mix freely
+}
+// rotation also accepts Value<Quaternion> — the graph runtime's port (§4):
+// decomposed similarities arrive as quat params, not axis-angle.
+```
+
+No factor chains, no whole-placement value kind: per-field params are UNIVERSAL because
+closure means every composed placement decomposes back to TRS (§3).
+
+- **Lowering**: any driven field ⇒ the leaf takes the §5.2/§5.3 general tier —
+  per-object uniforms `u_object<i>_w2l` (mat4) + `u_object<i>_scale` (float). GLSL
+  never composes matrices; the same uniform pair feeds the SDF wrapper, the analytic
+  conjugation, AND `analyticSignedDistance` in `scene_region_at`, so regions, interior
+  marching, and `current_medium` stay coherent automatically.
+- **Plumbing**: the Planner emits one `PlannedUniform` per driven object with
+  `parameters: [every {param} path in its TRS]` and a `compute` that assembles
+  TRS → (w2l, scale), constants baked into the closure. The engine already supports
+  this shape (`ParameterManager` loops `binding.parameters` and hands the whole value
+  map to `compute`); the only extension is multi-path `PlannedUniform` in
   `PipelineBuilder.buildUniforms`. **Engine untouched; boundary intact.**
-- ParameterMetadata (sliders, ranges, `triggersReset: true` — moving an object
-  invalidates accumulation) comes from the `ValueParam` ranges as everywhere else.
-- **Pin: driven transforms exclude emitters in v1** — samplable lights, `sampleAsLight`
-  objects, and delta lights. Light geometry is baked as literals into
+- **Standalone ergonomics for free**: a raw scene file with a driven angle gets a
+  working slider (ParameterMetadata from the `ValueParam` range,
+  `triggersReset: true`) with zero DSL involved. Param names are the AUTHOR's (or the
+  graph runtime's, from node paths) — the compiler never invents names from object
+  indices, so identity survives recompiles.
+- **Pin: driven fields exclude emitter leaves in v1** — explicit-light desugar targets,
+  `sampleAsLight` objects, delta lights. Light geometry is baked as literals into
   `emitSampleCall` / `emitPdfArm` / `lighting_query_delta` / the compile-time power CDF;
   making those uniform-driven is the already-deferred **`Value<T>` light params** item
   on the area-lights ledger. Validator enforces; the diagnostic names the deferred item.
+  Driven *occluders* need nothing — shadow rays go through `scene_intersect`, which
+  reads the same uniforms.
 - When that later batch lands, it must carry this constraint: **driven light transforms
   must be rigid** (translation + rotation only). Power is area-dependent; a driven
   scale would silently stale the baked power CDF — the one place a driven similarity
-  can create bias rather than mere wrong geometry.
+  can create bias rather than mere wrong geometry. The sampler/pdf/intersection arms
+  must then read the SAME uniforms (the byte-match discipline, live).
+- **Media under driven scale**: σ is per world unit, so a growing object gets optically
+  thicker — correct by definition, no bias.
+- **Scale hygiene**: the compile-time extreme-scale warning cannot see runtime values;
+  the param's `min`/`max` metadata is the clamp point.
 
 ---
 
@@ -219,11 +272,14 @@ instances).
    rejects a zero axis.
 3. Nonuniform scale: unrepresentable (scalar type); authored vector scale → shape
    diagnostic naming the ellipsoid-as-primitive alternative.
-4. Driven factor above an emitter → error naming the deferred ledger item (§6).
+4. Driven transform field on an emitter leaf → error naming the deferred ledger item
+   (§6) — enforced at the SceneDescription level, so it binds no matter who produced
+   the params (human or graph runtime).
 5. Extreme composed scale: `|log₁₀ s| > 2` warns, citing the fixed world-space epsilons
    (`EPSILON = 1e-3` spawn offset vs. an object scaled to size 1e-2 is scene-scale
    hygiene, not bias).
-6. Group `name` collisions allowed (names are provenance); flatten disambiguates paths.
+6. `name` collisions allowed (names are provenance, never identity); `flattenGroups`
+   disambiguates paths on the authoring side.
 
 ---
 
@@ -256,7 +312,8 @@ their diffs are exactly the removed no-op lines + shifted source-map line number
 | **twin-bake** | one object authored via `center` vs. via `transform.position`; twin gate (different GLSL, same image). |
 | **cross-backend** | SDF sphere vs. analytic sphere under the same rotated, scaled group; twin gate. |
 | **regions-under-transform** | the R-SUBMERGED nesting scene inside a rotated + scaled group: innermost-wins, `s·d` signed distances, interface epsilons under load. |
-| **light-under-group** | cornell-area with the emitter inside a transformed group vs. the pre-transformed twin: desugar ordering, power CDF, `lighting_pdf` byte-match discipline. (Stage 3) |
+| **flatten-equivalence** (vitest, no GPU) | `flattenGroups(tree)` leaves match hand-composed similarities + provenance paths + document order; aliased-node duplication semantics. (Stage 3) |
+| **light-under-flatten** | cornell-area authored as a tree (emitter inside a transformed group), flattened, vs. the pre-transformed twin: composition → desugar ordering, power CDF, `lighting_pdf` byte-match discipline. (Stage 3) |
 | **driven-equals-baked** | a `{param}`-driven rotation pinned at θ, equality-gated against the constant twin at θ; re-check at θ′ after a parameter set (exercises reset-on-change). (Stage 4) |
 
 ---
@@ -268,14 +325,25 @@ their diffs are exactly the removed no-op lines + shifted source-map line number
    rotation + scale now accepted: per-primitive analytic fold replacing
    `resolveAnalyticPositioning`, SDF wrapper tiers, Validator §7, byte gate, witnesses
    (conjugation, twin-bake, cross-backend, regions-under-transform).
-3. **Groups** — `SceneNode` tree + flatten front pass + provenance paths +
-   light-under-group witness.
-4. **Driven transforms** — multi-path `PlannedUniform`, factor-chain compute,
-   per-object uniform tier, no-driven-emitters pin, driven-equals-baked witness.
-5. **Deferred ledger** (named, not built): driven/`Value<T>` light geometry (rigid-only
-   constraint documented in §6), mesh backend + true instancing via §5.3, reflections,
-   nonuniform scale as an analytic/mesh-only extension if ever, curved-space placement
-   groups behind the structure-group contract (§1).
+3. **`flattenGroups` + provenance** — the pure authoring-layer utility (§4) +
+   `ObjectDescription.name` + the flatten-equivalence vitest + the light-under-flatten
+   witness. No compiler changes beyond the optional `name` field.
+   *BUILT July 16 2026*: `src/authoring/flatten.ts` (the authoring layer's first file —
+   Authoring → App → Engine → Compiler → Components is now the full stack); the
+   TRS lowering moved beside the algebra as `similarityFromTransform` (Planner's
+   `placementOf` is an alias — one lowering, two binding sites); static-composition
+   rule enforced with the doc'd errors; `flatten-tree` witness bit-exact
+   (0.00%/0.00%) against `transform-bake-ref`, including the lamp-in-a-transformed-
+   group chain (composition → desugar → power CDF → sampler).
+4. **Driven placement** — per-field `Value<>` on `Transform`, multi-path
+   `PlannedUniform` + TRS compute, the §5.2/§5.3 general uniform tiers, the
+   no-driven-emitters Validator pin, driven-equals-baked witness.
+5. **Deferred ledger** (named, not built): the live graph runtime / authoring DSL
+   (grows around `flattenGroups`; drives leaf placement params per §4), driven/
+   `Value<T>` light geometry (rigid-only constraint documented in §6), mesh backend +
+   true instancing via §5.3, reflections, nonuniform scale as an analytic/mesh-only
+   extension if ever, curved-space placement groups behind the structure-group
+   contract (§1).
 
 Each stage is independently shippable; none mixes refactor with feature. Stage 2
 changes zero rendered pixels for zero authored transforms.

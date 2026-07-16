@@ -92,6 +92,9 @@ export interface SDFObject {
     sdf: StandardSDF | CustomSDF;
     material: string;
     transform?: Transform;
+    /** Provenance only (never identity): diagnostics label; `flattenGroups` stamps the
+     *  authoring-tree node path here (fable-transforms §3). */
+    name?: string;
 }
 
 export interface AnalyticObject {
@@ -99,6 +102,8 @@ export interface AnalyticObject {
     shape: StandardAnalytic;
     material: string;
     transform?: Transform;
+    /** Provenance only (never identity) — see SDFObject.name. */
+    name?: string;
 }
 
 export interface MeshObject {
@@ -106,6 +111,8 @@ export interface MeshObject {
     data: Float32Array;
     material: string;
     transform?: Transform;
+    /** Provenance only (never identity) — see SDFObject.name. */
+    name?: string;
 }
 
 export interface StandardSDF {

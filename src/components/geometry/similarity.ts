@@ -8,6 +8,8 @@
 // Lives in components (the leaf layer) because geometry descriptors' fold functions and
 // the Planner both consume it — same residency rule as quadNormal/canonicalPlane.
 
+import type { Transform } from '../../compiler/types.js';
+
 export type Vec3Tuple = [number, number, number];
 
 /** Unit quaternion [x, y, z, w]. */
@@ -145,6 +147,25 @@ export function similarityInverse(g: Similarity): Similarity {
  *  This IS a similarity already; the constructor just names the convention. */
 export function similarityFromTRS(translation: Vec3Tuple, rotation: Quat, scale: number): Similarity {
     return { rotation: quatNormalize(rotation), translation, scale };
+}
+
+/** Authored `Transform` (TRS sugar: axis-angle | quaternion) → the canonical Similarity
+ *  (fable-transforms §2). The Validator has already diagnosed degenerate axes and
+ *  quaternions, so this only normalizes. Shared by the Planner (constant folds) and
+ *  the authoring layer's `flattenGroups` — one lowering, two binding sites. */
+export function similarityFromTransform(transform: Transform | undefined): Similarity {
+    if (transform === undefined) return IDENTITY_SIMILARITY;
+    let rotation = IDENTITY_QUAT;
+    if (transform.rotation !== undefined) {
+        rotation = Array.isArray(transform.rotation)
+            ? quatNormalize(transform.rotation)
+            : quatFromAxisAngle(transform.rotation.axis, transform.rotation.angle);
+    }
+    return similarityFromTRS(
+        (transform.position ?? [0, 0, 0]) as Vec3Tuple,
+        rotation,
+        transform.scale ?? 1,
+    );
 }
 
 const IDENTITY_EPS = 1e-12;

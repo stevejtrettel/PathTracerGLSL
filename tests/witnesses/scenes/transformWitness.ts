@@ -21,6 +21,7 @@
 // cannot reproduce itself into the reference arm.
 
 import type { SceneDescription, RenderStrategy, Transform } from '../../../src/compiler/types.js';
+import { flattenGroups } from '../../../src/authoring/flatten.js';
 
 // ---------------------------------------------------------------------------
 // Shared strategies
@@ -130,6 +131,60 @@ export const transformBakeRef: SceneDescription = {
             material: 'lamp',
         },
     ],
+    materials: bakeMaterials,
+    lights: [],
+    environment: bakeEnv,
+};
+
+// ---------------------------------------------------------------------------
+// flatten-tree — the light-under-flatten witness (fable-transforms §4/§8)
+// ---------------------------------------------------------------------------
+// The SAME world geometry as transform-bake, authored as a TREE and flattened by the
+// authoring layer at fixture-definition time. Each subtree composes to exactly the
+// per-leaf transform transform-bake authors directly (derivations inline), so this
+// twins against the SAME hand-folded reference arm:
+//   T(p) ∘ S(2)      = TRS(p, id, 2)      — the 'ball' group
+//   T(a) ∘ T(b)      = T(a+b)             — the nested 'orb' groups
+//   [T(p)·R] ∘ id    = TRS(p, R, 1)       — the 'rig' group carrying the LAMP
+// The lamp inside a transformed group is the point: composition → sampleAsLight
+// desugar → power CDF → sampler/pdf coherence, end to end from a tree.
+
+export const flattenTree: SceneDescription = {
+    id: 'flatten-tree',
+    name: 'Flatten witness (tree-authored twin of transform-bake)',
+    ambientSpace: { type: 'euclidean' },
+    objects: flattenGroups([
+        // depth-0 pass-through leaf (identity flatten):
+        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'floor' },
+        // group T(-1,-0.3,0) ∘ leaf S(2) — composes to transform-bake's red sphere:
+        {
+            kind: 'group', name: 'ball', transform: { position: [-1.0, -0.3, 0] },
+            children: [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 0.35 } }, material: 'red', transform: { scale: 2 } }],
+        },
+        // depth-0 pass-through leaf WITH its own transform (document order mirrors
+        // transform-bake exactly, so region ids and dispatch order match the twin):
+        {
+            kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: [0.4, 0.4, 0.4] } }, material: 'green',
+            transform: { position: [1.1, -0.6, -0.8] },
+        },
+        // nested translations T(0.5,0,0) ∘ T(0,0,0.3) = T(0.5,0,0.3) — the blue sphere:
+        {
+            kind: 'group', name: 'orb', transform: { position: [0.5, 0, 0] },
+            children: [{
+                kind: 'group', name: 'lift', transform: { position: [0, 0, 0.3] },
+                children: [{ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0.2, -0.4, 0], radius: 0.5 } }, material: 'blue' }],
+            }],
+        },
+        // the LAMP under a transformed group: T(0.2,0,0)·Ry(π/2) ∘ identity leaf:
+        {
+            kind: 'group', name: 'rig', transform: { position: [0.2, 0, 0], rotation: { axis: [0, 1, 0], angle: Math.PI / 2 } },
+            children: [{
+                kind: 'analytic',
+                shape: { type: 'quad', parameters: { corner: [-0.5, 1.5, -0.5], edge1: [1, 0, 0], edge2: [0, 0, 1] } },
+                material: 'lamp',
+            }],
+        },
+    ]),
     materials: bakeMaterials,
     lights: [],
     environment: bakeEnv,

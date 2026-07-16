@@ -9,11 +9,8 @@ import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
 import { canonicalPlane, foldAnalyticParameters } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
-    IDENTITY_SIMILARITY,
-    quatFromAxisAngle,
-    quatNormalize,
     similarityCompose,
-    similarityFromTRS,
+    similarityFromTransform,
     type Similarity,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
@@ -381,19 +378,10 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
     };
 }
 
-/** Authored TRS → the canonical Similarity (fable-transforms §2; T·R·S pin).
- *  Rotation sugar (axis-angle | quaternion) lowers here; the Validator has already
- *  diagnosed degenerate axes/quaternions, so this only normalizes. */
-export function placementOf(transform: Transform | undefined): Similarity {
-    if (transform === undefined) return IDENTITY_SIMILARITY;
-    let rotation = IDENTITY_QUAT;
-    if (transform.rotation !== undefined) {
-        rotation = Array.isArray(transform.rotation)
-            ? quatNormalize(transform.rotation)
-            : quatFromAxisAngle(transform.rotation.axis, transform.rotation.angle);
-    }
-    return similarityFromTRS(transform.position ?? [0, 0, 0], rotation, transform.scale ?? 1);
-}
+/** Authored TRS → the canonical Similarity. The lowering itself lives beside the
+ *  algebra (`similarityFromTransform`) so the authoring layer's `flattenGroups` and
+ *  this fold share ONE implementation; the alias keeps the Planner's vocabulary. */
+export const placementOf = similarityFromTransform;
 
 /**
  * SDF placement (fable-transforms §5.2): a local 'center' parameter is a PRE-translation

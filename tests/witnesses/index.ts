@@ -42,7 +42,7 @@ import {
 import { veachMis, veachMisStrategy, veachNeeStrategy, veachPtStrategy } from './scenes/ggxScenes.js';
 import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
 import {
-    transformBake, transformBakeRef, transformNeeStrategy,
+    transformBake, transformBakeRef, transformNeeStrategy, flattenTree,
     conjugationScene, conjugationBase, CONJ_CAMERA_BASE, CONJ_CAMERA_G,
     regionsTransformed, regionsTransformedRef, regionsNeeStrategy,
 } from './scenes/transformWitness.js';
@@ -447,6 +447,23 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // params): folds are fp-exact here, so the arms share streams in practice —
             // near-zero gates like thinlens-zero (measured 0.00%/0.00% at this budget).
             checks: [{ kind: 'twin', other: { scene: 'transform-bake-ref' }, meanTol: 0.002, rmse: 0.01, label: 'transform ≡ hand-fold' }],
+        },
+        initialParameters: {
+            'camera.position': [0, 1.0, 4.2],
+            'camera.target': [0, -0.2, 0],
+        },
+    },
+    'flatten-tree': {
+        scene: flattenTree,
+        strategies: [transformNeeStrategy],
+        exercises:
+            'light-under-flatten (fable-transforms §4/§8): the transform-bake scene authored as a TREE and composed by the authoring layer’s flattenGroups at fixture-definition time — group∘leaf composition (T∘S, nested T∘T, [T·R]∘id), the sampleAsLight LAMP inside a transformed group (composition → desugar → power CDF → sampler/pdf), depth-0 pass-through leaves',
+        expected: 'converges to the same image as transform-bake-ref; divergence implicates flattenGroups composition or the TRS re-expression, not the stage-2 machinery (transform-bake already gates that)',
+        witness: {
+            spp: 96,
+            // Composition happens in fp64 and lands sub-fp32-ulp from the directly-
+            // authored transforms → near-bit-exact gates like transform-bake.
+            checks: [{ kind: 'twin', other: { scene: 'transform-bake-ref' }, meanTol: 0.002, rmse: 0.01, label: 'flattened tree ≡ hand-fold' }],
         },
         initialParameters: {
             'camera.position': [0, 1.0, 4.2],
