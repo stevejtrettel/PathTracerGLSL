@@ -1,12 +1,13 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
+import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
+import { LIGHT_KINDS } from '../../components/lights/index.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
 import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
-import { PRIMITIVES, primitive, canonicalPlane, foldAnalyticParameters } from '../../components/geometry/index.js';
+import { PRIMITIVES, primitive, canonicalPlane, foldAnalyticParameters, resolveBackend } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
     isDrivenTransform,
@@ -22,20 +23,23 @@ import {
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty } from './types.js';
 
-/** SDF primitives the registry has bodies for — anything else must diagnose here, not
- *  throw there (impl-plan-geometry-descriptors: the capability IS the descriptor fact). */
-const implementedSdfTypes = () => Object.values(PRIMITIVES).filter((d) => d.provides.sdf).map((d) => d.type);
+/** Registered primitive types — unknowns must diagnose here, not throw downstream
+ *  (impl-plan-geometry-descriptors: the capability IS the descriptor fact). */
+const implementedTypes = () => Object.keys(PRIMITIVES);
 
 export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag): RenderPlan {
-    // --- Assign material IDs (sorted for deterministic ordering) ---
+    // --- Assign material IDs in AUTHORED (insertion) order — naming batch N1 (audit P1).
+    // Identity is STRUCTURAL, symmetric with objects/regions: renaming a material no
+    // longer renumbers ids or churns artifacts; names are provenance. JS insertion order
+    // is deterministic and JSON-round-trip-stable; the one trap — integer-like keys
+    // iterate first — is Validator-rejected.
     // Property resolution is SCHEMA-DRIVEN (materials-§7): exactly the model's declared
     // rows resolve, each `authored ?? row.default` shaped by glslType. The old per-field
     // hand-resolution (and its model-conditional ior default) dissolved into the rows —
     // a non-dielectric simply has no ior value; ior_of pins it structurally.
     const materials: PlannedMaterial[] = [];
     let materialIndex = 0;
-    const sortedMaterials = Object.entries(scene.materials).sort(([a], [b]) => a.localeCompare(b));
-    for (const [name, mat] of sortedMaterials) {
+    for (const [name, mat] of Object.entries(scene.materials)) {
         materials.push({
             id: materialIndex++,
             name,
@@ -51,124 +55,101 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         materialIdMap.set(m.name, m.id);
     }
 
-    // --- Assign objects by geometry backend (SDF vs analytic) ---
+    // --- Assign objects; RESOLVE the backend (B1 — shape, not backend) ---
+    // Auto = analytic if the primitive provides it, else sdf; a per-object `backend`
+    // pin overrides (research/coverage — Validator-checked against provides).
     // `index` is assigned in scene order across BOTH backends: it is the globally-unique
     // region id (§2.3), so material_of() spans both lists and regions never collide.
     const objects: PlannedSDFObject[] = [];
     const analyticObjects: PlannedAnalyticObject[] = [];
     let objectIndex = 0;
     for (const obj of scene.objects) {
-        if (obj.kind === 'sdf') {
-            const sdfObj = obj as SDFObject;
-            const sdf = sdfObj.sdf as StandardSDF;
-            // Review C7 (partial): torus/capsule/custom exist in the type but have no generator
-            // arm — a raw generator throw is not a diagnostic. Emit one here and skip the object.
-            if (!PRIMITIVES[sdf.type]?.provides.sdf) {
-                bag.error('missing-geometry',
-                    `SDF primitive '${sdf.type}' is not implemented yet (available: ${implementedSdfTypes().join(', ')})`)
-                    .add();
-                objectIndex++;   // keep region ids scene-order stable for the remaining objects
-                continue;
-            }
-            const matId = materialIdMap.get(sdfObj.material)!;   // validated by Validator
-
-            // Placement (fable-transforms §5.2/§6): constant → center folds into the
-            // placement as a pre-translation and the wrapper owns all positioning;
-            // driven → the uniform record with LOCAL parameters.
-            const { parameters, placement } = resolveSDFPlacement(sdf, sdfObj.transform, objectIndex);
-
-            objects.push({ index: objectIndex++, materialId: matId, sdfType: sdf.type, parameters, placement });
-        } else if (obj.kind === 'analytic') {
-            const anaObj = obj as AnalyticObject;
-            const shape = anaObj.shape as StandardAnalytic;
-            const matId = materialIdMap.get(anaObj.material)!;
-
-            if (isDrivenTransform(anaObj.transform)) {
-                // Driven (§6): parameters stay LOCAL (plane still canonicalized); the
-                // generated arm conjugates the ray into the rigid frame. The Validator
-                // has already rejected driven SAMPLABLE emitters, so the light registry
-                // never sees these.
-                const regionId = objectIndex++;
-                analyticObjects.push({
-                    index: regionId,
-                    materialId: matId,
-                    shapeType: shape.type,
-                    parameters: shape.type === 'plane' ? normalizePlaneParameters(shape.parameters) : shape.parameters,
-                    placement: buildDrivenPlacement(anaObj.transform!, regionId),
-                });
-            } else {
-                analyticObjects.push({
-                    index: objectIndex++,
-                    materialId: matId,
-                    shapeType: shape.type,
-                    // Constant transforms fold ENTIRELY into canonical parameters (the
-                    // analytic primitive set is similarity-closed — fable-transforms §5.1).
-                    // Keeping the light registry on these same resolved parameters ensures a
-                    // sampleAsLight emitter cannot drift away from its hittable geometry.
-                    parameters: foldAnalyticParameters(shape.type, shape.parameters, placementOf(anaObj.transform)),
-                });
-            }
+        if ('kind' in obj) continue;   // Validator-rejected (deferred)
+        const backend = resolveBackend(obj.type, obj.backend);
+        if (backend === undefined) {
+            // Unregistered type or unhonorable pin — a diagnostic, never a throw (C7).
+            bag.error('missing-geometry',
+                `Primitive '${obj.type}' is not implemented yet (available: ${implementedTypes().join(', ')})`)
+                .add();
+            objectIndex++;   // keep region ids scene-order stable for the remaining objects
+            continue;
         }
-        // mesh objects are not yet supported (deferred — see impl-plan-analytic-backend.md)
+        const matId = materialIdMap.get(obj.material)!;   // validated by Validator
+
+        if (backend === 'sdf') {
+            // Placement (fable-transforms §5.2/§6): constant → the point param folds into
+            // the placement as a pre-translation and the wrapper owns all positioning;
+            // driven → the uniform record with LOCAL parameters.
+            const { parameters, placement } = resolveSDFPlacement(obj.type, obj.parameters, obj.transform, objectIndex);
+            objects.push({ index: objectIndex++, materialId: matId, sdfType: obj.type, name: obj.name, parameters, placement });
+        } else if (isDrivenTransform(obj.transform)) {
+            // Driven (§6): parameters stay LOCAL (plane still canonicalized); the
+            // generated arm conjugates the ray into the rigid frame. The Validator
+            // has already rejected driven SAMPLABLE emitters, so the light registry
+            // never sees these.
+            const regionId = objectIndex++;
+            analyticObjects.push({
+                index: regionId,
+                materialId: matId,
+                shapeType: obj.type,
+                name: obj.name,
+                parameters: obj.type === 'plane' ? normalizePlaneParameters(obj.parameters) : obj.parameters,
+                placement: buildDrivenPlacement(obj.transform!, regionId),
+            });
+        } else {
+            analyticObjects.push({
+                index: objectIndex++,
+                materialId: matId,
+                shapeType: obj.type,
+                name: obj.name,
+                // Constant transforms fold ENTIRELY into canonical parameters (the
+                // analytic primitive set is similarity-closed — fable-transforms §5.1).
+                // Keeping the light registry on these same resolved parameters ensures a
+                // sampleAsLight emitter cannot drift away from its hittable geometry.
+                parameters: foldAnalyticParameters(obj.type, obj.parameters, placementOf(obj.transform)),
+            });
+        }
     }
 
     // --- Assign lights (the §6.2 samplable registry; order = light id = CDF order) ---
+    // REGISTRY-DRIVEN desugar (A3 — the lights door): the kind descriptor declares how
+    // an authored light lowers — registry values (radiometric PRODUCTS computed once)
+    // and, for hittable kinds, the backing emitter region. Le is shared EXACTLY
+    // between the emission table and the sampler (any mismatch makes pt and pt-nee
+    // converge to different images). Unregistered kinds (directional) are
+    // Validator-rejected; skipped here.
     const lights: PlannedLight[] = [];
     let lightIndex = 0;
     for (const light of scene.lights) {
-        const color = ('color' in light ? light.color : undefined) ?? ([1.0, 1.0, 1.0] as Vec3);
-        if (light.kind === 'point') {
-            lights.push({
-                id: lightIndex++,
-                kind: 'point',
-                position: light.position,
-                intensity: light.intensity,
-                color,
-            });
-        } else if (light.kind === 'quad' || light.kind === 'sphere') {
-            // DESUGAR (§6.2): every hittable light is a region — synthesize the emissive
-            // material + the analytic emitter object, then register the samplable entry.
-            // Le = color·intensity, shared EXACTLY between the emission table and the sampler
-            // (any mismatch makes pt and pt-nee converge to different images).
-            const radiance: Vec3 = [color[0] * light.intensity, color[1] * light.intensity, color[2] * light.intensity];
-            const matId = materialIndex++;
-            // Synthesized through the SAME schema path as authored materials (materials-§7)
-            // — the emitter's values cannot drift from the resolution rules.
-            materials.push({
-                id: matId,
-                name: `__light_${lightIndex}`,
-                model: 'lambert',
-                values: resolveMaterialValues('lambert', { albedo: [0.0, 0.0, 0.0], emission: radiance }),
-                medium: null,
-            });
-            const regionId = objectIndex++;
-            if (light.kind === 'quad') {
-                analyticObjects.push({
-                    index: regionId,
-                    materialId: matId,
-                    shapeType: 'quad',
-                    parameters: { corner: light.corner, edge1: light.edge1, edge2: light.edge2 },
-                });
-                lights.push({
-                    id: lightIndex++, kind: 'quad', regionId,
-                    corner: light.corner, edge1: light.edge1, edge2: light.edge2,
-                    intensity: light.intensity, color,
-                });
-            } else {
-                analyticObjects.push({
-                    index: regionId,
-                    materialId: matId,
-                    shapeType: 'sphere',
-                    parameters: { center: light.position, radius: light.radius },
-                });
-                lights.push({
-                    id: lightIndex++, kind: 'sphere', regionId,
-                    position: light.position, radius: light.radius,
-                    intensity: light.intensity, color,
-                });
-            }
+        const d = LIGHT_KINDS[light.kind];
+        if (d === undefined) continue;
+        // ONE authored word (B2): emission — Le for area kinds, radiant intensity for
+        // delta kinds; scalar broadcasts (the spectrum convention, §2.5).
+        const e = light.emission;
+        const product: Vec3 = typeof e === 'number' ? [e, e, e] : e;
+        const authored = light as unknown as Record<string, unknown>;
+        if (d.region === undefined) {
+            lights.push({ id: lightIndex++, kind: light.kind, values: d.toValues(authored, product) });
+            continue;
         }
-        // directional: Validator-rejected; skipped here
+        // Hittable: synthesize the emissive material + the backing region, THROUGH the
+        // same schema path as authored materials (materials-§7 — no drift possible).
+        const matId = materialIndex++;
+        materials.push({
+            id: matId,
+            name: `__light_${lightIndex}`,
+            model: 'lambert',
+            values: resolveMaterialValues('lambert', { albedo: [0.0, 0.0, 0.0], emission: product }),
+            medium: null,
+        });
+        const regionId = objectIndex++;
+        analyticObjects.push({
+            index: regionId,
+            materialId: matId,
+            shapeType: d.region.primitive,
+            parameters: d.region.parameters(authored),
+        });
+        lights.push({ id: lightIndex++, kind: light.kind, regionId, values: d.toValues(authored, product) });
     }
 
     // sampleAsLight route (§6.2): emissive analytic quad/sphere OBJECTS join the registry —
@@ -187,22 +168,15 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         const emission = mat.values[EMISSION_KEY];
         if (!Array.isArray(emission) || !emission.some((c) => c !== 0)) continue;
         const Le = emission as Vec3;
-        // Registry stores color·intensity factored as (Le, 1.0) — samplers only consume the product.
-        if (planned.shapeType === 'quad') {
-            const p = planned.parameters;
-            lights.push({
-                id: lightIndex++, kind: 'quad', regionId: planned.index,
-                corner: p.corner as Vec3, edge1: p.edge1 as Vec3, edge2: p.edge2 as Vec3,
-                intensity: 1.0, color: Le,
-            });
-        } else {
-            const p = planned.parameters;
-            lights.push({
-                id: lightIndex++, kind: 'sphere', regionId: planned.index,
-                position: p.center as Vec3, radius: p.radius as number,
-                intensity: 1.0, color: Le,
-            });
-        }
+        // Registry-driven (A3): the kind whose backing region primitive matches this
+        // object's shape converts the FOLDED parameters back to registry values —
+        // both authoring routes share one kind definition.
+        const kindEntry = Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === planned.shapeType);
+        if (kindEntry?.valuesFromRegion === undefined) continue;   // backstop; samplableAsLight already gated
+        lights.push({
+            id: lightIndex++, kind: kindEntry.kind, regionId: planned.index,
+            values: kindEntry.valuesFromRegion(planned.parameters, Le),
+        });
     }
 
     // --- Ambient medium (§2.4): material_of(-1) resolves to this id; -1 = vacuum ---
@@ -535,7 +509,8 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
  * For pure translations this reduces exactly to the old position+center sum (byte gate).
  */
 export function resolveSDFPlacement(
-    sdf: StandardSDF,
+    type: string,
+    rawParameters: Record<string, number | number[]>,
     transform: Transform | undefined,
     index: number,
 ): { parameters: Record<string, number | number[]>; placement: PlannedPlacement } {
@@ -543,7 +518,7 @@ export function resolveSDFPlacement(
     // SDF bound only when its normal is unit. The Validator rejects the zero vector;
     // normalizing (n, offset) together preserves the authored plane while making both
     // marching and shading frames well-defined.
-    const parameters = sdf.type === 'plane' ? normalizePlaneParameters(sdf.parameters) : sdf.parameters;
+    const parameters = type === 'plane' ? normalizePlaneParameters(rawParameters) : rawParameters;
 
     // Driven (§6): parameters stay LOCAL — the rigid-frame query scales them in-shader,
     // so there is no point fold (the wrapper handles ALL placement, live).
@@ -556,7 +531,7 @@ export function resolveSDFPlacement(
     // one translation cannot absorb two points) fall through unfolded. Only an
     // AUTHORED value folds — an omitted param resolves to its row default at emit
     // time, exactly as before the derivation.
-    const pointParams = primitive(sdf.type).params.filter((p) => p.kind === 'point');
+    const pointParams = primitive(type).params.filter((p) => p.kind === 'point');
     const point = pointParams.length === 1
         ? parameters[pointParams[0].name] as number[] | undefined
         : undefined;

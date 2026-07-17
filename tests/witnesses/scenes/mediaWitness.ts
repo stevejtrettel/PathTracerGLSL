@@ -26,14 +26,12 @@ export const slabScene: SceneDescription = {
     objects: [
         // Emissive backdrop: solid below z = -2 (sdf = p.z + 2)
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.0 } },
+            type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.0 },
             material: 'screen',
         },
         // The ink slab: z ∈ [-1, 0], spanning the view (null interfaces — model 'none')
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [0, 0, -0.5], halfSize: [4, 4, 0.5] } },
+            type: 'box', parameters: { center: [0, 0, -0.5], halfSize: [4, 4, 0.5] },
             material: 'ink',
         },
     ],
@@ -71,12 +69,12 @@ export const furnaceScatterScene: SceneDescription = {
     name: 'Furnace + Haze (F-BOX-M)',
     ambientSpace: { type: 'euclidean' },
     objects: [
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [1, 0, 0], offset: 1.0 } }, material: 'furnace' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 1.0 } }, material: 'furnace' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'furnace' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, -1, 0], offset: 1.0 } }, material: 'furnace' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, 1], offset: 1.0 } }, material: 'furnace' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, -1], offset: 1.0 } }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [1, 0, 0], offset: 1.0 }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 1.0 }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [0, -1, 0], offset: 1.0 }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [0, 0, 1], offset: 1.0 }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [0, 0, -1], offset: 1.0 }, material: 'furnace' },
     ],
     materials: {
         furnace: { model: 'lambert', albedo: [0.5, 0.5, 0.5], emission: [0.2, 0.2, 0.2] },
@@ -117,16 +115,15 @@ export const hazeScene: SceneDescription = {
     name: 'Haze (HG-sign witness, light shafts)',
     ambientSpace: { type: 'euclidean' },
     objects: [
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } }, material: 'gray' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, -1, 0], offset: 2.5 } }, material: 'gray' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.5 } }, material: 'gray' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [1, 0, 0], offset: 2.5 } }, material: 'gray' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 2.5 } }, material: 'gray' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, -1], offset: 6.0 } }, material: 'gray' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 }, material: 'gray' },
+        { type: 'plane', parameters: { normal: [0, -1, 0], offset: 2.5 }, material: 'gray' },
+        { type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.5 }, material: 'gray' },
+        { type: 'plane', parameters: { normal: [1, 0, 0], offset: 2.5 }, material: 'gray' },
+        { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 2.5 }, material: 'gray' },
+        { type: 'plane', parameters: { normal: [0, 0, -1], offset: 6.0 }, material: 'gray' },
         // Small emissive panel on the back wall — the path-only emitter key 3 can see.
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [-1.2, 1.2, -2.4], halfSize: [0.4, 0.4, 0.05] } },
+            type: 'box', parameters: { center: [-1.2, 1.2, -2.4], halfSize: [0.4, 0.4, 0.05] },
             material: 'panel',
         },
     ],
@@ -142,7 +139,7 @@ export const hazeScene: SceneDescription = {
             },
         },
     },
-    lights: [{ kind: 'point', position: [0.8, 2.2, -1.0], intensity: 10.0, color: [1.0, 1.0, 1.0] }],
+    lights: [{ kind: 'point', position: [0.8, 2.2, -1.0], emission: 10 }],
     ambientMedium: 'fog',
 };
 

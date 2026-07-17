@@ -13,30 +13,34 @@ export const cylinderScene: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: [
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0 } },
+            type: 'plane',
+            name: 'ground',   // authored names flow into emitted symbols (naming N5): sdf_ground, shape_ground
+            parameters: { normal: [0, 1, 0], offset: 0 },
             material: 'floor',
         },
         // Upright: canonical shape, translation tier.
         {
-            kind: 'sdf',
-            sdf: { type: 'cylinder', parameters: { radius: 0.3, halfHeight: 0.5 } },
+            type: 'cylinder',
+            name: 'pillar',
+            parameters: { radius: 0.3, halfHeight: 0.5 },
             material: 'clay',
             transform: { position: [-0.9, 0.5, 0] },
         },
         // Tilted: constant rotation + scale → the similarity wrapper tier (folded
         // mat3/s query + s·d world-distance correction). Orientation via PLACEMENT.
         {
-            kind: 'sdf',
-            sdf: { type: 'cylinder', parameters: { radius: 0.25, halfHeight: 0.45 } },
+            type: 'cylinder',
+            name: 'leaning',
+            parameters: { radius: 0.25, halfHeight: 0.45 },
             material: 'green',
             transform: { position: [0.1, 0.5, 0.35], rotation: { axis: [0, 0, 1], angle: Math.PI / 5 }, scale: 1.2 },
         },
         // Driven: live rotation + scale → rigid-frame uniform pair; the struct's
         // length params (radius, halfHeight) absorb s in-shader, world-exact.
         {
-            kind: 'sdf',
-            sdf: { type: 'cylinder', parameters: { radius: 0.2, halfHeight: 0.4 } },
+            type: 'cylinder',
+            name: 'spinner',   // driven → named FUNCTION but no hoisted const (uniforms in the ctor)
+            parameters: { radius: 0.2, halfHeight: 0.4 },
             material: 'red',
             transform: {
                 position: [1.0, 0.5, -0.25],
@@ -52,7 +56,7 @@ export const cylinderScene: SceneDescription = {
         red: { model: 'lambert', albedo: [0.7, 0.12, 0.12] },
     },
     lights: [
-        { kind: 'point', position: [2.5, 4, 2.5], intensity: 40.0, color: [1.0, 1.0, 1.0] },
+        { kind: 'point', position: [2.5, 4, 2.5], emission: 40 },
     ],
     environment: { type: 'constant', color: [0.12, 0.18, 0.32], intensity: 1.0 },
 };

@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { plan } from '../../src/compiler/plan/Planner.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
-import type { SceneDescription, RenderStrategy, Vec3 } from '../../src/compiler/types.js';
+import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
 
 const strategy: RenderStrategy = {
     id: 'pt-nee',
@@ -21,7 +21,7 @@ function baseScene(): SceneDescription {
         id: 's',
         ambientSpace: { type: 'euclidean' },
         objects: [
-            { kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 1 } }, material: 'm' },
+            { type: 'sphere', parameters: { radius: 1 }, material: 'm' },
         ],
         materials: { m: { model: 'lambert' } },
         lights: [],
@@ -36,9 +36,9 @@ describe('explicit-light desugar (§6.2)', () => {
     it('registry order = light id = scene order, across kinds', () => {
         const scene = baseScene();
         scene.lights = [
-            { kind: 'point', position: [0, 5, 0], intensity: 1 },
-            { kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], intensity: 2 },
-            { kind: 'sphere', position: [3, 3, 3], radius: 0.5, intensity: 3 },
+            { kind: 'point', position: [0, 5, 0], emission: 1 },
+            { kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 2 },
+            { kind: 'sphere', position: [3, 3, 3], radius: 0.5, emission: 3 },
         ];
         const p = runPlan(scene);
         expect(p.lights.map((l) => l.id)).toEqual([0, 1, 2]);
@@ -48,7 +48,7 @@ describe('explicit-light desugar (§6.2)', () => {
     it('desugars quad/sphere lights to __light_n regions with black albedo and Le = color·intensity', () => {
         const scene = baseScene();
         scene.lights = [
-            { kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], intensity: 5, color: [1, 0.5, 0.25] },
+            { kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: [5, 2.5, 1.25] },
         ];
         const p = runPlan(scene);
         const emitter = p.materials.find((m) => m.name.startsWith('__light_'));
@@ -58,7 +58,7 @@ describe('explicit-light desugar (§6.2)', () => {
         // Le shared EXACTLY between emission table and sampler (the invariant comment)
         expect(emitter!.values.emission).toEqual([5, 2.5, 1.25]);
         const light = p.lights[0];
-        expect((light.color as Vec3).map((c) => c * light.intensity)).toEqual([5, 2.5, 1.25]);
+        expect(light.values.radiance).toEqual([5, 2.5, 1.25]);
         // the synthesized region exists and points at the emitter material
         const region = p.analyticObjects.find((o) => o.index === light.regionId);
         expect(region).toBeDefined();
@@ -68,10 +68,10 @@ describe('explicit-light desugar (§6.2)', () => {
 
     it('assigns desugared region ids after user objects, in scene order (globally unique)', () => {
         const scene = baseScene();
-        scene.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 } }, material: 'm' });
+        scene.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 }, material: 'm' });
         scene.lights = [
-            { kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], intensity: 1 },
-            { kind: 'sphere', position: [0, 8, 0], radius: 0.2, intensity: 1 },
+            { kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 1 },
+            { kind: 'sphere', position: [0, 8, 0], radius: 0.2, emission: 1 },
         ];
         const p = runPlan(scene);
         const allIndices = [...p.objects.map((o) => o.index), ...p.analyticObjects.map((o) => o.index)].sort((a, b) => a - b);
@@ -85,16 +85,15 @@ describe('sampleAsLight route (§6.2)', () => {
     const emissiveQuadScene = (sampleAsLight: boolean | undefined): SceneDescription => {
         const scene = baseScene();
         scene.materials.glow = { model: 'lambert', albedo: 0, emission: [4, 4, 4], ...(sampleAsLight === undefined ? {} : { sampleAsLight }) };
-        scene.objects.push({ kind: 'analytic', shape: { type: 'quad', parameters: { corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] } }, material: 'glow' });
+        scene.objects.push({ type: 'quad', parameters: { corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, material: 'glow' });
         return scene;
     };
 
-    it('emissive analytic quads join the registry by default with (Le, intensity=1) factoring', () => {
+    it("emissive analytic quads join the registry by default carrying the radiance product", () => {
         const p = runPlan(emissiveQuadScene(undefined));
         expect(p.lights).toHaveLength(1);
         expect(p.lights[0].kind).toBe('quad');
-        expect(p.lights[0].intensity).toBe(1);
-        expect(p.lights[0].color).toEqual([4, 4, 4]);   // registry stores color·intensity as (Le, 1)
+                expect(p.lights[0].values.radiance).toEqual([4, 4, 4]);   // the registry stores Le directly
     });
 
     it('sampleAsLight: false excludes the emitter from the registry (path-only glow)', () => {
@@ -104,7 +103,7 @@ describe('sampleAsLight route (§6.2)', () => {
 
     it('two objects sharing one emissive material become two registry entries (per REGION)', () => {
         const scene = emissiveQuadScene(undefined);
-        scene.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [2, 4, 0], radius: 0.5 } }, material: 'glow' });
+        scene.objects.push({ type: 'sphere', parameters: { center: [2, 4, 0], radius: 0.5 }, material: 'glow' });
         const p = runPlan(scene);
         expect(p.lights).toHaveLength(2);
         expect(new Set(p.lights.map((l) => l.regionId)).size).toBe(2);
@@ -113,18 +112,18 @@ describe('sampleAsLight route (§6.2)', () => {
     it('uses the translated analytic geometry for both intersection and light sampling', () => {
         const scene = emissiveQuadScene(undefined);
         const quad = scene.objects[1];
-        if (quad.kind !== 'analytic') throw new Error('fixture must be analytic');
+        if ('kind' in quad) throw new Error('fixture must be a primitive');
         quad.transform = { position: [2, 3, 4] };
 
         const p = runPlan(scene);
         const region = p.analyticObjects.find((o) => o.index === p.lights[0].regionId)!;
         expect(region.parameters.corner).toEqual([2, 7, 4]);
-        expect(p.lights[0].corner).toEqual([2, 7, 4]);
+        expect(p.lights[0].values.corner).toEqual([2, 7, 4]);
     });
 
     it('desugared __light_n materials are not re-registered by the sampleAsLight sweep', () => {
         const scene = baseScene();
-        scene.lights = [{ kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], intensity: 1 }];
+        scene.lights = [{ kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 1 }];
         const p = runPlan(scene);
         expect(p.lights).toHaveLength(1);   // exactly one entry, not two
     });
@@ -132,15 +131,15 @@ describe('sampleAsLight route (§6.2)', () => {
     it('both routes produce identical registry entries for the same physical emitter', () => {
         // Route A: explicit light. Route B: authored emissive quad object with the same Le.
         const sceneA = baseScene();
-        sceneA.lights = [{ kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], intensity: 4 }];
+        sceneA.lights = [{ kind: 'quad', corner: [0, 4, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 4 }];
         const sceneB = emissiveQuadScene(undefined);
         const a = runPlan(sceneA).lights[0];
         const b = runPlan(sceneB).lights[0];
-        const LeA = (a.color as Vec3).map((c) => c * a.intensity);
-        const LeB = (b.color as Vec3).map((c) => c * b.intensity);
+        const LeA = a.values.radiance;
+        const LeB = b.values.radiance;
         expect(LeA).toEqual(LeB);
-        expect(a.corner).toEqual(b.corner);
-        expect(a.edge1).toEqual(b.edge1);
-        expect(a.edge2).toEqual(b.edge2);
+        expect(a.values.corner).toEqual(b.values.corner);
+        expect(a.values.edge1).toEqual(b.values.edge1);
+        expect(a.values.edge2).toEqual(b.values.edge2);
     });
 });

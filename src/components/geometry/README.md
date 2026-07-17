@@ -21,10 +21,10 @@ lives in `index.ts` (`PRIMITIVES`).
 
 A primitive supplies:
 
-1. **GLSL** obeying the symbol contract — type-first, the ONE convention across
-   families (`lambert_eval`) — enforced by `tests/components/geometryContract.test.ts`:
-   - `struct <Type>` whose fields match the schema row by NAME, TYPE, and ORDER
-     (+ derived fields appended) — constructors are emitted positionally.
+1. **GLSL — FUNCTIONS ONLY** (the `struct <Type>` is GENERATED from the descriptor
+   rows, typedef-disciplined: point → `Point`, direction → `Direction`; declaring a
+   struct in the occupant file is a contract-test FAILURE). Type-first symbols, the
+   ONE convention across families (`lambert_eval`):
    - `float <type>_sdf(vec3 p, <Type>)` iff `provides.sdf` — the signed distance,
      ALSO the analytic backend's `scene_region_at` containment (one distance truth
      per primitive; the dichotomy: every primitive provides sdf XOR declares thin).
@@ -33,15 +33,22 @@ A primitive supplies:
    - `bool <type>_intersect(Ray ray, <Type>, out float t)` and
      `vec3 <type>_normal(vec3 p, <Type>)` iff `provides.analytic`.
 2. **A descriptor** (`PrimitiveDescriptor`, components/descriptors.ts): the schema
-   row (`params` — ROW ORDER = GLSL SIGNATURE ORDER; each param declares `kind`
-   (point | vector | direction | length — how it transforms under a similarity),
-   `shape`, `required`, `default`, `constraint`), the declared surface
+   row (`params` — ROW ORDER = GENERATED STRUCT FIELD ORDER = CTOR ORDER; each param
+   declares `kind` (point | vector | direction | length — how it transforms under a
+   similarity), `shape`, `required`, `default`, `constraint`), the declared surface
    (`provides.sdf` / `provides.analytic`), flat facts (`thin`, `samplableAsLight`),
-   and — only when genuinely irregular — `derivedCtorFields` (quad: the precompiled
-   one-sided normal, a compile-time literal shared with the quad light's sampler so
-   hit side and sample side agree bit-exactly) or a `fold` override (plane: the
-   transformed offset couples translation with the rotated normal).
-3. **One registry line** in `index.ts`.
+   and — only when genuinely irregular — the `derivedFields`/`derivedCtorFields`
+   pair (quad: the precompiled one-sided normal, a compile-time literal shared with
+   the quad light's sampler so hit side and sample side agree bit-exactly) or a
+   `fold` override (plane: the transformed offset couples translation with the
+   rotated normal).
+3. **One registry line** in `index.ts`. Nothing else — no type union (B1: object
+   `type` is a string; the registry + Validator gatekeep), no demo entry for compile
+   coverage (the kitchen-sink test synthesizes one from the registries).
+
+The compiler resolves each object's BACKEND (B1 — shape, not backend): analytic if
+`provides.analytic`, else sdf; a per-object `backend:` pin overrides for
+research/coverage (Validator-rejected if unhonorable).
 
 Everything mechanical is DERIVED from the row (`emitCtor`, `emitSdfCall`,
 `emitAnalyticTest`, `emitSignedDistance` in `index.ts`): formatting by shape, the
@@ -55,9 +62,6 @@ classification, region tables ("descriptors declare facts; generators decide").
 1. `geometry/<type>/<type>.glsl` — the math, per the symbol contract.
 2. `geometry/<type>/<type>.ts` — the descriptor.
 3. One line in `index.ts` (`PRIMITIVES`).
-4. One word in the compiler's type union (`StandardSDF` / `StandardAnalytic` +
-   `PlannedSDFObject.sdfType` / `PlannedAnalyticObject.shapeType`) — unions are input
-   vocabulary, not registry shadows (reject-not-remove).
 
 Placement (constant folds, wrapper tiers, driven uniforms), regions, and epsilons
 come free — the wrapper machinery is placement-generic.

@@ -31,8 +31,7 @@ export const cornellArea: SceneDescription = {
             corner: [-0.5, 1.98, -0.5],
             edge1: [1.0, 0.0, 0.0],
             edge2: [0.0, 0.0, 1.0],
-            intensity: 15.0,
-            color: [1.0, 1.0, 1.0],
+            emission: 15.0,
         },
     ],
 };
@@ -143,10 +142,7 @@ export const fogPanel: SceneDescription = {
     objects: [
         ...fogArea.objects,
         {
-            kind: 'analytic',
-            // Vertical panel mid-box, normal cross(e1,e2) = +z (toward the camera); the back
-            // face looks into the fog toward the rear wall.
-            shape: { type: 'quad', parameters: { corner: [-0.4, 0.5, 0.2], edge1: [0.8, 0.0, 0.0], edge2: [0.0, 0.8, 0.0] } },
+            type: 'quad', parameters: { corner: [-0.4, 0.5, 0.2], edge1: [0.8, 0.0, 0.0], edge2: [0.0, 0.8, 0.0] },
             material: 'panel',
         },
     ],
@@ -167,28 +163,24 @@ export const orbScene: SceneDescription = {
     objects: [
         // Floor
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 },
             material: 'ground',
         },
         // The light: an ANALYTIC emissive sphere — sampleAsLight defaults true for this shape,
         // so it enters the registry with no explicit flag (the second authoring route).
         {
-            kind: 'analytic',
-            shape: { type: 'sphere', parameters: { center: [0.0, 1.6, 0.0], radius: 0.25 } },
+            type: 'sphere', parameters: { center: [0.0, 1.6, 0.0], radius: 0.25 },
             material: 'glow',
         },
         // A matte box for soft-shadow display
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [-0.7, 0.4, 0.0], halfSize: [0.35, 0.4, 0.35] } },
+            type: 'box', parameters: { center: [-0.7, 0.4, 0.0], halfSize: [0.35, 0.4, 0.35] },
             material: 'slate',
         },
         // A glass sphere — the orb must appear in its reflections (hittable-emitter invariant),
         // and specular chains exercise prev_was_delta → full-weight emission after delta.
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [0.75, 0.45, 0.35], radius: 0.45 } },
+            type: 'sphere', parameters: { center: [0.75, 0.45, 0.35], radius: 0.45 },
             material: 'glass',
         },
     ],

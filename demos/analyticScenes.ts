@@ -17,15 +17,15 @@ export const mixedScene: SceneDescription = {
     name: 'Mixed backends (analytic floor + SDF & analytic spheres)',
     ambientSpace: { type: 'euclidean' },
     objects: [
-        { kind: 'analytic', shape: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'ground' },
-        { kind: 'sdf', sdf: { type: 'sphere', parameters: { center: [-1.2, 0, 0], radius: 1.0 } }, material: 'red' },
-        { kind: 'analytic', shape: { type: 'sphere', parameters: { center: [1.2, 0, 0], radius: 1.0 } }, material: 'blue' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'ground' },
+        { type: 'sphere', parameters: { center: [-1.2, 0, 0], radius: 1.0 }, material: 'red' },
+        { type: 'sphere', parameters: { center: [1.2, 0, 0], radius: 1.0 }, material: 'blue' },
     ],
     materials: {
         ground: { model: 'lambert', albedo: [0.6, 0.6, 0.6] },
         red: { model: 'lambert', albedo: [0.9, 0.2, 0.2] },   // SDF sphere
         blue: { model: 'lambert', albedo: [0.2, 0.3, 0.9] },  // analytic sphere
     },
-    lights: [{ kind: 'point', position: [2, 5, 3], intensity: 40.0, color: [1.0, 1.0, 1.0] }],
+    lights: [{ kind: 'point', position: [2, 5, 3], emission: 40 }],
     environment: { type: 'constant', color: [0.08, 0.12, 0.2], intensity: 1.0 },
 };

@@ -2,13 +2,8 @@
 // The struct is the shape's record (house convention — MaterialProperties/MediumProperties
 // pattern); call sites construct it from compile-time literals (constant placement) or
 // s-scaled expressions (driven rigid frame, fable-transforms §6.1).
-// Provides: struct Sphere, sphere_sdf() (signed distance — also the analytic backend's
+// Provides (struct GENERATED from descriptor rows — A1): sphere_sdf() (signed distance — also the analytic backend's
 // containment query), sphere_intersect() (closed-form intersection), sphere_normal().
-
-struct Sphere {
-    vec3 center;
-    float radius;
-};
 
 float sphere_sdf(vec3 p, Sphere sp) {
     return length(p - sp.center) - sp.radius;

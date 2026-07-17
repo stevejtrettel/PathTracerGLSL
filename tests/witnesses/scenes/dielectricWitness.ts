@@ -24,14 +24,12 @@ export const etaScene: SceneDescription = {
     objects: [
         // Water half-space below y = 0 (sdf = p.y)
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 },
             material: 'water',
         },
         // Emissive plane INSIDE the water: solid below y = -1 (sdf = p.y + 1)
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 },
             material: 'glow',
         },
     ],
@@ -72,24 +70,22 @@ function cornellGlassObjects(glassKind: 'sdf' | 'analytic'): SceneDescription['o
     const glassSphere: SceneDescription['objects'][number] =
         glassKind === 'sdf'
             ? {
-                  kind: 'sdf',
-                  sdf: { type: 'sphere', parameters: { ...GLASS_SPHERE } },
+                  type: 'sphere', parameters: { ...GLASS_SPHERE },
                   material: 'glass',
               }
             : {
-                  kind: 'analytic',
-                  shape: { type: 'sphere', parameters: { ...GLASS_SPHERE } },
+                  type: 'sphere', parameters: { ...GLASS_SPHERE },
                   material: 'glass',
               };
 
     return [
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } }, material: 'white' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, -1, 0], offset: 2.0 } }, material: 'white' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.0 } }, material: 'white' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [1, 0, 0], offset: 1.5 } }, material: 'red' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 1.5 } }, material: 'green' },
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, -1], offset: 5.0 } }, material: 'white' },
-        { kind: 'sdf', sdf: { type: 'box', parameters: { center: [-0.5, 0.6, -0.5], halfSize: [0.3, 0.6, 0.3] } }, material: 'white' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 }, material: 'white' },
+        { type: 'plane', parameters: { normal: [0, -1, 0], offset: 2.0 }, material: 'white' },
+        { type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.0 }, material: 'white' },
+        { type: 'plane', parameters: { normal: [1, 0, 0], offset: 1.5 }, material: 'red' },
+        { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 1.5 }, material: 'green' },
+        { type: 'plane', parameters: { normal: [0, 0, -1], offset: 5.0 }, material: 'white' },
+        { type: 'box', parameters: { center: [-0.5, 0.6, -0.5], halfSize: [0.3, 0.6, 0.3] }, material: 'white' },
         glassSphere,
     ];
 }
@@ -107,7 +103,7 @@ export const cornellGlass: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: cornellGlassObjects('sdf'),
     materials: cornellGlassMaterials,
-    lights: [{ kind: 'point', position: [0, 1.9, 0], intensity: 15.0, color: [1.0, 1.0, 1.0] }],
+    lights: [{ kind: 'point', position: [0, 1.9, 0], emission: 15 }],
 };
 
 export const analyticGlass: SceneDescription = {

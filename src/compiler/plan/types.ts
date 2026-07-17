@@ -185,7 +185,11 @@ export interface PlannedPipeline {
 export interface PlannedSDFObject {
     index: number;
     materialId: number;
-    sdfType: 'sphere' | 'plane' | 'box' | 'cylinder' | 'torus' | 'capsule';
+    sdfType: string;   // registry-validated upstream (A2)
+    /** Authored provenance name (naming batch N5): flows into emitted symbols
+     *  (`sdf_<name>`, hoisted shape consts) after sanitization + dedup. Optional,
+     *  collision-legal (fable-transforms §7.6) — unnamed objects emit `object_<i>`. */
+    name?: string;
     parameters: Record<string, number | number[]>;
     /** Constant: composed local→world similarity (fable-transforms §5.2; any local
      *  'center' folded in as a pre-translation) lowered to wrapper tiers. Driven
@@ -202,7 +206,9 @@ export interface PlannedSDFObject {
 export interface PlannedAnalyticObject {
     index: number;
     materialId: number;
-    shapeType: 'sphere' | 'plane' | 'quad';
+    shapeType: string;   // registry-validated upstream (A2)
+    /** Authored provenance name (naming batch N5) — see PlannedSDFObject.name. */
+    name?: string;
     parameters: Record<string, number | number[]>;
     /** Present ONLY for driven placement (§6): parameters are then LOCAL (unfolded)
      *  and the generated arm conjugates the ray into the rigid frame. Constant
@@ -250,20 +256,20 @@ export interface PlannedMaterial {
  * synthesized emissive region + one of these; sampleAsLight emitters contribute one per
  * region (two objects sharing an emissive material = two lights). Registry order = light id
  * = CDF order. Delta kinds carry no region.
+ *
+ * Shaped like PlannedMaterial (struct-alignment batch): `values` holds exactly the
+ * kind descriptor's rows, keyed by row name — point: position/intensity (radiant
+ * intensity = color·intensity, W/sr); quad: corner/edge1/edge2/radiance;
+ * sphere: center/radius/radiance. Radiometric products are computed ONCE here (the
+ * old color×intensity factoring died with the loose-arg emitters).
  */
 export interface PlannedLight {
     id: number;
-    kind: 'point' | 'directional' | 'quad' | 'sphere';
-    position?: Vec3;      // point; sphere center
-    direction?: Vec3;     // directional (rejected in v1)
-    corner?: Vec3;        // quad
-    edge1?: Vec3;
-    edge2?: Vec3;
-    radius?: number;      // sphere
+    /** Registry key (registry-validated — A3; 'directional' is Validator-rejected input). */
+    kind: string;
+    values: Record<string, number | number[]>;
     /** The emitter's region id (quad/sphere) — feeds the generated light_of table. */
     regionId?: number;
-    intensity: number;
-    color: Vec3;
 }
 
 /**

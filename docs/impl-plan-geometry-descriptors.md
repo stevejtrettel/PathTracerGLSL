@@ -1,6 +1,6 @@
 # Implementation plan: geometry primitive descriptors
 
-**Status: OWNER-APPROVED July 16 2026, building.** Review amendments: NO byte-
+**Status: BUILT July 16–17 2026 (build record at the end). GPU sweep owner-pending.** Review amendments: NO byte-
 identity gate (proof = tsc + vitest with re-goldened snapshots + glslang + the full
 witness sweep — the numbers are the truth); defaults-in-rows approved; stage 3
 (cylinder) approved. Without the byte gate the two stages collapse into ONE build
@@ -195,3 +195,35 @@ would land); mesh backend (a third backend slot on the descriptor — the shape 
 ready, nothing built); torus/capsule bodies; `scales`-driven UBO/table packing
 (batch-codegen era); naming-batch items P1–P3; symbol-contract tests for the other
 families (naming batch).
+
+
+---
+
+## BUILD RECORD (July 17 2026 close-out)
+
+Executed beyond the plan by owner decisions during the build; the deltas:
+
+- **Struct-shaped GLSL** (owner-decided mid-batch), then superseded by **A1: structs
+  GENERATED from the descriptor rows** — occupant `.glsl` files declare functions
+  only; `structFromRows` emits typedef-disciplined structs (point→Point,
+  direction→Direction). The §2.6 symbol test evolved into the full contract test:
+  provides↔symbols both directions, the sdf-XOR-thin dichotomy, kind⇒shape,
+  derivedFields↔derivedCtorFields agreement, and NO-struct-in-occupant.
+- **Kinds (T1–T5)**: `ParamKind` drives BOTH the similarity folds and driven ×s
+  scaling; sphere/quad hand folds DELETED (18 boxless snapshot cases byte-identical
+  proved the derivation); plane keeps the one coupled override. Flat descriptor
+  facts (`provides`/`thin`/`samplableAsLight`); `half_size`→`halfSize` (field name
+  = row name, verbatim).
+- **Symbol rename** (owner-ordered): type-first — `<type>_sdf` / `<type>_intersect`
+  / `<type>_normal`; rename-only churn verified byte-exact against a preserved
+  baseline.
+- **Stage 3 (cylinder) PASSED as the door test**: math + rows + registry line;
+  no axis param (orientation is placement); registry kitchen-sink test (A4) now
+  compile-covers new occupants automatically, so no demo entry is even required.
+- **§2.5 consumer migrations went FURTHER than planned**: the SDF point-fold derives
+  from kinds (magic `center` name + plane type-check dead); `foldAnalyticParameters`
+  takes any registered type; the type unions were then deleted entirely (A2 — the
+  registry is the gatekeeper; the plan's "unions are input vocabulary" stance was
+  superseded by the owner's B1 decision).
+- **Proof regime**: as amended (no byte gate) — tsc + vitest with re-goldened
+  snapshots + glslang; the FULL witness sweep is owner-run and pending at close-out.

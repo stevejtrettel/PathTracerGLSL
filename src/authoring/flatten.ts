@@ -60,7 +60,7 @@ export function flattenGroups(nodes: SceneNode[]): ObjectDescription[] {
 
 function walk(nodes: SceneNode[], parent: Similarity, path: string[], out: ObjectDescription[]): void {
     nodes.forEach((node, i) => {
-        if (node.kind === 'group') {
+        if ('kind' in node && node.kind === 'group') {
             const label = [...path, node.name ?? `#${i}`];
             if (isDrivenTransform(node.transform)) {
                 throw new Error(
@@ -84,19 +84,18 @@ function walk(nodes: SceneNode[], parent: Similarity, path: string[], out: Objec
                     + `C·TRS(param) (fable-transforms §4); place it outside the transformed group or `
                     + `wait for the runtime graph`);
             }
-            out.push(atRoot ? node : { ...node, name: node.name ?? [...path, `#${i}`].join('/') });
+            out.push(atRoot ? (node as ObjectDescription) : { ...(node as ObjectDescription), name: node.name ?? [...path, `#${i}`].join('/') });
             return;
         }
 
         if (atRoot) {
-            out.push(node);   // identity pass-through, by reference
+            out.push(node as ObjectDescription);   // identity pass-through, by reference
             return;
         }
 
         const composed = similarityCompose(parent, similarityFromTransform(node.transform));
         out.push({
-            ...node,
-            transform: transformFromSimilarity(composed),
+            ...(node as ObjectDescription),            transform: transformFromSimilarity(composed),
             name: node.name ?? [...path, `#${i}`].join('/'),
         });
     });

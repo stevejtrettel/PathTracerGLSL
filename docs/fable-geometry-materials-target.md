@@ -1,7 +1,6 @@
 # Geometry & materials: the target shape, before and after the compiler
 
-**Status: PROPOSAL — owner-commissioned July 16 2026, drafted after a full read of the
-current code. Not design authority until the owner says so.** Tags: **[BUILT]**,
+**Status: owner-commissioned July 16 2026; REFRESHED at the July 17 close-out — nearly everything below is now BUILT (kinds, symbol rename, cylinder, materials-§7 reorg, naming, lights struct-alignment, generated structs A1, shape-not-backend B1, emission B2). Verification: vitest + glslang; the GPU sweep over the batch set is owner-run. Current worked examples live in fable-component-system.md.** Tags: **[BUILT]**,
 **[APPROVED]** (owner-decided, not yet executed), **[ASPIRATIONAL]** (proposed,
 undecided). Every emitted-GLSL example below is copied from the real snapshot suite
 (`tests/compiler/__snapshots__/generated-glsl.snapshot.test.ts.snap`, the `mixed`
@@ -33,15 +32,15 @@ Two multiplicities decide the emitted shape:
 ```ts
 objects: [
     // SDF box, constant placement (translation folds into the wrapper)
-    { kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: [0.3, 0.6, 0.3] } },
-      material: 'white', transform: { position: [-0.5, 0.6, -0.5] } },
+    { type: 'box', parameters: { halfSize: [0.3, 0.6, 0.3] },
+      material: 'white', transform: { position: [-0.5, 0.6, -0.5] } },   // sdf-only → marcher
 
     // analytic glass sphere, constant (transform would fold into the parameters)
-    { kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0.35, 1.0, 0.3], radius: 0.5 } },
-      material: 'glass' },
+    { type: 'sphere', parameters: { center: [0.35, 1.0, 0.3], radius: 0.5 },
+      material: 'glass' },   // auto → analytic (B1: shape, not backend; `backend:` pins for research)
 
     // driven: sliders move it with ZERO recompiles
-    { kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 0.4 } }, material: 'clay',
+    { type: 'sphere', parameters: { radius: 0.4 }, material: 'clay', backend: 'sdf',
       transform: { position: { param: 'ball.position', default: [0, 1, 0] },
                    rotation: { axis: [0, 1, 0], angle: { param: 'ball.theta', default: 0 } } } },
 ]
@@ -94,7 +93,7 @@ vec3 sphere_normal(vec3 p, Sphere sp) {
 | `<type>_normal(p, T)` | iff analytic | analytic hit frames |
 | `<type>_uv(p, T)` | future slot | today hit.uv is a hardcoded planar map |
 
-**The sdf slot's three clauses [APPROVED Jul 16 — the region_T slot is CUT; sdf is
+**The sdf slot's three clauses [BUILT — the region_T slot is CUT; sdf is
 the sole containment provider]:** (1) sign is containment truth everywhere;
 (2) magnitude never overestimates world distance (marching validity); (3) magnitude
 ≈ true world distance near the surface (epsilon discipline; §2.7 innermost-wins
@@ -180,7 +179,7 @@ int scene_region_at(vec3 p) {
     int region = -1;
     float best = -1.0e20;
     float d;
-    d = sdf_object_6(p);
+    d = sdf_object_6(p);   // (named objects emit sdf_<name> — N5)
     if (d < 0.0 && d > best) { best = d; region = 6; }
     d = sphere_sdf(p, Sphere(vec3(0.35, 1.0, 0.3), 0.5));   // analytic containment = same sdf
     if (d < 0.0 && d > best) { best = d; region = 7; }
@@ -213,7 +212,7 @@ The full placement tier table (the shape's math never knows its tier):
 | driven | rigid-frame ABI; length-like params × s in-shader | `Sphere(s * vec3(0.0), s * 0.4)` |
 | batch [ASPIRATIONAL] | UBO table, one loop per homogeneous batch | `u_spheres[i]` |
 
-**[ASPIRATIONAL — naming batch]** same code, named after the authored objects:
+**[BUILT — naming N5]** same code, named after the authored objects (struct consts hoisted for named constant objects):
 
 ```glsl
 const Sphere glass_ball = Sphere(vec3(0.35, 1.0, 0.3), 0.5);   // once, referenced everywhere
@@ -273,7 +272,7 @@ export const lambertDescriptor: MaterialModelDescriptor = {
 };
 ```
 
-**[ASPIRATIONAL — module-anatomy §7: materials adopt geometry's TS half.]** Today
+**[BUILT Jul 17 — the materials-§7 reorg]** Formerly:
 `source:` must name one of six fields hardcoded in `PlannedMaterial`, the Planner
 resolves all six for every material, and defaults live twice (Planner number +
 schema string). Target: **the schema rows ARE the property vocabulary** — an open
@@ -358,19 +357,26 @@ fields (`ior_of` in §1.3 — the far side of a boundary has no shading point).
 
 Media are the second tenant of the materials pattern (`MediumProperties`, same
 schema machinery) **[BUILT]**. Lights are the known deviant — samplers still take
-loose args; struct-aligning them is flagged, unscheduled **[ASPIRATIONAL]**.
+loose args — **struct-aligned + door-finished Jul 17** (PointLight/QuadLight/SphereLight, adjacent sampler/pdf functions, descriptor desugar facts).
 
 ---
 
-## 4. Ledger
+## 4. Ledger (as of the July 17 close-out)
 
-**[BUILT]** §1.1, §1.3 through the driven tier, §2.1, §2.2's GLSL half, §2.3, media.
-**[APPROVED, not executed]** T1–T5 descriptor kinds (STOP 1 owner file review,
-STOP 2 owner-called sweep); sdf-only containment (region_T cut, approx-sdf
-ellipsoid); cylinder only after the owner declares the system done.
-**[ASPIRATIONAL]** materials TS-half reorg (module-anatomy §7 — after geometry +
-naming); named emitted symbols (naming batch); batch/UBO tier; mesh backend; `T_uv`;
-marched-hit exact normals via `T_normal`; gradient-fallback normals.
+**[BUILT]** everything above except the items below — including, since the original
+draft: descriptor kinds (T1–T5), type-first symbols, cylinder, generated structs
+from rows (A1 — occupant GLSL declares functions only), the death of every
+registry-shadow type union (A2), the lights door (A3 desugar facts), the registry
+kitchen-sink compile test (A4), open material vocabulary (A6), shape-not-backend
+(B1 — `backend:` pins remain on minimal + submerged as deliberate marcher
+coverage), and one authored radiometric word (B2 `emission`; the environment's
+`intensity` survives as the live slider).
+**[ASPIRATIONAL]** batch/UBO tier; mesh backend; `T_uv` + the ShadingPoint property
+signature (one coupled design); marched-hit exact normals via `T_normal`;
+gradient-fallback normals; `Value<T>` light params (the light structs are now the
+ABI for it); C2 default-assignment elision in the material lookup; nested-vs-flat
+authored records (authoring-language-era); the `LightDescription` input union
+(per-kind — the authoring language's business).
 
-**Standing debt gating everything:** the struct-shaped geometry state is
-GPU-unswept; the sweep is the owner's call.
+**Verification state:** vitest (824) + glslang (every pair + the kitchen sink);
+the GPU witness sweep over the whole batch set is owner-run and pending.

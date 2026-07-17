@@ -11,6 +11,14 @@ import type { SceneSuiteEntry } from '../tests/witnesses/types.js';
 export type { SceneSuiteEntry };
 export { witnessSuite, demoSuite };
 
+// A demo key colliding with a witness key would silently WIN in this merge (audit
+// P5) — fail loudly instead; suiteIntegrity.test.ts enforces the same rule statically.
+for (const key of Object.keys(demoSuite)) {
+    if (key in witnessSuite) {
+        throw new Error(`registry: demo scene id '${key}' collides with a witness scene id — the merge would silently shadow the witness`);
+    }
+}
+
 export const sceneSuite: Record<string, SceneSuiteEntry> = {
     ...witnessSuite,
     ...demoSuite,

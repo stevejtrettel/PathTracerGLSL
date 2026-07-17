@@ -13,18 +13,15 @@ export const skyScene: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: [
         {
-            kind: 'analytic',
-            shape: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0 },
             material: 'ground',
         },
         {
-            kind: 'analytic',
-            shape: { type: 'sphere', parameters: { center: [0, 1, 0], radius: 1 } },
+            type: 'sphere', parameters: { center: [0, 1, 0], radius: 1 },
             material: 'clay',
         },
         {
-            kind: 'analytic',
-            shape: { type: 'sphere', parameters: { center: [2.2, 0.7, -0.5], radius: 0.7 } },
+            type: 'sphere', parameters: { center: [2.2, 0.7, -0.5], radius: 0.7 },
             material: 'glass',
         },
     ],
@@ -87,8 +84,7 @@ export const furnaceSkyScene: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: [
         {
-            kind: 'analytic',
-            shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 } },
+            type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 },
             material: 'gray',
         },
     ],
@@ -142,8 +138,7 @@ export const skyLampScene: SceneDescription = {
             corner: [-1.6, 2.5, -1.0],
             edge1: [0.8, 0.0, 0.0],
             edge2: [0.0, 0.0, 0.8],
-            intensity: 40.0,
-            color: [1.0, 0.85, 0.6],
+            emission: [40, 34, 24],
         },
     ],
 };

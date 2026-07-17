@@ -1,13 +1,8 @@
 // Plane — one primitive, both backends' math (included wholesale when present, §2.12).
 // Convention: the surface dot(p, normal) + offset = 0, normal unit (canonicalPlane
 // normalizes at plan time — the SDF expression is a true distance bound only then).
-// Provides: struct Plane, plane_sdf() (signed distance / containment), plane_intersect(),
+// Provides (struct GENERATED from descriptor rows — A1): plane_sdf() (signed distance / containment), plane_intersect(),
 // plane_normal().
-
-struct Plane {
-    vec3 normal;
-    float offset;
-};
 
 float plane_sdf(vec3 p, Plane pl) {
     return dot(p, pl.normal) + pl.offset;

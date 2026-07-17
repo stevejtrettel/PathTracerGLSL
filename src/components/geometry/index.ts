@@ -54,6 +54,18 @@ export function structName(d: PrimitiveDescriptor): string {
     return d.type[0].toUpperCase() + d.type.slice(1);
 }
 
+/** Backend resolution (B1 — shape, not backend): auto = analytic if provided, else
+ *  sdf; an explicit pin wins (the Validator rejects pins the primitive can't honor).
+ *  undefined = unregistered type or unhonorable pin — callers diagnose. */
+export function resolveBackend(type: string, pin?: 'sdf' | 'analytic'): 'sdf' | 'analytic' | undefined {
+    const d = PRIMITIVES[type];
+    if (d === undefined) return undefined;
+    if (pin !== undefined) {
+        return (pin === 'sdf' ? d.provides.sdf : d.provides.analytic) ? pin : undefined;
+    }
+    return d.provides.analytic ? 'analytic' : 'sdf';
+}
+
 // ============================================================================
 // Derived emission (the schema row IS the struct)
 // ============================================================================

@@ -3,6 +3,7 @@
 import type { SceneDescription, MaterialProperty } from '../types.js';
 import { isGlslExpression } from '../types.js';
 import type { SceneFeatures } from './types.js';
+import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
 
 /** A medium coefficient is "possibly nonzero" if it's a nonzero constant or {param}-driven
  *  (a live parameter can become nonzero at runtime, so the code path must exist). */
@@ -27,12 +28,14 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     let analyticCount = 0;
     let meshCount = 0;
 
+    // Backend is RESOLVED, not authored (B1): analytic if the primitive provides it,
+    // else sdf; per-object pins override. Unregistered types count nowhere — the
+    // Planner diagnoses them.
     for (const obj of scene.objects) {
-        switch (obj.kind) {
-            case 'sdf': sdfCount++; break;
-            case 'analytic': analyticCount++; break;
-            case 'mesh': meshCount++; break;
-        }
+        if ('kind' in obj) { meshCount++; continue; }
+        const backend = resolveBackend(obj.type, obj.backend);
+        if (backend === 'sdf') sdfCount++;
+        else if (backend === 'analytic') analyticCount++;
     }
 
     // --- Materials ---
@@ -87,8 +90,9 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     // emitters stay path-only under the default (explicit `true` on those is a Validator error).
     let samplableEmitterCount = 0;
     for (const obj of scene.objects) {
-        if (obj.kind !== 'analytic') continue;
-        if (obj.shape.type !== 'quad' && obj.shape.type !== 'sphere') continue;
+        if ('kind' in obj) continue;
+        if (resolveBackend(obj.type, obj.backend) !== 'analytic') continue;
+        if (PRIMITIVES[obj.type]?.samplableAsLight !== true) continue;
         const mat = scene.materials[obj.material];
         if (mat === undefined || mat.sampleAsLight === false) continue;
         if (isConstantNonzero(mat.emission)) samplableEmitterCount++;

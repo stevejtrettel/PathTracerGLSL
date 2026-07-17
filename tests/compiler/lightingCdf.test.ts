@@ -7,11 +7,11 @@ import { lightPower, computeSelectPdf } from '../../src/compiler/generate/featur
 import type { PlannedLight } from '../../src/compiler/plan/types.js';
 
 const point = (intensity: number, color: [number, number, number] = [1, 1, 1]): PlannedLight =>
-    ({ id: 0, kind: 'point', position: [0, 5, 0], intensity, color });
+    ({ id: 0, kind: "point", values: { position: [0, 5, 0], intensity: [color[0] * intensity, color[1] * intensity, color[2] * intensity] } });
 const quad = (intensity: number, e1: [number, number, number], e2: [number, number, number]): PlannedLight =>
-    ({ id: 0, kind: 'quad', regionId: 0, corner: [0, 0, 0], edge1: e1, edge2: e2, intensity, color: [1, 1, 1] });
+    ({ id: 0, kind: "quad", regionId: 0, values: { corner: [0, 0, 0], edge1: e1, edge2: e2, radiance: [intensity, intensity, intensity] } });
 const sphere = (intensity: number, radius: number): PlannedLight =>
-    ({ id: 0, kind: 'sphere', regionId: 0, position: [0, 0, 0], radius, intensity, color: [1, 1, 1] });
+    ({ id: 0, kind: "sphere", regionId: 0, values: { center: [0, 0, 0], radius, radiance: [intensity, intensity, intensity] } });
 
 describe('lightPower — pbrt PowerLightSampler formulas', () => {
     it('point: 4π · avg(color·intensity)', () => {

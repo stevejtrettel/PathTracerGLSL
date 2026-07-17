@@ -16,24 +16,6 @@
 import { describe, it, expect } from 'vitest';
 import { PRIMITIVES, structName } from '../../src/components/geometry/index.js';
 
-/** Struct body → ordered (glslType, name) pairs, comments stripped. */
-function parseStructFields(glsl: string, sn: string): Array<{ glslType: string; name: string }> {
-    const m = glsl.match(new RegExp(`struct\\s+${sn}\\s*\\{([^}]*)\\}`));
-    expect(m, `struct ${sn} declaration`).toBeTruthy();
-    const body = m![1].replace(/\/\/[^\n]*/g, '');
-    return body
-        .split(';')
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((decl) => {
-            const fm = decl.match(/^(\w+)\s+(\w+)$/);
-            expect(fm, `well-formed field declaration '${decl}' in struct ${sn}`).toBeTruthy();
-            return { glslType: fm![1], name: fm![2] };
-        });
-}
-
-const shapeToGlsl = { number: 'float', vec3: 'vec3' } as const;
-
 describe('geometry primitive descriptors (struct + symbol contract)', () => {
     for (const [key, d] of Object.entries(PRIMITIVES)) {
         const sn = structName(d);
@@ -62,22 +44,19 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                 }
             });
 
-            it(`struct ${sn} fields match the row — names, types, AND order`, () => {
-                const fields = parseStructFields(d.glsl, sn);
+            it(`glsl does NOT declare struct ${sn} (generated from the rows — A1)`, () => {
+                expect(new RegExp(`struct\\s+${sn}\\s*\\{`).test(d.glsl)).toBe(false);
+            });
+
+            it('derivedFields declarations match derivedCtorFields output (count + shapes)', () => {
                 const resolved = Object.fromEntries(
                     d.params.map((p) => [p.name, p.default ?? (p.shape === 'vec3' ? [1, 0, 0] : 1)]),
                 );
-                const derived = d.derivedCtorFields?.(resolved) ?? [];
-                expect(fields.length).toBe(d.params.length + derived.length);
-                // Row fields: positional emission makes name+type+order all load-bearing.
-                d.params.forEach((p, i) => {
-                    expect(fields[i].name, `field ${i} of ${sn}`).toBe(p.name);
-                    expect(fields[i].glslType, `field '${p.name}' of ${sn}`).toBe(shapeToGlsl[p.shape]);
-                });
-                // Derived fields: appended after the row; types inferred from the values.
-                derived.forEach((v, j) => {
-                    const expected = Array.isArray(v) ? 'vec3' : 'float';
-                    expect(fields[d.params.length + j].glslType, `derived field ${j} of ${sn}`).toBe(expected);
+                const values = d.derivedCtorFields?.(resolved) ?? [];
+                const specs = d.derivedFields ?? [];
+                expect(values.length, 'derivedFields ↔ derivedCtorFields length').toBe(specs.length);
+                values.forEach((v, j) => {
+                    expect(Array.isArray(v) ? 'vec3' : 'number', `derived '${specs[j].name}'`).toBe(specs[j].shape);
                 });
             });
 

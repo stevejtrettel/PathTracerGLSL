@@ -84,26 +84,30 @@ export type EnvironmentDescription =
       };
 
 // --- Objects ---
+// SHAPE, NOT BACKEND (B1, owner-decided Jul 17 2026): an object describes geometry;
+// the COMPILER picks the engine — analytic if the primitive provides it, sdf
+// otherwise. Backend choice is computation (both engines converge to the same image
+// — the cross-backend twins verify it), so it left the measurement description; the
+// optional `backend` pin remains as per-object research/coverage annotation
+// (computation metadata riding in the scene like `name` does).
 
-export type ObjectDescription = SDFObject | AnalyticObject | MeshObject;
+export type ObjectDescription = PrimitiveObject | MeshObject;
 
-export interface SDFObject {
-    kind: 'sdf';
-    sdf: StandardSDF | CustomSDF;
+export interface PrimitiveObject {
+    /** Primitive type — registry-validated (unknown types get a diagnostic listing
+     *  the available set; adding a primitive touches NO type union). */
+    type: string;
+    parameters: Record<string, number | number[]>;
     material: string;
     transform?: Transform;
-    /** Provenance only (never identity): diagnostics label; `flattenGroups` stamps the
-     *  authoring-tree node path here (fable-transforms §3). */
+    /** Provenance only (never identity): diagnostics label + emitted symbol names;
+     *  `flattenGroups` stamps the authoring-tree node path here (fable-transforms §3). */
     name?: string;
-}
-
-export interface AnalyticObject {
-    kind: 'analytic';
-    shape: StandardAnalytic;
-    material: string;
-    transform?: Transform;
-    /** Provenance only (never identity) — see SDFObject.name. */
-    name?: string;
+    /** RESEARCH PIN: force an engine (Validator-rejected if the primitive does not
+     *  provide it). Absent = auto — analytic if provided, else sdf. Used by the
+     *  cross-backend coverage twins (minimal, submerged) to keep the marcher
+     *  exercised on primitives that would otherwise resolve analytic. */
+    backend?: 'sdf' | 'analytic';
 }
 
 export interface MeshObject {
@@ -111,24 +115,17 @@ export interface MeshObject {
     data: Float32Array;
     material: string;
     transform?: Transform;
-    /** Provenance only (never identity) — see SDFObject.name. */
+    /** Provenance only (never identity) — see PrimitiveObject.name. */
     name?: string;
 }
 
-export interface StandardSDF {
-    type: 'sphere' | 'plane' | 'box' | 'cylinder' | 'torus' | 'capsule';
-    parameters: Record<string, number | number[]>;
-}
-
+/** RESERVED (future custom-geometry door): a user-authored per-object body filling
+ *  the same compiled surface (sdf_object_i / analytic arm). Not in ObjectDescription
+ *  yet — the target doc's §1.3 sketches the contract it must declare. */
 export interface CustomSDF {
     type: 'custom';
     glsl: string;
     imports?: string[];
-}
-
-export interface StandardAnalytic {
-    type: 'sphere' | 'plane' | 'quad';
-    parameters: Record<string, number | number[]>;
 }
 
 /** Axis-angle rotation (radians). The axis need not be unit; zero axis is rejected.
@@ -226,7 +223,9 @@ export interface MediumDescription {
     /** The volume's scattering model (which phase function). Default 'hg'. 'rayleigh' is
      *  parameter-free (molecular/sky; its λ⁻⁴ color is σ_s); 'draine' is approx-Mie for
      *  fog/cloud droplets. Registry: volume_scattering/. */
-    model?: 'hg' | 'rayleigh' | 'draine';
+    /** Volume scattering model — registry-validated (A2: unknown models get a
+     *  Validator diagnostic; adding a phase model touches no union). Default 'hg'. */
+    model?: string;
 }
 
 export interface MaterialDescription {
@@ -245,39 +244,57 @@ export interface MaterialDescription {
      * shapes `true` is a Validator error (V1-C2) — emissive SDFs stay path-only and still glow.
      */
     sampleAsLight?: boolean;
+    /**
+     * OPEN VOCABULARY (A6, materials-§7): the legal property keys are the model's
+     * SCHEMA ROWS, not this interface — a new model's new property (`sheen: 0.7`)
+     * is authored directly; the Validator warns on keys no present model declares.
+     * The named fields above are the current models' properties, kept for
+     * autocomplete/docs. Meta-keys (model/medium/sampleAsLight) are reserved
+     * (registry-test-enforced against row-source collisions).
+     */
+    [key: string]: MaterialProperty | MaterialModel | MediumDescription | boolean | undefined;
 }
 
 // --- Lights ---
+// ONE radiometric authoring word (B2, owner-decided Jul 17 2026): `emission`, the
+// same word materials use — a Spectrum (scalar broadcasts). Area emitters author
+// emitted RADIANCE Le (shared EXACTLY with the desugared region's material emission
+// — the pt ≡ pt-nee invariant is now visibly one field); delta lights author
+// RADIANT INTENSITY I (W/sr; a delta has no radiance — standard convention).
+// Human conveniences (power in watts, color temperature) belong to the AUTHORING
+// layer, which knows the object: power is per-OBJECT (Φ/(π·A) needs an area), so it
+// can never be a material/IR quantity. The intensity×color factoring died here.
+// (The ENVIRONMENT's `intensity` is different — a LIVE runtime multiplier slider,
+// not authored factoring — and deliberately survives.)
 
 export type LightDescription = PointLight | DirectionalLight | QuadLight | SphereLight;
 
 export interface PointLight {
     kind: 'point';
     position: Vec3;
-    intensity: number;
-    color?: Vec3;
+    /** Radiant intensity I (W/sr); scalar broadcasts. */
+    emission: number | Vec3;
 }
 
 export interface DirectionalLight {
     kind: 'directional';
     direction: Vec3;
-    intensity: number;
-    color?: Vec3;
+    emission: number | Vec3;
 }
 
 /**
  * Rectangular area light (§6.2): DESUGARS to a synthesized emissive quad region — hittable,
  * visible in reflections, samplable via the registry. ONE-SIDED: emits from the
- * `cross(edge1, edge2)` side (impl-plan-area-lights pinned deviation). Emitted radiance
- * Le = color·intensity (no falloff — the falloff IS the solid-angle measure, §6.1).
+ * `cross(edge1, edge2)` side (impl-plan-area-lights pinned deviation). `emission` is the
+ * emitted radiance Le (no falloff — the falloff IS the solid-angle measure, §6.1).
  */
 export interface QuadLight {
     kind: 'quad';
     corner: Vec3;
     edge1: Vec3;
     edge2: Vec3;
-    intensity: number;
-    color?: Vec3;
+    /** Emitted radiance Le; scalar broadcasts. */
+    emission: number | Vec3;
 }
 
 /** Spherical area light (§6.2): desugars like the quad; sampled via the visible cone. */
@@ -285,8 +302,8 @@ export interface SphereLight {
     kind: 'sphere';
     position: Vec3;
     radius: number;
-    intensity: number;
-    color?: Vec3;
+    /** Emitted radiance Le; scalar broadcasts. */
+    emission: number | Vec3;
 }
 
 // ============================================================================
@@ -466,6 +483,23 @@ export interface UniformBinding {
     type: UniformType;
     compute: (params: Record<string, any>) => any;
 }
+
+/**
+ * Parameter-namespace reservations (naming batch N2 — audit P3 made explicit).
+ * The compiler never invents parameter names (fable-transforms §6), but the ENGINE
+ * and APP mint these; an authored {param} colliding with them would silently fight
+ * the builtin channel. The Validator rejects authored params matching either list.
+ *
+ * - engine.*      — per-frame engine builtins (resolution, sampleCount, resetSalt, …)
+ * - env.*         — environment-feature-minted (env.selectProb, env.rotation)
+ * - debug.* / renderer.* — display-mode extension channels
+ * - camera.position / camera.target — OrbitControls' live channel (+ authored pose
+ *   defaults); camera.frame additionally carries a HIDDEN Float32Array coercion in
+ *   ParameterStore.restore. camera.fov is deliberately NOT reserved — it is the
+ *   authored fixture convention.
+ */
+export const RESERVED_PARAM_PREFIXES = ['engine.', 'env.', 'debug.', 'renderer.'] as const;
+export const RESERVED_PARAM_PATHS = ['camera.position', 'camera.target', 'camera.frame'] as const;
 
 /**
  * Parameter metadata for UI generation and validation

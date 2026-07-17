@@ -21,14 +21,12 @@ export const fogcubeScene: SceneDescription = {
     objects: [
         // Emissive checker floor: solid below y = 0
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 },
             material: 'floor',
         },
         // The absorber cube, floating
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [0, 1.0, 0], halfSize: [0.5, 0.5, 0.5] } },
+            type: 'box', parameters: { center: [0, 1.0, 0], halfSize: [0.5, 0.5, 0.5] },
             material: 'mist',
         },
     ],
@@ -74,23 +72,19 @@ export const rayleighScene: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: [
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 },
             material: 'floor',
         },
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [-1.3, 1.0, 0], halfSize: [0.45, 0.45, 0.45] } },
+            type: 'box', parameters: { center: [-1.3, 1.0, 0], halfSize: [0.45, 0.45, 0.45] },
             material: 'rayleigh_fog',
         },
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [0.0, 1.0, 0], halfSize: [0.45, 0.45, 0.45] } },
+            type: 'box', parameters: { center: [0.0, 1.0, 0], halfSize: [0.45, 0.45, 0.45] },
             material: 'hg_fog',
         },
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [1.3, 1.0, 0], halfSize: [0.45, 0.45, 0.45] } },
+            type: 'box', parameters: { center: [1.3, 1.0, 0], halfSize: [0.45, 0.45, 0.45] },
             material: 'draine_fog',
         },
     ],

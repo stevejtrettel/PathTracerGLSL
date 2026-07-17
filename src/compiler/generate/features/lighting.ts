@@ -9,6 +9,8 @@ import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
+import type { LightKindDescriptor } from '../../../components/descriptors.js';
+import { structFromRows } from '../schema.js';
 
 import shadowOpaqueGLSL from '../../../components/transport/shadow/opaque/opaque.glsl?raw';
 import shadowMediaGLSL from '../../../components/transport/shadow/media/media.glsl?raw';
@@ -59,11 +61,29 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     }
 
     // Per-kind sampler libraries for the kinds present (registry-driven, R1b; declared
-    // before the dispatcher).
-    for (const kind of ['point', 'quad', 'sphere'] as const) {
-        if (plan.lights.some((l) => l.kind === kind)) {
-            blocks.push({ origin: `components/lights/${kind}/${kind}.glsl`, source: LIGHT_KINDS[kind].glsl });
-        }
+    // before the dispatcher). Structs generated from the rows first (A1).
+    const presentKinds = Object.keys(LIGHT_KINDS).filter((kind) => plan.lights.some((l) => l.kind === kind));
+    if (presentKinds.length > 0) {
+        blocks.push({
+            origin: 'generated:light-structs',
+            source: ['// Generated light structs (rows are the single source — A1)',
+                ...presentKinds.map((kind) => {
+                    const d = LIGHT_KINDS[kind];
+                    const sn = kind[0].toUpperCase() + kind.slice(1) + 'Light';
+                    return structFromRows(sn, [...d.params, ...(d.derivedFields ?? [])]);
+                })].join('\n'),
+        });
+    }
+    for (const kind of presentKinds) {
+        blocks.push({ origin: `components/lights/${kind}/${kind}.glsl`, source: LIGHT_KINDS[kind].glsl });
+    }
+
+    // Hoisted light consts (struct-alignment batch, the N5 pattern): every light is
+    // compile-time data today (Value<T> light params deferred), so each becomes ONE
+    // named struct const shared by the sampler dispatcher, the MIS pdf query, and the
+    // delta query — one construction site, three readers.
+    if (plan.lights.length > 0) {
+        blocks.push({ origin: 'generated:light-consts', source: generateLightConsts(plan.lights) });
     }
 
     // Selection pdfs are computed ONCE and shared by the sampler and the MIS pdf query —
@@ -155,8 +175,8 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[])
         'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity) {',
     ];
     const arm = (l: PlannedLight, i: number) => [
-        `pos = ${formatVec3(l.position!)};`,
-        `intensity = ${formatSpectrum(l.color.map((c) => c * l.intensity))};`,
+        `pos = ${formatVec3(l.values.position as number[])};`,
+        `intensity = ${formatSpectrum(l.values.intensity as number[])};`,
         `return ${formatFloat(selectPdf[i])};`,
     ];
     if (lights.length === 1) {
@@ -180,14 +200,45 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[])
  *  (area-aware, pitfall 6). Exported for the H6 invariant tests. */
 export function lightPower(l: PlannedLight): number {
     const d = l.kind === 'directional' ? undefined : LIGHT_KINDS[l.kind];
-    return d ? d.power(l) : 1e-8;
+    return d ? d.power(l.values) : 1e-8;
 }
 
-/** GLSL call that samples light `l` at point `p` — the kind descriptor's dispatcher arm. */
-function sampleCall(l: PlannedLight, xiExpr: string): string {
+function lightKind(l: PlannedLight): LightKindDescriptor {
     const d = l.kind === 'directional' ? undefined : LIGHT_KINDS[l.kind];
     if (!d) throw new Error(`lighting: unsupported light kind '${l.kind}'`);
-    return d.emitSampleCall(l, xiExpr);
+    return d;
+}
+
+/** `<Kind>Light(…rows[, …derived])` — the struct ctor from the descriptor's rows
+ *  (row order = ctor order; radiometric values via formatSpectrum, §2.5). The lights
+ *  twin of geometry's emitCtor — all compile-time literals until Value<T> lights. */
+function lightCtor(l: PlannedLight): string {
+    const d = lightKind(l);
+    const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
+    const args = d.params.map((row) => {
+        const v = l.values[row.name];
+        if (row.shape === 'number') return formatFloat(v as number);
+        return row.semantic === 'radiometric' ? formatSpectrum(v as number[]) : formatVec3(v as number[]);
+    });
+    const derived = (d.derivedCtorFields?.(l.values) ?? [])
+        .map((v) => (Array.isArray(v) ? formatVec3(v) : formatFloat(v)));
+    return `${structName}(${[...args, ...derived].join(', ')})`;
+}
+
+/** One named const per light — `light_<id>`, the single construction site. */
+function generateLightConsts(lights: PlannedLight[]): string {
+    const lines = ['// Generated light consts (§6.1) — one struct per light, compile-time data'];
+    for (const l of lights) {
+        const d = lightKind(l);
+        const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
+        lines.push(`const ${structName} light_${l.id} = ${lightCtor(l)};`);
+    }
+    return lines.join('\n');
+}
+
+/** GLSL call that samples light `l` at point `p` — kind sampler over the hoisted const. */
+function sampleCall(l: PlannedLight, xiExpr: string): string {
+    return `${lightKind(l).kind}_light_sample(light_${l.id}, p, ${xiExpr})`;
 }
 
 /** Compile-time selection pdfs — shared by lighting_sample and lighting_pdf.
@@ -302,14 +353,13 @@ function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSam
     for (let i = 0; i < lights.length; i++) {
         const l = lights[i];
         if (l.regionId === undefined) continue;   // delta: not hittable, never queried
+        const d = lightKind(l);
+        if (d.delta) continue;                    // backstop; regionId already filtered
         const select = formatFloat(lights.length === 1 ? 1.0 : selectPdf[i]) + stage0;
-        // Hittable kinds carry their pdf arm on the descriptor — it must mirror the
-        // sampler's density exactly (the §6.1 byte-match invariant lives in ONE file per kind).
-        const arm = l.kind === 'directional' ? undefined : LIGHT_KINDS[l.kind].emitPdfArm;
-        if (!arm) continue;   // delta kinds have no arm (backstop; regionId already filtered)
-        lines.push(`    if (light_id == ${l.id}) {`);
-        lines.push(...arm(l, select));
-        lines.push('    }');
+        // The kind's density lives in its GLSL file, ADJACENT to its sampler (the §6.1
+        // byte-match invariant is now two functions over one struct) — the arm here is
+        // pure composition: selection pdf × the kind's solid-angle pdf.
+        lines.push(`    if (light_id == ${l.id}) return ${select} * ${d.kind}_light_pdf(light_${l.id}, p, light_hit.p, wi);`);
     }
     lines.push('    return 0.0;');
     lines.push('}');

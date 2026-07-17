@@ -12,7 +12,6 @@
 // NOT reference other descriptors or the plan. All decisions stay in feature-planner code.
 
 import type { MaterialModel } from '../compiler/types.js';
-import type { PlannedLight } from '../compiler/plan/types.js';
 import type { Similarity } from './geometry/similarity.js';
 
 /**
@@ -66,21 +65,80 @@ export interface MaterialModelDescriptor {
     };
 }
 
-/** A samplable light kind: one GLSL sampler file + these facts (contracts §6.1/§6.2). */
+/** One row of a light kind's parameter schema (struct-alignment batch): struct field
+ *  AND `PlannedLight.values` key. ROW ORDER = STRUCT FIELD ORDER = CTOR ORDER —
+ *  the struct itself is GENERATED from these rows (A1: one declaration, everything
+ *  derived), and the dispatcher constructs it positionally. */
+export interface LightParamSpec {
+    name: string;
+    shape: 'number' | 'vec3';
+    /** radiometric values format via formatSpectrum + type Spectrum (§2.5); geometric
+     *  via formatFloat/Vec3. */
+    semantic: 'radiometric' | 'geometric';
+    /** Geometric kind (required for geometric rows): drives the generated struct's
+     *  typedef (point → Point, direction → Direction, vector → vec3, length → float)
+     *  and, later, the Value<T>-light-params transform rules — the same table as
+     *  geometry. Ignored for radiometric rows (they are Spectrum). */
+    kind?: ParamKind;
+}
+
+/** A DERIVED struct field declaration (A1): computed by derivedCtorFields, appended
+ *  after the rows — name + typing declared here so the generated struct and the
+ *  positional ctor cannot disagree. */
+export interface DerivedFieldSpec {
+    name: string;
+    kind: ParamKind;
+    shape: 'number' | 'vec3';
+}
+
+/** A samplable light kind: one GLSL file + these facts (contracts §6.1/§6.2).
+ *
+ *  The GLSL is STRUCT-SHAPED (struct-alignment batch — the house pattern): the file
+ *  declares `struct <Kind>Light` whose field order = the rows (+ derivedCtorFields)
+ *  and BOTH halves of the kind's math as adjacent functions —
+ *  `LightSample <kind>_light_sample(<Kind>Light l, Point p, vec2 xi)` and, for
+ *  hittable (non-delta) kinds, `float <kind>_light_pdf(<Kind>Light l, Point p,
+ *  Point light_p, Direction wi)` (the uniform pdf signature; kinds ignore what they
+ *  don't need). The §6.1 byte-match invariant (pdf mirrors sampler) is now two
+ *  ADJACENT GLSL functions reading one struct — never TS strings.
+ *
+ *  Descriptors declare facts and return numbers; the lighting feature composes
+ *  (selection CDF, two-stage env wrapper, dispatcher, hoisted consts). */
 export interface LightKindDescriptor {
-    kind: 'point' | 'quad' | 'sphere';
-    /** ?raw source providing <kind>_light_sample. */
+    /** Registry key — validated against the registry (A2/A3: adding a kind touches
+     *  no union). */
+    kind: string;
+    /** ?raw source per the struct contract above. */
     glsl: string;
-    /** Delta kinds: not hittable, LIGHT_DELTA, no region, no lighting_pdf arm. */
+    /** Delta kinds: not hittable, LIGHT_DELTA, no region, no <kind>_light_pdf. */
     delta: boolean;
-    /** Emitted power for CDF selection (pbrt PowerLightSampler formulas). */
-    power(l: PlannedLight): number;
-    /** The lighting_sample dispatcher arm: a GLSL call expression sampling `l` at `p`. */
-    emitSampleCall(l: PlannedLight, xiExpr: string): string;
-    /** The lighting_pdf arm body for a hittable kind (absent for delta kinds):
-     *  lines returning `selectExpr` × the kind's solid-angle pdf from the hit geometry.
-     *  Must mirror emitSampleCall's density exactly (the byte-match invariant, §6.1). */
-    emitPdfArm?(l: PlannedLight, selectExpr: string): string[];
+    /** DESUGAR FACTS (A3 — the lights door): how an AUTHORED light of this kind
+     *  lowers. `toValues` builds the registry values from the authored fields + the
+     *  precomputed radiometric product (color·intensity). Hittable kinds declare
+     *  `region` — the backing emitter primitive the desugar synthesizes — and
+     *  `valuesFromRegion`, the sampleAsLight route's inverse (registry values from a
+     *  FOLDED region's parameters + Le), so both authoring routes share one kind
+     *  definition. `validateAuthored` returns degeneracy messages (quad area,
+     *  sphere radius) the Validator emits verbatim. */
+    toValues(authored: Record<string, unknown>, product: number[]): Record<string, number | number[]>;
+    region?: {
+        primitive: string;
+        parameters(authored: Record<string, unknown>): Record<string, number | number[]>;
+    };
+    valuesFromRegion?(parameters: Record<string, number | number[]>, Le: number[]): Record<string, number | number[]>;
+    validateAuthored?(authored: Record<string, unknown>): string[];
+    /** Struct rows, keyed into PlannedLight.values (row order = ctor order; the
+     *  struct is GENERATED from them — A1). */
+    params: LightParamSpec[];
+    /** Declared derived struct fields (A1) — the generated struct's tail. */
+    derivedFields?: DerivedFieldSpec[];
+    /** Computed compile-time values for `derivedFields`, same order (quad: the
+     *  precompiled one-sided normal + area — the normal MUST stay the same
+     *  compile-time literal geometry's quad bakes; bit-exact one-sided pin). */
+    derivedCtorFields?(values: Record<string, number | number[]>): (number | number[])[];
+    /** Emitted power for CDF selection (pbrt PowerLightSampler formulas) over the
+     *  resolved values — a CPU selection heuristic, returns a number. */
+    power(values: Record<string, number | number[]>): number;
 }
 
 /** A phase model: one GLSL file declaring into MediumProperties (§3.5) — the same
@@ -166,6 +224,9 @@ export interface PrimitiveDescriptor {
      *  test checks symbols exist iff declared). sdf also serves analytic containment
      *  (scene_region_at) — the sdf slot's three clauses bind approximate SDFs too. */
     provides: { sdf: boolean; analytic: boolean };
+    /** Declared derived struct fields (A1) — the generated struct's tail; values
+     *  computed by derivedCtorFields in the same order. */
+    derivedFields?: DerivedFieldSpec[];
     /** Zero-thickness (quad): never claims containment in scene_region_at, is
      *  one-sided under region_to emission, and needs the entering-side probe on
      *  back-face hits (audit H2's scene_region_thin). THE DICHOTOMY (owner, Jul 16

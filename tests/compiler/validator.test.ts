@@ -8,9 +8,9 @@ function baseScene(): SceneDescription {
     return {
         id: 's',
         ambientSpace: { type: 'euclidean' },
-        objects: [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 1 } }, material: 'm' }],
+        objects: [{ type: 'sphere', parameters: { radius: 1 }, material: 'm' }],
         materials: { m: { model: 'lambert' } },
-        lights: [{ kind: 'point', position: [0, 5, 0], intensity: 10 }],
+        lights: [{ kind: 'point', position: [0, 5, 0], emission: 10 }],
     };
 }
 
@@ -53,12 +53,12 @@ describe('Validator', () => {
     });
 
     it('accepts analytic geometry (closed-form sphere/plane backend)', () => {
-        const bag = run(s => { s.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 } }, material: 'm' }); });
+        const bag = run(s => { s.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 }, material: 'm' }); });
         expect(bag.hasErrors()).toBe(false);
     });
 
     it('rejects directional lights', () => {
-        const bag = run(s => { s.lights.push({ kind: 'directional', direction: [0, -1, 0], intensity: 1 }); });
+        const bag = run(s => { s.lights.push({ kind: 'directional', direction: [0, -1, 0], emission: 1 }); });
         expect(bag.getErrors().some(e => e.code === 'invalid-setting' && /directional/i.test(e.message))).toBe(true);
     });
 
@@ -188,8 +188,7 @@ describe('Validator', () => {
         const lamp = (sampleAsLight: boolean | undefined) => (s: SceneDescription) => {
             s.materials.glow = { model: 'lambert', albedo: [0, 0, 0], emission: [5, 5, 5], ...(sampleAsLight !== undefined ? { sampleAsLight } : {}) };
             s.objects.push({
-                kind: 'analytic',
-                shape: { type: 'quad', parameters: { corner: [0, 2, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] } },
+                type: 'quad', parameters: { corner: [0, 2, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] },
                 material: 'glow',
                 transform: { position: { param: 'lamp.pos', default: [0, 0, 0] } },
             });
@@ -213,7 +212,7 @@ describe('Validator — hardening pack (H1)', () => {
     it('rejects a samplable emitter whose model cannot emit (the phantom-light rule)', () => {
         const bag = run(s => {
             s.materials.glow = { model: 'dielectric', ior: 1.5, emission: [5, 5, 5] };
-            s.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 } }, material: 'glow' });
+            s.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 }, material: 'glow' });
         });
         expect(bag.getErrors().some(e => /emission dispatch returns zero/.test(e.message))).toBe(true);
     });
@@ -221,7 +220,7 @@ describe('Validator — hardening pack (H1)', () => {
     it('accepts the same emitter with sampleAsLight: false, but warns the emission is dead', () => {
         const bag = run(s => {
             s.materials.glow = { model: 'dielectric', ior: 1.5, emission: [5, 5, 5], sampleAsLight: false };
-            s.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 } }, material: 'glow' });
+            s.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 }, material: 'glow' });
         });
         expect(bag.hasErrors()).toBe(false);
         expect(bag.getWarnings().some(w => /emission is ignored/.test(w.message))).toBe(true);
@@ -230,7 +229,7 @@ describe('Validator — hardening pack (H1)', () => {
     it('accepts a lambert emitter on an analytic shape (the legitimate registry route)', () => {
         const bag = run(s => {
             s.materials.glow = { model: 'lambert', albedo: 0, emission: [5, 5, 5] };
-            s.objects.push({ kind: 'analytic', shape: { type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 1, 0] } }, material: 'glow' });
+            s.objects.push({ type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 1, 0] }, material: 'glow' });
         });
         expect(bag.hasErrors()).toBe(false);
     });
@@ -252,39 +251,39 @@ describe('Validator — hardening pack (H1)', () => {
         }).hasErrors()).toBe(false);
     });
 
-    it('rejects negative light intensity and negative emission', () => {
-        expect(run(s => { s.lights[0] = { kind: 'point', position: [0, 5, 0], intensity: -1 }; })
-            .getErrors().some(e => /intensity must be >= 0/.test(e.message))).toBe(true);
+    it('rejects negative light emission and negative material emission', () => {
+        expect(run(s => { s.lights[0] = { kind: 'point', position: [0, 5, 0], emission: -1 }; })
+            .getErrors().some(e => /emission must be >= 0/.test(e.message))).toBe(true);
         expect(run(s => { s.materials.m.emission = [-1, 0, 0]; })
             .getErrors().some(e => /emission components must be >= 0/.test(e.message))).toBe(true);
     });
 
     it('rejects non-finite scene numbers with a path in the message', () => {
         const bag = run(s => {
-            s.lights[0] = { kind: 'point', position: [0, Number.NaN, 0], intensity: 10 };
+            s.lights[0] = { kind: 'point', position: [0, Number.NaN, 0], emission: 10 };
         });
         expect(bag.getErrors().some(e => /not finite/.test(e.message) && /lights\[0\]\.position\[1\]/.test(e.message))).toBe(true);
     });
 
     it('rejects degenerate and near-degenerate analytic quad objects', () => {
         expect(run(s => {
-            s.objects.push({ kind: 'analytic', shape: { type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [2, 0, 0] } }, material: 'm' });
+            s.objects.push({ type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [2, 0, 0] }, material: 'm' });
         }).getErrors().some(e => /near-parallel/.test(e.message))).toBe(true);
         expect(run(s => {
-            s.objects.push({ kind: 'analytic', shape: { type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [1e-11, 1e-11, 0] } }, material: 'm' });
+            s.objects.push({ type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [1e-11, 1e-11, 0] }, material: 'm' });
         }).getErrors().some(e => /near-parallel/.test(e.message))).toBe(true);
     });
 
     it('rejects a near-degenerate quad LIGHT that the exact-zero test used to pass', () => {
         const bag = run(s => {
-            s.lights.push({ kind: 'quad', corner: [0, 5, 0], edge1: [1, 0, 0], edge2: [1e-11, 1e-11, 0], intensity: 5 });
+            s.lights.push({ kind: 'quad', corner: [0, 5, 0], edge1: [1, 0, 0], edge2: [1e-11, 1e-11, 0], emission: 5 });
         });
         expect(bag.getErrors().some(e => /near-parallel/.test(e.message))).toBe(true);
     });
 
     it('rejects an analytic sphere object with non-positive radius', () => {
         const bag = run(s => {
-            s.objects.push({ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 0 } }, material: 'm' });
+            s.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 0 }, material: 'm' });
         });
         expect(bag.getErrors().some(e => /sphere.*radius/.test(e.message))).toBe(true);
     });
@@ -293,21 +292,21 @@ describe('Validator — hardening pack (H1)', () => {
 describe('Validator — primitive parameter schemas (R3 / review C7)', () => {
     it('errors on a missing required parameter (the { r: 2 } unit-sphere hole)', () => {
         const bag = run(s => {
-            s.objects = [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { r: 2 } as never }, material: 'm' }];
+            s.objects = [{ type: 'sphere', parameters: { r: 2 } as never, material: 'm' }];
         });
         expect(bag.getErrors().some(e => /required parameter 'radius' is missing/.test(e.message))).toBe(true);
     });
 
     it('warns on an unknown parameter key, naming the valid ones', () => {
         const bag = run(s => {
-            s.objects = [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 1, radios: 2 } as never }, material: 'm' }];
+            s.objects = [{ type: 'sphere', parameters: { radius: 1, radios: 2 } as never, material: 'm' }];
         });
         expect(bag.getWarnings().some(w => /unknown parameter 'radios'.*valid: center, radius/.test(w.message))).toBe(true);
     });
 
     it('errors on a wrong-shape parameter', () => {
         const bag = run(s => {
-            s.objects = [{ kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: 2 } as never }, material: 'm' }];
+            s.objects = [{ type: 'box', parameters: { halfSize: 2 } as never, material: 'm' }];
         });
         expect(bag.getErrors().some(e => /'halfSize' must be a vec3/.test(e.message))).toBe(true);
     });
@@ -332,19 +331,19 @@ describe('Validator — schema discipline warnings (R2)', () => {
 describe('Validator — correctness domains', () => {
     it('rejects non-positive SDF radii and box half-sizes', () => {
         expect(run(s => {
-            s.objects = [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 0 } }, material: 'm' }];
+            s.objects = [{ type: 'sphere', parameters: { radius: 0 }, material: 'm' }];
         }).getErrors().some(e => /parameter 'radius' must be > 0/.test(e.message))).toBe(true);
         expect(run(s => {
-            s.objects = [{ kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: [1, 0, 1] } }, material: 'm' }];
+            s.objects = [{ type: 'box', parameters: { halfSize: [1, 0, 1] }, material: 'm' }];
         }).getErrors().some(e => /parameter 'halfSize' components must be > 0/.test(e.message))).toBe(true);
     });
 
     it('rejects zero plane normals but accepts non-unit normals for canonical normalization', () => {
         expect(run(s => {
-            s.objects = [{ kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, 0], offset: 1 } }, material: 'm' }];
+            s.objects = [{ type: 'plane', parameters: { normal: [0, 0, 0], offset: 1 }, material: 'm' }];
         }).getErrors().some(e => /parameter 'normal' length/.test(e.message))).toBe(true);
         expect(run(s => {
-            s.objects = [{ kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 2, 0], offset: 2 } }, material: 'm' }];
+            s.objects = [{ type: 'plane', parameters: { normal: [0, 2, 0], offset: 2 }, material: 'm' }];
         }).hasErrors()).toBe(false);
     });
 

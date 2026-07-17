@@ -29,17 +29,17 @@ export const furnaceBox: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: [
         // -x face at x=-1 (inward normal +x)
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [1, 0, 0], offset: 1.0 } }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [1, 0, 0], offset: 1.0 }, material: 'furnace' },
         // +x face at x=+1 (inward normal -x)
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 1.0 } }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 1.0 }, material: 'furnace' },
         // -y face at y=-1 (inward normal +y)
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'furnace' },
         // +y face at y=+1 (inward normal -y)
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, -1, 0], offset: 1.0 } }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [0, -1, 0], offset: 1.0 }, material: 'furnace' },
         // -z face at z=-1 (inward normal +z)
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, 1], offset: 1.0 } }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [0, 0, 1], offset: 1.0 }, material: 'furnace' },
         // +z face at z=+1 (inward normal -z)
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 0, -1], offset: 1.0 } }, material: 'furnace' },
+        { type: 'plane', parameters: { normal: [0, 0, -1], offset: 1.0 }, material: 'furnace' },
     ],
     materials: {
         // ρ = 0.5, Le = 0.2  →  L = 0.2 / (1 − 0.5) = 0.4 exactly.

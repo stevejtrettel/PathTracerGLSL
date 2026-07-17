@@ -5,12 +5,12 @@
 import { describe, it, expect } from 'vitest';
 import { flattenGroups, transformFromSimilarity, type SceneNode, type GroupNode } from '../../src/authoring/flatten.js';
 import { similarityApplyPoint, similarityFromTransform } from '../../src/components/geometry/similarity.js';
-import type { ObjectDescription, SDFObject, Vec3 } from '../../src/compiler/types.js';
+import type { ObjectDescription, PrimitiveObject, Vec3 } from '../../src/compiler/types.js';
 
 const RY90 = { axis: [0, 1, 0] as Vec3, angle: Math.PI / 2 };
 
-function sphere(over: Partial<SDFObject> = {}): SDFObject {
-    return { kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 1 } }, material: 'm', ...over };
+function sphere(over: Partial<PrimitiveObject> = {}): PrimitiveObject {
+    return { type: 'sphere', parameters: { radius: 1 }, material: 'm', ...over };
 }
 function group(over: Partial<GroupNode> & { children: SceneNode[] }): GroupNode {
     return { kind: 'group', ...over };

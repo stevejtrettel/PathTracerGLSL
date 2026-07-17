@@ -31,32 +31,27 @@ export const marbleScene: SceneDescription = {
     objects: [
         // Dark context floor under everything
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.1 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.1 },
             material: 'dark',
         },
         // The light table: a thin glowing slab the marble sits on
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [0, -0.05, 0], halfSize: [2.2, 0.05, 2.2] } },
+            type: 'box', parameters: { center: [0, -0.05, 0], halfSize: [2.2, 0.05, 2.2] },
             material: 'panel',
         },
         // The hero: glass shell + smoke interior, ONE material (surface + medium compose)
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [0, 0.62, 0], radius: 0.6 } },
+            type: 'sphere', parameters: { center: [0, 0.62, 0], radius: 0.6 },
             material: 'stormglass',
         },
         // Clear-glass companion for material contrast (and a second Fresnel rim)
         {
-            kind: 'analytic',
-            shape: { type: 'sphere', parameters: { center: [1.05, 0.22, 0.7], radius: 0.22 } },
+            type: 'sphere', parameters: { center: [1.05, 0.22, 0.7], radius: 0.22 },
             material: 'clearglass',
         },
         // Matte companion — shows the panel's soft falloff
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [-1.0, 0.18, 0.55], radius: 0.18 } },
+            type: 'sphere', parameters: { center: [-1.0, 0.18, 0.55], radius: 0.18 },
             material: 'clay',
         },
     ],
@@ -111,8 +106,7 @@ export const marbleNoScatterStrategy: RenderStrategy = {
 /** Axis-aligned basalt monolith (no rotations in v1 — Kubrick, not Stonehenge). */
 function monolith(x: number, z: number, h: number): SceneDescription['objects'][number] {
     return {
-        kind: 'sdf',
-        sdf: { type: 'box', parameters: { center: [x, h, z], halfSize: [0.55, h, 0.4] } },
+        type: 'box', parameters: { center: [x, h, z], halfSize: [0.55, h, 0.4] },
         material: 'basalt',
     };
 }
@@ -124,8 +118,7 @@ export const mistScene: SceneDescription = {
     objects: [
         // Ground
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 },
             material: 'earth',
         },
         // The avenue of stones, receding — repetition + fading is the aerial-perspective cue
@@ -138,15 +131,13 @@ export const mistScene: SceneDescription = {
         monolith(-2.6, -48, 2.4),
         // A fallen boulder near camera for foreground interest
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [1.1, 0.45, 1.2], radius: 0.5 } },
+            type: 'sphere', parameters: { center: [1.1, 0.45, 1.2], radius: 0.5 },
             material: 'basalt',
         },
         // The mist LAYER: ground fog from y=0 to y=12, bounded so sky rays escape it.
         // Null interface (model 'none') — its boundary must not exist optically.
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [0, 6, -20], halfSize: [90, 6, 90] } },
+            type: 'box', parameters: { center: [0, 6, -20], halfSize: [90, 6, 90] },
             material: 'mist',
         },
     ],
@@ -165,7 +156,7 @@ export const mistScene: SceneDescription = {
     },
     // The sun: ABOVE the fog top (y > 12) and behind the stones — backlit mist, long
     // shadow-lanes toward the camera. Warm dawn color; 1/d² folded by the sampler.
-    lights: [{ kind: 'point', position: [14, 18, -60], intensity: 22000.0, color: [1.0, 0.82, 0.6] }],
+    lights: [{ kind: 'point', position: [14, 18, -60], emission: [22000, 18040, 13200] }],
     environment: { type: 'constant', color: [0.42, 0.52, 0.68], intensity: 1.0 }, // cool sky
 };
 

@@ -9,15 +9,16 @@ import { pointLightDescriptor } from './point/point.js';
 import { quadLightDescriptor } from './quad/quad.js';
 import { sphereLightDescriptor } from './sphere/sphere.js';
 
-export const LIGHT_KINDS: Record<'point' | 'quad' | 'sphere', LightKindDescriptor> = {
+export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     point: pointLightDescriptor,
     quad: quadLightDescriptor,
     sphere: sphereLightDescriptor,
 };
 
-/** Mean channel of color·intensity — the scalar the pbrt power formulas weight by.
- *  Shared by every kind's `power` (§2.5 note: a CPU-side selection heuristic, not a
- *  radiometric reduction in GLSL — spectrum_average's discipline doesn't apply here). */
-export function emittedScalar(color: number[], intensity: number): number {
-    return ((color[0] + color[1] + color[2]) / 3) * intensity;
+/** Mean channel of a precomputed radiometric product (intensity or Le) — the scalar
+ *  the pbrt power formulas weight by. Shared by every kind's `power` (§2.5 note: a
+ *  CPU-side selection heuristic, not a radiometric reduction in GLSL —
+ *  spectrum_average's discipline doesn't apply here). */
+export function radiantScalar(product: number[]): number {
+    return (product[0] + product[1] + product[2]) / 3;
 }

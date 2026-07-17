@@ -21,21 +21,18 @@ export const submergedScene: SceneDescription = {
     objects: [
         // Water pool: big box around everything (camera included)
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [0, 0, 0], halfSize: [5, 5, 5] } },
+            type: 'box', parameters: { center: [0, 0, 0], halfSize: [5, 5, 5] },
             material: 'water',
         },
         // Glass sphere at the center, fully submerged
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 0.4 } },
-            material: 'glass',
+            type: 'sphere', parameters: { center: [0, 0, 0], radius: 0.4 },
+            material: 'glass', backend: 'sdf',   // R-SUBMERGED pins the MARCHER (per-owner-normal regression coverage)
         },
         // Emissive checker backwall: solid below z = -2 (inside the pool)
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.0 } },
-            material: 'screen',
+            type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.0 },
+            material: 'screen', backend: 'sdf',
         },
     ],
     materials: {

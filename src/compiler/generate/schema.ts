@@ -5,8 +5,39 @@
 // handful of models), never with library size; a single-model scene's struct IS that
 // model's struct (module-anatomy §1's degeneracy, where the numeric witnesses live).
 
-import type { PropertySchema } from '../../components/descriptors.js';
+import type { PropertySchema, ParamKind } from '../../components/descriptors.js';
 import { formatFloat } from '../../components/glsl-format.js';
+
+/** A struct-emittable row (A1): geometry PrimitiveParamSpec, LightParamSpec, and
+ *  DerivedFieldSpec all satisfy this. */
+export interface StructRow {
+    name: string;
+    shape: 'number' | 'vec3';
+    kind?: ParamKind;
+    semantic?: 'radiometric' | 'geometric';
+}
+
+/** The row's GLSL type — typedef-disciplined (curved-space prep): radiometric →
+ *  Spectrum; point → Point; direction → Direction; plain vectors → vec3;
+ *  scalars → float. */
+export function rowGlslType(row: StructRow): string {
+    if (row.semantic === 'radiometric') return 'Spectrum';
+    if (row.shape === 'number') return 'float';
+    if (row.kind === 'point') return 'Point';
+    if (row.kind === 'direction') return 'Direction';
+    return 'vec3';
+}
+
+/** GENERATED struct from rows (A1: one declaration — the occupant's .glsl declares
+ *  only functions; the row is the single source for struct, ctor, resolution, and
+ *  validation, so the field-order/name/type drift class is structurally dead). */
+export function structFromRows(structName: string, rows: StructRow[]): string {
+    return [
+        `struct ${structName} {`,
+        ...rows.map((r) => `    ${rowGlslType(r)} ${r.name};`),
+        '};',
+    ].join('\n');
+}
 
 /** GLSL default expression DERIVED from the row's numeric default (materials-§7:
  *  defaults live once, as numbers). Spectrum rows broadcast through the §2.5

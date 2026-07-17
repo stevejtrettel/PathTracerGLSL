@@ -56,10 +56,9 @@ const environment: SceneDescription['environment'] = { type: 'constant', color: 
 
 // Constant leaves shared by every arm.
 const floor_: SceneDescription['objects'][number] =
-    { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'floor' };
+    { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'floor' };
 const lamp: SceneDescription['objects'][number] = {
-    kind: 'analytic',
-    shape: { type: 'quad', parameters: { corner: [-0.6, 1.9, -0.6], edge1: [1.2, 0, 0], edge2: [0, 0, 1.2] } },
+    type: 'quad', parameters: { corner: [-0.6, 1.9, -0.6], edge1: [1.2, 0, 0], edge2: [0, 0, 1.2] },
     material: 'lamp',
 };
 
@@ -75,7 +74,7 @@ export const drivenScene: SceneDescription = {
     objects: [
         floor_,
         {
-            kind: 'sdf', sdf: { type: 'box', parameters: BOX }, material: 'red',
+            type: 'box', parameters: BOX, material: 'red',
             transform: {
                 position: { param: 'rig.boxPos', default: THETA['rig.boxPos'] },
                 rotation: { axis: [0, 1, 0], angle: { param: 'rig.boxAngle', default: THETA['rig.boxAngle'], min: 0, max: 6.3 } },
@@ -83,7 +82,7 @@ export const drivenScene: SceneDescription = {
             },
         },
         {
-            kind: 'analytic', shape: { type: 'sphere', parameters: ORB }, material: 'blue',
+            type: 'sphere', parameters: ORB, material: 'blue',
             transform: {
                 position: { param: 'rig.orbPos', default: THETA['rig.orbPos'] },
                 scale: { param: 'rig.orbScale', default: THETA['rig.orbScale'], min: 0.1, max: 4 },
@@ -106,8 +105,8 @@ function bakedAt(values: typeof THETA, id: string): SceneDescription {
         ambientSpace: { type: 'euclidean' },
         objects: [
             floor_,
-            { kind: 'sdf', sdf: { type: 'box', parameters: BOX }, material: 'red', transform: boxT },
-            { kind: 'analytic', shape: { type: 'sphere', parameters: ORB }, material: 'blue', transform: orbT },
+            { type: 'box', parameters: BOX, material: 'red', transform: boxT },
+            { type: 'sphere', parameters: ORB, material: 'blue', transform: orbT },
             lamp,
         ],
         materials,

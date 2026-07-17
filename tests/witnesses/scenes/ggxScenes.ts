@@ -22,29 +22,24 @@ export const veachMis: SceneDescription = {
         // bisector construction; edge1 = depth (0.4, tilted in yz), edge2 = width (x) —
         // cross(edge1, edge2) faces up toward lights and camera.
         {
-            kind: 'analytic',
-            shape: { type: 'quad', parameters: { corner: [-1.8, 1.113, -0.54], edge1: [0.0, -0.125, 0.38], edge2: [3.6, 0.0, 0.0] } },
+            type: 'quad', parameters: { corner: [-1.8, 1.113, -0.54], edge1: [0.0, -0.125, 0.38], edge2: [3.6, 0.0, 0.0] },
             material: 'plate1',
         },
         {
-            kind: 'analytic',
-            shape: { type: 'quad', parameters: { corner: [-1.8, 0.769, 0.156], edge1: [0.0, -0.099, 0.388], edge2: [3.6, 0.0, 0.0] } },
+            type: 'quad', parameters: { corner: [-1.8, 0.769, 0.156], edge1: [0.0, -0.099, 0.388], edge2: [3.6, 0.0, 0.0] },
             material: 'plate2',
         },
         {
-            kind: 'analytic',
-            shape: { type: 'quad', parameters: { corner: [-1.8, 0.457, 0.853], edge1: [0.0, -0.074, 0.393], edge2: [3.6, 0.0, 0.0] } },
+            type: 'quad', parameters: { corner: [-1.8, 0.457, 0.853], edge1: [0.0, -0.074, 0.393], edge2: [3.6, 0.0, 0.0] },
             material: 'plate3',
         },
         {
-            kind: 'analytic',
-            shape: { type: 'quad', parameters: { corner: [-1.8, 0.173, 1.551], edge1: [0.0, -0.047, 0.397], edge2: [3.6, 0.0, 0.0] } },
+            type: 'quad', parameters: { corner: [-1.8, 0.173, 1.551], edge1: [0.0, -0.047, 0.397], edge2: [3.6, 0.0, 0.0] },
             material: 'plate4',
         },
         // Matte floor catching the spill.
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.35 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.35 },
             material: 'floor',
         },
     ],
@@ -57,9 +52,9 @@ export const veachMis: SceneDescription = {
     },
     // Explicit sphere lights (desugar route): Le ∝ 1/r² for ~equal power (π·4πr²·Le).
     lights: [
-        { kind: 'sphere', position: [-1.15, 2.3, -1.9], radius: 0.035, intensity: 150.0, color: [1.0, 0.85, 0.7] },
-        { kind: 'sphere', position: [0.0, 2.3, -1.9], radius: 0.14, intensity: 9.4, color: [0.9, 1.0, 0.85] },
-        { kind: 'sphere', position: [1.15, 2.3, -1.9], radius: 0.5, intensity: 0.74, color: [0.8, 0.9, 1.0] },
+        { kind: 'sphere', position: [-1.15, 2.3, -1.9], radius: 0.035, emission: [150, 127.5, 105] },
+        { kind: 'sphere', position: [0.0, 2.3, -1.9], radius: 0.14, emission: [8.46, 9.4, 7.99] },
+        { kind: 'sphere', position: [1.15, 2.3, -1.9], radius: 0.5, emission: [0.592, 0.666, 0.74] },
     ],
     environment: { type: 'constant', color: [0.015, 0.015, 0.02], intensity: 1.0 },
 };

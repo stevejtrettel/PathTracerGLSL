@@ -8,15 +8,16 @@ export const minimalScene: SceneDescription = {
     name: 'Minimal Scene',
     ambientSpace: { type: 'euclidean' },
     objects: [
+        // backend PINNED 'sdf' (B1): minimal IS the marcher twin of analytic-minimal —
+        // under auto both would resolve analytic and the cross-backend witness would
+        // silently compare a scene with itself. The pin is the coverage tool doing its job.
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } },
-            material: 'ground',
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 },
+            material: 'ground', backend: 'sdf',
         },
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1.0 } },
-            material: 'sphere',
+            type: 'sphere', parameters: { center: [0, 0, 0], radius: 1.0 },
+            material: 'sphere', backend: 'sdf',
         },
     ],
     materials: {
@@ -24,7 +25,7 @@ export const minimalScene: SceneDescription = {
         sphere: { model: 'lambert', albedo: [0.9, 0.2, 0.2] },
     },
     lights: [
-        { kind: 'point', position: [3, 4, 2], intensity: 30.0, color: [1.0, 1.0, 1.0] },
+        { kind: 'point', position: [3, 4, 2], emission: 30 },
     ],
     // Constant sky — a live uniform color (§2.10 proving case c, analytic variant)
     environment: { type: 'constant', color: [0.1, 0.2, 0.45], intensity: 1.0 },

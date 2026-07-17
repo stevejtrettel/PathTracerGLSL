@@ -1,6 +1,15 @@
 # Naming Systems Audit — current state + problem ledger
 
-**Status: FACTUAL AUDIT (July 16 2026). Deliberately contains NO design.** This is
+**Status: FACTUAL AUDIT (July 16 2026) — RESOLVED July 17 2026.** Outcomes:
+P1 fixed (insertion-order material ids; integer-like names Validator-rejected).
+P2 fixed (paramToUniform-collision Validator check). P3 fixed (RESERVED_PARAM_PATHS/
+PREFIXES declared in compiler/types.ts + Validator enforcement; camera.fov stays
+authored convention). P4 fixed (symbol-contract tests for geometry/materials/phase/
+cameras/lights; type-first convention adopted — lights keep `<kind>_light_sample`).
+P5 fixed (registry-merge throw + suiteIntegrity tests). P6 addressed in docs
+(names are provenance everywhere now). P7 died with the geometry batch. P8 moot
+(names no longer identity). §5's quarantined direction was independently re-derived
+and adopted. The audit below is kept as the historical evidence trail. This is
 the input brief for the naming-modernization batch (sequenced after the
 geometry-descriptor batch). One candidate direction discussed in-session is
 quarantined in §5 and carries no authority — a designer reading this doc should form

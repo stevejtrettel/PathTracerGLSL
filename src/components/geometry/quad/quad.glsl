@@ -4,14 +4,7 @@
 // deviation). The `normal` FIELD is the precompiled unit cross(edge1, edge2) — the
 // emitting side, the SAME compile-time literal the quad light's sampler bakes (hit side
 // and sample side agree bit-exactly by construction; never recompute it per-fragment).
-// Provides: struct Quad, quad_intersect(), quad_normal().
-
-struct Quad {
-    vec3 corner;
-    vec3 edge1;
-    vec3 edge2;
-    vec3 normal;   // precompiled unit cross(edge1, edge2) — compile-time data
-};
+// Provides (struct GENERATED from descriptor rows — A1): quad_intersect(), quad_normal().
 
 bool quad_intersect(Ray ray, Quad q, out float t) {
     float denom = dot(ray.direction, q.normal);

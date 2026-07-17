@@ -13,14 +13,14 @@ export const analyticMinimal: SceneDescription = {
     name: 'Analytic Minimal (cross-method twin of minimal)',
     ambientSpace: { type: 'euclidean' },
     objects: [
-        { kind: 'analytic', shape: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'ground' },
-        { kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1.0 } }, material: 'sphere' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'ground' },
+        { type: 'sphere', parameters: { center: [0, 0, 0], radius: 1.0 }, material: 'sphere' },
     ],
     materials: {
         ground: { model: 'lambert', albedo: [0.6, 0.6, 0.6] },
         sphere: { model: 'lambert', albedo: [0.9, 0.2, 0.2] },
     },
-    lights: [{ kind: 'point', position: [3, 4, 2], intensity: 30.0, color: [1.0, 1.0, 1.0] }],
+    lights: [{ kind: 'point', position: [3, 4, 2], emission: 30 }],
     environment: { type: 'constant', color: [0.1, 0.2, 0.45], intensity: 1.0 },
 };
 

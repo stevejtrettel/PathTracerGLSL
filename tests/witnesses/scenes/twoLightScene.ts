@@ -21,26 +21,22 @@ export const twoLightScene: SceneDescription = {
     objects: [
         // Floor at y=0
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 },
             material: 'floor',
         },
         // Back wall at z=-3 (normal points inward, +z)
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 0, 1], offset: 3.0 } },
+            type: 'plane', parameters: { normal: [0, 0, 1], offset: 3.0 },
             material: 'floor',
         },
         // Left sphere
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [-0.75, 0.5, 0], radius: 0.5 } },
+            type: 'sphere', parameters: { center: [-0.75, 0.5, 0], radius: 0.5 },
             material: 'ivory',
         },
         // Right sphere
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [0.75, 0.5, 0], radius: 0.5 } },
+            type: 'sphere', parameters: { center: [0.75, 0.5, 0], radius: 0.5 },
             material: 'ivory',
         },
     ],
@@ -50,9 +46,9 @@ export const twoLightScene: SceneDescription = {
     },
     lights: [
         // Warm key light (higher power) — the `power` metric weights the CDF toward this one.
-        { kind: 'point', position: [-2.5, 3.0, 1.5], intensity: 26.0, color: [1.0, 0.55, 0.25] },
+        { kind: 'point', position: [-2.5, 3.0, 1.5], emission: [26, 14.3, 6.5] },
         // Cool fill light (lower power).
-        { kind: 'point', position: [2.5, 2.5, 1.5], intensity: 14.0, color: [0.35, 0.55, 1.0] },
+        { kind: 'point', position: [2.5, 2.5, 1.5], emission: [4.9, 7.7, 14] },
     ],
     // Pure two-light NEE story: no ambient, so the CDF is the whole lighting signal.
     environment: { type: 'none' },

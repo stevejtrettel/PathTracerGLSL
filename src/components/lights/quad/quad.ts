@@ -1,19 +1,19 @@
-// Quad area-light descriptor — co-located with light_quad.glsl (module-anatomy §2).
+// Quad area-light descriptor — co-located with quad.glsl (struct-alignment batch).
 // ONE-SIDED (pinned deviation from the §6.2 two-sided aside — hit side and sample side
-// must agree; see impl-plan-area-lights).
+// must agree). The derived normal is computed by geometry's quadNormal — ONE formula,
+// compile-time, so the light's emitting side and the analytic quad's hit side agree
+// bit-exactly by construction. Struct order = rows then derived:
+// corner/edge1/edge2/radiance + normal/area (contract-test-checked).
 
 import type { LightKindDescriptor } from '../../descriptors.js';
-import type { PlannedLight } from '../../../compiler/plan/types.js';
-import { formatFloat, formatSpectrum, formatVec3 } from '../../glsl-format.js';
 import { quadNormal } from '../../geometry/index.js';
-import { emittedScalar } from '../index.js';
+import { radiantScalar } from '../index.js';
 import lightQuadGLSL from './quad.glsl?raw';
 
-function quadArea(l: PlannedLight): number {
-    const e1 = l.edge1!, e2 = l.edge2!;
-    const cx = e1[1] * e2[2] - e1[2] * e2[1];
-    const cy = e1[2] * e2[0] - e1[0] * e2[2];
-    const cz = e1[0] * e2[1] - e1[1] * e2[0];
+function quadArea(edge1: number[], edge2: number[]): number {
+    const cx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
+    const cy = edge1[2] * edge2[0] - edge1[0] * edge2[2];
+    const cz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
     return Math.hypot(cx, cy, cz);
 }
 
@@ -21,28 +21,40 @@ export const quadLightDescriptor: LightKindDescriptor = {
     kind: 'quad',
     glsl: lightQuadGLSL,
     delta: false,
-
+    params: [
+        { name: 'corner', shape: 'vec3', semantic: 'geometric', kind: 'point' },
+        { name: 'edge1', shape: 'vec3', semantic: 'geometric', kind: 'vector' },
+        { name: 'edge2', shape: 'vec3', semantic: 'geometric', kind: 'vector' },
+        { name: 'radiance', shape: 'vec3', semantic: 'radiometric' },   // Le, precomputed product
+    ],
+    // QuadLight.normal + QuadLight.area — compile-time data (the one-sided pin).
+    derivedFields: [
+        { name: 'normal', kind: 'direction', shape: 'vec3' },
+        { name: 'area', kind: 'length', shape: 'number' },
+    ],
+    derivedCtorFields(v) {
+        const e1 = v.edge1 as number[], e2 = v.edge2 as number[];
+        return [quadNormal(e1, e2), quadArea(e1, e2)];
+    },
     // pbrt PowerLightSampler: one-sided quad π·A·Le (area-aware — pitfall 6: luminance-only
     // weighting mis-prioritizes a big dim panel vs a tiny bright one).
-    power(l) {
-        return Math.max(1e-8, Math.PI * quadArea(l) * emittedScalar(l.color, l.intensity));
+    power(v) {
+        return Math.max(1e-8, Math.PI * quadArea(v.edge1 as number[], v.edge2 as number[]) * radiantScalar(v.radiance as number[]));
     },
-
-    emitSampleCall(l, xiExpr) {
-        const Le = formatSpectrum(l.color.map((c) => c * l.intensity)); // radiometric (§2.5)
-        const n = quadNormal(l.edge1!, l.edge2!);
-        return `quad_light_sample(${formatVec3(l.corner!)}, ${formatVec3(l.edge1!)}, ${formatVec3(l.edge2!)}, ${formatVec3(n)}, ${formatFloat(quadArea(l))}, ${Le}, p, ${xiExpr})`;
+    // Desugar (A3): hittable — a backing quad region + the registry entry, both from
+    // the SAME authored fields; the sampleAsLight inverse reads the FOLDED region.
+    toValues: (a, product) => ({
+        corner: a.corner as number[], edge1: a.edge1 as number[], edge2: a.edge2 as number[], radiance: product,
+    }),
+    region: {
+        primitive: 'quad',
+        parameters: (a) => ({ corner: a.corner as number[], edge1: a.edge1 as number[], edge2: a.edge2 as number[] }),
     },
-
-    // Solid-angle pdf from the hit geometry: select × d²/(A·cosθ_l); back side pdf = 0
-    // (one-sided — mirrors the sampler exactly, the §6.1 byte-match invariant).
-    emitPdfArm(l, selectExpr) {
-        const n = quadNormal(l.edge1!, l.edge2!);
-        return [
-            `        float cos_l = dot(${formatVec3(n)}, -wi);`,
-            '        if (cos_l <= 0.0) return 0.0;',
-            '        vec3 d = light_hit.p - p;',
-            `        return ${selectExpr} * dot(d, d) / (${formatFloat(quadArea(l))} * cos_l);`,
-        ];
+    valuesFromRegion: (p, Le) => ({ corner: p.corner, edge1: p.edge1, edge2: p.edge2, radiance: Le }),
+    validateAuthored(a) {
+        const area = quadArea(a.edge1 as number[], a.edge2 as number[]);
+        return area < 1e-8
+            ? [`quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8`]
+            : [];
     },
 };

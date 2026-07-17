@@ -32,13 +32,20 @@ function idsByName(order: string[]): Record<string, number> {
 }
 
 describe('material ID assignment', () => {
-    it('assigns dense IDs from 0 in localeCompare order regardless of input order', () => {
+    // Naming batch N1 (audit P1): identity is STRUCTURAL — authored (insertion) order
+    // assigns ids, symmetric with objects/regions. Names are provenance: renaming a
+    // material does NOT renumber; reordering the description DOES (it is a different
+    // description). Integer-like names (JS iterates them first) are Validator-rejected.
+    it('assigns dense IDs from 0 in AUTHORED (insertion) order', () => {
         const a = idsByName(['zebra', 'apple', 'mango']);
-        expect(a).toEqual({ apple: 0, mango: 1, zebra: 2 });
+        expect(a).toEqual({ zebra: 0, apple: 1, mango: 2 });
     });
 
-    it('is order-independent — reordering the input materials does not change IDs', () => {
-        expect(idsByName(['apple', 'mango', 'zebra'])).toEqual(idsByName(['zebra', 'mango', 'apple']));
+    it('renaming a material does not change any id (names are provenance, not identity)', () => {
+        const before = idsByName(['floor', 'clay', 'glass']);
+        const after = idsByName(['floor', 'zzz_clay', 'glass']);
+        expect([before.floor, before.glass]).toEqual([after.floor, after.glass]);
+        expect(after.zzz_clay).toBe(before.clay);
     });
 
     it('IDs are contiguous starting at 0', () => {

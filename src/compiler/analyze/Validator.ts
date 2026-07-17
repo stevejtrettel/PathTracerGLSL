@@ -2,10 +2,12 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
-import { isGlslExpression, isValueParam } from '../types.js';
+import { isGlslExpression, isValueParam, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
-import { PRIMITIVES, type PrimitiveParamSpec } from '../../components/geometry/index.js';
+import { LIGHT_KINDS } from '../../components/lights/index.js';
+import { PRIMITIVES, resolveBackend, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
@@ -61,42 +63,45 @@ export function validate(
             .add();
     }
 
-    // --- Area lights (impl-plan-area-lights A0; thresholds hardened per the July 2026 audit) ---
+    // --- Lights (impl-plan-area-lights A0; degeneracy rules registry-driven — A3) ---
     for (let i = 0; i < scene.lights.length; i++) {
         const light = scene.lights[i];
-        if (light.kind === 'quad') {
-            // Near-degenerate quads (area ~1e-20) pass an exact-zero test but produce Inf pdfs
-            // in the sampler/lighting_pdf — require a real minimum area.
-            if (quadCrossSq(light.edge1, light.edge2) < MIN_QUAD_AREA * MIN_QUAD_AREA) {
-                bag.error('invalid-setting',
-                    `Light ${i}: quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= ${MIN_QUAD_AREA}`)
-                    .add();
+        // Kind-specific degeneracy (near-zero quad area → Inf pdfs; non-positive sphere
+        // radius): the kind DESCRIPTOR declares its rules; the Validator emits them.
+        const d = LIGHT_KINDS[light.kind];
+        if (d?.validateAuthored !== undefined) {
+            for (const msg of d.validateAuthored(light as unknown as Record<string, unknown>)) {
+                bag.error('invalid-setting', `Light ${i}: ${msg}`).add();
             }
-        }
-        if (light.kind === 'sphere' && light.radius <= 0) {
-            bag.error('invalid-setting', `Light ${i}: sphere light radius must be > 0`).add();
         }
         // Negative radiance is non-physical: pt sees negative energy on every hit while the
         // power CDF floors at ~0 so NEE almost never samples it — the strategies diverge.
-        if (light.intensity < 0) {
-            bag.error('invalid-setting', `Light ${i}: intensity must be >= 0 (negative radiance diverges pt vs pt-nee)`).add();
-        }
-        const color = 'color' in light ? light.color : undefined;
-        if (color !== undefined && color.some((c) => c < 0)) {
-            bag.error('invalid-setting', `Light ${i}: color components must be >= 0`).add();
+        const e = light.emission;
+        const negative = typeof e === 'number' ? e < 0 : e.some((c) => c < 0);
+        if (negative) {
+            bag.error('invalid-setting', `Light ${i}: emission must be >= 0 (negative radiance diverges pt vs pt-nee)`).add();
         }
     }
 
-    // --- Analytic OBJECT degeneracy (audit C1): the light checks above never covered analytic
-    // quad/sphere objects, which reach codegen where a zero cross product is NaN → a raw
-    // formatter throw instead of a diagnostic (and near-zero areas make Inf pdfs if emissive).
+    // --- Backend pins + analytic OBJECT degeneracy (B1 + audit C1). A pin the
+    // primitive can't honor is an error; quad objects that reach the analytic
+    // backend need non-degenerate edges (a zero cross product is NaN → a raw
+    // formatter throw; near-zero areas make Inf pdfs if emissive).
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
-        if (obj.kind !== 'analytic') continue;
-        const shape = obj.shape;
-        if (shape.type === 'quad') {
-            const e1 = shape.parameters.edge1, e2 = shape.parameters.edge2;
-            if (!isVec3(e1) || !isVec3(e2) || !isVec3(shape.parameters.corner)) {
+        if ('kind' in obj) continue;
+        const desc = PRIMITIVES[obj.type];
+        if (desc !== undefined && obj.backend !== undefined
+            && (obj.backend === 'sdf' ? !desc.provides.sdf : !desc.provides.analytic)) {
+            bag.error('invalid-setting',
+                `Object ${i}: backend '${obj.backend}' pinned but primitive '${obj.type}' does not provide it`)
+                .withOriginal('scene', [`objects[${i}]`, 'backend'])
+                .add();
+        }
+        if (resolveBackend(obj.type, obj.backend) !== 'analytic') continue;
+        if (obj.type === 'quad') {
+            const e1 = obj.parameters.edge1, e2 = obj.parameters.edge2;
+            if (!isVec3(e1) || !isVec3(e2) || !isVec3(obj.parameters.corner)) {
                 bag.error('invalid-setting',
                     `Object ${i}: analytic quad requires corner/edge1/edge2 as [x,y,z] arrays`)
                     .withOriginal('scene', [`objects[${i}]`])
@@ -117,6 +122,49 @@ export function validate(
     validateFinite(scene.materials, 'materials', bag);
     validateFinite(scene.lights, 'lights', bag);
     validateFinite(scene.environment, 'environment', bag);
+
+    // --- Parameter namespace (naming batch N2 — audit P2/P3) ---
+    // Reserved paths/prefixes are engine/app-minted channels (compiler/types.ts); an
+    // authored param there silently fights the builtin. paramToUniform collisions
+    // ('a.b_c' and 'a_b.c' → u_a_b_c) would silently SHARE one uniform.
+    {
+        const authored = new Set<string>();
+        collectParamPaths(scene, authored);
+        collectParamPaths(strategy.measurement, authored);
+        const byUniform = new Map<string, string>();
+        for (const path of authored) {
+            if ((RESERVED_PARAM_PATHS as readonly string[]).includes(path)) {
+                bag.error('invalid-setting',
+                    `Parameter '${path}' is a reserved builtin channel (engine/app-minted — see RESERVED_PARAM_PATHS); choose another name`)
+                    .add();
+            }
+            const prefix = RESERVED_PARAM_PREFIXES.find((p) => path.startsWith(p));
+            if (prefix !== undefined) {
+                bag.error('invalid-setting',
+                    `Parameter '${path}' uses the reserved prefix '${prefix}' (engine/app-minted namespace); choose another name`)
+                    .add();
+            }
+            const uniform = paramToUniform(path);
+            const prior = byUniform.get(uniform);
+            if (prior !== undefined && prior !== path) {
+                bag.error('invalid-setting',
+                    `Parameters '${prior}' and '${path}' both map to uniform '${uniform}' — dots and underscores collide in paramToUniform; rename one`)
+                    .add();
+            }
+            byUniform.set(uniform, path);
+        }
+    }
+
+    // Integer-like material names would silently reorder under JS key iteration
+    // (integer-like string keys iterate FIRST) — with insertion-order material ids
+    // (naming batch N1) that would scramble identity. Reject them.
+    for (const name of Object.keys(scene.materials)) {
+        if (/^(0|[1-9][0-9]*)$/.test(name)) {
+            bag.error('invalid-setting',
+                `Material name '${name}': integer-like names are reserved (JS iterates integer keys first, scrambling insertion-order material identity)`)
+                .add();
+        }
+    }
     // Descriptor schemas choose scalar/spectrum shape today; their future domain metadata can
     // feed the same reusable validator without changing its behavior (propertyValidation.ts).
     validateSceneProperties(scene, bag);
@@ -127,7 +175,8 @@ export function validate(
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.sampleAsLight !== true) continue;
         const analyticSamplable = scene.objects.some((o) =>
-            o.kind === 'analytic' && PRIMITIVES[o.shape.type]?.samplableAsLight === true && o.material === name);
+            !('kind' in o) && resolveBackend(o.type, o.backend) === 'analytic'
+            && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name);
         if (!analyticSamplable) {
             bag.error('invalid-setting',
                 `Material '${name}': sampleAsLight requires an ANALYTIC quad or sphere object using it (V1-C2 — emissive SDF/custom shapes are path-only and still glow)`)
@@ -161,7 +210,8 @@ export function validate(
         }
         if (nonzeroEmission && !EMITTING_MODELS.has(mat.model)) {
             const wouldRegister = mat.sampleAsLight !== false && scene.objects.some((o) =>
-                o.kind === 'analytic' && (o.shape.type === 'quad' || o.shape.type === 'sphere') && o.material === name);
+                !('kind' in o) && resolveBackend(o.type, o.backend) === 'analytic'
+                && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name);
             if (wouldRegister) {
                 bag.error('invalid-setting',
                     `Material '${name}': model '${mat.model}' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use model 'lambert' (albedo 0 for a pure emitter) or set sampleAsLight: false`)
@@ -385,22 +435,18 @@ export function validate(
     // error. Unimplemented primitive TYPES are the Planner's diagnostic, not ours.
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
-        if (obj.kind !== 'sdf' && obj.kind !== 'analytic') continue;   // mesh: rejected elsewhere
-        const spec = obj.kind === 'sdf'
-            ? (obj.sdf as { type?: string; parameters?: Record<string, unknown> })
-            : (obj.shape as { type?: string; parameters?: Record<string, unknown> });
-        const type = spec.type;
-        const params = spec.parameters ?? {};
+        if ('kind' in obj) continue;   // mesh: rejected elsewhere
+        const type = obj.type;
+        const params = (obj.parameters ?? {}) as Record<string, unknown>;
         const desc = type !== undefined ? PRIMITIVES[type] : undefined;
-        // Unimplemented types/backends are the Planner's diagnostic, not ours.
-        const backendPresent = desc !== undefined && (obj.kind === 'sdf' ? desc.provides.sdf : desc.provides.analytic);
-        if (!desc || !backendPresent) continue;
+        // Unimplemented types/unhonorable pins are diagnosed above / by the Planner.
+        if (!desc || resolveBackend(type, obj.backend) === undefined) continue;
         const schema = desc.params;
         const known = new Map(schema.map((s) => [s.name, s]));
         for (const key of Object.keys(params)) {
             if (!known.has(key)) {
                 bag.warning('invalid-setting',
-                    `Object ${i} (${obj.kind} ${type}): unknown parameter '${key}' is ignored (valid: ${schema.map((s) => s.name).join(', ')})`)
+                    `Object ${i} (${type}): unknown parameter '${key}' is ignored (valid: ${schema.map((s) => s.name).join(', ')})`)
                     .add();
             }
         }
@@ -409,7 +455,7 @@ export function validate(
             if (v === undefined) {
                 if (s.required) {
                     bag.error('invalid-setting',
-                        `Object ${i} (${obj.kind} ${type}): required parameter '${s.name}' is missing`)
+                        `Object ${i} (${type}): required parameter '${s.name}' is missing`)
                         .add();
                 }
                 continue;
@@ -419,10 +465,10 @@ export function validate(
                 : Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number' && Number.isFinite(c));
             if (!shapeOk) {
                 bag.error('invalid-setting',
-                    `Object ${i} (${obj.kind} ${type}): parameter '${s.name}' must be a ${s.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
+                    `Object ${i} (${type}): parameter '${s.name}' must be a ${s.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
                     .add();
             } else {
-                validatePrimitiveConstraint(s, v, `Object ${i} (${obj.kind} ${type}): parameter '${s.name}'`, bag);
+                validatePrimitiveConstraint(s, v, `Object ${i} (${type}): parameter '${s.name}'`, bag);
             }
         }
     }
@@ -499,8 +545,9 @@ export function validate(
         // baked as literals into the sampler/pdf arms and the compile-time power CDF.
         // Live light geometry is the deferred Value<T>-light-params batch (and must be
         // RIGID there — driven scale would silently stale the CDF).
-        if (isDrivenTransform(t) && obj.kind === 'analytic') {
-            if (PRIMITIVES[obj.shape.type]?.samplableAsLight === true) {
+        if (isDrivenTransform(t) && !('kind' in obj)
+            && resolveBackend(obj.type, obj.backend) === 'analytic') {
+            if (PRIMITIVES[obj.type]?.samplableAsLight === true) {
                 const mat = scene.materials[obj.material];
                 if (mat !== undefined && mat.sampleAsLight !== false && hasConstantNonzeroEmission(mat.emission)) {
                     bag.error('invalid-transform',
@@ -650,6 +697,22 @@ function quadCrossSq(e1: Vec3, e2: Vec3): number {
 
 function isVec3(v: unknown): v is Vec3 {
     return Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number');
+}
+
+/** Recursive {param} path collector — mirrors validateFinite's walk so future
+ *  Value<> fields are covered without a per-field list. */
+function collectParamPaths(value: unknown, out: Set<string>): void {
+    if (value === null || typeof value !== 'object') return;
+    if (isValueParam(value)) {
+        if (typeof value.param === 'string') out.add(value.param);
+        return;
+    }
+    if (ArrayBuffer.isView(value)) return;
+    if (Array.isArray(value)) {
+        for (const v of value) collectParamPaths(v, out);
+        return;
+    }
+    for (const v of Object.values(value)) collectParamPaths(v, out);
 }
 
 /**

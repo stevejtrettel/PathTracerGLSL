@@ -80,26 +80,25 @@ export const transformBake: SceneDescription = {
     name: 'Transform bake twin (transform-authored arm)',
     ambientSpace: { type: 'euclidean' },
     objects: [
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'floor' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'floor' },
         // SDF scale tier: radius 0.35 under scale 2 ⇒ world radius 0.7 (and s·d marching).
         {
-            kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 0.35 } }, material: 'red',
+            type: 'sphere', parameters: { radius: 0.35 }, material: 'red',
             transform: { position: [-1.0, -0.3, 0], scale: 2 },
         },
         // SDF translation tier (the historical wrapper line).
         {
-            kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: [0.4, 0.4, 0.4] } }, material: 'green',
+            type: 'box', parameters: { halfSize: [0.4, 0.4, 0.4] }, material: 'green',
             transform: { position: [1.1, -0.6, -0.8] },
         },
         // Analytic translate fold.
         {
-            kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0.2, -0.4, 0], radius: 0.5 } }, material: 'blue',
+            type: 'sphere', parameters: { center: [0.2, -0.4, 0], radius: 0.5 }, material: 'blue',
             transform: { position: [0.5, 0, 0.3] },
         },
         // Analytic ROTATION fold on the samplable emitter: Ry(π/2) + translate.
         {
-            kind: 'analytic',
-            shape: { type: 'quad', parameters: { corner: [-0.5, 1.5, -0.5], edge1: [1, 0, 0], edge2: [0, 0, 1] } },
+            type: 'quad', parameters: { corner: [-0.5, 1.5, -0.5], edge1: [1, 0, 0], edge2: [0, 0, 1] },
             material: 'lamp',
             transform: { position: [0.2, 0, 0], rotation: { axis: [0, 1, 0], angle: Math.PI / 2 } },
         },
@@ -121,13 +120,12 @@ export const transformBakeRef: SceneDescription = {
     name: 'Transform bake twin (hand-folded arm)',
     ambientSpace: { type: 'euclidean' },
     objects: [
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'floor' },
-        { kind: 'sdf', sdf: { type: 'sphere', parameters: { center: [-1.0, -0.3, 0], radius: 0.7 } }, material: 'red' },
-        { kind: 'sdf', sdf: { type: 'box', parameters: { center: [1.1, -0.6, -0.8], halfSize: [0.4, 0.4, 0.4] } }, material: 'green' },
-        { kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0.7, -0.4, 0.3], radius: 0.5 } }, material: 'blue' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'floor' },
+        { type: 'sphere', parameters: { center: [-1.0, -0.3, 0], radius: 0.7 }, material: 'red' },
+        { type: 'box', parameters: { center: [1.1, -0.6, -0.8], halfSize: [0.4, 0.4, 0.4] }, material: 'green' },
+        { type: 'sphere', parameters: { center: [0.7, -0.4, 0.3], radius: 0.5 }, material: 'blue' },
         {
-            kind: 'analytic',
-            shape: { type: 'quad', parameters: { corner: [-0.3, 1.5, 0.5], edge1: [0, 0, -1], edge2: [1, 0, 0] } },
+            type: 'quad', parameters: { corner: [-0.3, 1.5, 0.5], edge1: [0, 0, -1], edge2: [1, 0, 0] },
             material: 'lamp',
         },
     ],
@@ -155,16 +153,16 @@ export const flattenTree: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: flattenGroups([
         // depth-0 pass-through leaf (identity flatten):
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'floor' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'floor' },
         // group T(-1,-0.3,0) ∘ leaf S(2) — composes to transform-bake's red sphere:
         {
             kind: 'group', name: 'ball', transform: { position: [-1.0, -0.3, 0] },
-            children: [{ kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 0.35 } }, material: 'red', transform: { scale: 2 } }],
+            children: [{ type: 'sphere', parameters: { radius: 0.35 }, material: 'red', transform: { scale: 2 } }],
         },
         // depth-0 pass-through leaf WITH its own transform (document order mirrors
         // transform-bake exactly, so region ids and dispatch order match the twin):
         {
-            kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: [0.4, 0.4, 0.4] } }, material: 'green',
+            type: 'box', parameters: { halfSize: [0.4, 0.4, 0.4] }, material: 'green',
             transform: { position: [1.1, -0.6, -0.8] },
         },
         // nested translations T(0.5,0,0) ∘ T(0,0,0.3) = T(0.5,0,0.3) — the blue sphere:
@@ -172,15 +170,14 @@ export const flattenTree: SceneDescription = {
             kind: 'group', name: 'orb', transform: { position: [0.5, 0, 0] },
             children: [{
                 kind: 'group', name: 'lift', transform: { position: [0, 0, 0.3] },
-                children: [{ kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0.2, -0.4, 0], radius: 0.5 } }, material: 'blue' }],
+                children: [{ type: 'sphere', parameters: { center: [0.2, -0.4, 0], radius: 0.5 }, material: 'blue' }],
             }],
         },
         // the LAMP under a transformed group: T(0.2,0,0)·Ry(π/2) ∘ identity leaf:
         {
             kind: 'group', name: 'rig', transform: { position: [0.2, 0, 0], rotation: { axis: [0, 1, 0], angle: Math.PI / 2 } },
             children: [{
-                kind: 'analytic',
-                shape: { type: 'quad', parameters: { corner: [-0.5, 1.5, -0.5], edge1: [1, 0, 0], edge2: [0, 0, 1] } },
+                type: 'quad', parameters: { corner: [-0.5, 1.5, -0.5], edge1: [1, 0, 0], edge2: [0, 0, 1] },
                 material: 'lamp',
             }],
         },
@@ -214,12 +211,11 @@ function conjPoint([x, y, z]: [number, number, number]): [number, number, number
 }
 
 const conjObjects: SceneDescription['objects'] = [
-    { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'floor' },
-    { kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: [0.45, 0.7, 0.45] } }, material: 'red' },
-    { kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0.9, -0.5, 0.4], radius: 0.5 } }, material: 'blue' },
+    { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'floor' },
+    { type: 'box', parameters: { halfSize: [0.45, 0.7, 0.45] }, material: 'red' },
+    { type: 'sphere', parameters: { center: [0.9, -0.5, 0.4], radius: 0.5 }, material: 'blue' },
     {
-        kind: 'analytic',
-        shape: { type: 'quad', parameters: { corner: [-0.6, 2.0, -0.6], edge1: [1.2, 0, 0], edge2: [0, 0, 1.2] } },
+        type: 'quad', parameters: { corner: [-0.6, 2.0, -0.6], edge1: [1.2, 0, 0], edge2: [0, 0, 1.2] },
         material: 'lamp',
     },
 ];
@@ -286,7 +282,7 @@ const regionsMaterials: SceneDescription['materials'] = {
 };
 
 const regionsLights: SceneDescription['lights'] = [
-    { kind: 'point', position: [2.5, 3.0, 2.0], intensity: 40.0, color: [1.0, 1.0, 1.0] },
+    { kind: 'point', position: [2.5, 3.0, 2.0], emission: 40 },
 ];
 
 const regionsEnv: SceneDescription['environment'] = { type: 'constant', color: [0.12, 0.14, 0.18], intensity: 1.0 };
@@ -296,13 +292,13 @@ export const regionsTransformed: SceneDescription = {
     name: 'Regions under transform (transform-authored arm)',
     ambientSpace: { type: 'euclidean' },
     objects: [
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'floor' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'floor' },
         {
-            kind: 'sdf', sdf: { type: 'box', parameters: { halfSize: [0.8, 0.6, 0.4] } }, material: 'water',
+            type: 'box', parameters: { halfSize: [0.8, 0.6, 0.4] }, material: 'water',
             transform: regionsTransform,
         },
         {
-            kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0.2, 0, 0.1], radius: 0.24 } }, material: 'glass',
+            type: 'sphere', parameters: { center: [0.2, 0, 0.1], radius: 0.24 }, material: 'glass',
             transform: regionsTransform,
         },
     ],
@@ -316,9 +312,9 @@ export const regionsTransformedRef: SceneDescription = {
     name: 'Regions under transform (hand-folded arm)',
     ambientSpace: { type: 'euclidean' },
     objects: [
-        { kind: 'sdf', sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 } }, material: 'floor' },
-        { kind: 'sdf', sdf: { type: 'box', parameters: { center: [0.3, -0.25, 0], halfSize: [0.5, 0.75, 1.0] } }, material: 'water' },
-        { kind: 'analytic', shape: { type: 'sphere', parameters: { center: [0.425, -0.25, -0.25], radius: 0.3 } }, material: 'glass' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.0 }, material: 'floor' },
+        { type: 'box', parameters: { center: [0.3, -0.25, 0], halfSize: [0.5, 0.75, 1.0] }, material: 'water' },
+        { type: 'sphere', parameters: { center: [0.425, -0.25, -0.25], radius: 0.3 }, material: 'glass' },
     ],
     materials: regionsMaterials,
     lights: regionsLights,

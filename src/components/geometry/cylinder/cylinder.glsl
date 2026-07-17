@@ -1,13 +1,7 @@
 // Cylinder (finite, capped, canonical Y-axis; SDF backend only — orientation is
 // PLACEMENT, not shape: a tilted cylinder is transform.rotation through the wrapper
 // tiers, exactly like box). Included wholesale when present (§2.12).
-// Provides: struct Cylinder, cylinder_sdf().
-
-struct Cylinder {
-    vec3 center;
-    float radius;
-    float halfHeight;
-};
+// Provides (struct GENERATED from descriptor rows — A1): cylinder_sdf().
 
 // Exact signed distance to the capped cylinder (not a bound): correct sign, never
 // overestimates, exact near the surface — full quality for marching, containment,

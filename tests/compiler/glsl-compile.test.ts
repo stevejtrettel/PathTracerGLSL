@@ -96,3 +96,111 @@ describe('every tonemap occupant compiles (glslang static check)', () => {
         });
     }
 });
+
+// ============================================================================
+// Registry kitchen sink (A4): a scene SYNTHESIZED from the registries themselves —
+// every primitive (constant AND driven placement), every material model, every
+// phase model, every light kind — compiled under pt-mis. Presence-gated inclusion
+// means a new occupant's GLSL is otherwise invisible to glslang until some suite
+// scene uses it (the cylinder lesson); this test closes that gap the moment the
+// registry line lands. Light kinds need a sample authored form (input language is
+// per-kind); a registry kind missing one FAILS LOUDLY here instead of silently
+// losing coverage.
+// ============================================================================
+
+import { PRIMITIVES } from '../../src/components/geometry/index.js';
+import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
+import { PHASE_MODELS } from '../../src/components/volume_scattering/index.js';
+import { LIGHT_KINDS } from '../../src/components/lights/index.js';
+import type { SceneDescription, RenderStrategy, ObjectDescription, LightDescription, MaterialDescription, MaterialModel } from '../../src/compiler/types.js';
+
+describe('registry kitchen sink compiles (every occupant, glslang static check)', () => {
+    it('synthesized all-occupant scene + pt-mis', () => {
+        const materials: Record<string, MaterialDescription> = {};
+        const surfaceModels = Object.keys(MATERIAL_MODELS) as MaterialModel[];
+        for (const id of surfaceModels) {
+            materials[`mat_${id}`] = { model: id };
+        }
+        // Every phase model as an interior medium on a null-interface region.
+        for (const id of Object.keys(PHASE_MODELS)) {
+            materials[`medium_${id}`] = {
+                model: 'none',
+                medium: { sigma_a: [0.05, 0.05, 0.05], sigma_s: [0.4, 0.4, 0.4], model: id },
+            };
+        }
+
+        // Every primitive, on every backend it provides, constant AND driven.
+        const objects: ObjectDescription[] = [];
+        let n = 0;
+        const rowValue = (shape: 'number' | 'vec3') => (shape === 'vec3' ? [0.4, 0.2, 0.3] : 0.5);
+        const surfaceMat = () => `mat_${surfaceModels[n % surfaceModels.length]}`;
+        for (const d of Object.values(PRIMITIVES)) {
+            const parameters = Object.fromEntries(d.params.map((p) => [p.name, p.default ?? rowValue(p.shape)]));
+            const constant = { transform: { position: [n * 3, 0.5, 0] as [number, number, number] } };
+            const driven = {
+                transform: {
+                    position: { param: `sink.pos${n}`, default: [n * 3, 0.5, 3] as [number, number, number] },
+                    rotation: { axis: [0, 1, 0] as [number, number, number], angle: { param: `sink.angle${n}`, default: 0.3 } },
+                    scale: { param: `sink.scale${n}`, default: 1.0, min: 0.5, max: 2.0 },
+                },
+            };
+            if (d.provides.sdf) {
+                objects.push({ type: d.type, parameters, material: surfaceMat(), backend: 'sdf', ...constant, name: `sink_sdf_${d.type}` });
+                n++;
+                objects.push({ type: d.type, parameters, material: surfaceMat(), backend: 'sdf', ...driven, name: `sink_sdf_${d.type}_driven` });
+                n++;
+            }
+            if (d.provides.analytic) {
+                objects.push({ type: d.type, parameters, material: surfaceMat(), backend: 'analytic', ...constant, name: `sink_ana_${d.type}` });
+                n++;
+                objects.push({ type: d.type, parameters, material: surfaceMat(), backend: 'analytic', ...driven, name: `sink_ana_${d.type}_driven` });
+                n++;
+            }
+        }
+        // One region per phase medium (the dispatch needs every model PRESENT on a region).
+        for (const id of Object.keys(PHASE_MODELS)) {
+            objects.push({
+                type: 'sphere', parameters: { center: [n * 3, 0.5, -3], radius: 0.6 },
+                material: `medium_${id}`, name: `sink_medium_${id}`,
+            });
+            n++;
+        }
+
+        // Every light kind — sample authored forms; a registry kind without one fails loudly.
+        const sampleLights: Record<string, LightDescription> = {
+            point: { kind: 'point', position: [0, 6, 0], emission: 20 },
+            quad: { kind: 'quad', corner: [-0.5, 5.98, -0.5], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 10 },
+            sphere: { kind: 'sphere', position: [4, 6, 0], radius: 0.3, emission: 10 },
+        };
+        const lights: LightDescription[] = [];
+        for (const kind of Object.keys(LIGHT_KINDS)) {
+            const sample = sampleLights[kind];
+            if (sample === undefined) {
+                throw new Error(`kitchen sink: light kind '${kind}' has no sample authored form — add one so its GLSL stays compile-covered`);
+            }
+            lights.push(sample);
+        }
+
+        const scene: SceneDescription = {
+            id: 'kitchen-sink',
+            name: 'Registry kitchen sink (synthesized)',
+            ambientSpace: { type: 'euclidean' },
+            objects,
+            materials,
+            lights,
+            environment: { type: 'constant', color: [0.1, 0.1, 0.12], intensity: 1.0 },
+        };
+        const strategy: RenderStrategy = {
+            id: 'sink-mis',
+            measurement: { camera: { type: 'pinhole', fov: 0.8 }, maxBounces: 4 },
+            estimator: { directLighting: 'mis', russianRoulette: { startDepth: 3 }, accumulation: { type: 'average' } },
+            view: { tonemap: { type: 'reinhard' } },
+        };
+
+        const renderer = compiler.compile(scene, strategy);
+        for (const [shaderId, prog] of renderer.shaders) {
+            check(prog.vertex, 'vert', `${shaderId} [vertex]`);
+            check(prog.fragment, 'frag', `${shaderId} [fragment]`);
+        }
+    });
+});

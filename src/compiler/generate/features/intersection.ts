@@ -34,6 +34,7 @@ import {
 
 import raymarchGLSL from '../../../components/intersection/raymarch/raymarch.glsl?raw';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
+import { structFromRows } from '../schema.js';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     if (plan.program.intersection.method !== 'raymarch') {
@@ -42,6 +43,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
 
     const hasSDF = plan.objects.length > 0;
     const hasAnalytic = plan.analyticObjects.length > 0;
+    const ids = objectGlslIds(plan.objects, plan.analyticObjects);
     const blocks: ShaderBlock[] = [];
 
     // Driven placement (fable-transforms §6/§6.1): the rigid-frame query helpers +
@@ -64,19 +66,35 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Primitive math for exactly the primitives PRESENT (registry order): each is one
     // wholesale file carrying BOTH backends' functions for that primitive (§2.12 —
     // <type>_sdf also serves the analytic backend's containment classification).
+    // The STRUCTS are generated from the descriptor rows first (A1: one declaration —
+    // the row is the single source for struct, ctor, resolution, and validation).
     const presentTypes = new Set<string>([
         ...plan.objects.map((o) => o.sdfType as string),
         ...plan.analyticObjects.map((o) => o.shapeType as string),
     ]);
-    for (const d of Object.values(PRIMITIVES)) {
-        if (presentTypes.has(d.type)) {
-            blocks.push({ origin: `components/geometry/${d.type}/${d.type}.glsl`, source: d.glsl });
-        }
+    const present = Object.values(PRIMITIVES).filter((d) => presentTypes.has(d.type));
+    if (present.length > 0) {
+        blocks.push({
+            origin: 'generated:primitive-structs',
+            source: ['// Generated primitive structs (rows are the single source — A1)',
+                ...present.map((d) => structFromRows(structName(d), [...d.params, ...(d.derivedFields ?? [])]))].join('\n'),
+        });
+    }
+    for (const d of present) {
+        blocks.push({ origin: `components/geometry/${d.type}/${d.type}.glsl`, source: d.glsl });
+    }
+
+    // Named shapes (naming batch N5): each NAMED, CONSTANT-placed object's struct is
+    // hoisted to one named const — emitted source reads like the scene, machine code
+    // identical (the driver folds either form). Unnamed objects keep inline ctors.
+    const namedShapes = generateNamedShapes(plan.objects, plan.analyticObjects, ids);
+    if (namedShapes !== null) {
+        blocks.push({ origin: 'generated:named-shapes', source: namedShapes });
     }
 
     // SDF backend: per-scene march-bound dispatch + the marcher (sdf_intersect*).
     if (hasSDF) {
-        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects) });
+        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects, ids) });
         blocks.push({ origin: 'components/intersection/raymarch/raymarch.glsl', source: raymarchGLSL });
     }
 
@@ -88,7 +106,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
 
     // Analytic backend: per-scene analytic_intersect* dispatch over the closed forms.
     if (hasAnalytic) {
-        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects, anyQuery) });
+        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects, anyQuery, ids) });
     }
 
     // region → material table spans BOTH backends (regions are globally unique).
@@ -101,7 +119,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     }
 
     // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
-    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects) });
+    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects, ids) });
 
     // The top-level dispatcher, combining only the backends present (declared after both).
     // Zero-thickness regions (descriptor `thin` fact): they never claim containment, so
@@ -148,15 +166,66 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
 }
 
 // ============================================================================
+// Per-object GLSL identity (naming batch N5)
+// ============================================================================
+// Authored names flow into emitted symbols: `sdf_<name>` wrappers and hoisted
+// `shape_<name>` consts. Names are provenance and collision-LEGAL (fable-transforms
+// §7.6), so identifiers are sanitized then deduped; unnamed objects keep the
+// `object_<i>` scheme. The map spans BOTH backends (one identifier space).
+
+function objectGlslIds(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[]): Map<number, string> {
+    const used = new Set<string>();
+    const map = new Map<number, string>();
+    for (const o of [...sdf, ...analytic].sort((a, b) => a.index - b.index)) {
+        const base = o.name !== undefined ? sanitizeIdent(o.name) : `object_${o.index}`;
+        let id = base;
+        let n = 2;
+        while (used.has(id)) id = `${base}_${n++}`;
+        used.add(id);
+        map.set(o.index, id);
+    }
+    return map;
+}
+
+function sanitizeIdent(name: string): string {
+    let s = name.replace(/[^A-Za-z0-9_]/g, '_');
+    if (/^[0-9]/.test(s)) s = 'o_' + s;
+    return s;
+}
+
+/** A named, CONSTANT-placed object hoists its struct to `const <Type> shape_<id>`
+ *  (the `shape_` prefix keeps authored names clear of locals/params in the generated
+ *  functions). Driven objects construct in-function (uniforms cannot initialize a
+ *  global); unnamed objects keep inline ctors — zero churn where nothing is named. */
+function hoistedShapeName(obj: PlannedSDFObject | PlannedAnalyticObject, ids: Map<number, string>): string | null {
+    if (obj.name === undefined) return null;
+    const driven = 'sdfType' in obj ? isDrivenPlacement(obj.placement) : obj.placement !== undefined;
+    if (driven) return null;
+    return `shape_${ids.get(obj.index)!}`;
+}
+
+function generateNamedShapes(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], ids: Map<number, string>): string | null {
+    const lines: string[] = [];
+    for (const obj of [...sdf, ...analytic].sort((a, b) => a.index - b.index)) {
+        const constName = hoistedShapeName(obj, ids);
+        if (constName === null) continue;
+        const d = primitive('sdfType' in obj ? obj.sdfType : obj.shapeType);
+        lines.push(`const ${structName(d)} ${constName} = ${emitCtor(d, obj.parameters)};`);
+    }
+    if (lines.length === 0) return null;
+    return ['// Generated named shapes (authored names, constant placement — compile-time data)', ...lines].join('\n');
+}
+
+// ============================================================================
 // SDF backend dispatch (per-scene)
 // ============================================================================
 
-function generateSDFDispatch(objects: PlannedSDFObject[]): string {
+function generateSDFDispatch(objects: PlannedSDFObject[], ids: Map<number, string>): string {
     const lines: string[] = [];
     lines.push('// Generated SDF dispatch');
 
     for (const obj of objects) {
-        lines.push(`float sdf_object_${obj.index}(vec3 p) {`);
+        lines.push(`float sdf_${ids.get(obj.index)!}(vec3 p) {`);
         if (isDrivenPlacement(obj.placement)) {
             // Driven (§6.1): query in the RIGID frame; the similarity-closed primitive
             // params absorb s in-shader — distances stay exact WORLD values, so the
@@ -164,14 +233,14 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
             const g = obj.placement;
             lines.push(`    p = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p);`);
             lines.push(`    float s = placement_scale(${g.uniformTS});`);
-            lines.push(`    return ${generateSDFCall(obj, 's')};`);
+            lines.push(`    return ${generateSDFCall(obj, ids, 's')};`);
         } else {
             lines.push(...emitPlacementQuery(obj.placement));
             // s·d_local keeps the wrapper a WORLD-SPACE distance field — what keeps the
             // marcher's stepping and the epsilon discipline (march_epsilon/EPS_INTERFACE/
             // ray_spawn) valid unchanged (fable-transforms §5.2). s > 0 by Validator pin.
             const scalePrefix = isIdentityScale(obj.placement.scale) ? '' : `${formatFloat(obj.placement.scale)} * `;
-            lines.push(`    return ${scalePrefix}${generateSDFCall(obj)};`);
+            lines.push(`    return ${scalePrefix}${generateSDFCall(obj, ids)};`);
         }
         lines.push(`}`);
         lines.push('');
@@ -185,7 +254,7 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
     lines.push(`    float d_obj;`);
     lines.push(`    region = -1;`);
     for (const obj of objects) {
-        lines.push(`    d_obj = abs(sdf_object_${obj.index}(p));`);
+        lines.push(`    d_obj = abs(sdf_${ids.get(obj.index)!}(p));`);
         lines.push(`    if (d_obj < d) { d = d_obj; region = ${obj.index}; }`);
     }
     lines.push(`    return d;`);
@@ -199,7 +268,7 @@ function generateSDFDispatch(objects: PlannedSDFObject[]): string {
     // (found by the R-SUBMERGED witness).
     lines.push('float scene_object_sdf(vec3 p, int region) {');
     for (const obj of objects) {
-        lines.push(`    if (region == ${obj.index}) return sdf_object_${obj.index}(p);`);
+        lines.push(`    if (region == ${obj.index}) return sdf_${ids.get(obj.index)!}(p);`);
     }
     lines.push('    return 1e20;');
     lines.push('}');
@@ -234,10 +303,14 @@ function emitPlacementQuery(g: Similarity): string[] {
 }
 
 /** The primitive call — DERIVED from the descriptor's schema row (impl-plan-geometry-
- *  descriptors): row order = signature order; `scales` params × s under the driven
- *  tier (center/radius/halfSize/offset — plane normals are directions and never
- *  scale). Without scaleExpr, literals as folded. */
-function generateSDFCall(obj: PlannedSDFObject, scaleExpr?: string): string {
+ *  descriptors): row order = signature order; kind≠direction params × s under the
+ *  driven tier. Named constant objects reference their hoisted shape const; everyone
+ *  else gets the inline ctor (literals as folded, or s-scaled expressions). */
+function generateSDFCall(obj: PlannedSDFObject, ids: Map<number, string>, scaleExpr?: string): string {
+    const constName = hoistedShapeName(obj, ids);
+    if (constName !== null) {
+        return `${obj.sdfType}_sdf(p, ${constName})`;
+    }
     return emitSdfCall(primitive(obj.sdfType), obj.parameters, { point: 'p', scale: scaleExpr });
 }
 
@@ -247,7 +320,7 @@ function generateSDFCall(obj: PlannedSDFObject, scaleExpr?: string): string {
 // Nearest-hit over the analytic objects, and a first-blocker any-hit. p and the shading frame
 // come from ambient_geodesic/ambient_frame so they agree with the SDF path (cross-method match).
 
-function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: boolean): string {
+function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: boolean, ids: Map<number, string>): string {
     const lines: string[] = ['// Generated analytic dispatch'];
 
     // Nearest-hit bounded by the incoming hit.t (the running nearest — set by the caller / a prior
@@ -279,12 +352,16 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
             lines.push(`    }`);
             continue;
         }
+        const constName = hoistedShapeName(obj, ids);
+        const shapeRef = constName ?? 'shape';
         lines.push(`    {`);
-        lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters)};`);
-        lines.push(`        if (${d.type}_intersect(ray, shape, t) && t < hit.t) {`);
+        if (constName === null) {
+            lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters)};`);
+        }
+        lines.push(`        if (${d.type}_intersect(ray, ${shapeRef}, t) && t < hit.t) {`);
         lines.push(`            hit.t = t; found = true;`);
         lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
-        lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, shape));`);
+        lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, ${shapeRef}));`);
         lines.push(`            hit.region_owner = ${obj.index};`);
         lines.push(`            hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);`);
         lines.push(`        }`);
@@ -303,11 +380,11 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
                 lines.push(`    {`);
                 lines.push(`        Ray lray = make_ray(placement_rigid(${g.uniformQ}, ${g.uniformTS}, ray.origin), placement_dir(${g.uniformQ}, ray.direction));`);
                 lines.push(`        float s = placement_scale(${g.uniformTS});`);
-                lines.push(`        if (${analyticTest(obj, 'lray', 's')} && t < maxDist) return true;`);
+                lines.push(`        if (${analyticTest(obj, 'lray', ids, 's')} && t < maxDist) return true;`);
                 lines.push(`    }`);
                 continue;
             }
-            lines.push(`    if (${analyticTest(obj, 'ray')} && t < maxDist) return true;`);
+            lines.push(`    if (${analyticTest(obj, 'ray', ids)} && t < maxDist) return true;`);
         }
         lines.push('    return false;');
         lines.push('}');
@@ -317,17 +394,29 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
 }
 
 /** GLSL boolean test call that writes `t` — DERIVED from the descriptor row (quad's
- *  precomputed one-sided normal is a derived struct field). With `scaleExpr` (driven
- *  §6.1), the length-like constructor args are multiplied by s in-shader. */
-function analyticTest(obj: PlannedAnalyticObject, rayVar: string, scaleExpr?: string): string {
+ *  precomputed one-sided normal is a derived struct field). Named constant objects
+ *  reference their hoisted const; with `scaleExpr` (driven §6.1), the length-like
+ *  constructor args are multiplied by s in-shader. */
+function analyticTest(obj: PlannedAnalyticObject, rayVar: string, ids: Map<number, string>, scaleExpr?: string): string {
+    const constName = hoistedShapeName(obj, ids);
+    if (constName !== null) {
+        return `${obj.shapeType}_intersect(${rayVar}, ${constName}, t)`;
+    }
     return emitAnalyticTest(primitive(obj.shapeType), obj.parameters, rayVar, scaleExpr);
 }
 
 /** GLSL expr for the SIGNED distance to `obj` at point `p` (analytic backend) —
  *  derived: thin primitives never claim containment; everyone else reuses their own
- *  <type>_sdf body, so both backends share ONE distance truth per primitive. */
-function analyticSignedDistance(obj: PlannedAnalyticObject): string {
-    return emitSignedDistance(primitive(obj.shapeType), obj.parameters, { point: 'p' });
+ *  <type>_sdf body, so both backends share ONE distance truth per primitive. Named
+ *  constant objects reference their hoisted const. */
+function analyticSignedDistance(obj: PlannedAnalyticObject, ids: Map<number, string>): string {
+    const d = primitive(obj.shapeType);
+    if (d.thin) return '1.0e20';
+    const constName = hoistedShapeName(obj, ids);
+    if (constName !== null) {
+        return `${obj.shapeType}_sdf(p, ${constName})`;
+    }
+    return emitSignedDistance(d, obj.parameters, { point: 'p' });
 }
 
 // ============================================================================
@@ -337,14 +426,14 @@ function analyticSignedDistance(obj: PlannedAnalyticObject): string {
 // flipped inequality away: `d > best` among negatives — deepest-wins made a submerged sphere
 // invisible (verification T2 / R-SUBMERGED). Spans both backends.
 
-function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[]): string {
+function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], ids: Map<number, string>): string {
     const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
     lines.push('int scene_region_at(vec3 p) {');
     lines.push('    int region = -1;');
     lines.push('    float best = -1.0e20;   // best = least-negative inside distance so far');
     lines.push('    float d;');
     for (const obj of sdf) {
-        lines.push(`    d = sdf_object_${obj.index}(p);`);
+        lines.push(`    d = sdf_${ids.get(obj.index)!}(p);`);
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
     for (const obj of analytic) {
@@ -357,7 +446,7 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
             lines.push(`    { vec3 lp = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p); float s = placement_scale(${g.uniformTS});`);
             lines.push(`      d = ${emitSignedDistance(primitive(obj.shapeType), obj.parameters, { point: 'lp', scale: 's' })}; }`);
         } else {
-            lines.push(`    d = ${analyticSignedDistance(obj)};`);
+            lines.push(`    d = ${analyticSignedDistance(obj, ids)};`);
         }
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }

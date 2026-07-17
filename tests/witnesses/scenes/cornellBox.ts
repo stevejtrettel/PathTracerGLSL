@@ -10,50 +10,42 @@ export const cornellBox: SceneDescription = {
     objects: [
         // Floor
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 } },
+            type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 },
             material: 'white',
         },
         // Ceiling at y=2
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, -1, 0], offset: 2.0 } },
+            type: 'plane', parameters: { normal: [0, -1, 0], offset: 2.0 },
             material: 'white',
         },
         // Back wall at z=-2
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.0 } },
+            type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.0 },
             material: 'white',
         },
         // Left wall at x=-1.5 (red)
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [1, 0, 0], offset: 1.5 } },
+            type: 'plane', parameters: { normal: [1, 0, 0], offset: 1.5 },
             material: 'red',
         },
         // Right wall at x=1.5 (green)
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [-1, 0, 0], offset: 1.5 } },
+            type: 'plane', parameters: { normal: [-1, 0, 0], offset: 1.5 },
             material: 'green',
         },
         // Front wall at z=5 (behind camera)
         {
-            kind: 'sdf',
-            sdf: { type: 'plane', parameters: { normal: [0, 0, -1], offset: 5.0 } },
+            type: 'plane', parameters: { normal: [0, 0, -1], offset: 5.0 },
             material: 'white',
         },
         // Tall box
         {
-            kind: 'sdf',
-            sdf: { type: 'box', parameters: { center: [-0.5, 0.6, -0.5], halfSize: [0.3, 0.6, 0.3] } },
+            type: 'box', parameters: { center: [-0.5, 0.6, -0.5], halfSize: [0.3, 0.6, 0.3] },
             material: 'white',
         },
         // Sphere
         {
-            kind: 'sdf',
-            sdf: { type: 'sphere', parameters: { center: [0.5, 0.4, 0.3], radius: 0.4 } },
+            type: 'sphere', parameters: { center: [0.5, 0.4, 0.3], radius: 0.4 },
             material: 'clay',
         },
     ],
@@ -65,7 +57,7 @@ export const cornellBox: SceneDescription = {
         clay: { model: 'lambert', albedo: { param: 'clay.albedo', default: [0.8, 0.4, 0.2] } },
     },
     lights: [
-        { kind: 'point', position: [0, 1.9, 0], intensity: 15.0, color: [1.0, 1.0, 1.0] },
+        { kind: 'point', position: [0, 1.9, 0], emission: 15 },
     ],
 };
 

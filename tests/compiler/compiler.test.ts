@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
 import type { SceneDescription } from '../../src/compiler/types.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from '../witnesses/scenes/minimalScene.js';
+import { analyticMinimal, analyticStrategy } from '../witnesses/scenes/analyticMinimal.js';
 import { cornellBox, cornellStrategy } from '../witnesses/scenes/cornellBox.js';
 
 const compiler = new Compiler();
@@ -119,7 +120,7 @@ describe('Compiler', () => {
         it('rejects directional lights', () => {
             const badScene: SceneDescription = {
                 ...minimalScene,
-                lights: [{ kind: 'directional', direction: [0, -1, 0], intensity: 1.0 }],
+                lights: [{ kind: 'directional', direction: [0, -1, 0], emission: 1.0 }],
             };
             expect(() => compiler.compile(badScene, minimalStrategy)).toThrow('Directional lights not yet supported');
         });
@@ -128,7 +129,7 @@ describe('Compiler', () => {
             const badScene: SceneDescription = {
                 ...minimalScene,
                 objects: [
-                    { kind: 'sdf', sdf: { type: 'sphere', parameters: { radius: 1.0 } }, material: 'nonexistent' },
+                    { type: 'sphere', parameters: { radius: 1.0 }, material: 'nonexistent' },
                 ],
             };
             expect(() => compiler.compile(badScene, minimalStrategy)).toThrow("unknown material 'nonexistent'");
@@ -163,10 +164,15 @@ describe('Compiler', () => {
             expect(result.shaders.has('pathtracer-cornell-display')).toBe(true);
         });
 
-        it('main shader contains all 7 SDF objects', () => {
+        it('main shader contains all 8 objects across the RESOLVED backends (B1 auto)', () => {
             const frag = result.shaders.get('pathtracer-cornell-main')!.fragment;
-            for (let i = 0; i < 7; i++) {
-                expect(frag, `sdf_object_${i}`).toContain(`sdf_object_${i}`);
+            // Auto: 6 planes + sphere → analytic; box (sdf-only) → the marcher.
+            expect(frag).toContain('analytic_intersect');
+            expect(frag).toContain('plane_intersect');
+            expect(frag).toContain('sphere_intersect');
+            expect(frag).toContain('box_sdf');
+            for (let i = 0; i < 8; i++) {
+                expect(frag, `region ${i}`).toContain(`region == ${i}`);
             }
         });
 
@@ -206,13 +212,22 @@ describe('Compiler', () => {
             expect(lastBlock.endLine).toBe(lineCount);
         });
 
-        it('includes expected origin blocks', () => {
+        it('includes expected origin blocks (minimal PINS the marcher — the sdf twin)', () => {
             const sm = result.sourceMaps!.get('pathtracer-minimal-main')!;
             const origins = sm.blocks.map(b => b.origin);
             expect(origins).toContain('glsl/core/structs.glsl');
             expect(origins).toContain('generated:sdf-dispatch');
             expect(origins).toContain('generated:material-lookup');
             expect(origins).toContain('components/intersection/raymarch/raymarch.glsl');
+        });
+
+        it('an ALL-analytic scene carries NO marcher at all (B1 auto — backend-level exact linkage)', () => {
+            const r = compiler.compile(analyticMinimal, analyticStrategy);
+            const sm = r.sourceMaps!.get(`${analyticStrategy.id}-${analyticMinimal.id}-main`)!;
+            const origins = sm.blocks.map(b => b.origin);
+            expect(origins).toContain('generated:analytic-dispatch');
+            expect(origins).not.toContain('generated:sdf-dispatch');
+            expect(origins).not.toContain('components/intersection/raymarch/raymarch.glsl');
         });
     });
 

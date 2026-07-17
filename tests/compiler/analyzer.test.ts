@@ -14,12 +14,12 @@ function scene(partial: Partial<SceneDescription>): SceneDescription {
 }
 
 describe('analyze — geometry', () => {
-    it('counts sdf / analytic / mesh objects and sets the matching booleans', () => {
+    it('counts RESOLVED backends (B1: auto = analytic if provided, else sdf; pins override)', () => {
         const f = analyze(scene({
             objects: [
-                { kind: 'sdf', sdf: { type: 'sphere', parameters: {} }, material: 'm' },
-                { kind: 'sdf', sdf: { type: 'box', parameters: {} }, material: 'm' },
-                { kind: 'analytic', shape: { type: 'sphere', parameters: {} }, material: 'm' },
+                { type: 'sphere', parameters: {}, material: 'm' },                    // auto → analytic
+                { type: 'box', parameters: {}, material: 'm' },                       // sdf-only → sdf
+                { type: 'sphere', parameters: {}, material: 'm', backend: 'sdf' },    // pinned → sdf
                 { kind: 'mesh', data: new Float32Array(0), material: 'm' },
             ],
         }));
@@ -75,9 +75,9 @@ describe('analyze — lighting', () => {
     it('counts point vs directional and keeps totalLightCount consistent', () => {
         const f = analyze(scene({
             lights: [
-                { kind: 'point', position: [0, 0, 0], intensity: 1 },
-                { kind: 'point', position: [1, 0, 0], intensity: 1 },
-                { kind: 'directional', direction: [0, -1, 0], intensity: 1 },
+                { kind: 'point', position: [0, 0, 0], emission: 1 },
+                { kind: 'point', position: [1, 0, 0], emission: 1 },
+                { kind: 'directional', direction: [0, -1, 0], emission: 1 },
             ],
         }));
         expect(f.lighting.pointLightCount).toBe(2);

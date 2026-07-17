@@ -35,5 +35,6 @@ export const quadDescriptor: PrimitiveDescriptor = {
     samplableAsLight: true,   // §6.2: emissive analytic quads join the light registry
     // Quad.normal — the precompiled emitting side (unit cross is scale-invariant
     // under s>0, so it is never scaled).
+    derivedFields: [{ name: 'normal', kind: 'direction', shape: 'vec3' }],
     derivedCtorFields: (v) => [quadNormal(v.edge1 as number[], v.edge2 as number[])],
 };
