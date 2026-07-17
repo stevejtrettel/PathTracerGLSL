@@ -199,13 +199,13 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[])
 /** Emitted power for CDF selection — the kind descriptors carry the pbrt formulas
  *  (area-aware, pitfall 6). Exported for the H6 invariant tests. */
 export function lightPower(l: PlannedLight): number {
-    const d = l.kind === 'directional' ? undefined : LIGHT_KINDS[l.kind];
-    return d ? d.power(l.values) : 1e-8;
+    const d = LIGHT_KINDS[l.kind];
+    return d !== undefined ? d.power(l.values) : 1e-8;   // backstop; the Validator rejects unregistered kinds
 }
 
 function lightKind(l: PlannedLight): LightKindDescriptor {
-    const d = l.kind === 'directional' ? undefined : LIGHT_KINDS[l.kind];
-    if (!d) throw new Error(`lighting: unsupported light kind '${l.kind}'`);
+    const d = LIGHT_KINDS[l.kind];
+    if (d === undefined) throw new Error(`lighting: unsupported light kind '${l.kind}' (Validator should have rejected it)`);
     return d;
 }
 

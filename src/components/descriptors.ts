@@ -112,6 +112,16 @@ export interface LightKindDescriptor {
     glsl: string;
     /** Delta kinds: not hittable, LIGHT_DELTA, no region, no <kind>_light_pdf. */
     delta: boolean;
+    /** The kind's AUTHORED input schema (C7 parity with geometry): the fields an
+     *  authored light carries BESIDES `kind` and `emission` (B2's universal radiometric
+     *  word — validated generically, never listed here). The authored language may
+     *  differ from the registry rows (sphere: authored `position` → row `center`), which
+     *  is exactly why this second list exists. The Validator's generic loop enforces
+     *  unknown-key/required/shape from it and runs `validateAuthored` ONLY when shapes
+     *  pass — degeneracy rules may assume well-shaped input. The desugar-totality
+     *  contract test keeps this list and toValues/region.parameters honest in BOTH
+     *  directions (declared-but-unread and read-but-undeclared both fail vitest). */
+    authoredParams: { name: string; shape: 'number' | 'vec3'; required: boolean }[];
     /** DESUGAR FACTS (A3 — the lights door): how an AUTHORED light of this kind
      *  lowers. `toValues` builds the registry values from the authored fields + the
      *  precomputed radiometric product (color·intensity). Hittable kinds declare
@@ -178,10 +188,12 @@ export interface PrimitiveParamSpec {
     kind: ParamKind;
     shape: 'number' | 'vec3';
     /** Required = no sensible default exists (a sphere without a radius is a typo,
-     *  not a unit sphere — review C7). */
+     *  not a unit sphere — review C7). REQUIRED XOR DEFAULT (contract-test-enforced):
+     *  a default on a required row is dead on the validated path and a silent value
+     *  on any path that bypasses validation — declare one or the other. */
     required: boolean;
     /** Generator default, baked when the author omits the param (moved here from
-     *  the old inline `?? …` arms — owner-approved). */
+     *  the old inline `?? …` arms — owner-approved). Only on non-required rows. */
     default?: number | number[];
     /** Mathematical domain required by the implementation (Validator-interpreted). */
     constraint?:

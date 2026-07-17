@@ -75,7 +75,7 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                     .toBe(d.provides.analytic);
             });
 
-            it('rows are well-formed (names unique, defaults shape-consistent)', () => {
+            it('rows are well-formed (names unique, defaults shape-consistent, required XOR default)', () => {
                 const names = d.params.map((p) => p.name);
                 expect(new Set(names).size).toBe(names.length);
                 for (const p of d.params) {
@@ -83,6 +83,11 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                     if (p.default !== undefined) {
                         expect(Array.isArray(p.default) ? p.shape === 'vec3' : p.shape === 'number').toBe(true);
                     }
+                    // REQUIRED XOR DEFAULT: a default on a required row is dead on the
+                    // validated path (the Validator errors first) and a silent value on
+                    // any path that bypasses validation — one semantics per row.
+                    expect(p.required ? p.default === undefined : p.default !== undefined,
+                        `${key}.${p.name}: required rows carry no default; optional rows must have one`).toBe(true);
                 }
             });
         });

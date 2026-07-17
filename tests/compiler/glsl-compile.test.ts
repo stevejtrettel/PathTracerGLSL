@@ -1,9 +1,5 @@
-import { describe, it, beforeAll } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { createRequire } from 'node:module';
+import { describe, it } from 'vitest';
+import { glslangCheck as check } from '../helpers/glslangCheck.js';
 import { Compiler } from '../../src/compiler/Compiler.js';
 import { TONEMAP_MODELS } from '../../src/components/tonemap/index.js';
 import { witnessSuite } from '../witnesses/index.js';
@@ -28,42 +24,6 @@ const sceneSuite = { ...witnessSuite, ...demoSuite };
  * §11.5 SLOT: when spectral lands (contracts §8), this harness compiles every pair under
  * BOTH color modes — the enforcement mechanism for the §2.5 spectral discipline.
  */
-
-const require_ = createRequire(import.meta.url);
-const binByPlatform: Record<string, string> = {
-    darwin: 'glslangValidator.darwin',
-    linux: 'glslangValidator.linux',
-    win32: 'glslangValidator.exe',
-};
-const pkgDir = dirname(require_.resolve('glslang-validator-prebuilt-predownloaded/package.json'));
-const bin = join(pkgDir, 'bin', binByPlatform[process.platform] ?? 'glslangValidator.linux');
-
-let dir: string;
-beforeAll(() => {
-    try { chmodSync(bin, 0o755); } catch { /* already executable or read-only install */ }
-    dir = mkdtempSync(join(tmpdir(), 'glsl-compile-'));
-});
-
-/** Identical sources validate once (display shaders repeat across pairs). */
-const validated = new Map<string, string | null>();
-
-function check(source: string, stageExt: 'vert' | 'frag', label: string): void {
-    const cached = validated.get(source);
-    if (cached !== undefined) {
-        if (cached !== null) throw new Error(`${label}: ${cached}`);
-        return;
-    }
-    const file = join(dir, `${validated.size}.${stageExt}`);
-    writeFileSync(file, source);
-    try {
-        execFileSync(bin, [file], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-        validated.set(source, null);
-    } catch (e) {
-        const out = (e as { stdout?: string }).stdout ?? String(e);
-        validated.set(source, out);
-        throw new Error(`${label}: glslangValidator rejected the generated shader\n${out}`);
-    }
-}
 
 const compiler = new Compiler();
 
@@ -132,10 +92,12 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
         // Every primitive, on every backend it provides, constant AND driven.
         const objects: ObjectDescription[] = [];
         let n = 0;
-        const rowValue = (shape: 'number' | 'vec3') => (shape === 'vec3' ? [0.4, 0.2, 0.3] : 0.5);
+        // Index-varied dummies: required rows have NO defaults (required XOR default),
+        // and identical vec3s would make a quad's edges parallel (Validator-rejected).
+        const rowValue = (shape: 'number' | 'vec3', i: number) => (shape === 'vec3' ? [0.4 + i, 0.2 * i, 0.3] : 0.5 + 0.1 * i);
         const surfaceMat = () => `mat_${surfaceModels[n % surfaceModels.length]}`;
         for (const d of Object.values(PRIMITIVES)) {
-            const parameters = Object.fromEntries(d.params.map((p) => [p.name, p.default ?? rowValue(p.shape)]));
+            const parameters = Object.fromEntries(d.params.map((p, i) => [p.name, p.default ?? rowValue(p.shape, i)]));
             const constant = { transform: { position: [n * 3, 0.5, 0] as [number, number, number] } };
             const driven = {
                 transform: {

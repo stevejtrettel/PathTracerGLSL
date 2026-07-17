@@ -6,21 +6,24 @@
 // corner/edge1/edge2/radiance + normal/area (contract-test-checked).
 
 import type { LightKindDescriptor } from '../../descriptors.js';
-import { quadNormal } from '../../geometry/index.js';
+import { quadCross, quadNormal } from '../../geometry/index.js';
 import { radiantScalar } from '../index.js';
 import lightQuadGLSL from './quad.glsl?raw';
 
 function quadArea(edge1: number[], edge2: number[]): number {
-    const cx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
-    const cy = edge1[2] * edge2[0] - edge1[0] * edge2[2];
-    const cz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
-    return Math.hypot(cx, cy, cz);
+    return Math.hypot(...quadCross(edge1, edge2));
 }
 
 export const quadLightDescriptor: LightKindDescriptor = {
     kind: 'quad',
     glsl: lightQuadGLSL,
     delta: false,
+    // Authored input (besides kind/emission) — same names as the registry rows for quad.
+    authoredParams: [
+        { name: 'corner', shape: 'vec3', required: true },
+        { name: 'edge1', shape: 'vec3', required: true },
+        { name: 'edge2', shape: 'vec3', required: true },
+    ],
     params: [
         { name: 'corner', shape: 'vec3', semantic: 'geometric', kind: 'point' },
         { name: 'edge1', shape: 'vec3', semantic: 'geometric', kind: 'vector' },

@@ -14,21 +14,23 @@ export interface SceneFeatures {
     };
 
     materials: {
-        hasLambert: boolean;
-        hasDisney: boolean;
-        hasDielectric: boolean;
-        hasEmissive: boolean;
+        /** Any material property is a GLSL expression (per-model facts are NOT features —
+         *  the Validator checks model registration against MATERIAL_MODELS directly). */
         hasProcedural: boolean;
     };
 
     lighting: {
-        pointLightCount: number;
-        directionalLightCount: number;
-        /** Explicit quad/sphere area lights in scene.lights (each desugars to a region, §6.2). */
+        /** Registered delta kinds (descriptor `delta: true` — point today). */
+        deltaLightCount: number;
+        /** Registered hittable kinds in scene.lights (each desugars to a region, §6.2). */
         areaLightCount: number;
-        /** Emissive analytic quad/sphere OBJECTS that enter the registry via sampleAsLight. */
+        /** Authored kinds with no registry entry ('directional' reserved, typos) — the
+         *  Validator rejects each with a per-light diagnostic. */
+        unknownKindLightCount: number;
+        /** Emissive analytic samplable OBJECTS that enter the registry via sampleAsLight. */
         samplableEmitterCount: number;
-        /** Every samplable source: point + directional + area + samplable emitters. */
+        /** Every AUTHORED light (registered or not — authoring intent, so the no-lights
+         *  check never stacks on a kind rejection) + samplable emitters. */
         totalLightCount: number;
     };
 

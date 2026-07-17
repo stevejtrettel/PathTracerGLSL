@@ -200,10 +200,15 @@ export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';
 }
 
-// 'none' = no optical surface (§3.6): the region's boundary is a null interface — requires a
-// medium block (an invisible object with no medium is an authoring error, Validator-enforced).
-// 'emissive' is rejected by the Validator (review C4) — use emission on a surface model instead.
-export type MaterialModel = 'lambert' | 'disney' | 'dielectric' | 'ggx' | 'emissive' | 'none';
+/**
+ * Surface material model — REGISTRY-VALIDATED, like primitive/phase/light-kind ids
+ * (the B1 treatment: adding a model touches no type union; unknown models get a
+ * Validator diagnostic listing the registered set). Two non-registry words carry
+ * structural meaning: 'none' = no optical surface (§3.6, null interface — requires a
+ * medium block, Validator-enforced) and 'emissive' is rejected with a migration
+ * message (review C4) — use emission on a surface model instead.
+ */
+export type MaterialModel = string;
 
 /**
  * Medium of the region's INTERIOR (§3.5) — "materials of the interior". Homogeneous (V1-C1):

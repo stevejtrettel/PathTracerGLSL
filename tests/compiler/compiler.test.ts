@@ -122,7 +122,7 @@ describe('Compiler', () => {
                 ...minimalScene,
                 lights: [{ kind: 'directional', direction: [0, -1, 0], emission: 1.0 }],
             };
-            expect(() => compiler.compile(badScene, minimalStrategy)).toThrow('Directional lights not yet supported');
+            expect(() => compiler.compile(badScene, minimalStrategy)).toThrow('directional lights not yet supported');
         });
 
         it('rejects unknown material references', () => {

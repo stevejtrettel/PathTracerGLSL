@@ -11,9 +11,10 @@ BRDF is the constant `albedo/π` (the π makes a white surface exactly energy-pr
   (`cos_theta = sqrt(u.y)` — the sqrt IS the cosine weighting) and returns
   `weight = mp.albedo` exactly: (albedo/π)·cosθ / (cosθ/π) — the §2.1 cancellation
   with nothing left over. `pdf = cos_theta/π`; single lobe, `uc` unused.
-- `lambert_emission` returns `mp.emission * mp.emission_strength` — Lambert doubles as
-  the emissive surface model (`capabilities.emissive: true`); the strength split is
-  the §3.4 field-merge deferral, see the header note.
+- `lambert_emission` returns `mp.emission` — Lambert doubles as the emissive surface
+  model (`capabilities.emissive: true`). (The historical `emission_strength` rider was
+  a fixed-struct-era fossil, merged away July 2026: strength was 1 exactly when
+  emission was assigned nonzero, so the product was identically `emission`.)
 
 Why this occupant matters beyond itself: it is the **shape-setter** — the first model
 through every contract (the `(uc,u)` split, sample-returns-weight, the schema

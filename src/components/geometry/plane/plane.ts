@@ -22,7 +22,7 @@ export function canonicalPlane(normal: number[], offset = 0): { normal: [number,
 export const planeDescriptor: PrimitiveDescriptor = {
     type: 'plane',
     params: [
-        { name: 'normal', kind: 'direction', shape: 'vec3', required: true, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
+        { name: 'normal', kind: 'direction', shape: 'vec3', required: true, constraint: { kind: 'min-length', value: 1e-8 } },
         { name: 'offset', kind: 'length', shape: 'number', required: false, default: 0.0 },
     ],
     glsl: planeGLSL,

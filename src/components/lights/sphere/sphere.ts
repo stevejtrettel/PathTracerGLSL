@@ -9,6 +9,12 @@ export const sphereLightDescriptor: LightKindDescriptor = {
     kind: 'sphere',
     glsl: lightSphereGLSL,
     delta: false,
+    // Authored input (besides kind/emission): authored `position` maps to the registry
+    // row `center` in toValues — the proof the authored language needs its own schema.
+    authoredParams: [
+        { name: 'position', shape: 'vec3', required: true },
+        { name: 'radius', shape: 'number', required: true },
+    ],
     params: [
         { name: 'center', shape: 'vec3', semantic: 'geometric', kind: 'point' },
         { name: 'radius', shape: 'number', semantic: 'geometric', kind: 'length' },

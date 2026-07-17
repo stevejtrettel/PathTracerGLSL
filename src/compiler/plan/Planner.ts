@@ -134,6 +134,9 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         }
         // Hittable: synthesize the emissive material + the backing region, THROUGH the
         // same schema path as authored materials (materials-§7 — no drift possible).
+        // lambert is THE backing emitter model (albedo 0 = pure emitter) — the ONLY site
+        // that knows it: planProgram derives the model set from planned materials, so the
+        // choice propagates to includes/dispatch without a second synchronized site.
         const matId = materialIndex++;
         materials.push({
             id: matId,
@@ -185,7 +188,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         : -1;
 
     // --- Build program description ---
-    const program = planProgram(features, scene, strategy, lights);
+    const program = planProgram(features, scene, strategy, lights, materials);
     const pipeline = planPipeline(program);
 
     return {
@@ -203,17 +206,14 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[]): ProgramDescription {
-    // Surface models only, REGISTRY-DRIVEN (the extension-cost rule: adding a model must not
-    // touch this site). 'none' is a boundary classification (§3.6) and 'emissive' is
-    // Validator-rejected (C4) — neither is a registry key, so both fall out of the filter.
-    // Registry insertion order pins the dispatch order (deterministic snapshots).
-    const present = new Set(Object.values(scene.materials).map((m) => m.model));
-    // Desugared area lights synthesize lambert emitter materials — a lambert-free scene with a
-    // quad light still needs the lambert arms (else the emitter dispatches to a wrong fallback).
-    if (scene.lights.some((l) => l.kind === 'quad' || l.kind === 'sphere')) {
-        present.add('lambert');
-    }
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[]): ProgramDescription {
+    // Surface models = the models of the PLANNED materials — the one list that already
+    // includes the desugared area lights' synthesized emitter materials, so a new hittable
+    // light kind can never leave its backing model out of the program (the lights-door
+    // rule: adding a kind must not touch this site). 'none' (§3.6) and unregistered
+    // models fall out of the registry filter. Registry insertion order pins the dispatch
+    // order (deterministic snapshots).
+    const present = new Set(materials.map((m) => m.model));
     const brdfModels = (Object.keys(MATERIAL_MODELS) as MaterialModel[]).filter((m) => present.has(m));
 
     // A samplable environment is a light for NEE purposes (T3) — an env-only scene under

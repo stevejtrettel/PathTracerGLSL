@@ -10,7 +10,7 @@ export const boxDescriptor: PrimitiveDescriptor = {
     type: 'box',
     params: [
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
-        { name: 'halfSize', kind: 'length', shape: 'vec3', required: true, default: [1, 1, 1], constraint: { kind: 'positive-components' } },
+        { name: 'halfSize', kind: 'length', shape: 'vec3', required: true, constraint: { kind: 'positive-components' } },
     ],
     glsl: boxGLSL,
     provides: { sdf: true, analytic: false },

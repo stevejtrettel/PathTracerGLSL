@@ -265,10 +265,9 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
     lines.push('MaterialProperties scene_material_properties(int id, vec3 p) {');
     lines.push('    MaterialProperties props;');
     // Defaults from the union schemas — the GLSL expression DERIVED from the row's
-    // numeric default (emission carries its paired strength).
+    // numeric default.
     for (const f of fields) {
         lines.push(`    props.${f.name} = ${defaultExpr(f)};`);
-        if (f.name === 'emission') lines.push('    props.emission_strength = 0.0;');
     }
 
     let arms = 0;
@@ -281,16 +280,13 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             const target = `        props.${f.name}`;
             if (isValueParam(value)) {
                 body.push(`${target} = ${paramToUniform(value.param)};`);
-                if (f.name === 'emission') body.push('        props.emission_strength = 1.0;');
             } else if (isGlslExpression(value)) {
                 body.push(`${target} = ${value.source};`);
-                if (f.name === 'emission') body.push('        props.emission_strength = 1.0;');   // an expression emitter is an emitter
             } else if (f.name === 'emission') {
                 // Constant emission: assigned only when nonzero (the gate's `> 0` twin).
                 const rgb = value as Vec3;
                 if (rgb[0] > 0 || rgb[1] > 0 || rgb[2] > 0) {
                     body.push(`${target} = ${formatSpectrum(rgb)};`);
-                    body.push('        props.emission_strength = 1.0;');
                 }
             } else {
                 body.push(`${target} = ${f.glslType === 'Spectrum' ? formatSpectrum(value as Vec3) : formatFloat(value as number)};`);

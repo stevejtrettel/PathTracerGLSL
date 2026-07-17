@@ -8,13 +8,21 @@
 import type { PrimitiveDescriptor } from '../../descriptors.js';
 import quadGLSL from './quad.glsl?raw';
 
+/** cross(edge1, edge2) — the one formula behind BOTH the quad's normal and its area
+ *  (the quad light's |cross| weighting shares it; one source, no near-duplicate). */
+export function quadCross(edge1: number[], edge2: number[]): [number, number, number] {
+    return [
+        edge1[1] * edge2[2] - edge1[2] * edge2[1],
+        edge1[2] * edge2[0] - edge1[0] * edge2[2],
+        edge1[0] * edge2[1] - edge1[1] * edge2[0],
+    ];
+}
+
 /** Unit cross(edge1, edge2) — a quad's emitting-side normal, precomputed at compile
  *  time (must stay a compile-time value so hit side and sample side agree
  *  bit-exactly — never recompute it per-fragment). */
 export function quadNormal(edge1: number[], edge2: number[]): [number, number, number] {
-    const cx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
-    const cy = edge1[2] * edge2[0] - edge1[0] * edge2[2];
-    const cz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
+    const [cx, cy, cz] = quadCross(edge1, edge2);
     const len = Math.hypot(cx, cy, cz);
     return [cx / len, cy / len, cz / len];
 }
@@ -22,9 +30,9 @@ export function quadNormal(edge1: number[], edge2: number[]): [number, number, n
 export const quadDescriptor: PrimitiveDescriptor = {
     type: 'quad',
     params: [
-        { name: 'corner', kind: 'point', shape: 'vec3', required: true, default: [0, 0, 0] },
-        { name: 'edge1', kind: 'vector', shape: 'vec3', required: true, default: [1, 0, 0] },
-        { name: 'edge2', kind: 'vector', shape: 'vec3', required: true, default: [0, 0, 1] },
+        { name: 'corner', kind: 'point', shape: 'vec3', required: true },
+        { name: 'edge1', kind: 'vector', shape: 'vec3', required: true },
+        { name: 'edge2', kind: 'vector', shape: 'vec3', required: true },
     ],
     glsl: quadGLSL,
     provides: { sdf: false, analytic: true },

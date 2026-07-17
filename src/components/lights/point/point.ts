@@ -9,6 +9,10 @@ export const pointLightDescriptor: LightKindDescriptor = {
     kind: 'point',
     glsl: lightPointGLSL,
     delta: true,   // not hittable: no region, LIGHT_DELTA, no pdf function
+    // Authored input (besides kind/emission): the position.
+    authoredParams: [
+        { name: 'position', shape: 'vec3', required: true },
+    ],
     params: [
         { name: 'position', shape: 'vec3', semantic: 'geometric', kind: 'point' },
         { name: 'intensity', shape: 'vec3', semantic: 'radiometric' },   // W/sr, precomputed product

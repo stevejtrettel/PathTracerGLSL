@@ -62,6 +62,31 @@ describe('Validator', () => {
         expect(bag.getErrors().some(e => e.code === 'invalid-setting' && /directional/i.test(e.message))).toBe(true);
     });
 
+    it('rejects unknown light kinds with the registered list (never a silent skip)', () => {
+        const bag = run(s => { s.lights.push({ kind: 'quadd', corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 1 } as unknown as SceneDescription['lights'][number]); });
+        expect(bag.getErrors().some(e => /unknown light kind 'quadd'/.test(e.message) && /point, quad, sphere/.test(e.message))).toBe(true);
+    });
+
+    it('rejects a light missing a required authored field (schema-driven, W2)', () => {
+        const bag = run(s => { s.lights = [{ kind: 'sphere', position: [0, 5, 0], emission: 5 } as unknown as SceneDescription['lights'][number]]; });
+        expect(bag.getErrors().some(e => /required field 'radius' is missing/.test(e.message))).toBe(true);
+    });
+
+    it('rejects a light field of the wrong shape (no raw crash — the quad TypeError class)', () => {
+        const bag = run(s => { s.lights = [{ kind: 'quad', corner: [0, 0, 0], edge1: [1, 0], edge2: [0, 0, 1], emission: 5 } as unknown as SceneDescription['lights'][number]]; });
+        expect(bag.getErrors().some(e => /field 'edge1' must be a vec3/.test(e.message))).toBe(true);
+    });
+
+    it('rejects a light with no emission (required, B2 universal word)', () => {
+        const bag = run(s => { s.lights = [{ kind: 'point', position: [0, 5, 0] } as unknown as SceneDescription['lights'][number]]; });
+        expect(bag.getErrors().some(e => /required field 'emission' is missing/.test(e.message))).toBe(true);
+    });
+
+    it('warns on unknown light fields (typo class)', () => {
+        const bag = run(s => { s.lights = [{ kind: 'point', position: [0, 5, 0], intensity: 3, emission: 5 } as unknown as SceneDescription['lights'][number]]; });
+        expect(bag.getWarnings().some(w => /unknown field 'intensity'/.test(w.message))).toBe(true);
+    });
+
     it('rejects direct lighting requested with no lights', () => {
         const bag = run(s => { s.lights = []; });
         expect(codes(bag)).toContain('incompatible-options');

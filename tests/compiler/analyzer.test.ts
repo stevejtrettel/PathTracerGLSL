@@ -40,19 +40,6 @@ describe('analyze — geometry', () => {
 });
 
 describe('analyze — materials & procedural detection', () => {
-    it('sets per-model booleans from material.model', () => {
-        const f = analyze(scene({
-            materials: {
-                a: { model: 'lambert' },
-                b: { model: 'dielectric' },
-            },
-        }));
-        expect(f.materials.hasLambert).toBe(true);
-        expect(f.materials.hasDielectric).toBe(true);
-        expect(f.materials.hasDisney).toBe(false);
-        expect(f.materials.hasEmissive).toBe(false);
-    });
-
     it('flags hasProcedural only for GlslExpression properties', () => {
         const glsl: GlslExpression = { kind: 'glsl', source: 'vec3(0.5)' };
         const f = analyze(scene({ materials: { a: { model: 'lambert', albedo: glsl } } }));
@@ -71,21 +58,22 @@ describe('analyze — materials & procedural detection', () => {
     });
 });
 
-describe('analyze — lighting', () => {
-    it('counts point vs directional and keeps totalLightCount consistent', () => {
+describe('analyze — lighting (registry-derived census, the lights-door rule)', () => {
+    it('classifies by the descriptor delta fact and counts unregistered kinds separately', () => {
         const f = analyze(scene({
             lights: [
                 { kind: 'point', position: [0, 0, 0], emission: 1 },
                 { kind: 'point', position: [1, 0, 0], emission: 1 },
-                { kind: 'directional', direction: [0, -1, 0], emission: 1 },
+                { kind: 'quad', corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 1 },
+                { kind: 'directional', direction: [0, -1, 0], emission: 1 },   // reserved: no occupant
             ],
         }));
-        expect(f.lighting.pointLightCount).toBe(2);
-        expect(f.lighting.directionalLightCount).toBe(1);
-        expect(f.lighting.totalLightCount).toBe(3);
-        expect(f.lighting.totalLightCount).toBe(
-            f.lighting.pointLightCount + f.lighting.directionalLightCount,
-        );
+        expect(f.lighting.deltaLightCount).toBe(2);
+        expect(f.lighting.areaLightCount).toBe(1);
+        expect(f.lighting.unknownKindLightCount).toBe(1);
+        // totalLightCount counts AUTHORED lights (intent — a kind rejection must not
+        // stack a misleading "scene has no lights" on top).
+        expect(f.lighting.totalLightCount).toBe(4);
     });
 });
 

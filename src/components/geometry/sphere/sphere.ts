@@ -9,7 +9,7 @@ export const sphereDescriptor: PrimitiveDescriptor = {
     type: 'sphere',
     params: [
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
-        { name: 'radius', kind: 'length', shape: 'number', required: true, default: 1.0, constraint: { kind: 'positive' } },
+        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
     ],
     glsl: sphereGLSL,
     provides: { sdf: true, analytic: true },

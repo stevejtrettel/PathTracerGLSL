@@ -50,11 +50,6 @@ export function validate(
     // Analytic objects (closed-form sphere/plane) are supported — the analytic geometry backend
     // (docs/impl-plan-analytic-backend.md). StandardAnalytic already constrains type to sphere|plane.
 
-    if (features.lighting.directionalLightCount > 0) {
-        bag.error('invalid-setting', 'Directional lights not yet supported')
-            .add();
-    }
-
     if (strategy.estimator.directLighting !== 'none'
         && features.lighting.totalLightCount === 0
         && !features.environment.samplable) {
@@ -66,20 +61,77 @@ export function validate(
     // --- Lights (impl-plan-area-lights A0; degeneracy rules registry-driven — A3) ---
     for (let i = 0; i < scene.lights.length; i++) {
         const light = scene.lights[i];
-        // Kind-specific degeneracy (near-zero quad area → Inf pdfs; non-positive sphere
-        // radius): the kind DESCRIPTOR declares its rules; the Validator emits them.
         const d = LIGHT_KINDS[light.kind];
-        if (d?.validateAuthored !== undefined) {
-            for (const msg of d.validateAuthored(light as unknown as Record<string, unknown>)) {
-                bag.error('invalid-setting', `Light ${i}: ${msg}`).add();
+        // Unregistered kinds are REJECTED, never silently skipped (the Planner's skip is
+        // the unreachable backstop) — a typo'd kind must not render the scene minus one
+        // light with no diagnostic. 'directional' is declared input vocabulary
+        // (reserved-not-removed), so it gets the honest message instead of "unknown".
+        if (d === undefined) {
+            if (light.kind === 'directional') {
+                bag.error('invalid-setting',
+                    `Light ${i}: directional lights not yet supported (reserved input vocabulary — no light-kind registry occupant)`)
+                    .add();
+            } else {
+                bag.error('invalid-setting',
+                    `Light ${i}: unknown light kind '${light.kind}' (registered kinds: ${Object.keys(LIGHT_KINDS).join(', ')})`)
+                    .add();
+            }
+            continue;
+        }
+        // Authored-input schema (C7 parity with geometry): unknown keys warn (typo class),
+        // missing required / wrong shape error. Runs BEFORE the degeneracy rules so
+        // validateAuthored may assume well-shaped input (a missing edge used to throw a
+        // raw TypeError from inside the area formula).
+        const authored = light as unknown as Record<string, unknown>;
+        const known = new Set(['kind', 'emission', ...d.authoredParams.map((p) => p.name)]);
+        for (const key of Object.keys(authored)) {
+            if (!known.has(key)) {
+                bag.warning('invalid-setting',
+                    `Light ${i} (${light.kind}): unknown field '${key}' is ignored (valid: ${[...known].join(', ')})`)
+                    .add();
             }
         }
+        let shapesOk = true;
+        for (const p of d.authoredParams) {
+            const v = authored[p.name];
+            if (v === undefined) {
+                if (p.required) {
+                    bag.error('invalid-setting', `Light ${i} (${light.kind}): required field '${p.name}' is missing`).add();
+                    shapesOk = false;
+                }
+                continue;
+            }
+            const ok = p.shape === 'number'
+                ? typeof v === 'number' && Number.isFinite(v)
+                : Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number' && Number.isFinite(c));
+            if (!ok) {
+                bag.error('invalid-setting',
+                    `Light ${i} (${light.kind}): field '${p.name}' must be a ${p.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
+                    .add();
+                shapesOk = false;
+            }
+        }
+        // emission (B2's universal radiometric word) — required, number|vec3, >= 0.
         // Negative radiance is non-physical: pt sees negative energy on every hit while the
         // power CDF floors at ~0 so NEE almost never samples it — the strategies diverge.
-        const e = light.emission;
-        const negative = typeof e === 'number' ? e < 0 : e.some((c) => c < 0);
-        if (negative) {
+        const e = authored.emission;
+        const eChannels = typeof e === 'number' && Number.isFinite(e) ? [e]
+            : Array.isArray(e) && e.length === 3 && e.every((c) => typeof c === 'number' && Number.isFinite(c)) ? e as number[]
+            : null;
+        if (e === undefined) {
+            bag.error('invalid-setting', `Light ${i} (${light.kind}): required field 'emission' is missing (Le for area kinds, radiant intensity for delta — scalar broadcasts)`).add();
+        } else if (eChannels === null) {
+            bag.error('invalid-setting', `Light ${i} (${light.kind}): emission must be a finite number or vec3`).add();
+        } else if (eChannels.some((c) => c < 0)) {
             bag.error('invalid-setting', `Light ${i}: emission must be >= 0 (negative radiance diverges pt vs pt-nee)`).add();
+        }
+        // Kind-specific degeneracy (near-zero quad area → Inf pdfs; non-positive sphere
+        // radius): the kind DESCRIPTOR declares its rules; the Validator emits them —
+        // only over well-shaped input.
+        if (shapesOk && d.validateAuthored !== undefined) {
+            for (const msg of d.validateAuthored(authored)) {
+                bag.error('invalid-setting', `Light ${i}: ${msg}`).add();
+            }
         }
     }
 
@@ -214,27 +266,32 @@ export function validate(
                 && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name);
             if (wouldRegister) {
                 bag.error('invalid-setting',
-                    `Material '${name}': model '${mat.model}' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use model 'lambert' (albedo 0 for a pure emitter) or set sampleAsLight: false`)
+                    `Material '${name}': model '${mat.model}' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (${[...EMITTING_MODELS].join(', ')}) or set sampleAsLight: false`)
                     .add();
             } else {
                 bag.warning('invalid-setting',
-                    `Material '${name}': emission is ignored for model '${mat.model}' — its emission dispatch returns zero (only lambert emits in v1)`)
+                    `Material '${name}': emission is ignored for model '${mat.model}' — its emission dispatch returns zero (emissive-capable models: ${[...EMITTING_MODELS].join(', ')})`)
                     .add();
             }
         }
     }
 
-    // Check for unsupported material models
-    if (features.materials.hasDisney) {
-        bag.error('invalid-setting', "Material model 'disney' not yet supported").add();
-    }
-    if (features.materials.hasEmissive) {
-        // Review C4: 'emissive' flowed through the Planner into the dispatch and failed at the
-        // GPU with an undeclared-identifier error instead of a diagnostic. Superseded by
-        // emission on any surface model, and by model 'none' + medium for pure volume regions.
-        bag.error('invalid-setting',
-            "Material model 'emissive' is not a model — use emission on a surface model (e.g. lambert with albedo 0), or model 'none' with a medium block for a pure volume region")
-            .add();
+    // Model registration (the B1 treatment — model ids are strings, the registry + this
+    // check gatekeep): unknown models are REJECTED with the registered set, never passed
+    // through to emit calls on symbols no include defines. 'none' is structural
+    // vocabulary (§3.6), not a registry key; 'emissive' keeps its migration message
+    // (review C4: it used to fail at the GPU as an undeclared identifier).
+    for (const [name, mat] of Object.entries(scene.materials)) {
+        if (mat.model === 'none' || MATERIAL_MODELS[mat.model] !== undefined) continue;
+        if (mat.model === 'emissive') {
+            bag.error('invalid-setting',
+                `Material '${name}': model 'emissive' is not a model — use emission on a surface model (e.g. lambert with albedo 0), or model 'none' with a medium block for a pure volume region`)
+                .add();
+        } else {
+            bag.error('invalid-setting',
+                `Material '${name}': unknown material model '${mat.model}' (registered models: ${Object.keys(MATERIAL_MODELS).join(', ')}; 'none' = no optical surface)`)
+                .add();
+        }
     }
 
     // --- Media (impl-plan-media M0; V1-C1 as rejections per §1.1) ---
@@ -295,9 +352,13 @@ export function validate(
         }
         // Pin 1: equiangular needs the light's position BEFORE choosing t — our area
         // samplers are solid-angle-from-p. Delta lights only until the p-independent
-        // area arms land (reject-not-degrade).
-        const hasAreaLight = scene.lights.some((l) => l.kind === 'quad' || l.kind === 'sphere')
-            || Object.values(scene.materials).some((m) => m.sampleAsLight === true);
+        // area arms land (reject-not-degrade). Registry-derived (the lights-door rule);
+        // the explicit `!== undefined` guard matters — `!LIGHT_KINDS[k]?.delta` would
+        // count UNREGISTERED kinds as area lights (they already get their own rejection).
+        const hasAreaLight = scene.lights.some((l) => {
+            const kind = LIGHT_KINDS[l.kind];
+            return kind !== undefined && !kind.delta;
+        }) || Object.values(scene.materials).some((m) => m.sampleAsLight === true);
         if (hasAreaLight) {
             bag.error('incompatible-options',
                 `mediumLightSampling 'equiangular' supports DELTA lights only in v1 — this scene has samplable area emitters (deferred: p-independent area arms, impl-plan-equiangular §7)`)
@@ -374,25 +435,37 @@ export function validate(
     }
 
 
-    // Dielectric ior constraints: the generated ior_of table is region-indexed (no shading
-    // point), so a GLSL-expression ior is unrepresentable — reject here with a real diagnostic
-    // (the generator's throw is only a backstop). An ior on a NON-dielectric material is ignored
-    // (pinned to 1.0 in the table) — warn so the author isn't silently surprised.
+    // Region-table (ior-class) constraints, STRUCTURAL (materials-§7 — no model name
+    // here): the generated <row>_of table is region-indexed (no shading point), so a
+    // GLSL expression on a transmissive model's region-table row is unrepresentable —
+    // reject with a real diagnostic (the generator's throw is only a backstop). The
+    // same row source authored on a NON-transmissive model is ignored (pinned to 1.0
+    // in the table) — warn so the author isn't silently surprised.
+    const regionTableSources = new Set(Object.values(MATERIAL_MODELS)
+        .flatMap((d) => d?.properties.filter((p) => p.storage === 'region-table').map((p) => p.source as string) ?? []));
     for (const [name, mat] of Object.entries(scene.materials)) {
-        if (mat.model === 'dielectric' && isGlslExpression(mat.ior)) {
+        const ownRegionRow = MATERIAL_MODELS[mat.model]?.properties.find((p) => p.storage === 'region-table');
+        if (ownRegionRow !== undefined && isGlslExpression((mat as unknown as Record<string, unknown>)[ownRegionRow.source])) {
             bag.error('invalid-setting',
-                `Material '${name}': ior cannot be a GLSL expression — ior_of(region) is a region-indexed table with no shading point (use a constant or {param})`)
+                `Material '${name}': ${ownRegionRow.source} cannot be a GLSL expression — ${ownRegionRow.source}_of(region) is a region-indexed table with no shading point (use a constant or {param})`)
                 .add();
         }
-        if (mat.model !== 'dielectric' && mat.ior !== undefined) {
-            bag.warning('invalid-setting',
-                `Material '${name}': ior is ignored for model '${mat.model}' (non-transmissive regions are pinned to 1.0 in ior_of)`)
-                .add();
+        for (const source of regionTableSources) {
+            if (ownRegionRow?.source === source) continue;
+            if ((mat as unknown as Record<string, unknown>)[source] !== undefined) {
+                bag.warning('invalid-setting',
+                    `Material '${name}': ${source} is ignored for model '${mat.model}' (non-transmissive regions are pinned to 1.0 in ${source}_of)`)
+                    .add();
+            }
         }
 
         // GGX roughness sanity: alpha = roughness² is clamped ≥ 1e-3 in ggx.glsl — a
         // roughness authored below ~0.032 silently renders rougher than asked; a true
         // mirror is a delta model (§3.1), not GGX at 0.
+        // ACKNOWLEDGED model-by-name policy (warning-grade prose, not a domain): stays
+        // hardcoded until a SECOND model needs a soft range — then it becomes row
+        // metadata feeding propertyValidation (rule of three; don't build machinery
+        // for one instance).
         if (mat.model === 'ggx' && typeof mat.roughness === 'number') {
             if (mat.roughness < 0.032 || mat.roughness > 1.0) {
                 bag.warning('invalid-setting',

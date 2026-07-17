@@ -33,5 +33,5 @@ float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
 }
 
 Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
-    return mp.emission * mp.emission_strength;  // fixed struct still splits these (§3.4 defers the merge)
+    return mp.emission;
 }

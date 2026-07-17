@@ -73,17 +73,15 @@ export function unionFields<S extends string>(schemaSets: PropertySchema<S>[][])
     return [...byName.values()];
 }
 
-/**
- * The generated struct text. `emission` carries its paired `emission_strength`
- * (the fixed-struct split the §3.4 note defers merging — lambert_emission reads both).
- */
+/** The generated struct text — fields are EXACTLY the union rows (A1: no riders; the
+ *  fixed-struct-era emission_strength was merged away, its product was identically
+ *  `emission`). */
 export function buildPropertiesStruct<S extends string>(structName: string, fields: PropertySchema<S>[], baseFields: string[] = []): string {
     const lines = [`// Generated ${structName} — the union of fields the models PRESENT read (§3.4)`];
     lines.push(`struct ${structName} {`);
     for (const b of baseFields) lines.push(`    ${b}`);
     for (const f of fields) {
         lines.push(`    ${f.glslType} ${f.name};`);
-        if (f.name === 'emission') lines.push('    float emission_strength;');
     }
     lines.push('};');
     return lines.join('\n');

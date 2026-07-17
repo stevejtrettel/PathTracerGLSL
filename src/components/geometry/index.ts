@@ -1,6 +1,7 @@
 // Geometry primitive registry (impl-plan-geometry-descriptors) — one descriptor per
 // primitive, both backends' facts together. Adding a primitive = one folder + one
-// registry line (+ one word in the compiler's type union, reject-not-remove).
+// registry line, NOTHING else (B1: object `type` is a string; this registry + the
+// Validator gatekeep — no type union exists).
 //
 // GLSL is STRUCT-SHAPED (owner-decided; the MaterialProperties house pattern): each
 // primitive declares `struct <Type>` and the uniform function surface over it —
@@ -30,7 +31,7 @@ import { cylinderDescriptor } from './cylinder/cylinder.js';
 
 export type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues, PrimitiveParamSpec } from '../descriptors.js';
 export { canonicalPlane } from './plane/plane.js';
-export { quadNormal } from './quad/quad.js';
+export { quadCross, quadNormal } from './quad/quad.js';
 
 /** Registry insertion order = deterministic emission order for primitive includes. */
 export const PRIMITIVES: Record<string, PrimitiveDescriptor> = {

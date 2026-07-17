@@ -4,6 +4,7 @@ import type { SceneDescription, MaterialProperty } from '../types.js';
 import { isGlslExpression } from '../types.js';
 import type { SceneFeatures } from './types.js';
 import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
+import { LIGHT_KINDS } from '../../components/lights/index.js';
 
 /** A medium coefficient is "possibly nonzero" if it's a nonzero constant or {param}-driven
  *  (a live parameter can become nonzero at runtime, so the code path must exist). */
@@ -38,11 +39,8 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         else if (backend === 'analytic') analyticCount++;
     }
 
-    // --- Materials ---
-    let hasLambert = false;
-    let hasDisney = false;
-    let hasDielectric = false;
-    let hasEmissive = false;
+    // --- Materials (no per-model registry-shadow flags — the Validator checks model
+    // registration per material; 'none' is structural vocabulary, §3.6) ---
     let hasProcedural = false;
 
     // --- Media (§3.5/§3.6, fable-volumetric-component.md) ---
@@ -51,10 +49,6 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     let hasNullInterfaces = false;
 
     for (const mat of Object.values(scene.materials)) {
-        if (mat.model === 'lambert') hasLambert = true;
-        if (mat.model === 'disney') hasDisney = true;
-        if (mat.model === 'dielectric') hasDielectric = true;
-        if (mat.model === 'emissive') hasEmissive = true;
         if (mat.model === 'none') hasNullInterfaces = true;
 
         if (mat.medium !== undefined) {
@@ -71,18 +65,17 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         }
     }
 
-    // --- Lighting ---
-    let pointLightCount = 0;
-    let directionalLightCount = 0;
+    // --- Lighting (census REGISTRY-DERIVED — the lights-door rule: adding a kind must
+    // not touch this site; the descriptor's `delta` fact is the classification) ---
+    let deltaLightCount = 0;
     let areaLightCount = 0;
+    let unknownKindLightCount = 0;
 
     for (const light of scene.lights) {
-        switch (light.kind) {
-            case 'point': pointLightCount++; break;
-            case 'directional': directionalLightCount++; break;
-            case 'quad': areaLightCount++; break;
-            case 'sphere': areaLightCount++; break;
-        }
+        const d = LIGHT_KINDS[light.kind];
+        if (d === undefined) unknownKindLightCount++;   // 'directional' (reserved) + typos — Validator rejects each
+        else if (d.delta) deltaLightCount++;
+        else areaLightCount++;
     }
 
     // §6.2 registry, sampleAsLight route: emissive analytic quad/sphere OBJECTS are samplable
@@ -98,7 +91,10 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         if (isConstantNonzero(mat.emission)) samplableEmitterCount++;
     }
 
-    const totalLightCount = pointLightCount + directionalLightCount + areaLightCount + samplableEmitterCount;
+    // Unknown kinds COUNT here deliberately: totalLightCount is about authoring INTENT —
+    // a scene whose only light is a typo'd/reserved kind should get the kind rejection,
+    // not a misleading "scene has no lights" on top of it.
+    const totalLightCount = deltaLightCount + areaLightCount + unknownKindLightCount + samplableEmitterCount;
 
     // --- Environment as a light (T3/T4, D6): tabulated kinds default TRUE, constant opt-in, none never.
     const env = scene.environment;
@@ -121,16 +117,12 @@ export function analyze(scene: SceneDescription): SceneFeatures {
             analyticCount,
         },
         materials: {
-            hasLambert,
-            hasDisney,
-            hasDielectric,
-            hasEmissive,
             hasProcedural,
         },
         lighting: {
-            pointLightCount,
-            directionalLightCount,
+            deltaLightCount,
             areaLightCount,
+            unknownKindLightCount,
             samplableEmitterCount,
             totalLightCount,
         },
