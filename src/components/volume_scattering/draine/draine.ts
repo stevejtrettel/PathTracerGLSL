@@ -9,6 +9,6 @@ export const draineDescriptor: PhaseModelDescriptor = {
     id: 'draine',
     glsl: draineGLSL,
     properties: [
-        { name: 'draine_d', glslType: 'float', semantic: 'geometric', source: 'draine_d', default: '10.0', storage: 'field' },
+        { name: 'draine_d', glslType: 'float', semantic: 'geometric', source: 'draine_d', default: 10, storage: 'field' },
     ],
 };

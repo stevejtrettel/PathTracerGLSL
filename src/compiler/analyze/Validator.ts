@@ -5,7 +5,7 @@ import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
-import { PRIMITIVE_PARAMS, type PrimitiveParam } from '../../components/geometry/index.js';
+import { PRIMITIVES, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
@@ -16,8 +16,12 @@ import { validateSceneProperties } from './propertyValidation.js';
 const MIN_QUAD_AREA = 1e-8;
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
 const MAX_PHASE_G = 0.99;
-/** Models whose interaction_surface_emission dispatch reads mp.emission (the phantom-light rule). */
-const EMITTING_MODELS = new Set<string>(['lambert']);
+/** Models whose interaction_surface_emission dispatch reads mp.emission (the phantom-light
+ *  rule) — DERIVED from the registry's capabilities.emissive, the same fact the emission
+ *  gate compiles from (a hardcoded set here would go stale the day a new emissive-capable
+ *  model landed, erroring on legitimate emitters). */
+const EMITTING_MODELS = new Set<string>(
+    Object.entries(MATERIAL_MODELS).filter(([, d]) => d?.capabilities.emissive).map(([id]) => id));
 
 /**
  * Validate scene + strategy against current compiler capabilities.
@@ -123,7 +127,7 @@ export function validate(
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.sampleAsLight !== true) continue;
         const analyticSamplable = scene.objects.some((o) =>
-            o.kind === 'analytic' && (o.shape.type === 'quad' || o.shape.type === 'sphere') && o.material === name);
+            o.kind === 'analytic' && PRIMITIVES[o.shape.type]?.samplableAsLight === true && o.material === name);
         if (!analyticSamplable) {
             bag.error('invalid-setting',
                 `Material '${name}': sampleAsLight requires an ANALYTIC quad or sphere object using it (V1-C2 — emissive SDF/custom shapes are path-only and still glow)`)
@@ -350,10 +354,13 @@ export function validate(
         // Schema discipline (R2, the C5 silent-inert class): a {param}-DRIVEN property the
         // material's model doesn't read would be a live knob wired to nothing — warn.
         // (Constants on undeclared fields stay silent: harmless authoring slack.)
+        // The property list is the registry-wide union of row sources (materials-§7) —
+        // no hardcoded vocabulary here.
         if (mat.model !== 'none') {
             const declared = new Set(MATERIAL_MODELS[mat.model]?.properties.map((f) => f.source as string) ?? []);
-            for (const prop of ['albedo', 'emission', 'roughness', 'f0', 'transmittance', 'ior'] as const) {
-                const value = mat[prop];
+            const allSources = new Set(Object.values(MATERIAL_MODELS).flatMap((d) => d?.properties.map((f) => f.source as string) ?? []));
+            for (const prop of allSources) {
+                const value = (mat as unknown as Record<string, unknown>)[prop];
                 if (value !== undefined && isValueParam(value) && !declared.has(prop)) {
                     bag.warning('invalid-setting',
                         `Material '${name}': '${prop}' is {param}-driven but model '${mat.model}' does not read it — the knob would control nothing (schemas: fable-module-anatomy §3)`)
@@ -384,8 +391,11 @@ export function validate(
             : (obj.shape as { type?: string; parameters?: Record<string, unknown> });
         const type = spec.type;
         const params = spec.parameters ?? {};
-        const schema = PRIMITIVE_PARAMS[`${obj.kind}:${type}`];
-        if (!schema) continue;
+        const desc = type !== undefined ? PRIMITIVES[type] : undefined;
+        // Unimplemented types/backends are the Planner's diagnostic, not ours.
+        const backendPresent = desc !== undefined && (obj.kind === 'sdf' ? desc.provides.sdf : desc.provides.analytic);
+        if (!desc || !backendPresent) continue;
+        const schema = desc.params;
         const known = new Map(schema.map((s) => [s.name, s]));
         for (const key of Object.keys(params)) {
             if (!known.has(key)) {
@@ -490,8 +500,7 @@ export function validate(
         // Live light geometry is the deferred Value<T>-light-params batch (and must be
         // RIGID there — driven scale would silently stale the CDF).
         if (isDrivenTransform(t) && obj.kind === 'analytic') {
-            const shapeType = obj.shape.type;
-            if (shapeType === 'quad' || shapeType === 'sphere') {
+            if (PRIMITIVES[obj.shape.type]?.samplableAsLight === true) {
                 const mat = scene.materials[obj.material];
                 if (mat !== undefined && mat.sampleAsLight !== false && hasConstantNonzeroEmission(mat.emission)) {
                     bag.error('invalid-transform',
@@ -612,7 +621,7 @@ function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void 
 }
 
 function validatePrimitiveConstraint(
-    schema: PrimitiveParam,
+    schema: PrimitiveParamSpec,
     value: unknown,
     label: string,
     bag: DiagnosticBag,

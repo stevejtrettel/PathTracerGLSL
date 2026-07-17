@@ -116,7 +116,7 @@ export interface MeshObject {
 }
 
 export interface StandardSDF {
-    type: 'sphere' | 'plane' | 'box' | 'torus' | 'capsule';
+    type: 'sphere' | 'plane' | 'box' | 'cylinder' | 'torus' | 'capsule';
     parameters: Record<string, number | number[]>;
 }
 

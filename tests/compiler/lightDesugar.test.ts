@@ -54,9 +54,9 @@ describe('explicit-light desugar (§6.2)', () => {
         const emitter = p.materials.find((m) => m.name.startsWith('__light_'));
         expect(emitter).toBeDefined();
         expect(emitter!.model).toBe('lambert');
-        expect(emitter!.albedo).toEqual([0, 0, 0]);
+        expect(emitter!.values.albedo).toEqual([0, 0, 0]);
         // Le shared EXACTLY between emission table and sampler (the invariant comment)
-        expect(emitter!.emission).toEqual([5, 2.5, 1.25]);
+        expect(emitter!.values.emission).toEqual([5, 2.5, 1.25]);
         const light = p.lights[0];
         expect((light.color as Vec3).map((c) => c * light.intensity)).toEqual([5, 2.5, 1.25]);
         // the synthesized region exists and points at the emitter material

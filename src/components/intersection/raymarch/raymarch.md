@@ -1,14 +1,14 @@
 # SDF backend — what it computes and why
 
-Geometry as signed distance: each primitive is a function `sdf_*(p) → float` whose
+Geometry as signed distance: each primitive is a function `<type>_sdf(p, <Type>) → float` whose
 sign says inside/outside and whose magnitude bounds the distance to the surface.
 Intersection is sphere-tracing: step by the scene's unsigned nearest-surface bound
 until it collapses.
 
 The pieces and why they are shaped this way:
 
-- `sdf_primitives.glsl` — the closed-form distance functions (`sdf_sphere`,
-  `sdf_plane`, `sdf_box`); the compiler wraps them into per-object `sdf_object_<i>`
+- `components/geometry/<type>/<type>.glsl` — the closed-form distance functions (`sphere_sdf`,
+  `plane_sdf`, `box_sdf`); the compiler wraps them into per-object `sdf_object_<i>`
   functions with baked parameters and translations.
 - The generated `scene_march_bound(p, out region)` takes **min |sdf_i|** —
   UNSIGNED, arg-min over objects. Unsigned so marching works from object interiors

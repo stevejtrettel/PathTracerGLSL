@@ -11,6 +11,6 @@ export const hgDescriptor: PhaseModelDescriptor = {
     glsl: phaseHgGLSL,
     // Fields read (matches phase_hg.glsl's header): phase_g.
     properties: [
-        { name: 'phase_g', glslType: 'float', semantic: 'geometric', source: 'phase_g', default: '0.0', storage: 'field' },
+        { name: 'phase_g', glslType: 'float', semantic: 'geometric', source: 'phase_g', default: 0, storage: 'field' },
     ],
 };

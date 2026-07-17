@@ -14,6 +14,7 @@ import { fogcubeScene, fogcubeStrategy } from '../../demos/mediaScenes.js';
 import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistStrategy } from '../../demos/demoScenes.js';
 import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy, fogPanel, orbScene, orbNeeStrategy, orbPtStrategy } from '../witnesses/scenes/areaLightScenes.js';
 import { skyScene, skyPtStrategy, skyNeeStrategy, skyMisOctStrategy, furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, skyLampScene, skyLampMisStrategy, procSkyScene, procSkyNeeStrategy, procSkyMisCompStrategy } from '../witnesses/scenes/envScenes.js';
+import { cylinderScene, cylinderStrategy } from '../../demos/cylinderScene.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -126,6 +127,11 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     // env.sizeOct; compensated tables reuse the chart but bind _comp extern names.
     ['sky + pt-mis-oct', skyScene, skyMisOctStrategy],
     ['proc-sky + pt-mis-comp', procSkyScene, procSkyMisCompStrategy],
+    // Cylinder door test (first primitive through the descriptor front door): the canonical
+    // Y-axis cylinder across three placement tiers in one scene — translation, constant
+    // rotation+scale (similarity wrapper, s·d), {param}-driven rotation+scale (rigid-frame
+    // uniforms, radius/halfHeight absorb s). Also puts cylinder.glsl through glslang.
+    ['cylinders + pt-nee', cylinderScene, cylinderStrategy],
 ];
 
 describe('generated GLSL snapshot (§2.10 refactor safety net)', () => {

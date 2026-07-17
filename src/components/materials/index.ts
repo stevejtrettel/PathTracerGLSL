@@ -27,3 +27,10 @@ export function materialModel(id: MaterialModel): MaterialModelDescriptor {
 export function modelTransmission(id: MaterialModel): boolean {
     return id !== 'none' && (MATERIAL_MODELS[id]?.capabilities.transmission ?? false);
 }
+
+/** The ONE property key compiler POLICY reads by name: emission feeds the light desugar,
+ *  the sampleAsLight registry, and the emission gate — a cross-model concept paired with
+ *  `capabilities.emissive` (an emissive-capable model declares a row with this source).
+ *  Everything else is read only through schema rows; ior is found structurally (the
+ *  declaring model's region-table row), never by name. */
+export const EMISSION_KEY = 'emission';

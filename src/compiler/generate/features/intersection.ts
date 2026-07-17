@@ -12,8 +12,16 @@ import { isGlslExpression, isValueParam } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatMat3, formatVec3, paramToUniform } from '../../../components/glsl-format.js';
-import { modelTransmission } from '../../../components/materials/index.js';
-import { quadNormal } from '../../../components/geometry/index.js';
+import { MATERIAL_MODELS, modelTransmission } from '../../../components/materials/index.js';
+import {
+    PRIMITIVES,
+    primitive,
+    structName,
+    emitCtor,
+    emitSdfCall,
+    emitAnalyticTest,
+    emitSignedDistance,
+} from '../../../components/geometry/index.js';
 import {
     classifySimilarity,
     isIdentityRotation,
@@ -24,9 +32,7 @@ import {
     type Similarity,
 } from '../../../components/geometry/similarity.js';
 
-import sdfPrimitivesGLSL from '../../../components/geometry/sdf/sdf_primitives.glsl?raw';
-import raymarchGLSL from '../../../components/geometry/sdf/raymarch.glsl?raw';
-import analyticPrimitivesGLSL from '../../../components/geometry/analytic/analytic_primitives.glsl?raw';
+import raymarchGLSL from '../../../components/intersection/raymarch/raymarch.glsl?raw';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
@@ -55,11 +61,23 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         }
     }
 
-    // SDF backend: primitives + per-scene march-bound dispatch + the marcher (sdf_intersect*).
+    // Primitive math for exactly the primitives PRESENT (registry order): each is one
+    // wholesale file carrying BOTH backends' functions for that primitive (§2.12 —
+    // <type>_sdf also serves the analytic backend's containment classification).
+    const presentTypes = new Set<string>([
+        ...plan.objects.map((o) => o.sdfType as string),
+        ...plan.analyticObjects.map((o) => o.shapeType as string),
+    ]);
+    for (const d of Object.values(PRIMITIVES)) {
+        if (presentTypes.has(d.type)) {
+            blocks.push({ origin: `components/geometry/${d.type}/${d.type}.glsl`, source: d.glsl });
+        }
+    }
+
+    // SDF backend: per-scene march-bound dispatch + the marcher (sdf_intersect*).
     if (hasSDF) {
-        blocks.push({ origin: 'components/geometry/sdf/sdf_primitives.glsl', source: sdfPrimitivesGLSL });
         blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects) });
-        blocks.push({ origin: 'components/geometry/sdf/raymarch.glsl', source: raymarchGLSL });
+        blocks.push({ origin: 'components/intersection/raymarch/raymarch.glsl', source: raymarchGLSL });
     }
 
     // The occlusion query chain is a seam decision (impl-plan-exact-linkage): the opaque
@@ -68,9 +86,8 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // regardless (whole-component inclusion — the declared cost).
     const anyQuery = plan.program.intersection.anyQuery;
 
-    // Analytic backend: closed-form primitives + per-scene analytic_intersect* dispatch.
+    // Analytic backend: per-scene analytic_intersect* dispatch over the closed forms.
     if (hasAnalytic) {
-        blocks.push({ origin: 'components/geometry/analytic/analytic_primitives.glsl', source: analyticPrimitivesGLSL });
         blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects, anyQuery) });
     }
 
@@ -87,9 +104,11 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects) });
 
     // The top-level dispatcher, combining only the backends present (declared after both).
-    // Zero-thickness regions (analytic quads): their SDF never claims containment, so the
-    // dispatcher's owner-covers-own-side shortcut is invalid for them (audit H2).
-    const thinRegions = plan.analyticObjects.filter((o) => o.shapeType === 'quad').map((o) => o.index);
+    // Zero-thickness regions (descriptor `thin` fact): they never claim containment, so
+    // the dispatcher's owner-covers-own-side shortcut is invalid for them (audit H2).
+    const thinRegions = plan.analyticObjects
+        .filter((o) => primitive(o.shapeType).thin)
+        .map((o) => o.index);
     blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic, thinRegions, anyQuery) });
 
     // T4 seams: the geometry/region contract surface (§2.3 tables + the trace-loop queries).
@@ -214,31 +233,12 @@ function emitPlacementQuery(g: Similarity): string[] {
     return [`    p = ${formatMat3(m)} * ${centered};`];
 }
 
-/** The primitive call. With `scaleExpr` (driven tier), the similarity-closed LENGTH
- *  parameters are multiplied by s in-shader (center/radius/halfSize/offset — plane
- *  normals are directions and never scale). Without it, literals as folded. */
+/** The primitive call — DERIVED from the descriptor's schema row (impl-plan-geometry-
+ *  descriptors): row order = signature order; `scales` params × s under the driven
+ *  tier (center/radius/halfSize/offset — plane normals are directions and never
+ *  scale). Without scaleExpr, literals as folded. */
 function generateSDFCall(obj: PlannedSDFObject, scaleExpr?: string): string {
-    const p = obj.parameters;
-    const sized = (lit: string) => (scaleExpr ? `${scaleExpr} * ${lit}` : lit);
-    switch (obj.sdfType) {
-        case 'sphere': {
-            const center = sized(formatVec3(p.center as number[] ?? [0, 0, 0]));
-            const radius = sized(formatFloat(p.radius as number ?? 1.0));
-            return `sdf_sphere(p, ${center}, ${radius})`;
-        }
-        case 'plane': {
-            const normal = formatVec3(p.normal as number[] ?? [0, 1, 0]);
-            const offset = sized(formatFloat(p.offset as number ?? 0.0));
-            return `sdf_plane(p, ${normal}, ${offset})`;
-        }
-        case 'box': {
-            const center = sized(formatVec3(p.center as number[] ?? [0, 0, 0]));
-            const halfSize = sized(formatVec3(p.halfSize as number[] ?? [1, 1, 1]));
-            return `sdf_box(p, ${center}, ${halfSize})`;
-        }
-        default:
-            throw new Error(`intersection: unsupported SDF type '${obj.sdfType}'`);
-    }
+    return emitSdfCall(primitive(obj.sdfType), obj.parameters, { point: 'p', scale: scaleExpr });
 }
 
 // ============================================================================
@@ -257,32 +257,37 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
     lines.push('    bool found = false;');
     lines.push('    float t;');
     for (const obj of objects) {
+        const d = primitive(obj.shapeType);
+        const sn = structName(d);
         if (obj.placement !== undefined) {
-            // Driven (§6.1): conjugate into the RIGID frame once; params absorb s
-            // in-shader, so t is a WORLD value — comparable on hit.t unchanged, and
-            // the primitives' internal EPSILON guards stay world-correct.
+            // Driven (§6.1): conjugate into the RIGID frame once; the struct's
+            // length-like fields absorb s in-shader, so t is a WORLD value —
+            // comparable on hit.t unchanged, and the primitives' internal EPSILON
+            // guards stay world-correct.
             const g = obj.placement;
             lines.push(`    {`);
             lines.push(`        Ray lray = make_ray(placement_rigid(${g.uniformQ}, ${g.uniformTS}, ray.origin), placement_dir(${g.uniformQ}, ray.direction));`);
             lines.push(`        float s = placement_scale(${g.uniformTS});`);
-            lines.push(`        if (${analyticTest(obj, 'lray', 's')} && t < hit.t) {`);
+            lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters, 's')};`);
+            lines.push(`        if (${d.type}_intersect(lray, shape, t) && t < hit.t) {`);
             lines.push(`            hit.t = t; found = true;`);
             lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
-            lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${g.uniformQ}, ${drivenLocalNormal(obj)}));`);
+            lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${g.uniformQ}, ${d.type}_normal(lray.origin + t * lray.direction, shape)));`);
             lines.push(`            hit.region_owner = ${obj.index};`);
             lines.push(`            hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);`);
             lines.push(`        }`);
             lines.push(`    }`);
             continue;
         }
-        const test = analyticTest(obj, 'ray');
-        const normal = analyticNormal(obj); // GLSL expr for the OUTWARD surface normal at hit.p
-        lines.push(`    if (${test} && t < hit.t) {`);
-        lines.push(`        hit.t = t; found = true;`);
-        lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
-        lines.push(`        hit.frame = ambient_frame(hit.p, ${normal});`);
-        lines.push(`        hit.region_owner = ${obj.index};`);
-        lines.push(`        hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);`);
+        lines.push(`    {`);
+        lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters)};`);
+        lines.push(`        if (${d.type}_intersect(ray, shape, t) && t < hit.t) {`);
+        lines.push(`            hit.t = t; found = true;`);
+        lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
+        lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, shape));`);
+        lines.push(`            hit.region_owner = ${obj.index};`);
+        lines.push(`            hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);`);
+        lines.push(`        }`);
         lines.push(`    }`);
     }
     lines.push('    return found;');
@@ -311,90 +316,18 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
     return lines.join('\n');
 }
 
-/** GLSL boolean test call that writes `t` for object `obj`, against ray var `rayVar`.
- *  With `scaleExpr` (driven §6.1), the similarity-closed LENGTH parameters are
- *  multiplied by s in-shader (directions — plane/quad normals — never scale). */
+/** GLSL boolean test call that writes `t` — DERIVED from the descriptor row (quad's
+ *  precomputed one-sided normal is a derived struct field). With `scaleExpr` (driven
+ *  §6.1), the length-like constructor args are multiplied by s in-shader. */
 function analyticTest(obj: PlannedAnalyticObject, rayVar: string, scaleExpr?: string): string {
-    const p = obj.parameters;
-    const sized = (lit: string) => (scaleExpr ? `${scaleExpr} * ${lit}` : lit);
-    switch (obj.shapeType) {
-        case 'sphere': {
-            const center = sized(formatVec3(p.center as number[] ?? [0, 0, 0]));
-            const radius = sized(formatFloat(p.radius as number ?? 1.0));
-            return `ray_sphere(${rayVar}, ${center}, ${radius}, t)`;
-        }
-        case 'plane': {
-            const normal = formatVec3(p.normal as number[] ?? [0, 1, 0]);
-            const offset = sized(formatFloat(p.offset as number ?? 0.0));
-            return `ray_plane(${rayVar}, ${normal}, ${offset}, t)`;
-        }
-        case 'quad': {
-            const corner = sized(formatVec3(p.corner as number[] ?? [0, 0, 0]));
-            const edge1 = p.edge1 as number[] ?? [1, 0, 0];
-            const edge2 = p.edge2 as number[] ?? [0, 0, 1];
-            return `ray_quad(${rayVar}, ${corner}, ${sized(formatVec3(edge1))}, ${sized(formatVec3(edge2))}, ${formatVec3(quadNormal(edge1, edge2))}, t)`;
-        }
-        default:
-            throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
-    }
+    return emitAnalyticTest(primitive(obj.shapeType), obj.parameters, rayVar, scaleExpr);
 }
 
-/** Rigid-frame OUTWARD normal expr at the driven hit (world normal = placement_normal
- *  of this). Scale-invariant shapes: plane/quad normals are unit directions; the
- *  sphere normal renormalizes against the scaled center/radius. */
-function drivenLocalNormal(obj: PlannedAnalyticObject): string {
-    const p = obj.parameters;
-    switch (obj.shapeType) {
-        case 'sphere':
-            return `normalize((lray.origin + t * lray.direction) - s * ${formatVec3(p.center as number[] ?? [0, 0, 0])})`;
-        case 'plane':
-            return formatVec3(p.normal as number[] ?? [0, 1, 0]);
-        case 'quad':
-            // Emitting side (one-sided pin) — local edges' unit cross; unchanged by s>0.
-            return formatVec3(quadNormal(p.edge1 as number[] ?? [1, 0, 0], p.edge2 as number[] ?? [0, 0, 1]));
-        default:
-            throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
-    }
-}
-
-/** GLSL expr for the outward surface normal at `hit.p` (matches the SDF gradient's orientation). */
-function analyticNormal(obj: PlannedAnalyticObject): string {
-    const p = obj.parameters;
-    switch (obj.shapeType) {
-        case 'sphere':
-            return `normalize(hit.p - ${formatVec3(p.center as number[] ?? [0, 0, 0])})`;
-        case 'plane':
-            return formatVec3(p.normal as number[] ?? [0, 1, 0]);
-        case 'quad':
-            // The emitting side (impl-plan-area-lights: one-sided pin). Back-face hits get the
-            // dispatcher's exit flip, which keys emission on the region BEHIND — dark, correct.
-            return formatVec3(quadNormal(p.edge1 as number[] ?? [1, 0, 0], p.edge2 as number[] ?? [0, 0, 1]));
-        default:
-            throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
-    }
-}
-
-/** GLSL expr for the SIGNED distance to `obj` at point `p` (analytic backend; matches SDF sign). */
+/** GLSL expr for the SIGNED distance to `obj` at point `p` (analytic backend) —
+ *  derived: thin primitives never claim containment; everyone else reuses their own
+ *  <type>_sdf body, so both backends share ONE distance truth per primitive. */
 function analyticSignedDistance(obj: PlannedAnalyticObject): string {
-    const p = obj.parameters;
-    switch (obj.shapeType) {
-        case 'sphere': {
-            const center = formatVec3(p.center as number[] ?? [0, 0, 0]);
-            const radius = formatFloat(p.radius as number ?? 1.0);
-            return `length(p - ${center}) - ${radius}`;
-        }
-        case 'plane': {
-            const normal = formatVec3(p.normal as number[] ?? [0, 1, 0]);
-            const offset = formatFloat(p.offset as number ?? 0.0);
-            return `dot(p, ${normal}) + ${offset}`;
-        }
-        case 'quad':
-            // Zero-thickness: never contains a point, so it never claims a region in
-            // scene_region_at — which is exactly what makes it one-sided under region_to.
-            return '1.0e20';
-        default:
-            throw new Error(`intersection: unsupported analytic type '${obj.shapeType}'`);
-    }
+    return emitSignedDistance(primitive(obj.shapeType), obj.parameters, { point: 'p' });
 }
 
 // ============================================================================
@@ -415,14 +348,14 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
     for (const obj of analytic) {
-        if (obj.placement !== undefined && obj.shapeType !== 'quad') {
+        if (obj.placement !== undefined && !primitive(obj.shapeType).thin) {
             // Driven (§6.1): classify in the rigid frame with s-scaled params — d stays
             // an exact WORLD signed distance, so innermost-wins compares correctly
-            // across constant and driven objects. (Driven quads fall through: zero
-            // thickness never claims containment, placement irrelevant.)
+            // across constant and driven objects. (Driven THIN primitives fall through:
+            // zero thickness never claims containment, placement irrelevant.)
             const g = obj.placement;
             lines.push(`    { vec3 lp = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p); float s = placement_scale(${g.uniformTS});`);
-            lines.push(`      d = ${drivenSignedDistance(obj)}; }`);
+            lines.push(`      d = ${emitSignedDistance(primitive(obj.shapeType), obj.parameters, { point: 'lp', scale: 's' })}; }`);
         } else {
             lines.push(`    d = ${analyticSignedDistance(obj)};`);
         }
@@ -431,20 +364,6 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
     lines.push('    return region;');
     lines.push('}');
     return lines.join('\n');
-}
-
-/** Rigid-frame signed distance for a DRIVEN analytic object (reads `lp` and `s` from
- *  the enclosing block). Exact world values — similarity-closed params absorb s. */
-function drivenSignedDistance(obj: PlannedAnalyticObject): string {
-    const p = obj.parameters;
-    switch (obj.shapeType) {
-        case 'sphere':
-            return `length(lp - s * ${formatVec3(p.center as number[] ?? [0, 0, 0])}) - s * ${formatFloat(p.radius as number ?? 1.0)}`;
-        case 'plane':
-            return `dot(lp, ${formatVec3(p.normal as number[] ?? [0, 1, 0])}) + s * ${formatFloat(p.offset as number ?? 0.0)}`;
-        default:
-            throw new Error(`intersection: driven signed distance unsupported for '${obj.shapeType}'`);
-    }
 }
 
 // ============================================================================
@@ -477,14 +396,19 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
         // author set an ior on them — an authored lambert ior leaking into the table silently
         // yields η = 1 at adjacent dielectric boundaries (review finding). The Validator warns.
         if (!mat || !modelTransmission(mat.model)) continue;
+        // No property name here (materials-§7): the transmission capability implies a
+        // region-table row on the declaring model's schema — found structurally.
+        const row = MATERIAL_MODELS[mat.model]?.properties.find((p) => p.storage === 'region-table');
+        const ior = row !== undefined ? mat.values[row.source] : undefined;
+        if (ior === undefined) continue;   // registry-test-enforced; unreachable backstop
         let expr: string;
-        if (isValueParam(mat.ior)) {
-            expr = paramToUniform(mat.ior.param);
-        } else if (isGlslExpression(mat.ior)) {
+        if (isValueParam(ior)) {
+            expr = paramToUniform(ior.param);
+        } else if (isGlslExpression(ior)) {
             // Backstop only — the Validator rejects this with a proper diagnostic upstream.
             throw new Error(`intersection: material '${mat.name}': ior cannot be a GLSL expression (ior_of is region-indexed, no shading point)`);
         } else {
-            expr = formatFloat(mat.ior);
+            expr = formatFloat(ior as number);
         }
         lines.push(`    if (region == ${obj.index}) return ${expr};`);
     }

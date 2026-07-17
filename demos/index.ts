@@ -20,6 +20,7 @@ import {
     mistStrategy,
 } from './demoScenes.js';
 import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js';
+import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -55,6 +56,12 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
         strategies: posed([0, 1, 4], [0, 1, 0], cornellOneshotStrategy),
         exercises: 'non-accumulating (oneshot) accumulation occupant — writes the current sample each frame, no history blend; reuses the average pipeline (never reads u_previous)',
         expected: 'a live, noisy image that does NOT converge (grain animates every frame); contrast the accumulating cornell card which cleans up over time',
+    },
+    cylinders: {
+        scene: cylinderScene,
+        strategies: posed([0, 1.7, 3.4], [0, 0.45, 0], cylinderStrategy),
+        exercises: 'the cylinder primitive (door test: one folder + one registry line + one union word) across three placement tiers — translation · constant rotation+scale (similarity wrapper, s·d correction) · {param}-driven rotation+scale (rigid-frame uniforms; radius/halfHeight absorb s in-shader)',
+        expected: 'three cylinders on a floor: upright clay, tilted green (rotated by PLACEMENT — the shape is canonical Y-axis, no axis param), red one re-orients/scales live on the spin.angle / spin.scale sliders with zero recompiles',
     },
     mixed: {
         scene: mixedScene,

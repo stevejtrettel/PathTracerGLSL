@@ -185,7 +185,7 @@ export interface PlannedPipeline {
 export interface PlannedSDFObject {
     index: number;
     materialId: number;
-    sdfType: 'sphere' | 'plane' | 'box' | 'torus' | 'capsule';
+    sdfType: 'sphere' | 'plane' | 'box' | 'cylinder' | 'torus' | 'capsule';
     parameters: Record<string, number | number[]>;
     /** Constant: composed local→world similarity (fable-transforms §5.2; any local
      *  'center' folded in as a pre-translation) lowered to wrapper tiers. Driven
@@ -210,34 +210,38 @@ export interface PlannedAnalyticObject {
     placement?: DrivenPlacement;
 }
 
+/** A schema-resolved property value: constant, expression, or live param (§2.8). */
+export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number>;
+
 /**
  * Resolved interior medium (§3.5) — constants/params only (V1-C1; the Validator rejects GLSL
- * expressions, the generator backstop-throws like ior).
+ * expressions, the generator backstop-throws like ior). sigma_a/sigma_s/model are the RTE
+ * partition CORE, read by every arm regardless of phase model — fixed fields (the material
+ * side's analogue of geometry's `p`). Phase parameters are schema-resolved (materials-§7):
+ * `values` holds exactly the medium's own model's rows, keyed by row source.
  */
 export interface PlannedMedium {
     sigma_a: Vec3 | GlslExpression | ValueParam<Vec3>;
     sigma_s: Vec3 | GlslExpression | ValueParam<Vec3>;
-    phase_g: number | GlslExpression | ValueParam<number>;
-    /** Droplet diameter µm, read only by 'draine'. */
-    draine_d: number | GlslExpression | ValueParam<number>;
     /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh' | 'draine'. */
     model: string;
+    /** Phase params of THIS medium's model (union fields of OTHER present models fall
+     *  back to their row defaults at emit time). */
+    values: Record<string, number | GlslExpression | ValueParam<number>>;
 }
 
 /**
- * Resolved material for code generation.
- * Each property is either a constant value or a GLSL expression string.
+ * Resolved material for code generation (materials-§7): property resolution is DERIVED
+ * from the model's schema rows — `values` holds exactly the declared rows (field AND
+ * region-table storage), keyed by row source, each `authored ?? row.default` shaped by
+ * glslType. No compiler type names a property; a model with a new property adds a row,
+ * not a field here.
  */
 export interface PlannedMaterial {
     id: number;
     name: string;
     model: MaterialModel;
-    albedo: Vec3 | GlslExpression | ValueParam<Vec3>;
-    emission: Vec3 | GlslExpression | ValueParam<Vec3>;
-    roughness: number | GlslExpression | ValueParam<number>;
-    f0: Vec3 | GlslExpression | ValueParam<Vec3>;               // ggx normal-incidence reflectance
-    transmittance: Vec3 | GlslExpression | ValueParam<Vec3>;    // dielectric interface tint
-    ior: number | GlslExpression | ValueParam<number>;          // → generated ior_of table (expressions rejected)
+    values: Record<string, ResolvedProperty>;
     medium: PlannedMedium | null;                               // interior medium (§3.5); null = no medium block
 }
 

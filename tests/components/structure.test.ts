@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 const ROOT = resolve(__dirname, '../../src/components');
 
 const FAMILIES = [
-    'materials', 'lights', 'volume_scattering', 'geometry', 'ambient',
+    'materials', 'lights', 'volume_scattering', 'geometry', 'intersection', 'ambient',
     'sampler', 'sensor', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport',
 ];
 

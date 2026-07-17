@@ -1,12 +1,12 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
+import type { SceneDescription, RenderStrategy, SDFObject, StandardSDF, AnalyticObject, StandardAnalytic, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
-import { MATERIAL_MODELS } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
 import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
-import { canonicalPlane, foldAnalyticParameters } from '../../components/geometry/index.js';
+import { PRIMITIVES, primitive, canonicalPlane, foldAnalyticParameters } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
     isDrivenTransform,
@@ -20,13 +20,18 @@ import {
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty } from './types.js';
 
-/** SDF primitives the generator has arms for — anything else must diagnose here, not throw there. */
-const IMPLEMENTED_SDF_TYPES = new Set<string>(['sphere', 'plane', 'box']);
+/** SDF primitives the registry has bodies for — anything else must diagnose here, not
+ *  throw there (impl-plan-geometry-descriptors: the capability IS the descriptor fact). */
+const implementedSdfTypes = () => Object.values(PRIMITIVES).filter((d) => d.provides.sdf).map((d) => d.type);
 
 export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag): RenderPlan {
     // --- Assign material IDs (sorted for deterministic ordering) ---
+    // Property resolution is SCHEMA-DRIVEN (materials-§7): exactly the model's declared
+    // rows resolve, each `authored ?? row.default` shaped by glslType. The old per-field
+    // hand-resolution (and its model-conditional ior default) dissolved into the rows —
+    // a non-dielectric simply has no ior value; ior_of pins it structurally.
     const materials: PlannedMaterial[] = [];
     let materialIndex = 0;
     const sortedMaterials = Object.entries(scene.materials).sort(([a], [b]) => a.localeCompare(b));
@@ -35,21 +40,8 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             id: materialIndex++,
             name,
             model: mat.model,
-            albedo: resolveColorProperty(mat.albedo, [0.8, 0.8, 0.8]),
-            emission: resolveColorProperty(mat.emission, [0.0, 0.0, 0.0]),
-            roughness: resolveScalarProperty(mat.roughness, 0.5),   // matches ggx's schema default
-            f0: resolveColorProperty(mat.f0, [0.9, 0.9, 0.9]),
-            transmittance: resolveColorProperty(mat.transmittance, [1.0, 1.0, 1.0]),
-            // Non-dielectrics default to 1.0 (vacuum-like): ior_of is only physically meaningful
-            // for regions a transmitted ray can enter; opaque solids must not bend η ratios.
-            ior: resolveScalarProperty(mat.ior, mat.model === 'dielectric' ? 1.5 : 1.0),
-            medium: mat.medium === undefined ? null : {
-                sigma_a: resolveColorProperty(mat.medium.sigma_a, [0.0, 0.0, 0.0]),
-                sigma_s: resolveColorProperty(mat.medium.sigma_s, [0.0, 0.0, 0.0]),
-                phase_g: resolveScalarProperty(mat.medium.phase_g, 0.0),
-                draine_d: resolveScalarProperty(mat.medium.draine_d, 10.0),
-                model: mat.medium.model ?? 'hg',
-            },
+            values: resolveMaterialValues(mat.model, mat as unknown as Record<string, MaterialProperty | undefined>),
+            medium: mat.medium === undefined ? null : resolveMedium(mat.medium),
         });
     }
 
@@ -71,9 +63,9 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             const sdf = sdfObj.sdf as StandardSDF;
             // Review C7 (partial): torus/capsule/custom exist in the type but have no generator
             // arm — a raw generator throw is not a diagnostic. Emit one here and skip the object.
-            if (!IMPLEMENTED_SDF_TYPES.has(sdf.type)) {
+            if (!PRIMITIVES[sdf.type]?.provides.sdf) {
                 bag.error('missing-geometry',
-                    `SDF primitive '${sdf.type}' is not implemented yet (available: ${[...IMPLEMENTED_SDF_TYPES].join(', ')})`)
+                    `SDF primitive '${sdf.type}' is not implemented yet (available: ${implementedSdfTypes().join(', ')})`)
                     .add();
                 objectIndex++;   // keep region ids scene-order stable for the remaining objects
                 continue;
@@ -140,16 +132,13 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             // (any mismatch makes pt and pt-nee converge to different images).
             const radiance: Vec3 = [color[0] * light.intensity, color[1] * light.intensity, color[2] * light.intensity];
             const matId = materialIndex++;
+            // Synthesized through the SAME schema path as authored materials (materials-§7)
+            // — the emitter's values cannot drift from the resolution rules.
             materials.push({
                 id: matId,
                 name: `__light_${lightIndex}`,
                 model: 'lambert',
-                albedo: [0.0, 0.0, 0.0],
-                emission: radiance,
-                roughness: 1.0,
-                f0: [0.9, 0.9, 0.9],
-                transmittance: [1.0, 1.0, 1.0],
-                ior: 1.0,
+                values: resolveMaterialValues('lambert', { albedo: [0.0, 0.0, 0.0], emission: radiance }),
                 medium: null,
             });
             const regionId = objectIndex++;
@@ -188,15 +177,16 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     for (const planned of analyticObjects) {
         const mat = materials[planned.materialId];
         if (mat === undefined || mat.name.startsWith('__light_')) continue;   // synthesized: already registered
-        if (planned.shapeType !== 'quad' && planned.shapeType !== 'sphere') continue;
+        if (PRIMITIVES[planned.shapeType]?.samplableAsLight !== true) continue;
         // Driven placement (§6): parameters are LOCAL and the geometry is live — the
         // registry bakes literals, so driven emitters are Validator-rejected upstream;
         // this skip is the backstop that keeps a stale-literal light out of the CDF.
         if (planned.placement !== undefined) continue;
         const sceneMat = scene.materials[mat.name];
         if (sceneMat === undefined || sceneMat.sampleAsLight === false) continue;
-        if (!Array.isArray(mat.emission) || !mat.emission.some((c) => c !== 0)) continue;
-        const Le = mat.emission as Vec3;
+        const emission = mat.values[EMISSION_KEY];
+        if (!Array.isArray(emission) || !emission.some((c) => c !== 0)) continue;
+        const Le = emission as Vec3;
         // Registry stores color·intensity factored as (Le, 1.0) — samplers only consume the product.
         if (planned.shapeType === 'quad') {
             const p = planned.parameters;
@@ -536,10 +526,12 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
 }
 
 /**
- * SDF placement (fable-transforms §5.2): a local 'center' parameter is a PRE-translation
- * of the placement (the object rotates/scales about its own origin, carrying the center
- * offset along) — folded so the generated wrapper owns ALL positioning and the SDF call
- * stays origin-centered, preventing double-offset when both center and transform are set.
+ * SDF placement (fable-transforms §5.2): a local POINT parameter is a PRE-translation
+ * of the placement (the object rotates/scales about its own origin, carrying the
+ * offset along) — folded so the generated wrapper owns ALL positioning and the SDF
+ * call stays origin-centered, preventing double-offset when both center and transform
+ * are set. Which parameter folds is DERIVED from the kind rows (the object's single
+ * `kind: 'point'` param — plane has none, so it falls through with no type check).
  * For pure translations this reduces exactly to the old position+center sum (byte gate).
  */
 export function resolveSDFPlacement(
@@ -554,22 +546,29 @@ export function resolveSDFPlacement(
     const parameters = sdf.type === 'plane' ? normalizePlaneParameters(sdf.parameters) : sdf.parameters;
 
     // Driven (§6): parameters stay LOCAL — the rigid-frame query scales them in-shader,
-    // so there is no center fold (the wrapper handles ALL placement, live).
+    // so there is no point fold (the wrapper handles ALL placement, live).
     if (isDrivenTransform(transform)) {
         return { parameters, placement: buildDrivenPlacement(transform!, index) };
     }
 
     const placement = placementOf(transform);
-    const center = parameters.center as number[] | undefined;
-    if (sdf.type === 'plane' || !center) {
+    // Exactly one point param folds; zero (plane) or several (no current primitive —
+    // one translation cannot absorb two points) fall through unfolded. Only an
+    // AUTHORED value folds — an omitted param resolves to its row default at emit
+    // time, exactly as before the derivation.
+    const pointParams = primitive(sdf.type).params.filter((p) => p.kind === 'point');
+    const point = pointParams.length === 1
+        ? parameters[pointParams[0].name] as number[] | undefined
+        : undefined;
+    if (!point) {
         return { parameters, placement };
     }
 
     return {
-        parameters: { ...parameters, center: [0, 0, 0] },
+        parameters: { ...parameters, [pointParams[0].name]: [0, 0, 0] },
         placement: similarityCompose(placement, {
             rotation: IDENTITY_QUAT,
-            translation: center as [number, number, number],
+            translation: point as [number, number, number],
             scale: 1,
         }),
     };
@@ -581,6 +580,43 @@ function normalizePlaneParameters(parameters: Record<string, number | number[]>)
     return {
         ...parameters,
         ...plane,
+    };
+}
+
+/** Schema-driven property resolution (materials-§7): exactly the model's declared rows,
+ *  `authored ?? row.default`, shaped by glslType (Spectrum broadcasts the scalar default
+ *  and accepts scalar-with-broadcast authored values; float rejects vectors). 'none' and
+ *  unregistered models resolve to no values — they declare nothing. */
+export function resolveMaterialValues(
+    model: MaterialModel,
+    authored: Record<string, MaterialProperty | undefined>,
+): Record<string, ResolvedProperty> {
+    const values: Record<string, ResolvedProperty> = {};
+    if (model === 'none') return values;
+    for (const row of MATERIAL_MODELS[model]?.properties ?? []) {
+        const v = authored[row.source];
+        values[row.source] = row.glslType === 'Spectrum'
+            ? resolveColorProperty(v, [row.default, row.default, row.default])
+            : resolveScalarProperty(v, row.default);
+    }
+    return values;
+}
+
+/** Medium resolution (§3.5): sigma_a/sigma_s/model are the fixed RTE core; phase params
+ *  are the medium's OWN model's schema rows (union fields of other present models fall
+ *  back to their row defaults at emit time). */
+function resolveMedium(med: MediumDescription): PlannedMedium {
+    const model = med.model ?? 'hg';
+    const values: PlannedMedium['values'] = {};
+    for (const row of PHASE_MODELS[model]?.properties ?? []) {
+        values[row.source] = resolveScalarProperty(
+            (med as unknown as Record<string, MaterialProperty | undefined>)[row.source], row.default);
+    }
+    return {
+        sigma_a: resolveColorProperty(med.sigma_a, [0.0, 0.0, 0.0]),
+        sigma_s: resolveColorProperty(med.sigma_s, [0.0, 0.0, 0.0]),
+        model,
+        values,
     };
 }
 

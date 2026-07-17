@@ -11,8 +11,8 @@ export const lambertDescriptor: MaterialModelDescriptor = {
     // emission_strength — the resolver's strength coupling rides the emission row; the
     // §3.4 field merge is deferred, see the note in lambert.glsl).
     properties: [
-        { name: 'albedo', glslType: 'Spectrum', semantic: 'radiometric', source: 'albedo', default: 'Spectrum(0.8)', storage: 'field' },
-        { name: 'emission', glslType: 'Spectrum', semantic: 'radiometric', source: 'emission', default: 'SPECTRUM_ZERO', storage: 'field' },
+        { name: 'albedo', glslType: 'Spectrum', semantic: 'radiometric', source: 'albedo', default: 0.8, storage: 'field' },
+        { name: 'emission', glslType: 'Spectrum', semantic: 'radiometric', source: 'emission', default: 0, storage: 'field' },
     ],
     capabilities: {
         nonDeltaLobes: true,

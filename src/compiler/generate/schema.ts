@@ -6,6 +6,19 @@
 // model's struct (module-anatomy §1's degeneracy, where the numeric witnesses live).
 
 import type { PropertySchema } from '../../components/descriptors.js';
+import { formatFloat } from '../../components/glsl-format.js';
+
+/** GLSL default expression DERIVED from the row's numeric default (materials-§7:
+ *  defaults live once, as numbers). Spectrum rows broadcast through the §2.5
+ *  constants/constructor; float rows format directly. */
+export function defaultExpr(f: PropertySchema<string>): string {
+    if (f.glslType === 'Spectrum') {
+        if (f.default === 0) return 'SPECTRUM_ZERO';
+        if (f.default === 1) return 'SPECTRUM_ONE';
+        return `Spectrum(${formatFloat(f.default)})`;
+    }
+    return formatFloat(f.default);
+}
 
 /**
  * Union of 'field'-storage schemas across the models present, deduped by name in

@@ -65,7 +65,7 @@ export const etaStrategy: RenderStrategy = {
 
 // Sphere FLOATS mid-box (per validation X-GLASS: r 0.5, not touching anything): exact tangency
 // with the floor parked the witness on an epsilon-degeneracy hub (spawn points inside the sphere,
-// classification probes into the floor, the ray_sphere near-root window — review finding).
+// classification probes into the floor, the sphere_intersect near-root window — review finding).
 const GLASS_SPHERE = { center: [0.35, 1.0, 0.3], radius: 0.5 };
 
 function cornellGlassObjects(glassKind: 'sdf' | 'analytic'): SceneDescription['objects'] {

@@ -10,9 +10,9 @@ import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, paramToUniform } from '../../../components/glsl-format.js';
 
-import { MATERIAL_MODELS, materialModel } from '../../../components/materials/index.js';
+import { MATERIAL_MODELS, materialModel, EMISSION_KEY } from '../../../components/materials/index.js';
 import { PHASE_MODELS } from '../../../components/volume_scattering/index.js';
-import { unionFields } from '../schema.js';
+import { unionFields, defaultExpr } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
 import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
 
@@ -36,8 +36,10 @@ function surfaceMaterials(materials: PlannedMaterial[]): PlannedMaterial[] {
  * fetches positive constants — negatives are Validator-rejected anyway (audit H1.3).
  */
 function isEmissive(mat: PlannedMaterial): boolean {
-    if (isValueParam(mat.emission) || isGlslExpression(mat.emission)) return true;
-    return mat.emission.some((c) => c > 0);
+    const e = mat.values[EMISSION_KEY];
+    if (e === undefined) return false;   // model declares no emission row
+    if (isValueParam(e) || isGlslExpression(e)) return true;
+    return Array.isArray(e) && e.some((c) => c > 0);
 }
 
 /** Scattering at compile time: σ_s nonzero constant, or {param}/expression-driven. */
@@ -119,8 +121,8 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // {param} scan follows the schemas (R2): a material's model declares which fields
     // can become live uniforms — incl. region-table fields (ior) for declaring models.
     // A driven param on an UNDECLARED field is a Validator warning (the C5 silent-inert
-    // class), not a silent uniform. Medium fields: RTE extinction + phase params, for
-    // any material with a medium block (media are materials of the interior, §3.5).
+    // class), not a silent uniform. Medium fields: RTE extinction + the medium's OWN
+    // model's phase params (media are materials of the interior, §3.5).
     const uniforms: PlannedUniform[] = [];
     const parameters: Record<string, ParameterMetadata> = {};
     const seen = new Set<string>();
@@ -128,7 +130,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         const schemas = mat.model === 'none' ? [] : (MATERIAL_MODELS[mat.model]?.properties ?? []);
         for (const f of schemas) {
             addParamUniform(
-                mat[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>,
+                mat.values[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>,
                 f.glslType === 'Spectrum' ? 'vec3' : 'float',
                 f.semantic === 'radiometric' ? 'color' : 'float',
                 uniforms, parameters, seen,
@@ -137,11 +139,15 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         if (mat.medium !== null) {
             addParamUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen);
             addParamUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen);
-            // Phase params follow the schemas: a driven phase_g in an absorbing-only
-            // program has no reader, so it earns no uniform (the C5 silent-inert rule).
-            for (const f of phaseFields) {
+            // Phase params follow the schemas — the medium's OWN model's rows, and only
+            // when that model is LIVE in this program (media.models): a driven phase_g
+            // in an absorbing-only program has no reader, so it earns no uniform (C5).
+            const phaseRows = media.models.includes(mat.medium.model)
+                ? PHASE_MODELS[mat.medium.model]?.properties ?? []
+                : [];
+            for (const f of phaseRows) {
                 addParamUniform(
-                    mat.medium[f.source as keyof PlannedMedium] as number | ValueParam<number>,
+                    mat.medium.values[f.source] as number | ValueParam<number>,
                     f.glslType === 'Spectrum' ? 'vec3' : 'float',
                     f.semantic === 'radiometric' ? 'color' : 'float',
                     uniforms, parameters, seen,
@@ -258,9 +264,10 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
     lines.push('// a material sets exactly the fields its model reads, nothing else.');
     lines.push('MaterialProperties scene_material_properties(int id, vec3 p) {');
     lines.push('    MaterialProperties props;');
-    // Defaults from the union schemas (emission carries its paired strength).
+    // Defaults from the union schemas — the GLSL expression DERIVED from the row's
+    // numeric default (emission carries its paired strength).
     for (const f of fields) {
-        lines.push(`    props.${f.name} = ${f.default};`);
+        lines.push(`    props.${f.name} = ${defaultExpr(f)};`);
         if (f.name === 'emission') lines.push('    props.emission_strength = 0.0;');
     }
 
@@ -270,7 +277,7 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             .filter((f) => f.storage === 'field');
         const body: string[] = [];
         for (const f of schemas) {
-            const value = mat[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>;
+            const value = mat.values[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>;
             const target = `        props.${f.name}`;
             if (isValueParam(value)) {
                 body.push(`${target} = ${paramToUniform(value.param)};`);
@@ -394,7 +401,7 @@ function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Ve
     return format(prop as never);
 }
 
-function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema<Extract<keyof PlannedMedium, string>>[]): string {
+function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[]): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const hasModel = models.length > 0;         // the `model` field exists only when scattering is live
     // Field set = the PRESENT scattering models' schema union (§3.4 literal — the same
@@ -405,7 +412,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
     lines.push('    MediumProperties m;');
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');
     lines.push('    m.sigma_s = SPECTRUM_ZERO;');
-    for (const f of phaseFields) lines.push(`    m.${f.name} = ${f.default};`);
+    for (const f of phaseFields) lines.push(`    m.${f.name} = ${defaultExpr(f)};`);
     if (hasModel) lines.push('    m.model = 0;');
     for (let i = 0; i < withMedium.length; i++) {
         const mat = withMedium[i];
@@ -415,9 +422,11 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
         lines.push(`        m.sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatSpectrum)};`);
         lines.push(`        m.sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatSpectrum)};`);
         for (const f of phaseFields) {
-            const value = med[f.source as keyof PlannedMedium] as number | GlslExpression | ValueParam<number>;
+            // Union fields of OTHER present models fall back to their row default —
+            // this medium's values hold exactly its own model's rows.
+            const value = med.values[f.source] as number | GlslExpression | ValueParam<number> | undefined;
             const format = f.glslType === 'Spectrum' ? formatSpectrum : formatFloat;
-            lines.push(`        m.${f.name} = ${mediumPropertyExpr(value, f.name, format as (v: never) => string)};`);
+            lines.push(`        m.${f.name} = ${value === undefined ? defaultExpr(f) : mediumPropertyExpr(value, f.name, format as (v: never) => string)};`);
         }
         if (hasModel) lines.push(`        m.model = ${models.indexOf(med.model)};   // '${med.model}'`);
         lines.push('    }');
