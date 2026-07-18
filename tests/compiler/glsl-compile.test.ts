@@ -167,4 +167,60 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
             check(prog.fragment, 'frag', `${shaderId} [fragment]`);
         }
     });
+
+    // Heterogeneous media sink (fable-heterogeneous-media.md): delta-tracking × mis is
+    // Validator-rejected, so the null-collision arms need their own pair under pt-nee.
+    // Covers all three occupant functions (delta, ratio pass-through, ratio shadow), the
+    // D1 clamp splice, the Spectrum() expression wrap, and expression-param minting.
+    it('heterogeneous media sink + pt-nee delta-tracking', () => {
+        const scene: SceneDescription = {
+            id: 'het-sink',
+            name: 'Heterogeneous media sink (synthesized)',
+            ambientSpace: { type: 'euclidean' },
+            objects: [
+                { type: 'box', parameters: { center: [0, 1, 0], halfSize: [1, 1, 1] }, material: 'fog', name: 'het_fog' },
+                { type: 'box', parameters: { center: [3, 1, 0], halfSize: [1, 1, 1] }, material: 'ink', name: 'het_ink' },
+                { type: 'quad', parameters: { corner: [-5, 0, -5], edge1: [10, 0, 0], edge2: [0, 0, 10] }, material: 'floor', name: 'floor' },
+            ],
+            materials: {
+                floor: { model: 'lambert', albedo: [0.5, 0.5, 0.5] },
+                // Delta-tracking arm: scattering formula with a declared slider + majorant.
+                fog: {
+                    model: 'none',
+                    medium: {
+                        sigma_a: [0.05, 0.05, 0.05],
+                        sigma_s: { kind: 'glsl', source: 'u_sink_gain * exp(-2.0 * p.y)', params: [{ param: 'sink.gain', default: 1.5, min: 0, max: 4 }] },
+                        majorant: 4.2,
+                        phase_g: 0.3,
+                    },
+                },
+                // Ratio pass-through arm: absorbing-only formula (σ_s constant zero).
+                ink: {
+                    model: 'none',
+                    medium: {
+                        sigma_a: { kind: 'glsl', source: '2.0 + p.x' },
+                        majorant: 6.0,
+                    },
+                },
+            },
+            lights: [{ kind: 'point', position: [0, 6, 0], emission: 20 }],
+            environment: { type: 'constant', color: [0.1, 0.1, 0.12], intensity: 1.0 },
+        };
+        const strategy: RenderStrategy = {
+            id: 'sink-het-nee',
+            measurement: { camera: { type: 'pinhole', fov: 0.8 }, maxBounces: 6 },
+            estimator: {
+                directLighting: 'nee',
+                volumeSampling: 'delta-tracking',
+                russianRoulette: { startDepth: 3 },
+                accumulation: { type: 'average' },
+            },
+            view: { tonemap: { type: 'reinhard' } },
+        };
+        const renderer = compiler.compile(scene, strategy);
+        for (const [shaderId, prog] of renderer.shaders) {
+            check(prog.vertex, 'vert', `${shaderId} [vertex]`);
+            check(prog.fragment, 'frag', `${shaderId} [fragment]`);
+        }
+    });
 });

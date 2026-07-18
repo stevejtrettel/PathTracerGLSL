@@ -2,7 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
-import { isGlslExpression, isValueParam, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -175,6 +175,13 @@ export function validate(
     validateFinite(scene.lights, 'lights', bag);
     validateFinite(scene.environment, 'environment', bag);
 
+    // Expression-declared params (heterogeneous D4, general to any expression property):
+    // each entry must be well-shaped, and its derived uniform must actually appear in
+    // the expression source (C5 inert-knob class). The namespace/collision checks below
+    // cover these paths automatically — GlslExpressionParam is ValueParam-shaped, so
+    // collectParamPaths picks them up.
+    validateExpressionParams(scene.materials, 'materials', bag);
+
     // --- Parameter namespace (naming batch N2 — audit P2/P3) ---
     // Reserved paths/prefixes are engine/app-minted channels (compiler/types.ts); an
     // authored param there silently fights the builtin. paramToUniform collisions
@@ -294,13 +301,37 @@ export function validate(
         }
     }
 
-    // --- Media (impl-plan-media M0; V1-C1 as rejections per §1.1) ---
+    // --- Media (impl-plan-media M0; heterogeneous rules per fable-heterogeneous-media.md §2) ---
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.medium !== undefined) {
             for (const [prop, value] of Object.entries(mat.medium)) {
-                if (isGlslExpression(value)) {
+                if (!isGlslExpression(value)) continue;
+                if (prop === 'sigma_a' || prop === 'sigma_s') {
+                    // Rule 1: an expression coefficient is legal ONLY under a declared
+                    // ceiling — D1: the rendered medium IS the field min-scaled to σ̄.
+                    if (mat.medium.majorant === undefined) {
+                        bag.error('invalid-setting',
+                            `Material '${name}': medium.${prop} is a GLSL expression but the medium declares no majorant — heterogeneous media require a density ceiling σ̄ (D1: the rendered medium IS min(σ, σ̄); fable-heterogeneous-media.md). Add majorant: <finite number > 0>`)
+                            .add();
+                    }
+                } else {
+                    // Rule 7: spatially-varying phase parameters are not in v1.
                     bag.error('invalid-setting',
-                        `Material '${name}': medium.${prop} is a GLSL expression — procedural media not yet supported (V1-C1); declare a majorant when they are (§3.5). Use a constant or {param}`)
+                        `Material '${name}': medium.${prop} cannot be a GLSL expression — only σ_a/σ_s may vary spatially (heterogeneous v1); phase parameters are constants or {param}`)
+                        .add();
+                }
+            }
+            // Rule 2: majorant must be a positive finite number; a ceiling on an
+            // all-constant medium is inert (its bound is derivable — C5 class).
+            const maj = mat.medium.majorant;
+            if (maj !== undefined) {
+                if (typeof maj !== 'number' || !Number.isFinite(maj) || maj <= 0) {
+                    bag.error('invalid-setting',
+                        `Material '${name}': medium.majorant must be a finite number > 0 (got ${String(maj)})`)
+                        .add();
+                } else if (!isHeterogeneousMedium(mat.medium)) {
+                    bag.warning('invalid-setting',
+                        `Material '${name}': medium.majorant is declared but every coefficient is constant/{param} — the bound is derivable and the declaration is inert`)
                         .add();
                 }
             }
@@ -383,14 +414,45 @@ export function validate(
                 `mediumLightSampling 'equiangular' controls nothing here (needs directLighting 'nee' AND scattering media) — the knob is inert`)
                 .add();
         }
+        // Heterogeneous rule 8 (deferred-ledger pin enforced now): the equiangular
+        // estimate's T(0,t) factor is the analytic closed form — a heterogeneous
+        // medium would need ratio-tracked transmittance along the sampled segment.
+        if (features.media.hasHeterogeneousMedia) {
+            bag.error('incompatible-options',
+                `mediumLightSampling 'equiangular' does not support heterogeneous media — its transmittance factor is the analytic closed form (deferred: ratio-tracked T along the sampled segment); use 'vertex'`)
+                .add();
+        }
     }
 
-    // Reserved strategy values (reject-not-remove — the axes exist in the types so the
-    // design surface is visible; the implementations arrive later).
+    // volumeSampling axis (fable-heterogeneous-media.md §2 rules 3/4/6).
     const vs = strategy.estimator.volumeSampling;
-    if (vs === 'raymarch' || vs === 'delta-tracking' || vs === 'ratio-tracking') {
+    if (vs === 'raymarch' || vs === 'ratio-tracking') {
+        // Rule 6, reject-not-remove: ray marching is biased (if ever added it is a
+        // declared MEASUREMENT truncation, not an estimator); 'ratio-tracking' names a
+        // distance-sampling variant we are not building.
         bag.error('invalid-setting',
-            `volumeSampling '${vs}' not yet supported — homogeneous media (V1-C1) are exact under 'analytic' (closed-form sampling); 'raymarch' is reserved for biased marching and the null-collision pair needs majorants`)
+            `volumeSampling '${vs}' not supported — use 'analytic' (constant/{param} media, exact) or 'delta-tracking' (heterogeneous media, null-collision)`)
+            .add();
+    }
+    if (vs === 'delta-tracking') {
+        // Rule 3: delta tracking's scatter-distance pdf is unknowable (it marginalizes
+        // over phantom-collision chains), so MIS weights need the rescaled-probability
+        // tallies — the deferred tally batch.
+        if (strategy.estimator.directLighting === 'mis') {
+            bag.error('incompatible-options',
+                `volumeSampling 'delta-tracking' with directLighting 'mis' is reserved — delta tracking's distance pdf is unknowable, so MIS needs the probability-tally machinery (deferred batch); use 'nee' or 'none'`)
+                .add();
+        }
+        // Rule 4a (C5 silent-inert): the knob must control something.
+        if (!features.media.hasHeterogeneousMedia) {
+            bag.warning('invalid-setting',
+                `volumeSampling 'delta-tracking' controls nothing here — no medium has expression coefficients; constant media stay on the analytic arms`)
+                .add();
+        }
+    } else if (features.media.hasHeterogeneousMedia) {
+        // Rule 4b (reject-not-degrade): the analytic arms cannot evaluate σ(x).
+        bag.error('incompatible-options',
+            `This scene has heterogeneous media (expression coefficients) but volumeSampling is '${vs ?? 'analytic'}' — the analytic arms cannot evaluate σ(x); set estimator.volumeSampling: 'delta-tracking'`)
             .add();
     }
     const cameraType = strategy.measurement.camera.type;
@@ -787,6 +849,40 @@ function isVec3(v: unknown): v is Vec3 {
 
 /** Recursive {param} path collector — mirrors validateFinite's walk so future
  *  Value<> fields are covered without a per-field list. */
+/**
+ * Recursive sweep over GLSL expressions with declared params (heterogeneous D4).
+ * Shape: `param` a string, `default` a finite number (v1: float params only). Inertness:
+ * a declared param whose derived uniform never appears in the source drives nothing —
+ * the C5 class. Finiteness of defaults also rides validateFinite; the shape check here
+ * gives the authoring-time message.
+ */
+function validateExpressionParams(value: unknown, path: string, bag: DiagnosticBag): void {
+    if (value === null || typeof value !== 'object') return;
+    if (isGlslExpression(value)) {
+        for (const p of value.params ?? []) {
+            if (typeof p.param !== 'string' || p.param.length === 0
+                || typeof p.default !== 'number' || !Number.isFinite(p.default)) {
+                bag.error('invalid-setting',
+                    `Expression at '${path}': params entries must be { param: string, default: finite number } (v1: float params only)`)
+                    .add();
+                continue;
+            }
+            if (!value.source.includes(paramToUniform(p.param))) {
+                bag.warning('invalid-setting',
+                    `Expression at '${path}' declares param '${p.param}' but its uniform '${paramToUniform(p.param)}' never appears in the source — the slider drives nothing`)
+                    .add();
+            }
+        }
+        return;
+    }
+    if (ArrayBuffer.isView(value)) return;
+    if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) validateExpressionParams(value[i], `${path}[${i}]`, bag);
+        return;
+    }
+    for (const [k, v] of Object.entries(value)) validateExpressionParams(v, `${path}.${k}`, bag);
+}
+
 function collectParamPaths(value: unknown, out: Set<string>): void {
     if (value === null || typeof value !== 'object') return;
     if (isValueParam(value)) {

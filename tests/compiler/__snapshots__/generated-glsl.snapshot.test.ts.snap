@@ -18054,7 +18054,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 4;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -19680,7 +19680,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 4;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -21551,7 +21551,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 4;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -23384,7 +23384,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 4;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -25020,7 +25020,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 4;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -26629,7 +26629,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 1;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -29791,7 +29791,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 1;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -33430,7 +33430,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 2;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -34907,7 +34907,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 2;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -36650,7 +36650,7 @@ bool material_is_emissive(int mat) {
 bool material_has_medium(int mat) {
     return mat == 2;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -38123,7 +38123,7 @@ bool material_is_emissive(int mat) {
 bool material_has_medium(int mat) {
     return mat == 2;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -42293,7 +42293,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 2;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;
@@ -56375,7 +56375,7 @@ bool is_null_interface(int mat) {
 bool material_has_medium(int mat) {
     return mat == 1;
 }
-// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)
+// Generated medium-properties lookup (§3.5; heterogeneous media read p)
 MediumProperties scene_medium_properties(int mat, vec3 p) {
     MediumProperties m;
     m.sigma_a = SPECTRUM_ZERO;

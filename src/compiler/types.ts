@@ -180,9 +180,23 @@ export function isValueParam<T>(v: Value<T>): v is ValueParam<T> {
 
 // --- Materials ---
 
+/** A parameter declared BY a GLSL expression (heterogeneous-media D4; general to any
+ * expression property). Each becomes a live float uniform + slider through the same
+ * machinery as ValueParam — the expression source references the derived uniform name
+ * (`fog.gain` → `u_fog_gain`). v1: float params only. */
+export interface GlslExpressionParam {
+    /** Parameter path, e.g. 'fog.gain'. Reserved-prefix + collision rules apply. */
+    param: string;
+    default: number;
+    min?: number;
+    max?: number;
+}
+
 export interface GlslExpression {
     kind: 'glsl';
     source: string;
+    /** Live parameters this expression reads (as `u_<derived>` in `source`). */
+    params?: GlslExpressionParam[];
 }
 
 /** Scalar-valued authored property. Kept distinct from spectra so TypeScript catches a
@@ -200,6 +214,14 @@ export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';
 }
 
+/** Heterogeneous-medium predicate (fable-heterogeneous-media.md): any expression
+ * coefficient. Classification is by AUTHORED TYPE — an expression that happens to
+ * evaluate to a constant still routes to the null-collision arms (that is F-HET-CONST's
+ * whole point). Shaped to accept authored MediumDescription and PlannedMedium alike. */
+export function isHeterogeneousMedium(med: { sigma_a: unknown; sigma_s?: unknown }): boolean {
+    return isGlslExpression(med.sigma_a) || isGlslExpression(med.sigma_s);
+}
+
 /**
  * Surface material model — REGISTRY-VALIDATED, like primitive/phase/light-kind ids
  * (the B1 treatment: adding a model touches no type union; unknown models get a
@@ -211,15 +233,20 @@ export function isGlslExpression(v: unknown): v is GlslExpression {
 export type MaterialModel = string;
 
 /**
- * Medium of the region's INTERIOR (§3.5) — "materials of the interior". Homogeneous (V1-C1):
- * constants or {param} only; GLSL expressions are rejected until majorant declaration exists.
- * Segment behavior behind the volumetric-component seams (fable-volumetric-component.md).
+ * Medium of the region's INTERIOR (§3.5) — "materials of the interior". Coefficients are
+ * constants, {param}, or — with a declared `majorant` — GLSL expressions of position `p`
+ * (heterogeneous media, fable-heterogeneous-media.md). Segment behavior behind the
+ * volumetric-component seams (fable-volumetric-component.md).
  */
 export interface MediumDescription {
     /** Absorption coefficient σ_a (per unit arc length). */
     sigma_a: SpectrumProperty;
     /** Scattering coefficient σ_s. Default 0 (absorbing-only, e.g. tinted glass interior). */
     sigma_s?: SpectrumProperty;
+    /** Density ceiling σ̄ (heterogeneous D1): the rendered medium IS the proportionally
+     *  clamped field min-scaled so max-channel σ_t ≤ σ̄. REQUIRED with expression
+     *  coefficients (finite, > 0); inert (warned) on all-constant media. */
+    majorant?: number;
     /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). Read only by 'hg'. */
     phase_g?: ScalarProperty;
     /** Water-droplet diameter (µm), read only by 'draine' (HG–Draine approx-Mie). Drives the
@@ -399,9 +426,13 @@ export interface EstimatorDescription {
     /**
      * Volume distance-sampling method (§7.3 as amended by fable-volumetric-component.md §5),
      * consulted only when scattering is live (measurement.scattering 'full' + scattering
-     * media present). 'analytic' = the v1 closed-form homogeneous body (V1-C1); 'raymarch'
-     * is reserved for honest biased marching; the null-collision pair needs majorants —
-     * all three rejected-not-removed. Default 'analytic'.
+     * media present). 'analytic' = the closed-form homogeneous bodies (exact; constant/{param}
+     * media only). 'delta-tracking' = the null-collision arms for heterogeneous media
+     * (fable-heterogeneous-media.md; constant media in the same scene STAY analytic — the
+     * per-medium 2×2 dispatch). v1: pt/pt-nee only — 'delta-tracking' × directLighting 'mis'
+     * is rejected until the tally batch. 'raymarch' is reserved for honest biased marching;
+     * 'ratio-tracking' names a distance-sampling variant we are not building — both
+     * rejected-not-removed. Default 'analytic'.
      * (The old volumeIntegrator 'none' override moved to measurement.scattering: 'ignored' —
      * it changes the integral, not the sampling; taxonomy §8.)
      */

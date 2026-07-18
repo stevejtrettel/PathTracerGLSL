@@ -37,9 +37,10 @@ export interface ProgramDescription {
         /** null = BSDF-only transport (no NEE machinery in the program at all). */
         lighting: LightingDesc | null;
         russianRoulette: { startDepth: number } | null;
-        /** 'analytic' iff scattering arms are live (media.scatteringArms); 'none'
-         *  otherwise. Future null-collision methods are new values here. */
-        volumeSampling: 'none' | 'analytic';
+        /** How live scattering samples distances: 'analytic' (closed-form homogeneous)
+         *  or 'delta-tracking' (heterogeneous null-collision; per-medium 2×2 routing —
+         *  constant media stay analytic). 'none' when no scattering arms exist. */
+        volumeSampling: 'none' | 'analytic' | 'delta-tracking';
         /** Medium NEE vertex placement (impl-plan-equiangular): 'vertex' = at the
          *  transmittance-sampled scatter vertex (event site); 'equiangular' = per
          *  segment, drawn ∝ 1/d²-to-light. Meaningful only when lighting ≠ null and
@@ -86,6 +87,11 @@ export interface MediaDesc {
      *  phase functions + the channel-MIS scattering arms exist. Equivalent to
      *  estimator.volumeSampling !== 'none' — kept explicit for readers. */
     scatteringArms: boolean;
+    /** Some medium routes to a null-collision arm (fable-heterogeneous-media.md): the
+     *  delta/ratio-tracking occupant + MAX_NULL_COLLISIONS exist. Independent of
+     *  scatteringArms — absorbing-only heterogeneous media need the ratio pass-through
+     *  arm with no phase machinery. */
+    heterogeneousArms: boolean;
     /** Some material is model 'none' (§3.6): the null-crossing branch exists. */
     nullInterfaces: boolean;
     /** Media AND NEE: the spectral segment walker (shadow_media) replaces the boolean
@@ -220,17 +226,21 @@ export interface PlannedAnalyticObject {
 export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number>;
 
 /**
- * Resolved interior medium (§3.5) — constants/params only (V1-C1; the Validator rejects GLSL
- * expressions, the generator backstop-throws like ior). sigma_a/sigma_s/model are the RTE
- * partition CORE, read by every arm regardless of phase model — fixed fields (the material
- * side's analogue of geometry's `p`). Phase parameters are schema-resolved (materials-§7):
- * `values` holds exactly the medium's own model's rows, keyed by row source.
+ * Resolved interior medium (§3.5) — sigma_a/sigma_s/model are the RTE partition CORE, read
+ * by every arm regardless of phase model — fixed fields (the material side's analogue of
+ * geometry's `p`). Coefficients may be GLSL expressions of `p` when `majorant` is declared
+ * (heterogeneous media; the Validator enforces the pairing). Phase parameters are
+ * schema-resolved (materials-§7): `values` holds exactly the medium's own model's rows,
+ * keyed by row source — expressions remain rejected there.
  */
 export interface PlannedMedium {
     sigma_a: Vec3 | GlslExpression | ValueParam<Vec3>;
     sigma_s: Vec3 | GlslExpression | ValueParam<Vec3>;
     /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh' | 'draine'. */
     model: string;
+    /** Density ceiling σ̄ (heterogeneous D1) — present iff authored. Spliced as a literal
+     *  into the null-collision arms; the D1 scale is emitted in scene_medium_properties. */
+    majorant?: number;
     /** Phase params of THIS medium's model (union fields of OTHER present models fall
      *  back to their row defaults at emit time). */
     values: Record<string, number | GlslExpression | ValueParam<number>>;

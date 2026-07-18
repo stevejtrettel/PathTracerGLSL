@@ -3,7 +3,7 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
-import { isGlslExpression, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -15,6 +15,7 @@ import { PHASE_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields, defaultExpr } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
 import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
+import mediumDeltaTrackingGLSL from '../../../components/transport/volume/delta_tracking/delta_tracking.glsl?raw';
 
 /** Capability lookup over the descriptor registry (R1a — replaces the inline
  *  MODEL_HAS_NONDELTA_LOBES map). 'none' is a boundary classification, not a model:
@@ -102,6 +103,12 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         if (scatteringLive || wantsShadowMedia) {
             blocks.push({ origin: 'components/transport/volume/analytic/analytic.glsl', source: mediumAnalyticGLSL });
         }
+        // The null-collision bodies (fable-heterogeneous-media.md): included wholesale
+        // (§2.12) iff some medium routes to them — a Planner decision. Must follow the
+        // generated properties lookup (the loops re-fetch at every tentative collision).
+        if (media.heterogeneousArms) {
+            blocks.push({ origin: 'components/transport/volume/delta_tracking/delta_tracking.glsl', source: mediumDeltaTrackingGLSL });
+        }
         if (scatteringLive) {
             // Emit each present scattering model's GLSL, then the dispatch that routes by
             // mp.model (twin of the surface interaction dispatch; eval/pdf are seam
@@ -157,8 +164,11 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     }
 
     // No structural defines remain (item-9 commit D): media structs/helpers arrive via
-    // core's conditionally-included structs_media/math_media blocks.
+    // core's conditionally-included structs_media/math_media blocks. MAX_NULL_COLLISIONS
+    // is a NUMERIC knob (like MAX_SHADOW_SEGMENTS, per the house rule): the null-collision
+    // loop budget — exhaustion is a conservative pass-through, a declared truncation.
     const defines: Record<string, string> = {};
+    if (media.heterogeneousArms) defines['MAX_NULL_COLLISIONS'] = '64';
 
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     // Each entry mirrors its emission condition above — the interface header is truthful.
@@ -212,13 +222,38 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 }
 
 function addParamUniform(
-    prop: Vec3 | number | { source: string } | ValueParam<Vec3 | number>,
+    prop: Vec3 | number | GlslExpression | ValueParam<Vec3 | number>,
     glslType: 'vec3' | 'float',
     metaType: 'color' | 'float',
     uniforms: PlannedUniform[],
     parameters: Record<string, ParameterMetadata>,
     seen: Set<string>,
 ): void {
+    // Expression-declared params (heterogeneous D4, general to any expression property):
+    // each becomes a live FLOAT uniform (v1) named from its path, exactly like a
+    // ValueParam — the expression source references the derived name (u_fog_gain).
+    if (isGlslExpression(prop)) {
+        for (const p of prop.params ?? []) {
+            if (seen.has(p.param)) continue; // expressions may share one driven parameter
+            seen.add(p.param);
+            uniforms.push({
+                name: paramToUniform(p.param),
+                type: 'float',
+                parameterPath: p.param,
+                default: p.default,
+            });
+            const seg = p.param.split('.');
+            parameters[p.param] = {
+                type: 'float',
+                default: p.default,
+                name: capitalize(seg[seg.length - 1]),
+                group: seg.length > 1 ? seg[0] : undefined,
+                triggersReset: true,
+                ...(p.min !== undefined && p.max !== undefined ? { range: [p.min, p.max] } : {}),
+            };
+        }
+        return;
+    }
     if (!isValueParam(prop)) return;
     const path = prop.param;
     if (seen.has(path)) return; // materials may share one driven parameter (§2.8)
@@ -391,8 +426,16 @@ function generateMediaTables(materials: PlannedMaterial[], wantsNullTable: boole
 function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Vec3 | number>, name: string, format: (v: never) => string): string {
     if (isValueParam(prop)) return paramToUniform(prop.param);
     if (isGlslExpression(prop)) {
-        // Backstop only — the Validator rejects procedural media (V1-C1) with a real diagnostic.
-        throw new Error(`materials: medium.${name} cannot be a GLSL expression (procedural media not yet supported, V1-C1)`);
+        if (name === 'sigma_a' || name === 'sigma_s') {
+            // Heterogeneous coefficient (fable-heterogeneous-media.md D4): the authored
+            // formula of `p` (+ declared-param uniforms). Spectrum(...) broadcasts a
+            // scalar-valued source and passes a vec3-valued one through; the max(…, 0.0)
+            // floor makes coefficients nonnegative by definition (a formula that dips
+            // negative is not a medium — σ < 0 would poison probabilities and weights).
+            return `max(Spectrum(${prop.source}), 0.0)`;
+        }
+        // Backstop only — the Validator rejects spatially-varying phase parameters.
+        throw new Error(`materials: medium.${name} cannot be a GLSL expression (only sigma_a/sigma_s may vary spatially)`);
     }
     return format(prop as never);
 }
@@ -403,7 +446,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
     // Field set = the PRESENT scattering models' schema union (§3.4 literal — the same
     // union core.ts builds the struct from). An absorbing-only program has extinction
     // fields and nothing else.
-    const lines: string[] = ['// Generated medium-properties lookup (§3.5; p unused-but-present under V1-C1)'];
+    const lines: string[] = ['// Generated medium-properties lookup (§3.5; heterogeneous media read p)'];
     lines.push('MediumProperties scene_medium_properties(int mat, vec3 p) {');
     lines.push('    MediumProperties m;');
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');
@@ -417,6 +460,22 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
         lines.push(`    ${cond} (mat == ${mat.id}) {   // '${mat.name}'`);
         lines.push(`        m.sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatSpectrum)};`);
         lines.push(`        m.sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatSpectrum)};`);
+        if (isHeterogeneousMedium(med)) {
+            // D1 clamp IN THE LOOKUP (fable-heterogeneous-media.md, amended Jul 17): the
+            // rendered medium IS the proportionally clamped field — no caller can observe
+            // the unclamped formula. Proportional scale preserves the albedo field; only
+            // extinction saturates. Emitted ONLY for expression media (constant branches
+            // are byte-identical to before).
+            const maj = med.majorant;
+            if (maj === undefined) {
+                // Backstop — the Validator pairs expressions with a declared majorant.
+                throw new Error(`materials: medium of '${mat.name}' has expression coefficients but no majorant`);
+            }
+            lines.push(`        float sigma_max = spectrum_max(m.sigma_a + m.sigma_s);   // D1: medium IS min(σ, σ̄)`);
+            lines.push(`        float sigma_scale = sigma_max > ${formatFloat(maj)} ? ${formatFloat(maj)} / sigma_max : 1.0;`);
+            lines.push('        m.sigma_a *= sigma_scale;');
+            lines.push('        m.sigma_s *= sigma_scale;');
+        }
         for (const f of phaseFields) {
             // Union fields of OTHER present models fall back to their row default —
             // this medium's values hold exactly its own model's rows.
@@ -461,9 +520,14 @@ function generateMediumDispatch(models: string[], wantsEval: boolean, wantsPdf: 
 }
 
 // Seam 1 of the volumetric component: medium_sample(med, ray, t_max, xi) — the segment decision.
-// One dispatch over the media present, each arm specialized at compile time:
-//   absorbing-only  → deterministic Beer–Lambert, no RNG draw ({scattered:false, weight:e^{−σ_a·t}})
-//   scattering      → the analytic channel-MIS body (volumetric-component §4; HAS_SCATTERING, M2)
+// One dispatch over the media present, each arm specialized at compile time — the 2×2 of
+// fable-heterogeneous-media.md (amended D2): constant/{param} media keep the exact closed
+// forms; expression media route to the null-collision arms (either coefficient being an
+// expression routes BOTH ways — the D1 clamp couples σ_a to σ_s(x) through the scale):
+//   constant × absorbing    → deterministic Beer–Lambert, no RNG draw
+//   constant × scattering   → the analytic channel-MIS body (volumetric-component §4)
+//   expression × absorbing  → ratio-tracked pass-through (delta_tracking occupant)
+//   expression × scattering → delta tracking (Kutz Alg. 4, delta_tracking occupant)
 // Every arm assigns ms.radiance (mandatory — §3 partition rule; uninitialized GLSL is garbage).
 function generateMediumSample(plan: RenderPlan): string {
     const withMedium = plan.materials.filter((m) => m.medium !== null);
@@ -477,13 +541,22 @@ function generateMediumSample(plan: RenderPlan): string {
     lines.push('    ms.weight = SPECTRUM_ONE;');
     lines.push('    ms.radiance = SPECTRUM_ZERO;');
     for (const mat of withMedium) {
-        const scatters = scatteringLive && isScattering(mat.medium!);
-        lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — ${scatters ? 'scattering (analytic channel-MIS)' : 'absorbing-only (deterministic)'}`);
-        if (scatters) {
-            lines.push(`        return medium_sample_analytic(scene_medium_properties(${mat.id}, ray.origin), t_max, xi);`);
+        const med = mat.medium!;
+        const scatters = scatteringLive && isScattering(med);
+        if (isHeterogeneousMedium(med)) {
+            const maj = formatFloat(requireMajorant(med, mat.name));
+            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — heterogeneous, ${scatters ? 'scattering (delta tracking)' : 'absorbing-only (ratio-tracked pass-through)'}`);
+            lines.push(scatters
+                ? `        return medium_sample_delta(${mat.id}, ${maj}, ray, t_max, xi);`
+                : `        return medium_sample_ratio_absorb(${mat.id}, ${maj}, ray, t_max);`);
         } else {
-            lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, ray.origin);`);
-            lines.push('        ms.weight = spectrum_exp(-m.sigma_a * t_max);');
+            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — ${scatters ? 'scattering (analytic channel-MIS)' : 'absorbing-only (deterministic)'}`);
+            if (scatters) {
+                lines.push(`        return medium_sample_analytic(scene_medium_properties(${mat.id}, ray.origin), t_max, xi);`);
+            } else {
+                lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, ray.origin);`);
+                lines.push('        ms.weight = spectrum_exp(-m.sigma_a * t_max);');
+            }
         }
         lines.push('    }');
     }
@@ -492,15 +565,30 @@ function generateMediumSample(plan: RenderPlan): string {
     return lines.join('\n');
 }
 
+/** Backstop — the Validator pairs expression coefficients with a declared majorant. */
+function requireMajorant(med: PlannedMedium, name: string): number {
+    if (med.majorant === undefined) {
+        throw new Error(`materials: medium of '${name}' has expression coefficients but no majorant`);
+    }
+    return med.majorant;
+}
+
 // Seam 2 of the volumetric component: per-segment shadow transmittance over full σ_t.
-// Called only by shadow_media's segment walker; every arm is the analytic closed form (V1-C1).
+// Called only by shadow_media's segment walker. Constant/{param} media: the analytic
+// closed form (exact). Expression media: ratio tracking (delta_tracking occupant).
 function generateMediumTransmittance(materials: PlannedMaterial[]): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const lines: string[] = ['// Generated volumetric-component dispatch (seam 2, fable-volumetric-component §2)'];
     lines.push('Spectrum medium_transmittance(int med, Ray ray, float len) {');
     for (const mat of withMedium) {
-        lines.push(`    if (med == ${mat.id}) {   // '${mat.name}'`);
-        lines.push(`        return medium_transmittance_analytic(scene_medium_properties(${mat.id}, ray.origin), len);`);
+        if (isHeterogeneousMedium(mat.medium!)) {
+            const maj = formatFloat(requireMajorant(mat.medium!, mat.name));
+            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — heterogeneous (ratio tracking)`);
+            lines.push(`        return medium_transmittance_ratio(${mat.id}, ${maj}, ray, len);`);
+        } else {
+            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}'`);
+            lines.push(`        return medium_transmittance_analytic(scene_medium_properties(${mat.id}, ray.origin), len);`);
+        }
         lines.push('    }');
     }
     lines.push('    return SPECTRUM_ONE;');

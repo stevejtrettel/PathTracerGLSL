@@ -1,7 +1,7 @@
 // compiler/analyze/Analyzer.ts
 
 import type { SceneDescription, MaterialProperty } from '../types.js';
-import { isGlslExpression } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium } from '../types.js';
 import type { SceneFeatures } from './types.js';
 import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
 import { LIGHT_KINDS } from '../../components/lights/index.js';
@@ -12,7 +12,7 @@ function mayBeNonzero(prop: MaterialProperty | undefined): boolean {
     if (prop === undefined) return false;
     if (typeof prop === 'number') return prop !== 0;
     if (Array.isArray(prop)) return prop.some((c) => c !== 0);
-    return true; // {param} or GLSL expression (the latter is rejected by the Validator)
+    return true; // {param} or GLSL expression — either can be nonzero at runtime
 }
 
 /** Nonzero CONSTANT only — {param}/expression are false (the v1 sampleAsLight restriction). */
@@ -46,6 +46,8 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     // --- Media (§3.5/§3.6, fable-volumetric-component.md) ---
     let hasMedia = scene.ambientMedium !== undefined;
     let hasScatteringMedia = false;
+    // ambientMedium is a material NAME — its medium block is censused by the loop below.
+    let hasHeterogeneousMedia = false;
     let hasNullInterfaces = false;
 
     for (const mat of Object.values(scene.materials)) {
@@ -54,6 +56,7 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         if (mat.medium !== undefined) {
             hasMedia = true;
             if (mayBeNonzero(mat.medium.sigma_s)) hasScatteringMedia = true;
+            if (isHeterogeneousMedium(mat.medium)) hasHeterogeneousMedia = true;
         }
 
         // Check for procedural properties (GLSL expressions)
@@ -129,6 +132,7 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         media: {
             hasMedia,
             hasScatteringMedia,
+            hasHeterogeneousMedia,
             hasNullInterfaces,
         },
         environment: {

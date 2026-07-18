@@ -11,6 +11,7 @@
 | [fable-reference-implementations.md](fable-reference-implementations.md) | Normative GLSL: Lambert, dielectric (η² factor), GGX, HG phase, light samplers, shadow transmittance, the v1 transport loop, MIS diff, geodesic steppers |
 | [fable-validation-scenes.md](fable-validation-scenes.md) | Concrete test scenes with derived expected values — furnace box, Beer–Lambert slab, η² witness, cross-strategy trio, trace regressions |
 | [fable-volumetric-component.md](fable-volumetric-component.md) | The volumetric component contract — interface/segment separation, MediumSample seams, the RTE partition rule, chromatic sampling per pbrt-v3 (supersedes reference-implementations §5's medium lines), strategy-axis rename |
+| [fable-heterogeneous-media.md](fable-heterogeneous-media.md) | Heterogeneous media design authority (owner-approved Jul 17 2026; amended at implementation kickoff: clamp-in-the-lookup, absorbing-only arm, transcribe-with-lottery) — the phantom-fog picture, ceiling-as-definition (min(σ,σ̄) IS the medium), the 2×2 dispatch behind the volumetric seams, v1 = pt/pt-nee (mis = the deferred tally batch), expression coefficients + declared sliders + required majorant, witness plan |
 | [fable-module-anatomy.md](fable-module-anatomy.md) | Module anatomy & property machinery — descriptor/schema shapes for §3.3/§3.4, property pins, family taxonomy, deferred file layout, drift ledger |
 | [fable-transforms.md](fable-transforms.md) | Placement design authority — Euclidean similarities (s>0, no reflections, no nonuniform scale), the three-layer boundary (SceneDescription FLAT forever; groups = authoring layer via `flattenGroups`), per-backend lowering (analytic param fold / SDF wrapper tiers / local-frame conjugation), driven placement via per-field `Value<>`, staging + witness table. Supersedes design-scene-graph-transforms.md |
 | [architecture-decisions.md](architecture-decisions.md) | Summary of locked architectural decisions |
@@ -19,6 +20,7 @@
 | [fable-naming-audit.md](fable-naming-audit.md) | Naming-systems audit (July 16) + RESOLVED outcomes (July 17): structural ids, reserved param prefixes, symbol contracts, clobber guards |
 | [fable-review.md](fable-review.md) | Fable's full code review (July 2026) — bugs by layer, design recommendations |
 | [impl-plan-exact-linkage.md](impl-plan-exact-linkage.md) | Exact-linkage batch record (July 2026, BUILT) — wholesale component inclusion pin (contracts §2.12), seam decisions, the seam-unused diagnostic |
+| [impl-plan-heterogeneous-media.md](impl-plan-heterogeneous-media.md) | Heterogeneous media implementation plan (Jul 17 2026) — V0 plumbing / V1 transcribed loops / V2 witnesses, the 2×2 dispatch, the transcription-and-deviations section |
 
 ## Guides
 

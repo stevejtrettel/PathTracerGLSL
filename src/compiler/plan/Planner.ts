@@ -238,12 +238,22 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
 
     // Taxonomy §8 (the volumeIntegrator split): whether scattering is COMPUTED is a
     // measurement truncation (scattering 'ignored' renders scattering media absorbing-only);
-    // HOW live scattering is sampled is the estimator's volumeSampling axis. Only 'analytic'
-    // survives the Validator.
+    // HOW live scattering is sampled is the estimator's volumeSampling axis. 'analytic'
+    // and 'delta-tracking' survive the Validator (which also enforces coherence:
+    // 'analytic' × heterogeneous medium is an error, so vs matches the scene by here).
     const scattering = strategy.measurement.scattering ?? 'full';
+    const vs = strategy.estimator.volumeSampling ?? 'analytic';
     const scatteringArms = features.media.hasScatteringMedia
         && scattering === 'full'
-        && (strategy.estimator.volumeSampling ?? 'analytic') === 'analytic';
+        && (vs === 'analytic' || vs === 'delta-tracking');
+    // Heterogeneous media (fable-heterogeneous-media.md): some medium ROUTES to a
+    // null-collision arm, so the delta/ratio occupant is included. Independent of
+    // scatteringArms — an absorbing-only heterogeneous medium needs the ratio
+    // pass-through arm with no phase machinery at all. EITHER coefficient being an
+    // expression counts (even under scattering 'ignored'): the D1 clamp couples σ_a
+    // to σ_s(x) through the proportional scale, so the effective field is spatially
+    // varying whenever any coefficient is.
+    const heterogeneousArms = features.media.hasHeterogeneousMedia;
 
     // §6.2: samplable-emitter machinery exists iff some light entered the registry with a
     // region (delta-only scenes compile to the pre-area-light program).
@@ -264,7 +274,9 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         estimator: {
             lighting,
             russianRoulette: strategy.estimator.russianRoulette,
-            volumeSampling: scatteringArms ? 'analytic' : 'none',
+            // Reserved values ('raymarch'/'ratio-tracking') are Validator-rejected before
+            // planning, so vs here is 'analytic' | 'delta-tracking'.
+            volumeSampling: scatteringArms ? (vs as 'analytic' | 'delta-tracking') : 'none',
             // Placement is a decision only where a medium NEE estimate exists at all.
             mediumLightSampling: lighting !== null && scatteringArms
                 ? (strategy.estimator.mediumLightSampling ?? 'vertex')
@@ -302,6 +314,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         media: {
             present: features.media.hasMedia,
             scatteringArms,
+            heterogeneousArms,
             nullInterfaces: features.media.hasNullInterfaces,
             shadowWalker: features.media.hasMedia && lighting !== null,
             mediumEval: scatteringArms && lighting !== null,
@@ -584,6 +597,9 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
         sigma_a: resolveColorProperty(med.sigma_a, [0.0, 0.0, 0.0]),
         sigma_s: resolveColorProperty(med.sigma_s, [0.0, 0.0, 0.0]),
         model,
+        // Heterogeneous D1: carried only when authored (the Validator enforces the
+        // expression↔majorant pairing and warns on inert declarations).
+        ...(med.majorant !== undefined ? { majorant: med.majorant } : {}),
         values,
     };
 }
