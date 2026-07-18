@@ -9,7 +9,7 @@
 // two normalizes + two crosses leave the per-pixel path entirely.
 //
 // The frame is projection-agnostic (equirect/fisheye/orthographic use it too), so aspect
-// and TAN_FOV scaling stay in-shader — they are cheap scalar work and would entangle the
+// and u_tanFov scaling stay in-shader — they are cheap scalar work and would entangle the
 // shared frame with per-projection concerns.
 
 import type { Vec3Tuple } from '../geometry/similarity.js';

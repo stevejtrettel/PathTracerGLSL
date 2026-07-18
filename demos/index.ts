@@ -11,7 +11,7 @@ import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBo
 import { cornellThinlensStrategy, cornellEquirectStrategy, cornellOrthoStrategy, cornellCylindricalStrategy, fisheyeStrategy } from './cameraScenes.js';
 import { mixedScene, analyticStrategy } from './analyticScenes.js';
 import { submergedScene, submergedStrategy } from './dielectricScenes.js';
-import { fogcubeScene, fogcubeStrategy, rayleighScene, rayleighStrategy, groundfogScene, groundfogStrategy, fogblobsScene, fogblobsStrategy, glowblobsScene, glowblobsStrategy } from './mediaScenes.js';
+import { fogcubeScene, fogcubeStrategy, rayleighScene, rayleighStrategy, groundfogScene, groundfogStrategy, fogblobsScene, fogblobsStrategy, glowblobsScene, glowblobsStrategy, glowblobsPtStrategy } from './mediaScenes.js';
 import {
     marbleScene,
     marbleStrategy,
@@ -103,11 +103,11 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
     },
     glowblobs: {
         scene: glowblobsScene,
-        strategies: posed([0, 1, 4], [0, 1, -0.5], glowblobsStrategy),
+        strategies: posed([0, 1, 4], [0, 1, -0.5], glowblobsStrategy, glowblobsPtStrategy),
         exercises:
-            'EMISSIVE density fields (impl-plan-medium-emission): the fogblobs Gaussians glowing — emission is ε (radiance per unit length), each blob vec3-weighted (one warm, one cool); glow.heat scales brightness live; blob.sharp is SHARED between the density and glow expressions; lamp.power drives the ceiling panel\'s MATERIAL emission (driven light params are deferred, so the panel is a path-only emissive object — chance-hit lit, noisier than NEE by design)',
+            'EMISSIVE density fields (impl-plan-medium-emission) + a DRIVEN quad light (driven-lights Stage A): the fogblobs Gaussians glowing — emission is ε (radiance per unit length), each blob vec3-weighted (one warm, one cool); glow.heat scales brightness live; blob.sharp is SHARED between the density and glow expressions; lamp.power drives the ceiling QUAD LIGHT\'s emission, NEE-sampled (key 1) — shadow rays walk the heterogeneous fog via shadow_media; key 2 is the pt chance-hit version (grainier)',
         expected:
-            'a warm and a cool glowing blob lighting the fog around them; drag lamp.power to 0 — the room goes dark and ONLY the blobs remain (the money shot); drag glow.heat 0→10 — plain fog to lanterns; drag blob.sharp — density AND glow tighten together; core brightness saturates toward ε/σ_t instead of blowing out',
+            'a warm and a cool glowing blob lighting the fog around them; key 1 (pt-nee) is the clean one, key 2 (pt) grainier; drag lamp.power to 0 — the room goes dark and ONLY the blobs remain (the money shot: the light ships zero selection mass, no guard); drag glow.heat 0→10 — plain fog to lanterns; drag blob.sharp — density AND glow tighten together; core brightness saturates toward ε/σ_t',
     },
     groundfog: {
         scene: groundfogScene,
@@ -137,9 +137,9 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
         scene: rayleighScene,
         strategies: posed([0, 1.5, 5.5], [0, 0.9, 0], rayleighStrategy),
         exercises:
-            'DEMO — the multi-model volume dispatch (interaction_medium_* over mp.model), all 3 occupants side by side: L rayleigh (parameter-free, λ⁻⁴ color in σ_s) · C hg (g=0.6) · R draine (approx-Mie, 10µm droplets). Same extinction; only medium.model differs',
+            'DEMO — the multi-model volume dispatch (interaction_medium_* over mp.model), both occupants side by side: L rayleigh (parameter-free, λ⁻⁴ color in σ_s) · R hg (g=0.6). Same extinction; only medium.model differs',
         expected:
-            'three fog boxes lit from the emissive checker: L cool evenly-scattering haze (rayleigh) · C warm forward glow (hg) · R a sharper, more physical forward peak/brightness (draine). If they look identical the dispatch isn\'t selecting the model',
+            'two fog boxes lit from the emissive checker: L cool evenly-scattering haze (rayleigh) · R warm forward glow (hg). If they look identical the dispatch isn\'t selecting the model',
     },
     tonemap: {
         scene: tonemapScene,

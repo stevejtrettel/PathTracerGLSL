@@ -8,7 +8,8 @@ import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from 
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatSpectrum, paramToUniform } from '../../../components/glsl-format.js';
+import { formatFloat, formatSpectrum } from '../../../components/glsl-format.js';
+import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 
 import { MATERIAL_MODELS, materialModel, EMISSION_KEY } from '../../../components/materials/index.js';
 import { PHASE_MODELS } from '../../../components/volume_scattering/index.js';
@@ -150,7 +151,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     for (const mat of plan.materials) {
         const schemas = mat.model === 'none' ? [] : (MATERIAL_MODELS[mat.model]?.properties ?? []);
         for (const f of schemas) {
-            addParamUniform(
+            mintValueUniform(
                 mat.values[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>,
                 f.glslType === 'Spectrum' ? 'vec3' : 'float',
                 f.semantic === 'radiometric' ? 'color' : 'float',
@@ -158,11 +159,11 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             );
         }
         if (mat.medium !== null) {
-            addParamUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen);
-            addParamUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen);
+            mintValueUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen);
+            mintValueUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen);
             // ε rides the same machinery ({param} → vec3 uniform; expression → declared
             // float params) — but only when the field has a reader (media.emission, C5).
-            if (media.emission) addParamUniform(mat.medium.emission, 'vec3', 'color', uniforms, parameters, seen);
+            if (media.emission) mintValueUniform(mat.medium.emission, 'vec3', 'color', uniforms, parameters, seen);
             // Phase params follow the schemas — the medium's OWN model's rows, and only
             // when that model is LIVE in this program (media.models): a driven phase_g
             // in an absorbing-only program has no reader, so it earns no uniform (C5).
@@ -170,7 +171,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                 ? PHASE_MODELS[mat.medium.model]?.properties ?? []
                 : [];
             for (const f of phaseRows) {
-                addParamUniform(
+                mintValueUniform(
                     mat.medium.values[f.source] as number | ValueParam<number>,
                     f.glslType === 'Spectrum' ? 'vec3' : 'float',
                     f.semantic === 'radiometric' ? 'color' : 'float',
@@ -238,74 +239,6 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     return { ...emptyContribution('materials'), blocks, defines, uniforms, parameters, provides, requires };
 }
 
-function addParamUniform(
-    prop: Vec3 | number | GlslExpression | ValueParam<Vec3 | number>,
-    glslType: 'vec3' | 'float',
-    metaType: 'color' | 'float',
-    uniforms: PlannedUniform[],
-    parameters: Record<string, ParameterMetadata>,
-    seen: Set<string>,
-): void {
-    // Expression-declared params (heterogeneous D4, general to any expression property):
-    // each becomes a live FLOAT uniform (v1) named from its path, exactly like a
-    // ValueParam — the expression source references the derived name (u_fog_gain).
-    if (isGlslExpression(prop)) {
-        for (const p of prop.params ?? []) {
-            if (seen.has(p.param)) continue; // expressions may share one driven parameter
-            seen.add(p.param);
-            uniforms.push({
-                name: paramToUniform(p.param),
-                type: 'float',
-                parameterPath: p.param,
-                default: p.default,
-            });
-            const seg = p.param.split('.');
-            parameters[p.param] = {
-                type: 'float',
-                default: p.default,
-                name: capitalize(seg[seg.length - 1]),
-                group: seg.length > 1 ? seg[0] : undefined,
-                triggersReset: true,
-                ...(p.min !== undefined && p.max !== undefined ? { range: [p.min, p.max] } : {}),
-            };
-        }
-        return;
-    }
-    if (!isValueParam(prop)) return;
-    const path = prop.param;
-    if (seen.has(path)) return; // materials may share one driven parameter (§2.8)
-    seen.add(path);
-
-    uniforms.push({
-        name: paramToUniform(path),
-        type: glslType,
-        parameterPath: path,
-        default: prop.default as number | number[] | undefined,
-        // Spectrum properties deliberately accept achromatic scalar parameters. Preserve
-        // that broadcast for live programmatic updates, not only for the planned default.
-        ...(glslType === 'vec3' ? {
-            compute: (params: Record<string, unknown>) => {
-                const value = params[path] ?? prop.default;
-                return typeof value === 'number' ? [value, value, value] : value as number[];
-            },
-        } : {}),
-    });
-
-    const seg = path.split('.');
-    parameters[path] = {
-        type: metaType,
-        default: prop.default,
-        name: capitalize(seg[seg.length - 1]),
-        group: seg.length > 1 ? seg[0] : undefined,
-        triggersReset: true,
-        ...(prop.min !== undefined && prop.max !== undefined ? { range: [prop.min, prop.max] } : {}),
-    };
-}
-
-function capitalize(s: string): string {
-    return s.length ? s[0].toUpperCase() + s.slice(1) : s;
-}
-
 // ============================================================================
 // Generated material lookup (per-scene codegen)
 // ============================================================================
@@ -328,21 +261,17 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             .filter((f) => f.storage === 'field');
         const body: string[] = [];
         for (const f of schemas) {
-            const value = mat.values[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>;
+            const value = mat.values[f.source] as ParamValue;
             const target = `        props.${f.name}`;
-            if (isValueParam(value)) {
-                body.push(`${target} = ${paramToUniform(value.param)};`);
-            } else if (isGlslExpression(value)) {
-                body.push(`${target} = ${value.source};`);
-            } else if (f.name === 'emission') {
-                // Constant emission: assigned only when nonzero (the gate's `> 0` twin).
+            const fmt = (f.glslType === 'Spectrum' ? formatSpectrum : formatFloat) as (x: never) => string;
+            // Constant emission is assigned only when nonzero (the gate's `> 0` twin); a
+            // driven/expression emission always assigns (it may be nonzero at runtime).
+            if (f.name === 'emission' && !isValueParam(value) && !isGlslExpression(value)) {
                 const rgb = value as Vec3;
-                if (rgb[0] > 0 || rgb[1] > 0 || rgb[2] > 0) {
-                    body.push(`${target} = ${formatSpectrum(rgb)};`);
-                }
-            } else {
-                body.push(`${target} = ${f.glslType === 'Spectrum' ? formatSpectrum(value as Vec3) : formatFloat(value as number)};`);
+                if (rgb[0] > 0 || rgb[1] > 0 || rgb[2] > 0) body.push(`${target} = ${formatSpectrum(rgb)};`);
+                continue;
             }
+            body.push(`${target} = ${emitValue(value, fmt)};`);
         }
         if (body.length === 0) continue;   // 'none' / defaults-only materials earn no arm
         lines.push(`    ${arms === 0 ? 'if' : 'else if'} (id == ${mat.id}) {`);
@@ -440,21 +369,21 @@ function generateMediaTables(materials: PlannedMaterial[], wantsNullTable: boole
     return lines.join('\n');
 }
 
-function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Vec3 | number>, name: string, format: (v: never) => string): string {
-    if (isValueParam(prop)) return paramToUniform(prop.param);
-    if (isGlslExpression(prop)) {
-        if (name === 'sigma_a' || name === 'sigma_s' || name === 'emission') {
+// The constant/driven split is emitValue's; this adapter adds only the MEDIUM's expression
+// policy (the third axis): a coefficient formula gets the nonnegativity floor, a phase-param
+// formula is rejected (the Validator already guarantees phase params never vary spatially).
+function mediumPropertyExpr(prop: ParamValue, name: string, format: (v: never) => string): string {
+    const isCoefficient = name === 'sigma_a' || name === 'sigma_s' || name === 'emission';
+    return emitValue(prop, format, (e) => {
+        if (isCoefficient) {
             // Heterogeneous coefficient (fable-heterogeneous-media.md D4): the authored
-            // formula of `p` (+ declared-param uniforms). Spectrum(...) broadcasts a
-            // scalar-valued source and passes a vec3-valued one through; the max(…, 0.0)
-            // floor makes coefficients nonnegative by definition (a formula that dips
-            // negative is not a medium — σ < 0 would poison probabilities and weights).
-            return `max(Spectrum(${prop.source}), 0.0)`;
+            // formula of `p` (+ declared-param uniforms). Spectrum(...) broadcasts a scalar
+            // source and passes a vec3 one through; the max(…, 0.0) floor makes coefficients
+            // nonnegative by definition (σ < 0 would poison probabilities and weights).
+            return `max(Spectrum(${e.source}), 0.0)`;
         }
-        // Backstop only — the Validator rejects spatially-varying phase parameters.
         throw new Error(`materials: medium.${name} cannot be a GLSL expression (only sigma_a/sigma_s may vary spatially)`);
-    }
-    return format(prop as never);
+    });
 }
 
 function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[], wantsEmission: boolean): string {

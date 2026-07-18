@@ -1,7 +1,7 @@
 // compiler/analyze/Analyzer.ts
 
 import type { SceneDescription, MaterialProperty } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, isValueParam } from '../types.js';
 import type { SceneFeatures } from './types.js';
 import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
 import { LIGHT_KINDS } from '../../components/lights/index.js';
@@ -107,9 +107,12 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     if (env?.type === 'image' || env?.type === 'procedural') {
         envSamplable = env.sampleAsLight !== false;
     } else if (env?.type === 'constant') {
-        envSamplable = env.sampleAsLight === true
-            && (env.intensity ?? 1) > 0
-            && env.color.some((c) => c > 0);
+        // color is now a SCENE_VALUE (SpectrumValue): a driven {param} color counts as
+        // maybe-nonzero (the maybe-emitting rule); a constant is checked directly.
+        const c = env.color;
+        const colorMaybeNonzero = isValueParam(c) ? true
+            : typeof c === 'number' ? c > 0 : c.some((ch) => ch > 0);
+        envSamplable = env.sampleAsLight === true && (env.intensity ?? 1) > 0 && colorMaybeNonzero;
     }
 
     return {

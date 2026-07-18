@@ -11,8 +11,13 @@
 // may be functions (a pdf arm is kind-specific math, a fact expressed as code); they may
 // NOT reference other descriptors or the plan. All decisions stay in feature-planner code.
 
-import type { MaterialModel } from '../compiler/types.js';
+import type { MaterialModel, ValueParam } from '../compiler/types.js';
 import type { Similarity } from './geometry/similarity.js';
+
+/** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
+ *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —
+ *  the caller substitutes via `resolveLightValues` first. */
+export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<number[]>;
 
 /**
  * A field of a scene-scoped properties struct (MaterialProperties / MediumProperties)
@@ -140,7 +145,7 @@ export interface LightKindDescriptor {
      *  FOLDED region's parameters + Le), so both authoring routes share one kind
      *  definition. `validateAuthored` returns degeneracy messages (quad area,
      *  sphere radius) the Validator emits verbatim. */
-    toValues(authored: Record<string, unknown>, product: number[]): Record<string, number | number[]>;
+    toValues(authored: Record<string, unknown>, product: number[] | ValueParam<number> | ValueParam<number[]>): Record<string, LightRowValue>;
     region?: {
         primitive: string;
         parameters(authored: Record<string, unknown>): Record<string, number | number[]>;

@@ -15,21 +15,35 @@ import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
+import { formatSpectrum } from '../../../components/glsl-format.js';
+import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import envChartEquirectGLSL from '../../../components/env/equirect/equirect.glsl?raw';
 import envChartOctahedralGLSL from '../../../components/env/octahedral/octahedral.glsl?raw';
 import envSamplerCdfGLSL from '../../../components/env/sampler_cdf.glsl?raw';
 
 const ORIGIN = 'generated:environment';
 
-// Shared azimuth rotation (used by the octahedral chart and procedural radiance bodies).
+// Shared azimuth rotation (used by the octahedral chart and procedural radiance bodies). The
+// cos/sin of the rotation angle are CPU-precomputed and shipped as u_envRotCS (a DERIVED
+// uniform — the GPU no longer takes a transcendental of a frame-constant angle per sample).
 const ROTATE_BLOCK = {
     origin: 'generated:env-rotate',
-    source: '// Azimuth rotation by +a (adds a to atan(z, x)) — the chart rotation in direction space\n'
-        + 'vec3 env_rotate_y(vec3 d, float a) {\n'
-        + '    float c = cos(a), s = sin(a);\n'
-        + '    return vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);\n'
+    source: '// Azimuth rotation, cs = (cos a, sin a) shipped as u_envRotCS (negate .y for −a)\n'
+        + 'vec3 env_rotate_cs(vec3 d, vec2 cs) {\n'
+        + '    return vec3(cs.x * d.x - cs.y * d.z, d.y, cs.y * d.x + cs.x * d.z);\n'
         + '}',
 };
+
+/** The DERIVED rotation pair (cos, sin) of `env.rotation`, computed on the CPU and shipped —
+ *  minted wherever ROTATE_BLOCK's matrix rotation is used (octahedral chart / procedural body).
+ *  The additive-rotation paths (equirect chart, the image map lookup) keep `u_envRotation`. */
+function rotCsUniform(rotation: number): PlannedUniform {
+    return {
+        name: 'u_envRotCS', type: 'vec2', parameterPath: 'env.rotation',
+        default: [Math.cos(rotation), Math.sin(rotation)],
+        compute: (p) => { const r = (p['env.rotation'] as number) ?? rotation; return [Math.cos(r), Math.sin(r)]; },
+    };
+}
 
 /** T5 variant table suffix: which registered CDF pair this program samples. */
 export function envVariantSuffix(chart: 'equirect' | 'octahedral', compensation: boolean): string {
@@ -54,7 +68,8 @@ function sizeParamPath(chart: 'equirect' | 'octahedral'): string {
 const CONSTANT_PDF = `float environment_pdf(vec3 dir) {
     return 1.0 / (4.0 * PI);
 }`;
-const CONSTANT_SAMPLER = `// Constant environment as a light (uniform sphere, T3)
+// The color is a SCENE_VALUE — `colorExpr` is its baked literal (constant) or `u_` name (driven).
+const constantSampler = (colorExpr: string) => `// Constant environment as a light (uniform sphere, T3)
 LightSample environment_sample(Point p, vec2 xi) {
     LightSample ls;
     float z = 1.0 - 2.0 * xi.x;
@@ -62,7 +77,7 @@ LightSample environment_sample(Point p, vec2 xi) {
     float phi = TWO_PI * xi.y;
     ls.wi = vec3(r * cos(phi), z, r * sin(phi));
     ls.distance = 1.0e20;                                          // §6.1 environment convention
-    ls.radiance = u_environment_color * u_environment_intensity;   // without visibility
+    ls.radiance = ${colorExpr} * u_environment_intensity;         // without visibility
     ls.pdf = 1.0 / (4.0 * PI);                                     // per-light; selection applied by lighting_sample
     ls.flags = 0u;                                                 // not delta — BSDF paths see the env on miss
     ls.light_id = -1;
@@ -99,16 +114,18 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
 
     if (env.type === 'constant') {
         const intensity = env.intensity ?? 1.0;
+        // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes
+        // u_environment_color. Intensity is an always-live control (the owner-pinned exception).
+        const colorExpr = emitValue(env.color as ParamValue, formatSpectrum as (x: never) => string);
         const uniforms: PlannedUniform[] = [
-            { name: 'u_environment_color', type: 'vec3', parameterPath: 'environment.color', default: env.color },
             { name: 'u_environment_intensity', type: 'float', parameterPath: 'environment.intensity', default: intensity },
         ];
         const parameters: Record<string, ParameterMetadata> = {
-            'environment.color': { type: 'color', default: env.color, name: 'Sky color', group: 'Environment', triggersReset: true },
             'environment.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Sky intensity', group: 'Environment', triggersReset: true },
         };
-        const blocks = [{ origin: ORIGIN, source: radianceFn('return u_environment_color * u_environment_intensity;') }];
-        if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: CONSTANT_SAMPLER });
+        mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set());   // no-op if constant
+        const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${colorExpr} * u_environment_intensity;`) }];
+        if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: constantSampler(colorExpr) });
         if (plan.program.environmentPdf) blocks.push({ origin: 'generated:environment-pdf', source: CONSTANT_PDF });
         return {
             ...emptyContribution('environment'),
@@ -149,7 +166,10 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
             // env_rotate_y's only image-env caller is the octahedral chart (the equirect
             // chart and the fixed map lookup apply u_envRotation inline).
             blocks.unshift(chartBlock(chart));   // chart before radiance/sampler
-            if (chart === 'octahedral') blocks.unshift(ROTATE_BLOCK);   // rotate before its caller
+            if (chart === 'octahedral') {
+                blocks.unshift(ROTATE_BLOCK);        // rotate before its caller (the octahedral chart)
+                uniforms.push(rotCsUniform(rotation));   // its matrix rotation ships u_envRotCS
+            }
             blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: envSamplerCdfGLSL });
             textures.push(
                 { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },
@@ -173,9 +193,11 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         // radiance is environment_radiance(ls.wi) by the T4 unification.
         const intensity = env.intensity ?? 1.0;
         const rotation = env.rotation ?? 0.0;
+        // u_envRotation (the additive angle) is minted below ONLY for the equirect chart; the
+        // radiance body + octahedral chart use the shipped cos/sin (u_envRotCS). The env.rotation
+        // PARAMETER is always live (it drives both derived uniforms).
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
-            { name: 'u_envRotation', type: 'float', parameterPath: 'env.rotation', default: rotation },
         ];
         const parameters: Record<string, ParameterMetadata> = {
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Env intensity', group: 'Environment', triggersReset: true },
@@ -183,14 +205,16 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         };
         const { chart, compensation } = plan.program.estimator.envSampler;
         const blocks = [
-            ROTATE_BLOCK,   // the radiance body below always calls env_rotate_y
+            ROTATE_BLOCK,   // the radiance body below always calls env_rotate_cs
             // env_rotate_y(dir, +rot) evaluates the formula at the TABLE azimuth — the exact
             // direction-space form of the chart's rotation term, so the direct-eval'd field
             // and the CDF (baked unrotated, sampled through the chart) agree under rotation.
             // GLSL params are value copies: reassigning `dir` scopes the rotation to the
             // formula without touching the author's expression.
-            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_y(normalize(dir), u_envRotation);\n    return (${env.glsl.source}) * u_envIntensity;`) },
+            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_cs(normalize(dir), u_envRotCS);\n    return (${env.glsl.source}) * u_envIntensity;`) },
         ];
+        // Procedural radiance always uses the matrix rotation → always ships u_envRotCS.
+        uniforms.push(rotCsUniform(rotation));
         const textures: FeatureContribution['textures'] = [];
         if (samplable) {
             const suffix = envVariantSuffix(chart, compensation);
@@ -201,6 +225,8 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
                 { name: 'u_envCdfMarg', source: `extern:env_cdf_marg${suffix}` },
             );
             uniforms.push({ name: 'u_envSize', type: 'vec2', parameterPath: sizeParamPath(chart), default: [1, 1] });
+            // The equirect chart applies rotation ADDITIVELY (needs the angle, not cos/sin).
+            if (chart === 'equirect') uniforms.push({ name: 'u_envRotation', type: 'float', parameterPath: 'env.rotation', default: rotation });
         }
         return {
             ...emptyContribution('environment'),

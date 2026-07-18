@@ -5,9 +5,11 @@
 // generated `lighting_sample` that CDF-selects a light and calls its kind sampler (§6.1/§3.3).
 
 import type { RenderPlan, PlannedLight } from '../../plan/types.js';
+import { isValueParam } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
+import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
 import type { LightKindDescriptor } from '../../../components/descriptors.js';
 import { structFromRows } from '../schema.js';
@@ -79,11 +81,11 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     }
 
     // Hoisted light consts (struct-alignment batch, the N5 pattern): every light is
-    // compile-time data today (Value<T> light params deferred), so each becomes ONE
-    // named struct const shared by the sampler dispatcher, the MIS pdf query, and the
-    // delta query — one construction site, three readers.
+    // One accessor per light (`light_get_<id>()`), the single construction site shared by the
+    // sampler dispatcher, the MIS pdf query, and the delta query — constants baked inside,
+    // driven rows reading their uniforms (Model B).
     if (plan.lights.length > 0) {
-        blocks.push({ origin: 'generated:light-consts', source: generateLightConsts(plan.lights) });
+        blocks.push({ origin: 'generated:light-accessors', source: generateLightAccessors(plan.lights) });
     }
 
     // Selection pdfs are computed ONCE and shared by the sampler and the MIS pdf query —
@@ -92,16 +94,49 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     const selection = plan.program.estimator.lighting.selection;
     const selectPdf = computeSelectPdf(plan.lights, selection);
 
+    // Driven-lights Stage A: literal→uniform substitutions + the CPU-recomputed selection
+    // arrays. Constant scenes have driven=false → nothing below fires, byte-identical.
+    const driven = plan.program.emitters.driven;
+    if (driven) {
+        const seen = new Set<string>();
+        // Emission uniforms for driven DELTA lights (point/spot/…) via the shared minter — a
+        // hittable light's emission rides the synthesized __light_n material's uniform (same
+        // path, same name; merge dedups). mintValueUniform no-ops on constant rows.
+        for (const l of plan.lights) {
+            if (l.regionId !== undefined) continue;   // hittable: material owns the uniform
+            for (const v of Object.values(l.values)) mintValueUniform(v as ParamValue, 'vec3', 'color', uniforms, parameters, seen);
+        }
+        // Selection CDF + per-light select-pdf as CPU-computed float arrays (>1 light only;
+        // a single light has select_pdf ≡ 1). ONE computeSelectPdf call per array, run at
+        // plan time (default) and on any driven-emission change (compute) — the bake≡ship truth.
+        if (plan.lights.length > 1) {
+            const paths = drivenEmissionPaths(plan.lights);
+            const n = plan.lights.length;
+            uniforms.push({
+                name: 'u_light_selpdf', type: 'float[]', arrayLength: n,
+                parameterPath: paths[0], parameterPaths: paths,
+                default: computeSelectPdf(plan.lights, selection),
+                compute: (p) => computeSelectPdf(plan.lights, selection, p),
+            });
+            uniforms.push({
+                name: 'u_light_cdf', type: 'float[]', arrayLength: n,
+                parameterPath: paths[0], parameterPaths: paths,
+                default: cumulative(computeSelectPdf(plan.lights, selection)),
+                compute: (p) => cumulative(computeSelectPdf(plan.lights, selection, p)),
+            });
+        }
+    }
+
     blocks.push({
         origin: 'generated:light-sampling',
-        source: generateLightSampling(plan.lights, selectPdf, envSamplable),
+        source: generateLightSampling(plan.lights, selectPdf, envSamplable, driven),
     });
 
     // Equiangular placement needs the light's POSITION before choosing t — a query the
     // solid-angle-from-p sampler cannot answer (impl-plan-equiangular). Emitted only under
     // the knob; the Validator has already guaranteed every light is delta (v1 pin 1).
     if (plan.program.estimator.mediumLightSampling === 'equiangular') {
-        blocks.push({ origin: 'generated:lighting-query-delta', source: generateLightingQueryDelta(plan.lights, selectPdf) });
+        blocks.push({ origin: 'generated:lighting-query-delta', source: generateLightingQueryDelta(plan.lights, selectPdf, driven) });
     }
 
     // §6.2 registry table + the transport emission-bookkeeping gate: only when a samplable
@@ -112,7 +147,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'generated:light-of', source: generateLightOf(samplable) });
         // The MIS pdf query (§6.1): only under 'mis' — its sole reader is the emitter-hit weight.
         if (plan.program.emitters.lightingPdf) {
-            blocks.push({ origin: 'generated:lighting-pdf', source: generateLightingPdf(plan.lights, selectPdf, envSamplable) });
+            blocks.push({ origin: 'generated:lighting-pdf', source: generateLightingPdf(plan.lights, selectPdf, envSamplable, driven) });
         }
     }
 
@@ -172,27 +207,31 @@ function generateLightOf(samplable: PlannedLight[]): string {
  *  (the spot lesson: an anisotropic delta's on-axis intensity would BIAS the
  *  equiangular estimate, so such kinds declare no fact and the Validator rejects
  *  them under 'equiangular'; every light reaching here is delta AND isotropic). */
-function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[]): string {
+function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[], driven: boolean): string {
     const lines = [
         '// Generated delta-light query (equiangular placement): position + intensity + select pdf.',
         'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity) {',
     ];
+    // Same selection builder as the sampler — so the threshold (cdf) and the returned pdf are
+    // driven-aware in lockstep (a driven delta light under equiangular now reads the live
+    // u_light_cdf threshold, not a stale baked literal).
+    const sel = selectionExprs(selectPdf, driven && lights.length > 1);
     const arm = (l: PlannedLight, i: number) => {
         const q = lightKind(l).deltaQuery!;   // Validator-guaranteed (the isotropy pin)
+        // Position is geometry (constant in v1); intensity routes through the shared split.
+        const intensityE = emitValue(l.values[q.intensityRow] as ParamValue, formatSpectrum as (x: never) => string);
         return [
             `pos = ${formatVec3(l.values[q.positionRow] as number[])};`,
-            `intensity = ${formatSpectrum(l.values[q.intensityRow] as number[])};`,
-            `return ${formatFloat(selectPdf[i])};`,
+            `intensity = ${intensityE};`,
+            `return ${sel.selpdf(i)};`,
         ];
     };
     if (lights.length === 1) {
         lines.push(...arm(lights[0], 0).map((s) => `    ${s}`));
     } else {
-        let acc = 0;
         for (let i = 0; i < lights.length; i++) {
-            acc += selectPdf[i];
             if (i < lights.length - 1) {
-                lines.push(`    if (uc < ${formatFloat(acc)}) { ${arm(lights[i], i).join(' ')} }`);
+                lines.push(`    if (uc < ${sel.cdf(i)}) { ${arm(lights[i], i).join(' ')} }`);
             } else {
                 lines.push(`    ${arm(lights[i], i).join(' ')}`);   // last arm unconditional
             }
@@ -202,11 +241,31 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[])
     return lines.join('\n');
 }
 
+/** Substitute a light's driven RADIOMETRIC rows with concrete values (driven-lights
+ *  Stage A) — a `ValueParam` row → `params[path] ?? default`, broadcasting a scalar to a
+ *  Spectrum vec3 (§2.5); constant rows pass through. This is the ONE substitution truth:
+ *  the plan-time bake calls it with `{}` (defaults) and the CDF compute closure with live
+ *  store values, so `computeSelectPdf`/`power` see identical resolved values on both paths
+ *  (the `similarityFromTransform` bake≡ship precedent). No-op for constant lights. */
+export function resolveLightValues(l: PlannedLight, params: Record<string, unknown> = {}): Record<string, number | number[]> {
+    const out: Record<string, number | number[]> = {};
+    for (const [k, v] of Object.entries(l.values)) {
+        if (isValueParam(v)) {
+            const raw = params[v.param] ?? v.default;
+            out[k] = typeof raw === 'number' ? [raw, raw, raw] : raw as number[];
+        } else {
+            out[k] = v as number | number[];
+        }
+    }
+    return out;
+}
+
 /** Emitted power for CDF selection — the kind descriptors carry the pbrt formulas
- *  (area-aware, pitfall 6). Exported for the H6 invariant tests. */
-export function lightPower(l: PlannedLight): number {
+ *  (area-aware, pitfall 6). Reads RESOLVED values (driven rows substituted). Exported
+ *  for the H6 invariant tests. */
+export function lightPower(l: PlannedLight, params: Record<string, unknown> = {}): number {
     const d = LIGHT_KINDS[l.kind];
-    return d !== undefined ? d.power(l.values) : 1e-8;   // backstop; the Validator rejects unregistered kinds
+    return d !== undefined ? d.power(resolveLightValues(l, params)) : 1e-8;   // backstop; the Validator rejects unregistered kinds
 }
 
 function lightKind(l: PlannedLight): LightKindDescriptor {
@@ -215,48 +274,97 @@ function lightKind(l: PlannedLight): LightKindDescriptor {
     return d;
 }
 
+// ============================================================================
+// Driven-lights Stage A: CPU-side minting (the precompute-and-ship rule)
+// ============================================================================
+
+/** Distinct driven-emission parameter paths across all lights — the `parameterPaths` the
+ *  selection arrays depend on (any one changing recomputes the whole CDF). */
+function drivenEmissionPaths(lights: PlannedLight[]): string[] {
+    const s = new Set<string>();
+    for (const l of lights) for (const v of Object.values(l.values)) if (isValueParam(v)) s.add(v.param);
+    return [...s];
+}
+
+/** Cumulative sum — the selection CDF from per-light selection pdfs (shipped, not derived on the GPU). */
+function cumulative(sp: number[]): number[] {
+    const out: number[] = [];
+    let acc = 0;
+    for (const s of sp) { acc += s; out.push(acc); }
+    return out;
+}
+
+/** THE ONE builder + reader for the selection CDF (G1/G2): the prefix-sum is computed once
+ *  (via `cumulative`), and every reader — the sampler, the MIS pdf query, the equiangular delta
+ *  query — asks for the SAME `cdf(i)` / `selpdf(i)` expression. When the arrays are live
+ *  (`useArrays` = driven emission AND >1 light, exactly when contributeLighting mints them) the
+ *  reader reads the shipped `u_light_cdf`/`u_light_selpdf`; otherwise it bakes the literal. This
+ *  kills the three independent prefix-sums that previously had to agree by hand. */
+function selectionExprs(selectPdf: number[], useArrays: boolean): { cdf: (i: number) => string; selpdf: (i: number) => string } {
+    const cdf = cumulative(selectPdf);
+    return {
+        cdf: (i) => useArrays ? `u_light_cdf[${i}]` : formatFloat(cdf[i]),
+        selpdf: (i) => useArrays ? `u_light_selpdf[${i}]` : formatFloat(selectPdf[i]),
+    };
+}
+
 /** `<Kind>Light(…rows[, …derived])` — the struct ctor from the descriptor's rows
  *  (row order = ctor order; radiometric values via formatSpectrum, §2.5). The lights
  *  twin of geometry's emitCtor — all compile-time literals until Value<T> lights. */
+/** How every reader names light `l`'s struct: always the accessor `light_get_<id>()`
+ *  (Model B — structure is uniform-shaped; a driven light MUST use an accessor since a const
+ *  can't read a uniform, so a constant light does too, baking its literals inside). */
+function lightRef(l: PlannedLight): string {
+    return `light_get_${l.id}()`;
+}
+
 function lightCtor(l: PlannedLight): string {
     const d = lightKind(l);
     const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
     const args = d.params.map((row) => {
-        const v = l.values[row.name];
-        if (row.shape === 'number') return formatFloat(v as number);
-        return row.semantic === 'radiometric' ? formatSpectrum(v as number[]) : formatVec3(v as number[]);
+        // The constant/driven split is emitValue's: a driven radiometric row reads its uniform
+        // (for a HITTABLE light the SAME one the synthesized material's emission declares),
+        // a constant row bakes its literal via the row's formatter.
+        const fmt = (row.shape === 'number' ? formatFloat
+            : row.semantic === 'radiometric' ? formatSpectrum : formatVec3) as (x: never) => string;
+        return emitValue(l.values[row.name] as ParamValue, fmt);
     });
-    const derived = (d.derivedCtorFields?.(l.values) ?? [])
+    // Derived fields (quad normal/area) read GEOMETRY rows, constant in v1 — pass RESOLVED
+    // values so the signature stays on concrete numbers (the driven-row substitution is inert
+    // here: geometry is never driven in Stage A).
+    const derived = (d.derivedCtorFields?.(resolveLightValues(l)) ?? [])
         .map((v) => (Array.isArray(v) ? formatVec3(v) : formatFloat(v)));
     return `${structName}(${[...args, ...derived].join(', ')})`;
 }
 
-/** One named const per light — `light_<id>`, the single construction site. */
-function generateLightConsts(lights: PlannedLight[]): string {
-    const lines = ['// Generated light consts (§6.1) — one struct per light, compile-time data'];
+/** One nullary accessor per light (§6.1), `light_get_<id>()` — the uniform structural shape.
+ *  A constant light bakes its literals inside; a driven light reads its uniforms. The GPU
+ *  inlines a constant accessor to nothing, so this costs nothing and unifies the readers. */
+function generateLightAccessors(lights: PlannedLight[]): string {
+    const lines = ['// Generated light accessors (§6.1) — constants baked inline, driven read u_'];
     for (const l of lights) {
         const d = lightKind(l);
         const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
-        lines.push(`const ${structName} light_${l.id} = ${lightCtor(l)};`);
+        lines.push(`${structName} light_get_${l.id}() { return ${lightCtor(l)}; }`);
     }
     return lines.join('\n');
 }
 
-/** GLSL call that samples light `l` at point `p` — kind sampler over the hoisted const. */
+/** GLSL call that samples light `l` at point `p` — kind sampler over the const/accessor. */
 function sampleCall(l: PlannedLight, xiExpr: string): string {
-    return `${lightKind(l).kind}_light_sample(light_${l.id}, p, ${xiExpr})`;
+    return `${lightKind(l).kind}_light_sample(${lightRef(l)}, p, ${xiExpr})`;
 }
 
 /** Compile-time selection pdfs — shared by lighting_sample and lighting_pdf.
  *  Exported for the H6 invariant tests. */
-export function computeSelectPdf(lights: PlannedLight[], selection: 'uniform' | 'power'): number[] {
+export function computeSelectPdf(lights: PlannedLight[], selection: 'uniform' | 'power', params: Record<string, unknown> = {}): number[] {
     if (lights.length === 0) return [];
-    const weights = lights.map((l) => (selection === 'uniform' ? 1 : lightPower(l)));
+    const weights = lights.map((l) => (selection === 'uniform' ? 1 : lightPower(l, params)));
     const total = weights.reduce((a, b) => a + b, 0);
     return weights.map((w) => w / total);
 }
 
-function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean): string {
+function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean, driven: boolean): string {
     const lines: string[] = ['// Generated light selection dispatcher (§6.1)'];
 
     if (lights.length === 0) {
@@ -286,24 +394,24 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
         lines.push(`    ls = ${sampleCall(lights[0], 'xi')};`);
         lines.push('    ls.light_id = 0;');
     } else {
-        // Compile-time power-weighted (or uniform) CDF over samplable lights.
-        const cdf: number[] = [];
-        let acc = 0;
-        for (const sp of selectPdf) { acc += sp; cdf.push(acc); }
+        // Power-weighted (or uniform) CDF over samplable lights, via the ONE selection builder.
+        // Driven emission reads the shipped u_light_cdf/u_light_selpdf arrays (CPU-recomputed);
+        // constant scenes bake the literals — byte-identical. The GPU never accumulates/normalizes.
+        const sel = selectionExprs(selectPdf, driven && lights.length > 1);
 
         // Selection + cdf_rescale (pitfall 4: NEVER reuse the raw selection random for surface
         // sampling — recover a fresh stratified coordinate from the selection interval).
         lines.push('    int light_id; float select_pdf; float xr;');
         for (let i = 0; i < lights.length - 1; i++) {
             const kw = i === 0 ? 'if' : 'else if';
-            const lo = i === 0 ? '0.0' : formatFloat(cdf[i - 1]);
-            lines.push(`    ${kw} (xi.x < ${formatFloat(cdf[i])}) { light_id = ${i}; select_pdf = ${formatFloat(selectPdf[i])}; xr = (xi.x - ${lo}) / ${formatFloat(selectPdf[i])}; }`);
+            const lo = i === 0 ? '0.0' : sel.cdf(i - 1);
+            lines.push(`    ${kw} (xi.x < ${sel.cdf(i)}) { light_id = ${i}; select_pdf = ${sel.selpdf(i)}; xr = (xi.x - ${lo}) / ${sel.selpdf(i)}; }`);
         }
         const last = lights.length - 1;
-        const lastLo = formatFloat(cdf[last - 1]);
+        const lastLo = sel.cdf(last - 1);
         // The final else closes the CDF — no fallthrough (pitfall 5: the old fallback masked an
         // uninitialized-LightSample bug).
-        lines.push(`    else { light_id = ${last}; select_pdf = ${formatFloat(selectPdf[last])}; xr = (xi.x - ${lastLo}) / ${formatFloat(selectPdf[last])}; }`);
+        lines.push(`    else { light_id = ${last}; select_pdf = ${sel.selpdf(last)}; xr = (xi.x - ${lastLo}) / ${sel.selpdf(last)}; }`);
         lines.push('    vec2 light_xi = vec2(clamp(xr, 0.0, 0.9999999), xi.y);');
 
         for (let i = 0; i < lights.length; i++) {
@@ -349,23 +457,27 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
 // carry no arm; unknown ids return 0 (weight → 1 on the BSDF side, conservative).
 // ============================================================================
 
-function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean): string {
+function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean, driven: boolean): string {
     const lines: string[] = ['// Generated MIS pdf query (§6.1) — must mirror lighting_sample exactly'];
     // With a samplable env, every finite light's selection pdf carries the stage-0 factor —
     // exactly what the sampler applied. The env itself has no arm here (never hit; the miss
     // branch queries u_envSelectProb * environment_pdf directly, reference §8 line 3).
     const stage0 = envSamplable ? ' * (1.0 - u_envSelectProb)' : '';
+    const sel = selectionExprs(selectPdf, driven && lights.length > 1);
     lines.push('float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit) {');
     for (let i = 0; i < lights.length; i++) {
         const l = lights[i];
         if (l.regionId === undefined) continue;   // delta: not hittable, never queried
         const d = lightKind(l);
         if (d.delta) continue;                    // backstop; regionId already filtered
-        const select = formatFloat(lights.length === 1 ? 1.0 : selectPdf[i]) + stage0;
+        // Selection pdf = same value the sampler used (the ONE selection builder): the shipped
+        // array under driven emission, else the baked literal. Single light ⇒ selection ≡ 1.
+        const selBase = lights.length === 1 ? '1.0' : sel.selpdf(i);
+        const select = selBase + stage0;
         // The kind's density lives in its GLSL file, ADJACENT to its sampler (the §6.1
         // byte-match invariant is now two functions over one struct) — the arm here is
         // pure composition: selection pdf × the kind's solid-angle pdf.
-        lines.push(`    if (light_id == ${l.id}) return ${select} * ${d.kind}_light_pdf(light_${l.id}, p, light_hit.p, wi);`);
+        lines.push(`    if (light_id == ${l.id}) return ${select} * ${d.kind}_light_pdf(${lightRef(l)}, p, light_hit.p, wi);`);
     }
     lines.push('    return 0.0;');
     lines.push('}');

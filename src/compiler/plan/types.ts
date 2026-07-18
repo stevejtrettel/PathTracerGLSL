@@ -118,6 +118,12 @@ export interface EmittersDesc {
     samplable: boolean;
     /** samplable AND mis: the generated lighting_pdf MIS query is emitted. */
     lightingPdf: boolean;
+    /** Driven-lights Stage A: some light has a `{param}` RADIOMETRIC row. Gates the
+     *  literal→uniform substitutions — the light ctor becomes `light_get_<id>()` (a const
+     *  can't read a uniform), and the selection CDF/select-pdf read `u_light_cdf[i]` /
+     *  `u_light_selpdf[i]` (CPU-recomputed) instead of literals. FALSE → byte-identical to
+     *  the pre-driven emitters (constant scenes are unaffected). */
+    driven: boolean;
 }
 
 export type IntersectionDesc =
@@ -240,7 +246,7 @@ export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 
 export interface PlannedMedium {
     sigma_a: Vec3 | GlslExpression | ValueParam<Vec3>;
     sigma_s: Vec3 | GlslExpression | ValueParam<Vec3>;
-    /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh' | 'draine'. */
+    /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh'. */
     model: string;
     /** Density ceiling σ̄ (heterogeneous D1) — present iff authored. Spliced as a literal
      *  into the null-collision arms (AUTO-DERIVED there for constant-coefficient emissive
@@ -285,7 +291,11 @@ export interface PlannedLight {
     id: number;
     /** Registry key (registry-validated — A3; 'directional' is Validator-rejected input). */
     kind: string;
-    values: Record<string, number | number[]>;
+    /** Rows keyed by name. A RADIOMETRIC row may be a `ValueParam` (driven-lights Stage A):
+     *  the emitted ctor reads the row's uniform instead of a literal, and the selection CDF
+     *  is CPU-recomputed on change (`resolveLightValues` → `computeSelectPdf`). Geometry rows
+     *  stay constant in v1 (driven light geometry = Stage B). Mirrors PlannedMedium.values. */
+    values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]>>;
     /** The emitter's region id (quad/sphere) — feeds the generated light_of table. */
     regionId?: number;
 }
@@ -295,7 +305,7 @@ export interface PlannedLight {
  */
 export interface PlannedUniform {
     name: string;
-    type: 'float' | 'int' | 'vec2' | 'vec3' | 'vec4' | 'mat4' | 'sampler2D';
+    type: 'float' | 'float[]' | 'int' | 'vec2' | 'vec3' | 'vec4' | 'mat4' | 'sampler2D';
     parameterPath: string;
     /** Additional parameter paths when the uniform is a function of SEVERAL params
      *  (driven placement: one uniform ← position + rotation + scale paths). The
@@ -303,6 +313,9 @@ export interface PlannedUniform {
      *  receives the whole value map (fable-transforms §6). */
     parameterPaths?: string[];
     default?: number | number[];
+    /** Array length N for a `float[]` uniform — the GLSL declaration needs `float u_x[N];`
+     *  (the upload infers length from the Float32Array). Required for `float[]`, unused else. */
+    arrayLength?: number;
     /**
      * Optional transform from parameter values to the uniform value — used when the
      * uniform is a *function* of a parameter, e.g. u_tanFov = tan(camera.fov / 2).

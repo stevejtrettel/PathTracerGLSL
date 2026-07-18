@@ -114,14 +114,21 @@ export function validate(
         // emission (B2's universal radiometric word) — required, number|vec3, >= 0.
         // Negative radiance is non-physical: pt sees negative energy on every hit while the
         // power CDF floors at ~0 so NEE almost never samples it — the strategies diverge.
+        // Driven-lights Stage A: emission may be a {param} — validate its DEFAULT (the
+        // uniform's initial value AND the plan-time CDF bake; a driven light needs one). The
+        // reserved-path/collision checks ride collectParamPaths automatically (ValueParam-shaped).
         const e = authored.emission;
-        const eChannels = typeof e === 'number' && Number.isFinite(e) ? [e]
-            : Array.isArray(e) && e.length === 3 && e.every((c) => typeof c === 'number' && Number.isFinite(c)) ? e as number[]
+        const eDriven = isValueParam(e);
+        const eValue = eDriven ? (e as { default?: unknown }).default : e;
+        const eChannels = typeof eValue === 'number' && Number.isFinite(eValue) ? [eValue]
+            : Array.isArray(eValue) && eValue.length === 3 && eValue.every((c) => typeof c === 'number' && Number.isFinite(c)) ? eValue as number[]
             : null;
         if (e === undefined) {
             bag.error('invalid-setting', `Light ${i} (${light.kind}): required field 'emission' is missing (Le for area kinds, radiant intensity for delta — scalar broadcasts)`).add();
+        } else if (eDriven && eValue === undefined) {
+            bag.error('invalid-setting', `Light ${i} (${light.kind}): a driven emission {param: '${(e as { param?: string }).param}'} requires a 'default' (the uniform's initial value and the CDF bake)`).add();
         } else if (eChannels === null) {
-            bag.error('invalid-setting', `Light ${i} (${light.kind}): emission must be a finite number or vec3`).add();
+            bag.error('invalid-setting', `Light ${i} (${light.kind}): emission must be a finite number or vec3${eDriven ? ' default' : ''}`).add();
         } else if (eChannels.some((c) => c < 0)) {
             bag.error('invalid-setting', `Light ${i}: emission must be >= 0 (negative radiance diverges pt vs pt-nee)`).add();
         }

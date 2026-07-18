@@ -8,10 +8,10 @@
 
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, DrivenPlacement } from '../../plan/types.js';
 import { isDrivenPlacement } from '../../plan/types.js';
-import { isGlslExpression, isValueParam } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatMat3, formatVec3, paramToUniform } from '../../../components/glsl-format.js';
+import { formatFloat, formatMat3, formatVec3 } from '../../../components/glsl-format.js';
+import { emitValue, type ParamValue } from '../values.js';
 import { MATERIAL_MODELS, modelTransmission } from '../../../components/materials/index.js';
 import {
     PRIMITIVES,
@@ -495,15 +495,12 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
         const row = MATERIAL_MODELS[mat.model]?.properties.find((p) => p.storage === 'region-table');
         const ior = row !== undefined ? mat.values[row.source] : undefined;
         if (ior === undefined) continue;   // registry-test-enforced; unreachable backstop
-        let expr: string;
-        if (isValueParam(ior)) {
-            expr = paramToUniform(ior.param);
-        } else if (isGlslExpression(ior)) {
-            // Backstop only — the Validator rejects this with a proper diagnostic upstream.
+        // The constant/driven split is emitValue's — ior_of is a region-indexed SCENE_VALUE
+        // (no shading point, so it can't ride scene_material_properties, but the read obeys the
+        // same one split point). An expression is rejected (the Validator already diagnosed it).
+        const expr = emitValue(ior as ParamValue, formatFloat as (x: never) => string, () => {
             throw new Error(`intersection: material '${mat.name}': ior cannot be a GLSL expression (ior_of is region-indexed, no shading point)`);
-        } else {
-            expr = formatFloat(ior as number);
-        }
+        });
         lines.push(`    if (region == ${obj.index}) return ${expr};`);
     }
     lines.push('    return 1.0;'); // ambient / vacuum / non-transmissive regions

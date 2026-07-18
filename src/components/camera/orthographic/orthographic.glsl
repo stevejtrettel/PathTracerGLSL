@@ -5,8 +5,7 @@
 
 Ray camera_generateRay(vec2 film, vec2 xiLens) {
     vec2 ndc = (2.0 * film / u_imageSize) - 1.0;
-    float aspect = u_imageSize.x / u_imageSize.y;
-    ndc.x *= aspect;
+    ndc.x *= u_aspect;   // aspect precomputed on the CPU (u_aspect), not per-ray
 
     // Look-at frame precomputed on the CPU (components/camera/basis.ts), shipped as
     // uniforms — no per-ray normalize/cross (the up-reference guard lives there).

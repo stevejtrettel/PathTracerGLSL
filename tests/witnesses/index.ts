@@ -56,6 +56,10 @@ import {
 } from './scenes/transformWitness.js';
 import { drivenScene, drivenBakedTheta, drivenBakedTheta2, drivenNeeStrategy, THETA2 } from './scenes/drivenWitness.js';
 import {
+    drivenLightScene, drivenLightBaked, drivenLightBaked2, drivenLightOffBaked,
+    drivenLightNeeStrategy, drivenLightMisStrategy, LIGHT_THETA2, LIGHT_OFF,
+} from './scenes/drivenLightWitness.js';
+import {
     hetConstScene, hetConstRef, hetNeeStrategy, hetPtStrategy, hetRefNeeStrategy, hetRefPtStrategy,
     hetSlabScene, hetSlabStrategy,
     clampScene, clampRef, clampStrategy, clampRefStrategy,
@@ -480,6 +484,60 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         initialParameters: {
             ...THETA2,
         },
+    },
+    // Fixture partners: the constant-emission baked references of the driven-light witness.
+    'light-driven-baked': {
+        scene: drivenLightBaked,
+        strategies: posed([0, 1, 4], [0, 1, 0], drivenLightNeeStrategy),
+        exercises: 'constant-emission baked reference of the driven-light witness at θ (default power)',
+    },
+    'light-driven-baked2': {
+        scene: drivenLightBaked2,
+        strategies: posed([0, 1, 4], [0, 1, 0], drivenLightNeeStrategy),
+        exercises: 'constant-emission baked reference at θ′ (the reshuffled-CDF power)',
+    },
+    'light-off-baked': {
+        scene: drivenLightOffBaked,
+        strategies: posed([0, 1, 4], [0, 1, 0], drivenLightNeeStrategy),
+        exercises: 'constant-emission baked reference at 0 — the second panel is present but black',
+    },
+    'light-driven': {
+        scene: drivenLightScene,
+        strategies: posed([0, 1, 4], [0, 1, 0], drivenLightNeeStrategy, drivenLightMisStrategy),
+        exercises:
+            'driven-emission-equals-baked at θ (impl-plan-driven-lights §A): a Cornell scene with a CONSTANT ceiling panel + a DRIVEN one (emission = {param: lamp.power}). Covers the light_get_1() accessor, the shared u_lamp_power (hittable Le ≡ sampler radiance), and both CPU-shipped selection arrays. key 1 pt-nee, key 2 pt-mis. Drag lamp.power in the lab — the panel brightens and the CDF re-weights with NO recompile',
+        expected: 'converges to the same image as light-driven-baked; nee ≡ mis (the u_light_selpdf symmetry); divergence implicates the emission uniform sharing or the CDF closure',
+        witness: {
+            spp: 128,
+            checks: [
+                { kind: 'twin', other: { scene: 'light-driven-baked' }, meanTol: 0.003, rmse: 0.02, label: 'driven-emission ≡ baked @θ' },
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'driven nee ≡ mis' },
+            ],
+        },
+    },
+    'light-driven-theta2': {
+        scene: drivenLightScene,
+        strategies: posed([0, 1, 4], [0, 1, 0], drivenLightNeeStrategy),
+        exercises:
+            'driven-emission-equals-baked at θ′: lamp.power SET through the ParameterStore after init to a value that RESHUFFLES the power-selection ranking (the CDF coupling made visible) — covers recompute-on-change of the u_light_cdf/u_light_selpdf closures + the emission re-upload',
+        expected: 'converges to light-driven-baked2 (visibly brighter side panel than `light-driven`); divergence implicates the multi-path CDF recompute',
+        witness: {
+            spp: 128,
+            checks: [{ kind: 'twin', other: { scene: 'light-driven-baked2' }, meanTol: 0.003, rmse: 0.02, label: 'driven-emission ≡ baked @θ′ (post-set)' }],
+        },
+        initialParameters: { ...LIGHT_THETA2 },
+    },
+    'light-off': {
+        scene: drivenLightScene,
+        strategies: posed([0, 1, 4], [0, 1, 0], drivenLightNeeStrategy),
+        exercises:
+            'the dead driven light: lamp.power SET to 0 — the second panel ships zero CDF mass (never meaningfully selected, no shader guard) yet remains as present-but-black geometry',
+        expected: 'converges to light-off-baked (only the constant panel lights the scene); the black panel costs nothing but occlusion',
+        witness: {
+            spp: 128,
+            checks: [{ kind: 'twin', other: { scene: 'light-off-baked' }, meanTol: 0.003, rmse: 0.02, label: 'driven @0 ≡ constant-black panel' }],
+        },
+        initialParameters: { ...LIGHT_OFF },
     },
     'cornell-disk': {
         scene: cornellDisk,

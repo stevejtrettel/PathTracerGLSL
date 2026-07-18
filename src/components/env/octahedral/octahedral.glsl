@@ -36,11 +36,11 @@ vec3 env_chart_dir(vec2 uv) {
     float s = r * sqrt(max(0.0, 2.0 - r * r));
     // rotation: the table is unrotated; a world direction at azimuth φ reads the table at
     // φ + ρ, so decoding table uv must SUBTRACT ρ (the inverse — same discipline as equirect).
-    return env_rotate_y(vec3(cosPhi * s, y, sinPhi * s), -u_envRotation);
+    return env_rotate_cs(vec3(cosPhi * s, y, sinPhi * s), vec2(u_envRotCS.x, -u_envRotCS.y));   // −ρ: negate sin
 }
 
 vec2 env_chart_uv(vec3 dir) {
-    vec3 n = env_rotate_y(normalize(dir), u_envRotation);
+    vec3 n = env_rotate_cs(normalize(dir), u_envRotCS);
     float x = abs(n.x), y = abs(n.y), z = abs(n.z);
 
     float r = sqrt(max(0.0, 1.0 - y));

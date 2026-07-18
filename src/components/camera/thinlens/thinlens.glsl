@@ -1,5 +1,5 @@
 // Thin-lens camera — pinhole geometry + a finite aperture for defocus (depth of field).
-// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraForward/Right/Up,
+// Requires: u_tanFov (= tan(fov/2)), u_imageSize, u_cameraPosition, u_cameraForward/Right/Up,
 //           u_aperture (lens radius), u_focusDistance.
 // aperture → 0 collapses exactly to pinhole (the witness's correctness anchor).
 
@@ -17,8 +17,7 @@ vec2 concentric_disk(vec2 u) {
 Ray camera_generateRay(vec2 film, vec2 xiLens) {
     // film = continuous sub-pixel point (pixel/ owns the footprint).
     vec2 ndc = (2.0 * film / u_imageSize) - 1.0;
-    float aspect = u_imageSize.x / u_imageSize.y;
-    ndc.x *= aspect;
+    ndc.x *= u_aspect;   // aspect precomputed on the CPU (u_aspect), not per-ray
 
     // Look-at frame precomputed on the CPU (components/camera/basis.ts), shipped as
     // uniforms — no per-ray normalize/cross (the up-reference guard lives there).
@@ -27,7 +26,7 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     vec3 up = u_cameraUp;
 
     // The pinhole primary direction through the (jittered) pixel.
-    vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
+    vec3 dir = normalize(forward + ndc.x * u_tanFov * right + ndc.y * u_tanFov * up);
 
     // Everything on the focus plane (distance u_focusDistance along `forward`) images
     // sharply; the primary ray crosses it at t = focusDistance / dot(dir, forward).

@@ -1,21 +1,70 @@
 // compiler/generate/features/camera.ts
-// Camera: the ray-generation snippet + its uniforms, defines, and UI parameters.
+// Camera: the ray-generation snippet + its uniforms and UI parameters.
 //
-// This feature owns the SHARED camera plumbing — the look-at uniforms, the image size,
-// and the fov Value<number> → TAN_FOV block (a constant bakes to `#define TAN_FOV
-// <literal>`; a { param } becomes the `u_tanFov` uniform aliased via `#define TAN_FOV
-// u_tanFov`, so the occupant GLSL is unchanged either way). WHICH ray-generation body and
-// any MODEL-UNIQUE params come from the camera registry (components/camera/index.ts):
-// adding a camera is one folder + one registry line, no edit here.
+// THE CAMERA IS THE MEASURING DEVICE (measurement.camera), NOT part of the scene — so every
+// NUMERIC camera control is ALWAYS a live uniform, never baked. You can adjust the instrument
+// (pose, fov, aperture, focus) on any scene without a recompile; the constant-vs-driven Model B
+// split that governs scene values does NOT apply here. The one thing that IS structural is the
+// projection TYPE (pinhole vs a fisheye sub-projection) — changing it changes the integral, so
+// it recompiles (fisheye's FISHEYE_THETA function-selector define, NOT a value).
+//
+// This feature owns the SHARED camera uniforms — the CPU-computed look-at frame (basis.ts),
+// image size, aspect, and the perspective u_tanFov = tan(fov/2). Every OTHER model-unique
+// CONTROL (a slider) and DERIVED value (a precomputed uniform) comes from the camera registry
+// (components/camera/index.ts) and is minted through ONE rail below (mintControl/mintDerived) —
+// the SAME rail the shared fov rides. The old bespoke fov `if`-block is gone: fov is now just a
+// CameraControl feeding the u_tanFov CameraDerived. Adding a camera is one folder + one registry
+// line, no edit here.
 
-import { isValueParam } from '../../types.js';
-import type { RenderPlan } from '../../plan/types.js';
+import { isValueParam, type Value } from '../../types.js';
+import type { RenderPlan, PlannedUniform } from '../../plan/types.js';
+import type { ParameterMetadata } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import { formatFloat } from '../../../components/glsl-format.js';
-import { cameraModel } from '../../../components/camera/index.js';
+import { cameraModel, type CameraControl, type CameraDerived } from '../../../components/camera/index.js';
 import { cameraBasis } from '../../../components/camera/basis.js';
 import type { Vec3Tuple } from '../../../components/geometry/similarity.js';
+
+/** Mint a control's slider (and, for a pass-through, its raw uniform). No derivation. */
+function mintControl(c: CameraControl, uniforms: PlannedUniform[], parameters: Record<string, ParameterMetadata>): void {
+    parameters[c.path] = {
+        type: 'float', default: c.default, name: c.name, group: 'Camera', triggersReset: true,
+        ...(c.range ? { range: c.range } : {}),
+    };
+    if (c.uniform) uniforms.push({ name: c.uniform, type: 'float', parameterPath: c.path, default: c.default });
+}
+
+/** Mint a derived value's uniform: ONE fn drives both the plan-time default and the per-frame
+ *  compute closure (bake ≡ ship). `resolvedDefaults` holds the control inputs' defaults; engine
+ *  builtins (absent here) fall back inside the fn. */
+function mintDerived(d: CameraDerived, resolvedDefaults: Record<string, number | number[]>, uniforms: PlannedUniform[]): void {
+    uniforms.push({
+        name: d.uniform, type: d.type,
+        parameterPath: d.inputs[0],
+        ...(d.inputs.length > 1 ? { parameterPaths: d.inputs } : {}),
+        default: d.fn(resolvedDefaults),
+        compute: (p) => d.fn(p as Record<string, number | number[]>),
+    });
+}
+
+/** The shared perspective fov (pinhole/thin-lens): a control at 'camera.fov' feeding
+ *  u_tanFov = tan(fov/2). Resolves the authored `Value<number>` — a {param} fov keeps its
+ *  slider path + range; a constant fov seeds the default. This is the sole `Value<>`-typed
+ *  camera control, so its resolution stays feature-side (descriptors get resolved values). */
+function perspectiveFov(fov: Value<number>): { control: CameraControl; tanFov: CameraDerived } {
+    const driven = isValueParam(fov);
+    const def = driven ? (fov.default ?? 0.8) : fov;
+    const path = driven ? fov.param : 'camera.fov';   // 'camera.fov' = authored convention
+    const control: CameraControl = {
+        path, name: 'FOV', default: def,
+        ...(driven && fov.min !== undefined && fov.max !== undefined ? { range: [fov.min, fov.max] } : {}),
+    };
+    const tanFov: CameraDerived = {
+        uniform: 'u_tanFov', type: 'float', inputs: [path],
+        fn: (v) => Math.tan(((v[path] as number) ?? def) / 2),
+    };
+    return { control, tanFov };
+}
 
 export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): FeatureContribution {
     const cam = plan.program.measurement.camera;
@@ -54,6 +103,16 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
             basisUniform('u_cameraRight', (b) => b.right),
             basisUniform('u_cameraUp', (b) => b.up),
             { name: 'u_imageSize', type: 'vec2', parameterPath: 'engine.imageSize' },
+            // Aspect is DERIVED from the (frame-constant) image size — computed once on the CPU,
+            // not per-ray in every camera. engine.imageSize flows into the compute-closure param
+            // map exactly as it does for u_imageSize above.
+            {
+                name: 'u_aspect', type: 'float', parameterPath: 'engine.imageSize',
+                compute: (params) => {
+                    const s = params['engine.imageSize'] as number[] | undefined;
+                    return s && s[1] !== 0 ? s[0] / s[1] : 1.0;
+                },
+            },
         ],
         parameters: {
             'camera.position': { type: 'vec3', default: pose.position, name: 'Position', group: 'Camera', triggersReset: true },
@@ -61,51 +120,30 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
         },
     };
 
-    // TAN_FOV is the PERSPECTIVE half-angle (pinhole + thin-lens) — the Value<number>
-    // treatment (const → define, param → live uniform) is identical for both. Other cameras
-    // that carry a `fov` (fisheye's full angular field) mean something different and emit
-    // their own uniform via the descriptor's params(), so they are NOT handled here.
+    // Collect controls + derived values in emission order (perspective fov first — shared
+    // plumbing owned by the feature because it is the sole Value<>-typed control; then the
+    // model's own). resolvedDefaults feeds every derived fn's plan-time bake.
+    const resolvedDefaults: Record<string, number | number[]> = {};
+
+    // Shared perspective fov: control (camera.fov slider) + u_tanFov derived. Minted in this
+    // order so u_tanFov precedes any model pass-through control uniforms (aperture/focus).
     if (cam.type === 'pinhole' || cam.type === 'thinlens') {
-        const fov = cam.fov;
-        if (isValueParam(fov)) {
-            const path = fov.param;
-            const def = fov.default ?? 0.8;
-            contribution.defines['TAN_FOV'] = 'u_tanFov';
-            contribution.uniforms.push({
-                name: 'u_tanFov',
-                type: 'float',
-                parameterPath: path,
-                default: Math.tan(def / 2),
-                compute: (params) => Math.tan(((params[path] as number) ?? def) / 2),
-            });
-            contribution.parameters[path] = {
-                type: 'float',
-                default: def,
-                name: 'FOV',
-                group: 'Camera',
-                triggersReset: true,
-                ...(fov.min !== undefined && fov.max !== undefined ? { range: [fov.min, fov.max] } : {}),
-            };
-        } else {
-            contribution.defines['TAN_FOV'] = formatFloat(Math.tan(fov / 2));
-        }
+        const { control, tanFov } = perspectiveFov(cam.fov);
+        mintControl(control, contribution.uniforms, contribution.parameters);
+        resolvedDefaults[control.path] = control.default;
+        mintDerived(tanFov, resolvedDefaults, contribution.uniforms);
     }
 
-    // Model-unique live params (thin-lens aperture/focusDistance). Each is a slider that
-    // triggers accumulation reset — these change the INTEGRAL (measurement §6.2).
-    for (const p of model.params(cam)) {
-        contribution.uniforms.push({ name: p.uniform, type: 'float', parameterPath: p.path, default: p.default });
-        contribution.parameters[p.path] = {
-            type: 'float',
-            default: p.default,
-            name: p.name,
-            group: 'Camera',
-            triggersReset: true,
-            ...(p.range ? { range: p.range } : {}),
-        };
+    // Model-unique controls (sliders / pass-through uniforms) then derived values.
+    for (const c of model.controls?.(cam) ?? []) {
+        mintControl(c, contribution.uniforms, contribution.parameters);
+        resolvedDefaults[c.path] = c.default;
+    }
+    for (const d of model.derived?.(cam) ?? []) {
+        mintDerived(d, resolvedDefaults, contribution.uniforms);
     }
 
-    // Model-unique compile-time defines (fisheye's FISHEYE_THETA alias — the TAN_FOV kind).
+    // Model-unique compile-time defines (fisheye's FISHEYE_THETA alias — the STRUCTURAL axis).
     Object.assign(contribution.defines, model.defines?.(cam) ?? {});
 
     return contribution;

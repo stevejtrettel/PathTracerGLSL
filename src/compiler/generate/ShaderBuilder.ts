@@ -157,7 +157,13 @@ function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedT
     lines.push('// Uniforms');
 
     for (const u of uniforms) {
-        lines.push(`uniform ${u.type} ${u.name};`);
+        // `float[]` declares as `uniform float u_x[N];` (the array length rides the
+        // PlannedUniform; the upload infers it from the Float32Array).
+        if (u.type === 'float[]') {
+            lines.push(`uniform float ${u.name}[${u.arrayLength}];`);
+        } else {
+            lines.push(`uniform ${u.type} ${u.name};`);
+        }
     }
 
     // Feature-declared external textures (§2.10): the sampler declaration matches the

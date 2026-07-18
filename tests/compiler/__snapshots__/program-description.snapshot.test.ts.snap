@@ -3,6 +3,7 @@
 exports[`ProgramDescription structural snapshot (the link map) > analytic-glass + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -87,6 +88,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
 exports[`ProgramDescription structural snapshot (the link map) > analytic-minimal + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -176,6 +178,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
 exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -264,6 +267,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": true,
     "samplable": true,
   },
@@ -355,6 +359,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis
 exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -446,6 +451,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee
 exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -524,6 +530,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtra
 exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pathtracer-ref 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -602,6 +609,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pat
 exports[`ProgramDescription structural snapshot (the link map) > conjugation + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -691,6 +699,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
 exports[`ProgramDescription structural snapshot (the link map) > conjugation-base + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -780,6 +789,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
 exports[`ProgramDescription structural snapshot (the link map) > cornell + cylindrical 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -863,6 +873,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
 exports[`ProgramDescription structural snapshot (the link map) > cornell + equirect 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -945,6 +956,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
 exports[`ProgramDescription structural snapshot (the link map) > cornell + fisheye-equidistant 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -1029,6 +1041,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
 exports[`ProgramDescription structural snapshot (the link map) > cornell + orthographic 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -1112,6 +1125,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
 exports[`ProgramDescription structural snapshot (the link map) > cornell + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -1200,6 +1214,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
 exports[`ProgramDescription structural snapshot (the link map) > cornell + thinlens 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -1290,6 +1305,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -1375,6 +1391,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": true,
     "samplable": true,
   },
@@ -1463,6 +1480,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -1551,6 +1569,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area-glass + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -1637,6 +1656,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area-glass + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": true,
     "samplable": true,
   },
@@ -1726,6 +1746,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area-glass + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -1815,6 +1836,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
 exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -1900,6 +1922,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": true,
     "samplable": true,
   },
@@ -1988,6 +2011,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -2076,6 +2100,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-equidistant 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -2160,6 +2185,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-equisolid 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -2244,6 +2270,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-orthographic 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -2328,6 +2355,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-stereographic 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -2412,6 +2440,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
 exports[`ProgramDescription structural snapshot (the link map) > cornell-glass + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -2496,6 +2525,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
 exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot + oneshot 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -2579,6 +2609,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
 exports[`ProgramDescription structural snapshot (the link map) > cylinders + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -2668,6 +2699,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cylinders + pat
 exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -2756,6 +2788,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-
 exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -2844,6 +2877,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref +
 exports[`ProgramDescription structural snapshot (the link map) > driven + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -2933,6 +2967,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven + pathtr
 exports[`ProgramDescription structural snapshot (the link map) > driven-baked-theta + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -3022,6 +3057,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
 exports[`ProgramDescription structural snapshot (the link map) > driven-baked-theta2 + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -3111,6 +3147,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
 exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -3200,6 +3237,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 +
 exports[`ProgramDescription structural snapshot (the link map) > emit + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -3278,6 +3316,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit + pathtrac
 exports[`ProgramDescription structural snapshot (the link map) > emit-sat + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -3358,6 +3397,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat + path
 exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + pt-emit 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -3440,6 +3480,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
 exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + pt-nee-emit 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -3525,6 +3566,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
 exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pathtracer-swap 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -3603,6 +3645,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pat
 exports[`ProgramDescription structural snapshot (the link map) > eta + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -3682,6 +3725,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
 exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -3771,6 +3815,7 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
 exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -3858,6 +3903,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
 exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": true,
     "samplable": true,
   },
@@ -3948,6 +3994,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -4038,6 +4085,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -4125,6 +4173,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
 exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -4215,6 +4264,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
 exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-nee-het 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -4300,6 +4350,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > fogcube + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -4378,6 +4429,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
 exports[`ProgramDescription structural snapshot (the link map) > furnace + furnace 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -4456,6 +4508,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
 exports[`ProgramDescription structural snapshot (the link map) > furnace + furnace-var 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -4534,6 +4587,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
 exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter + furnace-scatter 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -4614,6 +4668,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
 exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -4703,6 +4758,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
 exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -4795,6 +4851,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
 exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -4887,8 +4944,9 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
 exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-het 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
-    "samplable": false,
+    "samplable": true,
   },
   "environment": {
     "type": "none",
@@ -4966,9 +5024,96 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-nee-het 1`] = `
+{
+  "emitters": {
+    "driven": true,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        -0.5,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-nee-het 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5055,6 +5200,7 @@ exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-
 exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5137,6 +5283,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
 exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5222,6 +5369,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
 exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-eq 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5307,6 +5455,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
 exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-het 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5389,6 +5538,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
 exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-nee-het 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5474,6 +5624,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
 exports[`ProgramDescription structural snapshot (the link map) > het-const-ref + pt-nee-ref 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5559,6 +5710,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
 exports[`ProgramDescription structural snapshot (the link map) > het-const-ref + pt-ref 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5641,6 +5793,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
 exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt-nee-het 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5726,6 +5879,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt
 exports[`ProgramDescription structural snapshot (the link map) > het-driven-baked + pt-nee-ref 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5811,6 +5965,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
 exports[`ProgramDescription structural snapshot (the link map) > het-driven-baked2 + pt-nee-ref 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5896,6 +6051,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
 exports[`ProgramDescription structural snapshot (the link map) > het-driven-theta2 + pt-nee-het 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -5981,6 +6137,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-thet
 exports[`ProgramDescription structural snapshot (the link map) > het-slab + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6056,9 +6213,598 @@ exports[`ProgramDescription structural snapshot (the link map) > het-slab + path
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > light-driven + pt-mis 1`] = `
+{
+  "emitters": {
+    "driven": true,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": true,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > light-driven + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": true,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > light-driven-baked + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > light-driven-baked2 + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > light-driven-theta2 + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": true,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > light-off + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": true,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > light-off-baked + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6148,6 +6894,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > marble + pt-noscatter 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6235,6 +6982,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
 exports[`ProgramDescription structural snapshot (the link map) > minimal + direct 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6322,6 +7070,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
 exports[`ProgramDescription structural snapshot (the link map) > minimal + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6411,6 +7160,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
 exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6500,6 +7250,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6592,6 +7343,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee
 exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6683,6 +7435,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
 exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -6772,6 +7525,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
 exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -6859,6 +7613,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
 exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -6949,6 +7704,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7041,6 +7797,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7136,6 +7893,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-mis-comp 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7231,6 +7989,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7326,6 +8085,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > rayleigh + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7391,7 +8151,6 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "models": [
       "hg",
       "rayleigh",
-      "draine",
     ],
     "nullInterfaces": true,
     "present": true,
@@ -7410,6 +8169,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
 exports[`ProgramDescription structural snapshot (the link map) > regions-transformed + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7500,6 +8260,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
 exports[`ProgramDescription structural snapshot (the link map) > regions-transformed-ref + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7590,6 +8351,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7679,6 +8441,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7771,6 +8534,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oct 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7863,6 +8627,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -7955,6 +8720,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
 exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -8044,6 +8810,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
 exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": true,
     "samplable": true,
   },
@@ -8136,6 +8903,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -8228,6 +8996,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > slab + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -8306,6 +9075,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
 exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -8391,6 +9161,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1
 exports[`ProgramDescription structural snapshot (the link map) > submerged + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -8470,6 +9241,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
 exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -8553,6 +9325,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
 exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero + thinlens0 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -8638,6 +9411,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -8730,6 +9504,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -8822,6 +9597,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -8914,6 +9690,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -9006,6 +9783,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + khronos 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -9098,6 +9876,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -9189,6 +9968,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinhard 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -9281,6 +10061,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
 exports[`ProgramDescription structural snapshot (the link map) > transform-bake + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -9370,6 +10151,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
 exports[`ProgramDescription structural snapshot (the link map) > transform-bake-ref + pathtracer 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -9459,6 +10241,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
 exports[`ProgramDescription structural snapshot (the link map) > two-light + power 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -9540,6 +10323,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
 exports[`ProgramDescription structural snapshot (the link map) > two-light + uniform 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": false,
   },
@@ -9621,6 +10405,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
 exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },
@@ -9708,6 +10493,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
 exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-mis 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": true,
     "samplable": true,
   },
@@ -9798,6 +10584,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
 exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-nee 1`] = `
 {
   "emitters": {
+    "driven": false,
     "lightingPdf": false,
     "samplable": true,
   },

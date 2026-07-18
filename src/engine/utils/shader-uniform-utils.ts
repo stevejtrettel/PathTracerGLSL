@@ -70,6 +70,10 @@ function setUniformTyped(
         case 'float':
             gl.uniform1f(location, value);
             break;
+        case 'float[]':
+            // GLSL `uniform float u_x[N]` — value is a Float32Array/number[] of length N.
+            gl.uniform1fv(location, value);
+            break;
         case 'int':
             gl.uniform1i(location, value);
             break;
@@ -129,6 +133,8 @@ function valuesEqualTyped(a: any, b: any, type: UniformType): boolean {
     switch (type) {
         case 'float':
             return Math.abs(a - b) < EPSILON;
+        case 'float[]':
+            return valuesEqualUntyped(a, b);   // element-wise, any length
         case 'int':
         case 'bool':
             return a === b;

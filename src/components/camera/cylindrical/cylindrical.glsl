@@ -6,11 +6,12 @@
 // SQUARE PIXELS: both axes share ONE focal length (the cylinder radius in pixels, set by the
 // horizontal sweep), so the image is perspectivally correct at ANY window size. The window
 // aspect decides how much VERTICAL is visible, it does NOT stretch. Ignores xiLens.
-// Requires: u_imageSize, u_cameraPosition, u_cameraForward/Right/Up, u_cylHfov (DEGREES).
+// Requires: u_imageSize, u_cameraPosition, u_cameraForward/Right/Up,
+//           u_cylFocal (cylinder radius in pixels = imageSize.x / radians(hfov), CPU-precomputed).
 
 Ray camera_generateRay(vec2 film, vec2 xiLens) {
-    float f = u_imageSize.x / radians(u_cylHfov);   // cylinder radius in pixels (from the width)
-    vec2 c = film - 0.5 * u_imageSize;               // centered pixel coords
+    float f = u_cylFocal;                // cylinder radius in pixels (CPU-precomputed from the width)
+    vec2 c = film - 0.5 * u_imageSize;   // centered pixel coords
 
     float phi = c.x / f;   // azimuth = arc length (c.x px at radius f px)
     float h   = c.y / f;   // cylinder height, SAME f → square pixels; elevation = atan(h)

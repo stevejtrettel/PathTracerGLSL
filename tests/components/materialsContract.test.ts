@@ -184,7 +184,9 @@ describe('light kind desugar totality (authoredParams ↔ toValues/region/power)
                     if (row.shape === 'vec3') expect(Array.isArray(v), `values.${row.name} shape`).toBe(true);
                     else expect(typeof v, `values.${row.name} shape`).toBe('number');
                 }
-                expect(Number.isFinite(d.power(values)), 'power over complete values').toBe(true);
+                // PRODUCT is a constant Vec3 → every row is resolved (no ValueParam); power's
+                // resolved-values contract holds. (Driven-lights Stage A widened toValues.)
+                expect(Number.isFinite(d.power(values as Record<string, number | number[]>)), 'power over complete values').toBe(true);
                 if (d.region !== undefined) {
                     const prim = PRIMITIVES[d.region.primitive];
                     expect(prim, `backing primitive '${d.region.primitive}' is registered`).toBeDefined();

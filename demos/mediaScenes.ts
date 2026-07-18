@@ -69,7 +69,7 @@ export const fogcubeStrategy: RenderStrategy = {
 
 export const rayleighScene: SceneDescription = {
     id: 'rayleigh',
-    name: 'Volume scattering models: rayleigh · hg · draine',
+    name: 'Volume scattering models: rayleigh · hg',
     ambientSpace: { type: 'euclidean' },
     objects: [
         {
@@ -77,16 +77,12 @@ export const rayleighScene: SceneDescription = {
             material: 'floor',
         },
         {
-            type: 'box', parameters: { center: [-1.3, 1.0, 0], halfSize: [0.45, 0.45, 0.45] },
+            type: 'box', parameters: { center: [-0.65, 1.0, 0], halfSize: [0.45, 0.45, 0.45] },
             material: 'rayleigh_fog',
         },
         {
-            type: 'box', parameters: { center: [0.0, 1.0, 0], halfSize: [0.45, 0.45, 0.45] },
+            type: 'box', parameters: { center: [0.65, 1.0, 0], halfSize: [0.45, 0.45, 0.45] },
             material: 'hg_fog',
-        },
-        {
-            type: 'box', parameters: { center: [1.3, 1.0, 0], halfSize: [0.45, 0.45, 0.45] },
-            material: 'draine_fog',
         },
     ],
     materials: {
@@ -102,8 +98,6 @@ export const rayleighScene: SceneDescription = {
         rayleigh_fog: { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [0.7, 1.0, 1.6], model: 'rayleigh' } },
         // HG: neutral σ_s, forward-scattering (g = 0.6).
         hg_fog: { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [1.1, 1.1, 1.1], model: 'hg', phase_g: 0.6 } },
-        // Draine (approx-Mie): 10µm water droplets — strong physical forward peak.
-        draine_fog: { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [1.1, 1.1, 1.1], model: 'draine', draine_d: 10.0 } },
     },
     lights: [],
 };
@@ -271,27 +265,19 @@ export const glowblobsScene: SceneDescription = {
     name: 'Glow Blobs (emissive density field)',
     objects: [
         ...cornellBox.objects.filter((o) => 'type' in o && o.type === 'plane'),
-        // The ceiling panel is an emissive-material OBJECT, not a light: driven LIGHT
-        // params are deferred (Value<T> light params — the power CDF folds constants),
-        // but driven MATERIAL emission is live. A {param} emitter is path-only by the
-        // v1 sampleAsLight rules — chance-hit lighting, noisier than NEE, and exactly
-        // what lets lamp.power dial the room light to zero for pure glow.
-        {
-            type: 'quad',
-            parameters: { corner: [-0.5, 1.98, -0.5], edge1: [1.0, 0.0, 0.0], edge2: [0.0, 0.0, 1.0] },
-            material: 'lamp', name: 'ceiling_lamp',
-        },
     ],
+    // The ceiling panel is now an EXPLICIT quad light with DRIVEN emission (driven-lights
+    // Stage A): NEE samples it directly, so lamp.power dials a real, low-noise room light —
+    // and still slides to 0 (the light ships zero selection mass, never picked) for pure glow.
+    lights: [{
+        kind: 'quad',
+        corner: [-0.5, 1.98, -0.5], edge1: [1.0, 0.0, 0.0], edge2: [0.0, 0.0, 1.0],  // emits DOWN
+        emission: { param: 'lamp.power', default: 8.0, min: 0.0, max: 20.0 },
+    }],
     materials: {
         white: { model: 'lambert', albedo: [0.73, 0.73, 0.73] },
         red: { model: 'lambert', albedo: [0.65, 0.05, 0.05] },
         green: { model: 'lambert', albedo: [0.12, 0.45, 0.15] },
-        lamp: {
-            model: 'lambert',
-            albedo: [0, 0, 0],
-            sampleAsLight: false,   // explicit: param emitters are path-only anyway (v1)
-            emission: { param: 'lamp.power', default: 8.0, min: 0.0, max: 20.0 },
-        },
         fog: {
             model: 'none',
             medium: {
@@ -318,18 +304,26 @@ export const glowblobsScene: SceneDescription = {
             },
         },
     },
-    lights: [],   // the panel above is the only emitter besides the glow — both path-found
     ambientMedium: 'fog',
 };
 
+// key 1: NEE — the driven quad light is sampled directly (shadow rays walk the fog via
+// shadow_media); key 2: pt — the same scene chance-hitting the panel (grainier), the
+// before/after of the graduation.
 export const glowblobsStrategy: RenderStrategy = {
-    id: 'pt-het',
+    id: 'pt-nee-het',
     measurement: { camera: { type: 'pinhole', fov: 0.9 }, maxBounces: 24 },
     estimator: {
-        directLighting: 'none',   // no samplable lights exist — declare the pt this is
+        directLighting: 'nee',
         volumeSampling: 'delta-tracking',
         russianRoulette: { startDepth: 4 },
         accumulation: { type: 'average' },
     },
     view: { tonemap: { type: 'reinhard' } },
+};
+
+export const glowblobsPtStrategy: RenderStrategy = {
+    ...glowblobsStrategy,
+    id: 'pt-het',
+    estimator: { ...glowblobsStrategy.estimator, directLighting: 'none' },
 };

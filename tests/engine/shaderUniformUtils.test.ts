@@ -38,6 +38,13 @@ describe('uniformValuesEqual — arrays', () => {
         expect(uniformValuesEqual([1, 2, 3], [1, 2, 3])).toBe(true);
     });
 
+    it('compares float[] arrays elementwise at any length (driven-lights CDF arrays)', () => {
+        expect(uniformValuesEqual([0.2, 0.5, 0.3], [0.2, 0.5, 0.3], 'float[]')).toBe(true);
+        expect(uniformValuesEqual([0.2, 0.5, 0.3], [0.2, 0.5, 0.31], 'float[]')).toBe(false);
+        expect(uniformValuesEqual([0.4, 0.6], [0.4, 0.6], 'float[]')).toBe(true);
+        expect(uniformValuesEqual([0.4, 0.6], [0.4, 0.6, 0.0], 'float[]')).toBe(false);
+    });
+
     it('documents the epsilon-boundary inconsistency between typed (>=) and untyped (>) paths', () => {
         // arrayEquals (typed path) uses `>= EPSILON`, so an exactly-epsilon diff is NOT equal.
         expect(uniformValuesEqual([0, 0], [EPSILON, 0], 'vec2')).toBe(false);

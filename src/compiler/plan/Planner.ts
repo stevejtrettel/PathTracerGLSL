@@ -124,9 +124,13 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         const d = LIGHT_KINDS[light.kind];
         if (d === undefined) continue;
         // ONE authored word (B2): emission — Le for area kinds, radiant intensity for
-        // delta kinds; scalar broadcasts (the spectrum convention, §2.5).
+        // delta kinds; scalar broadcasts (the spectrum convention, §2.5). Driven-lights
+        // Stage A: a {param} emission flows through UNRESOLVED into both the registry
+        // values (the sampler reads its uniform) AND, for hittable kinds, the synthesized
+        // material's emission row — the SAME uniform, so pt ≡ pt-nee by construction.
         const e = light.emission;
-        const product: Vec3 = typeof e === 'number' ? [e, e, e] : e;
+        const product: Vec3 | ValueParam<number> | ValueParam<Vec3> =
+            isValueParam(e) ? e : (typeof e === 'number' ? [e, e, e] : e);
         const authored = light as unknown as Record<string, unknown>;
         if (d.region === undefined) {
             lights.push({ id: lightIndex++, kind: light.kind, values: d.toValues(authored, product) });
@@ -337,6 +341,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         emitters: {
             samplable: samplableEmitters,
             lightingPdf: samplableEmitters && lighting?.method === 'mis',
+            // Driven-lights Stage A: a ValueParam reaches PlannedLight.values ONLY via a
+            // driven radiometric row (geometry stays constant in v1), so this is exactly
+            // "some light's emission is a {param}".
+            driven: lighting !== null && lights.some((l) => Object.values(l.values).some(isValueParam)),
         },
         environment: scene.environment ?? { type: 'none' },
         environmentSamplable: envSamplable,

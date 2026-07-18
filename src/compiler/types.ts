@@ -45,7 +45,9 @@ export type EnvironmentDescription =
     | { type: 'none' }
     | {
           type: 'constant';
-          color: Vec3;
+          /** Sky radiance — a SCENE_VALUE (Model B): a constant bakes inline, a `{param}` becomes
+           *  a live `u_environment_color`. (`intensity`/`rotation` are always-live controls.) */
+          color: SpectrumValue;
           intensity?: number;
           /** T3 opt-in (default FALSE — preserves pre-T3 witnesses): uniform-sphere NEE. */
           sampleAsLight?: boolean;
@@ -207,6 +209,11 @@ export type ScalarProperty = Value<number> | GlslExpression;
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
 export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3>;
 
+/** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty
+ * minus GlslExpression). The Model B split surface for radiometric values that are read at a
+ * point but never vary spatially: light emission and the constant-env color. */
+export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3>;
+
 /** Union used by generic planner helpers. Public fields use the narrower aliases above. */
 export type MaterialProperty = ScalarProperty | SpectrumProperty;
 
@@ -288,12 +295,8 @@ export interface MediumDescription {
     emission?: SpectrumProperty;
     /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). Read only by 'hg'. */
     phase_g?: ScalarProperty;
-    /** Water-droplet diameter (µm), read only by 'draine' (HG–Draine approx-Mie). Drives the
-     *  fitted lobe parameters; valid ~5–50µm. Default 10. */
-    draine_d?: ScalarProperty;
     /** The volume's scattering model (which phase function). Default 'hg'. 'rayleigh' is
-     *  parameter-free (molecular/sky; its λ⁻⁴ color is σ_s); 'draine' is approx-Mie for
-     *  fog/cloud droplets. Registry: volume_scattering/. */
+     *  parameter-free (molecular/sky; its λ⁻⁴ color is σ_s). Registry: volume_scattering/. */
     /** Volume scattering model — registry-validated (A2: unknown models get a
      *  Validator diagnostic; adding a phase model touches no union). Default 'hg'. */
     model?: string;
@@ -340,17 +343,23 @@ export interface MaterialDescription {
 
 export type LightDescription = PointLight | DirectionalLight | QuadLight | SphereLight | DiskLight | SpotLight;
 
+/** Authored light radiance/intensity: a constant Spectrum (scalar broadcasts) OR, driven-
+ *  lights Stage A, a `{param}` slider. It IS a SpectrumValue — the Model B split surface for a
+ *  radiometric value read at a point (for hittable kinds, the SAME uniform the desugared
+ *  region's material emission reads). Geometry rows stay constant in v1. */
+export type LightEmission = SpectrumValue;
+
 export interface PointLight {
     kind: 'point';
     position: Vec3;
     /** Radiant intensity I (W/sr); scalar broadcasts. */
-    emission: number | Vec3;
+    emission: LightEmission;
 }
 
 export interface DirectionalLight {
     kind: 'directional';
     direction: Vec3;
-    emission: number | Vec3;
+    emission: LightEmission;
 }
 
 /**
@@ -365,7 +374,7 @@ export interface QuadLight {
     edge1: Vec3;
     edge2: Vec3;
     /** Emitted radiance Le; scalar broadcasts. */
-    emission: number | Vec3;
+    emission: LightEmission;
 }
 
 /** Spherical area light (§6.2): desugars like the quad; sampled via the visible cone. */
@@ -374,7 +383,7 @@ export interface SphereLight {
     position: Vec3;
     radius: number;
     /** Emitted radiance Le; scalar broadcasts. */
-    emission: number | Vec3;
+    emission: LightEmission;
 }
 
 /** Spot light: DELTA with a smooth cone falloff (pbrt-v4 SpotLight's smoothstep).
@@ -390,7 +399,7 @@ export interface SpotLight {
      *  strictly < angle (a hard edge is smoothstep-undefined). */
     falloffStart?: number;
     /** On-axis radiant intensity I (W/sr); scalar broadcasts. */
-    emission: number | Vec3;
+    emission: LightEmission;
 }
 
 /** Circular area light (§6.2): desugars to a backing disk region; ONE-SIDED, emits
@@ -403,7 +412,7 @@ export interface DiskLight {
      *  shared unitVec3, bit-identical with the backing region's). Default [0,1,0]. */
     normal?: Vec3;
     /** Emitted radiance Le; scalar broadcasts. */
-    emission: number | Vec3;
+    emission: LightEmission;
 }
 
 // ============================================================================
@@ -565,6 +574,7 @@ export interface ShaderProgram {
  */
 export type UniformType =
     | 'float'
+    | 'float[]'   // GLSL `float u_x[N]`, uploaded via uniform1fv (driven-lights CDF arrays)
     | 'int'
     | 'bool'
     | 'vec2'
