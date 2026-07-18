@@ -1,5 +1,5 @@
 // Thin-lens camera — pinhole geometry + a finite aperture for defocus (depth of field).
-// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraTarget,
+// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraForward/Right/Up,
 //           u_aperture (lens radius), u_focusDistance.
 // aperture → 0 collapses exactly to pinhole (the witness's correctness anchor).
 
@@ -20,11 +20,11 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     float aspect = u_imageSize.x / u_imageSize.y;
     ndc.x *= aspect;
 
-    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
-    // Same degenerate up-reference guard as pinhole (looking ∥ ±Y → normalize(0) = NaN).
-    vec3 up_ref = abs(forward.y) > 0.999999 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
-    vec3 right = normalize(cross(forward, up_ref));
-    vec3 up = cross(right, forward);
+    // Look-at frame precomputed on the CPU (components/camera/basis.ts), shipped as
+    // uniforms — no per-ray normalize/cross (the up-reference guard lives there).
+    vec3 forward = u_cameraForward;
+    vec3 right = u_cameraRight;
+    vec3 up = u_cameraUp;
 
     // The pinhole primary direction through the (jittered) pixel.
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);

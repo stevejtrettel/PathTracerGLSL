@@ -3,7 +3,7 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -97,7 +97,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     const wantsNullTable = media.nullInterfaces || media.shadowWalker;
     if (media.present) {
         blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials, wantsNullTable) });
-        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models, phaseFields) });
+        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models, phaseFields, media.emission) });
         // The 'analytic' strategy bodies (volumetric-component §4) — needed by the scattering
         // arms (seam 1) and by the spectral shadow walker's per-segment form (seam 2).
         if (scatteringLive || wantsShadowMedia) {
@@ -107,6 +107,20 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         // (§2.12) iff some medium routes to them — a Planner decision. Must follow the
         // generated properties lookup (the loops re-fetch at every tentative collision).
         if (media.heterogeneousArms) {
+            // medium_emission (generated, impl-plan-medium-emission): the occupant's ONE
+            // program-dependent field access, behind a generated body per the static-file
+            // rule — ε when emissive media exist, the folded constant ZERO otherwise
+            // (the combiner-weight pattern). Precedes the occupant that calls it.
+            blocks.push({
+                origin: 'generated:medium-emission',
+                source: [
+                    'Spectrum medium_emission(MediumProperties m) {',
+                    media.emission
+                        ? '    return m.emission;   // volume emission coefficient ε (P1)'
+                        : '    return SPECTRUM_ZERO;   // no emissive media in this program — folds out',
+                    '}',
+                ].join('\n'),
+            });
             blocks.push({ origin: 'components/transport/volume/delta_tracking/delta_tracking.glsl', source: mediumDeltaTrackingGLSL });
         }
         if (scatteringLive) {
@@ -146,6 +160,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         if (mat.medium !== null) {
             addParamUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen);
             addParamUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen);
+            // ε rides the same machinery ({param} → vec3 uniform; expression → declared
+            // float params) — but only when the field has a reader (media.emission, C5).
+            if (media.emission) addParamUniform(mat.medium.emission, 'vec3', 'color', uniforms, parameters, seen);
             // Phase params follow the schemas — the medium's OWN model's rows, and only
             // when that model is LIVE in this program (media.models): a driven phase_g
             // in an absorbing-only program has no reader, so it earns no uniform (C5).
@@ -426,7 +443,7 @@ function generateMediaTables(materials: PlannedMaterial[], wantsNullTable: boole
 function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Vec3 | number>, name: string, format: (v: never) => string): string {
     if (isValueParam(prop)) return paramToUniform(prop.param);
     if (isGlslExpression(prop)) {
-        if (name === 'sigma_a' || name === 'sigma_s') {
+        if (name === 'sigma_a' || name === 'sigma_s' || name === 'emission') {
             // Heterogeneous coefficient (fable-heterogeneous-media.md D4): the authored
             // formula of `p` (+ declared-param uniforms). Spectrum(...) broadcasts a
             // scalar-valued source and passes a vec3-valued one through; the max(…, 0.0)
@@ -440,7 +457,7 @@ function mediumPropertyExpr(prop: Vec3 | number | GlslExpression | ValueParam<Ve
     return format(prop as never);
 }
 
-function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[]): string {
+function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[], wantsEmission: boolean): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const hasModel = models.length > 0;         // the `model` field exists only when scattering is live
     // Field set = the PRESENT scattering models' schema union (§3.4 literal — the same
@@ -451,6 +468,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
     lines.push('    MediumProperties m;');
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');
     lines.push('    m.sigma_s = SPECTRUM_ZERO;');
+    if (wantsEmission) lines.push('    m.emission = SPECTRUM_ZERO;');
     for (const f of phaseFields) lines.push(`    m.${f.name} = ${defaultExpr(f)};`);
     if (hasModel) lines.push('    m.model = 0;');
     for (let i = 0; i < withMedium.length; i++) {
@@ -460,6 +478,9 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
         lines.push(`    ${cond} (mat == ${mat.id}) {   // '${mat.name}'`);
         lines.push(`        m.sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatSpectrum)};`);
         lines.push(`        m.sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatSpectrum)};`);
+        if (wantsEmission && isEmissiveMedium(med)) {
+            lines.push(`        m.emission = ${mediumPropertyExpr(med.emission, 'emission', formatSpectrum)};`);
+        }
         if (isHeterogeneousMedium(med)) {
             // D1 clamp IN THE LOOKUP (fable-heterogeneous-media.md, amended Jul 17): the
             // rendered medium IS the proportionally clamped field — no caller can observe
@@ -475,6 +496,11 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
             lines.push(`        float sigma_scale = sigma_max > ${formatFloat(maj)} ? ${formatFloat(maj)} / sigma_max : 1.0;`);
             lines.push('        m.sigma_a *= sigma_scale;');
             lines.push('        m.sigma_s *= sigma_scale;');
+            if (wantsEmission && isEmissiveMedium(med)) {
+                // P2 (owner-pinned): ε scales with the extinction — a clamped region
+                // preserves its source function ε/σ_t, exactly as the scale preserves albedo.
+                lines.push('        m.emission *= sigma_scale;');
+            }
         }
         for (const f of phaseFields) {
             // Union fields of OTHER present models fall back to their row default —
@@ -540,12 +566,13 @@ function generateMediumSample(plan: RenderPlan): string {
     lines.push('    ms.t = t_max;');
     lines.push('    ms.weight = SPECTRUM_ONE;');
     lines.push('    ms.radiance = SPECTRUM_ZERO;');
+    const wantsEmission = plan.program.media.emission;
     for (const mat of withMedium) {
         const med = mat.medium!;
         const scatters = scatteringLive && isScattering(med);
-        if (isHeterogeneousMedium(med)) {
-            const maj = formatFloat(requireMajorant(med, mat.name));
-            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — heterogeneous, ${scatters ? 'scattering (delta tracking)' : 'absorbing-only (ratio-tracked pass-through)'}`);
+        if (mediumRoutesToTracking(med, scatters)) {
+            const maj = formatFloat(effectiveMajorant(med, mat.name));
+            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — tracking arms, ${scatters ? 'scattering (delta tracking)' : 'absorbing-only (ratio-tracked pass-through)'}`);
             lines.push(scatters
                 ? `        return medium_sample_delta(${mat.id}, ${maj}, ray, t_max, xi);`
                 : `        return medium_sample_ratio_absorb(${mat.id}, ${maj}, ray, t_max);`);
@@ -555,7 +582,17 @@ function generateMediumSample(plan: RenderPlan): string {
                 lines.push(`        return medium_sample_analytic(scene_medium_properties(${mat.id}, ray.origin), t_max, xi);`);
             } else {
                 lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, ray.origin);`);
-                lines.push('        ms.weight = spectrum_exp(-m.sigma_a * t_max);');
+                if (wantsEmission && isEmissiveMedium(med)) {
+                    // Emission closed form (impl-plan-medium-emission E1.5): the exact
+                    // ∫₀ᵗ e^{−σ_a s} ε ds = ε·(1−e^{−σ_a t})/σ_a. σ_a floored at 1e-6
+                    // for BOTH factors so the pair stays consistent — the σ_a→0 limit
+                    // ε·t is reached with relative error ~1e-6·t, below fp32 noise.
+                    lines.push('        Spectrum sa = max(m.sigma_a, Spectrum(1e-6));');
+                    lines.push('        ms.weight = spectrum_exp(-sa * t_max);');
+                    lines.push('        ms.radiance = m.emission * (SPECTRUM_ONE - ms.weight) / sa;');
+                } else {
+                    lines.push('        ms.weight = spectrum_exp(-m.sigma_a * t_max);');
+                }
             }
         }
         lines.push('    }');
@@ -565,12 +602,17 @@ function generateMediumSample(plan: RenderPlan): string {
     return lines.join('\n');
 }
 
-/** Backstop — the Validator pairs expression coefficients with a declared majorant. */
-function requireMajorant(med: PlannedMedium, name: string): number {
-    if (med.majorant === undefined) {
-        throw new Error(`materials: medium of '${name}' has expression coefficients but no majorant`);
+/** The tracking arms' σ̄: authored, or AUTO-DERIVED for constant-coefficient emissive
+ *  scattering media (emission P5 — max-channel σ_t is known at plan time). Throwing is
+ *  the backstop; the Validator owns the diagnostics. */
+function effectiveMajorant(med: PlannedMedium, name: string): number {
+    if (med.majorant !== undefined) return med.majorant;
+    if (Array.isArray(med.sigma_a) && Array.isArray(med.sigma_s)) {
+        const maj = Math.max(...med.sigma_a.map((a, i) => a + (med.sigma_s as Vec3)[i]));
+        if (maj > 0) return maj;
+        throw new Error(`materials: medium of '${name}' needs a positive derived majorant (σ_t is identically zero)`);
     }
-    return med.majorant;
+    throw new Error(`materials: medium of '${name}' routes to the tracking arms but has no majorant (expression coefficients require an authored σ̄)`);
 }
 
 // Seam 2 of the volumetric component: per-segment shadow transmittance over full σ_t.
@@ -582,7 +624,7 @@ function generateMediumTransmittance(materials: PlannedMaterial[]): string {
     lines.push('Spectrum medium_transmittance(int med, Ray ray, float len) {');
     for (const mat of withMedium) {
         if (isHeterogeneousMedium(mat.medium!)) {
-            const maj = formatFloat(requireMajorant(mat.medium!, mat.name));
+            const maj = formatFloat(effectiveMajorant(mat.medium!, mat.name));
             lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — heterogeneous (ratio tracking)`);
             lines.push(`        return medium_transmittance_ratio(${mat.id}, ${maj}, ray, len);`);
         } else {

@@ -87,11 +87,15 @@ export interface MediaDesc {
      *  phase functions + the channel-MIS scattering arms exist. Equivalent to
      *  estimator.volumeSampling !== 'none' — kept explicit for readers. */
     scatteringArms: boolean;
-    /** Some medium routes to a null-collision arm (fable-heterogeneous-media.md): the
-     *  delta/ratio-tracking occupant + MAX_NULL_COLLISIONS exist. Independent of
-     *  scatteringArms — absorbing-only heterogeneous media need the ratio pass-through
-     *  arm with no phase machinery. */
+    /** Some medium routes to a null-collision arm (fable-heterogeneous-media.md;
+     *  emission P5 extends the routing): the delta/ratio-tracking occupant +
+     *  MAX_NULL_COLLISIONS exist. Independent of scatteringArms — absorbing-only
+     *  heterogeneous media need the ratio pass-through arm with no phase machinery. */
     heterogeneousArms: boolean;
+    /** Emissive media present (impl-plan-medium-emission): the MediumProperties ε
+     *  field, the generated medium_emission accessor, the arms' per-collision
+     *  collection, and the walk's ms.radiance line exist. */
+    emission: boolean;
     /** Some material is model 'none' (§3.6): the null-crossing branch exists. */
     nullInterfaces: boolean;
     /** Media AND NEE: the spectral segment walker (shadow_media) replaces the boolean
@@ -239,8 +243,12 @@ export interface PlannedMedium {
     /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh' | 'draine'. */
     model: string;
     /** Density ceiling σ̄ (heterogeneous D1) — present iff authored. Spliced as a literal
-     *  into the null-collision arms; the D1 scale is emitted in scene_medium_properties. */
+     *  into the null-collision arms (AUTO-DERIVED there for constant-coefficient emissive
+     *  scattering media, emission P5); the D1 scale is emitted in scene_medium_properties. */
     majorant?: number;
+    /** Volume emission coefficient ε (impl-plan-medium-emission P1) — resolved like the
+     *  extinction core; [0,0,0] when unauthored. The D1 scale applies to it (P2). */
+    emission: Vec3 | GlslExpression | ValueParam<Vec3>;
     /** Phase params of THIS medium's model (union fields of OTHER present models fall
      *  back to their row defaults at emit time). */
     values: Record<string, number | GlslExpression | ValueParam<number>>;

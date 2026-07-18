@@ -14,6 +14,8 @@ import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { formatFloat } from '../../../components/glsl-format.js';
 import { cameraModel } from '../../../components/camera/index.js';
+import { cameraBasis } from '../../../components/camera/basis.js';
+import type { Vec3Tuple } from '../../../components/geometry/similarity.js';
 
 export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): FeatureContribution {
     const cam = plan.program.measurement.camera;
@@ -24,13 +26,33 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     // the same paths, so orbiting never recompiles.
     const pose = { position: cam.position ?? [0, 0, 8], target: cam.target ?? [0, 0, 0] };
 
+    // The look-at FRAME is derived ONCE on the CPU and shipped as three vec3 uniforms —
+    // the occupants read u_cameraForward/Right/Up instead of rebuilding the frame (two
+    // normalizes + two crosses) per ray. camera.position/target are always-live params
+    // (OrbitControls), so each basis uniform recomputes via its closure on a pose change —
+    // no recompile, and u_cameraTarget itself is no longer read by any shader (its role is
+    // to feed these closures). u_cameraPosition survives as the perspective/ortho origin.
+    const basisUniform = (name: string, pick: (b: ReturnType<typeof cameraBasis>) => Vec3Tuple) => ({
+        name,
+        type: 'vec3' as const,
+        parameterPath: 'camera.position',
+        parameterPaths: ['camera.position', 'camera.target'],
+        default: pick(cameraBasis(pose.position as Vec3Tuple, pose.target as Vec3Tuple)),
+        compute: (params: Record<string, unknown>) => pick(cameraBasis(
+            (params['camera.position'] as Vec3Tuple) ?? (pose.position as Vec3Tuple),
+            (params['camera.target'] as Vec3Tuple) ?? (pose.target as Vec3Tuple),
+        )),
+    });
+
     const contribution: FeatureContribution = {
         ...emptyContribution('camera'),
         provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 film, vec2 xiLens)' }],
         blocks: [{ origin: model.origin, source: model.glsl }],
         uniforms: [
             { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: pose.position },
-            { name: 'u_cameraTarget', type: 'vec3', parameterPath: 'camera.target', default: pose.target },
+            basisUniform('u_cameraForward', (b) => b.forward),
+            basisUniform('u_cameraRight', (b) => b.right),
+            basisUniform('u_cameraUp', (b) => b.up),
             { name: 'u_imageSize', type: 'vec2', parameterPath: 'engine.imageSize' },
         ],
         parameters: {

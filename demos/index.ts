@@ -11,7 +11,7 @@ import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBo
 import { cornellThinlensStrategy, cornellEquirectStrategy, cornellOrthoStrategy, cornellCylindricalStrategy, fisheyeStrategy } from './cameraScenes.js';
 import { mixedScene, analyticStrategy } from './analyticScenes.js';
 import { submergedScene, submergedStrategy } from './dielectricScenes.js';
-import { fogcubeScene, fogcubeStrategy, rayleighScene, rayleighStrategy } from './mediaScenes.js';
+import { fogcubeScene, fogcubeStrategy, rayleighScene, rayleighStrategy, groundfogScene, groundfogStrategy, fogblobsScene, fogblobsStrategy, glowblobsScene, glowblobsStrategy } from './mediaScenes.js';
 import {
     marbleScene,
     marbleStrategy,
@@ -92,6 +92,30 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
             'R-FOGCUBE null-interface rim witness (validation §5, absorbing variant): a bounded absorber over an emissive checker',
         expected:
             'the cube dims the checker behind it with NO bright rim at the silhouette (a Fresnel-like edge = the null interface leaked a BSDF); grazing edges fade smoothly',
+    },
+    fogblobs: {
+        scene: fogblobsScene,
+        strategies: posed([0, 1, 4], [0, 1, -0.5], fogblobsStrategy),
+        exercises:
+            'MATHEMATICAL density fields in the Cornell room: two nearby Gaussians summed — the metaball idea on density — so the blobs merge where they overlap; sculpt by editing the source in demos/mediaScenes.ts (any distance field works as exp(−sharp·d²)); blob.gain = density, blob.sharp = inverse square radius; the ceiling quad drives NEE through the blobs',
+        expected:
+            'two soft glowing blobs mid-room, self-shadowed under the ceiling panel, red/green wall bleed in the scatter; drag blob.sharp DOWN — they fuse into one form; UP — they separate into crisp puffs; drag blob.gain — density moves live',
+    },
+    glowblobs: {
+        scene: glowblobsScene,
+        strategies: posed([0, 1, 4], [0, 1, -0.5], glowblobsStrategy),
+        exercises:
+            'EMISSIVE density fields (impl-plan-medium-emission): the fogblobs Gaussians glowing — emission is ε (radiance per unit length), each blob vec3-weighted (one warm, one cool); glow.heat scales brightness live; blob.sharp is SHARED between the density and glow expressions; lamp.power drives the ceiling panel\'s MATERIAL emission (driven light params are deferred, so the panel is a path-only emissive object — chance-hit lit, noisier than NEE by design)',
+        expected:
+            'a warm and a cool glowing blob lighting the fog around them; drag lamp.power to 0 — the room goes dark and ONLY the blobs remain (the money shot); drag glow.heat 0→10 — plain fog to lanterns; drag blob.sharp — density AND glow tighten together; core brightness saturates toward ε/σ_t instead of blowing out',
+    },
+    groundfog: {
+        scene: groundfogScene,
+        strategies: posed([0, 1.6, 4.5], [0, 0.7, 0], groundfogStrategy),
+        exercises:
+            'the heterogeneous-media PLAYGROUND (fable-heterogeneous-media.md): ambient ground fog as a FORMULA of p with two declared sliders (fog.gain, fog.falloff) on the delta-tracking arms — edit the source string in demos/mediaScenes.ts and reload; the majorant ceiling (D1) saturates any spike instead of misrendering',
+        expected:
+            'fog hugs the floor and thins with height (drag fog.falloff); light shafts from the point light; drag fog.gain — density moves live with zero recompiles; patchy swirl from the sin-product term',
     },
     marble: {
         scene: marbleScene,

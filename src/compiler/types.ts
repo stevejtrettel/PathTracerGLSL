@@ -214,12 +214,44 @@ export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';
 }
 
-/** Heterogeneous-medium predicate (fable-heterogeneous-media.md): any expression
- * coefficient. Classification is by AUTHORED TYPE — an expression that happens to
- * evaluate to a constant still routes to the null-collision arms (that is F-HET-CONST's
- * whole point). Shaped to accept authored MediumDescription and PlannedMedium alike. */
-export function isHeterogeneousMedium(med: { sigma_a: unknown; sigma_s?: unknown }): boolean {
-    return isGlslExpression(med.sigma_a) || isGlslExpression(med.sigma_s);
+/** Heterogeneous-medium predicate (fable-heterogeneous-media.md; extended by
+ * impl-plan-medium-emission P5): any expression coefficient — σ_a, σ_s, OR ε.
+ * Classification is by AUTHORED TYPE — an expression that happens to evaluate to a
+ * constant still routes to the null-collision arms (that is F-HET-CONST's whole
+ * point). Shaped to accept authored MediumDescription and PlannedMedium alike. */
+export function isHeterogeneousMedium(med: { sigma_a: unknown; sigma_s?: unknown; emission?: unknown }): boolean {
+    return isGlslExpression(med.sigma_a) || isGlslExpression(med.sigma_s) || isGlslExpression(med.emission);
+}
+
+/** A medium property that may be nonzero at runtime: nonzero constant, {param}
+ * (live — can become nonzero), or expression. Authored and planned shapes alike. */
+function mediumPropertyMayBeNonzero(v: unknown): boolean {
+    if (v === undefined) return false;
+    if (typeof v === 'number') return v !== 0;
+    if (Array.isArray(v)) return v.some((c) => c !== 0);
+    return true;
+}
+
+/** The medium emits (impl-plan-medium-emission): ε may be nonzero. */
+export function isEmissiveMedium(med: { emission?: unknown }): boolean {
+    return mediumPropertyMayBeNonzero(med.emission);
+}
+
+/** The medium may scatter: σ_s may be nonzero (the Analyzer's census rule). */
+export function mediumMayScatter(med: { sigma_s?: unknown }): boolean {
+    return mediumPropertyMayBeNonzero(med.sigma_s);
+}
+
+/** The medium routes to the null-collision arms (heterogeneous 2×2, extended by
+ * emission P5): any expression coefficient, or an emissive medium that SCATTERS under
+ * the current measurement (the analytic channel-MIS arm has no source term; its σ̄ is
+ * auto-derived for constants). `scatters` = σ_s may be nonzero AND scattering is
+ * computed — the caller resolves the measurement side. */
+export function mediumRoutesToTracking(
+    med: { sigma_a: unknown; sigma_s?: unknown; emission?: unknown },
+    scatters: boolean,
+): boolean {
+    return isHeterogeneousMedium(med) || (isEmissiveMedium(med) && scatters);
 }
 
 /**
@@ -245,8 +277,15 @@ export interface MediumDescription {
     sigma_s?: SpectrumProperty;
     /** Density ceiling σ̄ (heterogeneous D1): the rendered medium IS the proportionally
      *  clamped field min-scaled so max-channel σ_t ≤ σ̄. REQUIRED with expression
-     *  coefficients (finite, > 0); inert (warned) on all-constant media. */
+     *  coefficients (finite, > 0); inert (warned) on all-constant media. Also paces
+     *  emission sampling in the tracking arms (impl-plan-medium-emission). */
     majorant?: number;
+    /** Volume emission coefficient ε (impl-plan-medium-emission P1 — B2's dimensional
+     *  ladder): radiance added per unit path length, W·sr⁻¹·m⁻³; dL/ds = ε(x). Deep
+     *  uniform glow saturates to ε/σ_t (the source function). Decoupled from σ_a —
+     *  glow needs no absorption (Kirchhoff coupling is authoring sugar: ε = σ_a·Le).
+     *  The D1 scale applies to ε too (P2: clamped regions preserve ε/σ_t). */
+    emission?: SpectrumProperty;
     /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). Read only by 'hg'. */
     phase_g?: ScalarProperty;
     /** Water-droplet diameter (µm), read only by 'draine' (HG–Draine approx-Mie). Drives the

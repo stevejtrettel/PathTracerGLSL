@@ -13,5 +13,6 @@ struct MediumSample {
     bool     scattered;  // true: real scattering event at t
     float    t;          // event arc length (valid when scattered)
     Spectrum weight;     // throughput factor for WHICHEVER outcome (§2.1)
-    Radiance radiance;   // inline source term (SPECTRUM_ZERO for v1 strategies)
+    Radiance radiance;   // inline source term (§3 partition rule) — the emission arms
+                         // fill it (impl-plan-medium-emission); ZERO in non-emissive arms
 };

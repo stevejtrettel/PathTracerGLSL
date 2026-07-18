@@ -1,5 +1,5 @@
 // Pinhole camera
-// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraTarget
+// Requires: TAN_FOV (define), u_imageSize, u_cameraPosition, u_cameraForward/Right/Up
 
 Ray camera_generateRay(vec2 film, vec2 xiLens) {
     // film = continuous sub-pixel point (pixel/ owns the footprint); xiLens unused (no aperture).
@@ -7,12 +7,11 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     float aspect = u_imageSize.x / u_imageSize.y;
     ndc.x *= aspect;
 
-    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
-    // Degenerate up-reference guard: forward ∥ ±Y makes cross(forward, +Y) zero-length —
-    // normalize(0) is NaN and poisons every ray of the frame. Fall back to +Z as reference.
-    vec3 up_ref = abs(forward.y) > 0.999999 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
-    vec3 right = normalize(cross(forward, up_ref));
-    vec3 up = cross(right, forward);
+    // Look-at frame precomputed on the CPU (components/camera/basis.ts) and shipped as
+    // uniforms — no per-ray normalize/cross (the degenerate up-reference guard lives there).
+    vec3 forward = u_cameraForward;
+    vec3 right = u_cameraRight;
+    vec3 up = u_cameraUp;
 
     vec3 dir = normalize(forward + ndc.x * TAN_FOV * right + ndc.y * TAN_FOV * up);
 

@@ -2,7 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -306,9 +306,11 @@ export function validate(
         if (mat.medium !== undefined) {
             for (const [prop, value] of Object.entries(mat.medium)) {
                 if (!isGlslExpression(value)) continue;
-                if (prop === 'sigma_a' || prop === 'sigma_s') {
+                if (prop === 'sigma_a' || prop === 'sigma_s' || prop === 'emission') {
                     // Rule 1: an expression coefficient is legal ONLY under a declared
-                    // ceiling — D1: the rendered medium IS the field min-scaled to σ̄.
+                    // ceiling — D1: the rendered medium IS the field min-scaled to σ̄
+                    // (an expression ε needs per-position evaluation at σ̄-paced points,
+                    // so it rides the same rule — impl-plan-medium-emission P5).
                     if (mat.medium.majorant === undefined) {
                         bag.error('invalid-setting',
                             `Material '${name}': medium.${prop} is a GLSL expression but the medium declares no majorant — heterogeneous media require a density ceiling σ̄ (D1: the rendered medium IS min(σ, σ̄); fable-heterogeneous-media.md). Add majorant: <finite number > 0>`)
@@ -317,9 +319,19 @@ export function validate(
                 } else {
                     // Rule 7: spatially-varying phase parameters are not in v1.
                     bag.error('invalid-setting',
-                        `Material '${name}': medium.${prop} cannot be a GLSL expression — only σ_a/σ_s may vary spatially (heterogeneous v1); phase parameters are constants or {param}`)
+                        `Material '${name}': medium.${prop} cannot be a GLSL expression — only σ_a/σ_s/emission may vary spatially; phase parameters are constants or {param}`)
                         .add();
                 }
+            }
+            // Emission P5: an emissive SCATTERING medium routes to the tracking arms;
+            // σ̄ auto-derives from constant coefficients, but {param} coefficients have
+            // no static bound — require the author's ceiling then.
+            if (isEmissiveMedium(mat.medium) && mediumMayScatter(mat.medium)
+                && mat.medium.majorant === undefined
+                && (isValueParam(mat.medium.sigma_a) || isValueParam(mat.medium.sigma_s))) {
+                bag.error('invalid-setting',
+                    `Material '${name}': an emissive scattering medium with {param} coefficients needs an authored majorant — the tracking arms' ceiling cannot be derived from a live parameter`)
+                    .add();
             }
             // Rule 2: majorant must be a positive finite number; a ceiling on an
             // all-constant medium is inert (its bound is derivable — C5 class).
@@ -415,16 +427,28 @@ export function validate(
                 .add();
         }
         // Heterogeneous rule 8 (deferred-ledger pin enforced now): the equiangular
-        // estimate's T(0,t) factor is the analytic closed form — a heterogeneous
+        // estimate's T(0,t) factor is the analytic closed form — a tracking-routed
         // medium would need ratio-tracked transmittance along the sampled segment.
-        if (features.media.hasHeterogeneousMedia) {
+        // (Checked against the ROUTING condition, so emissive scattering media —
+        // tracking-routed even with constant coefficients — are caught too.)
+        const eqScattering = strategy.measurement.scattering ?? 'full';
+        const eqNeedsTracking = Object.values(scene.materials).some((m) =>
+            m.medium !== undefined && mediumRoutesToTracking(
+                m.medium, eqScattering === 'full' && mediumMayScatter(m.medium)));
+        if (eqNeedsTracking) {
             bag.error('incompatible-options',
-                `mediumLightSampling 'equiangular' does not support heterogeneous media — its transmittance factor is the analytic closed form (deferred: ratio-tracked T along the sampled segment); use 'vertex'`)
+                `mediumLightSampling 'equiangular' does not support media on the null-collision arms — its transmittance factor is the analytic closed form (deferred: ratio-tracked T along the sampled segment); use 'vertex'`)
                 .add();
         }
     }
 
-    // volumeSampling axis (fable-heterogeneous-media.md §2 rules 3/4/6).
+    // volumeSampling axis (fable-heterogeneous-media.md §2 rules 3/4/6; the routing
+    // condition extends per impl-plan-medium-emission P5: a constant-ε SCATTERING
+    // medium routes to the tracking arms too — under the computed measurement only).
+    const measScattering = strategy.measurement.scattering ?? 'full';
+    const sceneNeedsTracking = Object.values(scene.materials).some((m) =>
+        m.medium !== undefined && mediumRoutesToTracking(
+            m.medium, measScattering === 'full' && mediumMayScatter(m.medium)));
     const vs = strategy.estimator.volumeSampling;
     if (vs === 'raymarch' || vs === 'ratio-tracking') {
         // Rule 6, reject-not-remove: ray marching is biased (if ever added it is a
@@ -444,15 +468,16 @@ export function validate(
                 .add();
         }
         // Rule 4a (C5 silent-inert): the knob must control something.
-        if (!features.media.hasHeterogeneousMedia) {
+        if (!sceneNeedsTracking) {
             bag.warning('invalid-setting',
-                `volumeSampling 'delta-tracking' controls nothing here — no medium has expression coefficients; constant media stay on the analytic arms`)
+                `volumeSampling 'delta-tracking' controls nothing here — no medium has expression coefficients (or emission with scattering); constant media stay on the analytic arms`)
                 .add();
         }
-    } else if (features.media.hasHeterogeneousMedia) {
-        // Rule 4b (reject-not-degrade): the analytic arms cannot evaluate σ(x).
+    } else if (sceneNeedsTracking) {
+        // Rule 4b (reject-not-degrade): the analytic arms cannot evaluate σ(x), and the
+        // analytic scattering arm has no emission source term.
         bag.error('incompatible-options',
-            `This scene has heterogeneous media (expression coefficients) but volumeSampling is '${vs ?? 'analytic'}' — the analytic arms cannot evaluate σ(x); set estimator.volumeSampling: 'delta-tracking'`)
+            `This scene has media that need the null-collision arms (expression coefficients, or an emissive scattering medium) but volumeSampling is '${vs ?? 'analytic'}' — set estimator.volumeSampling: 'delta-tracking'`)
             .add();
     }
     const cameraType = strategy.measurement.camera.type;

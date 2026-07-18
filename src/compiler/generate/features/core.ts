@@ -41,6 +41,9 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         const models = plan.program.media.models;
         const mediumFields = unionFields(models.map((m) => PHASE_MODELS[m]?.properties ?? []));
         const extra = ['Spectrum sigma_a;   // absorption', 'Spectrum sigma_s;   // scattering'];
+        // Emission ε joins the RTE core iff some medium emits (impl-plan-medium-emission;
+        // the exact-linkage rule — the field, its accessor, and its readers co-exist).
+        if (plan.program.media.emission) extra.push('Spectrum emission;   // volume emission coefficient ε (W·sr⁻¹·m⁻³, dL/ds = ε)');
         if (models.length > 0) extra.push('int model;   // volume_scattering registry index (interaction_medium_* dispatch)');
         blocks.push({
             origin: 'generated:medium-properties',

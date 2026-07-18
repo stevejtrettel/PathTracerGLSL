@@ -168,10 +168,12 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
         }
     });
 
-    // Heterogeneous media sink (fable-heterogeneous-media.md): delta-tracking × mis is
-    // Validator-rejected, so the null-collision arms need their own pair under pt-nee.
-    // Covers all three occupant functions (delta, ratio pass-through, ratio shadow), the
-    // D1 clamp splice, the Spectrum() expression wrap, and expression-param minting.
+    // Heterogeneous media sink (fable-heterogeneous-media.md + impl-plan-medium-emission):
+    // delta-tracking × mis is Validator-rejected, so the null-collision arms need their
+    // own pair under pt-nee. Covers all three occupant functions (delta, ratio
+    // pass-through, ratio shadow), the D1 clamp splice (incl. the P2 ε scale), the
+    // Spectrum() expression wrap, expression-param minting, the ε expression splice,
+    // the closed-form emissive absorbing arm, and the auto-derived-majorant routing.
     it('heterogeneous media sink + pt-nee delta-tracking', () => {
         const scene: SceneDescription = {
             id: 'het-sink',
@@ -180,16 +182,20 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
             objects: [
                 { type: 'box', parameters: { center: [0, 1, 0], halfSize: [1, 1, 1] }, material: 'fog', name: 'het_fog' },
                 { type: 'box', parameters: { center: [3, 1, 0], halfSize: [1, 1, 1] }, material: 'ink', name: 'het_ink' },
+                { type: 'box', parameters: { center: [6, 1, 0], halfSize: [1, 1, 1] }, material: 'ember', name: 'sink_ember' },
+                { type: 'box', parameters: { center: [9, 1, 0], halfSize: [1, 1, 1] }, material: 'glowmist', name: 'sink_glowmist' },
                 { type: 'quad', parameters: { corner: [-5, 0, -5], edge1: [10, 0, 0], edge2: [0, 0, 10] }, material: 'floor', name: 'floor' },
             ],
             materials: {
                 floor: { model: 'lambert', albedo: [0.5, 0.5, 0.5] },
-                // Delta-tracking arm: scattering formula with a declared slider + majorant.
+                // Delta-tracking arm: scattering formula with a declared slider + majorant,
+                // plus an ε EXPRESSION (P3 collection + the P2 clamp scale on ε).
                 fog: {
                     model: 'none',
                     medium: {
                         sigma_a: [0.05, 0.05, 0.05],
                         sigma_s: { kind: 'glsl', source: 'u_sink_gain * exp(-2.0 * p.y)', params: [{ param: 'sink.gain', default: 1.5, min: 0, max: 4 }] },
+                        emission: { kind: 'glsl', source: 'vec3(0.4, 0.2, 0.1) * exp(-p.y)' },
                         majorant: 4.2,
                         phase_g: 0.3,
                     },
@@ -201,6 +207,16 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
                         sigma_a: { kind: 'glsl', source: '2.0 + p.x' },
                         majorant: 6.0,
                     },
+                },
+                // Closed-form emissive absorbing arm (constant everything — analytic).
+                ember: {
+                    model: 'none',
+                    medium: { sigma_a: [1.5, 1.0, 0.5], emission: [2.0, 0.8, 0.2] },
+                },
+                // Auto-derived majorant (P5): constant-ε SCATTERING medium, no majorant.
+                glowmist: {
+                    model: 'none',
+                    medium: { sigma_a: [0.2, 0.2, 0.2], sigma_s: [0.6, 0.6, 0.6], emission: [0.5, 0.5, 0.5], phase_g: 0.2 },
                 },
             },
             lights: [{ kind: 'point', position: [0, 6, 0], emission: 20 }],

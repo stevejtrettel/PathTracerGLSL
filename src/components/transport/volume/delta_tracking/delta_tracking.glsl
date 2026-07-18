@@ -10,9 +10,11 @@
 // (SampleT_maj, the VolPathIntegrator collision branches, SampleLd's ratio tracking).
 //
 // Deviations — declared-and-inert facts ONLY (full table: impl-plan-heterogeneous-media.md):
-//   1. The absorption branch collects no emission (v1 media don't emit): it returns a
-//      dead path (weight 0). The branch, its probability, and its weight algebra are
-//      all PRESENT — fire later fills ms.radiance (the seam's field exists for this).
+//   1. The absorption branch is a pure TERMINATOR (weight 0). Emission is NOT collected
+//      there — it accumulates per tentative collision, pre-lottery, via the generated
+//      medium_emission() accessor (impl-plan-medium-emission P3: with a scalar majorant
+//      pbrt's per-collision emission term collapses to w ⊙ ε/σ̄; the two track-length
+//      derivations live in that plan and are gated by the EMIT witnesses).
 //   2. The papers' |·| guards negative sigma_n under non-bounding majorants; by D1
 //      (the medium IS the ceiling-clamped field, applied inside scene_medium_properties)
 //      sigma_t <= sigma_bar so sigma_n >= 0 — the max(…, 0.0) below is fp-safety only.
@@ -28,7 +30,8 @@
 // Budget: MAX_NULL_COLLISIONS (numeric knob, pin 64) — exhaustion is a conservative
 // pass-through with the accumulated weight, a declared truncation like MAX_SHADOW_SEGMENTS.
 // Depends on: scene_medium_properties (generated, returns the EFFECTIVE clamped field),
-// random (sampler), structs_media (MediumSample), spectrum_* (core math).
+// medium_emission (generated: ε or the folded ZERO), random (sampler), structs_media
+// (MediumSample), spectrum_* (core math).
 
 // Seam-1 delta-tracking arm (heterogeneous scattering media): Kutz Algorithm 4 on the
 // segment [0, t_max]. Scattered-at-t or transmitted, per-channel weight — the walk
@@ -53,6 +56,12 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
         Point p = ray.origin + t * ray.direction;
         MediumProperties m = scene_medium_properties(med, p);
         Spectrum sigma_n = max(Spectrum(sigma_bar) - (m.sigma_a + m.sigma_s), 0.0);
+
+        // Emission (impl-plan-medium-emission P3): per-tentative-collision track-length
+        // collection, PRE-lottery (the final real collision collects too):
+        //   E[Σ_i w_i · ε(x_i)/σ̄] = ∫ T·ε ds.  medium_emission() is generated — ε when
+        // emissive media exist, the folded constant ZERO otherwise.
+        ms.radiance += w * medium_emission(m) / sigma_bar;
 
         // History-aware average-based probabilities (Eq. 30–33; the history is this
         // tracker's own accumulated w-hat, per Algorithm 4's subpath definition).
@@ -106,6 +115,9 @@ MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float
         if (t >= t_max) break;
         Point p = ray.origin + t * ray.direction;
         MediumProperties m = scene_medium_properties(med, p);
+        // Emission (P3, ratio-arm sibling): collected with the PRE-update T — the
+        // weight of collisions prior. E[Σ_i T_i · ε(x_i)/σ̄] = ∫ T·ε ds.
+        ms.radiance += T * medium_emission(m) / sigma_bar;
         T *= max(Spectrum(sigma_bar) - m.sigma_a, 0.0) / sigma_bar;
     }
     ms.weight = T;                             // exhaustion falls through: conservative
@@ -113,7 +125,8 @@ MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float
 }
 
 // Seam-2 ratio-tracking arm: transmittance over FULL sigma_t (absorption + out-scatter,
-// the same shadow convention as the analytic form). pbrt-v4 SampleLd verbatim under a
+// the same shadow convention as the analytic form). NO emission here — shadow rays
+// carry transmittance only (the emission integral belongs to the camera path). pbrt-v4 SampleLd verbatim under a
 // scalar majorant: T_ray *= T_maj·sigma_n/pdf with pdf = T_maj[0]·sigma_maj[0]
 // collapses to T ⊙= sigma_n/sigma_bar (deviation 3). pbrt's Russian-roulette
 // termination is transcribed with it: the trigger (max channel < 0.05) is a heuristic,

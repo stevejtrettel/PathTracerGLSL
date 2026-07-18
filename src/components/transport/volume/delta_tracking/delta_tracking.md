@@ -25,9 +25,18 @@ w_⋆ = μ_⋆/(σ̄·P_⋆) (Eq. 15–16); ratio tracking per Novák et al. 201
 `SampleLd`. Deviations are declared-and-inert only (no modified formulas) — the
 table lives in the impl plan and in the `.glsl` header.
 
+## Emission (added same day — impl-plan-medium-emission)
+
+Both loops also collect the volume emission coefficient ε per tentative collision
+(`w ⊙ medium_emission(m)/σ̄`, pre-lottery / pre-update — the track-length estimator;
+derivations in that plan). `medium_emission` is generated: ε when emissive media
+exist, a folded constant zero otherwise. The seam-2 shadow arm collects nothing
+(shadow rays carry transmittance only).
+
 ## Correctness gates
 
 `F-HET-CONST` (constant-expression twin vs the analytic arm — same integrand, two
 estimators), `F-HET-SLAB` (linear σ(z), closed-form numbers), `F-CLAMP` (the D1
 definition as a twin equality), `HET-DRIVEN` (expression params at two points vs
-baked twins).
+baked twins). Emission: `EMIT-SWAP` (tracking ≡ closed form), `F-EMIT-SAT`
+(delta-arm saturation ε/σ_a).

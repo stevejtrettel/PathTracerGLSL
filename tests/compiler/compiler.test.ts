@@ -56,7 +56,11 @@ describe('Compiler', () => {
             const uniformNames = result.uniforms.map(u => u.uniform);
             expect(uniformNames).toContain('u_resolution');
             expect(uniformNames).toContain('u_cameraPosition');
-            expect(uniformNames).toContain('u_cameraTarget');
+            // The look-at frame is CPU-computed and shipped as basis uniforms; u_cameraTarget
+            // is no longer read by any shader (camera.target feeds the basis closures).
+            expect(uniformNames).toContain('u_cameraForward');
+            expect(uniformNames).toContain('u_cameraRight');
+            expect(uniformNames).toContain('u_cameraUp');
         });
 
         it('has camera parameter metadata', () => {

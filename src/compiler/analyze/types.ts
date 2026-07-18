@@ -39,9 +39,12 @@ export interface SceneFeatures {
         hasMedia: boolean;
         /** Any medium has σ_s nonzero or {param}-driven — transport needs the scattering arms. */
         hasScatteringMedia: boolean;
-        /** Any medium (incl. ambient) has an expression coefficient — the null-collision
-         *  arms (delta/ratio tracking) are needed (fable-heterogeneous-media.md). */
+        /** Any medium (incl. ambient) has an expression coefficient (σ_a/σ_s/ε) — the
+         *  null-collision arms (delta/ratio tracking) are needed (fable-heterogeneous-media.md). */
         hasHeterogeneousMedia: boolean;
+        /** Any medium has ε possibly nonzero (impl-plan-medium-emission) — the emission
+         *  machinery (lookup field, collection lines, walk radiance line) is needed. */
+        hasEmissiveMedia: boolean;
         /** Any material has model 'none' (§3.6) — transport needs the null-crossing branch. */
         hasNullInterfaces: boolean;
     };

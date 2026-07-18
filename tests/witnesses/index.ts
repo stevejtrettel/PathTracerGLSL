@@ -55,6 +55,17 @@ import {
     regionsTransformed, regionsTransformedRef, regionsNeeStrategy,
 } from './scenes/transformWitness.js';
 import { drivenScene, drivenBakedTheta, drivenBakedTheta2, drivenNeeStrategy, THETA2 } from './scenes/drivenWitness.js';
+import {
+    hetConstScene, hetConstRef, hetNeeStrategy, hetPtStrategy, hetRefNeeStrategy, hetRefPtStrategy,
+    hetSlabScene, hetSlabStrategy,
+    clampScene, clampRef, clampStrategy, clampRefStrategy,
+    hetDrivenScene, hetDrivenBaked, hetDrivenBaked2, HET_THETA2,
+} from './scenes/heterogeneousWitness.js';
+import {
+    emitScene, emitSwapScene, emitStrategy, emitSwapStrategy,
+    emitSatScene, emitSatStrategy,
+    emitScatterScene, emitScatterNeeStrategy, emitScatterPtStrategy,
+} from './scenes/emissionWitness.js';
 
 /** Camera pose is MEASUREMENT data: strategy literals are shared across scenes, so
  *  each entry stamps its pose onto its strategies here (no more pose-as-loose-
@@ -553,6 +564,166 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // NEE is guarded off at the delta surface) → the display-space gate.
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.005, rmse: 0.02, label: 'NEE guard: nee ≡ pt on pure delta' },
             ],
+        },
+    },
+    // Fixture partner: the plain-number (analytic-arm) half of the F-HET-CONST twin.
+    'het-const-ref': {
+        scene: hetConstRef,
+        strategies: posed([0, 1.2, 4.2], [0, 1, 0], hetRefNeeStrategy, hetRefPtStrategy),
+        exercises: 'analytic-arm reference of the F-HET-CONST estimator-swap twin — the same fog authored as a plain constant',
+    },
+    'het-const': {
+        scene: hetConstScene,
+        strategies: posed([0, 1.2, 4.2], [0, 1, 0], hetNeeStrategy, hetPtStrategy),
+        exercises:
+            'F-HET-CONST (heterogeneous-media §5.1): σ_s authored as the CONSTANT EXPRESSION glsl(\'0.5\') — routing is by authored type, so this runs the transcribed Kutz spectral tracker (delta arm) plus ratio-tracked shadow segments against the SAME integrand the ref solves in closed form. The single sharpest gate of the heterogeneous build',
+        expected:
+            'converges to the same image as het-const-ref on BOTH keys (nee and pt) — divergence implicates the transcribed lottery weights, the history-aware probabilities, or the ratio shadow arm; the majorant (0.6 > σ_t = 0.52) never clamps, so the integrands are identical by construction',
+        witness: {
+            spp: 192,
+            // Different estimators (tracking vs closed-form) → decorrelated streams:
+            // same-integrand display-space gates, like the backend twins. The pt pair
+            // is noisier (panel by chance hits) → looser tripwire.
+            checks: [
+                { kind: 'twin', other: { scene: 'het-const-ref' }, meanTol: 0.015, rmse: 0.08, label: 'F-HET-CONST delta ≡ analytic (nee)' },
+                { kind: 'twin', other: { scene: 'het-const-ref', strategy: 1 }, strategy: 1, meanTol: 0.03, rmse: 0.3, label: 'F-HET-CONST delta ≡ analytic (pt tripwire)' },
+            ],
+        },
+    },
+    'het-slab': {
+        scene: hetSlabScene,
+        strategies: posed([0, 0, 2], [0, 0, -2], hetSlabStrategy),
+        exercises:
+            'F-HET-SLAB (heterogeneous-media §5.2): chromatic LINEAR σ_a(z) through the F-SLAB geometry — the ratio-tracked pass-through arm (absorbing-only heterogeneous, amended D2) against pencil-and-paper truth; optical depth (0.5,1,2)·2 derived in the fixture comment',
+        expected:
+            'converged CENTER pixel = (0.36788, 0.13534, 0.01832) ± ~1%/channel in linear HDR — the F-SLAB triple through a truly varying field; per-channel drift implicates the ratio update (σ̄−σ)/σ̄ or the Spectrum() expression splice',
+        witness: {
+            spp: 96,
+            checks: [{
+                kind: 'mean', value: [0.36788, 0.13534, 0.01832], tol: [0.005, 0.004, 0.003],
+                region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                label: 'F-HET-SLAB linear-σ Beer–Lambert',
+            }],
+        },
+    },
+    // Fixture partner: the authored-constant-1.0 half of the F-CLAMP twin.
+    'clamp-ref': {
+        scene: clampRef,
+        strategies: posed([0, 0, 2], [0, 0, -2], clampRefStrategy),
+        exercises: 'authored-constant reference of the F-CLAMP twin (analytic Beer–Lambert arm)',
+    },
+    clamp: {
+        scene: clampScene,
+        strategies: posed([0, 0, 2], [0, 0, -2], clampStrategy),
+        exercises:
+            'F-CLAMP (heterogeneous-media §5.3, D1 as an equality): the formula says 2.0 everywhere, the ceiling says 1.0 — the rendered medium must BE the constant-1.0 slab (proportional clamp inside scene_medium_properties, so every consumer sees only the effective field)',
+        expected:
+            'converges to the same image as clamp-ref; center pixel = e⁻¹ = 0.36788 per channel — a darker slab (toward e⁻²) means the clamp is not applied; divergence from the ref means it is applied somewhere but not in the lookup',
+        witness: {
+            spp: 96,
+            checks: [
+                {
+                    kind: 'mean', value: 0.36788, tol: 0.005,
+                    region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                    label: 'F-CLAMP e⁻¹ (clamped field)',
+                },
+                { kind: 'twin', other: { scene: 'clamp-ref' }, meanTol: 0.01, rmse: 0.08, label: 'F-CLAMP clamped ≡ authored-1.0' },
+            ],
+        },
+    },
+    // Fixture partners: the baked constant twins of the HET-DRIVEN witness.
+    'het-driven-baked': {
+        scene: hetDrivenBaked,
+        strategies: posed([0, 1.2, 4.2], [0, 1, 0], hetRefNeeStrategy),
+        exercises: 'baked reference arm of the HET-DRIVEN witness at gain 1 (σ_s = 0.4, analytic arm)',
+    },
+    'het-driven-baked2': {
+        scene: hetDrivenBaked2,
+        strategies: posed([0, 1.2, 4.2], [0, 1, 0], hetRefNeeStrategy),
+        exercises: 'baked reference arm of the HET-DRIVEN witness at gain 2 (σ_s = 0.8, analytic arm)',
+    },
+    'het-driven': {
+        scene: hetDrivenScene,
+        strategies: posed([0, 1.2, 4.2], [0, 1, 0], hetNeeStrategy),
+        exercises:
+            'HET-DRIVEN (heterogeneous-media §5.4): the slider INSIDE the formula (GlslExpression.params → u_het_gain uniform + live slider) at its DEFAULT point — covers minting, upload, and the delta arm reading a driven field. Drag het.gain in the lab: fog thickens live with zero recompiles; past gain ≈ 2.45 the ceiling saturates it (D1) instead of misrendering',
+        expected: 'converges to the same image as het-driven-baked (σ_s = 0.4); divergence implicates the params minting or the uniform splice in the expression',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'het-driven-baked' }, meanTol: 0.015, rmse: 0.08, label: 'HET-DRIVEN ≡ baked @gain 1' }],
+        },
+    },
+    'het-driven-theta2': {
+        scene: hetDrivenScene,
+        strategies: posed([0, 1.2, 4.2], [0, 1, 0], hetNeeStrategy),
+        exercises:
+            'HET-DRIVEN at the θ′ point: het.gain SET to 2.0 through the ParameterStore after initialization (the slider path) — covers recompute + re-upload of an expression param, not just its default',
+        expected: 'converges to the same image as het-driven-baked2 (σ_s = 0.8 — visibly thicker fog than het-driven); divergence implicates the store→uniform update path',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'het-driven-baked2' }, meanTol: 0.015, rmse: 0.08, label: 'HET-DRIVEN ≡ baked @gain 2 (post-set)' }],
+        },
+        initialParameters: {
+            ...HET_THETA2,
+        },
+    },
+    emit: {
+        scene: emitScene,
+        strategies: posed([0, 0, 2], [0, 0, -2], emitStrategy),
+        exercises:
+            'F-EMIT (impl-plan-medium-emission E2): constant glowing absorbing slab through the ANALYTIC closed-form arm — ε is the volume emission coefficient (P1), L = ε/σ_a·(1−e^{−σ_a}) + e^{−σ_a}·L_back; the green channel is the equilibrium case (ε = σ_a·L_back ⇒ identically 1)',
+        expected:
+            'converged CENTER pixel = (0.68394, 1.00000, 1.63212) ± ~1%/channel in linear HDR — green ≠ 1 breaks the equilibrium (emission or attenuation off); r/b drifting with g exact implicates the ε/σ_a factor',
+        witness: {
+            spp: 48,
+            checks: [{
+                kind: 'mean', value: [0.68394, 1.0, 1.63212], tol: [0.007, 0.01, 0.016],
+                region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                label: 'F-EMIT closed-form glow',
+            }],
+        },
+    },
+    'emit-swap': {
+        scene: emitSwapScene,
+        strategies: posed([0, 0, 2], [0, 0, -2], emitSwapStrategy),
+        exercises:
+            'EMIT-SWAP: the F-EMIT slab authored as EXPRESSIONS (+majorant) — the ratio pass-through arm with P3 per-collision collection vs the analytic closed form: the estimator-swap gate for emission (gates the plan\'s track-length derivations)',
+        expected:
+            'converges to the same image as `emit`, same exact center numbers — divergence implicates the per-collision collection weight (w·ε/σ̄) or its pre-update-T placement',
+        witness: {
+            spp: 96,
+            checks: [
+                { kind: 'twin', other: { scene: 'emit' }, meanTol: 0.01, rmse: 0.08, label: 'EMIT-SWAP tracking ≡ analytic' },
+                {
+                    kind: 'mean', value: [0.68394, 1.0, 1.63212], tol: [0.007, 0.01, 0.016],
+                    region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                    label: 'EMIT-SWAP absolute numbers',
+                },
+            ],
+        },
+    },
+    'emit-sat': {
+        scene: emitSatScene,
+        strategies: posed([30, 1, 0], [31, 1, 0], emitSatStrategy),
+        exercises:
+            'F-EMIT-SAT: camera deep inside a uniform glowing SCATTERING medium — equilibrium radiance ε/σ_a exactly, every pixel. Gates the DELTA arm\'s per-collision collection with an absolute number AND the auto-derived majorant (constant-ε scattering medium, σ̄ = σ_t = 3 derived, P5)',
+        expected:
+            'EVERY pixel = (0.5, 1.0, 2.0) in linear HDR — low ⇒ bounce starvation or a lost emission weight; high ⇒ double collection; channels splitting ⇒ the ε splice or the scattering equilibrium',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'mean', value: [0.5, 1.0, 2.0], tol: [0.005, 0.01, 0.02], label: 'F-EMIT-SAT ε/σ_a saturation' }],
+        },
+    },
+    'emit-scatter': {
+        scene: emitScatterScene,
+        strategies: posed([0, 1.2, 4.2], [0, 1, 0], emitScatterNeeStrategy, emitScatterPtStrategy),
+        exercises:
+            'emission × scattering × NEE composition: glowing fog under a ceiling quad (second auto-derived majorant, σ̄ = 0.7) — glow is PATH-FOUND on both arms (P4: volumes are never light-sampled), so nee and pt estimate the same integral',
+        expected:
+            'keys 1 (pt-nee) and 2 (pt) converge to the same image — warm glow inside the fog + quad light pool; divergence implicates emission interacting with the NEE partition (it must not — glow rides the kernel arm only)',
+        witness: {
+            spp: 192,
+            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.4, label: 'emission nee ≡ pt tripwire' }],
         },
     },
     'veach-mis': {

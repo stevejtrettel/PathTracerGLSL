@@ -65,6 +65,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -153,6 +154,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -240,6 +242,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`]
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -330,6 +333,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -420,6 +424,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -433,6 +438,162 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee
     "tonemap": {
       "exposure": undefined,
       "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.6,
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "target": [
+        0,
+        0,
+        -2,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pathtracer-ref 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.6,
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "target": [
+        0,
+        0,
+        -2,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
     },
   },
 }
@@ -508,6 +669,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -596,6 +758,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -678,6 +841,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -759,6 +923,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -842,6 +1007,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -924,6 +1090,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1011,6 +1178,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1100,6 +1268,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1184,6 +1353,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1271,6 +1441,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1358,6 +1529,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1443,6 +1615,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1531,6 +1704,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1619,6 +1793,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1703,6 +1878,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1790,6 +1966,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1877,6 +2054,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -1960,6 +2138,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2043,6 +2222,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2126,6 +2306,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2209,6 +2390,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2292,6 +2474,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2374,6 +2557,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2462,6 +2646,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cylinders + pat
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2549,6 +2734,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2636,6 +2822,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2724,6 +2911,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven + pathtr
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2812,6 +3000,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2900,6 +3089,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -2988,12 +3178,416 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
     "models": [],
     "nullInterfaces": false,
     "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > emit + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.6,
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "target": [
+        0,
+        0,
+        -2,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": true,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > emit-sat + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        30,
+        1,
+        0,
+      ],
+      "target": [
+        31,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + pt-emit 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + pt-nee-emit 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pathtracer-swap 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.6,
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "target": [
+        0,
+        0,
+        -2,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
   },
@@ -3066,6 +3660,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -3154,6 +3749,7 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -3238,6 +3834,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -3327,6 +3924,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": true,
     "mediumPdf": true,
@@ -3416,6 +4014,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": true,
     "mediumPdf": false,
@@ -3502,6 +4101,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -3591,7 +4191,93 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-nee-het 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        -0.5,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": true,
     "mediumEval": true,
     "mediumPdf": false,
     "models": [
@@ -3670,6 +4356,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -3747,6 +4434,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -3824,6 +4512,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -3901,6 +4590,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -3992,6 +4682,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4083,6 +4774,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4174,6 +4866,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4186,6 +4879,174 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
   "view": {
     "tonemap": {
       "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-het 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        -0.5,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-nee-het 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "mirror",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.6,
+        4.5,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": true,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
     },
   },
 }
@@ -4252,6 +5113,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4336,6 +5198,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": true,
     "mediumPdf": false,
@@ -4420,6 +5283,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": true,
     "mediumPdf": false,
@@ -4430,6 +5294,758 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-het 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-nee-het 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": true,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-const-ref + pt-nee-ref 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-const-ref + pt-ref 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt-nee-het 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": true,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-driven-baked + pt-nee-ref 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-driven-baked2 + pt-nee-ref 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-driven-theta2 + pt-nee-het 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        4.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": true,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > het-slab + pathtracer 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.6,
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "target": [
+        0,
+        0,
+        -2,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": false,
   },
   "view": {
     "tonemap": {
@@ -4508,6 +6124,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4596,6 +6213,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4682,6 +6300,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4770,6 +6389,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4859,6 +6479,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`]
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -4950,6 +6571,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5037,6 +6659,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": true,
     "mediumPdf": false,
@@ -5127,6 +6750,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5213,6 +6837,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5302,6 +6927,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5393,6 +7019,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5487,6 +7114,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5581,6 +7209,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5675,6 +7304,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5754,6 +7384,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5847,6 +7478,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -5936,6 +7568,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6024,6 +7657,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6115,6 +7749,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6206,6 +7841,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6297,6 +7933,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6385,6 +8022,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6476,6 +8114,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6567,6 +8206,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6644,6 +8284,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6729,6 +8370,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6806,6 +8448,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6888,6 +8531,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -6972,6 +8616,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7063,6 +8708,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7154,6 +8800,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7245,6 +8892,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7336,6 +8984,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7427,6 +9076,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7518,6 +9168,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7608,6 +9259,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7696,6 +9348,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7784,6 +9437,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7864,6 +9518,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -7944,6 +9599,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -8030,6 +9686,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -8119,6 +9776,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,
@@ -8208,6 +9866,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "shadows": "opaque-dielectrics",
   },
   "media": {
+    "emission": false,
     "heterogeneousArms": false,
     "mediumEval": false,
     "mediumPdf": false,

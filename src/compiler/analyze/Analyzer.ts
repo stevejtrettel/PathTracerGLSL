@@ -1,7 +1,7 @@
 // compiler/analyze/Analyzer.ts
 
 import type { SceneDescription, MaterialProperty } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium } from '../types.js';
 import type { SceneFeatures } from './types.js';
 import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
 import { LIGHT_KINDS } from '../../components/lights/index.js';
@@ -48,6 +48,7 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     let hasScatteringMedia = false;
     // ambientMedium is a material NAME — its medium block is censused by the loop below.
     let hasHeterogeneousMedia = false;
+    let hasEmissiveMedia = false;
     let hasNullInterfaces = false;
 
     for (const mat of Object.values(scene.materials)) {
@@ -57,6 +58,7 @@ export function analyze(scene: SceneDescription): SceneFeatures {
             hasMedia = true;
             if (mayBeNonzero(mat.medium.sigma_s)) hasScatteringMedia = true;
             if (isHeterogeneousMedium(mat.medium)) hasHeterogeneousMedia = true;
+            if (isEmissiveMedium(mat.medium)) hasEmissiveMedia = true;
         }
 
         // Check for procedural properties (GLSL expressions)
@@ -133,6 +135,7 @@ export function analyze(scene: SceneDescription): SceneFeatures {
             hasMedia,
             hasScatteringMedia,
             hasHeterogeneousMedia,
+            hasEmissiveMedia,
             hasNullInterfaces,
         },
         environment: {

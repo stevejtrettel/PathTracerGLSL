@@ -43,7 +43,9 @@ struct MediumSample {
     float    t;          // event arc length (valid when scattered)
     Spectrum weight;     // throughput factor for WHICHEVER outcome (§2.1 sample-returns-weight)
     Radiance radiance;   // inline radiance the strategy resolved itself — the RTE source term.
-                         // §3 governs it. v1 strategies assign SPECTRUM_ZERO.
+                         // §3 governs it. LIVE since medium emission (Jul 17 2026,
+                         // impl-plan-medium-emission): the emissive arms fill it with the
+                         // ε integral; non-emissive arms assign SPECTRUM_ZERO.
 };
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 
@@ -63,6 +65,9 @@ Spectrum medium_transmittance(int med, Ray ray, float t);
   body, never the walker.
 - Strategies needing more randomness than `vec2 xi` (delta tracking's unbounded tentative
   collisions) draw from the global stream — the §2.9 escape hatch, documented per strategy.
+  **Live since the heterogeneous build (Jul 17 2026):** the null-collision arms
+  (`components/transport/volume/delta_tracking/`) use `xi` for the leading jump + lottery
+  and `random()` for the loop tail, per this rule.
   **Freshness rule:** every tentative collision and every re-spawned segment draws fresh
   dimensions. (pbrt-v4's wavefront integrator shipped a bug reusing one distance sample across
   medium segments after a null crossing — an emissive nested volume was never sampled. Our
@@ -113,9 +118,12 @@ Double-counting is thereby a per-strategy proof obligation, stated here once.
 
 **The capability flag.** "Emits inline radiance" is a compile-time capability declared per volume
 strategy (parallel to the materials' emissive-capable flag). The accumulate line is **generated only
-for strategies that declare it**; v1 strategies do not, so v1 shaders contain neither the field read
-nor a dead line — nothing unread exists in any generated program. Bodies must still assign the field
-(uninitialized GLSL struct members are garbage; assignment is checkable by eye).
+for strategies that declare it** — nothing unread exists in any generated program. Bodies must still
+assign the field (uninitialized GLSL struct members are garbage; assignment is checkable by eye).
+**LIVE since Jul 17 2026 (impl-plan-medium-emission):** the flag is the `media.emission` link-map
+decision — the walk's accumulate line, the `MediumProperties.emission` field, and the generated
+`medium_emission` accessor all exist iff some medium's ε may be nonzero; the reserved slot is
+exactly what the emission batch filled.
 
 ## 4. The v1 strategy: `analytic` — chromatic sampling per pbrt-v3 — PINNED (owner decision)
 

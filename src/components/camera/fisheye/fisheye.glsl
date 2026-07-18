@@ -3,7 +3,7 @@
 // The four radial maps below share everything else (frame, azimuth, direction assembly) —
 // the compiler aliases FISHEYE_THETA to the one `projection` selects (a value #define, like
 // TAN_FOV; the r(θ) forms + what each preserves are in fisheye.md). Ignores xiLens.
-// Requires: u_imageSize, u_cameraPosition, u_cameraTarget, u_fisheyeFov (full angular field),
+// Requires: u_imageSize, u_cameraPosition, u_cameraForward/Right/Up, u_fisheyeFov (full angular field),
 //           FISHEYE_THETA (aliased by the compiler to one of the four below).
 
 // theta(rho, tmax), normalized so rho = 1 ↔ theta = tmax. The sin-based maps clamp their
@@ -22,11 +22,11 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     float rho = length(c);
     float tmax = u_fisheyeFov * 0.5;   // theta_max = half the full angular field
 
-    vec3 forward = normalize(u_cameraTarget - u_cameraPosition);
-    // Same degenerate up-reference guard as pinhole (forward ∥ ±Y → normalize(0) = NaN).
-    vec3 up_ref = abs(forward.y) > 0.999999 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
-    vec3 right = normalize(cross(forward, up_ref));
-    vec3 up = cross(right, forward);
+    // Look-at frame precomputed on the CPU (components/camera/basis.ts), shipped as
+    // uniforms — no per-ray normalize/cross (the up-reference guard lives there).
+    vec3 forward = u_cameraForward;
+    vec3 right = u_cameraRight;
+    vec3 up = u_cameraUp;
 
     if (rho < 1e-6) return make_ray(u_cameraPosition, forward);   // center pixel: on axis
 

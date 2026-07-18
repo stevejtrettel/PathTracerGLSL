@@ -1,6 +1,24 @@
 # Heterogeneous media — implementation plan (V0 → V2)
 
-**Author:** Fable (July 17 2026) · **Status:** PLAN — implementation starting this session.
+**Author:** Fable (July 17 2026) · **Status: BUILT (same session) — GPU-UNSWEPT.**
+**Build record:** V0+V1+V2 all landed; tsc clean; **941 vitest** (incl. the het glslang
+sink + the four witness scenes joining the compile/snapshot suites); **byte gate held**
+(the entire pre-existing-scene snapshot diff = 95 additive `heterogeneousArms:false`
+link-map fields + 13 instances of one comment line in the lookup header — zero emitted
+code changed); emitted GLSL reviewed via `dump:shaders` (clamp-in-lookup, delta arm
+call `medium_sample_delta(2, 0.6, …)`, ratio arms, `u_het_gain` minting all confirmed
+in the dumps). Witness gates (twin meanTol/rmse) are pre-calibration estimates —
+**the owner runs `npm run witness`**; expect to tighten/loosen against measured
+numbers as usual. One addition beyond the design doc, recorded in "Transcription &
+deviations" and at the splice: the lookup floors expression coefficients at zero
+(`max(Spectrum(expr), 0.0)` — σ < 0 is not a medium; negative formulas would poison
+probabilities and weights). SEQUEL (same evening): the tally batch was planned and
+then DEFERRED by the owner (near-zero win for current scenes; re-triggers in the
+design doc's ledger); **medium emission was built instead**
+(`impl-plan-medium-emission.md`) — it fills this build's reserved slots (the
+`ms.radiance` field, the per-collision sites in both loops). Demo cards
+(groundfog, fogblobs, glowblobs) landed pre-sweep and render correctly per the
+owner's visual check; the numeric sweep remains owner-pending.
 **Authority:** `fable-heterogeneous-media.md` **as amended Jul 17** (kickoff decisions:
 clamp-in-the-lookup, the absorbing-only arm, transcribe-with-lottery). Seams:
 `fable-volumetric-component.md`. Strategy sections: `fable-strategy-taxonomy.md`.
@@ -160,7 +178,7 @@ is exact).
 
 | # | Deviation | Status |
 |---|---|---|
-| 1 | The absorption branch collects no emission (v1 media don't emit): its return is ŵ ⊙ σ_a·L_e/(σ̄·P_a) with L_e ≡ 0, expressed through the seam as `{scattered:false, t:t_max, weight:0, radiance:0}` — the walk carries a dead path to the boundary (RR reaps it). The branch, its probability, and its weight algebra are all present; fire later sets `radiance` (the seam's field exists for exactly this — §3 partition rule). | inert-by-value |
+| 1 | The absorption branch is a pure TERMINATOR (`{scattered:false, weight:0}` — the walk carries a dead path to the boundary; RR reaps it). ~~Fire later fills the branch with Le~~ — **superseded same day** (impl-plan-medium-emission P3): with the ε convention, emission collects PER TENTATIVE COLLISION (pbrt's shape), not in the lottery branch; the branch's probability and weight algebra stay exactly as transcribed. | superseded-by-emission |
 | 2 | The papers' \|·\| absolute values (Eq. 26–33) guard negative μ_n under non-bounding μ̄; by D1 the bound is exact (σ_t ≤ σ̄ by definition), so μ_n ≥ 0 and the \|·\| are identities. A `max(…, 0)` stays in GLSL for floating point. | unreachable-by-D1 |
 | 3 | The D1 clamp itself is applied upstream in `scene_medium_properties` — the tracker runs the papers' algorithm on the clamped field, which is *the* medium (D1 definitional). | definitional |
 | 4 | Scalar σ̄ (v1): pbrt's per-channel `T_maj` normalizations collapse (noted above) — an algebraic simplification that is exact, not an approximation. | exact-collapse |

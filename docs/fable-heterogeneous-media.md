@@ -1,16 +1,19 @@
 # Heterogeneous Media — Design Authority
 
-**Status: owner-approved design (July 17 2026 discussion). IMPLEMENTATION NOT STARTED.**
+**Status: owner-approved design (July 17 2026); BUILT the same day (V0→V2, build
+record: `impl-plan-heterogeneous-media.md`) — the GPU witness sweep is owner-pending.
+Medium emission (`impl-plan-medium-emission.md`) landed the same evening, filling this
+build's reserved slots.**
 **Amended July 17 2026 (implementation kickoff, owner-decided):** (a) the D1 clamp is
 emitted inside the generated `scene_medium_properties` itself — every consumer sees only
 the effective field; (b) absorbing-only heterogeneous media get a ratio-tracked
 pass-through arm of `medium_sample` (the fourth dispatch quadrant); (c) §3 policy
 revised: **transcribe the published spectral tracker with its absorption lottery**
-(Kutz et al. 2017 / STAR §6.5.2, cross-checked against pbrt-v4) — the emission branch is
-present-but-empty in v1 (fire later fills it) and the bound assumption holds exactly by
-D1; the doc's original no-lottery scatter-with-albedo loop moves to the deferred ledger
-as a no-emission-only variance optimization. Implementation plan:
-`impl-plan-heterogeneous-media.md`.
+(Kutz et al. 2017 / STAR §6.5.2, cross-checked against pbrt-v4) — the absorption branch
+is a pure terminator (emission, when it arrived, collects per tentative collision — NOT
+in the branch) and the bound assumption holds exactly by D1; the doc's original
+no-lottery scatter-with-albedo loop moves to the deferred ledger as a no-emission-only
+variance optimization. Implementation plan: `impl-plan-heterogeneous-media.md`.
 This document is the design authority for the heterogeneous-media build. It extends
 `fable-volumetric-component.md` (the seams it fills were cut there) and opens the door
 that contracts §1.1 / V1-C1 deliberately left closed ("procedural media not yet
@@ -247,8 +250,8 @@ loop (≤ MAX_NULL_COLLISIONS):
     if t ≥ t_max: return transmitted (weight as accumulated)
     fetch EFFECTIVE props at p(t)                    // clamp already applied in the lookup
     lottery over {absorb, scatter, null} with the papers' probabilities:
-        absorb  → path ends (v1: no emission — the branch is PRESENT and empty;
-                  fire later adds Le here)
+        absorb  → path ends (a pure terminator — emission, as built, collects per
+                  tentative collision instead, impl-plan-medium-emission P3)
         scatter → return scattered at t (weight per the papers' history weights)
         null    → phantom fog; update weight per the papers; continue
 ```
@@ -324,15 +327,15 @@ arms are live in v1).
 
 | Item | Note |
 |---|---|
-| **The mis/tally batch** | pbrt-v4 rescaled probabilities: generated `PathState` fields `r_u`/`r_l`, updated per tentative collision inside the arm (returned via MediumSample or accumulated in state), consumed by combiner weights at emitter-hit and NEE scoring sites; spectral MIS shape included. Owner-ordered: "plan an actual restructure carefully." This is the FIRST follow-up. |
+| **The mis/tally batch** | pbrt-v4 rescaled probabilities: generated `PathState` fields `r_u`/`r_l`, updated per tentative collision, consumed by combiner weights at every scoring site; spectral MIS shape included. **DEFERRED (owner, Jul 17 2026 evening, after a planning read)** — it is a whole-program switch (balance heuristic via tallies, tally-returning shadow walker, RR metric /avg(r_u)) with near-zero win for current scenes; re-trigger: the first nee-only firefly scene (bright emitters IN fog, g→0.85+, sun-through-atmosphere) or the spectral axis scheduling. |
 | Weighted (non-bounding) mode | Renders the *unclamped* field — a measurement-level declared mode (different integrand), negative-weight machinery; for percentile-majorant strategies on heavy-tailed noise. |
 | Exceedance debug view | False-color `max(0, u(x) − σ̄)` — the §11.4-family diagnostic for checking a declared bound while dragging sliders. |
 | Grid media (3D textures) | Density grids via the `extern:` texture chain (as env images); majorant derived at load (max), later per-segment via a coarse majorant grid + DDA (pbrt's 64–256³ sweet spot). A second medium *kind*, same seams. |
 | Decomposition tracking | Analytic control (our existing sampler!) + delta-tracked residual — third occupant of the `medium_sample` seam; production standard. |
 | Kettunen 2021 transmittance | Superior occupant for the `medium_transmittance` seam; zero variance on constant extinction. |
 | Driven majorant | The ceiling on a slider (live regularization exploration). Mechanically trivial (uniform pacing); do after v1 settles. |
-| Medium emission (fire) | The RTE emission term. Post-amendment §3 keeps the absorption lottery, so this is now *filling the present-but-empty absorption branch* with Le — no restructure. |
-| No-lottery collapsed tracker | The pre-amendment §3 sketch (always-scatter, absorption rides the weight): a variance optimization valid ONLY while media don't emit. Re-derive before enabling; twin-gate against the transcribed lottery form. |
+| Medium emission (fire) | **BUILT Jul 17 2026 evening (`impl-plan-medium-emission.md`).** `emission` = ε, the volume emission coefficient (W·sr⁻¹·m⁻³, B2's dimensional ladder), collected per-tentative-collision (pbrt's shape — NOT the lottery branch, which stays a pure terminator); the D1 scale applies to ε (source-function preservation). Volume light sampling (NEE toward glow) is that plan's deferred ledger. |
+| No-lottery collapsed tracker | The pre-amendment §3 sketch (always-scatter, absorption rides the weight): a variance optimization. NOTE (post-emission): with per-collision ε collection the absorption branch is no longer emission's site, so the old "non-emissive only" caveat needs re-examination if this is ever picked up — re-derive regardless; twin-gate against the transcribed lottery form. |
 | Equiangular × heterogeneous | Equiangular currently pairs with delta lights + nee; its estimate would need ratio-tracked transmittance along the sampled segment — check the interplay before enabling the combination. |
 | Brace-sugar for param refs | `{fog.gain}` substitution in expression source — authoring-layer nicety; v1 writes the derived uniform name. |
 

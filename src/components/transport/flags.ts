@@ -13,6 +13,8 @@ export function flags(p: ProgramDescription) {
         mis: lighting?.method === 'mis',
         media: p.media.present,
         scattering: p.media.scatteringArms,
+        /** Emissive media exist (impl-plan-medium-emission): the walk adds ms.radiance. */
+        mediumEmission: p.media.emission,
         nulls: p.media.nullInterfaces,
         transmission: p.materials.models.some(modelTransmission),
         envSamplable: p.environmentSamplable,

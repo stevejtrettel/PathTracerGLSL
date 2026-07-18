@@ -1,7 +1,7 @@
 // compiler/plan/Planner.ts
 
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
-import { isGlslExpression, isValueParam } from '../types.js';
+import { isGlslExpression, isValueParam, mediumRoutesToTracking, mediumMayScatter } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS } from '../../components/lights/index.js';
@@ -246,14 +246,16 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     const scatteringArms = features.media.hasScatteringMedia
         && scattering === 'full'
         && (vs === 'analytic' || vs === 'delta-tracking');
-    // Heterogeneous media (fable-heterogeneous-media.md): some medium ROUTES to a
-    // null-collision arm, so the delta/ratio occupant is included. Independent of
-    // scatteringArms — an absorbing-only heterogeneous medium needs the ratio
-    // pass-through arm with no phase machinery at all. EITHER coefficient being an
-    // expression counts (even under scattering 'ignored'): the D1 clamp couples σ_a
-    // to σ_s(x) through the proportional scale, so the effective field is spatially
-    // varying whenever any coefficient is.
-    const heterogeneousArms = features.media.hasHeterogeneousMedia;
+    // Heterogeneous media (fable-heterogeneous-media.md; emission P5): some medium
+    // ROUTES to a null-collision arm, so the delta/ratio occupant is included.
+    // Independent of scatteringArms — an absorbing-only heterogeneous medium needs the
+    // ratio pass-through arm with no phase machinery at all. Any expression coefficient
+    // counts (even under scattering 'ignored' — the D1 clamp couples the fields), and
+    // so does a constant-ε SCATTERING medium (the analytic channel-MIS arm has no
+    // source term; its σ̄ is auto-derived at emit time).
+    const heterogeneousArms = materials.some((m) =>
+        m.medium !== null && mediumRoutesToTracking(
+            m.medium, scattering === 'full' && mediumMayScatter(m.medium)));
 
     // §6.2: samplable-emitter machinery exists iff some light entered the registry with a
     // region (delta-only scenes compile to the pre-area-light program).
@@ -315,6 +317,11 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             present: features.media.hasMedia,
             scatteringArms,
             heterogeneousArms,
+            // Emissive media (impl-plan-medium-emission): the MediumProperties ε field,
+            // the arms' collection lines, and the walk's radiance line exist. NOT gated
+            // on scattering — emission is a source term, not scattering (the 'ignored'
+            // truncation does not suppress it).
+            emission: features.media.hasMedia && features.media.hasEmissiveMedia,
             nullInterfaces: features.media.hasNullInterfaces,
             shadowWalker: features.media.hasMedia && lighting !== null,
             mediumEval: scatteringArms && lighting !== null,
@@ -600,6 +607,7 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
         // Heterogeneous D1: carried only when authored (the Validator enforces the
         // expression↔majorant pairing and warns on inert declarations).
         ...(med.majorant !== undefined ? { majorant: med.majorant } : {}),
+        emission: resolveColorProperty(med.emission, [0.0, 0.0, 0.0]),
         values,
     };
 }

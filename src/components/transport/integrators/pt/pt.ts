@@ -154,8 +154,16 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         }
         lines.push(
             '            MediumSample ms = medium_sample(med_mat, s.ray, boundary ? hit.t : MAX_DIST, random2());',
-            '            s.throughput *= ms.weight;',
         );
+        if (f.mediumEmission) {
+            lines.push(
+                '            // Inline source term (impl-plan-medium-emission; the §3 partition rule):',
+                '            // ms.radiance is weighted relative to SEGMENT-START throughput — add before',
+                '            // the segment weight multiplies in.',
+                '            s.radiance += s.throughput * ms.radiance;',
+            );
+        }
+        lines.push('            s.throughput *= ms.weight;');
         if (f.scattering) {
             lines.push(
                 '            if (ms.scattered) {',
