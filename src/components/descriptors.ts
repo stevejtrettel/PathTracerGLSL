@@ -112,6 +112,16 @@ export interface LightKindDescriptor {
     glsl: string;
     /** Delta kinds: not hittable, LIGHT_DELTA, no region, no <kind>_light_pdf. */
     delta: boolean;
+    /** ISOTROPIC delta-query fact (equiangular placement): which rows carry the
+     *  position and the direction-INDEPENDENT radiant intensity. The equiangular
+     *  technique consumes the queried intensity directly in its estimate
+     *  (radiance = intensity/d² — equiangular.glsl), so ONLY isotropic delta kinds
+     *  may declare this: an anisotropic kind (spot) declaring its on-axis intensity
+     *  would BIAS the estimator, not just mis-sample it. Absent on a delta kind ⇒
+     *  the Validator rejects it under mediumLightSampling 'equiangular'
+     *  (reject-not-degrade). Deferred: a direction-dependent query for anisotropic
+     *  deltas (a function fact, not rows). */
+    deltaQuery?: { positionRow: string; intensityRow: string };
     /** The kind's AUTHORED input schema (C7 parity with geometry): the fields an
      *  authored light carries BESIDES `kind` and `emission` (B2's universal radiometric
      *  word — validated generically, never listed here). The authored language may
@@ -174,8 +184,10 @@ export type PrimitiveValues = Record<string, number | number[]>;
  *  ONE declaration from which BOTH derivations flow (T1–T5, owner-approved):
  *    point → g·p (rotate, scale, translate)   vector → sR·v (no translation)
  *    direction → R·d (rotation only)          length → s·ℓ (scale only; number or vec3)
- *  Driven ×s scaling derives from the same table: every kind scales except direction. */
-export type ParamKind = 'point' | 'vector' | 'direction' | 'length';
+ *    angle → θ (INVARIANT — cone half-angles/cosines; a similarity changes no angle)
+ *  Driven ×s scaling derives from the same table: every kind scales except
+ *  direction and angle (the invariant kinds). */
+export type ParamKind = 'point' | 'vector' | 'direction' | 'length' | 'angle';
 
 /** One row of a primitive's parameter schema. ROW ORDER = GLSL SIGNATURE ORDER
  *  (the derived call emitters splice arguments positionally — checked by the

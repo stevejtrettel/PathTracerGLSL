@@ -82,6 +82,14 @@ describe('Validator', () => {
         expect(bag.getErrors().some(e => /required field 'emission' is missing/.test(e.message))).toBe(true);
     });
 
+    it("rejects equiangular with an anisotropic delta light (the isotropy pin — spot declares no deltaQuery)", () => {
+        const bag = run((s, st) => {
+            st.estimator.mediumLightSampling = 'equiangular';
+            s.lights = [{ kind: 'spot', position: [0, 5, 0], direction: [0, -1, 0], angle: 0.5, emission: 5 } as unknown as SceneDescription['lights'][number]];
+        });
+        expect(bag.getErrors().some(e => /ISOTROPIC delta lights/.test(e.message) && /'spot'/.test(e.message))).toBe(true);
+    });
+
     it('warns on unknown light fields (typo class)', () => {
         const bag = run(s => { s.lights = [{ kind: 'point', position: [0, 5, 0], intensity: 3, emission: 5 } as unknown as SceneDescription['lights'][number]]; });
         expect(bag.getWarnings().some(w => /unknown field 'intensity'/.test(w.message))).toBe(true);

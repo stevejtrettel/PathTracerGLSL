@@ -9,6 +9,9 @@ export const pointLightDescriptor: LightKindDescriptor = {
     kind: 'point',
     glsl: lightPointGLSL,
     delta: true,   // not hittable: no region, LIGHT_DELTA, no pdf function
+    // ISOTROPIC delta: the equiangular delta query may read these rows directly
+    // (intensity is direction-independent — the anisotropy contrast is spot).
+    deltaQuery: { positionRow: 'position', intensityRow: 'intensity' },
     // Authored input (besides kind/emission): the position.
     authoredParams: [
         { name: 'position', shape: 'vec3', required: true },

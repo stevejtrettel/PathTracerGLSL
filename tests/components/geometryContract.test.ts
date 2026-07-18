@@ -36,9 +36,11 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                 if (d.thin === true) expect(d.provides.analytic).toBe(true);
             });
 
-            it('kinds imply shapes: point/vector/direction are vec3', () => {
+            it('kinds imply shapes: point/vector/direction are vec3; angle is a scalar', () => {
                 for (const p of d.params) {
-                    if (p.kind !== 'length') {
+                    if (p.kind === 'angle') {
+                        expect(p.shape, `${key}.${p.name} (kind 'angle')`).toBe('number');
+                    } else if (p.kind !== 'length') {
                         expect(p.shape, `${key}.${p.name} (kind '${p.kind}')`).toBe('vec3');
                     }
                 }

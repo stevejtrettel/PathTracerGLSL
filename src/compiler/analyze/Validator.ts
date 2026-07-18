@@ -364,6 +364,19 @@ export function validate(
                 `mediumLightSampling 'equiangular' supports DELTA lights only in v1 — this scene has samplable area emitters (deferred: p-independent area arms, impl-plan-equiangular §7)`)
                 .add();
         }
+        // Isotropy pin (the spot lesson): the generated delta query returns an
+        // intensity the equiangular estimate consumes DIRECTLY, so anisotropic delta
+        // kinds (no deltaQuery fact) are rejected — an on-axis intensity would bias
+        // the estimator, not just mis-sample it (deferred: direction-dependent query).
+        const anisotropicDelta = scene.lights.find((l) => {
+            const d = LIGHT_KINDS[l.kind];
+            return d !== undefined && d.delta && d.deltaQuery === undefined;
+        });
+        if (anisotropicDelta !== undefined) {
+            bag.error('incompatible-options',
+                `mediumLightSampling 'equiangular' requires ISOTROPIC delta lights — kind '${anisotropicDelta.kind}' declares no delta query (its intensity is direction-dependent; the queried on-axis value would bias the estimate). Use 'vertex', or remove the '${anisotropicDelta.kind}' light`)
+                .add();
+        }
         // The C5 silent-inert rule: the knob must control something.
         if (strategy.estimator.directLighting === 'none' || !features.media.hasScatteringMedia) {
             bag.warning('invalid-setting',

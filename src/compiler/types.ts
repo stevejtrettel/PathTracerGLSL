@@ -272,7 +272,7 @@ export interface MaterialDescription {
 // (The ENVIRONMENT's `intensity` is different — a LIVE runtime multiplier slider,
 // not authored factoring — and deliberately survives.)
 
-export type LightDescription = PointLight | DirectionalLight | QuadLight | SphereLight | DiskLight;
+export type LightDescription = PointLight | DirectionalLight | QuadLight | SphereLight | DiskLight | SpotLight;
 
 export interface PointLight {
     kind: 'point';
@@ -308,6 +308,22 @@ export interface SphereLight {
     position: Vec3;
     radius: number;
     /** Emitted radiance Le; scalar broadcasts. */
+    emission: number | Vec3;
+}
+
+/** Spot light: DELTA with a smooth cone falloff (pbrt-v4 SpotLight's smoothstep).
+ *  Anisotropic — excluded from equiangular v1 (the Validator explains). */
+export interface SpotLight {
+    kind: 'spot';
+    position: Vec3;
+    /** Aim direction (need not be unit — normalized at plan time). */
+    direction: Vec3;
+    /** Outer cone HALF-angle, radians — zero intensity outside. */
+    angle: number;
+    /** Inner half-angle where the smooth band begins; default 0.8·angle. Must be
+     *  strictly < angle (a hard edge is smoothstep-undefined). */
+    falloffStart?: number;
+    /** On-axis radiant intensity I (W/sr); scalar broadcasts. */
     emission: number | Vec3;
 }
 

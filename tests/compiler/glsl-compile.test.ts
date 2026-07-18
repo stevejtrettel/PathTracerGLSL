@@ -134,6 +134,7 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
             quad: { kind: 'quad', corner: [-0.5, 5.98, -0.5], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 10 },
             sphere: { kind: 'sphere', position: [4, 6, 0], radius: 0.3, emission: 10 },
             disk: { kind: 'disk', position: [8, 6, 0], radius: 0.4, normal: [0, -1, 0], emission: 10 },
+            spot: { kind: 'spot', position: [12, 6, 0], direction: [0, -1, 0], angle: 0.6, emission: 15 },
         };
         const lights: LightDescription[] = [];
         for (const kind of Object.keys(LIGHT_KINDS)) {

@@ -18,8 +18,13 @@ the descriptor rows). Type-first symbols; the `_light_` infix is deliberate:
   the MIS density, which MUST mirror the sampler (§6.1). The mirror is now two
   ADJACENT functions over one struct in one file — never TS strings.
 
-Conventions (§6.1): **delta kinds** (point) fold 1/d² into `radiance`, set
-`LIGHT_DELTA`, pdf 1 — never BSDF-hittable, MIS weight 1 (§6.4). **Area kinds**
+Conventions (§6.1): **delta kinds** (point, spot) fold 1/d² — and any angular
+falloff — into `radiance`, set `LIGHT_DELTA`, pdf 1 — never BSDF-hittable, MIS
+weight 1 (§6.4). ISOTROPIC delta kinds declare the `deltaQuery` fact (which rows are
+position/intensity — the equiangular placement query composes from it); anisotropic
+ones (spot) deliberately don't, and the Validator rejects them under 'equiangular'
+(the queried intensity feeds the estimate directly — an on-axis value would bias
+it). **Area kinds**
 (quad, sphere, disk) do the area→solid-angle conversion inside the sampler. Quads
 and disks are **ONE-SIDED** (pinned deviation from the §6.2 two-sided aside): the
 emitting-side normal is ONE compile-time formula shared with the backing geometry

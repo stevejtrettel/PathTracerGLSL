@@ -201,17 +201,29 @@ describe('light kind desugar totality (authoredParams ↔ toValues/region/power)
                 }
             });
 
-            it('every declared-required field is actually read (omit ⇒ some output undefined)', () => {
+            it('every declared-required field is actually read (omit ⇒ some output corrupted)', () => {
+                // "Corrupted" = undefined OR NaN: a desugar that COMPUTES on the field
+                // (spot's cos(angle)) turns an omitted input into NaN, not undefined —
+                // both prove the field is read (the output depends on it).
+                const corrupted = (v: unknown): boolean =>
+                    v === undefined
+                    || (typeof v === 'number' && Number.isNaN(v))
+                    || (Array.isArray(v) && v.some((c) => typeof c === 'number' && Number.isNaN(c)));
                 for (const p of d.authoredParams.filter((p) => p.required)) {
                     const omitted = fullAuthored();
                     delete omitted[p.name];
-                    const values = d.toValues(omitted, PRODUCT);
-                    const regionVals = d.region !== undefined ? d.region.parameters(omitted) : {};
-                    const outputs = [
-                        ...d.params.map((row) => values[row.name]),
-                        ...Object.values(regionVals),
-                    ];
-                    expect(outputs.some((v) => v === undefined),
+                    let outputs: unknown[];
+                    try {
+                        const values = d.toValues(omitted, PRODUCT);
+                        const regionVals = d.region !== undefined ? d.region.parameters(omitted) : {};
+                        outputs = [
+                            ...d.params.map((row) => values[row.name]),
+                            ...Object.values(regionVals),
+                        ];
+                    } catch {
+                        continue;   // a THROW on the omitted field is the strongest proof of dependence
+                    }
+                    expect(outputs.some(corrupted),
                         `authoredParams declares required '${p.name}' but no desugar output depends on it`).toBe(true);
                 }
             });

@@ -47,6 +47,7 @@ import {
     cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
     diskBake, diskBakeRef, diskBakeStrategy,
 } from './scenes/diskWitness.js';
+import { spotScene, spotNeeStrategy } from './scenes/spotWitness.js';
 import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
 import {
     transformBake, transformBakeRef, transformNeeStrategy, flattenTree,
@@ -503,6 +504,29 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             spp: 96,
             // fp64 fold vs hand-computed values → near-bit-exact arms (transform-bake's gates).
             checks: [{ kind: 'twin', other: { scene: 'disk-bake-ref' }, meanTol: 0.002, rmse: 0.01, label: 'disk transform ≡ hand-fold' }],
+        },
+    },
+    spot: {
+        scene: spotScene,
+        strategies: posed([0, 1.4, 2.2], [0, 0, 0], spotNeeStrategy),
+        exercises:
+            'F-SPOT: the spot kind (delta + smoothstep cone, pbrt-v4 falloff; cos rows are the new similarity-INVARIANT `angle` param kind). Also the isotropy pin\'s CONTRAST case: spot declares no deltaQuery fact, so equiangular rejects it (the Validator message names the kind)',
+        expected:
+            'hotspot center = ρ/π·I/d² = 1.2/π ≈ 0.3820 in linear HDR; a smooth ring fades from falloffStart (r≈0.89) to the cone edge (r≈1.15); OUTSIDE the cone the floor is exactly black (no env, delta light invisible to chance hits)',
+        witness: {
+            spp: 48,
+            checks: [
+                {
+                    kind: 'mean', value: 0.38197, tol: 0.006,
+                    region: { x: 0.47, y: 0.47, w: 0.06, h: 0.06 },
+                    label: 'F-SPOT hotspot ρ/π·I/d² = 1.2/π',
+                },
+                {
+                    kind: 'mean', value: 0.0, tol: 0.002,
+                    region: { x: 0.02, y: 0.02, w: 0.08, h: 0.08 },
+                    label: 'F-SPOT outside-cone = 0 exactly',
+                },
+            ],
         },
     },
     mirror: {

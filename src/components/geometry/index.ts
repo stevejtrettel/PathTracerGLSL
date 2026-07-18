@@ -88,15 +88,16 @@ const formatValue = (v: number | number[]): string =>
     Array.isArray(v) ? formatVec3(v) : formatFloat(v);
 
 /** `<Type>(…row[, …derived])` — the struct constructor: row values formatted by
- *  shape, ×scale under driven placement for every kind EXCEPT direction (fable-
- *  transforms §6.1 — the rigid-frame query scales the PARAMS, never distances;
- *  derived from the kind, same table as the fold), derived compile-time fields
- *  (quad's baked normal) appended unscaled. */
+ *  shape, ×scale under driven placement for every kind EXCEPT the invariants
+ *  (direction, angle — fable-transforms §6.1: the rigid-frame query scales the
+ *  PARAMS, never distances; derived from the kind, same table as the fold),
+ *  derived compile-time fields (quad's baked normal) appended unscaled. */
 export function emitCtor(d: PrimitiveDescriptor, values: PrimitiveValues, scale?: string): string {
     const v = resolvePrimitiveValues(d, values);
     const args = d.params.map((f) => {
         const lit = formatValue(v[f.name]!);
-        return f.kind !== 'direction' && scale ? `${scale} * ${lit}` : lit;
+        const invariant = f.kind === 'direction' || f.kind === 'angle';
+        return !invariant && scale ? `${scale} * ${lit}` : lit;
     });
     const derived = (d.derivedCtorFields?.(v) ?? []).map(formatValue);
     return `${structName(d)}(${[...args, ...derived].join(', ')})`;
@@ -149,6 +150,8 @@ function derivedFold(d: PrimitiveDescriptor, v: PrimitiveValues, g: Similarity):
                     ? value.map((x) => g.scale * x)
                     : g.scale * (value as number);
                 break;
+            case 'angle':
+                break;   // similarity-invariant: no rotation or scale changes an angle
         }
     }
     return out;

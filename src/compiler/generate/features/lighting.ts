@@ -168,17 +168,23 @@ function generateLightOf(samplable: PlannedLight[]): string {
 /** Position + radiant intensity (color·intensity, WITHOUT 1/d² — §6.1 folds that at
  *  the estimate site) + selection pdf, selected by the SAME compile-time CDF as
  *  lighting_sample (one selection truth, two readers — the pitfall-11 discipline).
- *  V1: every light is delta (Validator pin 1), so the table is total. */
+ *  Rows come from the kind's ISOTROPIC deltaQuery fact — never by hardcoded name
+ *  (the spot lesson: an anisotropic delta's on-axis intensity would BIAS the
+ *  equiangular estimate, so such kinds declare no fact and the Validator rejects
+ *  them under 'equiangular'; every light reaching here is delta AND isotropic). */
 function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[]): string {
     const lines = [
         '// Generated delta-light query (equiangular placement): position + intensity + select pdf.',
         'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity) {',
     ];
-    const arm = (l: PlannedLight, i: number) => [
-        `pos = ${formatVec3(l.values.position as number[])};`,
-        `intensity = ${formatSpectrum(l.values.intensity as number[])};`,
-        `return ${formatFloat(selectPdf[i])};`,
-    ];
+    const arm = (l: PlannedLight, i: number) => {
+        const q = lightKind(l).deltaQuery!;   // Validator-guaranteed (the isotropy pin)
+        return [
+            `pos = ${formatVec3(l.values[q.positionRow] as number[])};`,
+            `intensity = ${formatSpectrum(l.values[q.intensityRow] as number[])};`,
+            `return ${formatFloat(selectPdf[i])};`,
+        ];
+    };
     if (lights.length === 1) {
         lines.push(...arm(lights[0], 0).map((s) => `    ${s}`));
     } else {

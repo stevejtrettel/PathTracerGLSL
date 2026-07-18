@@ -9,12 +9,14 @@ import { pointLightDescriptor } from './point/point.js';
 import { quadLightDescriptor } from './quad/quad.js';
 import { sphereLightDescriptor } from './sphere/sphere.js';
 import { diskLightDescriptor } from './disk/disk.js';
+import { spotLightDescriptor } from './spot/spot.js';
 
 export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     point: pointLightDescriptor,
     quad: quadLightDescriptor,
     sphere: sphereLightDescriptor,
     disk: diskLightDescriptor,
+    spot: spotLightDescriptor,
 };
 
 /** Mean channel of a precomputed radiometric product (intensity or Le) — the scalar
