@@ -7,7 +7,7 @@ import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.
 import { LIGHT_KINDS } from '../../components/lights/index.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
 import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
-import { PRIMITIVES, primitive, canonicalPlane, foldAnalyticParameters, resolveBackend } from '../../components/geometry/index.js';
+import { PRIMITIVES, primitive, canonicalizePrimitiveParameters, foldAnalyticParameters, resolveBackend } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
     isDrivenTransform,
@@ -93,7 +93,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 materialId: matId,
                 shapeType: obj.type,
                 name: obj.name,
-                parameters: obj.type === 'plane' ? normalizePlaneParameters(obj.parameters) : obj.parameters,
+                parameters: canonicalizePrimitiveParameters(obj.type, obj.parameters),
                 placement: buildDrivenPlacement(obj.transform!, regionId),
             });
         } else {
@@ -150,7 +150,10 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             index: regionId,
             materialId: matId,
             shapeType: d.region.primitive,
-            parameters: d.region.parameters(authored),
+            // Framework canonicalization (the disk's unit normal): the same shared
+            // formula the kind's toValues applies — hit side and sample side stay
+            // bit-identical (the one-sided pin).
+            parameters: canonicalizePrimitiveParameters(d.region.primitive, d.region.parameters(authored)),
         });
         lights.push({ id: lightIndex++, kind: light.kind, regionId, values: d.toValues(authored, product) });
     }
@@ -514,11 +517,10 @@ export function resolveSDFPlacement(
     transform: Transform | undefined,
     index: number,
 ): { parameters: Record<string, number | number[]>; placement: PlannedPlacement } {
-    // Plane normalization applies on BOTH paths: a plane expression is a conservative
-    // SDF bound only when its normal is unit. The Validator rejects the zero vector;
-    // normalizing (n, offset) together preserves the authored plane while making both
-    // marching and shading frames well-defined.
-    const parameters = type === 'plane' ? normalizePlaneParameters(rawParameters) : rawParameters;
+    // Descriptor canonicalization applies on BOTH paths (plane: unit normal + scaled
+    // offset — the SDF expression is a conservative bound only then; the Validator
+    // rejects the zero vector). Framework-applied, never a type-name branch.
+    const parameters = canonicalizePrimitiveParameters(type, rawParameters);
 
     // Driven (§6): parameters stay LOCAL — the rigid-frame query scales them in-shader,
     // so there is no point fold (the wrapper handles ALL placement, live).
@@ -546,15 +548,6 @@ export function resolveSDFPlacement(
             translation: point as [number, number, number],
             scale: 1,
         }),
-    };
-}
-
-function normalizePlaneParameters(parameters: Record<string, number | number[]>): Record<string, number | number[]> {
-    const normal = parameters.normal as number[];
-    const plane = canonicalPlane(normal, parameters.offset as number | undefined);
-    return {
-        ...parameters,
-        ...plane,
     };
 }
 

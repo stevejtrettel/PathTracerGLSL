@@ -338,9 +338,8 @@ float scene_sdf_dist(vec3 p) {
 ```glsl
 MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
-    props.albedo = vec3(0.8);           // defaults
+    props.albedo = vec3(0.8);           // defaults (schema-derived; fields = the union the present models read)
     props.emission = vec3(0.0);
-    props.emission_strength = 0.0;
     props.roughness = 1.0;
     if (id == 0) {
         props.albedo = vec3(0.73, 0.73, 0.73);

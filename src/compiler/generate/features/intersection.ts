@@ -188,7 +188,12 @@ function objectGlslIds(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
 }
 
 function sanitizeIdent(name: string): string {
-    let s = name.replace(/[^A-Za-z0-9_]/g, '_');
+    // Collapse underscore RUNS: GLSL ES reserves any identifier containing `__`, and
+    // ANGLE enforces it while glslang does NOT (the known dialect gap) — flatten
+    // provenance paths like 'ball/#0' map char-by-char to 'ball__0' and killed the
+    // flatten-tree witness at ANGLE compile (July 17 sweep). Dedup below still
+    // disambiguates collapsed collisions.
+    let s = name.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_');
     if (/^[0-9]/.test(s)) s = 'o_' + s;
     return s;
 }

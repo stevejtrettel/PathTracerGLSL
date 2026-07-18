@@ -51,4 +51,6 @@ the ior table (transmission), and the emission gate (emissive ∧ authored value
 Furnace closure (F-BOX = 0.4 exactly, for lambert), §11.2 cross-strategy convergence
 (any two estimator strategies agree on the same scene), the §11.3 pdf-histogram triple
 (TS-twin form: see `ggx/ggx.test.ts`). Occupants: `lambert/` (the shape-setter),
-`dielectric/` (delta, η² factor — F-ETA 0.554), `ggx/` (VNDF; see `ggx/ggx.md`).
+`dielectric/` (delta, η² factor — F-ETA 0.554), `ggx/` (VNDF; see `ggx/ggx.md`),
+`mirror/` (delta conductor, Schlick — shares the `f0` row with ggx, the first real
+§3.4 union-dedupe pair; F-MIRROR = f0·L convex).

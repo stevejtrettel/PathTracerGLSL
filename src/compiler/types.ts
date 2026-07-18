@@ -272,7 +272,7 @@ export interface MaterialDescription {
 // (The ENVIRONMENT's `intensity` is different — a LIVE runtime multiplier slider,
 // not authored factoring — and deliberately survives.)
 
-export type LightDescription = PointLight | DirectionalLight | QuadLight | SphereLight;
+export type LightDescription = PointLight | DirectionalLight | QuadLight | SphereLight | DiskLight;
 
 export interface PointLight {
     kind: 'point';
@@ -307,6 +307,19 @@ export interface SphereLight {
     kind: 'sphere';
     position: Vec3;
     radius: number;
+    /** Emitted radiance Le; scalar broadcasts. */
+    emission: number | Vec3;
+}
+
+/** Circular area light (§6.2): desugars to a backing disk region; ONE-SIDED, emits
+ *  from the +normal side; concentric uniform-area sampling. */
+export interface DiskLight {
+    kind: 'disk';
+    position: Vec3;
+    radius: number;
+    /** Emitting-side normal (need not be unit — normalized at plan time through the
+     *  shared unitVec3, bit-identical with the backing region's). Default [0,1,0]. */
+    normal?: Vec3;
     /** Emitted radiance Le; scalar broadcasts. */
     emission: number | Vec3;
 }

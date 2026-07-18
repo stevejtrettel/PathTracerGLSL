@@ -42,6 +42,11 @@ import {
     skyMisOctStrategy, procSkyMisCompStrategy,
 } from './scenes/envScenes.js';
 import { veachMis, veachMisStrategy, veachNeeStrategy, veachPtStrategy } from './scenes/ggxScenes.js';
+import { mirrorScene, mirrorNeeStrategy, mirrorPtStrategy } from './scenes/mirrorWitness.js';
+import {
+    cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
+    diskBake, diskBakeRef, diskBakeStrategy,
+} from './scenes/diskWitness.js';
 import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
 import {
     transformBake, transformBakeRef, transformNeeStrategy, flattenTree,
@@ -462,6 +467,68 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         },
         initialParameters: {
             ...THETA2,
+        },
+    },
+    'cornell-disk': {
+        scene: cornellDisk,
+        strategies: posed([0, 1, 4], [0, 1, 0], cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy),
+        exercises:
+            'the disk light kind (explicit route → backing disk region): concentric area sampling, the d²/(πr²·cosθ) solid-angle pdf + its adjacent MIS mirror, π²r²·Le power in the CDF, and the thin/one-sided machinery\'s SECOND tenant (previously quad-only)',
+        expected:
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) ALL converge to the same image (§11.2) — nee/pt divergence implicates the disk pdf or the concentric map; mis joining implicates disk_light_pdf; the disk is VISIBLE and round; shadows soft',
+        witness: {
+            spp: 192,
+            // Same gate shape as cornell-area: nee↔mis share event coverage → χ²;
+            // the chance-hit pt arm gets the calibrated display-RMSE tripwire.
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'cornell-disk nee ≡ mis' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.02, rmse: 0.4, label: 'cornell-disk pt tripwire' },
+            ],
+        },
+    },
+    // Fixture partner: the hand-folded arm of the disk-bake twin.
+    'disk-bake-ref': {
+        scene: diskBakeRef,
+        strategies: posed([0, 1.2, 4], [0, 0.8, 0], diskBakeStrategy),
+        exercises: 'hand-folded reference arm of the disk-bake twin — the rotated normal authored directly',
+    },
+    'disk-bake': {
+        scene: diskBake,
+        strategies: posed([0, 1.2, 4], [0, 0.8, 0], diskBakeStrategy),
+        exercises:
+            'the direction-kind fold witness: an emissive disk OBJECT (sampleAsLight route) tilted via transform.rotation — the first witness through the KIND-DERIVED direction fold (plane\'s is a coupled override), flowing fold → desugar → power CDF → sampler/pdf; canonicalize (unit normal) rides the same path',
+        expected:
+            'converges to the same image as disk-bake-ref (tilted glowing disk, off-center light pool); divergence implicates the derived direction fold, canonicalize ordering, or the folded-params desugar',
+        witness: {
+            spp: 96,
+            // fp64 fold vs hand-computed values → near-bit-exact arms (transform-bake's gates).
+            checks: [{ kind: 'twin', other: { scene: 'disk-bake-ref' }, meanTol: 0.002, rmse: 0.01, label: 'disk transform ≡ hand-fold' }],
+        },
+    },
+    mirror: {
+        scene: mirrorScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], mirrorNeeStrategy, mirrorPtStrategy),
+        exercises:
+            'F-MIRROR: the smooth-conductor delta occupant (Schlick f0, weight = F exactly — the §2.1 delta cancellation) + the f0 row SHARED with ggx (§3.4 union dedupe). pt-nee (key 1) vs pt (key 2) is the NEE-guard check: the mirror is pure delta, NEE contributes nothing, miss emission stays full-weight after the delta bounce',
+        expected:
+            'sphere CENTER = f0·L = 0.5 exactly in linear HDR (convex: one bounce, F(cosθ≈1) = f0); rim rolls toward 1 (Schlick grazing) and blends into the sky; keys 1 and 2 converge to the same image',
+        witness: {
+            spp: 48,
+            checks: [
+                {
+                    kind: 'mean', value: 0.5, tol: 0.008,
+                    region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                    label: 'F-MIRROR center f0·L = 0.5',
+                },
+                {
+                    kind: 'mean', value: 0.5, tol: 0.008, strategy: 1,
+                    region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                    label: 'F-MIRROR center f0·L = 0.5 (pt)',
+                },
+                // Near-deterministic arms (pixel jitter is the only live randomness once
+                // NEE is guarded off at the delta surface) → the display-space gate.
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.005, rmse: 0.02, label: 'NEE guard: nee ≡ pt on pure delta' },
+            ],
         },
     },
     'veach-mis': {

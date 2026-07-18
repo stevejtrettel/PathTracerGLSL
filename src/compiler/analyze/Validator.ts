@@ -231,7 +231,7 @@ export function validate(
             && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name);
         if (!analyticSamplable) {
             bag.error('invalid-setting',
-                `Material '${name}': sampleAsLight requires an ANALYTIC quad or sphere object using it (V1-C2 — emissive SDF/custom shapes are path-only and still glow)`)
+                `Material '${name}': sampleAsLight requires an ANALYTIC samplable object using it (${Object.entries(PRIMITIVES).filter(([, d]) => d.samplableAsLight === true).map(([t]) => t).join(', ')}) — V1-C2: emissive SDF/custom shapes are path-only and still glow`)
                 .add();
         }
         const e = mat.emission;

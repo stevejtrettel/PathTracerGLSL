@@ -306,8 +306,7 @@ All real output for the `mixed` scene (materials: glass=0, green=1, red=2, white
 // Generated MaterialProperties — the union of fields the models PRESENT read (§3.4)
 struct MaterialProperties {
     Spectrum albedo;            // lambert reads it
-    Spectrum emission;          // lambert reads it (+ paired strength; §3.4 defers the merge)
-    float emission_strength;
+    Spectrum emission;          // lambert reads it
     Spectrum transmittance;     // dielectric reads it — NO roughness/f0: no ggx present
 };
 
@@ -316,7 +315,6 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
     MaterialProperties props;
     props.albedo = Spectrum(0.8);
     props.emission = SPECTRUM_ZERO;
-    props.emission_strength = 0.0;
     props.transmittance = SPECTRUM_ONE;
     if      (id == 0) { props.transmittance = vec3(1.0, 1.0, 1.0); }
     else if (id == 1) { props.albedo = vec3(0.12, 0.45, 0.15); }
@@ -353,7 +351,7 @@ fields (`ior_of` in §1.3 — the far side of a boundary has no shading point).
 | struct scope | per primitive type (compile-time carrier) | per scene, union of present models (runtime carrier) |
 | generated plumbing | per-object functions (enumerable) | id-switched lookups (runtime id) |
 | generated policy | backends present, placement tiers, thin, region tables | seam-gated ops, folded capability tables |
-| extension cost | folder + registry line + union word | folder + registry line (+ today: compiler types if a new property — §2.2 kills this) |
+| extension cost | folder + registry line (no union — B1) | folder + registry line (no union — the July 2026 union→string batch; new properties are schema rows, A6) |
 
 Media are the second tenant of the materials pattern (`MediumProperties`, same
 schema machinery) **[BUILT]**. Lights are the known deviant — samplers still take
@@ -378,5 +376,19 @@ ABI for it); C2 default-assignment elision in the material lookup; nested-vs-fla
 authored records (authoring-language-era); the `LightDescription` input union
 (per-kind — the authoring language's business).
 
-**Verification state:** vitest (824) + glslang (every pair + the kitchen sink);
-the GPU witness sweep over the whole batch set is owner-run and pending.
+**[BUILT — the doors-close batch, July 17 2026]** (post-review follow-up): the LIGHTS
+door finished for real — census/planning/validation kind branches all registry-derived
+(`brdfModels` now derives from PLANNED materials, so the desugared backing model flows
+alone), unknown light kinds rejected (never silently skipped), authored-light input
+schemas (`authoredParams` + the generic Validator loop + the desugar-totality contract
+test), and the door test (`tests/compiler/lightsDoor.test.ts`: a synthetic registry-only
+kind compiles + glslang-links end to end). `MaterialModel` union → string (the B1
+treatment — materials were the last unioned family; 'disney' vocabulary died with it);
+ior/region-table Validator rules made structural (capability + row, no model names);
+the fixed-struct-era `emission_strength` rider merged away (its product was identically
+`emission`); required XOR default pinned on geometry rows (contract-test-enforced).
+
+**Verification state:** vitest (850+) + glslang (every pair + the kitchen sink + the
+lights door); the GPU witness sweep over the batch sets is owner-run and pending
+(the strength merge is a provable semantic no-op but touches lambert.glsl + every
+generated struct — snapshots re-goldened, diff verified to be exactly the rider).

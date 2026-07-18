@@ -26,8 +26,22 @@ let dir: string | null = null;
 /** Identical sources validate once (display shaders repeat across pairs). */
 const validated = new Map<string, string | null>();
 
+/** ANGLE-only rule glslang does NOT enforce: GLSL ES reserves any identifier
+ *  containing `__` (the flatten-tree lesson — provenance names like 'ball/#0'
+ *  sanitized to 'ball__0' and died at ANGLE compile while every static gate stayed
+ *  green). Comments legitimately contain `__` (the '__light_n' provenance labels),
+ *  so strip them before scanning. */
+function checkNoReservedUnderscores(source: string, label: string): void {
+    const code = source.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const m = code.match(/[A-Za-z0-9_]*__[A-Za-z0-9_]*/);
+    if (m !== null) {
+        throw new Error(`${label}: identifier '${m[0]}' contains '__' — reserved in GLSL ES; ANGLE rejects it even though glslang accepts it`);
+    }
+}
+
 /** Throws (with glslang's output) if `source` fails the ES-profile static check. */
 export function glslangCheck(source: string, stageExt: 'vert' | 'frag', label: string): void {
+    checkNoReservedUnderscores(source, label);
     if (dir === null) {
         try { chmodSync(bin, 0o755); } catch { /* already executable or read-only install */ }
         dir = mkdtempSync(join(tmpdir(), 'glsl-compile-'));

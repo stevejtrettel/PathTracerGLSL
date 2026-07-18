@@ -253,10 +253,18 @@ export interface PrimitiveDescriptor {
      *  value so hit side and the quad light's sampler agree bit-exactly).
      *  Values, not strings; never scaled (they are directions/derived data). */
     derivedCtorFields?(values: PrimitiveValues): (number | number[])[];
+    /** Canonical-form normalization of authored values (plane: unit normal + scaled
+     *  offset — the SDF expression is a true distance bound only then; disk: unit
+     *  normal). Applied by the framework ONCE per parameter set, on every Planner
+     *  path (constant fold, driven-analytic, SDF placement) — never a type-name
+     *  branch, never inside `fold` (folds receive already-canonical values; direction
+     *  kinds stay unit under R). Must be idempotent in exact arithmetic; the
+     *  framework guarantees single application so fp drift can't accumulate. */
+    canonicalize?(values: PrimitiveValues): PrimitiveValues;
     /** Similarity-closure fold OVERRIDE (fable-transforms §5.1). ABSENT = derived
      *  from kinds (point → g·p, vector → sR·v, direction → R·d, length → s·ℓ).
      *  Declare only when a parameter's rule couples several pieces (plane: the new
      *  offset needs the translation AND the rotated normal together). Receives
-     *  resolved values. */
+     *  resolved, CANONICALIZED values. */
     fold?(values: PrimitiveValues, g: Similarity): PrimitiveValues;
 }

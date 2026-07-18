@@ -28,10 +28,12 @@ import { planeDescriptor } from './plane/plane.js';
 import { boxDescriptor } from './box/box.js';
 import { quadDescriptor } from './quad/quad.js';
 import { cylinderDescriptor } from './cylinder/cylinder.js';
+import { diskDescriptor } from './disk/disk.js';
 
 export type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues, PrimitiveParamSpec } from '../descriptors.js';
 export { canonicalPlane } from './plane/plane.js';
 export { quadCross, quadNormal } from './quad/quad.js';
+export { unitVec3 } from './disk/disk.js';
 
 /** Registry insertion order = deterministic emission order for primitive includes. */
 export const PRIMITIVES: Record<string, PrimitiveDescriptor> = {
@@ -40,6 +42,7 @@ export const PRIMITIVES: Record<string, PrimitiveDescriptor> = {
     box: boxDescriptor,
     quad: quadDescriptor,
     cylinder: cylinderDescriptor,
+    disk: diskDescriptor,
 };
 
 /** Lookup that throws on unregistered types — the Planner/Validator diagnose them
@@ -151,6 +154,16 @@ function derivedFold(d: PrimitiveDescriptor, v: PrimitiveValues, g: Similarity):
     return out;
 }
 
+/** Descriptor canonicalization at a Planner entry point (the plane/disk unit-normal
+ *  rule) — replaces the old per-type name branches. Identity for primitives that
+ *  declare none. The framework's single-application guarantee: each parameter set
+ *  passes through EXACTLY ONE of the Planner entry points (constant-analytic fold
+ *  below, driven-analytic, SDF placement), each of which canonicalizes once. */
+export function canonicalizePrimitiveParameters(type: string, parameters: PrimitiveValues): PrimitiveValues {
+    const d = PRIMITIVES[type];
+    return d?.canonicalize !== undefined ? d.canonicalize(parameters) : parameters;
+}
+
 /**
  * Constant-transform lowering for the analytic backend (fable-transforms §5.1): the
  * analytic primitive set is CLOSED under similarities, so a constant placement folds
@@ -158,8 +171,9 @@ function derivedFold(d: PrimitiveDescriptor, v: PrimitiveValues, g: Similarity):
  * declares a coupled override (plane). Identity placements pass through exactly
  * (IEEE: +0 adds, ×1 are exact). Takes any registered type — the `primitive()` lookup
  * is the throwing backstop (Planner/Validator diagnose unknown types upstream), so a
- * new analytic primitive never touches this signature. Values resolved before the
- * fold so descriptor folds never re-apply defaults.
+ * new analytic primitive never touches this signature. Values resolved and
+ * CANONICALIZED before the fold (folds assume canonical input; direction kinds stay
+ * unit under R, so folding preserves it).
  */
 export function foldAnalyticParameters(
     type: string,
@@ -168,5 +182,6 @@ export function foldAnalyticParameters(
 ): PrimitiveValues {
     const d = primitive(type);
     const resolved = resolvePrimitiveValues(d, parameters);
-    return d.fold ? d.fold(resolved, g) : derivedFold(d, resolved, g);
+    const canonical = d.canonicalize !== undefined ? d.canonicalize(resolved) : resolved;
+    return d.fold ? d.fold(canonical, g) : derivedFold(d, canonical, g);
 }

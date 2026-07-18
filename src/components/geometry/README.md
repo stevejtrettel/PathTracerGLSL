@@ -9,7 +9,10 @@ the backends present, plus the region tables (`material_of`, `ior_of`,
 ## Layout (impl-plan-geometry-descriptors, July 2026)
 
 **One folder per primitive, both backends together**: `sphere/`, `plane/`, `box/`
-(SDF-only), `quad/` (analytic-only, zero-thickness). Each folder holds ONE GLSL file
+(SDF-only), `cylinder/` (SDF-only, canonical Y-axis — orientation is placement),
+`quad/` and `disk/` (analytic-only, zero-thickness — the two thin tenants; the disk's
+unit `normal` is a real parameter because the analytic set must stay similarity-closed,
+canonicalized through the descriptor `canonicalize` fact). Each folder holds ONE GLSL file
 with all of that primitive's math — included wholesale when the primitive is present
 (§2.12) — plus one descriptor (`<type>.ts`). This family owns the SHAPES only; the
 engines that traverse them live in `components/intersection/` (the marcher — owner-

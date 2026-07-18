@@ -305,8 +305,7 @@ generated `Quad`), and `material_of` spans all three regions.
 ```glsl
 struct MaterialProperties {      // GENERATED: the union of fields the PRESENT models read
     Spectrum albedo;             // lambert
-    Spectrum emission;           // lambert (+ paired strength)
-    float emission_strength;
+    Spectrum emission;           // lambert
     Spectrum f0;                 // ggx
     float roughness;             // ggx
 };
@@ -326,7 +325,6 @@ MaterialProperties scene_material_properties(int id, vec3 p) {
     else if (id == 2) {
         props.albedo = vec3(0.0, 0.0, 0.0);                        // the desugared emitter
         props.emission = vec3(12.0, 11.4, 10.8);                   // = the authored Le, verbatim
-        props.emission_strength = 1.0;
     }
     return props;
 }

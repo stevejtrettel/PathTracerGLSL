@@ -1,17 +1,21 @@
 // Material-model registry (mix-many family, module-anatomy §5). Feature planners iterate
 // the models PRESENT in the plan and look descriptors up here — adding a model is one
-// GLSL file + one descriptor + one line below, and nothing else (the extension-cost test).
+// GLSL file + one descriptor + one line below, and NOTHING else (true since the
+// July 2026 union→string batch: model ids are strings like every other family;
+// this registry + the Validator's unknown-model rejection gatekeep).
 
 import type { MaterialModel } from '../../compiler/types.js';
 import type { MaterialModelDescriptor } from '../descriptors.js';
 import { lambertDescriptor } from './lambert/lambert.js';
 import { dielectricDescriptor } from './dielectric/dielectric.js';
 import { ggxDescriptor } from './ggx/ggx.js';
+import { mirrorDescriptor } from './mirror/mirror.js';
 
 export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescriptor>> = {
     lambert: lambertDescriptor,
     dielectric: dielectricDescriptor,
     ggx: ggxDescriptor,
+    mirror: mirrorDescriptor,
 };
 
 /** Lookup that throws on unregistered models — the Validator rejects them upstream

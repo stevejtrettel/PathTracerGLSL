@@ -27,15 +27,17 @@ export const planeDescriptor: PrimitiveDescriptor = {
     ],
     glsl: planeGLSL,
     provides: { sdf: true, analytic: true },
-    // (R·n̂, s·d − ⟨t, R·n̂⟩) in canonical unit-normal form — the coupled rule.
+    // Canonical form: unit normal + rescaled offset (the framework applies this ONCE
+    // on every Planner path — the SDF expression is a true distance bound only then).
+    canonicalize: (v) => ({ ...v, ...canonicalPlane(v.normal as number[], v.offset as number | undefined) }),
+    // (R·n̂, s·d − ⟨t, R·n̂⟩) — the coupled rule, over already-canonical values.
     fold: (v, g) => {
-        const plane = canonicalPlane(v.normal as number[], v.offset as number);
-        const n = similarityApplyDirection(g, plane.normal);
+        const n = similarityApplyDirection(g, v.normal as [number, number, number]);
         const t = g.translation;
         return {
             ...v,
             normal: n,
-            offset: g.scale * plane.offset - (t[0] * n[0] + t[1] * n[1] + t[2] * n[2]),
+            offset: g.scale * (v.offset as number) - (t[0] * n[0] + t[1] * n[1] + t[2] * n[2]),
         };
     },
 };

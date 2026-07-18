@@ -20,23 +20,32 @@ the descriptor rows). Type-first symbols; the `_light_` infix is deliberate:
 
 Conventions (§6.1): **delta kinds** (point) fold 1/d² into `radiance`, set
 `LIGHT_DELTA`, pdf 1 — never BSDF-hittable, MIS weight 1 (§6.4). **Area kinds**
-(quad, sphere) do the area→solid-angle conversion inside the sampler. Quads are
-**ONE-SIDED** (pinned deviation from the §6.2 two-sided aside): the derived `normal`
-struct field is computed by geometry's `quadNormal` — hit side and sample side agree
-bit-exactly by construction.
+(quad, sphere, disk) do the area→solid-angle conversion inside the sampler. Quads
+and disks are **ONE-SIDED** (pinned deviation from the §6.2 two-sided aside): the
+emitting-side normal is ONE compile-time formula shared with the backing geometry
+(quad: `quadNormal`; disk: `unitVec3` through the primitive's `canonicalize`) — hit
+side and sample side agree bit-exactly by construction.
 
-**Descriptor** (`<kind>.ts`): `kind`, `glsl`, `delta`, `params` (rows = generated
+**Descriptor** (`<kind>.ts`): `kind`, `glsl`, `delta`, `authoredParams` (the kind's
+AUTHORED input schema — fields besides `kind`/`emission`; the Validator's generic
+loop derives unknown-key/required/shape checks from it and runs `validateAuthored`
+only on well-shaped input; the desugar-totality contract test keeps it honest
+against the desugar functions in both drift directions), `params` (rows = generated
 struct fields = ctor order; radiometric rows are `Spectrum`; geometric rows carry a
 `kind` for the typedef + future Value<T> rules), `derivedFields` +
 `derivedCtorFields` (declared/computed pair), `power(values)` (pbrt
 PowerLightSampler, AREA-AWARE — pitfall 6), and the **desugar facts**: `toValues`
 (authored light → registry values; radiometric products computed once),
-`region` (the backing emitter primitive for hittable kinds), `valuesFromRegion`
-(the sampleAsLight route's inverse — both authoring routes share ONE definition),
-`validateAuthored` (degeneracy messages the Validator emits). **Registry line** in
-`index.ts`. No Planner/Validator branches exist per kind. (Residue: a new kind's
-authored-input interface still extends `LightDescription` — the scene-side union is
-the authoring language's business.)
+`region` (the backing emitter primitive for hittable kinds — one kind per primitive,
+registry-test-enforced: the sampleAsLight inverse is a first-wins lookup),
+`valuesFromRegion` (the sampleAsLight route's inverse — both authoring routes share
+ONE definition), `validateAuthored` (degeneracy messages the Validator emits).
+**Registry line** in `index.ts`. No Planner/Validator/Analyzer branches exist per
+kind — census classifies by the `delta` fact, the backing model flows from the
+desugared materials into `program.materials.models`, and the DOOR TEST
+(`tests/compiler/lightsDoor.test.ts`) proves a registry-only kind addition compiles
+end to end. (Residue: a new kind's authored-input interface still extends
+`LightDescription` — the scene-side union is the authoring language's business.)
 
 Authoring note (B2): lights author **`emission`** — Le for area kinds, radiant
 intensity (W/sr) for delta — the same word materials use; scalar broadcasts.

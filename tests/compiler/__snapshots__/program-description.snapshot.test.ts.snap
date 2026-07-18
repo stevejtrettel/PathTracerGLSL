@@ -169,6 +169,270 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+      "ggx",
+      "mirror",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.75,
+        "max": 1.4,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1.6,
+        5.2,
+      ],
+      "target": [
+        0,
+        0.75,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis 1`] = `
+{
+  "emitters": {
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+      "ggx",
+      "mirror",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": true,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.75,
+        "max": 1.4,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1.6,
+        5.2,
+      ],
+      "target": [
+        0,
+        0.75,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "dielectric",
+      "ggx",
+      "mirror",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.75,
+        "max": 1.4,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1.6,
+        5.2,
+      ],
+      "target": [
+        0,
+        0.75,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > conjugation + pathtracer 1`] = `
 {
   "emitters": {
@@ -1354,6 +1618,261 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt-mis 1`] = `
+{
+  "emitters": {
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": true,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt-nee 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-equidistant 1`] = `
 {
   "emitters": {
@@ -1904,6 +2423,178 @@ exports[`ProgramDescription structural snapshot (the link map) > cylinders + pat
       "target": [
         0,
         0.45,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-nee 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1.2,
+        4,
+      ],
+      "target": [
+        0,
+        0.8,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref + pt-nee 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1.2,
+        4,
+      ],
+      "target": [
+        0,
+        0.8,
         0,
       ],
       "type": "pinhole",
@@ -4036,6 +4727,183 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "tonemap": {
       "exposure": undefined,
       "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "sampleAsLight": true,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "mirror",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee 1`] = `
+{
+  "emitters": {
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "sampleAsLight": true,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "mirror",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
     },
   },
 }

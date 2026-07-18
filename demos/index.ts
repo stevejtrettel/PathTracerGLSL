@@ -21,6 +21,7 @@ import {
 } from './demoScenes.js';
 import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js';
 import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
+import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -36,6 +37,14 @@ const cornellOneshotStrategy: RenderStrategy = {
 };
 
 export const demoSuite: Record<string, SceneSuiteEntry> = {
+    chrome: {
+        scene: chromeScene,
+        strategies: posed([0, 1.6, 5.2], [0, 0.75, 0], chromeMisStrategy, chromeNeeStrategy, chromePtStrategy),
+        exercises:
+            'DEMO — the July-17 occupants in one frame: mirror (delta conductor, Schlick f0) · TWO tilted disk lights (concentric sampling, one-sided — the normal is the aim) · gold GGX · glass, on a {param}-roughness GGX floor under a black sky. MIS home turf: two area lights × a peaked glossy pdf',
+        expected:
+            'ROUND highlights everywhere — in the chrome, refracted through the glass, stretched across the glossy floor (disk shape, not the panel-era square); warm key + cool rim; key 1 (pt-mis) is the clean one, key 2 (pt-nee) fireflies on the glossy floor, key 3 (pt) is grain city; drag floor.roughness to smear the disk reflections live',
+    },
     // One scene, the whole camera family on keys 1-4 (all differ ONLY by camera — the
     // measurement axis). 1 pinhole · 2 thin-lens (defocus) · 3 orthographic · 4 equirect.
     // Shared pose frames the box for 1-3; equirect (4) renders a valid 360 pano from it.
