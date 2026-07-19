@@ -150,6 +150,10 @@ export interface IntersectionDesc {
      *  three, not re-derived per feature (it replaced the fake `method: 'raymarch'` singleton).
      *  scene_intersect / scene_intersect_any / the region tables emit exactly the arms flagged. */
     backends: { sdf: boolean; analytic: boolean; mesh: boolean };
+    /** Mesh traversal engine (impl-plan-mesh-bvh): 'bvh' walks the SAH tree, 'brute' scans all
+     *  triangles. The intersection family's first swappable occupant pair; gates which per-mesh
+     *  wrapper (and whether the mesh_N_bvh extern) is emitted. Only meaningful when backends.mesh. */
+    meshTraversal: 'brute' | 'bvh';
     /** The generated scene_intersect_any occlusion query exists — its only caller is
      *  the opaque shadow fast path (NEE without media; shadow_media re-spawns
      *  scene_intersect instead). The static backend walkers (sdf_intersect_any) ride

@@ -11,6 +11,7 @@
 // Pure TS — no imports from app/engine/compiler (components purity).
 
 import type { MeshObject } from '../../../compiler/types.js';
+import { buildBVH } from './bvh.js';
 
 /** Fixed width for every mesh data texture (row-major linear layout). 2048² texels ≈ 4M
  *  vertices/triangles per texture — ample for v0; a knob, not a structural gate. */
@@ -22,6 +23,7 @@ export interface MeshExternNames {
     index: string;
     normal: string;
     uv: string;
+    bvh: string;
 }
 
 export function meshExternNames(ordinal: number): MeshExternNames {
@@ -30,6 +32,7 @@ export function meshExternNames(ordinal: number): MeshExternNames {
         index: `mesh_${ordinal}_index`,
         normal: `mesh_${ordinal}_normal`,
         uv: `mesh_${ordinal}_uv`,
+        bvh: `mesh_${ordinal}_bvh`,
     };
 }
 
@@ -42,9 +45,10 @@ export interface PackedTexture<T extends Float32Array | Uint32Array> {
 
 export interface PackedMesh {
     position: PackedTexture<Float32Array>;   // RGBA32F, xyz per vertex
-    index: PackedTexture<Float32Array>;      // RGBA32F, ijk per triangle (indices ≤ 16M exact in f32)
+    index: PackedTexture<Float32Array>;      // RGBA32F, ijk per triangle — in BVH-LEAF order (≤16M exact)
     normal: PackedTexture<Float32Array>;     // RGBA32F, xyz per vertex (zeros when unauthored)
     uv: PackedTexture<Float32Array>;         // RGBA32F, xy per vertex (zeros when unauthored)
+    bvh: PackedTexture<Float32Array>;        // RGBA32F, 2 texels per node (impl-plan-mesh-bvh §3)
 }
 
 function ceilDiv(a: number, b: number): number { return Math.ceil(a / b); }
@@ -92,16 +96,31 @@ function packIndex(indices: Uint32Array, triCount: number): PackedTexture<Float3
     return { data, width: w, height: h };
 }
 
+/** Pack the flat BVH node array (8 floats = 2 RGBA32F texels per node) into a texel grid. The node
+ *  array is already texel-contiguous, so it copies straight in (padded to the grid). */
+function packNodes(nodes: Float32Array, nodeCount: number): PackedTexture<Float32Array> {
+    const texels = Math.max(1, nodeCount * 2);
+    const w = MESH_TEX_WIDTH;
+    const h = Math.max(1, ceilDiv(texels, w));
+    const data = new Float32Array(w * h * 4);
+    data.set(nodes.subarray(0, nodeCount * 8));
+    return { data, width: w, height: h };
+}
+
 /** Turn a MeshObject's flat arrays into the four padded data textures the engine uploads.
  *  Normals/UVs are always emitted (zero-filled when unauthored — the leaf reads them only
  *  when the mesh is smooth / a uv reader exists; useSmooth is a compile-time fact). */
 export function packMesh(mesh: MeshObject): PackedMesh {
     const vertexCount = mesh.positions.length / 3;
-    const triCount = mesh.indices.length / 3;
+    // Build the BVH always (cheap for these sizes): its reordered triangle index becomes the index
+    // texture — brute force scans it whole (order-independent), the BVH walk indexes leaf ranges
+    // into it. So one index texture serves both traversals; only the node texture is BVH-specific.
+    const bvh = buildBVH(mesh.positions, mesh.indices);
     return {
         position: packVec3ToRGBA(mesh.positions, vertexCount),
-        index: packIndex(mesh.indices, triCount),
+        index: packIndex(bvh.reindexedTriangles, bvh.reindexedTriangles.length / 3),
         normal: packVec3ToRGBA(mesh.normals, vertexCount),
         uv: packVec2ToRGBA(mesh.uvs, vertexCount),
+        bvh: packNodes(bvh.nodes, bvh.nodeCount),
     };
 }

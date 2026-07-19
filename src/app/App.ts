@@ -223,6 +223,9 @@ export class App {
             this.engine.registerDataTexture(names.index, packed.index.data, packed.index.width, packed.index.height);
             this.engine.registerDataTexture(names.normal, packed.normal.data, packed.normal.width, packed.normal.height);
             this.engine.registerDataTexture(names.uv, packed.uv.data, packed.uv.width, packed.uv.height);
+            // The BVH node texture — bound only by bvh-traversal programs, but registered always
+            // (scene-static data; a brute program simply never declares/binds it).
+            this.engine.registerDataTexture(names.bvh, packed.bvh.data, packed.bvh.width, packed.bvh.height);
         }
     }
 

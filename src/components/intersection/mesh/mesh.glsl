@@ -50,17 +50,18 @@ vec3 mesh_pos(sampler2D posTex, uint vi)  { return texelFetch(posTex, mesh_texel
 vec3 mesh_nrm(sampler2D nrmTex, uint vi)  { return texelFetch(nrmTex, mesh_texel1d(vi), 0).xyz; }
 vec2 mesh_uv (sampler2D uvTex,  uint vi)  { return texelFetch(uvTex,  mesh_texel1d(vi), 0).xy;  }
 
-// Nearest triangle in [0, triCount), bounded by tmax (the running nearest, world == local t).
-// On a closer hit: updates tmax and outputs the LOCAL shading normal (smooth-interpolated when
-// useSmooth, else the flat geometric normal) + the interpolated uv. Returns whether it hit.
-bool mesh_nearest_local(
+// ── The shared triangle LEAF ─────────────────────────────────────────────────────────────
+// Both traversals (brute force AND the BVH) run these over a range [offset, offset+count) of the
+// index texture — ONE triangle test, so the two engines can never drift (impl-plan-mesh-bvh §4).
+
+// Nearest triangle in [offset, offset+count), bounded by tmax. On a closer hit: updates tmax +
+// the LOCAL shading normal (smooth when useSmooth, else flat geometric) + interpolated uv + found.
+void mesh_test_range(
     sampler2D posTex, sampler2D idxTex, sampler2D nrmTex, sampler2D uvTex,
-    uint triCount, bool useSmooth,
-    vec3 ro, vec3 rd,
-    inout float tmax, out vec3 nLocal, out vec2 uvOut
+    uint offset, uint count, bool useSmooth, vec3 ro, vec3 rd,
+    inout float tmax, inout vec3 nLocal, inout vec2 uvOut, inout bool found
 ) {
-    bool found = false;
-    for (uint i = 0u; i < triCount; i++) {
+    for (uint i = offset; i < offset + count; i++) {
         uvec3 tri = uvec3(texelFetch(idxTex, mesh_texel1d(i), 0).xyz);
         vec3 a = mesh_pos(posTex, tri.x);
         vec3 b = mesh_pos(posTex, tri.y);
@@ -72,21 +73,111 @@ bool mesh_nearest_local(
             nLocal = useSmooth
                 ? bary.x * mesh_nrm(nrmTex, tri.x) + bary.y * mesh_nrm(nrmTex, tri.y) + bary.z * mesh_nrm(nrmTex, tri.z)
                 : gnorm;
+            // Shading-normal consistency (the Veach problem): near a silhouette the interpolated
+            // smooth normal can face the OPPOSITE side of the ray from the geometry, which makes
+            // the dispatcher's front/back test misclassify → black facets. Orient the shading
+            // normal to the geometric normal's ray-side. No-op for flat (nLocal == gnorm).
+            if (dot(rd, nLocal) * dot(rd, gnorm) < 0.0) nLocal = -nLocal;
             uvOut = bary.x * mesh_uv(uvTex, tri.x) + bary.y * mesh_uv(uvTex, tri.y) + bary.z * mesh_uv(uvTex, tri.z);
         }
     }
-    return found;
 }
 
-// Any-hit occlusion in [0, triCount): first triangle strictly before maxDist blocks. Local ray.
-bool mesh_any_local(sampler2D posTex, sampler2D idxTex, uint triCount, vec3 ro, vec3 rd, float maxDist) {
-    for (uint i = 0u; i < triCount; i++) {
+// Any-hit occlusion in [offset, offset+count): first triangle strictly before maxDist blocks.
+bool mesh_any_range(sampler2D posTex, sampler2D idxTex, uint offset, uint count, vec3 ro, vec3 rd, float maxDist) {
+    for (uint i = offset; i < offset + count; i++) {
         uvec3 tri = uvec3(texelFetch(idxTex, mesh_texel1d(i), 0).xyz);
         vec3 a = mesh_pos(posTex, tri.x);
         vec3 b = mesh_pos(posTex, tri.y);
         vec3 c = mesh_pos(posTex, tri.z);
         vec3 bary, gnorm; float t;
         if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > EPSILON && t < maxDist) return true;
+    }
+    return false;
+}
+
+// ── Brute force: the whole soup as one range (v0) ────────────────────────────────────────────
+bool mesh_nearest_local(
+    sampler2D posTex, sampler2D idxTex, sampler2D nrmTex, sampler2D uvTex,
+    uint triCount, bool useSmooth, vec3 ro, vec3 rd,
+    inout float tmax, out vec3 nLocal, out vec2 uvOut
+) {
+    bool found = false; vec3 nl = vec3(0.0); vec2 uo = vec2(0.0);
+    mesh_test_range(posTex, idxTex, nrmTex, uvTex, 0u, triCount, useSmooth, ro, rd, tmax, nl, uo, found);
+    nLocal = nl; uvOut = uo; return found;
+}
+
+bool mesh_any_local(sampler2D posTex, sampler2D idxTex, uint triCount, vec3 ro, vec3 rd, float maxDist) {
+    return mesh_any_range(posTex, idxTex, 0u, triCount, ro, rd, maxDist);
+}
+
+// ── BVH: a fixed-stack DFS around the shared leaf (v1) ───────────────────────────────────────
+#ifndef BVH_STACK_DEPTH
+#define BVH_STACK_DEPTH 64
+#endif
+
+// Node layout (bvh texture, 2 RGBA32F texels/node — impl-plan-mesh-bvh §3):
+//   texel 2i   = (min.xyz, A)   texel 2i+1 = (max.xyz, B)
+//   A >= 0 → LEAF (count=A, offset=B);  A < 0 → INTERNAL (axis=-A-1, rightChild=B, left=i+1).
+
+// Slab test (tavianator); returns whether the box interval meets [0, tmax], with the entry dist.
+bool mesh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 rd, float tmax, out float tenter) {
+    vec3 inv = 1.0 / rd;
+    vec3 t0 = (bmin - ro) * inv;
+    vec3 t1 = (bmax - ro) * inv;
+    vec3 tsm = min(t0, t1), tbg = max(t0, t1);
+    float tn = max(max(tsm.x, tsm.y), tsm.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z);
+    tenter = max(tn, 0.0);
+    return tf >= tenter && tenter < tmax;
+}
+
+bool mesh_nearest_bvh(
+    sampler2D posTex, sampler2D idxTex, sampler2D nrmTex, sampler2D uvTex, sampler2D bvhTex,
+    bool useSmooth, vec3 ro, vec3 rd,
+    inout float tmax, out vec3 nLocal, out vec2 uvOut
+) {
+    bool found = false; vec3 nl = vec3(0.0); vec2 uo = vec2(0.0);
+    int stack[BVH_STACK_DEPTH];
+    int ptr = 0;
+    stack[0] = 0;                                  // root
+    while (ptr >= 0) {
+        int ni = stack[ptr]; ptr--;
+        vec4 n0 = texelFetch(bvhTex, mesh_texel1d(uint(ni * 2)), 0);
+        vec4 n1 = texelFetch(bvhTex, mesh_texel1d(uint(ni * 2 + 1)), 0);
+        float tenter;
+        if (!mesh_aabb_hit(n0.xyz, n1.xyz, ro, rd, tmax, tenter)) continue;   // prune by running nearest
+        if (n0.w >= 0.0) {
+            mesh_test_range(posTex, idxTex, nrmTex, uvTex, uint(n1.w), uint(n0.w), useSmooth, ro, rd, tmax, nl, uo, found);
+        } else {
+            int axis = int(-n0.w - 1.0);
+            int L = ni + 1, R = int(n1.w);
+            bool nearFirst = rd[axis] >= 0.0;      // visit the near child first (tighter tmax sooner)
+            if (ptr + 2 < BVH_STACK_DEPTH) {       // push far, then near (near popped first)
+                stack[++ptr] = nearFirst ? R : L;
+                stack[++ptr] = nearFirst ? L : R;
+            }
+        }
+    }
+    nLocal = nl; uvOut = uo; return found;
+}
+
+bool mesh_any_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, vec3 ro, vec3 rd, float maxDist) {
+    int stack[BVH_STACK_DEPTH];
+    int ptr = 0;
+    stack[0] = 0;
+    while (ptr >= 0) {
+        int ni = stack[ptr]; ptr--;
+        vec4 n0 = texelFetch(bvhTex, mesh_texel1d(uint(ni * 2)), 0);
+        vec4 n1 = texelFetch(bvhTex, mesh_texel1d(uint(ni * 2 + 1)), 0);
+        float tenter;
+        if (!mesh_aabb_hit(n0.xyz, n1.xyz, ro, rd, maxDist, tenter)) continue;
+        if (n0.w >= 0.0) {
+            if (mesh_any_range(posTex, idxTex, uint(n1.w), uint(n0.w), ro, rd, maxDist)) return true;
+        } else if (ptr + 2 < BVH_STACK_DEPTH) {
+            stack[++ptr] = ni + 1;
+            stack[++ptr] = int(n1.w);
+        }
     }
     return false;
 }

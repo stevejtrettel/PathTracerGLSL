@@ -122,6 +122,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // brute-force scan — the leaf is BVH-ready (the BVH wraps a node walk around it, v1).
     if (hasMesh) {
         defines.MESH_TEX_WIDTH = String(MESH_TEX_WIDTH);
+        const meshTraversal = plan.program.intersection.meshTraversal;
         for (const m of plan.meshes) {
             const n = meshExternNames(m.ordinal);
             textures.push(
@@ -130,9 +131,12 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
                 { name: `u_mesh_${m.ordinal}_normal`, source: `extern:${n.normal}` },
                 { name: `u_mesh_${m.ordinal}_uv`, source: `extern:${n.uv}` },
             );
+            // The node texture is bound only by the bvh engine (exact linkage — a brute program
+            // never declares it, so the executor never binds it).
+            if (meshTraversal === 'bvh') textures.push({ name: `u_mesh_${m.ordinal}_bvh`, source: `extern:${n.bvh}` });
         }
         blocks.push({ origin: 'components/intersection/mesh/mesh.glsl', source: meshGLSL });
-        blocks.push({ origin: 'generated:mesh-dispatch', source: generateMeshDispatch(plan.meshes, anyQuery) });
+        blocks.push({ origin: 'generated:mesh-dispatch', source: generateMeshDispatch(plan.meshes, anyQuery, meshTraversal) });
     }
 
     // region → material table spans ALL backends (regions are globally unique).
@@ -491,17 +495,21 @@ function emitMeshPlacement(pl: PlannedPlacement): { setup: string[]; ro: string;
     return { setup: [], ro: `${formatMat3(M)} * ${centered}`, rd: `${formatMat3(M)} * ray.direction`, nWorld };
 }
 
-function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean): string {
-    const lines: string[] = ['// Generated mesh dispatch (ray-into-local; brute-force v0)'];
+function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTraversal: 'brute' | 'bvh'): string {
+    const lines: string[] = [`// Generated mesh dispatch (ray-into-local; ${meshTraversal} engine)`];
+    const bvh = meshTraversal === 'bvh';
 
     for (const m of meshes) {
         const o = m.ordinal;
         const pl = emitMeshPlacement(m.placement);
+        // The traversal call — bvh walks the node tree (no triCount); brute scans the whole soup.
+        const nearest = bvh
+            ? `mesh_nearest_bvh(u_mesh_${o}_position, u_mesh_${o}_index, u_mesh_${o}_normal, u_mesh_${o}_uv, u_mesh_${o}_bvh, ${m.smooth}, ${pl.ro}, ${pl.rd}, hit.t, nLocal, uv)`
+            : `mesh_nearest_local(u_mesh_${o}_position, u_mesh_${o}_index, u_mesh_${o}_normal, u_mesh_${o}_uv, ${m.triCount}u, ${m.smooth}, ${pl.ro}, ${pl.rd}, hit.t, nLocal, uv)`;
         lines.push(`bool mesh_intersect_${o}(Ray ray, inout Hit hit) {`);
         lines.push(...pl.setup.map((s) => `    ${s}`));
         lines.push(`    vec3 nLocal; vec2 uv;`);
-        lines.push(`    if (mesh_nearest_local(u_mesh_${o}_position, u_mesh_${o}_index, u_mesh_${o}_normal, u_mesh_${o}_uv,`);
-        lines.push(`            ${m.triCount}u, ${m.smooth}, ${pl.ro}, ${pl.rd}, hit.t, nLocal, uv)) {`);
+        lines.push(`    if (${nearest}) {`);
         // hit.t was shrunk to the local (== world) t inside the leaf; the world point is the
         // world ray at that t (ray-into-local preserves the parameter, impl-plan-meshes §6).
         lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);`);
@@ -526,10 +534,13 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean): string 
         for (const m of meshes) {
             const o = m.ordinal;
             const pl = emitMeshPlacement(m.placement);
+            // maxDist is a WORLD distance; local t == world t (rd unnormalized), so compare directly.
+            const any = bvh
+                ? `mesh_any_bvh(u_mesh_${o}_position, u_mesh_${o}_index, u_mesh_${o}_bvh, ${pl.ro}, ${pl.rd}, maxDist)`
+                : `mesh_any_local(u_mesh_${o}_position, u_mesh_${o}_index, ${m.triCount}u, ${pl.ro}, ${pl.rd}, maxDist)`;
             lines.push(`bool mesh_intersect_any_${o}(Ray ray, float maxDist) {`);
             lines.push(...pl.setup.map((s) => `    ${s}`));
-            // maxDist is a WORLD distance; local t == world t (rd unnormalized), so compare directly.
-            lines.push(`    return mesh_any_local(u_mesh_${o}_position, u_mesh_${o}_index, ${m.triCount}u, ${pl.ro}, ${pl.rd}, maxDist);`);
+            lines.push(`    return ${any};`);
             lines.push(`}`);
         }
         lines.push('bool mesh_intersect_any(Ray ray, float maxDist) {');

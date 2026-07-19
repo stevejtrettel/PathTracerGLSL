@@ -358,6 +358,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
                 analytic: analyticObjects.length > 0,
                 mesh: meshes.length > 0,
             },
+            // Mesh traversal engine (impl-plan-mesh-bvh) — default bvh; brute is the A/B baseline.
+            meshTraversal: strategy.estimator.meshTraversal ?? 'bvh',
             // The opaque shadow fast path is scene_intersect_any's only caller; the
             // media shadow walker re-spawns scene_intersect instead (§6.3).
             anyQuery: lighting !== null && !features.media.hasMedia,

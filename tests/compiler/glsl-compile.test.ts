@@ -62,14 +62,19 @@ describe('mesh backend compiles (glslang static check)', () => {
     };
     const driven: MeshObject = { ...quad, transform: { position: { param: 'mesh.pos', default: [0, 0, 0] } } };
     const cases: Array<[string, MeshObject]> = [['flat', quad], ['smooth+uv', smooth], ['driven', driven]];
+    // Both traversal engines (impl-plan-mesh-bvh): brute-force scan AND the BVH walk must compile.
+    const engines: Array<'brute' | 'bvh'> = ['brute', 'bvh'];
     for (const [label, mesh] of cases) {
-        it(`mesh ${label} + ${minimalStrategy.id}`, () => {
-            const scene: SceneDescription = { ...minimalScene, objects: [mesh] };
-            const renderer = compiler.compile(scene, minimalStrategy);
-            for (const [shaderId, prog] of renderer.shaders) {
-                check(prog.fragment, 'frag', `${shaderId} [mesh ${label}]`);
-            }
-        });
+        for (const engine of engines) {
+            it(`mesh ${label} (${engine})`, () => {
+                const scene: SceneDescription = { ...minimalScene, objects: [mesh] };
+                const strategy = { ...minimalStrategy, estimator: { ...minimalStrategy.estimator, meshTraversal: engine } };
+                const renderer = compiler.compile(scene, strategy);
+                for (const [shaderId, prog] of renderer.shaders) {
+                    check(prog.fragment, 'frag', `${shaderId} [mesh ${label} ${engine}]`);
+                }
+            });
+        }
     }
 });
 

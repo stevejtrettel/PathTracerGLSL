@@ -23,6 +23,8 @@ import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js'
 import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
+import { meshDemoScene, meshDemoNeeStrategy, meshDemoPtStrategy } from './meshScene.js';
+import { modelsScene, modelsBvhStrategy, modelsBruteStrategy, modelsPtStrategy } from './modelsScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -38,6 +40,22 @@ const cornellOneshotStrategy: RenderStrategy = {
 };
 
 export const demoSuite: Record<string, SceneSuiteEntry> = {
+    models: {
+        scene: modelsScene,
+        strategies: posed([0, 1.8, 5.2], [0.4, 0.6, 0], modelsBvhStrategy, modelsBruteStrategy, modelsPtStrategy),
+        exercises:
+            'DEMO — OBJ-loaded scene + the mesh BVH A/B (impl-plan-mesh-bvh): Utah teapot (6320 tris, smooth normals synthesized) + cactus (1152 tris), ~7.5k triangles. Key 1 = BVH traversal, key 2 = brute force — SAME image, the StatsPanel pathtracer ms/frame is the comparison; key 3 = pt.',
+        expected:
+            'a cream teapot + green cactus under one warm light; keys 1 (bvh) and 2 (brute) are pixel-identical but key 1 is DRAMATICALLY faster (brute ≈ 0.7 fps; bvh many× that); key 3 (pt) converges to the same image.',
+    },
+    meshes: {
+        scene: meshDemoScene,
+        strategies: posed([0, 2.4, 5.5], [0, 0.7, 0], meshDemoNeeStrategy, meshDemoPtStrategy),
+        exercises:
+            'DEMO — the FIRST triangle meshes (impl-plan-meshes v0): a flat-shaded icosahedron (20 faces, per-face geometric normals — visible facets) beside a smooth icosphere (80 faces, per-vertex normals → barycentric-smooth), both on an analytic quad floor, one point light. Brute-force traversal (no BVH yet); transforms are ray-into-local.',
+        expected:
+            'a faceted red d20 on the left, a smooth blue ball on the right — the flat vs smooth normal modes side by side; both cast/receive shadows from the point light; keys 1 (pt-nee) and 2 (pt) converge to the same image',
+    },
     hearth: {
         scene: hearthScene,
         strategies: posed([0, 1.7, 4.6], [0, 0.6, 0], hearthNeeStrategy, hearthPtStrategy),

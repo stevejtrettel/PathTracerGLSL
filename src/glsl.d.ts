@@ -25,6 +25,12 @@ declare module '*.glsl?raw' {
     export default content;
 }
 
+// OBJ mesh assets, imported as raw text and parsed by the authoring loader (impl-plan-meshes).
+declare module '*.obj?raw' {
+    const content: string;
+    export default content;
+}
+
 declare module '*.vert' {
     const content: string;
     export default content;

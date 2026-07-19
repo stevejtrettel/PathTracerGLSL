@@ -15,6 +15,28 @@ export interface MeshAuthoring {
     material: string;
     transform?: Transform;
     name?: string;
+    /** Synthesize smooth per-vertex normals (area-weighted face-normal averaging) when the
+     *  OBJ carries none — a model like the Utah teapot ships position-only. Ignored if the
+     *  file already has normals. Off by default (faithful → flat geometric shading). */
+    smoothNormals?: boolean;
+}
+
+/** Area-weighted vertex normals from an indexed triangle soup (the cross product's magnitude
+ *  IS twice the triangle area, so accumulating the raw cross weights by area for free). */
+function computeVertexNormals(positions: Float32Array, indices: Uint32Array): Float32Array {
+    const n = new Float32Array(positions.length);
+    for (let t = 0; t < indices.length; t += 3) {
+        const ia = indices[t] * 3, ib = indices[t + 1] * 3, ic = indices[t + 2] * 3;
+        const e1x = positions[ib] - positions[ia], e1y = positions[ib + 1] - positions[ia + 1], e1z = positions[ib + 2] - positions[ia + 2];
+        const e2x = positions[ic] - positions[ia], e2y = positions[ic + 1] - positions[ia + 1], e2z = positions[ic + 2] - positions[ia + 2];
+        const cx = e1y * e2z - e1z * e2y, cy = e1z * e2x - e1x * e2z, cz = e1x * e2y - e1y * e2x;
+        for (const i of [ia, ib, ic]) { n[i] += cx; n[i + 1] += cy; n[i + 2] += cz; }
+    }
+    for (let i = 0; i < n.length; i += 3) {
+        const l = Math.hypot(n[i], n[i + 1], n[i + 2]) || 1;
+        n[i] /= l; n[i + 1] /= l; n[i + 2] /= l;
+    }
+    return n;
 }
 
 /** Parse OBJ source text into a MeshObject. Normals/UVs are included only if the file has them
@@ -93,6 +115,7 @@ export function parseOBJ(text: string, opts: MeshAuthoring): MeshObject {
         material: opts.material,
     };
     if (usedNormals) mesh.normals = new Float32Array(outNrm);
+    else if (opts.smoothNormals) mesh.normals = computeVertexNormals(mesh.positions, mesh.indices);
     if (usedUvs) mesh.uvs = new Float32Array(outUv);
     if (opts.transform !== undefined) mesh.transform = opts.transform;
     if (opts.name !== undefined) mesh.name = opts.name;

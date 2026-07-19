@@ -502,6 +502,13 @@ export interface EstimatorDescription {
      * the deliberate pdf-0 regions are only unbiased when BSDF sampling covers them.
      */
     envCompensation?: boolean;
+    /**
+     * Mesh traversal engine (impl-plan-mesh-bvh — the intersection family's first swappable
+     * occupant pair): 'bvh' (default) walks the binned-SAH tree; 'brute' scans every triangle.
+     * Pure computation — same converged image (§11.2), so it rides the estimator section; the
+     * live A/B lets you watch the cost collapse on one scene. Meaningful only when meshes are
+     * present. Future BVH variants join here as new occupants. */
+    meshTraversal?: 'brute' | 'bvh';
     accumulation: AccumulationDescription;
 }
 
