@@ -40,12 +40,18 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
     if (f.rr) blocks.push(roulette(f));
     blocks.push(...kernelBlocks(f), ...lightBlocks(f), ...equiangularBlocks(f), walk(program, f));
 
+    // Numeric knobs (the house rule: budgets are NAMED pinned defines, never bare
+    // literals in the walk — MAX_SHADOW_SEGMENTS/MAX_NULL_COLLISIONS are the siblings).
+    const defines: Record<string, string> = {};
+    if (f.nulls) defines['MAX_NULL_CROSSINGS'] = '32';   // §3.6 null-interface budget; exhaustion terminates the path
+    if (f.rr) defines['RR_MAX_SURVIVAL'] = '0.95';       // §7.2 survival cap — bounds the 1/p_survive weight
+
     // Explicit literal (not ...emptyContribution): the purity rule — components import
     // no compiler VALUES, only contract types. tsc keeps this in sync with the type.
     return {
         feature: 'transport',
         blocks,
-        defines: {},
+        defines,
         uniforms: [],
         parameters: {},
         textures: [],
@@ -114,7 +120,7 @@ function roulette(f: Flags): ShaderBlock {
             '// ── Russian roulette (generated): §7.2 — once per iteration, post-weight, both sites ──',
             'bool roulette(inout PathState s, int bounce) {',
             `    if (bounce < ${f.rr!.startDepth}) return true;`,
-            `    float p_survive = min(0.95, ${metric}`,
+            `    float p_survive = min(RR_MAX_SURVIVAL, ${metric}`,
             '    if (random() > p_survive) return false;',
             '    s.throughput /= p_survive;',
             '    return true;',
@@ -198,7 +204,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             '            s.current_medium = hit.region_to;',
             '            s.ray = ray_spawn(hit, s.ray.direction);',
             '            s.null_crossings++;',
-            '            if (s.null_crossings > 32) break;',
+            '            if (s.null_crossings > MAX_NULL_CROSSINGS) break;',
             '            bounce--;',
             '            continue;',
             '        }',

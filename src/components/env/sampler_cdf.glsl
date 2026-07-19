@@ -32,6 +32,10 @@ float environment_pdf(vec3 dir) {
     return (dCond * dMarg) / env_texel_dOmega(j, sz);
 }
 
+// One-minus-ULP guard: keeps the intra-texel fractions strictly < 1 so the composed
+// texel coordinate never rounds up into the next row/column.
+const float CDF_FRAC_MAX = 0.9999999;
+
 LightSample environment_sample(Point p, vec2 xi) {
     ivec2 sz = ivec2(u_envSize + 0.5);
 
@@ -44,7 +48,7 @@ LightSample environment_sample(Point p, vec2 xi) {
     int j = lo;
     float mLo = (j > 0) ? env_cdf_marg(j - 1) : 0.0;
     float dMarg = env_cdf_marg(j) - mLo;
-    float vFrac = (dMarg > 0.0) ? clamp((xi.x - mLo) / dMarg, 0.0, 0.9999999) : 0.5;
+    float vFrac = (dMarg > 0.0) ? clamp((xi.x - mLo) / dMarg, 0.0, CDF_FRAC_MAX) : 0.5;
 
     // Column within the row: lower_bound over the conditional CDF
     lo = 0; hi = sz.x - 1;
@@ -55,7 +59,7 @@ LightSample environment_sample(Point p, vec2 xi) {
     int i = lo;
     float cLo = (i > 0) ? env_cdf_cond(j, i - 1) : 0.0;
     float dCond = env_cdf_cond(j, i) - cLo;
-    float uFrac = (dCond > 0.0) ? clamp((xi.y - cLo) / dCond, 0.0, 0.9999999) : 0.5;
+    float uFrac = (dCond > 0.0) ? clamp((xi.y - cLo) / dCond, 0.0, CDF_FRAC_MAX) : 0.5;
 
     vec2 uv = vec2((float(i) + uFrac) / float(sz.x), (float(j) + vFrac) / float(sz.y));
 

@@ -4,7 +4,7 @@
 // Every kind fills the same function — `environment_radiance(vec3 dir) -> vec3` —
 // with a different body + resources:
 //   none     → black
-//   constant → live u_environment_color * u_environment_intensity
+//   constant → baked (or {param}-driven) color * u_envIntensity
 //   image    → equirect lookup through the chart (env_equirect.glsl; T2). The radiance
 //              texture arrives via `extern:env_map` — the app loads the .hdr into the
 //              engine registry; the executor binds it like any pass input (§2.10).
@@ -77,7 +77,7 @@ LightSample environment_sample(Point p, vec2 xi) {
     float phi = TWO_PI * xi.y;
     ls.wi = vec3(r * cos(phi), z, r * sin(phi));
     ls.distance = 1.0e20;                                          // §6.1 environment convention
-    ls.radiance = ${colorExpr} * u_environment_intensity;         // without visibility
+    ls.radiance = ${colorExpr} * u_envIntensity;         // without visibility
     ls.pdf = 1.0 / (4.0 * PI);                                     // per-light; selection applied by lighting_sample
     ls.flags = 0u;                                                 // not delta — BSDF paths see the env on miss
     ls.light_id = -1;
@@ -104,8 +104,7 @@ function envProvides(samplable: boolean, pdf: 'none' | 'generated' | 'component'
     return provides;
 }
 
-export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
-    void bag;   // all four kinds are implemented (T4); kept for future env diagnostics
+export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): FeatureContribution {
     const env = plan.program.environment;
 
     // The samplable decision is Planner-resolved (T2: single source of truth for lighting,
@@ -114,17 +113,18 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
 
     if (env.type === 'constant') {
         const intensity = env.intensity ?? 1.0;
-        // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes
-        // u_environment_color. Intensity is an always-live control (the owner-pinned exception).
+        // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
+        // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
+        // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
         const colorExpr = emitValue(env.color as ParamValue, formatSpectrum as (x: never) => string);
         const uniforms: PlannedUniform[] = [
-            { name: 'u_environment_intensity', type: 'float', parameterPath: 'environment.intensity', default: intensity },
+            { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
         ];
         const parameters: Record<string, ParameterMetadata> = {
-            'environment.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Sky intensity', group: 'Environment', triggersReset: true },
+            'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Sky intensity', group: 'Environment', triggersReset: true },
         };
         mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set());   // no-op if constant
-        const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${colorExpr} * u_environment_intensity;`) }];
+        const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${colorExpr} * u_envIntensity;`) }];
         if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: constantSampler(colorExpr) });
         if (plan.program.environmentPdf) blocks.push({ origin: 'generated:environment-pdf', source: CONSTANT_PDF });
         return {
@@ -150,7 +150,6 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         // RADIANCE IS CHART-INDEPENDENT (D11: the integrand is held fixed across samplers):
         // the map is equirect, so the lookup uses its own fixed equirect mapping — the
         // swappable env_chart_* seam belongs exclusively to the SAMPLER below.
-        const { chart, compensation } = plan.program.estimator.envSampler;
         const blocks = [
             { origin: ORIGIN, source: '// Fixed equirect map lookup (sampler-chart-independent)\n'
                 + 'vec2 env_map_uv(vec3 dir) {\n'
@@ -162,6 +161,7 @@ export function contributeEnvironment(plan: RenderPlan, bag: DiagnosticBag): Fea
         ];
         const textures = [{ name: 'u_envMap', source: 'extern:env_map' }];
         if (samplable) {
+            const { chart, compensation } = plan.program.estimator.envSampler;
             const suffix = envVariantSuffix(chart, compensation);
             // env_rotate_y's only image-env caller is the octahedral chart (the equirect
             // chart and the fixed map lookup apply u_envRotation inline).

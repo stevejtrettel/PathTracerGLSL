@@ -123,9 +123,10 @@ export const furnaceSkyPtStrategy: RenderStrategy = {
 
 // ---------------------------------------------------------------------------
 // sky-lamp — the TWO-STAGE selection witness: image env AND a quad light in one scene.
-// Exercises u_envSelectProb (stage 0), lighting_sample_finite (the wrapped baked CDF),
-// the (1 − u_envSelectProb) factor in lighting_pdf, and the miss-MIS selection factor —
-// the full §6.1 pdf symmetry across both techniques and both estimator pairs.
+// Exercises u_envSelectProb (stage 0 — DERIVED since impl-plan-env-power-selection: the
+// power partition Φ_env/(Φ_env+ΣΦ), recomputed live), lighting_sample_finite (the wrapped
+// baked CDF), the (1 − u_envSelectProb) factor in lighting_pdf, and the miss-MIS selection
+// factor — the full §6.1 pdf symmetry across both techniques and both estimator pairs.
 // ---------------------------------------------------------------------------
 
 export const skyLampScene: SceneDescription = {

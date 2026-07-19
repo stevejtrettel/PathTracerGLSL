@@ -31,6 +31,17 @@ vec3 scene_normal(vec3 p, int region) {
     return normalize(n);
 }
 
+// Commit an accepted march point as the hit's GEOMETRY (region_from/to are classified by
+// the dispatcher, §4.2) — ONE body for the in-loop accept and the stall-exhaustion accept,
+// so the two acceptance paths cannot drift.
+void raymarch_commit(inout Hit hit, float t, vec3 p, int region) {
+    hit.t = t;
+    hit.p = p;
+    hit.frame = ambient_frame(p, scene_normal(p, region));   // owner's outward normal; dispatcher orients (§4.1)
+    hit.region_owner = region;
+    hit.uv = vec2(p.x * UV_PLANAR_SCALE, p.z * UV_PLANAR_SCALE);
+}
+
 // March bounded by the running nearest (hit.t); on a closer surface fill the hit's GEOMETRY
 // (p/frame/owner/uv — region_from/to are classified by the dispatcher, §4.2) and return true,
 // else leave hit untouched. Marches the UNSIGNED bound min|sdf_i| so interior rays (dielectric
@@ -49,11 +60,7 @@ bool sdf_intersect(Ray ray, inout Hit hit) {
         // surfaces, so without `t < hit.t` a step can sail through an analytic object and
         // commit an SDF surface BEHIND it, clobbering the closer hit (review finding).
         if (bound < march_epsilon(t) && t < hit.t) {
-            hit.t = t;
-            hit.p = p;
-            hit.frame = ambient_frame(p, scene_normal(p, region));   // owner's outward normal; dispatcher orients (§4.1)
-            hit.region_owner = region;
-            hit.uv = vec2(p.x * 0.1, p.z * 0.1);
+            raymarch_commit(hit, t, p, region);
             return true;
         }
 
@@ -75,12 +82,7 @@ bool sdf_intersect(Ray ray, inout Hit hit) {
     // stay within EPS_INTERFACE of the surface for the outside probe to clear); entry-side
     // grazes tolerate any δ. 16ε ≈ 8e-3 covers the band at 512 steps for unit-scale faces.
     if (bound < 16.0 * march_epsilon(t) && t < hit.t) {
-        vec3 p = ambient_geodesic(ray.origin, ray.direction, t);
-        hit.t = t;
-        hit.p = p;
-        hit.frame = ambient_frame(p, scene_normal(p, region));
-        hit.region_owner = region;
-        hit.uv = vec2(p.x * 0.1, p.z * 0.1);
+        raymarch_commit(hit, t, ambient_geodesic(ray.origin, ray.direction, t), region);
         return true;
     }
     return false;

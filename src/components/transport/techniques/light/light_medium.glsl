@@ -1,7 +1,8 @@
 // T2's medium site (included when NEE ∧ scattering media).
 // Provides: light_sample_direct_medium().
 // Depends on: PathState core, combiner_w_light_medium (generated), lighting_sample,
-//             shadow_transmittance, scene_medium_properties, hg_eval, make_ray.
+//             shadow_transmittance, scene_medium_properties, make_ray,
+//             interaction_medium_eval (generated dispatch over the registered phase models).
 
 void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase EVAL, NO cosine (§2.2 — the cosine is a surface Jacobian).

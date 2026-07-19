@@ -235,6 +235,11 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         ? {
               method: (strategy.estimator.directLighting === 'mis' ? 'mis' : 'nee') as 'mis' | 'nee',
               selection: strategy.estimator.lightSelection ?? 'power',
+              // The env selection OVERRIDE rides only when authored — absent means the
+              // derived power partition (impl-plan-env-power-selection).
+              ...(strategy.estimator.envSelectWeight !== undefined
+                  ? { envSelectWeight: strategy.estimator.envSelectWeight }
+                  : {}),
           }
         : null;
     const envSamplable = envKindSamplable && lighting !== null;

@@ -3,6 +3,8 @@
 // from compile-time literals (hoisted const) and calls the uniform surface over it.
 // Delta light: 1/d² falloff is folded into radiance; per-light pdf = 1; no pdf function
 // (never hittable, never MIS-queried).
+// METRIC EXEMPTION (trace-loop contract): raw dot() on world-space physical directions is
+// deliberate — light samplers are Euclidean closed forms; curved spaces get new bodies (§5.3).
 // Provides (struct GENERATED from descriptor rows — A1): point_light_sample().
 // Depends on: LightSample, LIGHT_DELTA, Point, Spectrum.
 

@@ -352,7 +352,7 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
             lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
             lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${g.uniformQ}, ${d.type}_normal(lray.origin + t * lray.direction, shape)));`);
             lines.push(`            hit.region_owner = ${obj.index};`);
-            lines.push(`            hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);`);
+            lines.push(`            hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);`);
             lines.push(`        }`);
             lines.push(`    }`);
             continue;
@@ -368,7 +368,7 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
         lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
         lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, ${shapeRef}));`);
         lines.push(`            hit.region_owner = ${obj.index};`);
-        lines.push(`            hit.uv = vec2(hit.p.x * 0.1, hit.p.z * 0.1);`);
+        lines.push(`            hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);`);
         lines.push(`        }`);
         lines.push(`    }`);
     }

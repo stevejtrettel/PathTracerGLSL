@@ -11,7 +11,8 @@
 // like the analytic medium bodies; curved-space equiangular is a research item).
 // Provides: equiangular_sample_direct().
 // Depends on: PathState core, lighting_query_delta (generated), shadow_transmittance,
-//             scene_medium_properties, hg_eval, ambient_geodesic, make_ray.
+//             scene_medium_properties, interaction_medium_eval (generated dispatch),
+//             spectrum_exp, ambient_geodesic, make_ray.
 
 void equiangular_sample_direct(inout PathState s, int med_mat, float t_max) {
     Point o = s.ray.origin;
@@ -35,8 +36,9 @@ void equiangular_sample_direct(inout PathState s, int med_mat, float t_max) {
     Point p_evt = ambient_geodesic(o, d, t);
     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
 
-    // Segment transmittance to the sampled vertex — analytic, homogeneous (§4).
-    Spectrum T_seg = exp(-(m_evt.sigma_a + m_evt.sigma_s) * t);
+    // Segment transmittance to the sampled vertex — analytic, homogeneous (§4; the v1
+    // homogeneous pin — the analytic arm's closed form, restated at this second site).
+    Spectrum T_seg = spectrum_exp(-(m_evt.sigma_a + m_evt.sigma_s) * t);
 
     vec3 to_light = pos - p_evt;
     float d2 = max(dot(to_light, to_light), 1e-8);

@@ -11,26 +11,12 @@
 // METRIC EXEMPTION (trace-loop contract): raw dot() on world-space physical directions is
 // deliberate — light samplers are Euclidean closed forms; curved spaces get new bodies (§5.3).
 // Provides (struct GENERATED from descriptor rows — A1): disk_light_sample(), disk_light_pdf().
-
-// pbrt's concentric map: [0,1)² → unit disk, area-preserving, low distortion.
-vec2 disk_light_concentric(vec2 xi) {
-    vec2 o = 2.0 * xi - 1.0;
-    if (o.x == 0.0 && o.y == 0.0) return vec2(0.0);
-    float r, theta;
-    if (abs(o.x) > abs(o.y)) {
-        r = o.x;
-        theta = (PI / 4.0) * (o.y / o.x);
-    } else {
-        r = o.y;
-        theta = (PI / 2.0) - (PI / 4.0) * (o.x / o.y);
-    }
-    return r * vec2(cos(theta), sin(theta));
-}
+// Depends on: concentric_disk + build_basis (core math).
 
 LightSample disk_light_sample(DiskLight l, Point p, vec2 xi) {
     vec3 t, b;
     build_basis(l.normal, t, b);
-    vec2 u = l.radius * disk_light_concentric(xi);
+    vec2 u = l.radius * concentric_disk(xi);
     Point q = l.center + u.x * t + u.y * b;
     vec3 d = q - p;
     float d2 = dot(d, d);

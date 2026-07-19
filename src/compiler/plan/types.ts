@@ -150,7 +150,13 @@ export interface MaterialsDesc {
 }
 
 export type LightingDesc =
-    | { method: 'nee' | 'mis'; selection: 'uniform' | 'power' };
+    | {
+        method: 'nee' | 'mis';
+        selection: 'uniform' | 'power';
+        /** Authored OVERRIDE of the env selection probability (estimator.envSelectWeight,
+         *  Validator-checked (0,1)). Absent = derived power partition (the closure). */
+        envSelectWeight?: number;
+    };
 
 // Mirrors CameraDescription (compiler/types.ts) — the ProgramDescription is the complete
 // link map, so every strategy-side camera variant must exist here for Generate to read.
@@ -248,9 +254,11 @@ export interface PlannedMedium {
     sigma_s: Vec3 | GlslExpression | ValueParam<Vec3>;
     /** Volume scattering model id (volume_scattering/ registry): 'hg' | 'rayleigh'. */
     model: string;
-    /** Density ceiling σ̄ (heterogeneous D1) — present iff authored. Spliced as a literal
-     *  into the null-collision arms (AUTO-DERIVED there for constant-coefficient emissive
-     *  scattering media, emission P5); the D1 scale is emitted in scene_medium_properties. */
+    /** Density ceiling σ̄ (heterogeneous D1) — present iff authored, honored ONLY for
+     *  expression coefficients (the D1 clamp in scene_medium_properties). Non-expression
+     *  tracking media DERIVE σ̄ from their (live) values — a literal for constants, a
+     *  compute-closure uniform for {param} coefficients (impl-plan-env-power-selection
+     *  batch 2); an authored ceiling there is inert (Validator warns). */
     majorant?: number;
     /** Volume emission coefficient ε (impl-plan-medium-emission P1) — resolved like the
      *  extinction core; [0,0,0] when unauthored. The D1 scale applies to it (P2). */

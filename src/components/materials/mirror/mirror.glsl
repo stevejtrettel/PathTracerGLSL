@@ -10,7 +10,7 @@
 // f0-from-(η,k) authoring sugar).
 // Provides: mirror_eval(), mirror_sample(), mirror_pdf(), mirror_emission().
 // Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
-//             LOBE_DELTA, SPECTRUM_ZERO/ONE, ambient_dot.
+//             LOBE_DELTA, SPECTRUM_ZERO/ONE, ambient_dot, schlick_fresnel (core math).
 
 Spectrum mirror_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) { return SPECTRUM_ZERO; } // pure delta
 float    mirror_pdf (Direction wi, Direction wo, Hit hit, MaterialProperties mp) { return 0.0; }
@@ -21,7 +21,7 @@ InteractionSample mirror_sample(Direction wo, Hit hit, MaterialProperties mp, fl
     // orientation; clamped at grazing (the dielectric's discipline).
     Direction n = hit.frame.n;
     float cos_i = clamp(ambient_dot(wo, n, hit.p), 1e-6, 1.0);
-    Spectrum F = mp.f0 + (SPECTRUM_ONE - mp.f0) * pow(1.0 - cos_i, 5.0);
+    Spectrum F = schlick_fresnel(mp.f0, cos_i);
 
     InteractionSample s;
     s.wi     = normalize(2.0 * cos_i * n - wo);

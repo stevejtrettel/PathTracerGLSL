@@ -24,14 +24,16 @@
 //   Kutz §5.1.3 (P_a = 0 for non-emissive media) is the paper's own variance option
 //   inside this same structure — noted, NOT enabled (owner decision: full lottery).
 //
-// EUCLIDEAN: p(t) = origin + t·dir is extrinsic, like the analytic bodies.
+// EUCLIDEAN pin: t is an extrinsic distance, like the analytic bodies — but point
+// advancement is spelled through ambient_geodesic() (a Euclidean no-op) so the one
+// occupant convention holds; curved-space tracking is a research item, not a respell.
 // RNG: xi carries the leading stratified draws (first jump, first lottery); the loop
 // tail draws from the stream (random()) — the equiangular precedent (volumetric §2).
 // Budget: MAX_NULL_COLLISIONS (numeric knob, pin 64) — exhaustion is a conservative
 // pass-through with the accumulated weight, a declared truncation like MAX_SHADOW_SEGMENTS.
 // Depends on: scene_medium_properties (generated, returns the EFFECTIVE clamped field),
 // medium_emission (generated: ε or the folded ZERO), random (sampler), structs_media
-// (MediumSample), spectrum_* (core math).
+// (MediumSample), spectrum_* (core math), ambient_geodesic.
 
 // Seam-1 delta-tracking arm (heterogeneous scattering media): Kutz Algorithm 4 on the
 // segment [0, t_max]. Scattered-at-t or transmitted, per-channel weight — the walk
@@ -53,7 +55,7 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
             ms.weight = w;
             return ms;
         }
-        Point p = ray.origin + t * ray.direction;
+        Point p = ambient_geodesic(ray.origin, ray.direction, t);
         MediumProperties m = scene_medium_properties(med, p);
         Spectrum sigma_n = max(Spectrum(sigma_bar) - (m.sigma_a + m.sigma_s), 0.0);
 
@@ -76,9 +78,9 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
         pa /= c; ps /= c; pn /= c;
 
         if (xi_evt < pa) {
-            // Absorption/emission (Alg. 4 line 6). Deviation 1: v1 media don't emit —
-            // the path dies; when fire arrives, Le lands in ms.radiance RIGHT HERE with
-            // weight w * m.sigma_a / (sigma_bar * pa).
+            // Absorption (Alg. 4 line 6): a pure TERMINATOR — deviation 1 (header).
+            // Emission was already collected pre-lottery above; collecting Le here
+            // as well would double-count the source term.
             ms.weight = SPECTRUM_ZERO;
             return ms;
         } else if (xi_evt < pa + ps) {
@@ -113,7 +115,7 @@ MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float
     for (int i = 0; i < MAX_NULL_COLLISIONS; i++) {
         t += -log(1.0 - random()) / sigma_bar;
         if (t >= t_max) break;
-        Point p = ray.origin + t * ray.direction;
+        Point p = ambient_geodesic(ray.origin, ray.direction, t);
         MediumProperties m = scene_medium_properties(med, p);
         // Emission (P3, ratio-arm sibling): collected with the PRE-update T — the
         // weight of collisions prior. E[Σ_i T_i · ε(x_i)/σ̄] = ∫ T·ε ds.
@@ -137,12 +139,13 @@ Spectrum medium_transmittance_ratio(int med, float sigma_bar, Ray ray, float len
     for (int i = 0; i < MAX_NULL_COLLISIONS; i++) {
         t += -log(1.0 - random()) / sigma_bar;
         if (t >= len) return T;
-        Point p = ray.origin + t * ray.direction;
+        Point p = ambient_geodesic(ray.origin, ray.direction, t);
         MediumProperties m = scene_medium_properties(med, p);
         T *= max(Spectrum(sigma_bar) - (m.sigma_a + m.sigma_s), 0.0) / sigma_bar;
+        float q = 0.75;                        // pbrt's termination prob — compensation below is 1/(1−q)
         if (spectrum_max(T) < 0.05) {
-            if (random() < 0.75) return SPECTRUM_ZERO;
-            T /= 0.25;
+            if (random() < q) return SPECTRUM_ZERO;
+            T /= (1.0 - q);
         }
     }
     return T;                                  // budget exhausted: conservative

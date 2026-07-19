@@ -81,13 +81,22 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     // (OrbitControls), so each basis uniform recomputes via its closure on a pose change —
     // no recompile, and u_cameraTarget itself is no longer read by any shader (its role is
     // to feed these closures). u_cameraPosition survives as the perspective/ortho origin.
+    // ONE basis computation shared by the three closures (they fire together each frame):
+    // memoized on the pose values so a frame runs cameraBasis once, not once per vector.
+    let memoKey = '';
+    let memoBasis = cameraBasis(pose.position as Vec3Tuple, pose.target as Vec3Tuple);
+    const basisFor = (position: Vec3Tuple, target: Vec3Tuple) => {
+        const key = `${position.join(',')}|${target.join(',')}`;
+        if (key !== memoKey) { memoKey = key; memoBasis = cameraBasis(position, target); }
+        return memoBasis;
+    };
     const basisUniform = (name: string, pick: (b: ReturnType<typeof cameraBasis>) => Vec3Tuple) => ({
         name,
         type: 'vec3' as const,
         parameterPath: 'camera.position',
         parameterPaths: ['camera.position', 'camera.target'],
-        default: pick(cameraBasis(pose.position as Vec3Tuple, pose.target as Vec3Tuple)),
-        compute: (params: Record<string, unknown>) => pick(cameraBasis(
+        default: pick(basisFor(pose.position as Vec3Tuple, pose.target as Vec3Tuple)),
+        compute: (params: Record<string, unknown>) => pick(basisFor(
             (params['camera.position'] as Vec3Tuple) ?? (pose.position as Vec3Tuple),
             (params['camera.target'] as Vec3Tuple) ?? (pose.target as Vec3Tuple),
         )),

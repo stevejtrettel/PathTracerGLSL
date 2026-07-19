@@ -46,13 +46,11 @@ export type EnvironmentDescription =
     | {
           type: 'constant';
           /** Sky radiance — a SCENE_VALUE (Model B): a constant bakes inline, a `{param}` becomes
-           *  a live `u_environment_color`. (`intensity`/`rotation` are always-live controls.) */
+           *  a live path-named uniform. (`intensity`/`rotation` are always-live controls.) */
           color: SpectrumValue;
           intensity?: number;
           /** T3 opt-in (default FALSE — preserves pre-T3 witnesses): uniform-sphere NEE. */
           sampleAsLight?: boolean;
-          /** P(select env) in NEE when finite samplable lights coexist. Default 0.5 (plan O1). */
-          selectWeight?: number;
       }
     | {
           type: 'procedural';
@@ -69,8 +67,6 @@ export type EnvironmentDescription =
           tableSize?: [number, number];
           /** T4: joins NEE/MIS via the baked CDF. Default TRUE for tabulated envs. */
           sampleAsLight?: boolean;
-          /** P(select env) in NEE when finite samplable lights coexist. Default 0.5 (plan O1). */
-          selectWeight?: number;
       }
     | {
           type: 'image';
@@ -81,8 +77,6 @@ export type EnvironmentDescription =
           rotation?: number;
           /** T3: joins NEE/MIS via the CDF machinery. Default TRUE for tabulated envs. */
           sampleAsLight?: boolean;
-          /** P(select env) in NEE when finite samplable lights coexist. Default 0.5 (plan O1). */
-          selectWeight?: number;
       };
 
 // --- Objects ---
@@ -468,6 +462,14 @@ export interface EstimatorDescription {
     /** Light-selection metric for NEE (compile-time). 'power' importance-samples brighter
      *  lights (spectrum_average(color·intensity)); 'uniform' is the naive baseline. Default 'power'. */
     lightSelection?: 'uniform' | 'power';
+    /** OVERRIDE of the env-vs-finite selection probability P(sample env) in two-stage NEE.
+     *  ESTIMATOR section, variance-only by construction (selection pdfs match on every
+     *  side — sampler, lighting_pdf, miss-MIS weight — so it can never move the converged
+     *  image; it trades noise between the env and finite-light techniques). Absent = the
+     *  derived power partition Φ_env/(Φ_env + ΣΦ_light), live via a compute closure
+     *  (impl-plan-env-power-selection: the env joins selection like any other light).
+     *  Must be strictly inside (0, 1); Validator-enforced. */
+    envSelectWeight?: number;
     /** null = off. Unbiased by construction (random termination WITH compensation) — the
      *  taxonomy's canonical estimator-side termination, vs maxBounces' measurement-side one. */
     russianRoulette: { startDepth: number } | null;

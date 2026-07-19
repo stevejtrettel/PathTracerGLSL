@@ -59,7 +59,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
 function buildPathtracerBlocks(merged: MergedContributions, varianceOutputs: boolean): ShaderBlock[] {
     return [
         { origin: 'generated:header', source: buildHeader(merged.defines, varianceOutputs) },
-        { origin: 'generated:uniforms', source: buildUniformDeclarations(merged.uniforms, merged.textures, varianceOutputs) },
+        { origin: 'generated:uniforms', source: buildUniformDeclarations(merged.uniforms, merged.textures) },
         ...merged.blocks,
     ];
 }
@@ -152,7 +152,7 @@ function buildHeader(defines: Record<string, string>, varianceOutputs = false): 
 // Uniform declarations (from the merged contribution list)
 // ============================================================================
 
-function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedTexture[] = [], varianceOutputs = false): string {
+function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedTexture[] = []): string {
     const lines: string[] = [];
     lines.push('// Uniforms');
 
@@ -172,11 +172,9 @@ function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedT
         lines.push(`uniform sampler2D ${t.name};`);
     }
 
-    // Previous accumulation texture (always needed for progressive rendering)
-    lines.push('uniform sampler2D u_previous;');
-    // Previous second-moment texture (variance accumulation occupant only; bound by
-    // the pathtracer pass input 'accumulation_previous:1').
-    if (varianceOutputs) lines.push('uniform sampler2D u_previousMoment;');
+    // The accumulator's ping-pong inputs (u_previous / u_previousMoment) are declared by
+    // the accumulation feature — exact linkage: the occupant that reads them declares them
+    // (oneshot reads neither and so declares neither).
 
     return lines.join('\n');
 }

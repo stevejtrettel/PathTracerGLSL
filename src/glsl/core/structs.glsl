@@ -34,8 +34,14 @@ struct Hit {
     int region_from;    // medium behind the boundary (-1 = ambient) — §4.2 classification
     int region_to;      // medium ahead of the boundary — emission keys on this (§6.2)
     int region_owner;   // whose surface this IS (§4.3) — material_of(region_owner) shades (§4.1)
-    vec2 uv;
+    vec2 uv;            // surface parameterization — PLACEHOLDER planar xz chart today (all
+                        // writers use UV_PLANAR_SCALE); no reader yet — the first consumer
+                        // will be a procedural material, which owns making this chart real.
 };
+
+// Placeholder planar-uv chart scale — the ONE truth for every Hit.uv writer (the SDF
+// marcher and the generated analytic arms) until a real per-primitive chart exists.
+#define UV_PLANAR_SCALE 0.1
 
 // Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
 const uint LIGHT_DELTA = 1u;

@@ -1,19 +1,10 @@
 // compiler/analyze/Analyzer.ts
 
 import type { SceneDescription, MaterialProperty } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, isValueParam } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, isValueParam, mediumMayScatter } from '../types.js';
 import type { SceneFeatures } from './types.js';
 import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
 import { LIGHT_KINDS } from '../../components/lights/index.js';
-
-/** A medium coefficient is "possibly nonzero" if it's a nonzero constant or {param}-driven
- *  (a live parameter can become nonzero at runtime, so the code path must exist). */
-function mayBeNonzero(prop: MaterialProperty | undefined): boolean {
-    if (prop === undefined) return false;
-    if (typeof prop === 'number') return prop !== 0;
-    if (Array.isArray(prop)) return prop.some((c) => c !== 0);
-    return true; // {param} or GLSL expression — either can be nonzero at runtime
-}
 
 /** Nonzero CONSTANT only — {param}/expression are false (the v1 sampleAsLight restriction). */
 function isConstantNonzero(prop: MaterialProperty | undefined): boolean {
@@ -56,7 +47,7 @@ export function analyze(scene: SceneDescription): SceneFeatures {
 
         if (mat.medium !== undefined) {
             hasMedia = true;
-            if (mayBeNonzero(mat.medium.sigma_s)) hasScatteringMedia = true;
+            if (mediumMayScatter(mat.medium)) hasScatteringMedia = true;   // the ONE census predicate (types.ts)
             if (isHeterogeneousMedium(mat.medium)) hasHeterogeneousMedia = true;
             if (isEmissiveMedium(mat.medium)) hasEmissiveMedia = true;
         }

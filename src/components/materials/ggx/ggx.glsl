@@ -7,7 +7,7 @@
 // Provides: ggx_to_local(), ggx_from_local(), ggx_D(), ggx_G1(),
 //           ggx_eval(), ggx_sample(), ggx_pdf(), ggx_emission().
 // Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
-//             PI, TWO_PI, SPECTRUM_ZERO/ONE, ambient_dot.
+//             PI, TWO_PI, SPECTRUM_ZERO/ONE, ambient_dot, schlick_fresnel (core math).
 // The TS twin in ggx.test.ts is the tested ground truth for D/G1/sample/pdf/eval —
 // line-for-line transcription, change one change both (§11.3 runs against the twin).
 
@@ -35,7 +35,7 @@ Spectrum ggx_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     if (wil.z * wol.z <= 0.0) return SPECTRUM_ZERO;         // reflection-only model
     float a = max(1e-3, mp.roughness * mp.roughness);
     vec3 h = normalize(wil + wol);
-    Spectrum F = mp.f0 + (SPECTRUM_ONE - mp.f0) * pow(1.0 - abs(dot(wol, h)), 5.0);
+    Spectrum F = schlick_fresnel(mp.f0, abs(dot(wol, h)));
     // bare f (§2.2): D·F·G / (4 cos_i cos_o), NO extra cos_i here
     return F * (ggx_D(h, a) * ggx_G1(wil, a) * ggx_G1(wol, a) / (4.0 * abs(wil.z) * abs(wol.z)));
 }
@@ -66,7 +66,7 @@ InteractionSample ggx_sample(Direction wo, Hit hit, MaterialProperties mp, float
         s.wi = wo; s.weight = SPECTRUM_ZERO; s.pdf = 0.0; s.flags = LOBE_REFLECTION;
         return s;
     }
-    Spectrum F = mp.f0 + (SPECTRUM_ONE - mp.f0) * pow(1.0 - abs(dot(wol, h)), 5.0);
+    Spectrum F = schlick_fresnel(mp.f0, abs(dot(wol, h)));
     // The VNDF elegance: weight = F · G1(wi) exactly (separable Smith) — D, cosines,
     // and the half-vector jacobian all cancel.
     s.weight = F * ggx_G1(wil, a);

@@ -2,7 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -330,18 +330,12 @@ export function validate(
                         .add();
                 }
             }
-            // Emission P5: an emissive SCATTERING medium routes to the tracking arms;
-            // σ̄ auto-derives from constant coefficients, but {param} coefficients have
-            // no static bound — require the author's ceiling then.
-            if (isEmissiveMedium(mat.medium) && mediumMayScatter(mat.medium)
-                && mat.medium.majorant === undefined
-                && (isValueParam(mat.medium.sigma_a) || isValueParam(mat.medium.sigma_s))) {
-                bag.error('invalid-setting',
-                    `Material '${name}': an emissive scattering medium with {param} coefficients needs an authored majorant — the tracking arms' ceiling cannot be derived from a live parameter`)
-                    .add();
-            }
-            // Rule 2: majorant must be a positive finite number; a ceiling on an
-            // all-constant medium is inert (its bound is derivable — C5 class).
+            // (The old "{param} coefficients need an authored majorant" error is DELETED —
+            // batch 2 of impl-plan-env-power-selection: σ̄ for non-expression tracking
+            // media is DERIVED from the live values (a compute-closure uniform), so the
+            // requirement that rule enforced is now met structurally.)
+            // Rule 2: majorant must be a positive finite number; a ceiling on a
+            // non-expression medium is inert (σ̄ derives from the live values — C5 class).
             const maj = mat.medium.majorant;
             if (maj !== undefined) {
                 if (typeof maj !== 'number' || !Number.isFinite(maj) || maj <= 0) {
@@ -350,7 +344,7 @@ export function validate(
                         .add();
                 } else if (!isHeterogeneousMedium(mat.medium)) {
                     bag.warning('invalid-setting',
-                        `Material '${name}': medium.majorant is declared but every coefficient is constant/{param} — the bound is derivable and the declaration is inert`)
+                        `Material '${name}': medium.majorant is declared but every coefficient is constant/{param} — σ̄ derives from the (live) values and the declaration is ignored`)
                         .add();
                 }
             }
@@ -379,6 +373,24 @@ export function validate(
         if (mat.model === 'none' && mat.medium === undefined) {
             bag.error('invalid-setting',
                 `Material '${name}': model 'none' (no optical surface, §3.6) requires a medium block — an object that neither reflects nor participates is invisible, which is an authoring error`)
+                .add();
+        }
+    }
+
+    // Env selection override (impl-plan-env-power-selection): a probability — an authored
+    // value outside (0,1) ships an invalid selection draw (silent estimator wrongness, the
+    // audit-H3 class). Inert-knob warning when nothing splits selection mass (C5 class).
+    const envW = strategy.estimator.envSelectWeight;
+    if (envW !== undefined) {
+        if (typeof envW !== 'number' || !Number.isFinite(envW) || envW <= 0 || envW >= 1) {
+            bag.error('invalid-setting',
+                `estimator.envSelectWeight must be strictly inside (0, 1) — it is P(sample env) in the two-stage NEE selection (got ${String(envW)})`)
+                .add();
+        } else if (strategy.estimator.directLighting === 'none'
+            || !features.environment.samplable
+            || features.lighting.totalLightCount === 0) {
+            bag.warning('invalid-setting',
+                'estimator.envSelectWeight controls nothing here (needs NEE, a samplable environment, AND finite lights to split selection mass with) — the knob is inert; absent it would derive from the power partition anyway')
                 .add();
         }
     }

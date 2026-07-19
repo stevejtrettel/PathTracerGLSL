@@ -12,8 +12,8 @@
 //   pt-mis   | power heuristic vs T1's density | power heuristic vs T2's density
 //
 // Every existence-dependent call (light_of, lighting_pdf, environment_pdf,
-// interaction_surface_pdf, hg_pdf, u_envSelectProb) lives INSIDE these generated
-// bodies — that is what lets the static files stay static (the flexibility rule).
+// interaction_surface_pdf, interaction_medium_pdf, u_envSelectProb) lives INSIDE these
+// generated bodies — that is what lets the static files stay static (the flexibility rule).
 // Deferred (owner-ratified): an identity-weight elision pass may later fold trivial
 // bodies out of the emitted text entirely; uniform emission is the deliberate v1.
 

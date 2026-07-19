@@ -1,6 +1,8 @@
 // Equal-area octahedral environment CHART (env-as-light T5, plan D11) — pbrt-v4's
 // ImageInfiniteLight mapping (Clarberg 2008), Y-up. Drop-in replacement for the equirect
-// chart behind the same names: env_chart_uv / env_chart_dir / env_texel_dOmega / env_rotate_y.
+// chart behind the same names: env_chart_uv / env_chart_dir / env_texel_dOmega — modulo
+// the rotation rail: this chart rotates via env_rotate_cs/u_envRotCS (CPU-derived cos/sin),
+// where equirect applies u_envRotation inline (both disclosed in environment.ts).
 //
 // EQUAL-AREA is the point: every texel of the N×N table subtends exactly 4π/N² sr — the
 // Jacobian is constant, the CDF table needs no sinθ weighting, poles cost nothing.
@@ -13,7 +15,7 @@ float env_copysign(float m, float s) {
     return s < 0.0 ? -abs(m) : abs(m);
 }
 
-// env_rotate_y comes from the shared generated block (emitted before any chart).
+// env_rotate_cs comes from the shared generated block (emitted before any chart).
 
 // Constant Jacobian: 4π / (W·H). (j unused — signature shared with the equirect chart.)
 float env_texel_dOmega(int j, ivec2 sz) {

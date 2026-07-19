@@ -6,6 +6,9 @@ Point ambient_geodesic(Point origin, Direction dir, float t) {
     return origin + dir * t;
 }
 
+// The METRIC-SEAM frame builder: curved-space occupants replace this wholesale, so its
+// construction is free to differ from core math's build_basis (the declared-Euclidean
+// sampler helper) — the two serve different contracts and need not agree.
 Frame ambient_frame(Point p, Direction n) {
     Direction nn = normalize(n);
     Direction t = abs(nn.x) < 0.9 ? Direction(1.0, 0.0, 0.0) : Direction(0.0, 1.0, 0.0);

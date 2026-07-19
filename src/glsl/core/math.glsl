@@ -1,6 +1,7 @@
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, build_basis(), local_to_world(),
-//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black()
+// Provides: PI, TWO_PI, EPSILON, build_basis(), concentric_disk(), schlick_fresnel(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black(),
+//           spectrum_exp() (math_media.glsl when media exist)
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
@@ -19,13 +20,31 @@ const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
 float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
 float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
 bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
+// Declared-EUCLIDEAN sampler helper (light samplers, phase ONBs — sites carrying the
+// METRIC EXEMPTION). Deliberately distinct from ambient_frame(), the METRIC SEAM that
+// builds shading frames and gets swapped per space: any construction/pivot works here
+// because a sampler only needs SOME orthonormal completion, while ambient_frame's output
+// is contract surface (Frame) that curved-space occupants replace wholesale.
 void build_basis(vec3 n, out vec3 t, out vec3 b) {
     vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     t = normalize(cross(up, n));
     b = cross(n, t);
 }
 
-// Local shading space convention: Z-up (normal direction). cos_theta = local_dir.z
-vec3 local_to_world(vec3 local_dir, vec3 n, vec3 t, vec3 b) {
-    return local_dir.x * t + local_dir.y * b + local_dir.z * n;
+// Concentric (Shirley) map [0,1)² → unit disk — equal-area, low distortion (pbrt's
+// SampleUniformDiskConcentric). Shared by the thin-lens aperture and the disk light.
+vec2 concentric_disk(vec2 u) {
+    vec2 o = 2.0 * u - 1.0;                 // to [-1,1]²
+    if (o.x == 0.0 && o.y == 0.0) return vec2(0.0);
+    float r, theta;
+    if (abs(o.x) > abs(o.y)) { r = o.x; theta = (PI / 4.0) * (o.y / o.x); }
+    else                     { r = o.y; theta = PI / 2.0 - (PI / 4.0) * (o.x / o.y); }
+    return r * vec2(cos(theta), sin(theta));
+}
+
+// Schlick's Fresnel from normal-incidence reflectance — the house conductor vocabulary
+// (f0 row shared by ggx + mirror). cos_theta is the caller's |cos| against its own
+// half-vector/normal convention; must be in [0,1].
+Spectrum schlick_fresnel(Spectrum f0, float cos_theta) {
+    return f0 + (SPECTRUM_ONE - f0) * pow(1.0 - cos_theta, 5.0);
 }

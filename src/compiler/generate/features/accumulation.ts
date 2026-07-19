@@ -12,20 +12,30 @@ import mainOneshotGLSL from '../../../components/accumulator/oneshot/oneshot.gls
 export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
     const program = plan.program;
     const type = program.estimator.accumulation.type;
-    const contribution: FeatureContribution = {
-        ...emptyContribution('accumulation'),
-        blocks: [{ origin: accumulationOrigin(program), source: buildAccumulationSource(program, bag) }],
-        requires: ['pixel_sample', 'camera_generateRay', 'transport_trace'],
-    };
 
-    if (type === 'average' || type === 'variance' || type === 'oneshot') {
-        contribution.uniforms = [
+    // The occupant's ping-pong inputs, declared HERE because the occupant reads them
+    // (exact linkage): average/variance read u_previous (variance also the second
+    // moment, bound as pathtracer pass input 'accumulation_previous:1'); oneshot reads
+    // neither and declares neither — its programs carry no dead sampler.
+    const inputDecls: string[] = [];
+    if (type !== 'oneshot') inputDecls.push('uniform sampler2D u_previous;');
+    if (type === 'variance') inputDecls.push('uniform sampler2D u_previousMoment;');
+
+    return {
+        ...emptyContribution('accumulation'),
+        blocks: [
+            ...(inputDecls.length
+                ? [{ origin: 'generated:accumulation-inputs', source: inputDecls.join('\n') }]
+                : []),
+            { origin: accumulationOrigin(program), source: buildAccumulationSource(program, bag) },
+        ],
+        // Engine builtins declared where READ (the core.ts discipline).
+        uniforms: [
             { name: 'u_sampleCount', type: 'int', parameterPath: 'engine.sampleCount' },
             { name: 'u_pixelOffset', type: 'vec2', parameterPath: 'engine.pixelOffset', default: [0, 0] },
-        ];
-    }
-
-    return contribution;
+        ],
+        requires: ['pixel_sample', 'camera_generateRay', 'transport_trace'],
+    };
 }
 
 function accumulationOrigin(program: ProgramDescription): string {

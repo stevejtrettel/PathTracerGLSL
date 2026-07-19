@@ -164,6 +164,34 @@ export const emitScatterScene: SceneDescription = {
     ],
 };
 
+// ---------------------------------------------------------------------------
+// emit-driven — F-EMIT-SAT with a DRIVEN σ_a, run at a point ABOVE its authored
+// default (impl-plan-env-power-selection batch 2, the DERIVED-majorant gate).
+// σ_a = {param 'glow.absorb', default 0.5} slid to 2.0 → live σ_t = 3 EXCEEDS the
+// default-point extinction (1.5). A stale plan-time σ̄ would make the null
+// coefficient σ̄ − σ_t negative (invalid probabilities → a wrecked image); the
+// derived u_majorant closure keeps σ̄ = 3 exact, so the equilibrium number
+// ε/σ_a = (0.5, 1.0, 2.0) must reproduce — the SAME absolute gate as emit-sat.
+// ---------------------------------------------------------------------------
+
+export const emitDrivenScene: SceneDescription = {
+    ...emitSatScene,
+    id: 'emit-driven',
+    name: 'EMIT-DRIVEN (derived majorant σ̄ follows the slider)',
+    materials: {
+        gray: { model: 'lambert', albedo: [0.5, 0.5, 0.5] },
+        glow: {
+            model: 'none',
+            medium: {
+                sigma_a: { param: 'glow.absorb', default: 0.5, min: 0.1, max: 4.0 },
+                sigma_s: [1.0, 1.0, 1.0],
+                emission: [1.0, 2.0, 4.0],
+                phase_g: 0.0,
+            },
+        },
+    },
+};
+
 export const emitScatterNeeStrategy: RenderStrategy = {
     id: 'pt-nee-emit',
     measurement: { camera: { type: 'pinhole', fov: 0.9 }, maxBounces: 24 },

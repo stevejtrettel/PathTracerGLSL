@@ -67,7 +67,7 @@ import {
 } from './scenes/heterogeneousWitness.js';
 import {
     emitScene, emitSwapScene, emitStrategy, emitSwapStrategy,
-    emitSatScene, emitSatStrategy,
+    emitSatScene, emitSatStrategy, emitDrivenScene,
     emitScatterScene, emitScatterNeeStrategy, emitScatterPtStrategy,
 } from './scenes/emissionWitness.js';
 import {
@@ -338,9 +338,9 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         scene: skyLampScene,
         strategies: posed([0, 1.4, 5], [0, 0.9, 0], skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy),
         exercises:
-            'TWO-STAGE selection (T3, plan D3): image env AND a quad light — u_envSelectProb stage 0, the wrapped lighting_sample_finite CDF, the (1−P) factor in lighting_pdf, and the P factor in the miss-MIS weight. The full §6.1 pdf symmetry across techniques',
+            'TWO-STAGE selection (T3, plan D3; p DERIVED per impl-plan-env-power-selection): image env AND a quad light — u_envSelectProb stage 0 (the power-partition closure over env.intensity/totalWeight and light power), the wrapped lighting_sample_finite CDF, the (1−P) factor in lighting_pdf, and the P factor in the miss-MIS weight. The full §6.1 pdf symmetry across techniques',
         expected:
-            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image (warm lamp pool + cool sky fill); sweeping env.selectProb changes NOISE ONLY, never brightness — brightness drift under the sweep is a selection-pdf asymmetry. KNOWN estimator boundary: sun-through-glass is BSDF-only in ALL keys (delta lobes skip NEE, §6.3 blocks shadow rays at glass) — equal noise there across keys is expected, not a bug',
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image (warm lamp pool + cool sky fill); the derived P changes NOISE ONLY, never brightness (sweep env.intensity or an estimator.envSelectWeight override to probe) — brightness drift under a P change is a selection-pdf asymmetry. KNOWN estimator boundary: sun-through-glass is BSDF-only in ALL keys (delta lobes skip NEE, §6.3 blocks shadow rays at glass) — equal noise there across keys is expected, not a bug',
         witness: {
             spp: 192,
             checks: [
@@ -762,6 +762,19 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 },
             ],
         },
+    },
+    'emit-driven': {
+        scene: emitDrivenScene,
+        strategies: posed([30, 1, 0], [31, 1, 0], emitSatStrategy),
+        exercises:
+            'EMIT-DRIVEN (impl-plan-env-power-selection batch 2): F-EMIT-SAT with a DRIVEN σ_a slid ABOVE its authored default (0.5 → 2.0, live σ_t = 3 > the default-point 1.5) — gates the DERIVED u_majorant compute closure: σ̄ must follow the slider, or the delta arm\'s null coefficient goes negative',
+        expected:
+            'EVERY pixel = (0.5, 1.0, 2.0) in linear HDR — the SAME equilibrium number as emit-sat. A wrecked/dark image here with emit-sat green implicates a stale majorant (σ̄ < live σ_t)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'mean', value: [0.5, 1.0, 2.0], tol: [0.005, 0.01, 0.02], label: 'EMIT-DRIVEN ε/σ_a @slid σ̄' }],
+        },
+        initialParameters: { 'glow.absorb': 2.0 },
     },
     'emit-sat': {
         scene: emitSatScene,

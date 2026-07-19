@@ -11,6 +11,7 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
+import { PRIMITIVES } from '../../../components/geometry/index.js';
 import type { LightKindDescriptor } from '../../../components/descriptors.js';
 import { structFromRows } from '../schema.js';
 
@@ -29,28 +30,38 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
 
     // Environment as a light (T3): the env joins selection through a TWO-STAGE draw —
     // stage 0 picks env-vs-finite with probability u_envSelectProb, stage 1 is the baked
-    // CDF (rescaled). The env's power is load-time data the baked CDF can't absorb; the
-    // uniform is the deliberate deviation from reference §8's compile-time ENV_SELECT_PDF
-    // (same structure — see impl-plan-env-as-light D3). Arnold's dome-as-dedicated-technique
-    // is the precedent for the two-stage shape.
+    // CDF (rescaled). The two-stage shape is the exact FACTORIZATION of an (N+1)-entry
+    // power CDF (env mass p vs finite mass 1−p, then the finite CDF within), so since
+    // impl-plan-env-power-selection the env is selection-commensurable with every other
+    // light: u_envSelectProb is a DERIVED uniform — the power partition Φ_env/(Φ_env+ΣΦ),
+    // recomputed live from env intensity, the loaded table's luminance mass, and driven
+    // emissions (the u_light_cdf closure's sibling). An authored estimator.envSelectWeight
+    // overrides it with a constant (+ the slider), Validator-checked (0,1).
     const envSamplable = plan.program.environmentSamplable;
-    const env = plan.program.environment;
     // The uniform exists iff the selection draw is LIVE (finite lights split mass with
     // the env — the environmentSelectionLive decision). Env-only programs fold the
     // selection to the constant 1 on BOTH sides (sampler here, pdf in the combiner):
     // there is no other technique to absorb the remaining mass — changing 1.0 would be
     // bias, so no dead uniform is declared either.
     if (plan.program.environmentSelectionLive) {
-        const envSelectDefault = (env.type === 'constant' || env.type === 'image') && env.selectWeight !== undefined
-            ? env.selectWeight
-            : 0.5;                                                       // plan O1 default
-        // environment_sample/environment_pdf are declared by the T4 interface header even
-        // though the environment feature's definitions assemble AFTER lighting.
-        uniforms.push({ name: 'u_envSelectProb', type: 'float', parameterPath: 'env.selectProb', default: envSelectDefault });
-        parameters['env.selectProb'] = {
-            type: 'float', default: envSelectDefault, range: [0.05, 0.95],
-            name: 'Env select P', group: 'Environment', triggersReset: true,
-        };
+        const override = plan.program.estimator.lighting.envSelectWeight;
+        if (override !== undefined) {
+            uniforms.push({ name: 'u_envSelectProb', type: 'float', parameterPath: 'env.selectProb', default: override });
+            parameters['env.selectProb'] = {
+                type: 'float', default: override, range: [0.05, 0.95],
+                name: 'Env select P', group: 'Environment', triggersReset: true,
+            };
+        } else {
+            // DERIVED (category 5): no slider — the probability rides its inputs' sliders
+            // through the closure (a manual env.selectProb would fight the recompute).
+            const deps = envSelectionDeps(plan);
+            uniforms.push({
+                name: 'u_envSelectProb', type: 'float',
+                parameterPath: deps[0], parameterPaths: deps,
+                default: envSelectionProbability(plan, {}),
+                compute: (p) => envSelectionProbability(plan, p),
+            });
+        }
     }
     // Shadow query behind the §6.3 contract — the compiler specializes: the boolean-fast-path
     // opaque form for media-free scenes, the spectral segment walker (composing the generated
@@ -104,7 +115,13 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         // path, same name; merge dedups). mintValueUniform no-ops on constant rows.
         for (const l of plan.lights) {
             if (l.regionId !== undefined) continue;   // hittable: material owns the uniform
-            for (const v of Object.values(l.values)) mintValueUniform(v as ParamValue, 'vec3', 'color', uniforms, parameters, seen);
+            for (const [row, v] of Object.entries(l.values)) {
+                // The row's declared shape drives the uniform type — a driven float row
+                // (e.g. a future driven cone angle) mints a float, not a mistyped vec3.
+                const spec = LIGHT_KINDS[l.kind]?.params.find((p) => p.name === row);
+                const isVec3 = (spec?.shape ?? 'vec3') === 'vec3';
+                mintValueUniform(v as ParamValue, isVec3 ? 'vec3' : 'float', isVec3 ? 'color' : 'float', uniforms, parameters, seen);
+            }
         }
         // Selection CDF + per-light select-pdf as CPU-computed float arrays (>1 light only;
         // a single light has select_pdf ≡ 1). ONE computeSelectPdf call per array, run at
@@ -115,13 +132,13 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
             uniforms.push({
                 name: 'u_light_selpdf', type: 'float[]', arrayLength: n,
                 parameterPath: paths[0], parameterPaths: paths,
-                default: computeSelectPdf(plan.lights, selection),
+                default: selectPdf,   // the ONE plan-time computation above
                 compute: (p) => computeSelectPdf(plan.lights, selection, p),
             });
             uniforms.push({
                 name: 'u_light_cdf', type: 'float[]', arrayLength: n,
                 parameterPath: paths[0], parameterPaths: paths,
-                default: cumulative(computeSelectPdf(plan.lights, selection)),
+                default: cumulative(selectPdf),
                 compute: (p) => cumulative(computeSelectPdf(plan.lights, selection, p)),
             });
         }
@@ -353,6 +370,87 @@ function generateLightAccessors(lights: PlannedLight[]): string {
 /** GLSL call that samples light `l` at point `p` — kind sampler over the const/accessor. */
 function sampleCall(l: PlannedLight, xiExpr: string): string {
     return `${lightKind(l).kind}_light_sample(${lightRef(l)}, p, ${xiExpr})`;
+}
+
+// ============================================================================
+// Env selection probability — the DERIVED power partition (impl-plan-env-power-selection):
+// the env is one more entry in the power CDF; the two-stage draw is its factorization.
+// ============================================================================
+
+/** Plan-time scene-radius estimate from descriptor KINDS: over analytic + SDF objects and
+ *  lights, max of |point rows| + Σ length-row extents, floored at 1. A declared heuristic —
+ *  p_env is variance-only by construction, so a crude r shifts noise, never the mean. */
+function sceneRadiusEstimate(plan: RenderPlan): number {
+    let r = 1;
+    const consider = (params: Record<string, number | number[]>, rows: ReadonlyArray<{ name: string; kind?: string }>) => {
+        let center = 0, extent = 0;
+        for (const row of rows) {
+            const v = params[row.name];
+            if (v === undefined || typeof v === 'object' && !Array.isArray(v)) continue;
+            if (row.kind === 'point' && Array.isArray(v)) center = Math.max(center, Math.hypot(v[0], v[1], v[2]));
+            if (row.kind === 'length') extent += Array.isArray(v) ? Math.max(...v) : (v as number);
+        }
+        r = Math.max(r, center + extent);
+    };
+    for (const o of plan.analyticObjects) consider(o.parameters, PRIMITIVES[o.shapeType]?.params ?? []);
+    for (const o of plan.objects) consider(o.parameters, PRIMITIVES[o.sdfType]?.params ?? []);
+    for (const l of plan.lights) consider(resolveLightValues(l), LIGHT_KINDS[l.kind]?.params ?? []);
+    return r;
+}
+
+/** P(select env) in the two-stage NEE draw, derived like every other light's selection:
+ *  'uniform' → 1/(N+1); 'power' → Φ_env/(Φ_env + ΣΦ_light) with pbrt's infinite-light
+ *  power Φ_env = 4π²r²·L̄·intensity. L̄: constant env = spectrum average of the (live)
+ *  color; tabulated envs = the loaded table's luminance mass (env.totalWeight, the CDF
+ *  builder's total with constants dropped) converted per chart — L̄ = 1 before the table
+ *  loads (declared pre-load default; for MIS-compensated tables the mass is the
+ *  COMPENSATED one, deliberately: selection tracks what the env technique samples).
+ *  Clamped to [0.01, 0.99] (fp guard; degenerate power sets stay valid draws). */
+export function envSelectionProbability(plan: RenderPlan, params: Record<string, unknown> = {}): number {
+    const clampP = (p: number) => Math.min(0.99, Math.max(0.01, p));
+    const lighting = plan.program.estimator.lighting;
+    if (lighting === null) return 0.5;   // unreachable: selection is live only under NEE
+    if (lighting.selection === 'uniform') return clampP(1 / (plan.lights.length + 1));
+
+    const env = plan.program.environment;
+    const intensity = (params['env.intensity'] as number)
+        ?? (env.type !== 'none' ? env.intensity : undefined) ?? 1.0;
+    let meanL = 1.0;
+    if (env.type === 'constant') {
+        const c = env.color;
+        const raw = isValueParam(c) ? (params[c.param] ?? c.default) : c;
+        const arr = typeof raw === 'number' ? [raw, raw, raw] : (raw as number[]) ?? [1, 1, 1];
+        meanL = (arr[0] + arr[1] + arr[2]) / 3;
+    } else if (env.type === 'image' || env.type === 'procedural') {
+        const chart = plan.program.estimator.envSampler.chart;
+        const total = params['env.totalWeight'] as number | undefined;
+        const size = params[chart === 'octahedral' ? 'env.sizeOct' : 'env.size'] as number[] | undefined;
+        if (total !== undefined && size !== undefined && size[0] > 0 && size[1] > 0) {
+            // totalWeight = Σ Y·w with the chart constants dropped (build-environment-sampler):
+            // equirect w = sinθ ⇒ ∫L dΩ = total·2π²/(WH); octahedral w = 1 ⇒ ∫L dΩ = total·4π/(WH).
+            // L̄ = ∫L dΩ / 4π.
+            const [w, h] = size;
+            meanL = chart === 'octahedral' ? total / (w * h) : (total * Math.PI) / (2 * w * h);
+        }
+    }
+    const r = sceneRadiusEstimate(plan);
+    const phiEnv = 4 * Math.PI * Math.PI * r * r * meanL * intensity;
+    const phiFin = plan.lights.reduce((acc, l) => acc + lightPower(l, params), 0);
+    return clampP(phiEnv / Math.max(phiEnv + phiFin, 1e-20));
+}
+
+/** The parameter paths the derived p_env depends on (the closure's inputs). */
+function envSelectionDeps(plan: RenderPlan): string[] {
+    const env = plan.program.environment;
+    const deps = new Set<string>(['env.intensity']);
+    if (env.type === 'constant') {
+        if (isValueParam(env.color)) deps.add(env.color.param);
+    } else if (env.type === 'image' || env.type === 'procedural') {
+        deps.add('env.totalWeight');
+        deps.add(plan.program.estimator.envSampler.chart === 'octahedral' ? 'env.sizeOct' : 'env.size');
+    }
+    for (const p of drivenEmissionPaths(plan.lights)) deps.add(p);
+    return [...deps];
 }
 
 /** Compile-time selection pdfs — shared by lighting_sample and lighting_pdf.
