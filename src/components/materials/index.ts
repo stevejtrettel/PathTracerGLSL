@@ -10,12 +10,14 @@ import { lambertDescriptor } from './lambert/lambert.js';
 import { dielectricDescriptor } from './dielectric/dielectric.js';
 import { ggxDescriptor } from './ggx/ggx.js';
 import { mirrorDescriptor } from './mirror/mirror.js';
+import { checkerDescriptor } from './checker/checker.js';
 
 export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescriptor>> = {
     lambert: lambertDescriptor,
     dielectric: dielectricDescriptor,
     ggx: ggxDescriptor,
     mirror: mirrorDescriptor,
+    checker: checkerDescriptor,
 };
 
 /** The model's STRUCT surface (D4): its rows plus its derived fields as pseudo-rows —

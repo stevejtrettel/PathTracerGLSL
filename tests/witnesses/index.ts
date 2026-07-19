@@ -21,6 +21,7 @@ import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '.
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
+import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy } from './scenes/meshWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import {
     slabScene, slabStrategy,
@@ -120,6 +121,37 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // fp32 noise, not just statistically — hence the near-zero gates.
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.001, rmse: 0.002, label: 'variance occupant mean untouched' },
             ],
+        },
+    },
+    // Mesh backend (impl-plan-meshes). mesh-furnace: F-BOX 0.4 through the triangle engine +
+    // the emissive-mesh path — the sharpest single gate. mesh-quad-twin ⇄ mesh-quad-ref: same
+    // floor+blocker geometry as a mesh vs analytic quads (cross-backend twin, exercises NEE
+    // occlusion / the blocker's shadow via mesh_intersect_any).
+    'mesh-furnace': {
+        scene: meshFurnace,
+        strategies: posed([0, 0, 0], [0, 0, -1], meshFurnaceStrategy),
+        exercises: 'triangle-mesh engine (brute force) + emissive mesh (region_to = owner on front hit); a closed inward-normal cube with the F-BOX material → mean 0.4',
+        expected: 'every pixel = EXACTLY 0.4 in linear HDR (F-BOX Le/(1−ρ)) — any energy leak in mesh intersect/shade/emission moves it off 0.4',
+        witness: {
+            spp: 48,
+            checks: [{ kind: 'mean', value: 0.4, tol: 0.01, label: 'mesh F-BOX 0.4' }],
+        },
+    },
+    // Fixture partner: the analytic-quad half of the mesh-quad twin.
+    'mesh-quad-ref': {
+        scene: meshQuadRef,
+        strategies: [meshTwinStrategy],
+        exercises: 'analytic-quad reference arm of the mesh-quad twin (floor + blocker as two analytic quads)',
+    },
+    'mesh-quad-twin': {
+        scene: meshQuadTwin,
+        strategies: [meshTwinStrategy],
+        exercises: 'floor + floating blocker authored as ONE triangle mesh: primary hits, Lambert shading, and NEE occlusion (mesh_intersect_any casts the blocker\'s shadow) — twin of mesh-quad-ref (analytic quads)',
+        expected: 'converges to the same image as mesh-quad-ref (the mesh and analytic backends agree)',
+        witness: {
+            spp: 96,
+            // Cross-backend twin → the display-space RMSE gate (like analytic-minimal), not χ².
+            checks: [{ kind: 'twin', other: { scene: 'mesh-quad-ref' }, meanTol: 0.02, rmse: 0.08, label: 'mesh ≡ analytic quads' }],
         },
     },
     // Fixture partner: the SDF half of the analytic-minimal twin (and the direct-only

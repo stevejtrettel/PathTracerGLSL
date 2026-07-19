@@ -5,6 +5,7 @@ import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '..
 import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
+import { packMesh, meshExternNames } from '../components/intersection/mesh/mesh.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
@@ -151,6 +152,19 @@ export class App {
             }
         }
 
+        // Mesh geometry (impl-plan-meshes): pack each mesh's vertex/triangle data into extern
+        // data textures and register them BEFORE the renderers exist — like the env map, the
+        // executor hard-errors on a missing extern, so the textures must be in the registry
+        // before any pass could bind them. Scene-static data → uploaded once, then only bound.
+        if (config.scene !== undefined) {
+            try {
+                this._uploadMeshes(config.scene);
+            } catch (error: any) {
+                this._showErrorOverlay(error);
+                throw error;
+            }
+        }
+
         try {
             await this.rendererManager.initialize(config);
         } catch (error: any) {
@@ -190,6 +204,25 @@ export class App {
                 console.error(`Failed to load HDR environment: ${hdrPath}`, error);
                 throw error;
             }
+        }
+    }
+
+    /**
+     * Pack every mesh in the scene into its four extern data textures (position/index/normal/uv,
+     * all RGBA32F) and register them under meshExternNames(ordinal) — the SAME names the compiler's
+     * `extern:` sources use, keyed by mesh ordinal in scene order. App-side (like the env load):
+     * the compiler declares the samplers, the app owns the GPU payload. impl-plan-meshes §7.
+     */
+    private _uploadMeshes(scene: SceneDescription): void {
+        let ordinal = 0;
+        for (const obj of scene.objects) {
+            if (!('kind' in obj)) continue;
+            const packed = packMesh(obj);
+            const names = meshExternNames(ordinal++);
+            this.engine.registerDataTexture(names.position, packed.position.data, packed.position.width, packed.position.height);
+            this.engine.registerDataTexture(names.index, packed.index.data, packed.index.width, packed.index.height);
+            this.engine.registerDataTexture(names.normal, packed.normal.data, packed.normal.width, packed.normal.height);
+            this.engine.registerDataTexture(names.uv, packed.uv.data, packed.uv.width, packed.uv.height);
         }
     }
 

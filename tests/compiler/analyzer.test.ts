@@ -18,11 +18,11 @@ function scene(partial: Partial<SceneDescription>): SceneDescription {
 }
 
 describe('analyze — geometry', () => {
-    it('flags meshes (Validator-rejected until the BVH backend); empty scene → false', () => {
+    it('flags meshes present; empty scene → false', () => {
         expect(analyze(scene({
             objects: [
                 { type: 'sphere', parameters: {}, material: 'm' },
-                { kind: 'mesh', data: new Float32Array(0), material: 'm' },
+                { kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2]), material: 'm' },
             ],
         })).geometry.hasMeshes).toBe(true);
         expect(analyze(scene({})).geometry.hasMeshes).toBe(false);

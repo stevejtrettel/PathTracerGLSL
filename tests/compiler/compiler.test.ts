@@ -113,12 +113,15 @@ describe('Compiler', () => {
             expect(() => compiler.compile(badScene, minimalStrategy)).toThrow('not yet supported');
         });
 
-        it('rejects mesh objects', () => {
-            const badScene: SceneDescription = {
+        it('compiles a mesh object (impl-plan-meshes)', () => {
+            const meshScene: SceneDescription = {
                 ...minimalScene,
-                objects: [{ kind: 'mesh', data: new Float32Array(), material: 'ground' }],
+                objects: [{ kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2]), material: 'ground' }],
             };
-            expect(() => compiler.compile(badScene, minimalStrategy)).toThrow('Mesh objects not yet supported');
+            const result = compiler.compile(meshScene, minimalStrategy);
+            const frag = result.shaders.get('pathtracer-minimal-main')!.fragment;
+            expect(frag).toContain('mesh_intersect');
+            expect(frag).toContain('u_mesh_0_position');
         });
 
         it('rejects directional lights', () => {
@@ -143,14 +146,14 @@ describe('Compiler', () => {
             const badScene: SceneDescription = {
                 ...minimalScene,
                 ambientSpace: { type: 'spherical' },
-                objects: [{ kind: 'mesh', data: new Float32Array(), material: 'ground' }],
+                objects: [{ kind: 'mesh', positions: new Float32Array(0), indices: new Uint32Array(0), material: 'ground' }],
             };
             try {
                 compiler.compile(badScene, minimalStrategy);
                 expect.fail('should have thrown');
             } catch (e: any) {
                 expect(e.message).toContain('Ambient space');
-                expect(e.message).toContain('Mesh objects');
+                expect(e.message).toMatch(/mesh/i);
             }
         });
     });

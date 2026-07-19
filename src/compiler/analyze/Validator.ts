@@ -2,7 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -42,12 +42,6 @@ export function validate(
         bag.error('invalid-setting', `Ambient space '${features.ambientSpace}' not yet supported`)
             .add();
     }
-
-    if (features.geometry.hasMeshes) {
-        bag.error('missing-geometry', 'Mesh objects not yet supported')
-            .add();
-    }
-
 
     if (strategy.estimator.directLighting !== 'none'
         && features.lighting.totalLightCount === 0
@@ -127,6 +121,20 @@ export function validate(
         // uniform's initial value AND the plan-time CDF bake; a driven light needs one). The
         // reserved-path/collision checks ride collectParamPaths automatically (ValueParam-shaped).
         const e = authored.emission;
+        // Blackbody spelling (impl-plan-blackbody-uv): validate the DIALS — kelvin
+        // (finite, > 0; constant or {param} default) and scale (finite, >= 0).
+        if (isBlackbody(e)) {
+            const { kelvin, scale } = e.blackbody;
+            const kVal = isValueParam(kelvin) ? kelvin.default : kelvin;
+            if (typeof kVal !== 'number' || !Number.isFinite(kVal) || kVal <= 0) {
+                bag.error('invalid-setting', `Light ${i} (${light.kind}): blackbody kelvin must be a finite number > 0 (constant, or a {param} with a finite default)`).add();
+            }
+            const sVal = scale === undefined ? 1 : isValueParam(scale) ? (scale.default ?? 1) : scale;
+            if (typeof sVal !== 'number' || !Number.isFinite(sVal) || sVal < 0) {
+                bag.error('invalid-setting', `Light ${i} (${light.kind}): blackbody scale must be a finite number >= 0`).add();
+            }
+            continue;   // the generic shape/negativity checks below are for plain spectra
+        }
         const eDriven = isValueParam(e);
         const eValue = eDriven ? (e as { default?: unknown }).default : e;
         const eChannels = typeof eValue === 'number' && Number.isFinite(eValue) ? [eValue]
@@ -745,6 +753,45 @@ export function validate(
                 .withOriginal('scene', [`objects[${i}]`, `material`])
                 .suggest(`Available materials: ${[...materialNames].join(', ')}`)
                 .add();
+        }
+    }
+
+    // Mesh geometry sanity (impl-plan-meshes): the arrays must be well-formed and the indices
+    // in range — a malformed buffer would silently texelFetch garbage vertices on the GPU.
+    for (let i = 0; i < scene.objects.length; i++) {
+        const obj = scene.objects[i];
+        if (!('kind' in obj)) continue;
+        const vertexCount = obj.positions.length / 3;
+        if (obj.positions.length === 0 || obj.positions.length % 3 !== 0) {
+            bag.error('invalid-setting', `Object ${i} (mesh): positions length ${obj.positions.length} is not a nonzero multiple of 3`)
+                .withOriginal('scene', [`objects[${i}]`, 'positions']).add();
+        }
+        if (obj.indices.length === 0 || obj.indices.length % 3 !== 0) {
+            bag.error('invalid-setting', `Object ${i} (mesh): indices length ${obj.indices.length} is not a nonzero multiple of 3`)
+                .withOriginal('scene', [`objects[${i}]`, 'indices']).add();
+        } else if (Number.isInteger(vertexCount)) {
+            let maxIdx = -1;
+            for (let k = 0; k < obj.indices.length; k++) if (obj.indices[k] > maxIdx) maxIdx = obj.indices[k];
+            if (maxIdx >= vertexCount) {
+                bag.error('invalid-setting', `Object ${i} (mesh): vertex index ${maxIdx} out of range (only ${vertexCount} vertices)`)
+                    .withOriginal('scene', [`objects[${i}]`, 'indices']).add();
+            }
+        }
+        if (obj.normals !== undefined && obj.normals.length !== obj.positions.length) {
+            bag.error('invalid-setting', `Object ${i} (mesh): normals length ${obj.normals.length} must match positions length ${obj.positions.length} (one normal per vertex)`)
+                .withOriginal('scene', [`objects[${i}]`, 'normals']).add();
+        }
+        if (obj.uvs !== undefined && obj.uvs.length !== vertexCount * 2) {
+            bag.error('invalid-setting', `Object ${i} (mesh): uvs length ${obj.uvs.length} must be 2× the vertex count (${vertexCount * 2})`)
+                .withOriginal('scene', [`objects[${i}]`, 'uvs']).add();
+        }
+        // v0 meshes are thin surfaces (no interior containment — impl-plan-meshes §3): a
+        // transmissive material has no interior region, so ior_of falls to 1.0 and the mesh
+        // refracts as vacuum. Warn (don't error) — the surface still renders; dielectric
+        // meshes await the winding-number containment batch (v2).
+        if (MATERIAL_MODELS[scene.materials[obj.material]?.model ?? '']?.capabilities.transmission) {
+            bag.warning('invalid-setting', `Object ${i} (mesh): a transmissive material on a v0 mesh has no interior (thin surface) — it will refract as η = 1; dielectric meshes are deferred (impl-plan-meshes §3)`)
+                .withOriginal('scene', [`objects[${i}]`, 'material']).add();
         }
     }
 

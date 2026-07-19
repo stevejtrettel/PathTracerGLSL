@@ -1,7 +1,7 @@
 // compiler/plan/Planner.ts
 
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
-import { isGlslExpression, isValueParam, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission } from '../types.js';
+import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
@@ -21,7 +21,9 @@ import {
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
+import { foldBlackbody } from '../../components/lights/blackbody.js';
+import type { BlackbodyValue } from '../types.js';
 
 /** Registered primitive types — unknowns must diagnose here, not throw downstream
  *  (impl-plan-geometry-descriptors: the capability IS the descriptor fact). */
@@ -71,9 +73,29 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     // region id (§2.3), so material_of() spans both lists and regions never collide.
     const objects: PlannedSDFObject[] = [];
     const analyticObjects: PlannedAnalyticObject[] = [];
+    const meshes: PlannedMesh[] = [];
     let objectIndex = 0;
+    let meshOrdinal = 0;
     for (const obj of scene.objects) {
-        if ('kind' in obj) continue;   // Validator-rejected (deferred)
+        if ('kind' in obj) {
+            // Mesh (impl-plan-meshes): a region in the shared id space; placement is
+            // ray-into-local for BOTH constant and driven (vertices stay object-LOCAL —
+            // never folded, so a slider moves the mesh with no re-upload). Data (vertices/
+            // triangles) becomes extern textures the app uploads; only counts/flags plan here.
+            const matId = materialIdMap.get(obj.material)!;   // validated by the Validator
+            meshes.push({
+                ordinal: meshOrdinal++,
+                index: objectIndex++,
+                materialId: matId,
+                name: obj.name,
+                triCount: obj.indices.length / 3,
+                smooth: obj.normals !== undefined,
+                placement: isDrivenTransform(obj.transform)
+                    ? buildDrivenPlacement(obj.transform!, objectIndex - 1)
+                    : placementOf(obj.transform),
+            });
+            continue;
+        }
         const backend = resolveBackend(obj.type, obj.backend);
         if (backend === undefined) {
             // Unregistered type or unhonorable pin — a diagnostic, never a throw (C7).
@@ -138,8 +160,12 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         // values (the sampler reads its uniform) AND, for hittable kinds, the synthesized
         // material's emission row — the SAME uniform, so pt ≡ pt-nee by construction.
         const e = light.emission;
-        const product: Vec3 | ValueParam<number> | ValueParam<Vec3> =
-            isValueParam(e) ? e : (typeof e === 'number' ? [e, e, e] : e);
+        // Blackbody (impl-plan-blackbody-uv): constant dials FOLD here; a driven dial
+        // flows through as the spec — the split point mints slider + derived uniform.
+        const product: Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue =
+            isValueParam(e) ? e
+            : isBlackbody(e) ? foldBlackbody(e)
+            : (typeof e === 'number' ? [e, e, e] : e);
         // Row defaults applied ONCE by the framework (D1) — the same record the
         // Validator judged; toValues/region.parameters read plain values.
         const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
@@ -206,12 +232,13 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         : -1;
 
     // --- Build program description ---
-    const program = planProgram(features, scene, strategy, lights, materials);
+    const program = planProgram(features, scene, strategy, lights, materials, objects, analyticObjects, meshes);
     const pipeline = planPipeline(program);
 
     return {
         objects,
         analyticObjects,
+        meshes,
         materials,
         lights,
         ambientMedium,
@@ -224,7 +251,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[]): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[], objects: PlannedSDFObject[], analyticObjects: PlannedAnalyticObject[], meshes: PlannedMesh[]): ProgramDescription {
     // Surface models = the models of the PLANNED materials — the one list that already
     // includes the desugared area lights' synthesized emitter materials, so a new hittable
     // light kind can never leave its backing model out of the program (the lights-door
@@ -323,7 +350,14 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         // iff some included technique links it — the same conditions the techniques'
         // `requires` lists state, written down ONCE where the providers read them.
         intersection: {
-            method: 'raymarch',
+            // Backend presence — the intersection family's link map (symmetric across all
+            // three; scene_intersect combines exactly these arms). Derived from the resolved
+            // plan objects, so byte-identical to the prior local length checks in the feature.
+            backends: {
+                sdf: objects.length > 0,
+                analytic: analyticObjects.length > 0,
+                mesh: meshes.length > 0,
+            },
             // The opaque shadow fast path is scene_intersect_any's only caller; the
             // media shadow walker re-spawns scene_intersect instead (§6.3).
             anyQuery: lighting !== null && !features.media.hasMedia,
@@ -363,7 +397,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // Driven-lights Stage A: a ValueParam reaches PlannedLight.values ONLY via a
             // driven radiometric row (geometry stays constant in v1), so this is exactly
             // "some light's emission is a {param}".
-            driven: lighting !== null && lights.some((l) => Object.values(l.values).some(isValueParam)),
+            driven: lighting !== null && lights.some((l) => Object.values(l.values).some((v) => isValueParam(v) || isBlackbody(v))),   // a driven blackbody dial is driven emission
         },
         environment: resolveEnvironment(scene.environment),
         environmentSamplable: envSamplable,
@@ -627,21 +661,28 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
         values[row.source] = resolveScalarProperty(
             (med as unknown as Record<string, MaterialProperty | undefined>)[row.source], row.default);
     }
+    // Media coefficients are NOT blackbody surfaces (σ is extinction, not radiance);
+    // the narrowing below is honest — isBlackbody σ is Validator-rejected upstream.
+    const noBB = (v: ReturnType<typeof resolveColorProperty>): Vec3 | GlslExpression | ValueParam<Vec3> => {
+        if (isBlackbody(v)) throw new Error('blackbody spelling on a medium coefficient (Validator should have rejected it)');
+        return v;
+    };
     return {
-        sigma_a: resolveColorProperty(med.sigma_a, [0.0, 0.0, 0.0]),
-        sigma_s: resolveColorProperty(med.sigma_s, [0.0, 0.0, 0.0]),
+        sigma_a: noBB(resolveColorProperty(med.sigma_a, [0.0, 0.0, 0.0])),
+        sigma_s: noBB(resolveColorProperty(med.sigma_s, [0.0, 0.0, 0.0])),
         model,
         // Heterogeneous D1: carried only when authored (the Validator enforces the
         // expression↔majorant pairing and warns on inert declarations).
         ...(med.majorant !== undefined ? { majorant: med.majorant } : {}),
-        emission: resolveColorProperty(med.emission, [0.0, 0.0, 0.0]),
+        emission: noBB(resolveColorProperty(med.emission, [0.0, 0.0, 0.0])),
         values,
     };
 }
 
-export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> {
+export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> | BlackbodyValue {
     if (value === undefined) return fallback;
     if (isGlslExpression(value)) return value;
+    if (isBlackbody(value)) return foldBlackbody(value);   // constant dials bake; driven survive
     if (isValueParam(value)) {
         // Scalar spectra intentionally broadcast. Do the same for a parameter default so
         // the generated vec3 uniform can never receive a scalar on its initial upload.

@@ -28,13 +28,14 @@
 // keeps its own idiom because it is not a name swap: the light selection CDF (a float[] fed by
 // computeSelectPdf). The environment's intensity/rotation are the deliberate always-live controls.
 
-import { isValueParam, isGlslExpression, type Vec3, type ValueParam, type GlslExpression, type ParameterMetadata } from '../types.js';
+import { isValueParam, isGlslExpression, isBlackbody, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata } from '../types.js';
+import { blackbodyRGB, foldBlackbody } from '../../components/lights/blackbody.js';
 import type { PlannedUniform } from '../plan/types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
  *  (heterogeneous media only — the third axis, orthogonal to the constant/driven split). */
-export type ParamValue = Vec3 | number | GlslExpression | ValueParam<Vec3 | number>;
+export type ParamValue = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue;
 
 /**
  * USE SITE. What the emitted GLSL reads for a value:
@@ -48,9 +49,26 @@ export function emitValue(
     format: (x: never) => string,
     exprFormat: (e: GlslExpression) => string = (e) => e.source,
 ): string {
+    if (isBlackbody(v)) {
+        // Constant dials bake (plan entry normally folds these already — this is the
+        // backstop); a driven dial reads its ONE derived vec3 uniform.
+        const folded = foldBlackbody(v);
+        if (!isBlackbody(folded)) return format(folded as never);
+        return blackbodyUniformName(v);
+    }
     if (isValueParam(v)) return paramToUniform(v.param);
     if (isGlslExpression(v)) return exprFormat(v);
     return format(v as never);
+}
+
+/** The derived vec3 uniform's name — from the driven dial's path (kelvin wins), so a
+ *  hittable lamp's sampler and its surface emission mint THE SAME uniform (dedup by
+ *  name at merge + by `seen` here — the Stage-A discipline). */
+function blackbodyUniformName(v: BlackbodyValue): string {
+    const { kelvin, scale } = v.blackbody;
+    const driven = isValueParam(kelvin) ? kelvin : (scale !== undefined && isValueParam(scale) ? scale : null);
+    if (driven === null) throw new Error('blackbodyUniformName: both dials constant (should have folded)');
+    return `${paramToUniform(driven.param)}_rgb`;
 }
 
 /**
@@ -85,6 +103,49 @@ export function mintValueUniform(
                 ...(p.min !== undefined && p.max !== undefined ? { range: [p.min, p.max] } : {}),
             };
         }
+        return;
+    }
+    if (isBlackbody(prop)) {
+        // The blackbody DERIVED mint (impl-plan-blackbody-uv): each driven dial gets its
+        // float slider; ONE computed vec3 uniform carries chroma(kelvin)·scale — the
+        // u_majorant pattern (bake ≡ ship through blackbodyRGB, one body).
+        const folded = foldBlackbody(prop);
+        if (!isBlackbody(folded)) return;   // fully constant: emitValue baked the literal
+        const { kelvin, scale } = prop.blackbody;
+        const name = blackbodyUniformName(prop);
+        if (seen.has(name)) return;
+        seen.add(name);
+        const kDefault = isValueParam(kelvin) ? (kelvin.default ?? 6500) : kelvin;
+        const sDefault = scale === undefined ? 1 : isValueParam(scale) ? (scale.default ?? 1) : scale;
+        const deps: string[] = [];
+        if (isValueParam(kelvin)) {
+            deps.push(kelvin.param);
+            const seg = kelvin.param.split('.');
+            parameters[kelvin.param] = {
+                type: 'float', default: kDefault, name: 'Kelvin', unit: 'K',
+                group: seg.length > 1 ? seg[0] : undefined, triggersReset: true,
+                range: [kelvin.min ?? 1000, kelvin.max ?? 12000],
+            };
+        }
+        if (scale !== undefined && isValueParam(scale)) {
+            deps.push(scale.param);
+            const seg = scale.param.split('.');
+            parameters[scale.param] = {
+                type: 'float', default: sDefault, name: capitalize(seg[seg.length - 1]),
+                group: seg.length > 1 ? seg[0] : undefined, triggersReset: true,
+                range: [scale.min ?? 0, scale.max ?? Math.max(4 * sDefault, 1)],
+            };
+        }
+        uniforms.push({
+            name, type: 'vec3',
+            parameterPath: deps[0],
+            ...(deps.length > 1 ? { parameterPaths: deps } : {}),
+            default: blackbodyRGB(kDefault, sDefault),
+            compute: (p) => blackbodyRGB(
+                isValueParam(kelvin) ? ((p[kelvin.param] as number) ?? kDefault) : kelvin,
+                scale === undefined ? 1 : isValueParam(scale) ? ((p[scale.param] as number) ?? sDefault) : scale,
+            ),
+        });
         return;
     }
     if (!isValueParam(prop)) return;

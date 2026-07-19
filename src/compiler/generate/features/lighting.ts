@@ -5,7 +5,8 @@
 // generated `lighting_sample` that CDF-selects a light and calls its kind sampler (§6.1/§3.3).
 
 import type { RenderPlan, PlannedLight } from '../../plan/types.js';
-import { isValueParam } from '../../types.js';
+import { isValueParam, isBlackbody } from '../../types.js';
+import { blackbodyRGB } from '../../../components/lights/blackbody.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
@@ -270,6 +271,14 @@ export function resolveLightValues(l: PlannedLight, params: Record<string, unkno
         if (isValueParam(v)) {
             const raw = params[v.param] ?? v.default;
             out[k] = typeof raw === 'number' ? [raw, raw, raw] : raw as number[];
+        } else if (isBlackbody(v)) {
+            // Blackbody dials resolve LIVE (impl-plan-blackbody-uv): the kelvin slider
+            // reshuffles the power CDF through the same bake ≡ ship body.
+            const { kelvin, scale } = v.blackbody;
+            out[k] = blackbodyRGB(
+                isValueParam(kelvin) ? ((params[kelvin.param] as number) ?? kelvin.default ?? 6500) : kelvin,
+                scale === undefined ? 1 : isValueParam(scale) ? ((params[scale.param] as number) ?? scale.default ?? 1) : scale,
+            );
         } else {
             out[k] = v as number | number[];
         }
@@ -299,7 +308,13 @@ function lightKind(l: PlannedLight): LightKindDescriptor {
  *  selection arrays depend on (any one changing recomputes the whole CDF). */
 function drivenEmissionPaths(lights: PlannedLight[]): string[] {
     const s = new Set<string>();
-    for (const l of lights) for (const v of Object.values(l.values)) if (isValueParam(v)) s.add(v.param);
+    for (const l of lights) for (const v of Object.values(l.values)) {
+        if (isValueParam(v)) s.add(v.param);
+        else if (isBlackbody(v)) {   // driven dials feed the CDF closures too
+            if (isValueParam(v.blackbody.kelvin)) s.add(v.blackbody.kelvin.param);
+            if (v.blackbody.scale !== undefined && isValueParam(v.blackbody.scale)) s.add(v.blackbody.scale.param);
+        }
+    }
     return [...s];
 }
 

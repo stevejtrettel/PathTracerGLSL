@@ -47,9 +47,12 @@ describe('Validator', () => {
         expect(bag.getErrors().some(e => /ambient space/i.test(e.message))).toBe(true);
     });
 
-    it('rejects mesh geometry', () => {
-        const bag = run(s => { s.objects.push({ kind: 'mesh', data: new Float32Array(0), material: 'm' }); });
-        expect(bag.getErrors().some(e => e.code === 'missing-geometry' && /mesh/i.test(e.message))).toBe(true);
+    it('accepts a well-formed mesh; rejects a malformed one (impl-plan-meshes)', () => {
+        const ok = run(s => { s.objects.push({ kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2]), material: 'm' }); });
+        expect(ok.getErrors().length).toBe(0);
+        // Out-of-range vertex index must error (would texelFetch garbage on the GPU).
+        const bad = run(s => { s.objects.push({ kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 9]), material: 'm' }); });
+        expect(bad.getErrors().some(e => e.code === 'invalid-setting' && /index .* out of range/i.test(e.message))).toBe(true);
     });
 
     it('accepts analytic geometry (closed-form sphere/plane backend)', () => {
@@ -234,7 +237,7 @@ describe('Validator', () => {
     it('accumulates multiple independent errors in one pass', () => {
         const bag = run(s => {
             s.ambientSpace = { type: 'spherical' };
-            s.objects.push({ kind: 'mesh', data: new Float32Array(0), material: 'm' });
+            s.objects.push({ kind: 'mesh', positions: new Float32Array(0), indices: new Uint32Array(0), material: 'm' });
         });
         expect(bag.count('error')).toBeGreaterThanOrEqual(2);
     });

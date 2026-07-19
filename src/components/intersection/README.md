@@ -1,10 +1,10 @@
 # intersection/ — the intersection-method axis
 
-**Taxonomy:** the numerical method by which rays find the scene's geometry — the
-occupant of `ProgramDescription.intersection.method` (feature:
-`compiler/generate/features/intersection.ts`). Distinct from `geometry/`, which owns
-the SHAPES (primitives, their math, the placement algebra); this family owns the
-ENGINES that traverse them.
+**Taxonomy:** the numerical engines by which rays find the scene's geometry — gated by
+`ProgramDescription.intersection.backends` (`{ sdf, analytic, mesh }`; feature:
+`compiler/generate/features/intersection.ts`, which combines exactly the arms present).
+Distinct from `geometry/`, which owns the SHAPES (primitives, their math, the placement
+algebra); this family owns the ENGINES that traverse them.
 
 ## Occupants
 
@@ -17,8 +17,8 @@ ENGINES that traverse them.
 
 The analytic backend needs no engine file — its "method" is the generated
 closed-form dispatch (`generateAnalyticDispatch`) over the primitives' `<type>_intersect`
-functions. The future mesh backend's BVH traversal is this family's next occupant
-(`intersection.method` grows a value when it lands).
+functions. The mesh backend (`mesh/` — impl-plan-meshes) is this family's second occupant:
+a triangle engine over data-texture geometry, gated by `intersection.backends.mesh`.
 
 ## Contract
 

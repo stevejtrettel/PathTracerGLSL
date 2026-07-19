@@ -29,6 +29,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'similarity.ts',                       // geometry shared part (placement algebra — fable-transforms §2)
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)
+    'blackbody.ts',                        // lights shared part (kelvin → RGB parameterization — impl-plan-blackbody-uv)
 ]);
 
 describe('components structure', () => {

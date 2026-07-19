@@ -5,6 +5,7 @@ import { RenderExecutor } from './RenderExecutor.js';
 import { ParameterManager } from './ParameterManager.js';
 import { GPUProfiler } from './GPUProfiler.js';
 import { TextureRegistry } from './TextureRegistry.js';
+import { TextureFactory } from './utils/TextureFactory.js';
 import { HDREnvironmentLoader } from './HDREnvironmentLoader.js';
 import { buildEnvironmentSampler } from './loaders/build-environment-sampler.js';
 import { registerBlueNoise } from './loaders/blueNoise.js';
@@ -421,6 +422,17 @@ export class Engine {
      * The radiance table itself is NOT registered: a procedural env direct-evals its
      * formula; the table exists only as CDF food.
      */
+    /**
+     * Register a generic RGBA32F data texture under `name`, bindable via `extern:<name>`
+     * (impl-plan-meshes). NEAREST/CLAMP, texelFetch-ready. The engine stays scene-agnostic —
+     * the app computes the payload (e.g. packed mesh geometry) and owns the extern name;
+     * the registry replaces (and disposes) any prior texture of the same name.
+     */
+    registerDataTexture(name: string, data: Float32Array, width: number, height: number): void {
+        const factory = new TextureFactory(this.gl);
+        this.textureRegistry.register(name, factory.createRGBA32F(data, width, height));
+    }
+
     registerEnvironmentTable(
         rgb: Float32Array,
         width: number,

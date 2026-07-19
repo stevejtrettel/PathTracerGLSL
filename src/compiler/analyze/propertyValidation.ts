@@ -4,7 +4,7 @@
 // migration can later carry the same shape/domain data and call this function directly; the
 // validation behavior and diagnostics do not need to be rewritten when ownership moves.
 
-import { isGlslExpression, isValueParam, type SceneDescription } from '../types.js';
+import { isGlslExpression, isValueParam, isBlackbody, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -43,6 +43,13 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
         }
 
         if (mat.medium === undefined) continue;
+        for (const [prop, v] of [['sigma_a', mat.medium.sigma_a], ['sigma_s', mat.medium.sigma_s], ['emission', mat.medium.emission]] as const) {
+            if (isBlackbody(v)) {
+                bag.error('invalid-setting',
+                    `Material '${name}': medium.${prop} cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields`)
+                    .add();
+            }
+        }
         validatePropertyValue(mat.medium.sigma_a, { shape: 'spectrum', constraint: { kind: 'nonnegative' } },
             `Material '${name}': medium.sigma_a`, bag);
         validatePropertyValue(mat.medium.sigma_s, { shape: 'spectrum', constraint: { kind: 'nonnegative' } },
@@ -67,6 +74,20 @@ export function validatePropertyValue(
     bag: DiagnosticBag,
 ): void {
     if (value === undefined || isGlslExpression(value)) return;
+    if (isBlackbody(value)) {
+        // The blackbody spelling: dials validated here; the chroma is derived (>= 0 by
+        // construction), so the generic spectrum checks below do not apply.
+        const { kelvin, scale } = value.blackbody;
+        const kVal = isValueParam(kelvin as never) ? (kelvin as { default?: unknown }).default : kelvin;
+        if (typeof kVal !== 'number' || !Number.isFinite(kVal) || kVal <= 0) {
+            bag.error('invalid-setting', `${label}: blackbody kelvin must be a finite number > 0 (constant, or a {param} with a finite default)`).add();
+        }
+        const sRaw = scale === undefined ? 1 : isValueParam(scale as never) ? ((scale as { default?: unknown }).default ?? 1) : scale;
+        if (typeof sRaw !== 'number' || !Number.isFinite(sRaw) || sRaw < 0) {
+            bag.error('invalid-setting', `${label}: blackbody scale must be a finite number >= 0`).add();
+        }
+        return;
+    }
 
     let authored: unknown = value;
     let parameterMin: number | undefined;

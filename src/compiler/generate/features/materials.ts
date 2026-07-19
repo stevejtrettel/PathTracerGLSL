@@ -3,7 +3,7 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
-import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumMayScatter, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumMayScatter, isValueParam, isBlackbody, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -41,7 +41,7 @@ function surfaceMaterials(materials: PlannedMaterial[]): PlannedMaterial[] {
 function isEmissive(mat: PlannedMaterial): boolean {
     const e = mat.values[EMISSION_KEY];
     if (e === undefined) return false;   // model declares no emission row
-    if (isValueParam(e) || isGlslExpression(e)) return true;
+    if (isValueParam(e) || isGlslExpression(e) || isBlackbody(e)) return true;   // driven blackbody: may be nonzero
     return Array.isArray(e) && e.some((c) => c > 0);
 }
 
@@ -324,7 +324,7 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             const fmt = (f.glslType === 'Spectrum' ? formatSpectrum : formatFloat) as (x: never) => string;
             // Constant emission is assigned only when nonzero (the gate's `> 0` twin); a
             // driven/expression emission always assigns (it may be nonzero at runtime).
-            if (f.name === 'emission' && !isValueParam(value) && !isGlslExpression(value)) {
+            if (f.name === 'emission' && !isValueParam(value) && !isGlslExpression(value) && !isBlackbody(value)) {
                 const rgb = value as Vec3;
                 if (rgb[0] > 0 || rgb[1] > 0 || rgb[2] > 0) body.push(`${target} = ${formatSpectrum(rgb)};`);
                 continue;

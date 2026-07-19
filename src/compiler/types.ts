@@ -106,9 +106,25 @@ export interface PrimitiveObject {
     backend?: 'sdf' | 'analytic';
 }
 
+/**
+ * A triangle mesh (impl-plan-meshes). Built from incoming data (OBJ → authoring loader).
+ * v0: thin surface (no interior containment — §3), single material per mesh (one region),
+ * ray-into-local placement (positions stay object-LOCAL; the transform conjugates the ray).
+ * Arrays are flat typed buffers — the BVH/packer (components/intersection/mesh) turns them
+ * into the data textures the traversal texelFetches.
+ */
 export interface MeshObject {
     kind: 'mesh';
-    data: Float32Array;
+    /** Vertex positions, xyz per vertex (length 3·V), OBJECT-LOCAL space. */
+    positions: Float32Array;
+    /** Triangle vertex indices, 3 per triangle (length 3·T). */
+    indices: Uint32Array;
+    /** Optional per-vertex normals (length 3·V) for smooth shading; absent = flat
+     *  geometric normals (per-face cross product, computed in-shader). */
+    normals?: Float32Array;
+    /** Optional per-vertex UVs (length 2·V) — barycentric-interpolated into Hit.uv (the
+     *  first real per-primitive chart). Absent = the planar placeholder chart. */
+    uvs?: Float32Array;
     material: string;
     transform?: Transform;
     /** Provenance only (never identity) — see PrimitiveObject.name. */
@@ -201,12 +217,30 @@ export type ScalarProperty = Value<number> | GlslExpression;
 
 /** Spectrum-valued authored property. A scalar is an intentional achromatic broadcast,
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
-export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3>;
+export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
 
 /** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty
  * minus GlslExpression). The Model B split surface for radiometric values that are read at a
  * point but never vary spatially: light emission and the constant-env color. */
-export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3>;
+/** Blackbody emission spelling (impl-plan-blackbody-uv): the lamp's two PHYSICAL dials —
+ *  temperature and power. kelvin → chroma is a pure function (components/lights/
+ *  blackbody.ts), so this is a DERIVED value: constant kelvin+scale FOLD to a Vec3 at
+ *  plan entry; a driven dial mints its float slider + ONE computed vec3 uniform
+ *  (`u_<kelvinPath>_rgb`) at the Model-B split point. Chroma is max-channel normalized —
+ *  `scale` carries all magnitude (the HDR-widget decomposition). */
+export interface BlackbodyValue {
+    blackbody: {
+        kelvin: Value<number>;
+        /** Radiometric magnitude multiplying the unit-max chroma. Default 1. */
+        scale?: Value<number>;
+    };
+}
+
+export function isBlackbody(v: unknown): v is BlackbodyValue {
+    return typeof v === 'object' && v !== null && 'blackbody' in v;
+}
+
+export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
 
 /** Union used by generic planner helpers. Public fields use the narrower aliases above. */
 export type MaterialProperty = ScalarProperty | SpectrumProperty;

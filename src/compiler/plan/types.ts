@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
 
 /** The RESOLVED environment (compiler-pass C2): defaults applied at plan time, so the
  *  record's own pin — "all fields RESOLVED, no optionals" — now holds for the env too
@@ -142,18 +142,23 @@ export interface EmittersDesc {
     driven: boolean;
 }
 
-export type IntersectionDesc =
-    | {
-        method: 'raymarch';
-        /** The generated scene_intersect_any occlusion query exists — its only caller is
-         *  the opaque shadow fast path (NEE without media; shadow_media re-spawns
-         *  scene_intersect instead). The static backend walkers (sdf_intersect_any) ride
-         *  along inside their component files regardless — the declared wholesale cost. */
-        anyQuery: boolean;
-        /** Any leaf has a live ({param}-driven) placement (fable-transforms §6) —
-         *  gates glsl/core/placement.glsl and the rigid-frame query tiers. */
-        drivenPlacement: boolean;
-    };
+export interface IntersectionDesc {
+    /** Which geometry backends this program's scene_intersect combines — the intersection
+     *  family's registry occupants (raymarch = the SDF marcher, mesh = the triangle engine)
+     *  plus the engine-less analytic closed-form dispatch. A LINK-MAP decision (decision-hoist):
+     *  "does this program contain the X backend" is answered ONCE here, symmetrically for all
+     *  three, not re-derived per feature (it replaced the fake `method: 'raymarch'` singleton).
+     *  scene_intersect / scene_intersect_any / the region tables emit exactly the arms flagged. */
+    backends: { sdf: boolean; analytic: boolean; mesh: boolean };
+    /** The generated scene_intersect_any occlusion query exists — its only caller is
+     *  the opaque shadow fast path (NEE without media; shadow_media re-spawns
+     *  scene_intersect instead). The static backend walkers (sdf_intersect_any) ride
+     *  along inside their component files regardless — the declared wholesale cost. */
+    anyQuery: boolean;
+    /** Any leaf has a live ({param}-driven) placement (fable-transforms §6) —
+     *  gates glsl/core/placement.glsl and the rigid-frame query tiers. */
+    drivenPlacement: boolean;
+}
 
 export interface MaterialsDesc {
     models: MaterialModel[];
@@ -232,8 +237,35 @@ export interface PlannedAnalyticObject {
     placement?: DrivenPlacement;
 }
 
+/**
+ * Resolved triangle mesh for code generation (impl-plan-meshes). A third geometry backend
+ * behind scene_intersect. `index` shares the region-id space with SDF/analytic objects
+ * (regions are globally unique — §2.3), so material_of() spans all three. v0: thin surface
+ * (no `scene_region_at` containment — §3), single material (one region), ray-into-local
+ * placement (the mesh's vertex data stays object-LOCAL; the generated arm conjugates the ray).
+ * The vertex/triangle DATA never reaches the compiler as tables — it is uploaded as extern
+ * data textures by the app (like the env map); only the counts/flags/region are planned here.
+ */
+export interface PlannedMesh {
+    /** Ordinal among the scene's meshes (scene order) — keys the extern texture names
+     *  (components/intersection/mesh meshExternNames) so compiler and app agree. */
+    ordinal: number;
+    /** Region id (shared index space with SDF/analytic objects) — material_of(index). */
+    index: number;
+    materialId: number;
+    /** Authored provenance name (naming batch N5) — see PlannedSDFObject.name. */
+    name?: string;
+    /** Triangle count — baked as the literal loop bound (the compiler has the mesh data). */
+    triCount: number;
+    /** Authored vertex normals present → smooth (barycentric) shading; else flat geometric. */
+    smooth: boolean;
+    /** Constant similarity or a live driven placement — the ray is conjugated into the mesh's
+     *  local frame (positions stay local; never folded into vertices). */
+    placement: PlannedPlacement;
+}
+
 /** A schema-resolved property value: constant, expression, or live param (§2.8). */
-export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number>;
+export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue;   // BlackbodyValue survives resolution ONLY when driven (constants fold at plan entry)
 
 /**
  * Resolved interior medium (§3.5) — sigma_a/sigma_s/model are the RTE partition CORE, read
@@ -297,7 +329,7 @@ export interface PlannedLight {
      *  the emitted ctor reads the row's uniform instead of a literal, and the selection CDF
      *  is CPU-recomputed on change (`resolveLightValues` → `computeSelectPdf`). Geometry rows
      *  stay constant in v1 (driven light geometry = Stage B). Mirrors PlannedMedium.values. */
-    values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]>>;
+    values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
     /** The emitter's region id (quad/sphere) — feeds the generated light_of table. */
     regionId?: number;
 }
@@ -362,6 +394,7 @@ export interface RenderPlan {
     /** Resolved scene data for code generators */
     objects: PlannedSDFObject[];
     analyticObjects: PlannedAnalyticObject[];
+    meshes: PlannedMesh[];
     materials: PlannedMaterial[];
     lights: PlannedLight[];
 

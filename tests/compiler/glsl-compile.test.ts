@@ -4,6 +4,8 @@ import { Compiler } from '../../src/compiler/Compiler.js';
 import { TONEMAP_MODELS } from '../../src/components/tonemap/index.js';
 import { witnessSuite } from '../witnesses/index.js';
 import { demoSuite } from '../../demos/index.js';
+import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
+import type { MeshObject } from '../../src/compiler/types.js';
 
 // Codegen coverage spans BOTH registries: the durable witnesses and the demo layer.
 const sceneSuite = { ...witnessSuite, ...demoSuite };
@@ -38,6 +40,36 @@ describe('generated GLSL compiles (glslang static check)', () => {
                 }
             });
         }
+    }
+});
+
+// Mesh backend (impl-plan-meshes): meshes are not in a registry, so the kitchen-sink pairs
+// above never exercise the triangle engine. Compile a mesh scene through glslang directly —
+// flat (geometric normals), smooth+uv (barycentric interpolation), and driven placement
+// (ray-into-local via the §6.1 placement helpers). minimalStrategy uses nee → anyQuery, so
+// mesh_intersect AND mesh_intersect_any are both emitted and checked.
+describe('mesh backend compiles (glslang static check)', () => {
+    const quad: MeshObject = {
+        kind: 'mesh',
+        positions: new Float32Array([-1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1]),
+        indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+        material: 'ground',
+    };
+    const smooth: MeshObject = {
+        ...quad,
+        normals: new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]),
+        uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+    };
+    const driven: MeshObject = { ...quad, transform: { position: { param: 'mesh.pos', default: [0, 0, 0] } } };
+    const cases: Array<[string, MeshObject]> = [['flat', quad], ['smooth+uv', smooth], ['driven', driven]];
+    for (const [label, mesh] of cases) {
+        it(`mesh ${label} + ${minimalStrategy.id}`, () => {
+            const scene: SceneDescription = { ...minimalScene, objects: [mesh] };
+            const renderer = compiler.compile(scene, minimalStrategy);
+            for (const [shaderId, prog] of renderer.shaders) {
+                check(prog.fragment, 'frag', `${shaderId} [mesh ${label}]`);
+            }
+        });
     }
 });
 

@@ -6,9 +6,9 @@
 // so "swapping the details of intersect" is exactly what the codegen does. Region ids are
 // globally unique across both backends (§2.3), so material_of() spans them.
 
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, DrivenPlacement } from '../../plan/types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedMaterial, DrivenPlacement, PlannedPlacement } from '../../plan/types.js';
 import { isDrivenPlacement } from '../../plan/types.js';
-import { emptyContribution, type FeatureContribution } from './types.js';
+import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatMat3, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, type ParamValue } from '../values.js';
@@ -33,18 +33,22 @@ import {
 } from '../../../components/geometry/similarity.js';
 
 import raymarchGLSL from '../../../components/intersection/raymarch/raymarch.glsl?raw';
+import meshGLSL from '../../../components/intersection/mesh/mesh.glsl?raw';
+import { MESH_TEX_WIDTH, meshExternNames } from '../../../components/intersection/mesh/mesh.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 import { structFromRows } from '../schema.js';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
-    if (plan.program.intersection.method !== 'raymarch') {
+    // Backend presence is a link-map decision (ProgramDescription.intersection.backends) —
+    // no scene with geometry is empty, but a fully-empty scene contributes nothing.
+    const { sdf: hasSDF, analytic: hasAnalytic, mesh: hasMesh } = plan.program.intersection.backends;
+    if (!hasSDF && !hasAnalytic && !hasMesh) {
         return emptyContribution('intersection');
     }
-
-    const hasSDF = plan.objects.length > 0;
-    const hasAnalytic = plan.analyticObjects.length > 0;
     const ids = objectGlslIds(plan.objects, plan.analyticObjects);
     const blocks: ShaderBlock[] = [];
+    const defines: FeatureContribution['defines'] = {};
+    const textures: PlannedTexture[] = [];
 
     // Driven placement (fable-transforms §6/§6.1): the rigid-frame query helpers +
     // per-object uniform pairs + slider metadata. Gated on the Planner's decision —
@@ -52,6 +56,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const drivenRecords: DrivenPlacement[] = [
         ...plan.objects.map((o) => o.placement).filter(isDrivenPlacement),
         ...plan.analyticObjects.map((o) => o.placement).filter((p): p is DrivenPlacement => p !== undefined),
+        ...plan.meshes.map((m) => m.placement).filter(isDrivenPlacement),
     ];
     const uniforms: FeatureContribution['uniforms'] = [];
     const parameters: FeatureContribution['parameters'] = {};
@@ -109,8 +114,29 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects, anyQuery, ids) });
     }
 
-    // region → material table spans BOTH backends (regions are globally unique).
-    blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects, plan.ambientMedium) });
+    // Mesh backend (impl-plan-meshes): the wholesale triangle leaf (mesh.glsl) + generated
+    // per-mesh wrappers that conjugate the world ray into each mesh's LOCAL frame (ray-into-
+    // local; vertices stay object-local). The vertex/triangle DATA arrives as extern data
+    // textures (RGBA32F, incl. the index texture — indices ≤ 16M are exact in f32) the app
+    // uploads; the loop bound (triCount) is baked (the compiler has the mesh data). v0 is a
+    // brute-force scan — the leaf is BVH-ready (the BVH wraps a node walk around it, v1).
+    if (hasMesh) {
+        defines.MESH_TEX_WIDTH = String(MESH_TEX_WIDTH);
+        for (const m of plan.meshes) {
+            const n = meshExternNames(m.ordinal);
+            textures.push(
+                { name: `u_mesh_${m.ordinal}_position`, source: `extern:${n.position}` },
+                { name: `u_mesh_${m.ordinal}_index`, source: `extern:${n.index}` },
+                { name: `u_mesh_${m.ordinal}_normal`, source: `extern:${n.normal}` },
+                { name: `u_mesh_${m.ordinal}_uv`, source: `extern:${n.uv}` },
+            );
+        }
+        blocks.push({ origin: 'components/intersection/mesh/mesh.glsl', source: meshGLSL });
+        blocks.push({ origin: 'generated:mesh-dispatch', source: generateMeshDispatch(plan.meshes, anyQuery) });
+    }
+
+    // region → material table spans ALL backends (regions are globally unique).
+    blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects, plan.meshes, plan.ambientMedium) });
 
     // region → IOR table (§2.3 generated-tables family) — only when a transmissive model
     // reads it (capability-driven, R1a — the far side's IOR has no shading point).
@@ -121,13 +147,16 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
     blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects, ids) });
 
-    // The top-level dispatcher, combining only the backends present (declared after both).
+    // The top-level dispatcher, combining only the backends present (declared after all).
     // Zero-thickness regions (descriptor `thin` fact): they never claim containment, so
-    // the dispatcher's owner-covers-own-side shortcut is invalid for them (audit H2).
-    const thinRegions = plan.analyticObjects
-        .filter((o) => primitive(o.shapeType).thin)
-        .map((o) => o.index);
-    blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic, thinRegions, anyQuery) });
+    // the dispatcher's owner-covers-own-side shortcut is invalid for them (audit H2). Meshes
+    // are thin-like in v0 (surface-only, excluded from scene_region_at — impl-plan-meshes §3),
+    // so their regions join the thin set: a back-face mesh hit probes the entering side.
+    const thinRegions = [
+        ...plan.analyticObjects.filter((o) => primitive(o.shapeType).thin).map((o) => o.index),
+        ...plan.meshes.map((m) => m.index),
+    ];
+    blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic, hasMesh, thinRegions, anyQuery) });
 
     // T4 seams: the geometry/region contract surface (§2.3 tables + the trace-loop queries).
     const provides = [
@@ -152,7 +181,8 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         // vocabulary; a driven-SDF-only program leaves them as unlisted wholesale
         // residue of the core file, like sdf_intersect_any inside raymarch.glsl).
         const anaDriven = plan.analyticObjects.some((o) => o.placement !== undefined);
-        const used = ['placement_rigid', 'placement_scale', ...(anaDriven ? ['placement_dir', 'placement_normal'] : [])];
+        const meshDriven = plan.meshes.some((m) => isDrivenPlacement(m.placement));
+        const used = ['placement_rigid', 'placement_scale', ...((anaDriven || meshDriven) ? ['placement_dir', 'placement_normal'] : [])];
         const sigs: Record<string, string> = {
             placement_rigid: 'vec3 placement_rigid(vec4 q, vec4 ts, vec3 p)',
             placement_dir: 'vec3 placement_dir(vec4 q, vec3 d)',
@@ -162,7 +192,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         provides.push(...used.map((name) => ({ name, signature: sigs[name] })));
         requires.push(...used);
     }
-    return { ...emptyContribution('intersection'), blocks, uniforms, parameters, provides, requires };
+    return { ...emptyContribution('intersection'), blocks, defines, uniforms, parameters, textures, provides, requires };
 }
 
 // ============================================================================
@@ -425,6 +455,93 @@ function analyticSignedDistance(obj: PlannedAnalyticObject, ids: Map<number, str
 }
 
 // ============================================================================
+// Mesh backend dispatch (per-scene) — impl-plan-meshes
+// ============================================================================
+// One wholesale triangle leaf (mesh.glsl) shared by every mesh; a generated per-mesh wrapper
+// conjugates the world ray into the mesh's LOCAL frame (ray-into-local, t-preserving — the
+// local direction is NOT re-normalized, so the local parameter t equals the world t) and
+// assembles the world-space Hit. v0 brute force; the leaf is BVH-ready (§5.3).
+
+/** World→local ray conjugation for one mesh placement. Returns the local origin/direction
+ *  expressions (t preserved), any setup lines (driven scale), and the local→world normal map
+ *  (rotation only — uniform scale never tilts a normal). Constant tiers mirror emitPlacementQuery;
+ *  driven reuses the §6.1 placement helpers (rigid/dir/normal + scale), like the analytic arm. */
+function emitMeshPlacement(pl: PlannedPlacement): { setup: string[]; ro: string; rd: string; nWorld: (n: string) => string } {
+    if (isDrivenPlacement(pl)) {
+        return {
+            setup: [`float s = placement_scale(${pl.uniformTS});`],
+            ro: `placement_rigid(${pl.uniformQ}, ${pl.uniformTS}, ray.origin) / s`,
+            rd: `placement_dir(${pl.uniformQ}, ray.direction) / s`,
+            nWorld: (n) => `placement_normal(${pl.uniformQ}, ${n})`,
+        };
+    }
+    const g = pl as Similarity;
+    const kind = classifySimilarity(g);
+    if (kind === 'identity') return { setup: [], ro: 'ray.origin', rd: 'ray.direction', nWorld: (n) => n };
+    const t = g.translation;
+    if (kind === 'translation') {
+        return { setup: [], ro: `ray.origin - ${formatVec3(t)}`, rd: 'ray.direction', nWorld: (n) => n };
+    }
+    // rigid or similarity: M = Rᵀ (÷ s) folded into one constant mat3 for the inverse map.
+    const Rt = quatToMat3(quatConjugate(g.rotation));
+    const M = kind === 'rigid' ? Rt : Rt.map((v) => v / g.scale);
+    const centered = isIdentityTranslation(t) ? 'ray.origin' : `(ray.origin - ${formatVec3(t)})`;
+    const R = quatToMat3(g.rotation);
+    const nWorld = isIdentityRotation(g.rotation) ? (n: string) => n : (n: string) => `${formatMat3(R)} * ${n}`;
+    return { setup: [], ro: `${formatMat3(M)} * ${centered}`, rd: `${formatMat3(M)} * ray.direction`, nWorld };
+}
+
+function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean): string {
+    const lines: string[] = ['// Generated mesh dispatch (ray-into-local; brute-force v0)'];
+
+    for (const m of meshes) {
+        const o = m.ordinal;
+        const pl = emitMeshPlacement(m.placement);
+        lines.push(`bool mesh_intersect_${o}(Ray ray, inout Hit hit) {`);
+        lines.push(...pl.setup.map((s) => `    ${s}`));
+        lines.push(`    vec3 nLocal; vec2 uv;`);
+        lines.push(`    if (mesh_nearest_local(u_mesh_${o}_position, u_mesh_${o}_index, u_mesh_${o}_normal, u_mesh_${o}_uv,`);
+        lines.push(`            ${m.triCount}u, ${m.smooth}, ${pl.ro}, ${pl.rd}, hit.t, nLocal, uv)) {`);
+        // hit.t was shrunk to the local (== world) t inside the leaf; the world point is the
+        // world ray at that t (ray-into-local preserves the parameter, impl-plan-meshes §6).
+        lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);`);
+        lines.push(`        hit.frame = ambient_frame(hit.p, normalize(${pl.nWorld('nLocal')}));`);
+        lines.push(`        hit.region_owner = ${m.index};`);
+        lines.push(`        hit.uv = uv;`);
+        lines.push(`        return true;`);
+        lines.push(`    }`);
+        lines.push(`    return false;`);
+        lines.push(`}`);
+        lines.push('');
+    }
+
+    lines.push('bool mesh_intersect(Ray ray, inout Hit hit) {');
+    lines.push('    bool found = false;');
+    for (const m of meshes) lines.push(`    if (mesh_intersect_${m.ordinal}(ray, hit)) found = true;`);   // bounded by hit.t
+    lines.push('    return found;');
+    lines.push('}');
+
+    if (anyQuery) {
+        lines.push('');
+        for (const m of meshes) {
+            const o = m.ordinal;
+            const pl = emitMeshPlacement(m.placement);
+            lines.push(`bool mesh_intersect_any_${o}(Ray ray, float maxDist) {`);
+            lines.push(...pl.setup.map((s) => `    ${s}`));
+            // maxDist is a WORLD distance; local t == world t (rd unnormalized), so compare directly.
+            lines.push(`    return mesh_any_local(u_mesh_${o}_position, u_mesh_${o}_index, ${m.triCount}u, ${pl.ro}, ${pl.rd}, maxDist);`);
+            lines.push(`}`);
+        }
+        lines.push('bool mesh_intersect_any(Ray ray, float maxDist) {');
+        for (const m of meshes) lines.push(`    if (mesh_intersect_any_${m.ordinal}(ray, maxDist)) return true;`);
+        lines.push('    return false;');
+        lines.push('}');
+    }
+
+    return lines.join('\n');
+}
+
+// ============================================================================
 // Point classification — scene_region_at (§2.7 innermost-wins, §4.2)
 // ============================================================================
 // Among regions containing p (sdf < 0), the LEAST negative wins (innermost). The bug is one
@@ -464,10 +581,11 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
 // region → material table (both backends)
 // ============================================================================
 
-function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], ambientMedium: number): string {
+function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], ambientMedium: number): string {
     const lines: string[] = ['// Generated region -> material table (§2.3), across both backends'];
     lines.push('int material_of(int region) {');
-    for (const obj of [...sdf, ...analytic].sort((a, b) => a.index - b.index)) {
+    const all: Array<{ index: number; materialId: number }> = [...sdf, ...analytic, ...meshes];
+    for (const obj of all.sort((a, b) => a.index - b.index)) {
         lines.push(`    if (region == ${obj.index}) return ${obj.materialId};`);
     }
     // Default arm covers region -1: the ambientMedium's material id, or -1 = vacuum (§2.4).
@@ -522,7 +640,7 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
 // residual (EPS_INTERFACE = 10× MARCH_EPSILON). Entering ⇒ region_to = owner; exiting ⇒
 // region_from = owner and the frame flips so n faces region_from (§4.1).
 
-function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, thinRegions: number[], anyQuery: boolean): string {
+function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, hasMesh: boolean, thinRegions: number[], anyQuery: boolean): string {
     const lines: string[] = ['// Generated scene_intersect dispatcher'];
 
     // Zero-thickness owners (quads) never claim containment in scene_region_at, so
@@ -542,6 +660,7 @@ function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, thinRegio
     lines.push('    bool found = false;');
     if (hasAnalytic) lines.push('    if (analytic_intersect(ray, hit)) found = true;');
     if (hasSDF) lines.push('    if (sdf_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
+    if (hasMesh) lines.push('    if (mesh_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
     lines.push('    if (found) {');
     lines.push('        // §4.2/§4.3: one outside-probe along the outward normal; owner covers its own side.');
     lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.frame.n, EPS_INTERFACE));');
@@ -571,6 +690,7 @@ function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, thinRegio
         lines.push('bool scene_intersect_any(Ray ray, float maxDist) {');
         if (hasAnalytic) lines.push('    if (analytic_intersect_any(ray, maxDist)) return true;');
         if (hasSDF) lines.push('    if (sdf_intersect_any(ray, maxDist)) return true;');
+        if (hasMesh) lines.push('    if (mesh_intersect_any(ray, maxDist)) return true;');
         lines.push('    return false;');
         lines.push('}');
     }

@@ -22,6 +22,7 @@ import {
 import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js';
 import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
+import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -37,6 +38,14 @@ const cornellOneshotStrategy: RenderStrategy = {
 };
 
 export const demoSuite: Record<string, SceneSuiteEntry> = {
+    hearth: {
+        scene: hearthScene,
+        strategies: posed([0, 1.7, 4.6], [0, 0.6, 0], hearthNeeStrategy, hearthPtStrategy),
+        exercises:
+            'DEMO — the blackbody lamp + the FIRST Hit.uv reader (impl-plan-blackbody-uv): a quad lamp whose emission is {blackbody: {kelvin, scale}} — both dials DRIVEN (kelvin → chroma is a CPU Planck-locus fold into u_lamp_kelvin_rgb; the power CDF re-weights live) — over a `checker` floor mixing two albedos in Hit.uv (today the placeholder planar xz chart, visibly)',
+        expected:
+            'a candle-warm (2900 K) pool over ivory/slate tiles; drag lamp.kelvin toward 1500 K → ember-red, toward 9000 K → blue-white, with ZERO recompiles (the chrome ball re-reflects the shift); lamp.power scales brightness independently of color; keys 1 (pt-nee) and 2 (pt) converge to the same image',
+    },
     chrome: {
         scene: chromeScene,
         strategies: posed([0, 1.6, 5.2], [0, 0.75, 0], chromeMisStrategy, chromeNeeStrategy, chromePtStrategy),
