@@ -45,18 +45,18 @@ function rotCsUniform(rotation: number): PlannedUniform {
 }
 
 /** T5 variant table suffix: which registered CDF pair this program samples. */
-export function envVariantSuffix(chart: 'equirect' | 'octahedral', compensation: boolean): string {
+export function envVariantSuffix(chart: string, compensation: boolean): string {
     return (chart === 'octahedral' ? '_oct' : '') + (compensation ? '_comp' : '');
 }
 
-function chartBlock(chart: 'equirect' | 'octahedral') {
+function chartBlock(chart: string) {
     // From the chart registry (D3) — origin derived from the key.
     const d = ENV_CHARTS[chart];
     return { origin: `components/env/${d.id}/${d.id}.glsl`, source: d.glsl };
 }
 
 /** Per-chart table dimensions live on separate parameter paths (they differ: W×H vs N×N). */
-function sizeParamPath(chart: 'equirect' | 'octahedral'): string {
+function sizeParamPath(chart: string): string {
     return chart === 'octahedral' ? 'env.sizeOct' : 'env.size';
 }
 
@@ -111,7 +111,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
     const samplable = plan.program.environmentSamplable;
 
     if (env.type === 'constant') {
-        const intensity = env.intensity ?? 1.0;
+        const intensity = env.intensity;   // C2: plan-resolved, no re-defaulting
         // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
         // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
         // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
@@ -136,8 +136,8 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
     }
 
     if (env.type === 'image') {
-        const intensity = env.intensity ?? 1.0;
-        const rotation = env.rotation ?? 0.0;
+        const intensity = env.intensity;   // C2: plan-resolved, no re-defaulting
+        const rotation = env.rotation;
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
             { name: 'u_envRotation', type: 'float', parameterPath: 'env.rotation', default: rotation },
@@ -190,8 +190,8 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         // T4: the formula IS the radiance (direct-eval — sharp, resolution-free, D7); the
         // baked table exists only as CPU CDF food. No radiance texture at all: the sampler's
         // radiance is environment_radiance(ls.wi) by the T4 unification.
-        const intensity = env.intensity ?? 1.0;
-        const rotation = env.rotation ?? 0.0;
+        const intensity = env.intensity;   // C2: plan-resolved, no re-defaulting
+        const rotation = env.rotation;
         // u_envRotation (the additive angle) is minted below ONLY for the equirect chart; the
         // radiance body + octahedral chart use the shipped cos/sin (u_envRotCS). The env.rotation
         // PARAMETER is always live (it drives both derived uniforms).

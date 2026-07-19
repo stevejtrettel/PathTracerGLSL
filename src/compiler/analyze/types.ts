@@ -1,36 +1,24 @@
 // compiler/analyze/types.ts
+//
+// The scene census (compiler-pass C4: SLIMMED to exactly its consumers — census fields
+// exist to feed Validator/Planner decisions, not to be a second model of the scene; the
+// audit found half the old record had zero readers, one of them a hardcoded field list
+// that contradicted the open schema vocabulary. A future decision re-adds its field WITH
+// its reader).
 
-export type AmbientSpaceType = 'euclidean' | 'hyperbolic' | 'spherical';
+export type AmbientSpaceType = string;   // AMBIENT_SPACES registry key (D3: the open door)
 
 export interface SceneFeatures {
     ambientSpace: AmbientSpaceType;
 
     geometry: {
-        hasSDFs: boolean;
-        hasAnalytic: boolean;
+        /** Mesh objects present — Validator-rejected until the BVH/mesh backend. */
         hasMeshes: boolean;
-        sdfCount: number;
-        analyticCount: number;
-    };
-
-    materials: {
-        /** Any material property is a GLSL expression (per-model facts are NOT features —
-         *  the Validator checks model registration against MATERIAL_MODELS directly). */
-        hasProcedural: boolean;
     };
 
     lighting: {
-        /** Registered delta kinds (descriptor `delta: true` — point today). */
-        deltaLightCount: number;
-        /** Registered hittable kinds in scene.lights (each desugars to a region, §6.2). */
-        areaLightCount: number;
-        /** Authored kinds with no registry entry ('directional' reserved, typos) — the
-         *  Validator rejects each with a per-light diagnostic. */
-        unknownKindLightCount: number;
-        /** Emissive analytic samplable OBJECTS that enter the registry via sampleAsLight. */
-        samplableEmitterCount: number;
-        /** Every AUTHORED light (registered or not — authoring intent, so the no-lights
-         *  check never stacks on a kind rejection) + samplable emitters. */
+        /** Every AUTHORED light (registered kind or not — authoring INTENT, so the
+         *  no-lights check never stacks on a kind rejection) + samplable emitters. */
         totalLightCount: number;
     };
 
@@ -39,9 +27,6 @@ export interface SceneFeatures {
         hasMedia: boolean;
         /** Any medium has σ_s nonzero or {param}-driven — transport needs the scattering arms. */
         hasScatteringMedia: boolean;
-        /** Any medium (incl. ambient) has an expression coefficient (σ_a/σ_s/ε) — the
-         *  null-collision arms (delta/ratio tracking) are needed (fable-heterogeneous-media.md). */
-        hasHeterogeneousMedia: boolean;
         /** Any medium has ε possibly nonzero (impl-plan-medium-emission) — the emission
          *  machinery (lookup field, collection lines, walk radiance line) is needed. */
         hasEmissiveMedia: boolean;

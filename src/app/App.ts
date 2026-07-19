@@ -191,7 +191,7 @@ export class App {
      * from it. The engine executes perfectly ordinary pipelines; run-once semantics and
      * variant knowledge belong to the app.
      */
-    private _bakeProceduralEnvironment(scene: SceneDescription, variants: Array<{ chart: 'equirect' | 'octahedral'; compensation: boolean }>): void {
+    private _bakeProceduralEnvironment(scene: SceneDescription, variants: Array<{ chart: string; compensation: boolean }>): void {
         const env = scene.environment as Extract<SceneDescription['environment'], { type: 'procedural' }>;
         const charts = [...new Set(variants.map((v) => v.chart))];
 
@@ -794,8 +794,8 @@ export class App {
  * Live strategy switching (keys 1-9) means every variant's tables must be registered
  * up front; missing-extern binds are hard errors by design.
  */
-function envVariants(strategies: RenderStrategy[] | undefined): Array<{ chart: 'equirect' | 'octahedral'; compensation: boolean }> {
-    const seen = new Map<string, { chart: 'equirect' | 'octahedral'; compensation: boolean }>();
+function envVariants(strategies: RenderStrategy[] | undefined): Array<{ chart: string; compensation: boolean }> {
+    const seen = new Map<string, { chart: string; compensation: boolean }>();
     for (const st of strategies ?? []) {
         const chart = st.estimator.envSampler ?? 'equirect';
         const compensation = st.estimator.envCompensation ?? false;

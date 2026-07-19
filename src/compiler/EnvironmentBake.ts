@@ -18,7 +18,7 @@ import { ENV_CHARTS } from '../components/env/index.js';
 export const DEFAULT_ENV_TABLE_SIZE: [number, number] = [512, 256];
 
 /** Table dimensions per chart: equirect W×H, octahedral N×N (equal-area, D11/T5). */
-export function envTableSize(env: { tableSize?: [number, number] }, chart: 'equirect' | 'octahedral'): [number, number] {
+export function envTableSize(env: { tableSize?: [number, number] }, chart: string): [number, number] {
     if (chart === 'octahedral') {
         const n = env.tableSize?.[1] ?? DEFAULT_ENV_TABLE_SIZE[1];
         return [n, n];
@@ -26,7 +26,7 @@ export function envTableSize(env: { tableSize?: [number, number] }, chart: 'equi
     return env.tableSize ?? DEFAULT_ENV_TABLE_SIZE;
 }
 
-export function compileEnvironmentBake(scene: SceneDescription, chart: 'equirect' | 'octahedral' = 'equirect'): CompiledRenderer | null {
+export function compileEnvironmentBake(scene: SceneDescription, chart: string = 'equirect'): CompiledRenderer | null {
     const env = scene.environment;
     if (env?.type !== 'procedural') return null;
 
@@ -43,13 +43,17 @@ export function compileEnvironmentBake(scene: SceneDescription, chart: 'equirect
         '',
         '#define PI 3.14159265359',
         '#define TWO_PI 6.28318530718',
-        '// The chart reads u_envRotation; the TABLE is unrotated by definition (rotation is a',
-        '// lookup-time transform) — a const shadows the uniform the chart file expects.',
+        '// The TABLE is unrotated by definition (rotation is a lookup-time transform) —',
+        '// consts shadow BOTH rotation rails the chart files may read (compiler-pass C1:',
+        '// the old shim provided only the retired env_rotate_y contract, so the octahedral',
+        '// chart — which reads env_rotate_cs/u_envRotCS — failed to compile at bake time):',
+        '//   equirect  → u_envRotation (additive angle; 0 = identity)',
+        '//   octahedral → env_rotate_cs with u_envRotCS = (cos 0, sin 0) = (1, 0) = identity.',
         'const float u_envRotation = 0.0;',
+        'const vec2 u_envRotCS = vec2(1.0, 0.0);',
         '',
-        'vec3 env_rotate_y(vec3 d, float a) {',
-        '    float c = cos(a), s = sin(a);',
-        '    return vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);',
+        'vec3 env_rotate_cs(vec3 d, vec2 cs) {',
+        '    return vec3(cs.x * d.x - cs.y * d.z, d.y, cs.y * d.x + cs.x * d.z);',
         '}',
         '',
         ENV_CHARTS[chart].glsl,   // D3: from the chart registry

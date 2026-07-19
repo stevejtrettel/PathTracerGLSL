@@ -22,7 +22,7 @@ export function buildEnvironmentSampler(
         blur?: boolean;
         /** Chart the table lives in (T5, D11): 'equirect' weights texels by the sinθ
          *  Jacobian; 'octahedral' texels are equal-area (constant weight). Default equirect. */
-        chart?: 'equirect' | 'octahedral';
+        chart?: string;
         /** MIS compensation (pbrt-v4 / Karlík et al. 2019): subtract the dΩ-weighted mean
          *  luminance before the CDF build — spend light samples only where the env beats
          *  the average that BSDF sampling already covers. ONLY sound under MIS (the

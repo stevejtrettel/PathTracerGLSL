@@ -67,11 +67,8 @@ const strategies: RenderStrategy[] = (['nee', 'mis'] as const).map((dl) => ({
 }));
 
 describe('lights door: a registry-only kind addition works end to end', () => {
-    it('the Analyzer census classifies the new kind by its descriptor delta fact', () => {
-        const f = analyze(scene);
-        expect(f.lighting.areaLightCount).toBe(1);
-        expect(f.lighting.unknownKindLightCount).toBe(0);
-        expect(f.lighting.totalLightCount).toBe(1);
+    it('the Analyzer census counts the new kind (C4: intent count — per-kind classification lives on the descriptors)', () => {
+        expect(analyze(scene).lighting.totalLightCount).toBe(1);
     });
 
     for (const strategy of strategies) {

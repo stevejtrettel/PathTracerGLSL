@@ -417,7 +417,7 @@ export class Engine {
         rgb: Float32Array,
         width: number,
         height: number,
-        opts: { names?: { map: string; cond: string; marg: string }; chart?: 'equirect' | 'octahedral'; compensation?: boolean } = {},
+        opts: { names?: { map: string; cond: string; marg: string }; chart?: string; compensation?: boolean } = {},
     ): { totalWeight: number } {
         const result = buildEnvironmentSampler(
             this.gl, this.textureRegistry, rgb, width, height,

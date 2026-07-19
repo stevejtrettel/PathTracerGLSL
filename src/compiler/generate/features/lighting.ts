@@ -414,7 +414,7 @@ export function envSelectionProbability(plan: RenderPlan, params: Record<string,
 
     const env = plan.program.environment;
     const intensity = (params['env.intensity'] as number)
-        ?? (env.type !== 'none' ? env.intensity : undefined) ?? 1.0;
+        ?? (env.type !== 'none' ? env.intensity : 1.0);   // C2: plan-resolved
     let meanL = 1.0;
     if (env.type === 'constant') {
         const c = env.color;

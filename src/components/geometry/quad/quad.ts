@@ -45,4 +45,13 @@ export const quadDescriptor: PrimitiveDescriptor = {
     // under s>0, so it is never scaled).
     derivedFields: [{ name: 'normal', kind: 'direction', shape: 'vec3' }],
     derivedCtorFields: (v) => [quadNormal(v.edge1 as number[], v.edge2 as number[])],
+    // COUPLED rule (C5): area relates edge1 AND edge2 — a zero cross product is NaN in
+    // the normal formatter; near-zero areas make Inf pdfs if emissive. ONE formula
+    // (quadCross) with the quad LIGHT's identical rule (both routes, one truth).
+    validateValues(v) {
+        const c = quadCross(v.edge1 as number[], v.edge2 as number[]);
+        return Math.hypot(c[0], c[1], c[2]) < 1e-8
+            ? ['edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8']
+            : [];
+    },
 };

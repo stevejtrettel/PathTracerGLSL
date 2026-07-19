@@ -646,8 +646,13 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // same-integrand display-space gates, like the backend twins. The pt pair
             // is noisier (panel by chance hits) → looser tripwire.
             checks: [
-                { kind: 'twin', other: { scene: 'het-const-ref' }, meanTol: 0.015, rmse: 0.08, label: 'F-HET-CONST delta ≡ analytic (nee)' },
-                { kind: 'twin', other: { scene: 'het-const-ref', strategy: 1 }, strategy: 1, meanTol: 0.03, rmse: 0.3, label: 'F-HET-CONST delta ≡ analytic (pt tripwire)' },
+                // Calibrated Jul 19 2026 (first sweep): measured 13.15% @spec spp, ×4-spp probe
+                // fell to 6.61% (ratio 0.50 = 1/√4 — PURE VARIANCE, Δmean 0.07%): the
+                // delta-tracking arm's per-pixel noise dominates an analytic twin; the
+                // pre-calibration 8% guess assumed same-noise arms. Gate = measured ×1.5.
+                { kind: 'twin', other: { scene: 'het-const-ref' }, meanTol: 0.015, rmse: 0.20, label: 'F-HET-CONST delta ≡ analytic (nee)' },
+                // Calibrated Jul 19: measured 60.05% @spec, 29.36% @×4 (0.49 — variance; Δmean 0.36%).
+                { kind: 'twin', other: { scene: 'het-const-ref', strategy: 1 }, strategy: 1, meanTol: 0.03, rmse: 0.9, label: 'F-HET-CONST delta ≡ analytic (pt tripwire)' },
             ],
         },
     },
@@ -688,7 +693,8 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                     region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
                     label: 'F-CLAMP e⁻¹ (clamped field)',
                 },
-                { kind: 'twin', other: { scene: 'clamp-ref' }, meanTol: 0.01, rmse: 0.08, label: 'F-CLAMP clamped ≡ authored-1.0' },
+                // Calibrated Jul 19: measured 10.26% @spec, 5.11% @×4 (0.50 — variance; Δmean 0.02%).
+                { kind: 'twin', other: { scene: 'clamp-ref' }, meanTol: 0.01, rmse: 0.16, label: 'F-CLAMP clamped ≡ authored-1.0' },
             ],
         },
     },
@@ -711,7 +717,8 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         expected: 'converges to the same image as het-driven-baked (σ_s = 0.4); divergence implicates the params minting or the uniform splice in the expression',
         witness: {
             spp: 96,
-            checks: [{ kind: 'twin', other: { scene: 'het-driven-baked' }, meanTol: 0.015, rmse: 0.08, label: 'HET-DRIVEN ≡ baked @gain 1' }],
+            // Calibrated Jul 19: measured 17.84% @spec, 9.04% @×4 (0.51 — variance; Δmean 0.02%).
+            checks: [{ kind: 'twin', other: { scene: 'het-driven-baked' }, meanTol: 0.015, rmse: 0.27, label: 'HET-DRIVEN ≡ baked @gain 1' }],
         },
     },
     'het-driven-theta2': {
@@ -722,7 +729,8 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         expected: 'converges to the same image as het-driven-baked2 (σ_s = 0.8 — visibly thicker fog than het-driven); divergence implicates the store→uniform update path',
         witness: {
             spp: 96,
-            checks: [{ kind: 'twin', other: { scene: 'het-driven-baked2' }, meanTol: 0.015, rmse: 0.08, label: 'HET-DRIVEN ≡ baked @gain 2 (post-set)' }],
+            // Calibrated Jul 19: measured 19.93% @spec, 10.06% @×4 (0.50 — variance; Δmean 0.05%).
+            checks: [{ kind: 'twin', other: { scene: 'het-driven-baked2' }, meanTol: 0.015, rmse: 0.30, label: 'HET-DRIVEN ≡ baked @gain 2 (post-set)' }],
         },
         initialParameters: {
             ...HET_THETA2,

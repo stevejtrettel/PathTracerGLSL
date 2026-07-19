@@ -243,6 +243,19 @@ export function mediumMayScatter(med: { sigma_s?: unknown }): boolean {
     return mediumPropertyMayBeNonzero(med.sigma_s);
 }
 
+/** CONSTANT nonzero emission — the v1 samplable-emitter leg (compiler-pass C3: ONE body
+ *  for the Analyzer census, the Validator's sampleAsLight/phantom/driven-transform rules,
+ *  and the Planner's registry route — these jointly guard pt ≡ pt-nee, so agreeing by
+ *  convention was the audit's M6). Absent, `{param}`-driven, and expression emissions are
+ *  all FALSE: a v1 samplable emitter's power must bake into the compile-time CDF.
+ *  (Deliberately `!== 0`, matching the registry route; materials.ts's emission GATE uses
+ *  `> 0` — a documented, separate fact.) */
+export function hasConstantNonzeroEmission(emission: unknown): boolean {
+    if (typeof emission === 'number') return emission !== 0;
+    if (Array.isArray(emission)) return emission.some((c) => typeof c === 'number' && c !== 0);
+    return false;
+}
+
 /** The medium routes to the null-collision arms (heterogeneous 2×2, extended by
  * emission P5): any expression coefficient, or an emissive medium that SCATTERS under
  * the current measurement (the analytic channel-MIS arm has no source term; its σ̄ is
@@ -448,7 +461,7 @@ export interface EstimatorDescription {
      * (constant Jacobian, no pole waste). The radiance integrand is IDENTICAL under both —
      * cross-chart convergence is a controlled experiment (the X-CHART witness).
      */
-    envSampler?: 'equirect' | 'octahedral';
+    envSampler?: string;   // ENV_CHARTS registry key (C6: the open door — Validator-gated)
     /**
      * MIS compensation for the env importance table (pbrt-v4 / Karlík et al. 2019): build
      * the CDF from max(L − L̄, 0). Requires directLighting 'mis' (Validator-enforced) —

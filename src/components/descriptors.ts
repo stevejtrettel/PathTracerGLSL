@@ -192,7 +192,7 @@ export interface LightKindDescriptor {
     authoredParams: AuthoredParamSpec[];
     /** DESUGAR FACTS (A3 — the lights door): how an AUTHORED light of this kind
      *  lowers. `toValues` builds the registry values from the authored fields + the
-     *  precomputed radiometric product (color·intensity). Hittable kinds declare
+     *  precomputed radiometric product (the authored `emission`, B2's one word). Hittable kinds declare
      *  `region` — the backing emitter primitive the desugar synthesizes — and
      *  `valuesFromRegion`, the sampleAsLight route's inverse (registry values from a
      *  FOLDED region's parameters + Le), so both authoring routes share one kind
@@ -331,6 +331,12 @@ export interface PrimitiveDescriptor {
      *  kinds stay unit under R). Must be idempotent in exact arithmetic; the
      *  framework guarantees single application so fp drift can't accumulate. */
     canonicalize?(values: PrimitiveValues): PrimitiveValues;
+    /** COUPLED degeneracy rules over WELL-SHAPED values (compiler-pass C5 — the lights
+     *  door's validateAuthored pattern, closing the last primitive name-branch in the
+     *  Validator): messages emitted verbatim as errors. Separable rules belong on rows
+     *  (`constraint`); this is for multi-row facts only (quad's parallel-edges — the
+     *  area couples edge1 AND edge2). Runs after the C7 shape loop passes. */
+    validateValues?(values: PrimitiveValues): string[];
     /** Similarity-closure fold OVERRIDE (fable-transforms §5.1). ABSENT = derived
      *  from kinds (point → g·p, vector → sR·v, direction → R·d, length → s·ℓ).
      *  Declare only when a parameter's rule couples several pieces (plane: the new

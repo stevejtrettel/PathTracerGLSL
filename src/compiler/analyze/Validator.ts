@@ -2,13 +2,14 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
+import { ENV_CHARTS } from '../../components/env/index.js';
 import { PRIMITIVES, resolveBackend, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
@@ -16,8 +17,6 @@ import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
 import { validateSceneProperties, constraintViolation } from './propertyValidation.js';
 
-/** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
-const MIN_QUAD_AREA = 1e-8;
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
 const MAX_PHASE_G = 0.99;
 /** Models whose interaction_surface_emission dispatch reads mp.emission (the phantom-light
@@ -49,8 +48,6 @@ export function validate(
             .add();
     }
 
-    // Analytic objects (closed-form sphere/plane) are supported — the analytic geometry backend
-    // (docs/impl-plan-analytic-backend.md). StandardAnalytic already constrains type to sphere|plane.
 
     if (strategy.estimator.directLighting !== 'none'
         && features.lighting.totalLightCount === 0
@@ -169,19 +166,22 @@ export function validate(
                 .withOriginal('scene', [`objects[${i}]`, 'backend'])
                 .add();
         }
-        if (resolveBackend(obj.type, obj.backend) !== 'analytic') continue;
-        if (obj.type === 'quad') {
-            const e1 = obj.parameters.edge1, e2 = obj.parameters.edge2;
-            if (!isVec3(e1) || !isVec3(e2) || !isVec3(obj.parameters.corner)) {
-                bag.error('invalid-setting',
-                    `Object ${i}: analytic quad requires corner/edge1/edge2 as [x,y,z] arrays`)
-                    .withOriginal('scene', [`objects[${i}]`])
-                    .add();
-            } else if (quadCrossSq(e1 as [number, number, number], e2 as [number, number, number]) < MIN_QUAD_AREA * MIN_QUAD_AREA) {
-                bag.error('invalid-setting',
-                    `Object ${i}: analytic quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= ${MIN_QUAD_AREA}`)
-                    .withOriginal('scene', [`objects[${i}]`])
-                    .add();
+        // Coupled degeneracy rules come from the DESCRIPTOR (C5: the last primitive
+        // name-branch died here — quad's parallel-edges rule now lives on quad.ts,
+        // ONE formula with the quad light's). The C7 schema loop below owns shapes;
+        // this call runs only over well-shaped required rows.
+        if (desc?.validateValues !== undefined) {
+            const rowsOk = desc.params.every((s) => {
+                const v = obj.parameters[s.name];
+                if (v === undefined) return !s.required;
+                return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
+            });
+            if (rowsOk) {
+                for (const msg of desc.validateValues(obj.parameters)) {
+                    bag.error('invalid-setting', `Object ${i} (${obj.type}): ${msg}`)
+                        .withOriginal('scene', [`objects[${i}]`])
+                        .add();
+                }
             }
         }
     }
@@ -252,17 +252,12 @@ export function validate(
     // path-only (they still glow; they converge slower — the honest open-question-#10 answer).
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.sampleAsLight !== true) continue;
-        const analyticSamplable = scene.objects.some((o) =>
-            !('kind' in o) && resolveBackend(o.type, o.backend) === 'analytic'
-            && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name);
-        if (!analyticSamplable) {
+        if (!analyticSamplableObjectUses(scene, name)) {
             bag.error('invalid-setting',
                 `Material '${name}': sampleAsLight requires an ANALYTIC samplable object using it (${Object.entries(PRIMITIVES).filter(([, d]) => d.samplableAsLight === true).map(([t]) => t).join(', ')}) — V1-C2: emissive SDF/custom shapes are path-only and still glow`)
                 .add();
         }
-        const e = mat.emission;
-        const constantEmission = typeof e === 'number' ? e !== 0 : Array.isArray(e) ? e.some((c) => c !== 0) : false;
-        if (!constantEmission) {
+        if (!hasConstantNonzeroEmission(mat.emission)) {   // C3: the ONE predicate
             bag.error('invalid-setting',
                 `Material '${name}': sampleAsLight requires CONSTANT nonzero emission in v1 — {param}/procedural emitter power needs the light-registry accessor (deferred)`)
                 .add();
@@ -287,9 +282,7 @@ export function validate(
             bag.error('invalid-setting', `Material '${name}': emission components must be >= 0`).add();
         }
         if (nonzeroEmission && !EMITTING_MODELS.has(mat.model)) {
-            const wouldRegister = mat.sampleAsLight !== false && scene.objects.some((o) =>
-                !('kind' in o) && resolveBackend(o.type, o.backend) === 'analytic'
-                && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name);
+            const wouldRegister = mat.sampleAsLight !== false && analyticSamplableObjectUses(scene, name);
             if (wouldRegister) {
                 bag.error('invalid-setting',
                     `Material '${name}': model '${mat.model}' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (${[...EMITTING_MODELS].join(', ')}) or set sampleAsLight: false`)
@@ -407,6 +400,15 @@ export function validate(
         }
     }
 
+    // envSampler chart (C6: the open door — the last registry-shadow union): the
+    // registry gatekeeps, exactly like every other family.
+    const chart = strategy.estimator.envSampler;
+    if (chart !== undefined && ENV_CHARTS[chart] === undefined) {
+        bag.error('invalid-setting',
+            `envSampler '${chart}' is not a registered environment chart (registered: ${Object.keys(ENV_CHARTS).join(', ')})`)
+            .add();
+    }
+
     // T5: a compensated env table deliberately has pdf = 0 where L > 0 — unbiased ONLY when
     // BSDF sampling covers those directions with MIS weighting. NEE-only would lose energy.
     if (strategy.estimator.envCompensation === true && strategy.estimator.directLighting !== 'mis') {
@@ -414,6 +416,15 @@ export function validate(
             `envCompensation requires directLighting 'mis' — a compensated importance table has deliberate pdf-0 regions that only MIS covers unbiasedly (got '${strategy.estimator.directLighting}')`)
             .add();
     }
+
+    // The tracking-routing condition, computed ONCE (C6: the equiangular and
+    // volumeSampling rules held byte-identical private copies) — impl-plan-medium-
+    // emission P5: a constant-ε SCATTERING medium routes to the tracking arms too,
+    // under the computed measurement only.
+    const trackScattering = strategy.measurement.scattering ?? 'full';
+    const sceneNeedsTracking = Object.values(scene.materials).some((m) =>
+        m.medium !== undefined && mediumRoutesToTracking(
+            m.medium, trackScattering === 'full' && mediumMayScatter(m.medium)));
 
     // Equiangular medium NEE — v1 scope pins (impl-plan-equiangular §3).
     if (strategy.estimator.mediumLightSampling === 'equiangular') {
@@ -460,13 +471,9 @@ export function validate(
         // Heterogeneous rule 8 (deferred-ledger pin enforced now): the equiangular
         // estimate's T(0,t) factor is the analytic closed form — a tracking-routed
         // medium would need ratio-tracked transmittance along the sampled segment.
-        // (Checked against the ROUTING condition, so emissive scattering media —
-        // tracking-routed even with constant coefficients — are caught too.)
-        const eqScattering = strategy.measurement.scattering ?? 'full';
-        const eqNeedsTracking = Object.values(scene.materials).some((m) =>
-            m.medium !== undefined && mediumRoutesToTracking(
-                m.medium, eqScattering === 'full' && mediumMayScatter(m.medium)));
-        if (eqNeedsTracking) {
+        // (Checked against the ROUTING condition — sceneNeedsTracking below is hoisted
+        // and shared with the volumeSampling rules: C6 killed the byte-identical twin.)
+        if (sceneNeedsTracking) {
             bag.error('incompatible-options',
                 `mediumLightSampling 'equiangular' does not support media on the null-collision arms — its transmittance factor is the analytic closed form (deferred: ratio-tracked T along the sampled segment); use 'vertex'`)
                 .add();
@@ -476,10 +483,6 @@ export function validate(
     // volumeSampling axis (fable-heterogeneous-media.md §2 rules 3/4/6; the routing
     // condition extends per impl-plan-medium-emission P5: a constant-ε SCATTERING
     // medium routes to the tracking arms too — under the computed measurement only).
-    const measScattering = strategy.measurement.scattering ?? 'full';
-    const sceneNeedsTracking = Object.values(scene.materials).some((m) =>
-        m.medium !== undefined && mediumRoutesToTracking(
-            m.medium, measScattering === 'full' && mediumMayScatter(m.medium)));
     const vs = strategy.estimator.volumeSampling;
     if (vs === 'raymarch' || vs === 'ratio-tracking') {
         // Rule 6, reject-not-remove: ray marching is biased (if ever added it is a
@@ -804,11 +807,13 @@ export function validate(
     }
 }
 
-/** Constant nonzero emission — mirrors the Planner's sampleAsLight registry condition. */
-function hasConstantNonzeroEmission(emission: unknown): boolean {
-    if (typeof emission === 'number') return emission !== 0;
-    if (Array.isArray(emission)) return emission.some((c) => typeof c === 'number' && c !== 0);
-    return false;   // absent, param-driven, or GLSL: not a v1 samplable emitter
+/** "Some analytic samplable object uses material `name`" — the geometry leg of the
+ *  §6.2 emitter condition, shared by the sampleAsLight rule and the phantom-light rule
+ *  (C3: the two inline scans were byte-identical and drifted only by luck). */
+function analyticSamplableObjectUses(scene: SceneDescription, name: string): boolean {
+    return scene.objects.some((o) =>
+        !('kind' in o) && resolveBackend(o.type, o.backend) === 'analytic'
+        && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name);
 }
 
 /** §7 rules 2: quaternion normalized-within-tolerance (warn + the Planner normalizes),
@@ -924,12 +929,6 @@ function validatePrimitiveConstraint(
 // Helpers (audit-hardening H1)
 // ============================================================================
 
-function quadCrossSq(e1: Vec3, e2: Vec3): number {
-    const [ax, ay, az] = e1;
-    const [bx, by, bz] = e2;
-    const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
-    return cx * cx + cy * cy + cz * cz;
-}
 
 function isVec3(v: unknown): v is Vec3 {
     return Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number');

@@ -75,7 +75,22 @@ Exemplary (the style bar): dielectric.glsl η² block, quad/disk sampler-pdf adj
 pitfall ledgers, placement.glsl, sampler_cdf.glsl, analytic.glsl + pcg4d.glsl transcription
 provenance, raymarch.glsl epsilon reasoning.
 
-## Front 3 — Analyze / Validate / Plan (compiler pass — AFTER the descriptor pass)
+## Front 3 — Analyze / Validate / Plan (COMPILER PASS BUILT Jul 19 2026 — 1035 vitest)
+
+Dispositions: H1 FIXED (bake shim emits the env_rotate_cs contract; first
+compileEnvironmentBake glslang test — both charts). H3 CLOSED earlier (env-power-selection).
+M1 FIXED (PrimitiveDescriptor.validateValues fact; quad's rule on quad.ts, ONE formula with
+the light's; Validator name-branch + quadCrossSq + MIN_QUAD_AREA dead). M2/M3 CLOSED by D2
+(mirrors = aliases; unions open). M4/M5 FIXED (census slimmed to consumers — hasProcedural,
+backend counts, per-kind light counts, hasHeterogeneousMedia all dead; tracking routing
+computed ONCE in the Validator). M6 FIXED (hasConstantNonzeroEmission in types.ts — the ONE
+predicate at all 5 sites; analyticSamplableObjectUses for the twin object-scans). M7 FIXED
+(ResolvedEnvironment in ProgramDescription — no optionals; Generate's ?? defaults dead;
+ENV_CHARTS registry from D3). M8 HELD for BVH (with intersection's registry). L1/L2/L5/L6
+fixed; L7 closed in the generate batch; L8 resolved earlier; L9/L10 no-action as noted.
+envSampler chart union OPENED (string, ENV_CHARTS-gated) — the last registry-shadow union.
+
+(Original findings below for the record.)
 
 | # | Sev | Finding |
 |---|---|---|

@@ -1,6 +1,19 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, EnvironmentDescription, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
+
+/** The RESOLVED environment (compiler-pass C2): defaults applied at plan time, so the
+ *  record's own pin — "all fields RESOLVED, no optionals" — now holds for the env too
+ *  (Generate's scattered `?? defaults` are dead; the raw authored record was where the
+ *  dropped-selectWeight bug hid). Carries exactly GENERATE'S surface: the samplable
+ *  DECISION is `environmentSamplable` below, and `tableSize` is bake-orchestration data
+ *  (compileEnvironmentBake reads the scene). The kind set is STRUCTURAL — four codegen
+ *  shapes, not a registry family — so a closed union is honest here. */
+export type ResolvedEnvironment =
+    | { type: 'none' }
+    | { type: 'constant'; color: SpectrumValue; intensity: number }
+    | { type: 'image'; url: string; intensity: number; rotation: number }
+    | { type: 'procedural'; glsl: GlslExpression; intensity: number; rotation: number };
 import type { Similarity } from '../../components/geometry/similarity.js';
 
 // ============================================================================
@@ -51,7 +64,7 @@ export interface ProgramDescription {
         mediumLightSampling: 'vertex' | 'equiangular';
         /** T5 strategy axis (plan D11): which chart the env sampler's CDF table lives
          *  in, and whether the table is MIS-compensated. Radiance is chart-independent. */
-        envSampler: { chart: 'equirect' | 'octahedral'; compensation: boolean };
+        envSampler: { chart: string; compensation: boolean };   // chart = ENV_CHARTS key (C6)
         accumulation: AccumulationDesc;
     };
     /** Presentation — applied to the converged linear HDR quantity only (taxonomy §10). */
@@ -65,7 +78,7 @@ export interface ProgramDescription {
     materials: MaterialsDesc;
     media: MediaDesc;
     emitters: EmittersDesc;
-    environment: EnvironmentDescription;
+    environment: ResolvedEnvironment;
     /** The env participates in NEE/MIS as a light (env-as-light T3/D6) — drives the
      *  selection codegen, the miss-branch w-bookkeeping, and env sampler emission.
      *  A DECISION, not the analyzer's kind-fact (impl-plan-exact-linkage): under
@@ -272,7 +285,7 @@ export interface PlannedMaterial {
  *
  * Shaped like PlannedMaterial (struct-alignment batch): `values` holds exactly the
  * kind descriptor's rows, keyed by row name — point: position/intensity (radiant
- * intensity = color·intensity, W/sr); quad: corner/edge1/edge2/radiance;
+ * intensity = the authored emission as radiant intensity, W/sr); quad: corner/edge1/edge2/radiance;
  * sphere: center/radius/radiance. Radiometric products are computed ONCE here (the
  * old color×intensity factoring died with the loose-arg emitters).
  */

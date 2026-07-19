@@ -1,7 +1,7 @@
 // compiler/plan/Planner.ts
 
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
-import { isGlslExpression, isValueParam, mediumRoutesToTracking, mediumMayScatter } from '../types.js';
+import { isGlslExpression, isValueParam, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
@@ -21,11 +21,20 @@ import {
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 
 /** Registered primitive types — unknowns must diagnose here, not throw downstream
  *  (impl-plan-geometry-descriptors: the capability IS the descriptor fact). */
 const implementedTypes = () => Object.keys(PRIMITIVES);
+
+/** C2: the ONE place env defaults resolve — the plan record is closed (no optionals),
+ *  so Generate reads values, never re-derives defaults. */
+function resolveEnvironment(env: SceneDescription['environment']): ResolvedEnvironment {
+    if (env === undefined || env.type === 'none') return { type: 'none' };
+    if (env.type === 'constant') return { type: 'constant', color: env.color, intensity: env.intensity ?? 1.0 };
+    if (env.type === 'image') return { type: 'image', url: env.url, intensity: env.intensity ?? 1.0, rotation: env.rotation ?? 0.0 };
+    return { type: 'procedural', glsl: env.glsl, intensity: env.intensity ?? 1.0, rotation: env.rotation ?? 0.0 };
+}
 
 export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag): RenderPlan {
     // --- Assign material IDs in AUTHORED (insertion) order — naming batch N1 (audit P1).
@@ -178,7 +187,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         const sceneMat = scene.materials[mat.name];
         if (sceneMat === undefined || sceneMat.sampleAsLight === false) continue;
         const emission = mat.values[EMISSION_KEY];
-        if (!Array.isArray(emission) || !emission.some((c) => c !== 0)) continue;
+        if (!hasConstantNonzeroEmission(emission)) continue;   // C3: the ONE predicate (shared with Analyzer/Validator)
         const Le = emission as Vec3;
         // Registry-driven (A3): the kind whose backing region primitive matches this
         // object's shape converts the FOLDED parameters back to registry values —
@@ -301,9 +310,9 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
                 chart: strategy.estimator.envSampler ?? 'equirect',
                 compensation: strategy.estimator.envCompensation ?? false,
             },
-            accumulation: strategy.estimator.accumulation.type === 'exponential'
-                ? { type: 'exponential', alpha: strategy.estimator.accumulation.alpha }
-                : { type: strategy.estimator.accumulation.type },
+            // 'exponential' is reserved-not-built: the Validator rejects it before
+            // planning, so no dead construction branch survives here (C6).
+            accumulation: { type: strategy.estimator.accumulation.type },
         },
         view: {
             tonemap: strategy.view.tonemap.type === 'none'
@@ -356,7 +365,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // "some light's emission is a {param}".
             driven: lighting !== null && lights.some((l) => Object.values(l.values).some(isValueParam)),
         },
-        environment: scene.environment ?? { type: 'none' },
+        environment: resolveEnvironment(scene.environment),
         environmentSamplable: envSamplable,
         environmentPdf: envSamplable && mis,
         // Selection is live only when finite lights split mass with the env; env-only

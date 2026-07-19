@@ -1,6 +1,10 @@
+// The scene census, SLIMMED to its consumers (compiler-pass C4): every field asserted
+// here has a real Validator/Planner reader — the old backend counts / per-model flags /
+// heterogeneous mirror died with their zero readers.
+
 import { describe, it, expect } from 'vitest';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
-import type { SceneDescription, GlslExpression, ValueParam } from '../../src/compiler/types.js';
+import type { SceneDescription } from '../../src/compiler/types.js';
 
 function scene(partial: Partial<SceneDescription>): SceneDescription {
     return {
@@ -14,66 +18,69 @@ function scene(partial: Partial<SceneDescription>): SceneDescription {
 }
 
 describe('analyze — geometry', () => {
-    it('counts RESOLVED backends (B1: auto = analytic if provided, else sdf; pins override)', () => {
-        const f = analyze(scene({
+    it('flags meshes (Validator-rejected until the BVH backend); empty scene → false', () => {
+        expect(analyze(scene({
             objects: [
-                { type: 'sphere', parameters: {}, material: 'm' },                    // auto → analytic
-                { type: 'box', parameters: {}, material: 'm' },                       // sdf-only → sdf
-                { type: 'sphere', parameters: {}, material: 'm', backend: 'sdf' },    // pinned → sdf
+                { type: 'sphere', parameters: {}, material: 'm' },
                 { kind: 'mesh', data: new Float32Array(0), material: 'm' },
             ],
-        }));
-        expect(f.geometry.sdfCount).toBe(2);
-        expect(f.geometry.analyticCount).toBe(1);
-        expect(f.geometry.hasSDFs).toBe(true);
-        expect(f.geometry.hasAnalytic).toBe(true);
-        expect(f.geometry.hasMeshes).toBe(true);
-    });
-
-    it('empty scene → all geometry false / zero', () => {
-        const f = analyze(scene({}));
-        expect(f.geometry.hasSDFs).toBe(false);
-        expect(f.geometry.hasAnalytic).toBe(false);
-        expect(f.geometry.hasMeshes).toBe(false);
-        expect(f.geometry.sdfCount).toBe(0);
+        })).geometry.hasMeshes).toBe(true);
+        expect(analyze(scene({})).geometry.hasMeshes).toBe(false);
     });
 });
 
-describe('analyze — materials & procedural detection', () => {
-    it('flags hasProcedural only for GlslExpression properties', () => {
-        const glsl: GlslExpression = { kind: 'glsl', source: 'vec3(0.5)' };
-        const f = analyze(scene({ materials: { a: { model: 'lambert', albedo: glsl } } }));
-        expect(f.materials.hasProcedural).toBe(true);
-    });
-
-    it('does NOT count a ValueParam ({param}) as procedural', () => {
-        const p: ValueParam<number> = { param: 'a.roughness' };
-        const f = analyze(scene({ materials: { a: { model: 'lambert', roughness: p } } }));
-        expect(f.materials.hasProcedural).toBe(false);
-    });
-
-    it('does not count constant numeric/vec properties as procedural', () => {
-        const f = analyze(scene({ materials: { a: { model: 'lambert', albedo: [0.5, 0.5, 0.5], roughness: 0.3 } } }));
-        expect(f.materials.hasProcedural).toBe(false);
-    });
-});
-
-describe('analyze — lighting (registry-derived census, the lights-door rule)', () => {
-    it('classifies by the descriptor delta fact and counts unregistered kinds separately', () => {
+describe('analyze — lighting (authoring-intent count)', () => {
+    it('counts every AUTHORED light, registered kind or not (a kind rejection must not stack a misleading no-lights error)', () => {
         const f = analyze(scene({
             lights: [
                 { kind: 'point', position: [0, 0, 0], emission: 1 },
-                { kind: 'point', position: [1, 0, 0], emission: 1 },
                 { kind: 'quad', corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 1 },
                 { kind: 'directional', direction: [0, -1, 0], emission: 1 },   // reserved: no occupant
             ],
         }));
-        expect(f.lighting.deltaLightCount).toBe(2);
-        expect(f.lighting.areaLightCount).toBe(1);
-        expect(f.lighting.unknownKindLightCount).toBe(1);
-        // totalLightCount counts AUTHORED lights (intent — a kind rejection must not
-        // stack a misleading "scene has no lights" on top).
-        expect(f.lighting.totalLightCount).toBe(4);
+        expect(f.lighting.totalLightCount).toBe(3);
+    });
+
+    it('counts sampleAsLight emitter OBJECTS (analytic samplable primitive + constant nonzero emission)', () => {
+        const f = analyze(scene({
+            objects: [{ type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, material: 'lamp' }],
+            materials: { lamp: { model: 'lambert', albedo: [0, 0, 0], emission: [5, 5, 5] } },
+        }));
+        expect(f.lighting.totalLightCount).toBe(1);
+    });
+
+    it('a {param}-driven emission object does NOT count (v1: power must bake into the CDF)', () => {
+        const f = analyze(scene({
+            objects: [{ type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, material: 'lamp' }],
+            materials: { lamp: { model: 'lambert', albedo: [0, 0, 0], emission: { param: 'lamp.power', default: 5 } } },
+        }));
+        expect(f.lighting.totalLightCount).toBe(0);
+    });
+});
+
+describe('analyze — media', () => {
+    it('census flags: media / scattering / emissive / null interfaces', () => {
+        const f = analyze(scene({
+            materials: {
+                fog: { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [0.5, 0.5, 0.5], emission: [0.2, 0.2, 0.2] } },
+            },
+        }));
+        expect(f.media.hasMedia).toBe(true);
+        expect(f.media.hasScatteringMedia).toBe(true);
+        expect(f.media.hasEmissiveMedia).toBe(true);
+        expect(f.media.hasNullInterfaces).toBe(true);
+    });
+
+    it('ambientMedium alone flags hasMedia', () => {
+        expect(analyze(scene({ ambientMedium: 'fog' })).media.hasMedia).toBe(true);
+    });
+});
+
+describe('analyze — environment as a light (D6)', () => {
+    it('image env samplable by default; constant env is opt-in', () => {
+        expect(analyze(scene({ environment: { type: 'image', url: 'x.hdr' } })).environment.samplable).toBe(true);
+        expect(analyze(scene({ environment: { type: 'constant', color: [1, 1, 1] } })).environment.samplable).toBe(false);
+        expect(analyze(scene({ environment: { type: 'constant', color: [1, 1, 1], sampleAsLight: true } })).environment.samplable).toBe(true);
     });
 });
 
