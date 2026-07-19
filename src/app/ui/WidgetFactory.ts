@@ -13,6 +13,7 @@ import { NumberInput } from './inputs/NumberInput.js';
 import { ColorPicker } from './inputs/ColorPicker.js';
 import { VectorInput } from './inputs/VectorInput.js';
 import { Dropdown } from './inputs/Dropdown.js';
+import { HdrColorInput } from './inputs/HdrColorInput.js';
 
 export interface WidgetFactoryOptions {
     /** Current value of the parameter */
@@ -110,6 +111,15 @@ export function createWidget(meta: ParameterMetadata, options: WidgetFactoryOpti
         }
 
         case 'color': {
+            // E2: radiometric colors get the chroma × intensity composite — the plain
+            // swatch's hex round-trip clamps to [0,1] and would destroy HDR magnitudes.
+            if (meta.hdr) {
+                return new HdrColorInput(value as number[], {
+                    label,
+                    ...(meta.range ? { intensityMax: meta.range[1] } : {}),
+                    onChange: onChange as (v: number[]) => void
+                });
+            }
             return new ColorPicker(value as number[], {
                 label,
                 onChange: onChange as (v: number[]) => void

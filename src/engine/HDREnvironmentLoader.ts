@@ -67,7 +67,7 @@ export class HDREnvironmentLoader {
      * @param path - Path to the .hdr file
      * @returns HDR environment data including dimensions and total weight
      */
-    async loadEnvironmentHDR(path: string): Promise<HDREnvironmentData> {
+    async loadEnvironmentHDR(path: string, names: { map: string; cond: string; marg: string }): Promise<HDREnvironmentData> {
         console.log(`Loading HDR environment: ${path}`);
 
         try {
@@ -113,16 +113,17 @@ export class HDREnvironmentLoader {
                 `Failed to create texture for '${path}'.`
             );
 
-            this.textureRegistry.register('env_map', envTex);
+            this.textureRegistry.register(names.map, envTex);
 
-            // Build CDF textures for importance sampling
+            // Build CDF textures for importance sampling (E6: names are the CALLER's —
+            // this loader registers what it is told, knowing nothing).
             const built = buildEnvironmentSampler(
                 this.gl,
                 this.textureRegistry,
                 data,
                 width,
                 height,
-                { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' }
+                names
             );
 
             console.log(`✅ HDR loaded: ${width}×${height} (CDFs built)`);

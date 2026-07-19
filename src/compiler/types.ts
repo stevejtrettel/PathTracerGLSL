@@ -578,6 +578,10 @@ export const RESERVED_PARAM_PATHS = ['camera.position', 'camera.target', 'camera
 export interface ParameterMetadata {
     // Required
     type: 'float' | 'int' | 'bool' | 'vec2' | 'vec3' | 'vec4' | 'color';
+    /** RADIOMETRIC magnitude (E2): the panel renders chroma × intensity (HdrColorInput)
+     *  instead of an LDR swatch, so editing can never clamp an emission of 40 to ≤1.
+     *  Plain 'color' without this flag stays a swatch (albedo/f0 — genuinely [0,1]). */
+    hdr?: boolean;
     default: any;
 
     // For numeric types
@@ -834,6 +838,23 @@ export interface CompiledRenderer {
      * - 'albedo', 'normal', 'depth', etc.
      */
     exportTargets?: Record<string, ExportTarget>;
+
+    /** ON-DEMAND LDR recipe (engine-app pass E5 — a CONTRACT EXTENSION, owner-approved
+     *  Jul 19 2026): everything the engine needs to run the display pass into the LDR
+     *  scratch buffer for PNG export, shipped as DATA. The engine had memorized four
+     *  compiler names ('display-pass', 'u_radiance', 'accumulation_previous', 'ldr') —
+     *  a silent-runtime-breakage class on any compiler rename; now the compiler, which
+     *  owns those names, declares them. Absent ⇒ the renderer has no display pass
+     *  (bake renderers) and renderLdr errors honestly. */
+    ldrRecipe?: {
+        /** The pipeline pass to re-run (the display pass's id). */
+        passId: string;
+        /** Texture-input overrides for the re-run (display's radiance input → the
+         *  post-swap accumulation buffer, so LDR matches what HDR export reads). */
+        inputs: Record<string, string>;
+        /** The framebuffer to render into (the byte-format LDR scratch target). */
+        output: string;
+    };
 }
 
 /**

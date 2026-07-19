@@ -89,6 +89,23 @@ interface ShaderProgram {
 - RenderPipeline describes how Engine should execute them
 - UniformBinding[] connects parameter system to shader uniforms
 
+**Extension (owner-approved Jul 19 2026 — impl-plan-engine-app E5):** `ldrRecipe?` — the
+on-demand LDR/PNG re-run shipped as data:
+
+```typescript
+ldrRecipe?: {
+  passId: string;                    // the display pass to re-run
+  inputs: Record<string, string>;    // texture-input overrides (radiance → post-swap accumulation)
+  output: string;                    // the byte-format LDR scratch framebuffer
+}
+```
+
+The engine had memorized four compiler-side names (`display-pass`, `u_radiance`,
+`accumulation_previous`, `ldr`) for `renderLdr()` — a silent-runtime-breakage class on any
+compiler rename, and the only place the blindness rule was violated. The compiler (which
+owns those names in PipelineBuilder) now declares them; `Engine.renderLdr` consumes the
+recipe as data. Additive only — every existing field is unchanged.
+
 ---
 
 ## 2. The RenderPipeline Contract

@@ -91,13 +91,12 @@ describe('ParameterStore — resendAll', () => {
 });
 
 describe('ParameterStore — restore / serialize', () => {
-    it('restore coerces camera.frame to Float32Array and emits one batch', () => {
+    it('restore copies arrays and emits one batch (E11: the camera.frame coercion fossil is gone)', () => {
         const store = new ParameterStore();
         const calls = withOnChange(store);
         calls.length = 0;
-        store.restore({ 'camera.frame': [1, 2, 3], other: 7 });
-        expect(store.get('camera.frame')).toBeInstanceOf(Float32Array);
-        expect(Array.from(store.get('camera.frame'))).toEqual([1, 2, 3]);
+        store.restore({ 'camera.position': [1, 2, 3], other: 7 });
+        expect(store.get('camera.position')).toEqual([1, 2, 3]);
         expect(calls).toHaveLength(1); // single batch, not per-item
         expect(calls[0].changes.every(c => c.oldValue === undefined)).toBe(true);
     });

@@ -55,6 +55,7 @@ import './styles/components.css';
 export { UIComponent } from './core/UIComponent.js';
 export { Container } from './core/Container.js';
 export { Input, type InputOptions } from './core/Input.js';
+export { HdrColorInput, type HdrColorInputOptions } from './inputs/HdrColorInput.js';
 
 // Containers
 export { Panel, type PanelOptions } from './containers/Panel.js';

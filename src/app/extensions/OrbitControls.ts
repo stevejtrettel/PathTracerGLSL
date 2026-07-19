@@ -211,8 +211,9 @@ export class OrbitControls implements Extension {
         if (!this.app || !this.bus) return;
 
         const newPos = this.sphericalToCartesian();
-        this.app.setParameter('camera.position', newPos);
-        this.app.setParameter('camera.target', this.target);
+        // E3: ONE batched write → one onChange → one accumulation reset per input tick
+        // (two setParameter calls reset twice — buffer clear + salt bump, per mouse-move).
+        this.app.setParameters({ 'camera.position': newPos, 'camera.target': this.target });
         this.bus.emit(AppEvents.CAMERA_MOVED, { position: newPos, target: this.target });
     }
 

@@ -5,7 +5,7 @@ import type { RenderPlan } from '../plan/types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { buildShaders } from './ShaderBuilder.js';
 import { collectFeatures } from './features/index.js';
-import { buildPipeline, buildUniforms, buildExportTargets } from './PipelineBuilder.js';
+import { buildPipeline, buildUniforms, buildExportTargets, buildLdrRecipe } from './PipelineBuilder.js';
 
 export function generate(
     plan: RenderPlan,
@@ -55,6 +55,7 @@ export function generate(
         uniforms,
         parameters,
         exportTargets,
+        ldrRecipe: buildLdrRecipe(),   // E5: the display re-run as data — the engine reads, never knows
         sourceMaps,
     };
 }

@@ -66,6 +66,9 @@ export function mintValueUniform(
     uniforms: PlannedUniform[],
     parameters: Record<string, ParameterMetadata>,
     seen: Set<string>,
+    /** E2: radiometric-magnitude marker — callers pass true for emission/σ/ε-class
+     *  quantities so the panel renders chroma × intensity, never an LDR swatch. */
+    hdr = false,
 ): void {
     // Expression-declared params (heterogeneous D4): each declared slider becomes a live FLOAT
     // uniform named from its path, exactly like a ValueParam — the expression source references
@@ -107,6 +110,7 @@ export function mintValueUniform(
     const seg = path.split('.');
     parameters[path] = {
         type: metaType,
+        ...(hdr && metaType === 'color' ? { hdr: true } : {}),
         default: prop.default,
         name: capitalize(seg[seg.length - 1]),
         group: seg.length > 1 ? seg[0] : undefined,

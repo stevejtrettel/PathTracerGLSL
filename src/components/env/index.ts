@@ -20,3 +20,9 @@ export const ENV_CHARTS: Record<string, EnvChartDescriptor> = {
     equirect: { id: 'equirect', glsl: equirectGLSL },
     octahedral: { id: 'octahedral', glsl: octahedralGLSL },
 };
+
+/** The env extern-texture naming contract (E6): the compiler's `extern:` sources, the
+ *  app's load orchestration, and the engine's registration all speak THESE names —
+ *  declared once, here, beside the charts. Variant tables append envVariantSuffix
+ *  (generate/features/environment.ts) per (chart, compensation). */
+export const ENV_EXTERN_NAMES = { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' } as const;

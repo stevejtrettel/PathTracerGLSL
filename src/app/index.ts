@@ -36,7 +36,7 @@ export type { Extension, EventHandler } from './types.js';
 export type { SessionData } from './types.js';
 
 // Event constants and parameter prefixes
-export { AppEvents, ParamPrefix, type AppEventName } from './events.js';
+export { AppEvents, type AppEventName } from './events.js';
 
 // Extensions
 export {

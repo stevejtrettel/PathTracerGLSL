@@ -153,12 +153,6 @@ export class AppShortcutsExtension implements Extension {
                 this.app.loadSessionFromFile();
                 break;
 
-            // m/M: Cycle display mode
-            case 'm':
-            case 'M':
-                e.preventDefault();
-                this.app.cycleDisplayMode();
-                break;
         }
     }
 

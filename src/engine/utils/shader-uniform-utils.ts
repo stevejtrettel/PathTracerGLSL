@@ -33,28 +33,8 @@ export function uniformValuesEqual(a: any, b: any, type?: UniformType): boolean 
     return valuesEqualUntyped(a, b);
 }
 
-/**
- * Cache all uniform locations for a program
- */
-export function cacheUniformLocations(
-    gl: WebGL2RenderingContext,
-    program: WebGLProgram
-): Map<string, WebGLUniformLocation> {
-    const locations = new Map<string, WebGLUniformLocation>();
-    const numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
-
-    for (let i = 0; i < numUniforms; i++) {
-        const uniformInfo = gl.getActiveUniform(program, i);
-        if (!uniformInfo) continue;
-
-        const location = gl.getUniformLocation(program, uniformInfo.name);
-        if (location) {
-            locations.set(uniformInfo.name, location);
-        }
-    }
-
-    return locations;
-}
+// (cacheUniformLocations deleted — E11: zero callers; the executor owns its own
+// per-program WeakMap location cache.)
 
 // ============================================================================
 // Private: Uniform Setting

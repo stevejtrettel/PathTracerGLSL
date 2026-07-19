@@ -59,6 +59,18 @@ export function buildUniforms(uniforms: PlannedUniform[]): UniformBinding[] {
     return bindings;
 }
 
+/** The on-demand LDR recipe (E5): the display-pass re-run facts, shipped as DATA so the
+ *  engine stays blind — this file owns the pass-id/buffer/input names, so it declares them. */
+export function buildLdrRecipe(): NonNullable<CompiledRenderer['ldrRecipe']> {
+    return {
+        passId: 'display-pass',
+        // Display's radiance input re-aimed at the POST-SWAP accumulation buffer, so the
+        // LDR bytes match exactly what HDR export reads (impl-plan-display Stage 4).
+        inputs: { u_radiance: 'accumulation_previous' },
+        output: 'ldr',
+    };
+}
+
 export function buildExportTargets(variance = false): CompiledRenderer['exportTargets'] {
     return {
         // 'previous', not 'current': exports run after renderFrame(), and the postFrame

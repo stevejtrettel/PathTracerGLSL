@@ -25,6 +25,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'combiner.ts', 'flags.ts',            // transport shared parts
     'math_mis.glsl',                       // transport shared part (β=2 power heuristic)
     'sampler_cdf.glsl',                    // env shared CDF walk
+    'importance.ts',                       // env shared part (importance-table math — E6: mirrors the charts' Jacobians)
     'similarity.ts',                       // geometry shared part (placement algebra — fable-transforms §2)
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)

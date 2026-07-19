@@ -4,6 +4,7 @@ import { Compiler } from '../compiler/Compiler.js';
 import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '../compiler/EnvironmentBake.js';
 import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
+import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
@@ -68,16 +69,15 @@ export class App {
         });
         // Wire ParameterStore changes to engine, EventBus, and accumulation reset
         this.parameterStore.onChange = (changes) => {
+            let resetReason: string | null = null;
             for (const change of changes.changes) {
                 this.engine.setParameter(change.path, change.newValue);
 
                 // Skip resends (oldValue === newValue) from renderer switch
                 const isResend = change.oldValue === change.newValue;
 
-                // Reset (or, if stopped/complete, mark dirty for the next start) so a
-                // camera/param change never ghosts new samples into the old image (#4).
                 if (!isResend && this._triggersReset(change.path)) {
-                    this.coordinator.requestAccumulationReset(`parameter: ${change.path}`);
+                    resetReason = `parameter: ${change.path}`;
                 }
 
                 if (!isResend) {
@@ -87,6 +87,14 @@ export class App {
                         newValue: change.newValue
                     });
                 }
+            }
+            // E3: ONE reset per CHANGESET — a batched pose write (position+target) is one
+            // user action; the old per-change request cleared accumulation once per field
+            // (twice per orbit tick: buffer clears + salt bumps, doubled). The reset (or,
+            // if stopped/complete, the dirty mark for the next start) still fires so a
+            // camera/param change never ghosts new samples into the old image (#4).
+            if (resetReason !== null) {
+                this.coordinator.requestAccumulationReset(resetReason);
             }
         };
 
@@ -158,7 +166,7 @@ export class App {
         if (hdrPath) {
             try {
                 // The loader registers env_map + the DEFAULT tables (equirect, uncompensated).
-                const env = await this.engine.loadEnvironmentHDR(hdrPath);
+                const env = await this.engine.loadEnvironmentHDR(hdrPath, ENV_EXTERN_NAMES);
                 this.parameterStore.batch({ 'env.size': [env.width, env.height], 'env.totalWeight': env.totalWeight });
 
                 // T5: build the non-default (chart, compensation) variants the strategies use.
@@ -174,7 +182,7 @@ export class App {
                         this.parameterStore.set('env.sizeOct', [octaN, octaN]);
                     }
                     this.engine.registerEnvironmentTable(rgb, w, h, {
-                        names: { map: 'env_map', cond: `env_cdf_cond${suffix}`, marg: `env_cdf_marg${suffix}` },
+                        names: { map: ENV_EXTERN_NAMES.map, cond: `${ENV_EXTERN_NAMES.cond}${suffix}`, marg: `${ENV_EXTERN_NAMES.marg}${suffix}` },
                         chart, compensation,
                     });
                 }
@@ -216,7 +224,7 @@ export class App {
                 for (const v of variants.filter((v) => v.chart === chart)) {
                     const suffix = envVariantSuffix(v.chart, v.compensation);
                     const { totalWeight } = this.engine.registerEnvironmentTable(rgb, w, h, {
-                        names: { map: 'env_map', cond: `env_cdf_cond${suffix}`, marg: `env_cdf_marg${suffix}` },
+                        names: { map: ENV_EXTERN_NAMES.map, cond: `${ENV_EXTERN_NAMES.cond}${suffix}`, marg: `${ENV_EXTERN_NAMES.marg}${suffix}` },
                         chart: v.chart, compensation: v.compensation,
                     });
                     console.log(`Baked procedural environment [${v.chart}${v.compensation ? '+comp' : ''}]: ${w}×${h}, totalWeight ${totalWeight.toFixed(3)}`);
@@ -288,7 +296,7 @@ export class App {
     // -- Content Loading --
 
     async loadEnvironmentHDR(path: string): Promise<void> {
-        await this.engine.loadEnvironmentHDR(path);
+        await this.engine.loadEnvironmentHDR(path, ENV_EXTERN_NAMES);
         this.clearAccumulation();
     }
 
@@ -337,26 +345,6 @@ export class App {
     getFPS(): number { return this.coordinator.getFPS(); }
     getRenderMode(): 'interactive' | 'production' { return this.coordinator.getMode(); }
     getRenderState(): 'rendering' | 'paused' | 'complete' | 'stopped' { return this.coordinator.getState(); }
-
-    // Cycle through display modes for AOV renderers
-    cycleDisplayMode(): void {
-        const modeParams = ['debug.displayMode', 'renderer.displayMode'];
-        const renderer = this.engine.getActiveRenderer();
-
-        for (const param of modeParams) {
-            const metadata = renderer?.parameters?.[param];
-            if (metadata) {
-                const current = this.getParameter(param) ?? metadata.default ?? 0;
-                const max = metadata.range?.[1] ?? 2;
-                const next = ((current as number) + 1) % (max + 1);
-                this.setParameter(param, next);
-                const modeName = metadata.options?.[next] ?? `Mode ${next}`;
-                console.log(`Display mode: ${modeName} (${next})`);
-                return;
-            }
-        }
-        console.log('No display mode parameter found for current renderer');
-    }
 
     // -- Stats & Profiling --
 
@@ -642,10 +630,13 @@ export class App {
         const exports = this.getAvailableExports();
         const aovs = exports.filter(e => e !== 'hdr' && e !== 'ldr');
 
+        // E1: an empty AOV set is the NORMAL case for standard renderers (only
+        // hdr/ldr/±variance targets exist) — a no-op, never a throw: the old
+        // ExportError fired mid-production-flow and skipped autoSave, reporting a
+        // successful render as "Production render failed".
         if (aovs.length === 0) {
-            throw new ExportError('No AOVs available for export', {
-                availableExports: exports
-            });
+            console.log('No AOVs to export (standard renderer: hdr/ldr only)');
+            return;
         }
 
         console.log(`Exporting ${aovs.length} AOVs...`);

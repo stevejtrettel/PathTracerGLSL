@@ -235,23 +235,14 @@ export class ParameterPanelExtension extends UIExtension {
     private sortGroups(
         groups: Map<string, Array<{ path: string; meta: ParameterMetadata }>>
     ): Map<string, Array<{ path: string; meta: ParameterMetadata }>> {
-        // Group display order (matches module compilation order)
-        const GROUP_ORDER = [
-            'Ambient', 'Scene', 'Environment', 'Lighting',
-            'Camera', 'Interaction', 'Transport', 'Accumulator', 'Developer'
-        ];
-        const order = new Map<string, number>();
-        GROUP_ORDER.forEach((name, index) => {
-            order.set(name, index);
-        });
-
-        const sorted = Array.from(groups.entries()).sort((a, b) => {
-            const orderA = order.get(a[0]) ?? 999;
-            const orderB = order.get(b[0]) ?? 999;
-            return orderA - orderB;
-        });
-
-        return new Map(sorted);
+        // E10: group order = FIRST APPEARANCE in the compiled parameter record — the
+        // compiler's feature order IS the ordering, so the panel is compiler-built like
+        // everything else about the parameters. (The old hardcoded GROUP_ORDER list was
+        // dead-architecture vocabulary: only two of its nine names still existed, and
+        // 'Placement' plus every object-named group fell to an unsorted bucket.)
+        // Map iteration preserves insertion order, and buildGroups inserts groups as it
+        // walks the compiled record — so the input order is already the compiler's.
+        return groups;
     }
 
     private createWidgetForParam(path: string, meta: ParameterMetadata): UIComponent {

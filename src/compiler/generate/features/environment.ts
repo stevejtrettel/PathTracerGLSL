@@ -122,7 +122,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         const parameters: Record<string, ParameterMetadata> = {
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Sky intensity', group: 'Environment', triggersReset: true },
         };
-        mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set());   // no-op if constant
+        mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set(), true);   // no-op if constant; sky radiance is HDR (E2)
         const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${colorExpr} * u_envIntensity;`) }];
         if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: constantSampler(colorExpr) });
         if (plan.program.environmentPdf) blocks.push({ origin: 'generated:environment-pdf', source: CONSTANT_PDF });

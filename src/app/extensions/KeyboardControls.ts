@@ -17,7 +17,6 @@ import { AppEvents } from '../events.js';
  * Rotation (WASD + QE)
  *   W - pitch up   S - pitch down
  *   A - yaw left   D - yaw right
- *   Q - roll left  E - roll right
  *
  * Modifiers
  *   Shift - boost (3x speed)
@@ -261,8 +260,6 @@ export class KeyboardControls implements Extension {
         if (this.pressed.has('KeyD')) rot[1] += 1;  // Yaw right
 
         // Roll (Q/E)
-        if (this.pressed.has('KeyQ')) rot[2] += 1;  // Roll left
-        if (this.pressed.has('KeyE')) rot[2] -= 1;  // Roll right
 
         return vec3IsZero(rot) ? null : vec3Normalize(rot);
     }
@@ -280,24 +277,23 @@ export class KeyboardControls implements Extension {
     }
 
     private rotateLocal(rotation: Vec3, angle: number): void {
-        const [pitch, yaw, roll] = rotation;
+        const [pitch, yaw] = rotation;
 
         if (pitch !== 0) this.frame.rotatePitch(pitch * angle);
         if (yaw !== 0) this.frame.rotateYaw(yaw * angle);
-        if (roll !== 0) this.frame.rotateRoll(roll * angle);
+        // E8: roll DELETED — the pose rail is position/target with world-up, so roll was a
+        // no-op on screen (it mutated only this extension's private frame). A real keyboard
+        // NAVIGATION system is the owner's planned follow-up (impl-plan-engine-app).
     }
 
     private updateParameters(): void {
-        // Update camera position
-        this.app.setParameter('camera.position', [...this.position]);
-
-        // Compute target from position + forward
+        // Compute target from position + forward; ONE batched write (E3: one reset per tick).
         const target: Vec3 = [
             this.position[0] + this.frame.forward[0] * 5,
             this.position[1] + this.frame.forward[1] * 5,
             this.position[2] + this.frame.forward[2] * 5
         ];
-        this.app.setParameter('camera.target', target);
+        this.app.setParameters({ 'camera.position': [...this.position], 'camera.target': target });
 
         // Emit event for other systems
         this.bus.emit(AppEvents.CAMERA_MOVED, {
@@ -375,10 +371,6 @@ class Frame {
         this.forward = vec3Rotate(this.forward, this.up, angle);
     }
 
-    rotateRoll(angle: number): void {
-        this.right = vec3Rotate(this.right, this.forward, angle);
-        this.up = vec3Rotate(this.up, this.forward, angle);
-    }
 
     orthonormalize(): void {
         this.forward = vec3Normalize(this.forward);

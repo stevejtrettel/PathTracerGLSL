@@ -88,9 +88,7 @@ class ParameterStore {
         this.parameters.clear();
 
         for (const [key, value] of Object.entries(params)) {
-            if (key === 'camera.frame' && Array.isArray(value)) {
-                this.parameters.set(key, new Float32Array(value));
-            } else if (Array.isArray(value)) {
+            if (Array.isArray(value)) {
                 this.parameters.set(key, [...value]);
             } else {
                 this.parameters.set(key, value);

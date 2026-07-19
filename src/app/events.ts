@@ -47,37 +47,19 @@ export const AppEvents = {
 export type AppEventName = typeof AppEvents[keyof typeof AppEvents];
 
 /**
- * Parameter path prefixes used for accumulation reset decisions.
- */
-export const ParamPrefix = {
-    CAMERA:    'camera.',
-    SCENE:     'scene.',
-    MATERIAL:  'material.',
-    LIGHT:     'light.',
-    DEVELOPER: 'developer.',
-    DEBUG:     'debug.',
-    RENDERER_DISPLAY_MODE: 'renderer.displayMode',
-} as const;
-
-/**
- * Determines whether a parameter change should reset accumulation.
- *
- * Camera, scene, material, and light parameters cause a reset.
- * Developer, debug, and display mode parameters do not.
- * Unknown prefixes reset to be safe.
+ * Fallback reset heuristic (E4): used ONLY when a parameter carries no compiled
+ * ParameterMetadata (App._triggersReset prefers metadata.triggersReset). ONE prefix
+ * vocabulary — the compiler's RESERVED_PARAM_PREFIXES — replaces the app's drifted
+ * private list (which predated the current architecture: 'developer.'/'scene.'/
+ * 'material.'/'light.' matched nothing, and missing 'env.' spammed a bogus warning
+ * on every HDR-environment scene load).
+ *   debug./renderer. — developer surfaces: never reset.
+ *   engine./env.     — compiler-owned plumbing (sizes, table totals): their metadata-less
+ *                      members are load-time data; resets ride renderer loads instead.
+ *   everything else  — scene-affecting (camera.*, object-named params): reset.
  */
 export function shouldResetAccumulation(path: string): boolean {
-    if (path.startsWith(ParamPrefix.DEVELOPER) ||
-        path.startsWith(ParamPrefix.DEBUG) ||
-        path.startsWith(ParamPrefix.RENDERER_DISPLAY_MODE)) {
-        return false;
-    }
-    if (path.startsWith(ParamPrefix.CAMERA) ||
-        path.startsWith(ParamPrefix.SCENE) ||
-        path.startsWith(ParamPrefix.MATERIAL) ||
-        path.startsWith(ParamPrefix.LIGHT)) {
-        return true;
-    }
-    console.warn(`Unknown parameter prefix: ${path}, resetting accumulation`);
+    if (path.startsWith('debug.') || path.startsWith('renderer.')) return false;
+    if (path.startsWith('engine.') || path.startsWith('env.')) return false;
     return true;
 }

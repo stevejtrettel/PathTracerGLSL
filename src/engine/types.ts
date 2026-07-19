@@ -8,6 +8,7 @@
 export type { UniformType, UniformBinding, ParameterMetadata } from '../compiler/types.js';
 
 /**
- * Engine execution state
+ * Engine execution state (E11: was a stale two-state copy while Engine.ts's real one
+ * had four — ONE definition now, here, imported by Engine.ts).
  */
-export type EngineState = 'ready' | 'running';
+export type EngineState = 'ready' | 'running' | 'error' | 'context-lost';

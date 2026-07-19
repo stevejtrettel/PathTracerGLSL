@@ -13,8 +13,8 @@ import {
     ConsoleReporter
 } from '../errors/index.js';
 import type { CompiledRenderer } from '../compiler/types.js';
+import type { EngineState } from './types.js';
 
-type EngineState = 'ready' | 'running' | 'error' | 'context-lost';
 
 interface Rectangle {
     x: number;
@@ -208,15 +208,20 @@ export class Engine {
         if (this.state !== 'running') throw new Error(`Cannot render LDR in state: ${this.state}`);
         if (!this.activeRendererId) throw new Error('No active renderer');
         const renderer = this.renderers.get(this.activeRendererId)!;
-        const displayPass = renderer.pipeline.passes.find(p => p.id === 'display-pass');
-        if (!displayPass) throw new Error('renderLdr: active renderer has no display pass');
+        // E5: the recipe is DATA the compiler shipped — this engine knows no pass,
+        // buffer, or uniform names (the four memorized names were a silent-runtime-
+        // breakage class on any compiler rename).
+        const recipe = renderer.ldrRecipe;
+        if (!recipe) throw new Error('renderLdr: renderer ships no ldrRecipe (no display pass)');
+        const displayPass = renderer.pipeline.passes.find(p => p.id === recipe.passId);
+        if (!displayPass) throw new Error(`renderLdr: recipe pass '${recipe.passId}' not in pipeline`);
 
         const sampleCount = this.sampleCounts.get(this.activeRendererId)!;
         const parameters = this._buildParameters(sampleCount);
         this.renderExecutor.executePass({
             ...displayPass,
-            output: 'ldr',
-            inputs: { textures: { ...(displayPass.inputs?.textures ?? {}), u_radiance: 'accumulation_previous' } },
+            output: recipe.output,
+            inputs: { textures: { ...(displayPass.inputs?.textures ?? {}), ...recipe.inputs } },
         }, parameters);
     }
 
@@ -230,6 +235,9 @@ export class Engine {
         const parameters: Record<string, any> = {
             'engine.resolution': [width, height],
             'engine.imageSize': imgSize,
+            // RESERVED: engine.time has zero shader consumers today (u_time left the
+            // program in exact-linkage); kept for the deferred motion-blur seed field
+            // (impl-plan-cameras Category B).
             'engine.time': this._time,
             'engine.sampleCount': sampleCount,
             'engine.resetSalt': this.resetSalt,
@@ -244,7 +252,7 @@ export class Engine {
 
     // -- Parameters --
 
-    // Set a custom parameter (e.g. 'renderer.displayMode', 'scene.metallic')
+    // Set a custom parameter by dotted path (e.g. 'camera.fov', 'lamp.emission')
     setParameter(name: string, value: any): void { this.customParameters.set(name, value); }
     getParameter(name: string): any { return this.customParameters.get(name); }
 
@@ -396,14 +404,14 @@ export class Engine {
     // -- Environment Loading --
 
     /**
-     * Load a Radiance .hdr file into the texture registry under the extern names
-     * (env_map, env_cdf_cond, env_cdf_marg). No binding happens here: the executor
+     * Load a Radiance .hdr file into the texture registry under the CALLER-provided
+     * extern names (E6: the compiler/app own naming; the engine registers blindly). No binding happens here: the executor
      * binds `extern:` pass inputs to units per pass (§2.10 — the old per-program
      * bind-at-load path was the blind-executor violation; deleted in env-as-light T1).
      * Returns the env metadata so the app can set the `env.*` parameters.
      */
-    async loadEnvironmentHDR(path: string): Promise<{ width: number; height: number; totalWeight: number; data: Float32Array }> {
-        const envData = await this.hdrLoader.loadEnvironmentHDR(path);
+    async loadEnvironmentHDR(path: string, names: { map: string; cond: string; marg: string }): Promise<{ width: number; height: number; totalWeight: number; data: Float32Array }> {
+        const envData = await this.hdrLoader.loadEnvironmentHDR(path, names);
         return { width: envData.width, height: envData.height, totalWeight: envData.totalWeight, data: envData.data };
     }
 
@@ -417,7 +425,7 @@ export class Engine {
         rgb: Float32Array,
         width: number,
         height: number,
-        opts: { names?: { map: string; cond: string; marg: string }; chart?: string; compensation?: boolean } = {},
+        opts: { names: { map: string; cond: string; marg: string }; chart?: string; compensation?: boolean },
     ): { totalWeight: number } {
         const result = buildEnvironmentSampler(
             this.gl, this.textureRegistry, rgb, width, height,

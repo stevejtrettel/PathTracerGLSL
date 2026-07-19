@@ -412,7 +412,7 @@ export class TiledRenderer {
         if (config.format === 'hdr' || config.format === 'both') {
             if (exports.includes('hdr')) {
                 const radiance = this.app.readExport('hdr') as Float32Array;
-                saveHDRFile(radiance, rect.width, rect.height, `${filename}.hdr`);
+                saveHDRFile(radiance, rect.width, rect.height, `${filename}.hdr`, this.app.buildRenderStamp());   // E12: tiles carry the stamp like every export
             } else {
                 console.warn('HDR export not available for current renderer');
             }
@@ -422,7 +422,7 @@ export class TiledRenderer {
             if (exports.includes('ldr')) {
                 this.app.renderLdr();   // tonemap + dither this tile → 'ldr' before reading
                 const rgb = this.app.readExport('ldr') as Uint8Array;
-                savePNGFile(rgb, rect.width, rect.height, `${filename}.png`);
+                savePNGFile(rgb, rect.width, rect.height, `${filename}.png`, this.app.buildRenderStamp());
             } else {
                 console.warn('LDR export not available for current renderer');
             }

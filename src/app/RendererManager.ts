@@ -188,6 +188,19 @@ export class RendererManager {
         // Phase 3 — commit: replace programs/resources in the engine. Every new
         // shader is known to compile, so this no longer fails partway.
         this.scene = target;
+        // E9: renderer ids embed the scene id — a recompile with a DIFFERENT scene mints
+        // all-new ids, and the old renderers (programs + GPU framebuffers) used to leak,
+        // staying selectable and shifting the 1-9 keys. Diff-and-unload the stale ids.
+        const newIds = new Set(compiled.map((c) => c.renderer.id));
+        for (const staleId of [...this.renderers.keys()]) {
+            if (!newIds.has(staleId)) {
+                this.engine.unloadRenderer(staleId);
+                this.renderers.delete(staleId);
+            }
+        }
+        for (const [strategyId, rid] of [...this.strategyToRenderer]) {
+            if (!newIds.has(rid)) this.strategyToRenderer.delete(strategyId);
+        }
         for (const { strategyId, renderer } of compiled) {
             this.engine.loadRenderer(renderer.id, renderer);
             this.renderers.set(renderer.id, renderer);

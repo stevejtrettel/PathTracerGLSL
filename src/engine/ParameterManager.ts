@@ -33,8 +33,16 @@ class ParameterManager {
     // Value cache for change detection (uniform values are same across shaders)
     private uniformValueCache = new Map<string, any>();
 
+    // E7 (recompute-on-change): per-binding INPUT snapshots + the last computed value.
+    // Closures run only when an input actually changed — previously every compute()
+    // (camera basis, light CDFs, majorants, env selection) ran once per shader per
+    // frame unconditionally, the scaling cliff for hundreds of driven objects. Inputs
+    // are snapshotted BY COPY (the reused-mutated-array trap documented below).
+    private inputSnapshots = new Map<string, Record<string, any>>();
+    private computedValues = new Map<string, any>();
+
     // Statistics
-    private updateStats = { total: 0, skipped: 0 };
+    private updateStats = { total: 0, skipped: 0, closuresRun: 0, closuresSkipped: 0 };
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
@@ -61,9 +69,11 @@ class ParameterManager {
         // Cache uniform locations for all programs
         this._cacheAllUniformLocations();
 
-        // Clear value cache for fresh start
+        // Clear caches for fresh start
         this.uniformValueCache.clear();
-        this.updateStats = { total: 0, skipped: 0 };
+        this.inputSnapshots.clear();
+        this.computedValues.clear();
+        this.updateStats = { total: 0, skipped: 0, closuresRun: 0, closuresSkipped: 0 };
     }
 
     /**
@@ -95,8 +105,22 @@ class ParameterManager {
                 paramValues[paramPath] = parameters[paramPath];
             }
 
-            // Compute uniform value
-            const value = binding.compute(paramValues);
+            // E7: run the closure only when an input changed; otherwise reuse the last
+            // computed value (also collapses the per-SHADER recompute — the value is
+            // shader-independent, so the second shader this frame reuses it too).
+            let value: any;
+            const prevInputs = this.inputSnapshots.get(binding.uniform);
+            if (prevInputs !== undefined && !inputsChanged(prevInputs, paramValues)) {
+                value = this.computedValues.get(binding.uniform);
+                this.updateStats.closuresSkipped++;
+            } else {
+                value = binding.compute(paramValues);
+                this.inputSnapshots.set(binding.uniform, snapshotRecord(paramValues));
+                // Snapshot the computed value too — a closure reusing one mutated array
+                // would otherwise alias this cache.
+                this.computedValues.set(binding.uniform, (Array.isArray(value) || ArrayBuffer.isView(value)) ? (value as number[]).slice() : value);
+                this.updateStats.closuresRun++;
+            }
 
             // Check cache - skip if unchanged
             const cacheKey = `${shaderId}:${binding.uniform}`;
@@ -127,7 +151,9 @@ class ParameterManager {
      */
     clearCache(): void {
         this.uniformValueCache.clear();
-        this.updateStats = { total: 0, skipped: 0 };
+        this.inputSnapshots.clear();
+        this.computedValues.clear();
+        this.updateStats = { total: 0, skipped: 0, closuresRun: 0, closuresSkipped: 0 };
     }
 
     /**
@@ -141,7 +167,9 @@ class ParameterManager {
         this.uniformLocations.clear();
         this.parameterToBindings.clear();
         this.uniformValueCache.clear();
-        this.updateStats = { total: 0, skipped: 0 };
+        this.inputSnapshots.clear();
+        this.computedValues.clear();
+        this.updateStats = { total: 0, skipped: 0, closuresRun: 0, closuresSkipped: 0 };
     }
 
     /**
@@ -220,6 +248,34 @@ class ParameterManager {
             }
         }
     }
+}
+
+// ============================================================================
+// E7 helpers — exact input comparison (params are exact JS values; the epsilon
+// tolerance belongs to the GPU-upload cache, not here) + by-copy snapshots.
+// ============================================================================
+
+function inputsChanged(prev: Record<string, any>, next: Record<string, any>): boolean {
+    for (const key in next) {
+        const a = prev[key], b = next[key];
+        if (a === b) continue;
+        if ((Array.isArray(a) || ArrayBuffer.isView(a)) && (Array.isArray(b) || ArrayBuffer.isView(b))) {
+            const aa = a as ArrayLike<number>, bb = b as ArrayLike<number>;
+            if (aa.length !== bb.length) return true;
+            for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return true;
+            continue;
+        }
+        return true;
+    }
+    return false;
+}
+
+function snapshotRecord(values: Record<string, any>): Record<string, any> {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(values)) {
+        out[k] = (Array.isArray(v) || ArrayBuffer.isView(v)) ? (v as number[]).slice() : v;
+    }
+    return out;
 }
 
 export { ParameterManager };

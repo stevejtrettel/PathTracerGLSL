@@ -17,7 +17,7 @@ describe('buildEnvironmentSampler', () => {
         const W = 4, H = 3;
         const rgb = new Float32Array(W * H * 3).fill(1); // uniform white
         const reg = fakeRegistry();
-        const res = buildEnvironmentSampler(glStub(), reg, rgb, W, H);
+        const res = buildEnvironmentSampler(glStub(), reg, rgb, W, H, { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' });
 
         expect(res.size).toEqual([W, H]);
         expect(res.totalWeight).toBeGreaterThan(0);
@@ -31,7 +31,7 @@ describe('buildEnvironmentSampler', () => {
         const W = 2, H = 2;
         const rgb = new Float32Array(W * H * 3).fill(0.5);
         const reg = fakeRegistry();
-        const res = buildEnvironmentSampler(glStub(), reg, rgb, W, H);
+        const res = buildEnvironmentSampler(glStub(), reg, rgb, W, H, { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' });
         // With a uniform image every row's weight is positive, so totalWeight > 0 and
         // both CDF textures were registered (their monotonicity/normalization is what
         // the R32F upload carries — exercised indirectly here).
@@ -43,7 +43,7 @@ describe('buildEnvironmentSampler', () => {
         const W = 2, H = 2;
         const rgb = new Float32Array(W * H * 3); // all zero
         const reg = fakeRegistry();
-        const res = buildEnvironmentSampler(glStub(), reg, rgb, W, H);
+        const res = buildEnvironmentSampler(glStub(), reg, rgb, W, H, { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' });
         expect(res.totalWeight).toBe(0);
         // still registers both textures (degenerate but valid)
         expect(reg.registered).toEqual(['env_cdf_cond', 'env_cdf_marg']);
@@ -58,7 +58,7 @@ describe('buildEnvironmentSampler', () => {
         const rgb = new Float32Array(W * H * 3);
         for (let i = 0; i < rgb.length; i++) rgb[i] = ((i * 37) % 11) * 0.13; // varied, non-negative
         // blur: false — this test is the exact identity against the RAW luminance weights
-        const res = buildEnvironmentSampler(glStub(), fakeRegistry(), rgb, W, H, undefined, { blur: false });
+        const res = buildEnvironmentSampler(glStub(), fakeRegistry(), rgb, W, H, { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' }, { blur: false });
         const { cond, marg } = res.cdf;
 
         // Reference density directly from the build weights
@@ -103,7 +103,7 @@ describe('buildEnvironmentSampler', () => {
         const rgb = new Float32Array(W * H * 3);            // all black…
         const ci = 3, cj = 2;
         rgb[3 * (cj * W + ci)] = 100;                        // …except one bright red texel
-        const res = buildEnvironmentSampler(glStub(), fakeRegistry(), rgb, W, H);
+        const res = buildEnvironmentSampler(glStub(), fakeRegistry(), rgb, W, H, { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' });
         const { cond, marg } = res.cdf;
         const density = (i: number, j: number) => {
             const dM = marg[j] - (j > 0 ? marg[j - 1] : 0);
@@ -125,7 +125,7 @@ describe('buildEnvironmentSampler', () => {
         const rgb = new Float32Array(W * H * 3);
         for (let i = 0; i < rgb.length; i++) rgb[i] = (i % 7) * 0.1; // varied but non-negative
         const reg = fakeRegistry();
-        buildEnvironmentSampler(glStub(), reg, rgb, W, H);
+        buildEnvironmentSampler(glStub(), reg, rgb, W, H, { map: 'env_map', cond: 'env_cdf_cond', marg: 'env_cdf_marg' });
         // Recompute marginal the sampler's way to assert monotonicity holds for varied input.
         const Y = new Float32Array(W * H);
         for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {

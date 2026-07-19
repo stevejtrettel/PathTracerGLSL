@@ -170,14 +170,16 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                 f.glslType === 'Spectrum' ? 'vec3' : 'float',
                 f.semantic === 'radiometric' ? 'color' : 'float',
                 uniforms, parameters, seen,
+                f.source === EMISSION_KEY,   // E2: emission is HDR; albedo/f0 stay swatches
             );
         }
         if (mat.medium !== null) {
-            mintValueUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen);
-            mintValueUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen);
+            // E2: RTE coefficients are magnitudes (σ > 1 is routine) — HDR widgets.
+            mintValueUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen, true);
+            mintValueUniform(mat.medium.sigma_s, 'vec3', 'color', uniforms, parameters, seen, true);
             // ε rides the same machinery ({param} → vec3 uniform; expression → declared
             // float params) — but only when the field has a reader (media.emission, C5).
-            if (media.emission) mintValueUniform(mat.medium.emission, 'vec3', 'color', uniforms, parameters, seen);
+            if (media.emission) mintValueUniform(mat.medium.emission, 'vec3', 'color', uniforms, parameters, seen, true);   // ε: HDR
             // Phase params follow the schemas — the medium's OWN model's rows, and only
             // when that model is LIVE in this program (media.models): a driven phase_g
             // in an absorbing-only program has no reader, so it earns no uniform (C5).
