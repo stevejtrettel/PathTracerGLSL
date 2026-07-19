@@ -70,6 +70,9 @@ import {
     emitSatScene, emitSatStrategy,
     emitScatterScene, emitScatterNeeStrategy, emitScatterPtStrategy,
 } from './scenes/emissionWitness.js';
+import {
+    shadowMediumScene, shadowMediumNeeStrategy, shadowMediumPtStrategy,
+} from './scenes/shadowMediumWitness.js';
 
 /** Camera pose is MEASUREMENT data: strategy literals are shared across scenes, so
  *  each entry stamps its pose onto its strategies here (no more pose-as-loose-
@@ -782,6 +785,21 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         witness: {
             spp: 192,
             checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.4, label: 'emission nee ≡ pt tripwire' }],
+        },
+    },
+    'shadow-medium': {
+        scene: shadowMediumScene,
+        strategies: posed([0, 1, 4], [0, 1, 0], shadowMediumNeeStrategy, shadowMediumPtStrategy),
+        exercises:
+            'NEE shadow ray crossing a bounded ABSORBING fog-box boundary to reach a ceiling quad — the regression gate for the shadow_transmittance light-POINT fix (the pre-fix drift blocked the shadow ray on the light\'s own surface, blacking out NEE through any bounded medium)',
+        expected:
+            'keys 1 (pt-nee) and 2 (pt) converge to the same image. The MEAN is the discriminator: the pre-fix bug drove pt-nee ~orders dark, so Δmean explodes; here 0.81% @192spp. The pt arm is chance-hit (finds the quad by random bounce), so its DISPLAY-space RMSE is high (~47%) like every pt tripwire — a loose structural tripwire, not the gate.',
+        witness: {
+            spp: 192,
+            // Δmean is the real gate (a shadow regression blacks NEE out → huge Δmean). The
+            // rmse is a loose chance-hit-pt tripwire (measured ~47% display-space, sibling of
+            // cornell-area 40% / fog-area 65%) — NOT a tight equality (pt fireflies per pixel).
+            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.65, label: 'shadow-through-medium nee ≡ pt' }],
         },
     },
     'veach-mis': {

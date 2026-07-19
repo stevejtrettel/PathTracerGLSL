@@ -417,7 +417,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -945,9 +945,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -1105,10 +1107,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -1348,84 +1351,84 @@ void main() {
         "startLine": 760,
       },
       {
-        "endLine": 778,
+        "endLine": 780,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 764,
       },
       {
-        "endLine": 783,
+        "endLine": 785,
         "origin": "generated:light-structs",
-        "startLine": 779,
-      },
-      {
-        "endLine": 805,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 784,
+        "startLine": 781,
       },
       {
         "endLine": 807,
-        "origin": "generated:light-accessors",
-        "startLine": 806,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 786,
       },
       {
-        "endLine": 814,
-        "origin": "generated:light-sampling",
+        "endLine": 809,
+        "origin": "generated:light-accessors",
         "startLine": 808,
       },
       {
-        "endLine": 822,
+        "endLine": 816,
+        "origin": "generated:light-sampling",
+        "startLine": 810,
+      },
+      {
+        "endLine": 824,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 815,
+        "startLine": 817,
       },
       {
-        "endLine": 841,
+        "endLine": 843,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 823,
+        "startLine": 825,
       },
       {
-        "endLine": 845,
+        "endLine": 847,
         "origin": "generated:environment",
-        "startLine": 842,
+        "startLine": 844,
       },
       {
-        "endLine": 863,
+        "endLine": 865,
         "origin": "generated:transport/state",
-        "startLine": 846,
+        "startLine": 848,
       },
       {
-        "endLine": 873,
+        "endLine": 875,
         "origin": "generated:transport/combiner",
-        "startLine": 864,
+        "startLine": 866,
       },
       {
-        "endLine": 877,
+        "endLine": 879,
         "origin": "generated:transport/kernel-record",
-        "startLine": 874,
+        "startLine": 876,
       },
       {
-        "endLine": 885,
+        "endLine": 887,
         "origin": "generated:transport/roulette",
-        "startLine": 878,
+        "startLine": 880,
       },
       {
-        "endLine": 920,
+        "endLine": 922,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 886,
+        "startLine": 888,
       },
       {
-        "endLine": 942,
+        "endLine": 945,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 921,
+        "startLine": 923,
       },
       {
-        "endLine": 966,
+        "endLine": 969,
         "origin": "generated:transport/walk",
-        "startLine": 943,
+        "startLine": 946,
       },
       {
-        "endLine": 993,
+        "endLine": 996,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 967,
+        "startLine": 970,
       },
     ],
   },
@@ -1941,7 +1944,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -2168,9 +2171,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -2326,10 +2331,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -2539,84 +2545,84 @@ void main() {
         "startLine": 458,
       },
       {
-        "endLine": 476,
+        "endLine": 478,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 462,
       },
       {
-        "endLine": 481,
+        "endLine": 483,
         "origin": "generated:light-structs",
-        "startLine": 477,
-      },
-      {
-        "endLine": 503,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 482,
+        "startLine": 479,
       },
       {
         "endLine": 505,
-        "origin": "generated:light-accessors",
-        "startLine": 504,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 484,
       },
       {
-        "endLine": 512,
-        "origin": "generated:light-sampling",
+        "endLine": 507,
+        "origin": "generated:light-accessors",
         "startLine": 506,
       },
       {
-        "endLine": 520,
+        "endLine": 514,
+        "origin": "generated:light-sampling",
+        "startLine": 508,
+      },
+      {
+        "endLine": 522,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 513,
+        "startLine": 515,
       },
       {
-        "endLine": 539,
+        "endLine": 541,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 521,
+        "startLine": 523,
       },
       {
-        "endLine": 543,
+        "endLine": 545,
         "origin": "generated:environment",
-        "startLine": 540,
+        "startLine": 542,
       },
       {
-        "endLine": 559,
+        "endLine": 561,
         "origin": "generated:transport/state",
-        "startLine": 544,
+        "startLine": 546,
       },
       {
-        "endLine": 569,
+        "endLine": 571,
         "origin": "generated:transport/combiner",
-        "startLine": 560,
+        "startLine": 562,
       },
       {
-        "endLine": 573,
+        "endLine": 575,
         "origin": "generated:transport/kernel-record",
-        "startLine": 570,
+        "startLine": 572,
       },
       {
-        "endLine": 581,
+        "endLine": 583,
         "origin": "generated:transport/roulette",
-        "startLine": 574,
+        "startLine": 576,
       },
       {
-        "endLine": 616,
+        "endLine": 618,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 582,
+        "startLine": 584,
       },
       {
-        "endLine": 638,
+        "endLine": 641,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 617,
+        "startLine": 619,
       },
       {
-        "endLine": 657,
+        "endLine": 660,
         "origin": "generated:transport/walk",
-        "startLine": 639,
+        "startLine": 642,
       },
       {
-        "endLine": 684,
+        "endLine": 687,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 658,
+        "startLine": 661,
       },
     ],
   },
@@ -3143,7 +3149,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -3603,9 +3609,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -3761,10 +3769,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -3989,84 +3998,84 @@ void main() {
         "startLine": 691,
       },
       {
-        "endLine": 709,
+        "endLine": 711,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 695,
       },
       {
-        "endLine": 714,
+        "endLine": 716,
         "origin": "generated:light-structs",
-        "startLine": 710,
-      },
-      {
-        "endLine": 736,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 715,
+        "startLine": 712,
       },
       {
         "endLine": 738,
-        "origin": "generated:light-accessors",
-        "startLine": 737,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 717,
       },
       {
-        "endLine": 745,
-        "origin": "generated:light-sampling",
+        "endLine": 740,
+        "origin": "generated:light-accessors",
         "startLine": 739,
       },
       {
-        "endLine": 753,
+        "endLine": 747,
+        "origin": "generated:light-sampling",
+        "startLine": 741,
+      },
+      {
+        "endLine": 755,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 746,
+        "startLine": 748,
       },
       {
-        "endLine": 772,
+        "endLine": 774,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 754,
+        "startLine": 756,
       },
       {
-        "endLine": 776,
+        "endLine": 778,
         "origin": "generated:environment",
-        "startLine": 773,
+        "startLine": 775,
       },
       {
-        "endLine": 792,
+        "endLine": 794,
         "origin": "generated:transport/state",
-        "startLine": 777,
+        "startLine": 779,
       },
       {
-        "endLine": 802,
+        "endLine": 804,
         "origin": "generated:transport/combiner",
-        "startLine": 793,
+        "startLine": 795,
       },
       {
-        "endLine": 806,
+        "endLine": 808,
         "origin": "generated:transport/kernel-record",
-        "startLine": 803,
+        "startLine": 805,
       },
       {
-        "endLine": 814,
+        "endLine": 816,
         "origin": "generated:transport/roulette",
-        "startLine": 807,
+        "startLine": 809,
       },
       {
-        "endLine": 849,
+        "endLine": 851,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 815,
+        "startLine": 817,
       },
       {
-        "endLine": 871,
+        "endLine": 874,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 850,
+        "startLine": 852,
       },
       {
-        "endLine": 890,
+        "endLine": 893,
         "origin": "generated:transport/walk",
-        "startLine": 872,
+        "startLine": 875,
       },
       {
-        "endLine": 917,
+        "endLine": 920,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 891,
+        "startLine": 894,
       },
     ],
   },
@@ -5966,7 +5975,7 @@ bool material_has_nondelta_lobes(int mat);
 float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit);
 // pixel:
@@ -6490,9 +6499,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -6703,10 +6714,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -6936,99 +6948,99 @@ void main() {
         "startLine": 756,
       },
       {
-        "endLine": 774,
+        "endLine": 776,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 760,
       },
       {
-        "endLine": 783,
+        "endLine": 785,
         "origin": "generated:light-structs",
-        "startLine": 775,
-      },
-      {
-        "endLine": 825,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 784,
+        "startLine": 777,
       },
       {
         "endLine": 827,
-        "origin": "generated:light-accessors",
-        "startLine": 826,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 786,
       },
       {
-        "endLine": 834,
-        "origin": "generated:light-sampling",
+        "endLine": 829,
+        "origin": "generated:light-accessors",
         "startLine": 828,
       },
       {
-        "endLine": 839,
+        "endLine": 836,
+        "origin": "generated:light-sampling",
+        "startLine": 830,
+      },
+      {
+        "endLine": 841,
         "origin": "generated:light-of",
-        "startLine": 835,
+        "startLine": 837,
       },
       {
-        "endLine": 844,
+        "endLine": 846,
         "origin": "generated:lighting-pdf",
-        "startLine": 840,
+        "startLine": 842,
       },
       {
-        "endLine": 852,
+        "endLine": 854,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 845,
+        "startLine": 847,
       },
       {
-        "endLine": 871,
+        "endLine": 873,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 853,
+        "startLine": 855,
       },
       {
-        "endLine": 875,
+        "endLine": 877,
         "origin": "generated:environment",
-        "startLine": 872,
+        "startLine": 874,
       },
       {
-        "endLine": 895,
+        "endLine": 897,
         "origin": "generated:transport/state",
-        "startLine": 876,
+        "startLine": 878,
       },
       {
-        "endLine": 904,
+        "endLine": 906,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 896,
+        "startLine": 898,
       },
       {
-        "endLine": 920,
+        "endLine": 922,
         "origin": "generated:transport/combiner",
-        "startLine": 905,
+        "startLine": 907,
       },
       {
-        "endLine": 926,
+        "endLine": 928,
         "origin": "generated:transport/kernel-record",
-        "startLine": 921,
+        "startLine": 923,
       },
       {
-        "endLine": 934,
+        "endLine": 936,
         "origin": "generated:transport/roulette",
-        "startLine": 927,
+        "startLine": 929,
       },
       {
-        "endLine": 969,
+        "endLine": 971,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 935,
+        "startLine": 937,
       },
       {
-        "endLine": 991,
+        "endLine": 994,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 970,
+        "startLine": 972,
       },
       {
-        "endLine": 1010,
+        "endLine": 1013,
         "origin": "generated:transport/walk",
-        "startLine": 992,
+        "startLine": 995,
       },
       {
-        "endLine": 1037,
+        "endLine": 1040,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1011,
+        "startLine": 1014,
       },
     ],
   },
@@ -7555,7 +7567,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -8075,9 +8087,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -8266,10 +8280,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -8499,89 +8514,89 @@ void main() {
         "startLine": 751,
       },
       {
-        "endLine": 769,
+        "endLine": 771,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 755,
       },
       {
-        "endLine": 778,
+        "endLine": 780,
         "origin": "generated:light-structs",
-        "startLine": 770,
-      },
-      {
-        "endLine": 820,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 779,
+        "startLine": 772,
       },
       {
         "endLine": 822,
-        "origin": "generated:light-accessors",
-        "startLine": 821,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 781,
       },
       {
-        "endLine": 829,
-        "origin": "generated:light-sampling",
+        "endLine": 824,
+        "origin": "generated:light-accessors",
         "startLine": 823,
       },
       {
-        "endLine": 834,
+        "endLine": 831,
+        "origin": "generated:light-sampling",
+        "startLine": 825,
+      },
+      {
+        "endLine": 836,
         "origin": "generated:light-of",
-        "startLine": 830,
+        "startLine": 832,
       },
       {
-        "endLine": 842,
+        "endLine": 844,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 835,
+        "startLine": 837,
       },
       {
-        "endLine": 861,
+        "endLine": 863,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 843,
+        "startLine": 845,
       },
       {
-        "endLine": 865,
+        "endLine": 867,
         "origin": "generated:environment",
-        "startLine": 862,
+        "startLine": 864,
       },
       {
-        "endLine": 881,
+        "endLine": 883,
         "origin": "generated:transport/state",
-        "startLine": 866,
+        "startLine": 868,
       },
       {
-        "endLine": 895,
+        "endLine": 897,
         "origin": "generated:transport/combiner",
-        "startLine": 882,
+        "startLine": 884,
       },
       {
-        "endLine": 899,
+        "endLine": 901,
         "origin": "generated:transport/kernel-record",
-        "startLine": 896,
+        "startLine": 898,
       },
       {
-        "endLine": 907,
+        "endLine": 909,
         "origin": "generated:transport/roulette",
-        "startLine": 900,
+        "startLine": 902,
       },
       {
-        "endLine": 942,
+        "endLine": 944,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 908,
+        "startLine": 910,
       },
       {
-        "endLine": 964,
+        "endLine": 967,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 943,
+        "startLine": 945,
       },
       {
-        "endLine": 983,
+        "endLine": 986,
         "origin": "generated:transport/walk",
-        "startLine": 965,
+        "startLine": 968,
       },
       {
-        "endLine": 1010,
+        "endLine": 1013,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 984,
+        "startLine": 987,
       },
     ],
   },
@@ -10537,7 +10552,7 @@ bool material_has_nondelta_lobes(int mat);
 float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit);
 // pixel:
@@ -11130,9 +11145,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -11345,10 +11362,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -11593,99 +11611,99 @@ void main() {
         "startLine": 826,
       },
       {
-        "endLine": 844,
+        "endLine": 846,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 830,
       },
       {
-        "endLine": 853,
+        "endLine": 855,
         "origin": "generated:light-structs",
-        "startLine": 845,
-      },
-      {
-        "endLine": 895,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 854,
+        "startLine": 847,
       },
       {
         "endLine": 897,
-        "origin": "generated:light-accessors",
-        "startLine": 896,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 856,
       },
       {
-        "endLine": 904,
-        "origin": "generated:light-sampling",
+        "endLine": 899,
+        "origin": "generated:light-accessors",
         "startLine": 898,
       },
       {
-        "endLine": 909,
+        "endLine": 906,
+        "origin": "generated:light-sampling",
+        "startLine": 900,
+      },
+      {
+        "endLine": 911,
         "origin": "generated:light-of",
-        "startLine": 905,
+        "startLine": 907,
       },
       {
-        "endLine": 914,
+        "endLine": 916,
         "origin": "generated:lighting-pdf",
-        "startLine": 910,
+        "startLine": 912,
       },
       {
-        "endLine": 922,
+        "endLine": 924,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 915,
+        "startLine": 917,
       },
       {
-        "endLine": 941,
+        "endLine": 943,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 923,
+        "startLine": 925,
       },
       {
-        "endLine": 945,
+        "endLine": 947,
         "origin": "generated:environment",
-        "startLine": 942,
+        "startLine": 944,
       },
       {
-        "endLine": 967,
+        "endLine": 969,
         "origin": "generated:transport/state",
-        "startLine": 946,
+        "startLine": 948,
       },
       {
-        "endLine": 976,
+        "endLine": 978,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 968,
+        "startLine": 970,
       },
       {
-        "endLine": 992,
+        "endLine": 994,
         "origin": "generated:transport/combiner",
-        "startLine": 977,
+        "startLine": 979,
       },
       {
-        "endLine": 998,
+        "endLine": 1000,
         "origin": "generated:transport/kernel-record",
-        "startLine": 993,
+        "startLine": 995,
       },
       {
-        "endLine": 1006,
+        "endLine": 1008,
         "origin": "generated:transport/roulette",
-        "startLine": 999,
+        "startLine": 1001,
       },
       {
-        "endLine": 1041,
+        "endLine": 1043,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1007,
+        "startLine": 1009,
       },
       {
-        "endLine": 1063,
+        "endLine": 1066,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1042,
+        "startLine": 1044,
       },
       {
-        "endLine": 1087,
+        "endLine": 1090,
         "origin": "generated:transport/walk",
-        "startLine": 1064,
+        "startLine": 1067,
       },
       {
-        "endLine": 1114,
+        "endLine": 1117,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1088,
+        "startLine": 1091,
       },
     ],
   },
@@ -12195,7 +12213,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -12783,9 +12801,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -12976,10 +12996,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -13224,89 +13245,89 @@ void main() {
         "startLine": 820,
       },
       {
-        "endLine": 838,
+        "endLine": 840,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 824,
       },
       {
-        "endLine": 847,
+        "endLine": 849,
         "origin": "generated:light-structs",
-        "startLine": 839,
-      },
-      {
-        "endLine": 889,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 848,
+        "startLine": 841,
       },
       {
         "endLine": 891,
-        "origin": "generated:light-accessors",
-        "startLine": 890,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 850,
       },
       {
-        "endLine": 898,
-        "origin": "generated:light-sampling",
+        "endLine": 893,
+        "origin": "generated:light-accessors",
         "startLine": 892,
       },
       {
-        "endLine": 903,
+        "endLine": 900,
+        "origin": "generated:light-sampling",
+        "startLine": 894,
+      },
+      {
+        "endLine": 905,
         "origin": "generated:light-of",
-        "startLine": 899,
+        "startLine": 901,
       },
       {
-        "endLine": 911,
+        "endLine": 913,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 904,
+        "startLine": 906,
       },
       {
-        "endLine": 930,
+        "endLine": 932,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 912,
+        "startLine": 914,
       },
       {
-        "endLine": 934,
+        "endLine": 936,
         "origin": "generated:environment",
-        "startLine": 931,
+        "startLine": 933,
       },
       {
-        "endLine": 952,
+        "endLine": 954,
         "origin": "generated:transport/state",
-        "startLine": 935,
+        "startLine": 937,
       },
       {
-        "endLine": 966,
+        "endLine": 968,
         "origin": "generated:transport/combiner",
-        "startLine": 953,
+        "startLine": 955,
       },
       {
-        "endLine": 970,
+        "endLine": 972,
         "origin": "generated:transport/kernel-record",
-        "startLine": 967,
+        "startLine": 969,
       },
       {
-        "endLine": 978,
+        "endLine": 980,
         "origin": "generated:transport/roulette",
-        "startLine": 971,
+        "startLine": 973,
       },
       {
-        "endLine": 1013,
+        "endLine": 1015,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 979,
+        "startLine": 981,
       },
       {
-        "endLine": 1035,
+        "endLine": 1038,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1014,
+        "startLine": 1016,
       },
       {
-        "endLine": 1059,
+        "endLine": 1062,
         "origin": "generated:transport/walk",
-        "startLine": 1036,
+        "startLine": 1039,
       },
       {
-        "endLine": 1086,
+        "endLine": 1089,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1060,
+        "startLine": 1063,
       },
     ],
   },
@@ -13812,7 +13833,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -14340,9 +14361,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -14500,10 +14523,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -14743,84 +14767,84 @@ void main() {
         "startLine": 760,
       },
       {
-        "endLine": 778,
+        "endLine": 780,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 764,
       },
       {
-        "endLine": 783,
+        "endLine": 785,
         "origin": "generated:light-structs",
-        "startLine": 779,
-      },
-      {
-        "endLine": 805,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 784,
+        "startLine": 781,
       },
       {
         "endLine": 807,
-        "origin": "generated:light-accessors",
-        "startLine": 806,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 786,
       },
       {
-        "endLine": 814,
-        "origin": "generated:light-sampling",
+        "endLine": 809,
+        "origin": "generated:light-accessors",
         "startLine": 808,
       },
       {
-        "endLine": 822,
+        "endLine": 816,
+        "origin": "generated:light-sampling",
+        "startLine": 810,
+      },
+      {
+        "endLine": 824,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 815,
+        "startLine": 817,
       },
       {
-        "endLine": 841,
+        "endLine": 843,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 823,
+        "startLine": 825,
       },
       {
-        "endLine": 845,
+        "endLine": 847,
         "origin": "generated:environment",
-        "startLine": 842,
+        "startLine": 844,
       },
       {
-        "endLine": 863,
+        "endLine": 865,
         "origin": "generated:transport/state",
-        "startLine": 846,
+        "startLine": 848,
       },
       {
-        "endLine": 873,
+        "endLine": 875,
         "origin": "generated:transport/combiner",
-        "startLine": 864,
+        "startLine": 866,
       },
       {
-        "endLine": 877,
+        "endLine": 879,
         "origin": "generated:transport/kernel-record",
-        "startLine": 874,
+        "startLine": 876,
       },
       {
-        "endLine": 885,
+        "endLine": 887,
         "origin": "generated:transport/roulette",
-        "startLine": 878,
+        "startLine": 880,
       },
       {
-        "endLine": 920,
+        "endLine": 922,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 886,
+        "startLine": 888,
       },
       {
-        "endLine": 942,
+        "endLine": 945,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 921,
+        "startLine": 923,
       },
       {
-        "endLine": 966,
+        "endLine": 969,
         "origin": "generated:transport/walk",
-        "startLine": 943,
+        "startLine": 946,
       },
       {
-        "endLine": 993,
+        "endLine": 996,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 967,
+        "startLine": 970,
       },
     ],
   },
@@ -15362,7 +15386,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -15775,9 +15799,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -15933,10 +15959,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -16166,84 +16193,84 @@ void main() {
         "startLine": 648,
       },
       {
-        "endLine": 666,
+        "endLine": 668,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 652,
       },
       {
-        "endLine": 671,
+        "endLine": 673,
         "origin": "generated:light-structs",
-        "startLine": 667,
-      },
-      {
-        "endLine": 693,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 672,
+        "startLine": 669,
       },
       {
         "endLine": 695,
-        "origin": "generated:light-accessors",
-        "startLine": 694,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 674,
       },
       {
-        "endLine": 702,
-        "origin": "generated:light-sampling",
+        "endLine": 697,
+        "origin": "generated:light-accessors",
         "startLine": 696,
       },
       {
-        "endLine": 710,
+        "endLine": 704,
+        "origin": "generated:light-sampling",
+        "startLine": 698,
+      },
+      {
+        "endLine": 712,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 703,
+        "startLine": 705,
       },
       {
-        "endLine": 729,
+        "endLine": 731,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 711,
+        "startLine": 713,
       },
       {
-        "endLine": 733,
+        "endLine": 735,
         "origin": "generated:environment",
-        "startLine": 730,
+        "startLine": 732,
       },
       {
-        "endLine": 749,
+        "endLine": 751,
         "origin": "generated:transport/state",
-        "startLine": 734,
+        "startLine": 736,
       },
       {
-        "endLine": 759,
+        "endLine": 761,
         "origin": "generated:transport/combiner",
-        "startLine": 750,
+        "startLine": 752,
       },
       {
-        "endLine": 763,
+        "endLine": 765,
         "origin": "generated:transport/kernel-record",
-        "startLine": 760,
+        "startLine": 762,
       },
       {
-        "endLine": 771,
+        "endLine": 773,
         "origin": "generated:transport/roulette",
-        "startLine": 764,
+        "startLine": 766,
       },
       {
-        "endLine": 806,
+        "endLine": 808,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 772,
+        "startLine": 774,
       },
       {
-        "endLine": 828,
+        "endLine": 831,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 807,
+        "startLine": 809,
       },
       {
-        "endLine": 847,
+        "endLine": 850,
         "origin": "generated:transport/walk",
-        "startLine": 829,
+        "startLine": 832,
       },
       {
-        "endLine": 874,
+        "endLine": 877,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 848,
+        "startLine": 851,
       },
     ],
   },
@@ -19527,7 +19554,7 @@ Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp
 float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit);
 // pixel:
@@ -20173,16 +20200,26 @@ Spectrum medium_transmittance(int med, Ray ray, float len) {
 // (ZERO). Depends on: scene_intersect/scene_region_at (intersection), material_of,
 // material_has_medium/is_null_interface/medium_transmittance (materials), ray_spawn (core),
 // MAX_SHADOW_SEGMENTS (define, pin: 8).
+//
+// The stop bound is the LIGHT POINT, not a scalar distance (trace-loop-contract: a shadow ray
+// is defined by its destination). Each segment re-derives the 2·EPSILON back-off against the
+// FIXED light_p — pbrt's SpawnRayTo discipline — so the back-off can never be eroded by the
+// ray_spawn offsets that accumulate across null-interface crossings. A decremented \`remaining\`
+// (the earlier form) drifted by one EPSILON per crossing, and after ≥2 crossings the drift
+// exceeded the back-off, letting the AREA LIGHT'S OWN surface block the shadow ray → NEE went
+// dark through any bounded medium. (length() is Euclidean; a geodesic-distance ambient helper
+// is the curved-space follow-up, like the straight-ray march itself.)
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
     Spectrum T = SPECTRUM_ONE;
-    // Starting medium recovered from the §4.4 containment oracle — self-contained, no
-    // signature change (works from surface points and medium event points alike).
+    // Starting medium recovered from the §4.4 containment oracle — self-contained
+    // (works from surface points and medium event points alike).
     int medium = scene_region_at(shadow_ray.origin);
     Ray seg_ray = shadow_ray;
-    float remaining = maxDist;
 
     for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
+        // Distance to the light re-derived from the fixed target — drift-free by construction.
+        float remaining = length(light_p - seg_ray.origin) - 2.0 * EPSILON;
         Hit h;
         bool hit_boundary = scene_intersect(seg_ray, h) && h.t < remaining;
         float seg_len = hit_boundary ? h.t : remaining;
@@ -20197,7 +20234,6 @@ Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
             return SPECTRUM_ZERO;                                 // opaque or dielectric: blocked (§6.3 v1)
         }
         medium = h.region_to;                                     // pass through the null interface
-        remaining -= h.t;                                         // EPS gaps ~1e-3/crossing: negligible
         seg_ray = ray_spawn(h, seg_ray.direction);                // far side by sign(dir·n)
     }
     return SPECTRUM_ZERO;                                         // budget exhausted: conservative
@@ -20432,10 +20468,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -20452,7 +20489,9 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
     LightSample ls = lighting_sample(p_evt, random2());
     if (ls.pdf <= 0.0) return;
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
+    // Pass the LIGHT POINT (drift-free target); the walker measures its back-off against it.
+    Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), light_p);
     if (spectrum_is_black(vis)) return;
     s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
@@ -20761,109 +20800,109 @@ void main() {
         "startLine": 912,
       },
       {
-        "endLine": 958,
+        "endLine": 967,
         "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 919,
       },
       {
-        "endLine": 967,
+        "endLine": 976,
         "origin": "generated:light-structs",
-        "startLine": 959,
-      },
-      {
-        "endLine": 1009,
-        "origin": "components/lights/quad/quad.glsl",
         "startLine": 968,
       },
       {
-        "endLine": 1011,
-        "origin": "generated:light-accessors",
-        "startLine": 1010,
-      },
-      {
         "endLine": 1018,
-        "origin": "generated:light-sampling",
-        "startLine": 1012,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 977,
       },
       {
-        "endLine": 1023,
-        "origin": "generated:light-of",
+        "endLine": 1020,
+        "origin": "generated:light-accessors",
         "startLine": 1019,
       },
       {
-        "endLine": 1028,
+        "endLine": 1027,
+        "origin": "generated:light-sampling",
+        "startLine": 1021,
+      },
+      {
+        "endLine": 1032,
+        "origin": "generated:light-of",
+        "startLine": 1028,
+      },
+      {
+        "endLine": 1037,
         "origin": "generated:lighting-pdf",
-        "startLine": 1024,
+        "startLine": 1033,
       },
       {
-        "endLine": 1036,
+        "endLine": 1045,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1029,
+        "startLine": 1038,
       },
       {
-        "endLine": 1055,
+        "endLine": 1064,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1037,
+        "startLine": 1046,
       },
       {
-        "endLine": 1059,
+        "endLine": 1068,
         "origin": "generated:environment",
-        "startLine": 1056,
-      },
-      {
-        "endLine": 1083,
-        "origin": "generated:transport/state",
-        "startLine": 1060,
+        "startLine": 1065,
       },
       {
         "endLine": 1092,
-        "origin": "components/transport/math_mis.glsl",
-        "startLine": 1084,
+        "origin": "generated:transport/state",
+        "startLine": 1069,
       },
       {
-        "endLine": 1113,
-        "origin": "generated:transport/combiner",
+        "endLine": 1101,
+        "origin": "components/transport/math_mis.glsl",
         "startLine": 1093,
       },
       {
-        "endLine": 1119,
+        "endLine": 1122,
+        "origin": "generated:transport/combiner",
+        "startLine": 1102,
+      },
+      {
+        "endLine": 1128,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1114,
+        "startLine": 1123,
       },
       {
-        "endLine": 1127,
+        "endLine": 1136,
         "origin": "generated:transport/roulette",
-        "startLine": 1120,
+        "startLine": 1129,
       },
       {
-        "endLine": 1162,
+        "endLine": 1171,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1128,
+        "startLine": 1137,
       },
       {
-        "endLine": 1175,
+        "endLine": 1184,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1163,
+        "startLine": 1172,
       },
       {
-        "endLine": 1197,
+        "endLine": 1207,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1176,
+        "startLine": 1185,
       },
       {
-        "endLine": 1212,
+        "endLine": 1224,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1198,
+        "startLine": 1208,
       },
       {
-        "endLine": 1262,
+        "endLine": 1274,
         "origin": "generated:transport/walk",
-        "startLine": 1213,
+        "startLine": 1225,
       },
       {
-        "endLine": 1289,
+        "endLine": 1301,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1263,
+        "startLine": 1275,
       },
     ],
   },
@@ -21427,7 +21466,7 @@ InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, v
 Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -22066,16 +22105,26 @@ Spectrum medium_transmittance(int med, Ray ray, float len) {
 // (ZERO). Depends on: scene_intersect/scene_region_at (intersection), material_of,
 // material_has_medium/is_null_interface/medium_transmittance (materials), ray_spawn (core),
 // MAX_SHADOW_SEGMENTS (define, pin: 8).
+//
+// The stop bound is the LIGHT POINT, not a scalar distance (trace-loop-contract: a shadow ray
+// is defined by its destination). Each segment re-derives the 2·EPSILON back-off against the
+// FIXED light_p — pbrt's SpawnRayTo discipline — so the back-off can never be eroded by the
+// ray_spawn offsets that accumulate across null-interface crossings. A decremented \`remaining\`
+// (the earlier form) drifted by one EPSILON per crossing, and after ≥2 crossings the drift
+// exceeded the back-off, letting the AREA LIGHT'S OWN surface block the shadow ray → NEE went
+// dark through any bounded medium. (length() is Euclidean; a geodesic-distance ambient helper
+// is the curved-space follow-up, like the straight-ray march itself.)
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
     Spectrum T = SPECTRUM_ONE;
-    // Starting medium recovered from the §4.4 containment oracle — self-contained, no
-    // signature change (works from surface points and medium event points alike).
+    // Starting medium recovered from the §4.4 containment oracle — self-contained
+    // (works from surface points and medium event points alike).
     int medium = scene_region_at(shadow_ray.origin);
     Ray seg_ray = shadow_ray;
-    float remaining = maxDist;
 
     for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
+        // Distance to the light re-derived from the fixed target — drift-free by construction.
+        float remaining = length(light_p - seg_ray.origin) - 2.0 * EPSILON;
         Hit h;
         bool hit_boundary = scene_intersect(seg_ray, h) && h.t < remaining;
         float seg_len = hit_boundary ? h.t : remaining;
@@ -22090,7 +22139,6 @@ Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
             return SPECTRUM_ZERO;                                 // opaque or dielectric: blocked (§6.3 v1)
         }
         medium = h.region_to;                                     // pass through the null interface
-        remaining -= h.t;                                         // EPS gaps ~1e-3/crossing: negligible
         seg_ray = ray_spawn(h, seg_ray.direction);                // far side by sign(dir·n)
     }
     return SPECTRUM_ZERO;                                         // budget exhausted: conservative
@@ -22301,10 +22349,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -22321,7 +22370,9 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
     LightSample ls = lighting_sample(p_evt, random2());
     if (ls.pdf <= 0.0) return;
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
+    // Pass the LIGHT POINT (drift-free target); the walker measures its back-off against it.
+    Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), light_p);
     if (spectrum_is_black(vis)) return;
     s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
@@ -22630,99 +22681,99 @@ void main() {
         "startLine": 903,
       },
       {
-        "endLine": 949,
+        "endLine": 958,
         "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 910,
       },
       {
-        "endLine": 958,
+        "endLine": 967,
         "origin": "generated:light-structs",
-        "startLine": 950,
-      },
-      {
-        "endLine": 1000,
-        "origin": "components/lights/quad/quad.glsl",
         "startLine": 959,
       },
       {
-        "endLine": 1002,
-        "origin": "generated:light-accessors",
-        "startLine": 1001,
-      },
-      {
         "endLine": 1009,
-        "origin": "generated:light-sampling",
-        "startLine": 1003,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 968,
       },
       {
-        "endLine": 1014,
-        "origin": "generated:light-of",
+        "endLine": 1011,
+        "origin": "generated:light-accessors",
         "startLine": 1010,
       },
       {
-        "endLine": 1022,
+        "endLine": 1018,
+        "origin": "generated:light-sampling",
+        "startLine": 1012,
+      },
+      {
+        "endLine": 1023,
+        "origin": "generated:light-of",
+        "startLine": 1019,
+      },
+      {
+        "endLine": 1031,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1015,
+        "startLine": 1024,
       },
       {
-        "endLine": 1041,
+        "endLine": 1050,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1023,
+        "startLine": 1032,
       },
       {
-        "endLine": 1045,
+        "endLine": 1054,
         "origin": "generated:environment",
-        "startLine": 1042,
+        "startLine": 1051,
       },
       {
-        "endLine": 1065,
+        "endLine": 1074,
         "origin": "generated:transport/state",
-        "startLine": 1046,
+        "startLine": 1055,
       },
       {
-        "endLine": 1082,
+        "endLine": 1091,
         "origin": "generated:transport/combiner",
-        "startLine": 1066,
+        "startLine": 1075,
       },
       {
-        "endLine": 1086,
+        "endLine": 1095,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1083,
+        "startLine": 1092,
       },
       {
-        "endLine": 1094,
+        "endLine": 1103,
         "origin": "generated:transport/roulette",
-        "startLine": 1087,
+        "startLine": 1096,
       },
       {
-        "endLine": 1129,
+        "endLine": 1138,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1095,
+        "startLine": 1104,
       },
       {
-        "endLine": 1142,
+        "endLine": 1151,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1130,
+        "startLine": 1139,
       },
       {
-        "endLine": 1164,
+        "endLine": 1174,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1143,
+        "startLine": 1152,
       },
       {
-        "endLine": 1179,
+        "endLine": 1191,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1165,
+        "startLine": 1175,
       },
       {
-        "endLine": 1229,
+        "endLine": 1241,
         "origin": "generated:transport/walk",
-        "startLine": 1180,
+        "startLine": 1192,
       },
       {
-        "endLine": 1256,
+        "endLine": 1268,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1230,
+        "startLine": 1242,
       },
     ],
   },
@@ -24930,7 +24981,7 @@ InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, v
 Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -25585,16 +25636,26 @@ Spectrum medium_transmittance(int med, Ray ray, float len) {
 // (ZERO). Depends on: scene_intersect/scene_region_at (intersection), material_of,
 // material_has_medium/is_null_interface/medium_transmittance (materials), ray_spawn (core),
 // MAX_SHADOW_SEGMENTS (define, pin: 8).
+//
+// The stop bound is the LIGHT POINT, not a scalar distance (trace-loop-contract: a shadow ray
+// is defined by its destination). Each segment re-derives the 2·EPSILON back-off against the
+// FIXED light_p — pbrt's SpawnRayTo discipline — so the back-off can never be eroded by the
+// ray_spawn offsets that accumulate across null-interface crossings. A decremented \`remaining\`
+// (the earlier form) drifted by one EPSILON per crossing, and after ≥2 crossings the drift
+// exceeded the back-off, letting the AREA LIGHT'S OWN surface block the shadow ray → NEE went
+// dark through any bounded medium. (length() is Euclidean; a geodesic-distance ambient helper
+// is the curved-space follow-up, like the straight-ray march itself.)
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
     Spectrum T = SPECTRUM_ONE;
-    // Starting medium recovered from the §4.4 containment oracle — self-contained, no
-    // signature change (works from surface points and medium event points alike).
+    // Starting medium recovered from the §4.4 containment oracle — self-contained
+    // (works from surface points and medium event points alike).
     int medium = scene_region_at(shadow_ray.origin);
     Ray seg_ray = shadow_ray;
-    float remaining = maxDist;
 
     for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
+        // Distance to the light re-derived from the fixed target — drift-free by construction.
+        float remaining = length(light_p - seg_ray.origin) - 2.0 * EPSILON;
         Hit h;
         bool hit_boundary = scene_intersect(seg_ray, h) && h.t < remaining;
         float seg_len = hit_boundary ? h.t : remaining;
@@ -25609,7 +25670,6 @@ Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
             return SPECTRUM_ZERO;                                 // opaque or dielectric: blocked (§6.3 v1)
         }
         medium = h.region_to;                                     // pass through the null interface
-        remaining -= h.t;                                         // EPS gaps ~1e-3/crossing: negligible
         seg_ray = ray_spawn(h, seg_ray.direction);                // far side by sign(dir·n)
     }
     return SPECTRUM_ZERO;                                         // budget exhausted: conservative
@@ -25820,10 +25880,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -25840,7 +25901,9 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
     LightSample ls = lighting_sample(p_evt, random2());
     if (ls.pdf <= 0.0) return;
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
+    // Pass the LIGHT POINT (drift-free target); the walker measures its back-off against it.
+    Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), light_p);
     if (spectrum_is_black(vis)) return;
     s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
@@ -26149,99 +26212,99 @@ void main() {
         "startLine": 919,
       },
       {
-        "endLine": 965,
+        "endLine": 974,
         "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 926,
       },
       {
-        "endLine": 974,
+        "endLine": 983,
         "origin": "generated:light-structs",
-        "startLine": 966,
-      },
-      {
-        "endLine": 1016,
-        "origin": "components/lights/quad/quad.glsl",
         "startLine": 975,
       },
       {
-        "endLine": 1018,
-        "origin": "generated:light-accessors",
-        "startLine": 1017,
-      },
-      {
         "endLine": 1025,
-        "origin": "generated:light-sampling",
-        "startLine": 1019,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 984,
       },
       {
-        "endLine": 1030,
-        "origin": "generated:light-of",
+        "endLine": 1027,
+        "origin": "generated:light-accessors",
         "startLine": 1026,
       },
       {
-        "endLine": 1038,
+        "endLine": 1034,
+        "origin": "generated:light-sampling",
+        "startLine": 1028,
+      },
+      {
+        "endLine": 1039,
+        "origin": "generated:light-of",
+        "startLine": 1035,
+      },
+      {
+        "endLine": 1047,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1031,
+        "startLine": 1040,
       },
       {
-        "endLine": 1057,
+        "endLine": 1066,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1039,
+        "startLine": 1048,
       },
       {
-        "endLine": 1061,
+        "endLine": 1070,
         "origin": "generated:environment",
-        "startLine": 1058,
+        "startLine": 1067,
       },
       {
-        "endLine": 1081,
+        "endLine": 1090,
         "origin": "generated:transport/state",
-        "startLine": 1062,
+        "startLine": 1071,
       },
       {
-        "endLine": 1098,
+        "endLine": 1107,
         "origin": "generated:transport/combiner",
-        "startLine": 1082,
+        "startLine": 1091,
       },
       {
-        "endLine": 1102,
+        "endLine": 1111,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1099,
+        "startLine": 1108,
       },
       {
-        "endLine": 1110,
+        "endLine": 1119,
         "origin": "generated:transport/roulette",
-        "startLine": 1103,
+        "startLine": 1112,
       },
       {
-        "endLine": 1145,
+        "endLine": 1154,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1111,
+        "startLine": 1120,
       },
       {
-        "endLine": 1158,
+        "endLine": 1167,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1146,
+        "startLine": 1155,
       },
       {
-        "endLine": 1180,
+        "endLine": 1190,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1159,
+        "startLine": 1168,
       },
       {
-        "endLine": 1195,
+        "endLine": 1207,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1181,
+        "startLine": 1191,
       },
       {
-        "endLine": 1245,
+        "endLine": 1257,
         "origin": "generated:transport/walk",
-        "startLine": 1196,
+        "startLine": 1208,
       },
       {
-        "endLine": 1272,
+        "endLine": 1284,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1246,
+        "startLine": 1258,
       },
     ],
   },
@@ -31416,7 +31479,7 @@ bool material_has_nondelta_lobes(int mat);
 float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -31604,9 +31667,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -31758,10 +31823,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -31960,79 +32026,79 @@ void main() {
         "startLine": 420,
       },
       {
-        "endLine": 438,
+        "endLine": 440,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 424,
       },
       {
-        "endLine": 442,
+        "endLine": 444,
         "origin": "generated:light-sampling",
-        "startLine": 439,
+        "startLine": 441,
       },
       {
-        "endLine": 450,
+        "endLine": 452,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 443,
+        "startLine": 445,
       },
       {
-        "endLine": 469,
+        "endLine": 471,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 451,
+        "startLine": 453,
       },
       {
-        "endLine": 473,
+        "endLine": 475,
         "origin": "generated:environment",
-        "startLine": 470,
+        "startLine": 472,
       },
       {
-        "endLine": 487,
+        "endLine": 489,
         "origin": "generated:environment-sampler",
-        "startLine": 474,
+        "startLine": 476,
       },
       {
-        "endLine": 490,
+        "endLine": 492,
         "origin": "generated:environment-pdf",
-        "startLine": 488,
+        "startLine": 490,
       },
       {
-        "endLine": 510,
+        "endLine": 512,
         "origin": "generated:transport/state",
-        "startLine": 491,
+        "startLine": 493,
       },
       {
-        "endLine": 519,
+        "endLine": 521,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 511,
+        "startLine": 513,
       },
       {
-        "endLine": 533,
+        "endLine": 535,
         "origin": "generated:transport/combiner",
-        "startLine": 520,
+        "startLine": 522,
       },
       {
-        "endLine": 539,
+        "endLine": 541,
         "origin": "generated:transport/kernel-record",
-        "startLine": 534,
+        "startLine": 536,
       },
       {
-        "endLine": 574,
+        "endLine": 576,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 540,
+        "startLine": 542,
       },
       {
-        "endLine": 596,
+        "endLine": 599,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 575,
+        "startLine": 577,
       },
       {
-        "endLine": 614,
+        "endLine": 617,
         "origin": "generated:transport/walk",
-        "startLine": 597,
+        "startLine": 600,
       },
       {
-        "endLine": 641,
+        "endLine": 644,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 615,
+        "startLine": 618,
       },
     ],
   },
@@ -32545,7 +32611,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -32729,9 +32795,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -32863,10 +32931,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -33065,69 +33134,69 @@ void main() {
         "startLine": 415,
       },
       {
-        "endLine": 433,
+        "endLine": 435,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 419,
       },
       {
-        "endLine": 437,
+        "endLine": 439,
         "origin": "generated:light-sampling",
-        "startLine": 434,
+        "startLine": 436,
       },
       {
-        "endLine": 445,
+        "endLine": 447,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 438,
+        "startLine": 440,
       },
       {
-        "endLine": 464,
+        "endLine": 466,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 446,
+        "startLine": 448,
       },
       {
-        "endLine": 468,
+        "endLine": 470,
         "origin": "generated:environment",
-        "startLine": 465,
+        "startLine": 467,
       },
       {
-        "endLine": 482,
+        "endLine": 484,
         "origin": "generated:environment-sampler",
-        "startLine": 469,
+        "startLine": 471,
       },
       {
-        "endLine": 498,
+        "endLine": 500,
         "origin": "generated:transport/state",
-        "startLine": 483,
+        "startLine": 485,
       },
       {
-        "endLine": 510,
+        "endLine": 512,
         "origin": "generated:transport/combiner",
-        "startLine": 499,
+        "startLine": 501,
       },
       {
-        "endLine": 514,
+        "endLine": 516,
         "origin": "generated:transport/kernel-record",
-        "startLine": 511,
+        "startLine": 513,
       },
       {
-        "endLine": 549,
+        "endLine": 551,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 515,
+        "startLine": 517,
       },
       {
-        "endLine": 571,
+        "endLine": 574,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 550,
+        "startLine": 552,
       },
       {
-        "endLine": 589,
+        "endLine": 592,
         "origin": "generated:transport/walk",
-        "startLine": 572,
+        "startLine": 575,
       },
       {
-        "endLine": 616,
+        "endLine": 619,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 590,
+        "startLine": 593,
       },
     ],
   },
@@ -35188,7 +35257,7 @@ InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, v
 Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -35713,16 +35782,26 @@ Spectrum medium_transmittance(int med, Ray ray, float len) {
 // (ZERO). Depends on: scene_intersect/scene_region_at (intersection), material_of,
 // material_has_medium/is_null_interface/medium_transmittance (materials), ray_spawn (core),
 // MAX_SHADOW_SEGMENTS (define, pin: 8).
+//
+// The stop bound is the LIGHT POINT, not a scalar distance (trace-loop-contract: a shadow ray
+// is defined by its destination). Each segment re-derives the 2·EPSILON back-off against the
+// FIXED light_p — pbrt's SpawnRayTo discipline — so the back-off can never be eroded by the
+// ray_spawn offsets that accumulate across null-interface crossings. A decremented \`remaining\`
+// (the earlier form) drifted by one EPSILON per crossing, and after ≥2 crossings the drift
+// exceeded the back-off, letting the AREA LIGHT'S OWN surface block the shadow ray → NEE went
+// dark through any bounded medium. (length() is Euclidean; a geodesic-distance ambient helper
+// is the curved-space follow-up, like the straight-ray march itself.)
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
     Spectrum T = SPECTRUM_ONE;
-    // Starting medium recovered from the §4.4 containment oracle — self-contained, no
-    // signature change (works from surface points and medium event points alike).
+    // Starting medium recovered from the §4.4 containment oracle — self-contained
+    // (works from surface points and medium event points alike).
     int medium = scene_region_at(shadow_ray.origin);
     Ray seg_ray = shadow_ray;
-    float remaining = maxDist;
 
     for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
+        // Distance to the light re-derived from the fixed target — drift-free by construction.
+        float remaining = length(light_p - seg_ray.origin) - 2.0 * EPSILON;
         Hit h;
         bool hit_boundary = scene_intersect(seg_ray, h) && h.t < remaining;
         float seg_len = hit_boundary ? h.t : remaining;
@@ -35737,7 +35816,6 @@ Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
             return SPECTRUM_ZERO;                                 // opaque or dielectric: blocked (§6.3 v1)
         }
         medium = h.region_to;                                     // pass through the null interface
-        remaining -= h.t;                                         // EPS gaps ~1e-3/crossing: negligible
         seg_ray = ray_spawn(h, seg_ray.direction);                // far side by sign(dir·n)
     }
     return SPECTRUM_ZERO;                                         // budget exhausted: conservative
@@ -35915,10 +35993,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -35935,7 +36014,9 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
     LightSample ls = lighting_sample(p_evt, random2());
     if (ls.pdf <= 0.0) return;
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
+    // Pass the LIGHT POINT (drift-free target); the walker measures its back-off against it.
+    Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), light_p);
     if (spectrum_is_black(vis)) return;
     s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
@@ -36234,94 +36315,94 @@ void main() {
         "startLine": 789,
       },
       {
-        "endLine": 835,
+        "endLine": 844,
         "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 796,
       },
       {
-        "endLine": 840,
+        "endLine": 849,
         "origin": "generated:light-structs",
-        "startLine": 836,
-      },
-      {
-        "endLine": 862,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 841,
-      },
-      {
-        "endLine": 864,
-        "origin": "generated:light-accessors",
-        "startLine": 863,
+        "startLine": 845,
       },
       {
         "endLine": 871,
-        "origin": "generated:light-sampling",
-        "startLine": 865,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 850,
       },
       {
-        "endLine": 879,
-        "origin": "components/pixel/box/box.glsl",
+        "endLine": 873,
+        "origin": "generated:light-accessors",
         "startLine": 872,
       },
       {
-        "endLine": 898,
+        "endLine": 880,
+        "origin": "generated:light-sampling",
+        "startLine": 874,
+      },
+      {
+        "endLine": 888,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 881,
+      },
+      {
+        "endLine": 907,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 880,
+        "startLine": 889,
       },
       {
-        "endLine": 902,
+        "endLine": 911,
         "origin": "generated:environment",
-        "startLine": 899,
+        "startLine": 908,
       },
       {
-        "endLine": 922,
+        "endLine": 931,
         "origin": "generated:transport/state",
-        "startLine": 903,
+        "startLine": 912,
       },
       {
-        "endLine": 935,
+        "endLine": 944,
         "origin": "generated:transport/combiner",
-        "startLine": 923,
+        "startLine": 932,
       },
       {
-        "endLine": 939,
+        "endLine": 948,
         "origin": "generated:transport/kernel-record",
-        "startLine": 936,
+        "startLine": 945,
       },
       {
-        "endLine": 947,
+        "endLine": 956,
         "origin": "generated:transport/roulette",
-        "startLine": 940,
+        "startLine": 949,
       },
       {
-        "endLine": 982,
+        "endLine": 991,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 948,
+        "startLine": 957,
       },
       {
-        "endLine": 995,
+        "endLine": 1004,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 983,
+        "startLine": 992,
       },
       {
-        "endLine": 1017,
+        "endLine": 1027,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 996,
+        "startLine": 1005,
       },
       {
-        "endLine": 1032,
+        "endLine": 1044,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1018,
+        "startLine": 1028,
       },
       {
-        "endLine": 1082,
+        "endLine": 1094,
         "origin": "generated:transport/walk",
-        "startLine": 1033,
+        "startLine": 1045,
       },
       {
-        "endLine": 1109,
+        "endLine": 1121,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1083,
+        "startLine": 1095,
       },
     ],
   },
@@ -39958,7 +40039,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -40297,9 +40378,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -40447,10 +40530,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -40664,79 +40748,79 @@ void main() {
         "startLine": 570,
       },
       {
-        "endLine": 588,
+        "endLine": 590,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 574,
       },
       {
-        "endLine": 593,
+        "endLine": 595,
         "origin": "generated:light-structs",
-        "startLine": 589,
-      },
-      {
-        "endLine": 615,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 594,
+        "startLine": 591,
       },
       {
         "endLine": 617,
-        "origin": "generated:light-accessors",
-        "startLine": 616,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 596,
       },
       {
-        "endLine": 624,
-        "origin": "generated:light-sampling",
+        "endLine": 619,
+        "origin": "generated:light-accessors",
         "startLine": 618,
       },
       {
-        "endLine": 632,
+        "endLine": 626,
+        "origin": "generated:light-sampling",
+        "startLine": 620,
+      },
+      {
+        "endLine": 634,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 625,
+        "startLine": 627,
       },
       {
-        "endLine": 651,
+        "endLine": 653,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 633,
+        "startLine": 635,
       },
       {
-        "endLine": 655,
+        "endLine": 657,
         "origin": "generated:environment",
-        "startLine": 652,
+        "startLine": 654,
       },
       {
-        "endLine": 671,
+        "endLine": 673,
         "origin": "generated:transport/state",
-        "startLine": 656,
+        "startLine": 658,
       },
       {
-        "endLine": 681,
+        "endLine": 683,
         "origin": "generated:transport/combiner",
-        "startLine": 672,
+        "startLine": 674,
       },
       {
-        "endLine": 685,
+        "endLine": 687,
         "origin": "generated:transport/kernel-record",
-        "startLine": 682,
+        "startLine": 684,
       },
       {
-        "endLine": 720,
+        "endLine": 722,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 686,
+        "startLine": 688,
       },
       {
-        "endLine": 742,
+        "endLine": 745,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 721,
+        "startLine": 723,
       },
       {
-        "endLine": 760,
+        "endLine": 763,
         "origin": "generated:transport/walk",
-        "startLine": 743,
+        "startLine": 746,
       },
       {
-        "endLine": 787,
+        "endLine": 790,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 761,
+        "startLine": 764,
       },
     ],
   },
@@ -41259,7 +41343,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -41598,9 +41682,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -41756,10 +41842,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -41974,84 +42061,84 @@ void main() {
         "startLine": 570,
       },
       {
-        "endLine": 588,
+        "endLine": 590,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 574,
       },
       {
-        "endLine": 593,
+        "endLine": 595,
         "origin": "generated:light-structs",
-        "startLine": 589,
-      },
-      {
-        "endLine": 615,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 594,
+        "startLine": 591,
       },
       {
         "endLine": 617,
-        "origin": "generated:light-accessors",
-        "startLine": 616,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 596,
       },
       {
-        "endLine": 624,
-        "origin": "generated:light-sampling",
+        "endLine": 619,
+        "origin": "generated:light-accessors",
         "startLine": 618,
       },
       {
-        "endLine": 632,
+        "endLine": 626,
+        "origin": "generated:light-sampling",
+        "startLine": 620,
+      },
+      {
+        "endLine": 634,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 625,
+        "startLine": 627,
       },
       {
-        "endLine": 651,
+        "endLine": 653,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 633,
+        "startLine": 635,
       },
       {
-        "endLine": 655,
+        "endLine": 657,
         "origin": "generated:environment",
-        "startLine": 652,
+        "startLine": 654,
       },
       {
-        "endLine": 671,
+        "endLine": 673,
         "origin": "generated:transport/state",
-        "startLine": 656,
+        "startLine": 658,
       },
       {
-        "endLine": 681,
+        "endLine": 683,
         "origin": "generated:transport/combiner",
-        "startLine": 672,
+        "startLine": 674,
       },
       {
-        "endLine": 685,
+        "endLine": 687,
         "origin": "generated:transport/kernel-record",
-        "startLine": 682,
+        "startLine": 684,
       },
       {
-        "endLine": 693,
+        "endLine": 695,
         "origin": "generated:transport/roulette",
-        "startLine": 686,
+        "startLine": 688,
       },
       {
-        "endLine": 728,
+        "endLine": 730,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 694,
+        "startLine": 696,
       },
       {
-        "endLine": 750,
+        "endLine": 753,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 729,
+        "startLine": 731,
       },
       {
-        "endLine": 769,
+        "endLine": 772,
         "origin": "generated:transport/walk",
-        "startLine": 751,
+        "startLine": 754,
       },
       {
-        "endLine": 796,
+        "endLine": 799,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 770,
+        "startLine": 773,
       },
     ],
   },
@@ -42623,7 +42710,7 @@ InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, v
 Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -43209,16 +43296,26 @@ Spectrum medium_transmittance(int med, Ray ray, float len) {
 // (ZERO). Depends on: scene_intersect/scene_region_at (intersection), material_of,
 // material_has_medium/is_null_interface/medium_transmittance (materials), ray_spawn (core),
 // MAX_SHADOW_SEGMENTS (define, pin: 8).
+//
+// The stop bound is the LIGHT POINT, not a scalar distance (trace-loop-contract: a shadow ray
+// is defined by its destination). Each segment re-derives the 2·EPSILON back-off against the
+// FIXED light_p — pbrt's SpawnRayTo discipline — so the back-off can never be eroded by the
+// ray_spawn offsets that accumulate across null-interface crossings. A decremented \`remaining\`
+// (the earlier form) drifted by one EPSILON per crossing, and after ≥2 crossings the drift
+// exceeded the back-off, letting the AREA LIGHT'S OWN surface block the shadow ray → NEE went
+// dark through any bounded medium. (length() is Euclidean; a geodesic-distance ambient helper
+// is the curved-space follow-up, like the straight-ray march itself.)
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
     Spectrum T = SPECTRUM_ONE;
-    // Starting medium recovered from the §4.4 containment oracle — self-contained, no
-    // signature change (works from surface points and medium event points alike).
+    // Starting medium recovered from the §4.4 containment oracle — self-contained
+    // (works from surface points and medium event points alike).
     int medium = scene_region_at(shadow_ray.origin);
     Ray seg_ray = shadow_ray;
-    float remaining = maxDist;
 
     for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
+        // Distance to the light re-derived from the fixed target — drift-free by construction.
+        float remaining = length(light_p - seg_ray.origin) - 2.0 * EPSILON;
         Hit h;
         bool hit_boundary = scene_intersect(seg_ray, h) && h.t < remaining;
         float seg_len = hit_boundary ? h.t : remaining;
@@ -43233,7 +43330,6 @@ Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
             return SPECTRUM_ZERO;                                 // opaque or dielectric: blocked (§6.3 v1)
         }
         medium = h.region_to;                                     // pass through the null interface
-        remaining -= h.t;                                         // EPS gaps ~1e-3/crossing: negligible
         seg_ray = ray_spawn(h, seg_ray.direction);                // far side by sign(dir·n)
     }
     return SPECTRUM_ZERO;                                         // budget exhausted: conservative
@@ -43411,10 +43507,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -43431,7 +43528,9 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
     LightSample ls = lighting_sample(p_evt, random2());
     if (ls.pdf <= 0.0) return;
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
+    // Pass the LIGHT POINT (drift-free target); the walker measures its back-off against it.
+    Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), light_p);
     if (spectrum_is_black(vis)) return;
     s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }
@@ -43735,94 +43834,94 @@ void main() {
         "startLine": 851,
       },
       {
-        "endLine": 897,
+        "endLine": 906,
         "origin": "components/transport/shadow/media/media.glsl",
         "startLine": 858,
       },
       {
-        "endLine": 902,
+        "endLine": 911,
         "origin": "generated:light-structs",
-        "startLine": 898,
-      },
-      {
-        "endLine": 924,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 903,
-      },
-      {
-        "endLine": 926,
-        "origin": "generated:light-accessors",
-        "startLine": 925,
+        "startLine": 907,
       },
       {
         "endLine": 933,
-        "origin": "generated:light-sampling",
-        "startLine": 927,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 912,
       },
       {
-        "endLine": 941,
-        "origin": "components/pixel/box/box.glsl",
+        "endLine": 935,
+        "origin": "generated:light-accessors",
         "startLine": 934,
       },
       {
-        "endLine": 960,
+        "endLine": 942,
+        "origin": "generated:light-sampling",
+        "startLine": 936,
+      },
+      {
+        "endLine": 950,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 943,
+      },
+      {
+        "endLine": 969,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 942,
+        "startLine": 951,
       },
       {
-        "endLine": 964,
+        "endLine": 973,
         "origin": "generated:environment",
-        "startLine": 961,
+        "startLine": 970,
       },
       {
-        "endLine": 984,
+        "endLine": 993,
         "origin": "generated:transport/state",
-        "startLine": 965,
+        "startLine": 974,
       },
       {
-        "endLine": 997,
+        "endLine": 1006,
         "origin": "generated:transport/combiner",
-        "startLine": 985,
+        "startLine": 994,
       },
       {
-        "endLine": 1001,
+        "endLine": 1010,
         "origin": "generated:transport/kernel-record",
-        "startLine": 998,
+        "startLine": 1007,
       },
       {
-        "endLine": 1009,
+        "endLine": 1018,
         "origin": "generated:transport/roulette",
-        "startLine": 1002,
+        "startLine": 1011,
       },
       {
-        "endLine": 1044,
+        "endLine": 1053,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1010,
+        "startLine": 1019,
       },
       {
-        "endLine": 1057,
+        "endLine": 1066,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1045,
+        "startLine": 1054,
       },
       {
-        "endLine": 1079,
+        "endLine": 1089,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1058,
+        "startLine": 1067,
       },
       {
-        "endLine": 1094,
+        "endLine": 1106,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1080,
+        "startLine": 1090,
       },
       {
-        "endLine": 1144,
+        "endLine": 1156,
         "origin": "generated:transport/walk",
-        "startLine": 1095,
+        "startLine": 1107,
       },
       {
-        "endLine": 1171,
+        "endLine": 1183,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1145,
+        "startLine": 1157,
       },
     ],
   },
@@ -44352,7 +44451,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -44596,9 +44695,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -44754,10 +44855,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -44967,84 +45069,84 @@ void main() {
         "startLine": 475,
       },
       {
-        "endLine": 493,
+        "endLine": 495,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 479,
       },
       {
-        "endLine": 498,
+        "endLine": 500,
         "origin": "generated:light-structs",
-        "startLine": 494,
-      },
-      {
-        "endLine": 520,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 499,
+        "startLine": 496,
       },
       {
         "endLine": 522,
-        "origin": "generated:light-accessors",
-        "startLine": 521,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 501,
       },
       {
-        "endLine": 529,
-        "origin": "generated:light-sampling",
+        "endLine": 524,
+        "origin": "generated:light-accessors",
         "startLine": 523,
       },
       {
-        "endLine": 537,
+        "endLine": 531,
+        "origin": "generated:light-sampling",
+        "startLine": 525,
+      },
+      {
+        "endLine": 539,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 530,
+        "startLine": 532,
       },
       {
-        "endLine": 556,
+        "endLine": 558,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 538,
+        "startLine": 540,
       },
       {
-        "endLine": 560,
+        "endLine": 562,
         "origin": "generated:environment",
-        "startLine": 557,
+        "startLine": 559,
       },
       {
-        "endLine": 576,
+        "endLine": 578,
         "origin": "generated:transport/state",
-        "startLine": 561,
+        "startLine": 563,
       },
       {
-        "endLine": 586,
+        "endLine": 588,
         "origin": "generated:transport/combiner",
-        "startLine": 577,
+        "startLine": 579,
       },
       {
-        "endLine": 590,
+        "endLine": 592,
         "origin": "generated:transport/kernel-record",
-        "startLine": 587,
+        "startLine": 589,
       },
       {
-        "endLine": 598,
+        "endLine": 600,
         "origin": "generated:transport/roulette",
-        "startLine": 591,
+        "startLine": 593,
       },
       {
-        "endLine": 633,
+        "endLine": 635,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 599,
+        "startLine": 601,
       },
       {
-        "endLine": 655,
+        "endLine": 658,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 634,
+        "startLine": 636,
       },
       {
-        "endLine": 674,
+        "endLine": 677,
         "origin": "generated:transport/walk",
-        "startLine": 656,
+        "startLine": 659,
       },
       {
-        "endLine": 701,
+        "endLine": 704,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 675,
+        "startLine": 678,
       },
     ],
   },
@@ -46908,7 +47010,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -47382,9 +47484,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -47586,10 +47690,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -47829,89 +47934,89 @@ void main() {
         "startLine": 707,
       },
       {
-        "endLine": 725,
+        "endLine": 727,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 711,
       },
       {
-        "endLine": 731,
+        "endLine": 733,
         "origin": "generated:light-structs",
-        "startLine": 726,
-      },
-      {
-        "endLine": 787,
-        "origin": "components/lights/sphere/sphere.glsl",
-        "startLine": 732,
+        "startLine": 728,
       },
       {
         "endLine": 789,
-        "origin": "generated:light-accessors",
-        "startLine": 788,
+        "origin": "components/lights/sphere/sphere.glsl",
+        "startLine": 734,
       },
       {
-        "endLine": 796,
-        "origin": "generated:light-sampling",
+        "endLine": 791,
+        "origin": "generated:light-accessors",
         "startLine": 790,
       },
       {
-        "endLine": 801,
+        "endLine": 798,
+        "origin": "generated:light-sampling",
+        "startLine": 792,
+      },
+      {
+        "endLine": 803,
         "origin": "generated:light-of",
-        "startLine": 797,
+        "startLine": 799,
       },
       {
-        "endLine": 809,
+        "endLine": 811,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 802,
+        "startLine": 804,
       },
       {
-        "endLine": 828,
+        "endLine": 830,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 810,
+        "startLine": 812,
       },
       {
-        "endLine": 832,
+        "endLine": 834,
         "origin": "generated:environment",
-        "startLine": 829,
+        "startLine": 831,
       },
       {
-        "endLine": 850,
+        "endLine": 852,
         "origin": "generated:transport/state",
-        "startLine": 833,
+        "startLine": 835,
       },
       {
-        "endLine": 864,
+        "endLine": 866,
         "origin": "generated:transport/combiner",
-        "startLine": 851,
+        "startLine": 853,
       },
       {
-        "endLine": 868,
+        "endLine": 870,
         "origin": "generated:transport/kernel-record",
-        "startLine": 865,
+        "startLine": 867,
       },
       {
-        "endLine": 876,
+        "endLine": 878,
         "origin": "generated:transport/roulette",
-        "startLine": 869,
+        "startLine": 871,
       },
       {
-        "endLine": 911,
+        "endLine": 913,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 877,
+        "startLine": 879,
       },
       {
-        "endLine": 933,
+        "endLine": 936,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 912,
+        "startLine": 914,
       },
       {
-        "endLine": 957,
+        "endLine": 960,
         "origin": "generated:transport/walk",
-        "startLine": 934,
+        "startLine": 937,
       },
       {
-        "endLine": 984,
+        "endLine": 987,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 958,
+        "startLine": 961,
       },
     ],
   },
@@ -48459,7 +48564,7 @@ bool material_has_nondelta_lobes(int mat);
 float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -48777,9 +48882,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -49040,10 +49147,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -49268,89 +49376,89 @@ void main() {
         "startLine": 557,
       },
       {
-        "endLine": 575,
+        "endLine": 577,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 561,
       },
       {
-        "endLine": 579,
+        "endLine": 581,
         "origin": "generated:light-sampling",
-        "startLine": 576,
+        "startLine": 578,
       },
       {
-        "endLine": 587,
+        "endLine": 589,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 580,
+        "startLine": 582,
       },
       {
-        "endLine": 606,
+        "endLine": 608,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 588,
+        "startLine": 590,
       },
       {
-        "endLine": 610,
+        "endLine": 612,
         "origin": "generated:env-rotate",
-        "startLine": 607,
+        "startLine": 609,
       },
       {
-        "endLine": 646,
+        "endLine": 648,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 611,
+        "startLine": 613,
       },
       {
-        "endLine": 651,
+        "endLine": 653,
         "origin": "generated:environment",
-        "startLine": 647,
+        "startLine": 649,
       },
       {
-        "endLine": 726,
+        "endLine": 728,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 652,
+        "startLine": 654,
       },
       {
-        "endLine": 748,
+        "endLine": 750,
         "origin": "generated:transport/state",
-        "startLine": 727,
+        "startLine": 729,
       },
       {
-        "endLine": 757,
+        "endLine": 759,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 749,
+        "startLine": 751,
       },
       {
-        "endLine": 771,
+        "endLine": 773,
         "origin": "generated:transport/combiner",
-        "startLine": 758,
+        "startLine": 760,
       },
       {
-        "endLine": 777,
+        "endLine": 779,
         "origin": "generated:transport/kernel-record",
-        "startLine": 772,
+        "startLine": 774,
       },
       {
-        "endLine": 785,
+        "endLine": 787,
         "origin": "generated:transport/roulette",
-        "startLine": 778,
+        "startLine": 780,
       },
       {
-        "endLine": 820,
+        "endLine": 822,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 786,
+        "startLine": 788,
       },
       {
-        "endLine": 842,
+        "endLine": 845,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 821,
+        "startLine": 823,
       },
       {
-        "endLine": 866,
+        "endLine": 869,
         "origin": "generated:transport/walk",
-        "startLine": 843,
+        "startLine": 846,
       },
       {
-        "endLine": 893,
+        "endLine": 896,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 867,
+        "startLine": 870,
       },
     ],
   },
@@ -49918,7 +50026,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -50232,9 +50340,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -50478,10 +50588,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -50706,84 +50817,84 @@ void main() {
         "startLine": 552,
       },
       {
-        "endLine": 570,
+        "endLine": 572,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 556,
       },
       {
-        "endLine": 574,
+        "endLine": 576,
         "origin": "generated:light-sampling",
-        "startLine": 571,
+        "startLine": 573,
       },
       {
-        "endLine": 582,
+        "endLine": 584,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 575,
+        "startLine": 577,
       },
       {
-        "endLine": 601,
+        "endLine": 603,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 583,
+        "startLine": 585,
       },
       {
-        "endLine": 605,
+        "endLine": 607,
         "origin": "generated:env-rotate",
-        "startLine": 602,
+        "startLine": 604,
       },
       {
-        "endLine": 641,
+        "endLine": 643,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 606,
+        "startLine": 608,
       },
       {
-        "endLine": 646,
+        "endLine": 648,
         "origin": "generated:environment",
-        "startLine": 642,
+        "startLine": 644,
       },
       {
-        "endLine": 721,
+        "endLine": 723,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 647,
+        "startLine": 649,
       },
       {
-        "endLine": 739,
+        "endLine": 741,
         "origin": "generated:transport/state",
-        "startLine": 722,
+        "startLine": 724,
       },
       {
-        "endLine": 751,
+        "endLine": 753,
         "origin": "generated:transport/combiner",
-        "startLine": 740,
+        "startLine": 742,
       },
       {
-        "endLine": 755,
+        "endLine": 757,
         "origin": "generated:transport/kernel-record",
-        "startLine": 752,
+        "startLine": 754,
       },
       {
-        "endLine": 763,
+        "endLine": 765,
         "origin": "generated:transport/roulette",
-        "startLine": 756,
+        "startLine": 758,
       },
       {
-        "endLine": 798,
+        "endLine": 800,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 764,
+        "startLine": 766,
       },
       {
-        "endLine": 820,
+        "endLine": 823,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 799,
+        "startLine": 801,
       },
       {
-        "endLine": 844,
+        "endLine": 847,
         "origin": "generated:transport/walk",
-        "startLine": 821,
+        "startLine": 824,
       },
       {
-        "endLine": 871,
+        "endLine": 874,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 845,
+        "startLine": 848,
       },
     ],
   },
@@ -52549,7 +52660,7 @@ bool material_has_nondelta_lobes(int mat);
 float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -52867,9 +52978,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -53163,10 +53276,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -53391,89 +53505,89 @@ void main() {
         "startLine": 558,
       },
       {
-        "endLine": 576,
+        "endLine": 578,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 562,
       },
       {
-        "endLine": 580,
+        "endLine": 582,
         "origin": "generated:light-sampling",
-        "startLine": 577,
+        "startLine": 579,
       },
       {
-        "endLine": 588,
+        "endLine": 590,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 581,
+        "startLine": 583,
       },
       {
-        "endLine": 607,
+        "endLine": 609,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 589,
+        "startLine": 591,
       },
       {
-        "endLine": 611,
+        "endLine": 613,
         "origin": "generated:env-rotate",
-        "startLine": 608,
+        "startLine": 610,
       },
       {
-        "endLine": 675,
+        "endLine": 677,
         "origin": "components/env/octahedral/octahedral.glsl",
-        "startLine": 612,
+        "startLine": 614,
       },
       {
-        "endLine": 685,
+        "endLine": 687,
         "origin": "generated:environment",
-        "startLine": 676,
+        "startLine": 678,
       },
       {
-        "endLine": 760,
+        "endLine": 762,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 686,
+        "startLine": 688,
       },
       {
-        "endLine": 782,
+        "endLine": 784,
         "origin": "generated:transport/state",
-        "startLine": 761,
+        "startLine": 763,
       },
       {
-        "endLine": 791,
+        "endLine": 793,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 783,
+        "startLine": 785,
       },
       {
-        "endLine": 805,
+        "endLine": 807,
         "origin": "generated:transport/combiner",
-        "startLine": 792,
+        "startLine": 794,
       },
       {
-        "endLine": 811,
+        "endLine": 813,
         "origin": "generated:transport/kernel-record",
-        "startLine": 806,
+        "startLine": 808,
       },
       {
-        "endLine": 819,
+        "endLine": 821,
         "origin": "generated:transport/roulette",
-        "startLine": 812,
+        "startLine": 814,
       },
       {
-        "endLine": 854,
+        "endLine": 856,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 820,
+        "startLine": 822,
       },
       {
-        "endLine": 876,
+        "endLine": 879,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 855,
+        "startLine": 857,
       },
       {
-        "endLine": 900,
+        "endLine": 903,
         "origin": "generated:transport/walk",
-        "startLine": 877,
+        "startLine": 880,
       },
       {
-        "endLine": 927,
+        "endLine": 930,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 901,
+        "startLine": 904,
       },
     ],
   },
@@ -54042,7 +54156,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -54356,9 +54470,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -54603,10 +54719,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -54831,79 +54948,79 @@ void main() {
         "startLine": 552,
       },
       {
-        "endLine": 570,
+        "endLine": 572,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 556,
       },
       {
-        "endLine": 574,
+        "endLine": 576,
         "origin": "generated:light-sampling",
-        "startLine": 571,
+        "startLine": 573,
       },
       {
-        "endLine": 582,
+        "endLine": 584,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 575,
+        "startLine": 577,
       },
       {
-        "endLine": 601,
+        "endLine": 603,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 583,
+        "startLine": 585,
       },
       {
-        "endLine": 637,
+        "endLine": 639,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 602,
+        "startLine": 604,
       },
       {
-        "endLine": 647,
+        "endLine": 649,
         "origin": "generated:environment",
-        "startLine": 638,
+        "startLine": 640,
       },
       {
-        "endLine": 722,
+        "endLine": 724,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 648,
+        "startLine": 650,
       },
       {
-        "endLine": 740,
+        "endLine": 742,
         "origin": "generated:transport/state",
-        "startLine": 723,
+        "startLine": 725,
       },
       {
-        "endLine": 752,
+        "endLine": 754,
         "origin": "generated:transport/combiner",
-        "startLine": 741,
+        "startLine": 743,
       },
       {
-        "endLine": 756,
+        "endLine": 758,
         "origin": "generated:transport/kernel-record",
-        "startLine": 753,
+        "startLine": 755,
       },
       {
-        "endLine": 764,
+        "endLine": 766,
         "origin": "generated:transport/roulette",
-        "startLine": 757,
+        "startLine": 759,
       },
       {
-        "endLine": 799,
+        "endLine": 801,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 765,
+        "startLine": 767,
       },
       {
-        "endLine": 821,
+        "endLine": 824,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 800,
+        "startLine": 802,
       },
       {
-        "endLine": 845,
+        "endLine": 848,
         "origin": "generated:transport/walk",
-        "startLine": 822,
+        "startLine": 825,
       },
       {
-        "endLine": 872,
+        "endLine": 875,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 846,
+        "startLine": 849,
       },
     ],
   },
@@ -55478,7 +55595,7 @@ bool material_has_nondelta_lobes(int mat);
 float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 int light_of(int region);
 float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit);
 // pixel:
@@ -55857,9 +55974,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -56207,10 +56326,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -56440,109 +56560,109 @@ void main() {
         "startLine": 619,
       },
       {
-        "endLine": 637,
+        "endLine": 639,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 623,
       },
       {
-        "endLine": 646,
+        "endLine": 648,
         "origin": "generated:light-structs",
-        "startLine": 638,
-      },
-      {
-        "endLine": 688,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 647,
+        "startLine": 640,
       },
       {
         "endLine": 690,
-        "origin": "generated:light-accessors",
-        "startLine": 689,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 649,
       },
       {
-        "endLine": 713,
-        "origin": "generated:light-sampling",
+        "endLine": 692,
+        "origin": "generated:light-accessors",
         "startLine": 691,
       },
       {
-        "endLine": 718,
+        "endLine": 715,
+        "origin": "generated:light-sampling",
+        "startLine": 693,
+      },
+      {
+        "endLine": 720,
         "origin": "generated:light-of",
-        "startLine": 714,
+        "startLine": 716,
       },
       {
-        "endLine": 723,
+        "endLine": 725,
         "origin": "generated:lighting-pdf",
-        "startLine": 719,
+        "startLine": 721,
       },
       {
-        "endLine": 731,
+        "endLine": 733,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 724,
+        "startLine": 726,
       },
       {
-        "endLine": 750,
+        "endLine": 752,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 732,
+        "startLine": 734,
       },
       {
-        "endLine": 786,
+        "endLine": 788,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 751,
+        "startLine": 753,
       },
       {
-        "endLine": 796,
+        "endLine": 798,
         "origin": "generated:environment",
-        "startLine": 787,
+        "startLine": 789,
       },
       {
-        "endLine": 871,
+        "endLine": 873,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 797,
+        "startLine": 799,
       },
       {
-        "endLine": 893,
+        "endLine": 895,
         "origin": "generated:transport/state",
-        "startLine": 872,
+        "startLine": 874,
       },
       {
-        "endLine": 902,
+        "endLine": 904,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 894,
+        "startLine": 896,
       },
       {
-        "endLine": 920,
+        "endLine": 922,
         "origin": "generated:transport/combiner",
-        "startLine": 903,
+        "startLine": 905,
       },
       {
-        "endLine": 926,
+        "endLine": 928,
         "origin": "generated:transport/kernel-record",
-        "startLine": 921,
+        "startLine": 923,
       },
       {
-        "endLine": 934,
+        "endLine": 936,
         "origin": "generated:transport/roulette",
-        "startLine": 927,
+        "startLine": 929,
       },
       {
-        "endLine": 969,
+        "endLine": 971,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 935,
+        "startLine": 937,
       },
       {
-        "endLine": 991,
+        "endLine": 994,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 970,
+        "startLine": 972,
       },
       {
-        "endLine": 1015,
+        "endLine": 1018,
         "origin": "generated:transport/walk",
-        "startLine": 992,
+        "startLine": 995,
       },
       {
-        "endLine": 1042,
+        "endLine": 1045,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1016,
+        "startLine": 1019,
       },
     ],
   },
@@ -59608,7 +59728,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -59863,9 +59983,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -60020,10 +60142,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -60232,79 +60355,79 @@ void main() {
         "startLine": 485,
       },
       {
-        "endLine": 503,
+        "endLine": 505,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 489,
       },
       {
-        "endLine": 508,
+        "endLine": 510,
         "origin": "generated:light-structs",
-        "startLine": 504,
+        "startLine": 506,
       },
       {
-        "endLine": 530,
+        "endLine": 532,
         "origin": "components/lights/point/point.glsl",
-        "startLine": 509,
+        "startLine": 511,
       },
       {
-        "endLine": 533,
+        "endLine": 535,
         "origin": "generated:light-accessors",
-        "startLine": 531,
+        "startLine": 533,
       },
       {
-        "endLine": 546,
+        "endLine": 548,
         "origin": "generated:light-sampling",
-        "startLine": 534,
+        "startLine": 536,
       },
       {
-        "endLine": 554,
+        "endLine": 556,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 547,
+        "startLine": 549,
       },
       {
-        "endLine": 573,
+        "endLine": 575,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 555,
+        "startLine": 557,
       },
       {
-        "endLine": 577,
+        "endLine": 579,
         "origin": "generated:environment",
-        "startLine": 574,
+        "startLine": 576,
       },
       {
-        "endLine": 593,
+        "endLine": 595,
         "origin": "generated:transport/state",
-        "startLine": 578,
+        "startLine": 580,
       },
       {
-        "endLine": 603,
+        "endLine": 605,
         "origin": "generated:transport/combiner",
-        "startLine": 594,
+        "startLine": 596,
       },
       {
-        "endLine": 607,
+        "endLine": 609,
         "origin": "generated:transport/kernel-record",
-        "startLine": 604,
+        "startLine": 606,
       },
       {
-        "endLine": 642,
+        "endLine": 644,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 608,
+        "startLine": 610,
       },
       {
-        "endLine": 664,
+        "endLine": 667,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 643,
+        "startLine": 645,
       },
       {
-        "endLine": 682,
+        "endLine": 685,
         "origin": "generated:transport/walk",
-        "startLine": 665,
+        "startLine": 668,
       },
       {
-        "endLine": 709,
+        "endLine": 712,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 683,
+        "startLine": 686,
       },
     ],
   },
@@ -60808,7 +60931,7 @@ Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, 
 bool material_has_nondelta_lobes(int mat);
 // lighting:
 LightSample lighting_sample(Point p, vec2 xi);
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -61063,9 +61186,11 @@ bool material_is_emissive(int mat) {
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }
 
@@ -61220,10 +61345,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     if (!material_has_nondelta_lobes(mat)) return;
     LightSample ls = lighting_sample(hit.p, random2());
     if (ls.pdf <= 0.0) return;
-    // §6.3 per-channel transmittance; 2·EPSILON back-off (ray_spawn moved the origin
-    // up to EPSILON — an area light's own surface can sit at distance−EPSILON).
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    Spectrum vis = shadow_transmittance(shadow_ray, ls.distance - 2.0 * EPSILON);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
@@ -61432,79 +61558,79 @@ void main() {
         "startLine": 485,
       },
       {
-        "endLine": 503,
+        "endLine": 505,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
         "startLine": 489,
       },
       {
-        "endLine": 508,
+        "endLine": 510,
         "origin": "generated:light-structs",
-        "startLine": 504,
+        "startLine": 506,
       },
       {
-        "endLine": 530,
+        "endLine": 532,
         "origin": "components/lights/point/point.glsl",
-        "startLine": 509,
+        "startLine": 511,
       },
       {
-        "endLine": 533,
+        "endLine": 535,
         "origin": "generated:light-accessors",
-        "startLine": 531,
+        "startLine": 533,
       },
       {
-        "endLine": 546,
+        "endLine": 548,
         "origin": "generated:light-sampling",
-        "startLine": 534,
+        "startLine": 536,
       },
       {
-        "endLine": 554,
+        "endLine": 556,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 547,
+        "startLine": 549,
       },
       {
-        "endLine": 573,
+        "endLine": 575,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 555,
+        "startLine": 557,
       },
       {
-        "endLine": 577,
+        "endLine": 579,
         "origin": "generated:environment",
-        "startLine": 574,
+        "startLine": 576,
       },
       {
-        "endLine": 593,
+        "endLine": 595,
         "origin": "generated:transport/state",
-        "startLine": 578,
+        "startLine": 580,
       },
       {
-        "endLine": 603,
+        "endLine": 605,
         "origin": "generated:transport/combiner",
-        "startLine": 594,
+        "startLine": 596,
       },
       {
-        "endLine": 607,
+        "endLine": 609,
         "origin": "generated:transport/kernel-record",
-        "startLine": 604,
+        "startLine": 606,
       },
       {
-        "endLine": 642,
+        "endLine": 644,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 608,
+        "startLine": 610,
       },
       {
-        "endLine": 664,
+        "endLine": 667,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 643,
+        "startLine": 645,
       },
       {
-        "endLine": 682,
+        "endLine": 685,
         "origin": "generated:transport/walk",
-        "startLine": 665,
+        "startLine": 668,
       },
       {
-        "endLine": 709,
+        "endLine": 712,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 683,
+        "startLine": 686,
       },
     ],
   },

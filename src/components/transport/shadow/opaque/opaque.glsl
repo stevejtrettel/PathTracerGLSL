@@ -7,8 +7,10 @@
 // transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
-// Ray (origin escaped off the surface) and the far bound (the light distance) as maxDist.
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }

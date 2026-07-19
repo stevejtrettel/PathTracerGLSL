@@ -8,7 +8,9 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
     LightSample ls = lighting_sample(p_evt, random2());
     if (ls.pdf <= 0.0) return;
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance - 2.0 * EPSILON);
+    // Pass the LIGHT POINT (drift-free target); the walker measures its back-off against it.
+    Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), light_p);
     if (spectrum_is_black(vis)) return;
     s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }

@@ -255,7 +255,16 @@ export class ParameterPanelExtension extends UIExtension {
     }
 
     private createWidgetForParam(path: string, meta: ParameterMetadata): UIComponent {
-        const currentValue = this.app.getParameter(path) ?? meta.default;
+        let currentValue = this.app.getParameter(path) ?? meta.default;
+
+        // A radiometric ('color') parameter may hold a SCALAR — the system's spectrum-broadcast
+        // convention (a driven emission authored as `{param}` with a scalar default; the uniform
+        // closure broadcasts scalar → vec3). The color widget's contract is an [r,g,b] array, so
+        // adapt at this boundary rather than letting a scalar reach it (a scalar `lamp.power`
+        // from a witness's initialParameters otherwise crashed ColorPicker.updateDisplay).
+        if (meta.type === 'color' && typeof currentValue === 'number') {
+            currentValue = [currentValue, currentValue, currentValue];
+        }
 
         return WidgetFactory.create(meta, {
             value: currentValue,

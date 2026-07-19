@@ -154,7 +154,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // T4 seams: the §6.1/§6.2/§6.3 direct-lighting contract surface.
     const provides = [
         { name: 'lighting_sample', signature: 'LightSample lighting_sample(Point p, vec2 xi)' },
-        { name: 'shadow_transmittance', signature: 'Spectrum shadow_transmittance(Ray shadow_ray, float maxDist)' },
+        { name: 'shadow_transmittance', signature: 'Spectrum shadow_transmittance(Ray shadow_ray, Point light_p)' },
     ];
     if (plan.program.emitters.samplable) {
         provides.push({ name: 'light_of', signature: 'int light_of(int region)' });

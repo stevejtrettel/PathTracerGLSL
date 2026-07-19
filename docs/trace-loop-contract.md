@@ -82,7 +82,7 @@ There is no local-frame BSDF yet (Lambert works in world space), so **today ever
 bool     scene_intersect     (Ray ray, out Hit hit);                   // hit.t = MAX_DIST in; running nearest out. Ray READ-ONLY.
 bool     <backend>_intersect (Ray ray, inout Hit hit);                 // accumulate nearest into hit (bound = hit.t); never mutate ray
 bool     scene_intersect_any (Ray ray, float maxDist);                 // occlusion bound is an argument
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);          // was (p, wi, dist) — revises §6.3
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);          // destination is a POINT, not a distance — see below
 Point    ambient_geodesic    (Point origin, Direction dir, float t);   // UNCHANGED — the geodesic mechanism
 float    ambient_dot         (Direction a, Direction b, Point p);      // UNCHANGED — now actually called
 ```
@@ -96,8 +96,18 @@ never mutated by intersection — it is a pure seed.
   `ambient_geodesic(origin, dir, t) → Point`; that signature holds in *every* space, including a
   black hole (which integrates the ODE internally — an implementation/perf detail of the ambient
   module, never a type in the loop). There is no stepper state in the trace loop.
-- **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray, float maxDist)` (the interval now
-  travels on the `Ray`).
+- **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray, Point light_p)`.
+  **A shadow ray is defined by its DESTINATION, not a distance.** The scalar `maxDist` form (an
+  earlier revision) was non-robust for the media segment-walk: the walker decremented `remaining`
+  and re-spawned the ray (+EPSILON) at each null-interface crossing without subtracting that
+  offset, so the light back-off drifted by ~EPSILON per crossing. After ≥2 crossings (entering +
+  exiting one bounded medium) the drift exceeded the fixed 2·EPSILON light margin and the AREA
+  LIGHT'S OWN surface blocked the shadow ray → NEE went dark through any bounded medium (pt, which
+  reaches the light via the emitter-hit, stayed correct). Passing the light POINT lets each segment
+  re-derive the back-off against the fixed target (pbrt's `SpawnRayTo` discipline), so no drift can
+  accumulate. The opaque fast path derives its `maxDist` from the point; the media walk measures
+  `length(light_p − seg_ray.origin) − 2·EPSILON` per segment. (length() is Euclidean; a geodesic
+  ambient-distance helper is the curved-space follow-up, like the straight-ray march itself.)
 
 ## Deferred (not this contract)
 

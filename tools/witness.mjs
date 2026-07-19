@@ -11,11 +11,15 @@
 // this is the numeric one. See docs/fable-validation-scenes.md for where the numbers
 // come from.
 //
-//   npm run witness                # all scenes with witness specs
-//   npm run witness -- furnace eta # only these scenes
-//   npm run witness -- --list      # list checks without rendering
+//   npm run witness                     # all scenes with witness specs
+//   npm run witness -- furnace eta      # only these scenes
+//   npm run witness -- --list           # list checks without rendering
+//   npm run witness -- --spp-scale 3 het-const   # run these at 3× each spec's spp
 //
-// Exit code: number of failed checks (0 = all green).
+// --spp-scale <x> multiplies every witness's spp (a one-time convergence probe: a twin
+// whose means agree but whose display-space RMSE just misses at the spec spp will fall as
+// ~1/√spp — this is the bias-vs-variance classifier; the cache keys on spp so a scaled run
+// is a fresh render, and the spec spp on disk is untouched). Exit code = failed check count.
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -37,7 +41,12 @@ const WITNESS_SALT = 1234;
 const argv = process.argv.slice(2);
 const listOnly = argv.includes('--list');
 const noCache = argv.includes('--no-cache');
-const sceneFilter = argv.filter(a => !a.startsWith('--'));
+// --spp-scale <x>: multiply every witness's spp (convergence probe). Its numeric value is
+// consumed here so it never lands in sceneFilter.
+const sppScaleIdx = argv.indexOf('--spp-scale');
+const SPP_SCALE = sppScaleIdx >= 0 ? Number(argv[sppScaleIdx + 1]) : 1;
+if (!(SPP_SCALE > 0)) { console.error(`--spp-scale needs a positive number (got '${argv[sppScaleIdx + 1]}')`); process.exit(2); }
+const sceneFilter = argv.filter((a, i) => !a.startsWith('--') && !(sppScaleIdx >= 0 && i === sppScaleIdx + 1));
 
 // ---------------------------------------------------------------------------
 // Render cache: the pinned salt makes every witness render DETERMINISTIC, so a
@@ -451,7 +460,7 @@ function fmt(v, digits = 4) {
 
 async function runCheck(browser, registry, sceneId, spec, check) {
     const size = spec.size ?? DEFAULT_SIZE;
-    const spp = spec.spp ?? DEFAULT_SPP;
+    const spp = Math.round((spec.spp ?? DEFAULT_SPP) * SPP_SCALE);   // --spp-scale convergence probe
     const label = check.label ?? check.kind;
 
     if (check.kind === 'mean') {

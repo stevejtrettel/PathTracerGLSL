@@ -42,7 +42,7 @@ void equiangular_sample_direct(inout PathState s, int med_mat, float t_max) {
     float d2 = max(dot(to_light, to_light), 1e-8);
     float dist = sqrt(d2);
     Direction wi = to_light / dist;
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, wi), dist - 2.0 * EPSILON);
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, wi), pos);   // pos = the light POINT (drift-free target)
     if (spectrum_is_black(vis)) return;
 
     // Delta convention (§6.1): 1/d² folds into the incident radiance here. Phase EVAL,

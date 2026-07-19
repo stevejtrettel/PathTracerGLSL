@@ -8,16 +8,26 @@
 // (ZERO). Depends on: scene_intersect/scene_region_at (intersection), material_of,
 // material_has_medium/is_null_interface/medium_transmittance (materials), ray_spawn (core),
 // MAX_SHADOW_SEGMENTS (define, pin: 8).
+//
+// The stop bound is the LIGHT POINT, not a scalar distance (trace-loop-contract: a shadow ray
+// is defined by its destination). Each segment re-derives the 2·EPSILON back-off against the
+// FIXED light_p — pbrt's SpawnRayTo discipline — so the back-off can never be eroded by the
+// ray_spawn offsets that accumulate across null-interface crossings. A decremented `remaining`
+// (the earlier form) drifted by one EPSILON per crossing, and after ≥2 crossings the drift
+// exceeded the back-off, letting the AREA LIGHT'S OWN surface block the shadow ray → NEE went
+// dark through any bounded medium. (length() is Euclidean; a geodesic-distance ambient helper
+// is the curved-space follow-up, like the straight-ray march itself.)
 
-Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
     Spectrum T = SPECTRUM_ONE;
-    // Starting medium recovered from the §4.4 containment oracle — self-contained, no
-    // signature change (works from surface points and medium event points alike).
+    // Starting medium recovered from the §4.4 containment oracle — self-contained
+    // (works from surface points and medium event points alike).
     int medium = scene_region_at(shadow_ray.origin);
     Ray seg_ray = shadow_ray;
-    float remaining = maxDist;
 
     for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
+        // Distance to the light re-derived from the fixed target — drift-free by construction.
+        float remaining = length(light_p - seg_ray.origin) - 2.0 * EPSILON;
         Hit h;
         bool hit_boundary = scene_intersect(seg_ray, h) && h.t < remaining;
         float seg_len = hit_boundary ? h.t : remaining;
@@ -32,7 +42,6 @@ Spectrum shadow_transmittance(Ray shadow_ray, float maxDist) {
             return SPECTRUM_ZERO;                                 // opaque or dielectric: blocked (§6.3 v1)
         }
         medium = h.region_to;                                     // pass through the null interface
-        remaining -= h.t;                                         // EPS gaps ~1e-3/crossing: negligible
         seg_ray = ray_spawn(h, seg_ray.direction);                // far side by sign(dir·n)
     }
     return SPECTRUM_ZERO;                                         // budget exhausted: conservative

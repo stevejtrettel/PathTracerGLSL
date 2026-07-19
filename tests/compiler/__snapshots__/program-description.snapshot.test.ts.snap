@@ -8348,6 +8348,171 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > shadow-medium + pt 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": false,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 12,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > shadow-medium + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "drivenPlacement": false,
+    "method": "raymarch",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 12,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = `
 {
   "emitters": {
