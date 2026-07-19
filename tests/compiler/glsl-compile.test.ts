@@ -70,7 +70,7 @@ describe('every tonemap occupant compiles (glslang static check)', () => {
 
 import { PRIMITIVES } from '../../src/components/geometry/index.js';
 import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
-import { PHASE_MODELS } from '../../src/components/volume_scattering/index.js';
+import { VOLUME_SCATTERING_MODELS } from '../../src/components/volume_scattering/index.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
 import type { SceneDescription, RenderStrategy, ObjectDescription, LightDescription, MaterialDescription, MaterialModel } from '../../src/compiler/types.js';
 
@@ -82,7 +82,7 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
             materials[`mat_${id}`] = { model: id };
         }
         // Every phase model as an interior medium on a null-interface region.
-        for (const id of Object.keys(PHASE_MODELS)) {
+        for (const id of Object.keys(VOLUME_SCATTERING_MODELS)) {
             materials[`medium_${id}`] = {
                 model: 'none',
                 medium: { sigma_a: [0.05, 0.05, 0.05], sigma_s: [0.4, 0.4, 0.4], model: id },
@@ -120,7 +120,7 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
             }
         }
         // One region per phase medium (the dispatch needs every model PRESENT on a region).
-        for (const id of Object.keys(PHASE_MODELS)) {
+        for (const id of Object.keys(VOLUME_SCATTERING_MODELS)) {
             objects.push({
                 type: 'sphere', parameters: { center: [n * 3, 0.5, -3], radius: 0.6 },
                 material: `medium_${id}`, name: `sink_medium_${id}`,

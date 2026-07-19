@@ -95,7 +95,8 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
         { origin: 'generated:display-header', source: header },
         { origin: 'glsl/shared/display.glsl', source: displayMathGLSL },
         ...(dither ? [{ origin: 'glsl/shared/noise.glsl', source: blueNoiseGLSL }] : []),
-        { origin: model.origin, source: model.glsl },
+        // Origin DERIVED from the registry key (D2 — the path convention is the one truth).
+        { origin: `components/tonemap/${model.type}/${model.type}.glsl`, source: model.glsl },
         { origin: 'generated:display-main', source: buildDisplayMain(model) },
     ];
 }

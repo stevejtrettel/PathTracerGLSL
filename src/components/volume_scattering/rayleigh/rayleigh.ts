@@ -2,10 +2,10 @@
 // parameter-free: the λ⁻⁴ color is the medium's σ_s, not the phase, so it declares no
 // fields into MediumProperties (unlike hg's phase_g).
 
-import type { PhaseModelDescriptor } from '../../descriptors.js';
+import type { VolumeScatteringModelDescriptor } from '../../descriptors.js';
 import rayleighGLSL from './rayleigh.glsl?raw';
 
-export const rayleighDescriptor: PhaseModelDescriptor = {
+export const rayleighDescriptor: VolumeScatteringModelDescriptor = {
     id: 'rayleigh',
     glsl: rayleighGLSL,
     properties: [],

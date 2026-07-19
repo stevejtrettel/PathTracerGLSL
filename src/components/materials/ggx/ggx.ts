@@ -13,6 +13,13 @@ export const ggxDescriptor: MaterialModelDescriptor = {
         { name: 'f0', glslType: 'Spectrum', semantic: 'radiometric', source: 'f0', default: 0.9, storage: 'field' },
         { name: 'roughness', glslType: 'float', semantic: 'geometric', source: 'roughness', default: 0.5, storage: 'field' },
     ],
+    // D4 derived: alpha = max(1e-3, roughness²) — declared ONCE, host-computed (baked
+    // literal / driven closure); the three in-shader recomputations became mp.alpha.
+    // The 1e-3 clamp is the descriptor's convention (author true mirrors as delta).
+    derived: [{
+        name: 'alpha', glslType: 'float', inputs: ['roughness'],
+        fn: (v) => Math.max(1e-3, (v.roughness as number) * (v.roughness as number)),
+    }],
     capabilities: {
         nonDeltaLobes: true,    // glossy: NEE samples it, MIS weights against ggx_pdf
         transmission: false,    // conductor — no ior table entry, no etaScale

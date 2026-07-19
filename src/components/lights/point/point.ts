@@ -2,7 +2,7 @@
 // Rows + facts only; the lighting feature constructs PointLight from values.
 
 import type { LightKindDescriptor } from '../../descriptors.js';
-import { radiantScalar } from '../index.js';
+import { radiantScalar } from '../power.js';
 import lightPointGLSL from './point.glsl?raw';
 
 export const pointLightDescriptor: LightKindDescriptor = {
@@ -14,7 +14,7 @@ export const pointLightDescriptor: LightKindDescriptor = {
     deltaQuery: { positionRow: 'position', intensityRow: 'intensity' },
     // Authored input (besides kind/emission): the position.
     authoredParams: [
-        { name: 'position', shape: 'vec3', required: true },
+        { name: 'position', shape: 'vec3', required: true, kind: 'point' },
     ],
     params: [
         { name: 'position', shape: 'vec3', semantic: 'geometric', kind: 'point' },

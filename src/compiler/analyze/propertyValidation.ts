@@ -6,13 +6,24 @@
 
 import { isGlslExpression, isValueParam, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
+import type { RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
-import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
+import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
+
+/** THE constraint interpreter (D1): one message voice for every family's rows.
+ *  Shape-agnostic — scalar rules apply per-component; min-length needs a vec3. */
+export function constraintViolation(value: number | number[], c: RowConstraint): string | null {
+    const values = typeof value === 'number' ? [value] : value;
+    if (c.kind === 'nonnegative') return values.some((v) => v < 0) ? 'components must be >= 0' : null;
+    if (c.kind === 'positive') return values.some((v) => v <= 0) ? 'must be > 0' : null;
+    return Array.isArray(value) && Math.hypot(...value) < c.value ? `length must be >= ${c.value}` : null;
+}
 
 export interface PropertyValueContract {
     shape: 'scalar' | 'spectrum';
-    /** Only domains required by current transport mathematics, not artistic policy. */
-    domain?: 'nonnegative' | 'positive';
+    /** Only domains required by current transport mathematics, not artistic policy —
+     *  the shared RowConstraint vocabulary (descriptor-unification D1). */
+    constraint?: RowConstraint;
 }
 
 /** Current contract wiring. Model/phase field shapes already come from descriptors; the
@@ -24,7 +35,7 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
             for (const field of MATERIAL_MODELS[mat.model]?.properties ?? []) {
                 validatePropertyValue(
                     (mat as unknown as Record<string, unknown>)[field.source],
-                    { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', domain: field.domain },
+                    { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint },
                     `Material '${name}': ${field.source}`,
                     bag,
                 );
@@ -32,16 +43,16 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
         }
 
         if (mat.medium === undefined) continue;
-        validatePropertyValue(mat.medium.sigma_a, { shape: 'spectrum', domain: 'nonnegative' },
+        validatePropertyValue(mat.medium.sigma_a, { shape: 'spectrum', constraint: { kind: 'nonnegative' } },
             `Material '${name}': medium.sigma_a`, bag);
-        validatePropertyValue(mat.medium.sigma_s, { shape: 'spectrum', domain: 'nonnegative' },
+        validatePropertyValue(mat.medium.sigma_s, { shape: 'spectrum', constraint: { kind: 'nonnegative' } },
             `Material '${name}': medium.sigma_s`, bag);
 
-        const phase = PHASE_MODELS[mat.medium.model ?? 'hg'];
+        const phase = VOLUME_SCATTERING_MODELS[mat.medium.model ?? 'hg'];
         for (const field of phase?.properties ?? []) {
             validatePropertyValue(
                 (mat.medium as unknown as Record<string, unknown>)[field.source],
-                { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', domain: field.domain },
+                { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint },
                 `Material '${name}': medium.${field.source}`,
                 bag,
             );
@@ -70,7 +81,7 @@ export function validatePropertyValue(
         authored = param.default;
         parameterMin = param.min;
         if (authored === undefined) {
-            validateMinimum(parameterMin, contract.domain, `${label} parameter min`, bag);
+            validateMinimum(parameterMin, contract.constraint, `${label} parameter min`, bag);
             return;
         }
     }
@@ -85,27 +96,22 @@ export function validatePropertyValue(
         return;
     }
 
-    const values = typeof authored === 'number' ? [authored] : authored as number[];
-    if (contract.domain === 'nonnegative' && values.some((v) => v < 0)) {
-        bag.error('invalid-setting', `${label} components must be >= 0`).add();
-    } else if (contract.domain === 'positive' && values.some((v) => v <= 0)) {
-        bag.error('invalid-setting', `${label} must be > 0`).add();
+    if (contract.constraint !== undefined) {
+        const violation = constraintViolation(authored as number | number[], contract.constraint);
+        if (violation !== null) bag.error('invalid-setting', `${label} ${violation}`).add();
     }
-    validateMinimum(parameterMin, contract.domain, `${label} parameter min`, bag);
+    validateMinimum(parameterMin, contract.constraint, `${label} parameter min`, bag);
 }
 
 function validateMinimum(
     min: number | undefined,
-    domain: PropertyValueContract['domain'],
+    constraint: RowConstraint | undefined,
     label: string,
     bag: DiagnosticBag,
 ): void {
-    if (min === undefined) return;
-    if (domain === 'nonnegative' && min < 0) {
-        bag.error('invalid-setting', `${label} must be >= 0`).add();
-    } else if (domain === 'positive' && min <= 0) {
-        bag.error('invalid-setting', `${label} must be > 0`).add();
-    }
+    if (min === undefined || constraint === undefined || constraint.kind === 'min-length') return;
+    const violation = constraintViolation(min, constraint);
+    if (violation !== null) bag.error('invalid-setting', `${label} ${violation}`).add();
 }
 
 function isFiniteNumber(value: unknown): value is number {

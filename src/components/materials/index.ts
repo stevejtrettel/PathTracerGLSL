@@ -5,7 +5,7 @@
 // this registry + the Validator's unknown-model rejection gatekeep).
 
 import type { MaterialModel } from '../../compiler/types.js';
-import type { MaterialModelDescriptor } from '../descriptors.js';
+import type { MaterialModelDescriptor, PropertySchema } from '../descriptors.js';
 import { lambertDescriptor } from './lambert/lambert.js';
 import { dielectricDescriptor } from './dielectric/dielectric.js';
 import { ggxDescriptor } from './ggx/ggx.js';
@@ -17,6 +17,20 @@ export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescrip
     ggx: ggxDescriptor,
     mirror: mirrorDescriptor,
 };
+
+/** The model's STRUCT surface (D4): its rows plus its derived fields as pseudo-rows —
+ *  ONE list for the struct union, the lookup's default lines, and the resolver, so a
+ *  derived field can never drift from the fields the occupant reads. Derived pseudo-rows
+ *  are semantic 'geometric' with default 0 (never read outside the model's own arms). */
+export function modelStructFields(d: MaterialModelDescriptor): PropertySchema[] {
+    return [
+        ...d.properties,
+        ...(d.derived ?? []).map((s): PropertySchema => ({
+            name: s.name, glslType: s.glslType, semantic: 'geometric',
+            source: s.name, default: 0, storage: 'field',
+        })),
+    ];
+}
 
 /** Lookup that throws on unregistered models — the Validator rejects them upstream
  *  (reject-not-remove), so this is an unreachable backstop, not a diagnostic. */

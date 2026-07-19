@@ -5,7 +5,6 @@ import glsl from './aces.glsl?raw';
 export const acesDescriptor: TonemapDescriptor = {
     type: 'aces',
     glsl,
-    origin: 'components/tonemap/aces/aces.glsl',
     curveFn: 'aces_curve',
     encodesToDisplay: true,
 };

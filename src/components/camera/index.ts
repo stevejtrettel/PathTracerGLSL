@@ -21,8 +21,8 @@
 // precompute a projection constant (fisheye's u_fisheyeK, cylindrical's u_cylFocal) instead
 // of leaking transcendentals to the GPU — the same rail the shared u_tanFov rides.
 
-import type { CameraType } from '../../compiler/types.js';
 import type { CameraDesc } from '../../compiler/plan/types.js';
+import type { RowConstraint } from '../descriptors.js';
 
 import { pinholeDescriptor } from './pinhole/pinhole.js';
 import { thinlensDescriptor } from './thinlens/thinlens.js';
@@ -68,11 +68,15 @@ export interface CameraDerived {
 }
 
 export interface CameraModelDescriptor {
-    type: CameraType;
+    /** Registry key (D2: the OPEN door — no union to edit; the registry gatekeeps). */
+    type: string;
     /** ?raw source providing `Ray camera_generateRay(vec2 film, vec2 xiLens)`. */
     glsl: string;
-    /** Provenance origin string for source maps (the occupant's path). */
-    origin: string;
+    /** The model's AUTHORED strategy fields beyond `type`/pose (D2: the validation the
+     *  old typed union used to do, now schema-shaped like the lights' — unknown-key /
+     *  required / shape / constraint via the Validator's generic loop, defaults
+     *  framework-applied). 'enum' rows carry their legal `values`. */
+    authoredParams?: AuthoredCameraParamSpec[];
     /** Model-unique controls (sliders). Omit for parameterless cameras (pinhole/equirect);
      *  the shared perspective fov is minted by the feature, not declared here. */
     controls?(cam: CameraDesc): CameraControl[];
@@ -85,7 +89,24 @@ export interface CameraModelDescriptor {
     defines?(cam: CameraDesc): Record<string, string>;
 }
 
-export const CAMERA_MODELS: Record<CameraType, CameraModelDescriptor | undefined> = {
+/** A camera authored-field row (D2) — the lights' AuthoredParamSpec grammar plus two
+ *  camera-specific shapes: 'enum' for structural selectors (fisheye's projection) and
+ *  'value-number' for the perspective fov (a finite number OR a `{param}` slider
+ *  spelling carrying path/range — the one load-bearing Value<> camera field).
+ *  REQUIRED XOR DEFAULT (no camera row declares a default today — every field is
+ *  required — so no framework default application exists yet; add it with the first
+ *  defaulted row, the lights' applyAuthoredDefaults pattern). */
+export interface AuthoredCameraParamSpec {
+    name: string;
+    shape: 'number' | 'vec3' | 'enum' | 'value-number';
+    required: boolean;
+    default?: number | number[] | string;
+    /** Legal values for 'enum' rows. */
+    values?: string[];
+    constraint?: RowConstraint;
+}
+
+export const CAMERA_MODELS: Record<string, CameraModelDescriptor> = {
     pinhole: pinholeDescriptor,
     thinlens: thinlensDescriptor,
     equirect: equirectDescriptor,
@@ -96,8 +117,8 @@ export const CAMERA_MODELS: Record<CameraType, CameraModelDescriptor | undefined
 
 /** Lookup that throws on unregistered types — the Validator rejects them upstream
  *  (reject-not-remove), so this is an unreachable backstop, not a diagnostic. */
-export function cameraModel(type: CameraType): CameraModelDescriptor {
+export function cameraModel(type: string): CameraModelDescriptor {
     const d = CAMERA_MODELS[type];
-    if (!d) throw new Error(`camera type '${type}' has no descriptor (Validator should have rejected it)`);
+    if (d === undefined) throw new Error(`camera type '${type}' has no descriptor (Validator should have rejected it)`);
     return d;
 }

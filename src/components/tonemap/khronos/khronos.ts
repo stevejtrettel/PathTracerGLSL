@@ -5,7 +5,6 @@ import glsl from './khronos.glsl?raw';
 export const khronosDescriptor: TonemapDescriptor = {
     type: 'khronos',
     glsl,
-    origin: 'components/tonemap/khronos/khronos.glsl',
     curveFn: 'khronos_curve',
     encodesToDisplay: true,
 };

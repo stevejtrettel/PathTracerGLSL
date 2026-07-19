@@ -17,8 +17,7 @@ import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { formatSpectrum } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
-import envChartEquirectGLSL from '../../../components/env/equirect/equirect.glsl?raw';
-import envChartOctahedralGLSL from '../../../components/env/octahedral/octahedral.glsl?raw';
+import { ENV_CHARTS } from '../../../components/env/index.js';
 import envSamplerCdfGLSL from '../../../components/env/sampler_cdf.glsl?raw';
 
 const ORIGIN = 'generated:environment';
@@ -51,9 +50,9 @@ export function envVariantSuffix(chart: 'equirect' | 'octahedral', compensation:
 }
 
 function chartBlock(chart: 'equirect' | 'octahedral') {
-    return chart === 'octahedral'
-        ? { origin: 'components/env/octahedral/octahedral.glsl', source: envChartOctahedralGLSL }
-        : { origin: 'components/env/equirect/equirect.glsl', source: envChartEquirectGLSL };
+    // From the chart registry (D3) — origin derived from the key.
+    const d = ENV_CHARTS[chart];
+    return { origin: `components/env/${d.id}/${d.id}.glsl`, source: d.glsl };
 }
 
 /** Per-chart table dimensions live on separate parameter paths (they differ: W×H vs N×N). */

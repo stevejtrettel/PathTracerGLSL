@@ -96,8 +96,10 @@ export function emitCtor(d: PrimitiveDescriptor, values: PrimitiveValues, scale?
     const v = resolvePrimitiveValues(d, values);
     const args = d.params.map((f) => {
         const lit = formatValue(v[f.name]!);
-        const invariant = f.kind === 'direction' || f.kind === 'angle';
-        return !invariant && scale ? `${scale} * ${lit}` : lit;
+        if (!scale) return lit;
+        if (f.kind === 'direction' || f.kind === 'angle') return lit;          // invariant kinds
+        if (f.kind === 'area') return `${scale} * ${scale} * ${lit}`;          // surface measure: ×s²
+        return `${scale} * ${lit}`;
     });
     const derived = (d.derivedCtorFields?.(v) ?? []).map(formatValue);
     return `${structName(d)}(${[...args, ...derived].join(', ')})`;
@@ -152,6 +154,9 @@ function derivedFold(d: PrimitiveDescriptor, v: PrimitiveValues, g: Similarity):
                 break;
             case 'angle':
                 break;   // similarity-invariant: no rotation or scale changes an angle
+            case 'area':
+                out[f.name] = g.scale * g.scale * (value as number);   // surface measure: ×s²
+                break;
         }
     }
     return out;

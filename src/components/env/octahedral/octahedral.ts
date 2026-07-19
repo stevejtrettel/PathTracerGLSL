@@ -10,7 +10,9 @@
 // The GLSL chart (octahedral.glsl, this folder) is a line-for-line transcription of these
 // two functions — change one, change both (the sampler's pdf depends on the pair agreeing).
 
-export type Vec3Tuple = [number, number, number];
+// D5: ONE Vec3Tuple — geometry/similarity.ts owns it (components-internal import).
+import type { Vec3Tuple } from '../../geometry/similarity.js';
+export type { Vec3Tuple } from '../../geometry/similarity.js';
 
 function copysign(mag: number, sign: number): number {
     return sign < 0 || Object.is(sign, -0) ? -Math.abs(mag) : Math.abs(mag);

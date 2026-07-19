@@ -9,12 +9,17 @@ import orthographicGLSL from './orthographic.glsl?raw';
 export const orthographicDescriptor: CameraModelDescriptor = {
     type: 'orthographic',
     glsl: orthographicGLSL,
-    origin: 'components/camera/orthographic/orthographic.glsl',
+    authoredParams: [
+        { name: 'scale', shape: 'number', required: true, constraint: { kind: 'positive' } },
+    ],
     controls(cam: CameraDesc): CameraControl[] {
         if (cam.type !== 'orthographic') throw new Error('orthographic descriptor got a non-orthographic camera');
         // Read RAW by the shader (pass-through) — the film-plane half-height.
         return [
-            { path: 'camera.scale', uniform: 'u_orthoScale', name: 'Ortho Scale', default: cam.scale, range: [0.1, 20] },
+            // 'camera.orthoScale' (D5): 'scale' alone is ambiguous across models; aperture/
+            // focusDistance stay generic-shared (universal lens vocabulary, a future
+            // realistic lens SHOULD share them) — ambiguity, not genericity, is the enemy.
+            { path: 'camera.orthoScale', uniform: 'u_orthoScale', name: 'Ortho Scale', default: cam.scale as number, range: [0.1, 20] },
         ];
     },
 };

@@ -2,7 +2,7 @@
 // Sampled via the visible cone; inside-the-sphere the sampler punts (deferred fallback).
 
 import type { LightKindDescriptor } from '../../descriptors.js';
-import { radiantScalar } from '../index.js';
+import { radiantScalar } from '../power.js';
 import lightSphereGLSL from './sphere.glsl?raw';
 
 export const sphereLightDescriptor: LightKindDescriptor = {
@@ -12,8 +12,8 @@ export const sphereLightDescriptor: LightKindDescriptor = {
     // Authored input (besides kind/emission): authored `position` maps to the registry
     // row `center` in toValues — the proof the authored language needs its own schema.
     authoredParams: [
-        { name: 'position', shape: 'vec3', required: true },
-        { name: 'radius', shape: 'number', required: true },
+        { name: 'position', shape: 'vec3', required: true, kind: 'point' },
+        { name: 'radius', shape: 'number', required: true, kind: 'length', constraint: { kind: 'positive' } },
     ],
     params: [
         { name: 'center', shape: 'vec3', semantic: 'geometric', kind: 'point' },
@@ -32,7 +32,5 @@ export const sphereLightDescriptor: LightKindDescriptor = {
         parameters: (a) => ({ center: a.position as number[], radius: a.radius as number }),
     },
     valuesFromRegion: (p, Le) => ({ center: p.center, radius: p.radius, radiance: Le }),
-    validateAuthored(a) {
-        return (a.radius as number) <= 0 ? ['sphere light radius must be > 0'] : [];
-    },
+    // No validateAuthored: every rule is separable and lives on the rows (D1).
 };

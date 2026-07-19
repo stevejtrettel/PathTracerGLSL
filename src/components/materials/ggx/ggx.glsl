@@ -1,9 +1,10 @@
 // GGX rough conductor — conforms to §3.2 (transcribed from reference-implementations §7,
 // adapted to the (uc, u) sampler split and the ambient_dot metric discipline).
 // Smith separable masking, Schlick Fresnel, VNDF sampling (Heitz 2018).
-// Fields read: mp.f0 (normal-incidence reflectance), mp.roughness (alpha = roughness²).
-// Convention: alpha clamped ≥ 1e-3 — author true mirrors as a delta model instead (§3.1);
-// letting alpha→0 here produces fireflies, not a mirror.
+// Fields read: mp.f0 (normal-incidence reflectance), mp.alpha (DERIVED host-side, D4:
+// max(1e-3, roughness²) — the descriptor's `derived` declaration; the shader never
+// recomputes it). Convention: alpha clamped ≥ 1e-3 — author true mirrors as a delta
+// model instead (§3.1); letting alpha→0 here produces fireflies, not a mirror.
 // Provides: ggx_to_local(), ggx_from_local(), ggx_D(), ggx_G1(),
 //           ggx_eval(), ggx_sample(), ggx_pdf(), ggx_emission().
 // Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
@@ -33,7 +34,7 @@ Spectrum ggx_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     vec3 wil = ggx_to_local(hit.frame, hit.p, wi);
     vec3 wol = ggx_to_local(hit.frame, hit.p, wo);
     if (wil.z * wol.z <= 0.0) return SPECTRUM_ZERO;         // reflection-only model
-    float a = max(1e-3, mp.roughness * mp.roughness);
+    float a = mp.alpha;                                     // derived host-side (D4): max(1e-3, roughness²)
     vec3 h = normalize(wil + wol);
     Spectrum F = schlick_fresnel(mp.f0, abs(dot(wol, h)));
     // bare f (§2.2): D·F·G / (4 cos_i cos_o), NO extra cos_i here
@@ -45,7 +46,7 @@ InteractionSample ggx_sample(Direction wo, Hit hit, MaterialProperties mp, float
     vec3 wol = ggx_to_local(hit.frame, hit.p, wo);
     float side = wol.z < 0.0 ? -1.0 : 1.0;                  // canonical side (undone at exit)
     wol *= side;
-    float a = max(1e-3, mp.roughness * mp.roughness);
+    float a = mp.alpha;                                     // derived host-side (D4)
     // VNDF sampling (Heitz 2018) — sample the visible microfacet distribution:
     vec3 vh = normalize(vec3(a * wol.x, a * wol.y, wol.z));
     float lensq = vh.x * vh.x + vh.y * vh.y;
@@ -81,7 +82,7 @@ float ggx_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     vec3 wil = ggx_to_local(hit.frame, hit.p, wi);
     vec3 wol = ggx_to_local(hit.frame, hit.p, wo);
     if (wil.z * wol.z <= 0.0) return 0.0;
-    float a = max(1e-3, mp.roughness * mp.roughness);
+    float a = mp.alpha;                                     // derived host-side (D4)
     vec3 h = normalize(wil + wol);
     // Side-symmetric by construction (G1 uses |z|, D uses z²) — no canonicalization needed.
     return ggx_G1(wol, a) * ggx_D(h, a) / (4.0 * abs(wol.z));   // MUST match ggx_sample's pdf — §11.3 checks this

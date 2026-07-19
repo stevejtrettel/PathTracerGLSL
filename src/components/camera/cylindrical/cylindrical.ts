@@ -12,11 +12,13 @@ const HFOV_PATH = 'camera.cylHfov';
 export const cylindricalDescriptor: CameraModelDescriptor = {
     type: 'cylindrical',
     glsl: cylindricalGLSL,
-    origin: 'components/camera/cylindrical/cylindrical.glsl',
+    authoredParams: [
+        { name: 'hfov', shape: 'number', required: true, constraint: { kind: 'positive' } },   // horizontal sweep, DEGREES
+    ],
     controls(cam: CameraDesc): CameraControl[] {
         if (cam.type !== 'cylindrical') throw new Error('cylindrical descriptor got a non-cylindrical camera');
         // Feeds u_cylFocal only (not read raw) — the horizontal sweep in DEGREES.
-        return [{ path: HFOV_PATH, name: 'Width (°)', default: cam.hfov, range: [30, 360] }];
+        return [{ path: HFOV_PATH, name: 'Width (°)', default: cam.hfov as number, range: [30, 360] }];
     },
     derived(cam: CameraDesc): CameraDerived[] {
         if (cam.type !== 'cylindrical') throw new Error('cylindrical descriptor got a non-cylindrical camera');

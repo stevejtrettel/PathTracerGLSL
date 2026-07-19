@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, Value, ValueParam, EnvironmentDescription, ParameterMetadata } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, EnvironmentDescription, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
 import type { Similarity } from '../../components/geometry/similarity.js';
 
 // ============================================================================
@@ -25,6 +25,9 @@ export interface ProgramDescription {
      *  (the bias ledger, each with a declared exact limit — taxonomy §4). */
     measurement: {
         camera: CameraDesc;
+        /** The ambient space's registry key (D3 — the non-Euclidean seam's decision:
+         *  which AMBIENT_SPACES occupant provides the ambient_* contract surface). */
+        ambient: string;
         response: 'radiance';
         maxBounces: number;
         scattering: 'full' | 'ignored';
@@ -158,35 +161,13 @@ export type LightingDesc =
         envSelectWeight?: number;
     };
 
-// Mirrors CameraDescription (compiler/types.ts) — the ProgramDescription is the complete
-// link map, so every strategy-side camera variant must exist here for Generate to read.
-// Registered occupants (camera/index.ts) are pinhole + thinlens; orthographic is
-// type-declared but unregistered → Validator-rejected (reserved-not-removed).
-// The pose fields ride along: authored defaults for the always-live
-// camera.position/camera.target parameters (compiler/types.ts CameraPose).
-export type CameraDesc = { position?: Vec3; target?: Vec3 } & (
-    | { type: 'pinhole'; fov: Value<number> }
-    | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
-    | { type: 'equirect' }
-    | { type: 'orthographic'; scale: number }
-    | { type: 'fisheye'; projection: 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic'; fov: number }
-    | { type: 'cylindrical'; hfov: number }
-);
-
-export type AccumulationDesc =
-    | { type: 'average' }
-    | { type: 'oneshot' }
-    | { type: 'exponential'; alpha: number }
-    | { type: 'variance' };
-
-export type TonemapDesc =
-    | { type: 'reinhard'; exposure?: number }
-    | { type: 'aces'; exposure?: number }
-    | { type: 'agx'; exposure?: number }
-    | { type: 'khronos'; exposure?: number }
-    | { type: 'hable'; exposure?: number }
-    | { type: 'gt'; exposure?: number }
-    | { type: 'none' };
+// D2: the hand-mirrored strategy-side unions are DEAD — the plan carries the ONE
+// authored shape (compiler/types.ts, now registry-open). The local names survive as
+// aliases so plan consumers keep reading `CameraDesc` etc.; there is exactly one
+// definition to drift from now, which is to say zero.
+export type CameraDesc = CameraDescription;
+export type AccumulationDesc = AccumulationDescription;
+export type TonemapDesc = DisplayDescription;
 
 // ============================================================================
 // Planned Pipeline — how the GPU program executes

@@ -368,7 +368,7 @@ describe('Validator — correctness domains', () => {
         }).getErrors().some(e => /parameter 'radius' must be > 0/.test(e.message))).toBe(true);
         expect(run(s => {
             s.objects = [{ type: 'box', parameters: { halfSize: [1, 0, 1] }, material: 'm' }];
-        }).getErrors().some(e => /parameter 'halfSize' components must be > 0/.test(e.message))).toBe(true);
+        }).getErrors().some(e => /parameter 'halfSize' must be > 0/.test(e.message))).toBe(true);   // D1: one constraint voice (per-component check unchanged)
     });
 
     it('rejects zero plane normals but accepts non-unit normals for canonical normalization', () => {

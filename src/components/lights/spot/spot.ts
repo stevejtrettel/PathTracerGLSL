@@ -9,7 +9,7 @@
 
 import type { LightKindDescriptor } from '../../descriptors.js';
 import { unitVec3 } from '../../geometry/index.js';
-import { radiantScalar } from '../index.js';
+import { radiantScalar } from '../power.js';
 import lightSpotGLSL from './spot.glsl?raw';
 
 export const spotLightDescriptor: LightKindDescriptor = {
@@ -17,10 +17,13 @@ export const spotLightDescriptor: LightKindDescriptor = {
     glsl: lightSpotGLSL,
     delta: true,   // not hittable: no region, LIGHT_DELTA, no pdf function
     authoredParams: [
-        { name: 'position', shape: 'vec3', required: true },
-        { name: 'direction', shape: 'vec3', required: true },
-        { name: 'angle', shape: 'number', required: true },
-        { name: 'falloffStart', shape: 'number', required: false },
+        { name: 'position', shape: 'vec3', required: true, kind: 'point' },
+        { name: 'direction', shape: 'vec3', required: true, kind: 'direction', constraint: { kind: 'min-length', value: 1e-8 } },
+        // angle's (0, π) bound and falloffStart < angle are COUPLED/range rules —
+        // validateAuthored territory (D1), not row constraints. falloffStart's default
+        // is COMPUTED (0.8·angle), so it is not a row default either.
+        { name: 'angle', shape: 'number', required: true, kind: 'angle', constraint: { kind: 'positive' } },
+        { name: 'falloffStart', shape: 'number', required: false, kind: 'angle' },
     ],
     params: [
         { name: 'position', shape: 'vec3', semantic: 'geometric', kind: 'point' },
@@ -49,16 +52,16 @@ export const spotLightDescriptor: LightKindDescriptor = {
             intensity: product,
         };
     },
+    // COUPLED rules only (D1): the separable direction/angle-positivity checks live on
+    // the rows; what remains genuinely relates two quantities (or bounds a range).
     validateAuthored(a) {
         const msgs: string[] = [];
         const angle = a.angle as number;
-        if (!(angle > 0) || angle >= Math.PI) msgs.push('spot angle (outer cone half-angle, radians) must be in (0, π)');
+        if (angle >= Math.PI) msgs.push('spot angle (outer cone half-angle, radians) must be in (0, π)');
         const start = a.falloffStart as number | undefined;
         if (start !== undefined && (!(start > 0) || start >= angle)) {
             msgs.push('spot falloffStart must be in (0, angle) — a hard edge (falloffStart = angle) is smoothstep-undefined; use a thin band instead');
         }
-        const dir = a.direction as number[];
-        if (Math.hypot(dir[0], dir[1], dir[2]) < 1e-8) msgs.push('spot direction must be a nonzero vector');
         return msgs;
     },
 };

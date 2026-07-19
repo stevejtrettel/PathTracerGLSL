@@ -4,13 +4,12 @@
 // one line below. The Generator's display pass (ShaderBuilder.buildDisplayBlocks) owns
 // the SHARED glue — exposure, safe_color, the sRGB OETF, and the composed main() — and
 // calls the occupant's curve. Adding a tonemapper touches nothing but its folder and the
-// TONEMAP_MODELS line (+ the Validator allowlist until every declared type is built).
+// TONEMAP_MODELS line — the registry IS the gate (no separate allowlist; D2/D5).
 //
 // Descriptors declare FACTS about one curve (its GLSL + whether it encodes to display);
 // they never reference the plan or other descriptors (components purity). TonemapDescriptor
 // is a pick-one shape, so it lives here with the registry (the camera/sampler precedent).
 
-import type { TonemapDesc } from '../../compiler/plan/types.js';
 
 import { noneDescriptor } from './none/none.js';
 import { reinhardDescriptor } from './reinhard/reinhard.js';
@@ -20,14 +19,13 @@ import { khronosDescriptor } from './khronos/khronos.js';
 import { hableDescriptor } from './hable/hable.js';
 import { gtDescriptor } from './gt/gt.js';
 
-export type TonemapType = TonemapDesc['type'];
+/** D2: the OPEN door — registry keys are strings; the registry gatekeeps. */
+export type TonemapType = string;
 
 export interface TonemapDescriptor {
     type: TonemapType;
     /** ?raw source providing `vec3 <curveFn>(vec3 x)` — HDR-linear → display-linear [0,1]. */
     glsl: string;
-    /** Provenance origin string for source maps (the occupant's path). */
-    origin: string;
     /** The curve function name the generated display main() calls. */
     curveFn: string;
     /** true  → apply the curve, then sRGB-encode + clamp (the display/PNG path).
@@ -36,10 +34,10 @@ export interface TonemapDescriptor {
     encodesToDisplay: boolean;
 }
 
-/** Partial by shape: a TonemapDesc type is LIVE iff it appears here. The Validator gates
+/** A tonemap type is LIVE iff it appears here (D2: open door). The Validator gates
  *  `view.tonemap.type` against these keys (registry-driven — adding a curve here is the
  *  ONLY wiring, no separate allowlist to sync). */
-export const TONEMAP_MODELS: Partial<Record<TonemapType, TonemapDescriptor>> = {
+export const TONEMAP_MODELS: Record<string, TonemapDescriptor> = {
     none: noneDescriptor,
     reinhard: reinhardDescriptor,
     aces: acesDescriptor,

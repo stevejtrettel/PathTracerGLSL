@@ -11,8 +11,9 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 
-import { MATERIAL_MODELS, materialModel, EMISSION_KEY } from '../../../components/materials/index.js';
-import { PHASE_MODELS } from '../../../components/volume_scattering/index.js';
+import { MATERIAL_MODELS, materialModel, modelStructFields, EMISSION_KEY } from '../../../components/materials/index.js';
+import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
+import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields, defaultExpr } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
 import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
@@ -46,12 +47,23 @@ function isEmissive(mat: PlannedMaterial): boolean {
 
 export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // The union the resolver assigns = the union the struct declares (core emits the
-    // struct from the same registry + models — one truth, two readers).
+    // struct from the same registry + models — one truth, two readers; rows + D4
+    // derived pseudo-rows via modelStructFields).
     const structFields = unionFields(
-        plan.program.materials.models.map((m) => MATERIAL_MODELS[m]?.properties ?? []),
+        plan.program.materials.models.map((m) => {
+            const d = MATERIAL_MODELS[m];
+            return d !== undefined ? modelStructFields(d) : [];
+        }),
     );
+    // DERIVED material fields (D4): per-material expressions — a baked literal for
+    // constant inputs, a `u_<name>_<id>` compute-closure uniform for driven ones.
+    const derivedByMat = new Map<number, DerivedExpr[]>();
+    for (const mat of plan.materials) {
+        const specs = mat.model === 'none' ? [] : (MATERIAL_MODELS[mat.model]?.derived ?? []);
+        if (specs.length > 0) derivedByMat.set(mat.id, specs.map((s) => materialDerivedExpr(mat, s)));
+    }
     const blocks: ShaderBlock[] = [
-        { origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials, structFields) },
+        { origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials, structFields, derivedByMat) },
     ];
 
     // Model includes from the registry (R1a): one line per model PRESENT, no per-model ifs.
@@ -86,7 +98,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // Phase-parameter fields = the union of the PRESENT scattering models' schemas (§3.4)
     // — shared by the lookup codegen and the {param} scan below (one truth, two readers;
     // core.ts builds the MediumProperties struct from the same union).
-    const phaseFields = unionFields(media.models.map((m) => PHASE_MODELS[m]?.properties ?? []));
+    const phaseFields = unionFields(media.models.map((m) => VOLUME_SCATTERING_MODELS[m]?.properties ?? []));
     // is_null_interface has two callers: the walk's null branch (nullInterfaces) and the
     // static shadow_media walker, which probes it unconditionally (shadowWalker).
     const wantsNullTable = media.nullInterfaces || media.shadowWalker;
@@ -131,7 +143,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             // mp.model (twin of the surface interaction dispatch; eval/pdf are seam
             // decisions like the surface ops).
             for (const m of plan.program.media.models) {
-                blocks.push({ origin: `components/volume_scattering/${m}/${m}.glsl`, source: PHASE_MODELS[m].glsl });
+                blocks.push({ origin: `components/volume_scattering/${m}/${m}.glsl`, source: VOLUME_SCATTERING_MODELS[m].glsl });
             }
             blocks.push({ origin: 'generated:medium-dispatch', source: generateMediumDispatch(plan.program.media.models, media.mediumEval, media.mediumPdf) });
         }
@@ -170,7 +182,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             // when that model is LIVE in this program (media.models): a driven phase_g
             // in an absorbing-only program has no reader, so it earns no uniform (C5).
             const phaseRows = media.models.includes(mat.medium.model)
-                ? PHASE_MODELS[mat.medium.model]?.properties ?? []
+                ? VOLUME_SCATTERING_MODELS[mat.medium.model]?.properties ?? []
                 : [];
             for (const f of phaseRows) {
                 mintValueUniform(
@@ -185,6 +197,8 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // DERIVED σ̄ uniforms for {param}-driven tracking media (batch 2) — no parameter
     // metadata of their own: they ride the σ params' sliders through their closures.
     for (const m of majorants.values()) if (m.uniform) uniforms.push(m.uniform);
+    // DERIVED material-field uniforms (D4) — same discipline as the majorants.
+    for (const list of derivedByMat.values()) for (const e of list) if (e.uniform) uniforms.push(e.uniform);
 
     // No structural defines remain (item-9 commit D): media structs/helpers arrive via
     // core's conditionally-included structs_media/math_media blocks. MAX_NULL_COLLISIONS
@@ -248,7 +262,44 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 // Generated material lookup (per-scene codegen)
 // ============================================================================
 
-function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySchema[]): string {
+/** A D4 derived field's emitted form for ONE material: the expression the lookup arm
+ *  assigns, plus the uniform when any input is driven (the majorantSpec pattern). */
+type DerivedExpr = { name: string; expr: string; uniform?: PlannedUniform };
+
+/** Resolve a spec's row inputs (constants + {param} substituted live) — the ONE
+ *  substitution the plan-time bake and the compute closure share (bake ≡ ship). */
+function resolveDerivedInputs(mat: PlannedMaterial, inputs: string[], params: Record<string, unknown> = {}): Record<string, number | number[]> {
+    const out: Record<string, number | number[]> = {};
+    for (const src of inputs) {
+        const v = mat.values[src];
+        out[src] = isValueParam(v)
+            ? (params[v.param] ?? v.default) as number | number[]
+            : v as number | number[];
+    }
+    return out;
+}
+
+function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec): DerivedExpr {
+    const fmt = (s.glslType === 'Spectrum' ? formatSpectrum : formatFloat) as (x: never) => string;
+    const deps = s.inputs.map((src) => mat.values[src]).filter((v) => isValueParam(v)).map((v) => (v as ValueParam<number>).param);
+    if (deps.length === 0) {
+        return { name: s.name, expr: fmt(s.fn(resolveDerivedInputs(mat, s.inputs)) as never) };
+    }
+    const uName = `u_${s.name}_${mat.id}`;
+    return {
+        name: s.name,
+        expr: uName,
+        uniform: {
+            name: uName,
+            type: s.glslType === 'Spectrum' ? 'vec3' : 'float',
+            parameterPath: deps[0], parameterPaths: deps,
+            default: s.fn(resolveDerivedInputs(mat, s.inputs)),
+            compute: (p) => s.fn(resolveDerivedInputs(mat, s.inputs, p)),
+        },
+    };
+}
+
+function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySchema[], derivedByMat: Map<number, DerivedExpr[]>): string {
     const lines: string[] = [];
     lines.push('// Generated material properties lookup — assignments follow the models\' schemas (§3.4):');
     lines.push('// a material sets exactly the fields its model reads, nothing else.');
@@ -277,6 +328,10 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
                 continue;
             }
             body.push(`${target} = ${emitValue(value, fmt)};`);
+        }
+        // DERIVED fields (D4): assigned after the rows they derive from.
+        for (const e of derivedByMat.get(mat.id) ?? []) {
+            body.push(`        props.${e.name} = ${e.expr};`);
         }
         if (body.length === 0) continue;   // 'none' / defaults-only materials earn no arm
         lines.push(`    ${arms === 0 ? 'if' : 'else if'} (id == ${mat.id}) {`);

@@ -6,13 +6,15 @@ import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTr
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
-import { LIGHT_KINDS } from '../../components/lights/index.js';
+import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
+import { AMBIENT_SPACES } from '../../components/ambient/index.js';
+import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { PRIMITIVES, resolveBackend, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
-import { validateSceneProperties } from './propertyValidation.js';
+import { validateSceneProperties, constraintViolation } from './propertyValidation.js';
 
 /** Minimum |edge1 × edge2| for quads (lights AND analytic objects) — near-zero areas make Inf pdfs. */
 const MIN_QUAD_AREA = 1e-8;
@@ -37,7 +39,7 @@ export function validate(
     strategy: RenderStrategy,
     bag: DiagnosticBag,
 ): void {
-    if (features.ambientSpace !== 'euclidean') {
+    if (AMBIENT_SPACES[features.ambientSpace] === undefined) {   // D3: registry-gated (the door)
         bag.error('invalid-setting', `Ambient space '${features.ambientSpace}' not yet supported`)
             .add();
     }
@@ -79,10 +81,13 @@ export function validate(
             continue;
         }
         // Authored-input schema (C7 parity with geometry): unknown keys warn (typo class),
-        // missing required / wrong shape error. Runs BEFORE the degeneracy rules so
+        // missing required / wrong shape error, then the row's declarative constraint
+        // (D1: the shared RowConstraint vocabulary). Runs BEFORE the coupled rules so
         // validateAuthored may assume well-shaped input (a missing edge used to throw a
-        // raw TypeError from inside the area formula).
-        const authored = light as unknown as Record<string, unknown>;
+        // raw TypeError from inside the area formula). Row DEFAULTS are applied first
+        // (the ONE framework application — the same record the Planner desugar sees),
+        // so constraints and coupled rules judge the value that will actually be used.
+        const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
         const known = new Set(['kind', 'emission', ...d.authoredParams.map((p) => p.name)]);
         for (const key of Object.keys(authored)) {
             if (!known.has(key)) {
@@ -109,6 +114,13 @@ export function validate(
                     `Light ${i} (${light.kind}): field '${p.name}' must be a ${p.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
                     .add();
                 shapesOk = false;
+                continue;
+            }
+            if (p.constraint !== undefined) {
+                const violation = constraintViolation(v as number | number[], p.constraint);
+                if (violation !== null) {
+                    bag.error('invalid-setting', `Light ${i} (${light.kind}): '${p.name}' ${violation}`).add();
+                }
             }
         }
         // emission (B2's universal radiometric word) — required, number|vec3, >= 0.
@@ -500,12 +512,51 @@ export function validate(
             .add();
     }
     const cameraType = strategy.measurement.camera.type;
-    if (CAMERA_MODELS[cameraType] === undefined) {
-        const registered = Object.keys(CAMERA_MODELS).filter((t) => CAMERA_MODELS[t as keyof typeof CAMERA_MODELS] !== undefined);
+    const cameraModelDesc = CAMERA_MODELS[cameraType];
+    if (cameraModelDesc === undefined) {
         bag.error('invalid-setting',
             `Camera type '${cameraType}' not yet supported — no occupant in the camera registry (reserved-not-removed)`)
-            .suggest(`Registered cameras: ${registered.join(', ')}`)
+            .suggest(`Registered cameras: ${Object.keys(CAMERA_MODELS).join(', ')}`)
             .add();
+    } else {
+        // The model's authored-field schema (D2): the validation the old typed union used
+        // to do at compile time, now registry-declared — unknown-key / required / shape /
+        // enum / constraint, the lights loop's grammar.
+        const authored = strategy.measurement.camera as unknown as Record<string, unknown>;
+        const rows = cameraModelDesc.authoredParams ?? [];
+        const known = new Set(['type', 'position', 'target', ...rows.map((r) => r.name)]);
+        for (const key of Object.keys(authored)) {
+            if (!known.has(key)) {
+                bag.warning('invalid-setting',
+                    `measurement.camera (${cameraType}): unknown field '${key}' is ignored (valid: ${[...known].join(', ')})`)
+                    .add();
+            }
+        }
+        for (const p of rows) {
+            const v = authored[p.name];
+            if (v === undefined) {
+                if (p.required) bag.error('invalid-setting', `measurement.camera (${cameraType}): required field '${p.name}' is missing`).add();
+                continue;
+            }
+            // 'value-number' unwraps a {param} spelling to its default for the checks below.
+            const numeric = p.shape === 'value-number' && isValueParam(v) ? (v as { default?: unknown }).default : v;
+            const shapeOk =
+                p.shape === 'enum' ? typeof v === 'string' && (p.values ?? []).includes(v)
+                : p.shape === 'vec3' ? isVec3(v)
+                : typeof numeric === 'number' && Number.isFinite(numeric);
+            if (!shapeOk) {
+                const want = p.shape === 'enum' ? `one of ${(p.values ?? []).join(' | ')}`
+                    : p.shape === 'vec3' ? 'a vec3 of finite numbers'
+                    : p.shape === 'value-number' ? 'a finite number (or a {param} with a finite default)'
+                    : 'a finite number';
+                bag.error('invalid-setting', `measurement.camera (${cameraType}): field '${p.name}' must be ${want}`).add();
+                continue;
+            }
+            if (p.constraint !== undefined && p.shape !== 'enum') {
+                const violation = constraintViolation(numeric as number | number[], p.constraint);
+                if (violation !== null) bag.error('invalid-setting', `measurement.camera (${cameraType}): '${p.name}' ${violation}`).add();
+            }
+        }
     }
     // Camera pose (CameraPose): authored defaults of the always-live
     // camera.position/camera.target parameters. The strategy is outside the scene
@@ -671,9 +722,7 @@ export function validate(
     }
 
     // Check for unsupported accumulation/tonemap types
-    if (strategy.estimator.accumulation.type !== 'average'
-        && strategy.estimator.accumulation.type !== 'variance'
-        && strategy.estimator.accumulation.type !== 'oneshot') {
+    if (ACCUMULATORS[strategy.estimator.accumulation.type] === undefined) {   // D3: registry-gated
         bag.error('invalid-setting',
             `Accumulation type '${strategy.estimator.accumulation.type}' not yet supported`)
             .add();
@@ -865,15 +914,10 @@ function validatePrimitiveConstraint(
     label: string,
     bag: DiagnosticBag,
 ): void {
-    const constraint = schema.constraint;
-    if (constraint === undefined) return;
-    if (constraint.kind === 'positive' && (value as number) <= 0) {
-        bag.error('invalid-setting', `${label} must be > 0`).add();
-    } else if (constraint.kind === 'positive-components' && (value as number[]).some((v) => v <= 0)) {
-        bag.error('invalid-setting', `${label} components must be > 0`).add();
-    } else if (constraint.kind === 'min-length' && Math.hypot(...value as number[]) < constraint.value) {
-        bag.error('invalid-setting', `${label} length must be >= ${constraint.value}`).add();
-    }
+    // The shared D1 interpreter — one message voice for every family's rows.
+    if (schema.constraint === undefined) return;
+    const violation = constraintViolation(value as number | number[], schema.constraint);
+    if (violation !== null) bag.error('invalid-setting', `${label} ${violation}`).add();
 }
 
 // ============================================================================

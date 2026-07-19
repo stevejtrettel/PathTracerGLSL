@@ -30,22 +30,25 @@ function fisheyeK(projection: string, fov: number): number {
 export const fisheyeDescriptor: CameraModelDescriptor = {
     type: 'fisheye',
     glsl: fisheyeGLSL,
-    origin: 'components/camera/fisheye/fisheye.glsl',
+    authoredParams: [
+        { name: 'fov', shape: 'number', required: true, constraint: { kind: 'positive' } },   // full angular field, radians
+        { name: 'projection', shape: 'enum', required: true, values: ['equidistant', 'equisolid', 'stereographic', 'orthographic'] },
+    ],
     controls(cam: CameraDesc): CameraControl[] {
         if (cam.type !== 'fisheye') throw new Error('fisheye descriptor got a non-fisheye camera');
         // Feeds u_fisheyeK only (not read raw) — the full angular field.
-        return [{ path: FOV_PATH, name: 'Fisheye FOV', default: cam.fov, range: [1.0, 2.0 * Math.PI] }];
+        return [{ path: FOV_PATH, name: 'Fisheye FOV', default: cam.fov as number, range: [1.0, 2.0 * Math.PI] }];
     },
     derived(cam: CameraDesc): CameraDerived[] {
         if (cam.type !== 'fisheye') throw new Error('fisheye descriptor got a non-fisheye camera');
-        const projection = cam.projection;
+        const projection = cam.projection as string;
         return [{
             uniform: 'u_fisheyeK', type: 'float', inputs: [FOV_PATH],
-            fn: (v) => fisheyeK(projection, (v[FOV_PATH] as number) ?? cam.fov),
+            fn: (v) => fisheyeK(projection, (v[FOV_PATH] as number) ?? (cam.fov as number)),
         }];
     },
     defines(cam: CameraDesc): Record<string, string> {
         if (cam.type !== 'fisheye') throw new Error('fisheye descriptor got a non-fisheye camera');
-        return { FISHEYE_THETA: `fisheye_theta_${cam.projection}` };
+        return { FISHEYE_THETA: `fisheye_theta_${cam.projection as string}` };
     },
 };

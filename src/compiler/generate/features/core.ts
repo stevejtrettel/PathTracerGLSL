@@ -4,8 +4,8 @@
 import type { RenderPlan } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { unionFields, buildPropertiesStruct } from '../schema.js';
-import { MATERIAL_MODELS } from '../../../components/materials/index.js';
-import { PHASE_MODELS } from '../../../components/volume_scattering/index.js';
+import { MATERIAL_MODELS, modelStructFields } from '../../../components/materials/index.js';
+import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { SAMPLERS } from '../../../components/sampler/index.js';
 import { SENSORS } from '../../../components/sensor/index.js';
 
@@ -14,7 +14,15 @@ import structsMediaGLSL from '../../../glsl/core/structs_media.glsl?raw';
 import interactionGLSL from '../../../glsl/core/interaction.glsl?raw';
 import mathGLSL from '../../../glsl/core/math.glsl?raw';
 import mathMediaGLSL from '../../../glsl/core/math_media.glsl?raw';
-import euclideanGLSL from '../../../components/ambient/euclidean/euclidean.glsl?raw';
+import { AMBIENT_SPACES } from '../../../components/ambient/index.js';
+
+/** The ambient occupant's block, from the registry (D3) — throws on an unregistered
+ *  type as an unreachable backstop (the Validator rejects upstream). */
+function ambientBlock(type: string): { origin: string; source: string } {
+    const d = AMBIENT_SPACES[type];
+    if (d === undefined) throw new Error(`ambient space '${type}' has no occupant (Validator should have rejected it)`);
+    return { origin: `components/ambient/${d.type}/${d.type}.glsl`, source: d.glsl };
+}
 import rayGLSL from '../../../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
 
@@ -28,7 +36,12 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     // models PRESENT. A Lambert-only program has no transmittance field; roughness
     // returns when GGX's schema declares it.
     const materialFields = unionFields(
-        plan.program.materials.models.map((m) => MATERIAL_MODELS[m]?.properties ?? []),
+        // Rows + DERIVED pseudo-rows (D4) — ONE list per model (modelStructFields), so
+        // the struct, the lookup defaults, and the resolver can never disagree.
+        plan.program.materials.models.map((m) => {
+            const d = MATERIAL_MODELS[m];
+            return d !== undefined ? modelStructFields(d) : [];
+        }),
     );
     blocks.push({ origin: 'generated:material-properties', source: buildPropertiesStruct('MaterialProperties', materialFields) });
 
@@ -39,7 +52,7 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         // it — an absorbing-only program has no phase fields at all). `model` (registry
         // index) drives the dispatch and exists only when scattering models are live.
         const models = plan.program.media.models;
-        const mediumFields = unionFields(models.map((m) => PHASE_MODELS[m]?.properties ?? []));
+        const mediumFields = unionFields(models.map((m) => VOLUME_SCATTERING_MODELS[m]?.properties ?? []));
         const extra = ['Spectrum sigma_a;   // absorption', 'Spectrum sigma_s;   // scattering'];
         // Emission ε joins the RTE core iff some medium emits (impl-plan-medium-emission;
         // the exact-linkage rule — the field, its accessor, and its readers co-exist).
@@ -64,7 +77,9 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         // accumulator main() multiplies into the traced radiance. Sole occupant — a strategy
         // knob arrives with the first real sensor (exposure/vignette/spectral).
         { origin: 'components/sensor/ideal/ideal.glsl', source: SENSORS.ideal.glsl },
-        { origin: 'components/ambient/euclidean/euclidean.glsl', source: euclideanGLSL },
+        // Ambient occupant from the registry (D3: the non-Euclidean door) — the plan's
+        // measurement.ambient decision picks it; origin derived from the key.
+        ambientBlock(plan.program.measurement.ambient),
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
 

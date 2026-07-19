@@ -13,8 +13,7 @@
 
 import type { SceneDescription, CompiledRenderer } from './types.js';
 import fullscreenVertGLSL from '../glsl/shared/fullscreen.vert.glsl?raw';
-import envChartEquirectGLSL from '../components/env/equirect/equirect.glsl?raw';
-import envChartOctahedralGLSL from '../components/env/octahedral/octahedral.glsl?raw';
+import { ENV_CHARTS } from '../components/env/index.js';
 
 export const DEFAULT_ENV_TABLE_SIZE: [number, number] = [512, 256];
 
@@ -53,7 +52,7 @@ export function compileEnvironmentBake(scene: SceneDescription, chart: 'equirect
         '    return vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);',
         '}',
         '',
-        chart === 'octahedral' ? envChartOctahedralGLSL : envChartEquirectGLSL,
+        ENV_CHARTS[chart].glsl,   // D3: from the chart registry
         '',
         '// gl_FragCoord centers at +0.5, so uv hits texel centers; readback row j then',
         '// corresponds to θ = π(j+½)/H — the exact convention the CPU CDF builder assumes.',

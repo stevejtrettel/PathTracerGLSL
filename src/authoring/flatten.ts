@@ -95,8 +95,13 @@ function walk(nodes: SceneNode[], parent: Similarity, path: string[], out: Objec
 
         const composed = similarityCompose(parent, similarityFromTransform(node.transform));
         out.push({
-            ...(node as ObjectDescription),            transform: transformFromSimilarity(composed),
-            name: node.name ?? [...path, `#${i}`].join('/'),
+            ...(node as ObjectDescription),
+            transform: transformFromSimilarity(composed),
+            // A leaf's name is a PATH SEGMENT like a group's (D5): two `ball` leaves in
+            // different groups flatten to distinct provenance paths — the old
+            // name-replaces-path rule collided them, caught only by the compiler's
+            // symbol-clobber guard with a worse message.
+            name: [...path, node.name ?? `#${i}`].join('/'),
         });
     });
 }

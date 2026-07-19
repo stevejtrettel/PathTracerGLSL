@@ -7,7 +7,7 @@
 
 import type { LightKindDescriptor } from '../../descriptors.js';
 import { quadCross, quadNormal } from '../../geometry/index.js';
-import { radiantScalar } from '../index.js';
+import { radiantScalar } from '../power.js';
 import lightQuadGLSL from './quad.glsl?raw';
 
 function quadArea(edge1: number[], edge2: number[]): number {
@@ -20,9 +20,9 @@ export const quadLightDescriptor: LightKindDescriptor = {
     delta: false,
     // Authored input (besides kind/emission) — same names as the registry rows for quad.
     authoredParams: [
-        { name: 'corner', shape: 'vec3', required: true },
-        { name: 'edge1', shape: 'vec3', required: true },
-        { name: 'edge2', shape: 'vec3', required: true },
+        { name: 'corner', shape: 'vec3', required: true, kind: 'point' },
+        { name: 'edge1', shape: 'vec3', required: true, kind: 'vector' },
+        { name: 'edge2', shape: 'vec3', required: true, kind: 'vector' },
     ],
     params: [
         { name: 'corner', shape: 'vec3', semantic: 'geometric', kind: 'point' },
@@ -33,7 +33,9 @@ export const quadLightDescriptor: LightKindDescriptor = {
     // QuadLight.normal + QuadLight.area — compile-time data (the one-sided pin).
     derivedFields: [
         { name: 'normal', kind: 'direction', shape: 'vec3' },
-        { name: 'area', kind: 'length', shape: 'number' },
+        // 'area' scales s², not s — the honest kind (D1; 'length' here would silently
+        // under-scale A the day light params take Value<T> transforms).
+        { name: 'area', kind: 'area', shape: 'number' },
     ],
     derivedCtorFields(v) {
         const e1 = v.edge1 as number[], e2 = v.edge2 as number[];

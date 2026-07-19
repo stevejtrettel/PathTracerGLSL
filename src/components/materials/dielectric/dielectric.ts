@@ -11,7 +11,7 @@ export const dielectricDescriptor: MaterialModelDescriptor = {
     // reason the region-table storage kind exists).
     properties: [
         { name: 'transmittance', glslType: 'Spectrum', semantic: 'radiometric', source: 'transmittance', default: 1, storage: 'field' },
-        { name: 'ior', glslType: 'float', semantic: 'geometric', source: 'ior', default: 1.5, storage: 'region-table', domain: 'positive' },
+        { name: 'ior', glslType: 'float', semantic: 'geometric', source: 'ior', default: 1.5, storage: 'region-table', constraint: { kind: 'positive' } },
     ],
     capabilities: {
         nonDeltaLobes: false,   // pure delta: eval ≡ 0, NEE skips (the generated guard)

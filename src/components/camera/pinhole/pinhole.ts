@@ -7,5 +7,7 @@ import pinholeGLSL from './pinhole.glsl?raw';
 export const pinholeDescriptor: CameraModelDescriptor = {
     type: 'pinhole',
     glsl: pinholeGLSL,
-    origin: 'components/camera/pinhole/pinhole.glsl',
+    authoredParams: [
+        { name: 'fov', shape: 'value-number', required: true, constraint: { kind: 'positive' } },
+    ],
 };

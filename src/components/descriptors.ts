@@ -14,6 +14,20 @@
 import type { MaterialModel, ValueParam } from '../compiler/types.js';
 import type { Similarity } from './geometry/similarity.js';
 
+/** THE one constraint vocabulary (descriptor-unification D1): a rule a machine can READ —
+ *  one checker, one error voice, one contract test, UI-consumable ranges. Shared by every
+ *  family's rows (primitives, material/phase properties, lights' authored params).
+ *  Shape-agnostic: scalar rules apply per-component to vec3/Spectrum values.
+ *    nonnegative — every component ≥ 0 (RTE coefficients, albedo)
+ *    positive    — every component > 0 (radii, half-sizes, ior)
+ *    min-length  — vec3 magnitude ≥ value (unit-normalizable directions)
+ *  Coupled rules (quad parallel-edges, spot falloffStart < angle) stay code — that is
+ *  what `validateAuthored` is FOR; a separable rule there is a smell. */
+export type RowConstraint =
+    | { kind: 'nonnegative' }
+    | { kind: 'positive' }
+    | { kind: 'min-length'; value: number };
+
 /** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
  *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —
  *  the caller substitutes via `resolveLightValues` first. */
@@ -33,9 +47,10 @@ export interface PropertySchema<TSource extends string = string> {
     glslType: 'float' | 'Spectrum';
     /** radiometric constants format via formatSpectrum (§2.5); geometric via formatFloat. */
     semantic: 'radiometric' | 'geometric';
-    /** Mathematical input domain required by the implementation. Omitted means the model
-     *  accepts the full numeric range; this is not a general artistic-policy clamp. */
-    domain?: 'nonnegative' | 'positive';
+    /** Mathematical input domain required by the implementation (the shared RowConstraint
+     *  vocabulary — D1). Omitted means the model accepts the full numeric range; this is
+     *  not a general artistic-policy clamp. */
+    constraint?: RowConstraint;
     /** Which resolved data field feeds it — ALSO the authored scene key the resolver
      *  reads (materials-§7 reorg: resolution derives from the row). */
     source: TSource;
@@ -49,6 +64,22 @@ export interface PropertySchema<TSource extends string = string> {
     storage: 'field' | 'region-table';
 }
 
+/** A DERIVED material property (D4 — the CameraDerived rail on the schema): a pure
+ *  function of this model's ROW values, computed HOST-SIDE — baked as a literal when
+ *  every input is constant, a compute-closure uniform when any input is driven (the
+ *  u_majorant pattern; `fn` runs for BOTH the plan-time bake and the per-frame value,
+ *  so the two can never drift). Lands in MaterialProperties as a struct field the
+ *  occupant reads (`mp.<name>`) — GLSL never recomputes a pure function of its own
+ *  rows per evaluation (ggx's alpha = max(1e-3, roughness²) is the first occupant). */
+export interface MaterialDerivedSpec {
+    name: string;
+    glslType: 'float' | 'Spectrum';
+    /** Row SOURCE names this value depends on. */
+    inputs: string[];
+    /** Pure derivation over resolved input values ({param} rows substituted live). */
+    fn(resolved: Record<string, number | number[]>): number | number[];
+}
+
 /** A surface material model: one GLSL file + these facts (contracts §3.2/§3.3). */
 export interface MaterialModelDescriptor {
     id: MaterialModel;
@@ -57,6 +88,8 @@ export interface MaterialModelDescriptor {
     glsl: string;
     /** Fields this model READS → scene-scoped struct + resolver (§3.4, R2). */
     properties: PropertySchema[];
+    /** DERIVED fields (D4) — join the struct union like rows; never authored. */
+    derived?: MaterialDerivedSpec[];
     capabilities: {
         /** Has lobes NEE can sample (false = pure delta: eval ≡ 0, shadow rays wasted).
          *  Feeds material_has_nondelta_lobes directly. (Polarity flipped vs
@@ -68,6 +101,26 @@ export interface MaterialModelDescriptor {
          *  whether a given MATERIAL emits stays a per-value analysis. */
         emissive: boolean;
     };
+}
+
+/** One row of a light kind's AUTHORED input schema (D1: the geometry row grammar,
+ *  ported). REQUIRED XOR DEFAULT (contract-test-enforced — the geometry discipline):
+ *  defaults live HERE, applied ONCE by the framework (`applyAuthoredDefaults`) before
+ *  validation and desugar, so `toValues`/`region.parameters` read plain values — the
+ *  disk normal's two-site `?? DEFAULT` class is structurally dead. A default that is
+ *  COMPUTED from other fields (spot's falloffStart = 0.8·angle) is not a row default —
+ *  it stays in `toValues`, and the row stays optional without one. */
+export interface AuthoredParamSpec {
+    name: string;
+    shape: 'number' | 'vec3';
+    required: boolean;
+    /** Only on non-required rows (required XOR default). */
+    default?: number | number[];
+    /** Transformation semantics (the geometry table) — declared now for uniformity and
+     *  the future Value<T>-light-params batch; not yet fold-consumed on this surface. */
+    kind?: ParamKind;
+    /** Separable domain rule, machine-readable (D1). */
+    constraint?: RowConstraint;
 }
 
 /** One row of a light kind's parameter schema (struct-alignment batch): struct field
@@ -132,11 +185,11 @@ export interface LightKindDescriptor {
      *  word — validated generically, never listed here). The authored language may
      *  differ from the registry rows (sphere: authored `position` → row `center`), which
      *  is exactly why this second list exists. The Validator's generic loop enforces
-     *  unknown-key/required/shape from it and runs `validateAuthored` ONLY when shapes
-     *  pass — degeneracy rules may assume well-shaped input. The desugar-totality
+     *  unknown-key/required/shape/constraint from it and runs `validateAuthored` ONLY
+     *  when shapes pass — coupled rules may assume well-shaped input. The desugar-totality
      *  contract test keeps this list and toValues/region.parameters honest in BOTH
      *  directions (declared-but-unread and read-but-undeclared both fail vitest). */
-    authoredParams: { name: string; shape: 'number' | 'vec3'; required: boolean }[];
+    authoredParams: AuthoredParamSpec[];
     /** DESUGAR FACTS (A3 — the lights door): how an AUTHORED light of this kind
      *  lowers. `toValues` builds the registry values from the authored fields + the
      *  precomputed radiometric product (color·intensity). Hittable kinds declare
@@ -168,7 +221,7 @@ export interface LightKindDescriptor {
 
 /** A phase model: one GLSL file declaring into MediumProperties (§3.5) — the same
  *  schema machinery, second struct family. */
-export interface PhaseModelDescriptor {
+export interface VolumeScatteringModelDescriptor {
     id: string;
     /** ?raw source providing <id>_eval / <id>_sample / <id>_pdf (LOBE_MEDIUM). */
     glsl: string;
@@ -190,9 +243,11 @@ export type PrimitiveValues = Record<string, number | number[]>;
  *    point → g·p (rotate, scale, translate)   vector → sR·v (no translation)
  *    direction → R·d (rotation only)          length → s·ℓ (scale only; number or vec3)
  *    angle → θ (INVARIANT — cone half-angles/cosines; a similarity changes no angle)
+ *    area → s²·A (a derived surface measure — the quad/disk lights' A; kinding it
+ *           'length' would silently under-scale it the day light params take Value<T>)
  *  Driven ×s scaling derives from the same table: every kind scales except
- *  direction and angle (the invariant kinds). */
-export type ParamKind = 'point' | 'vector' | 'direction' | 'length' | 'angle';
+ *  direction and angle (the invariant kinds); area scales ×s². */
+export type ParamKind = 'point' | 'vector' | 'direction' | 'length' | 'angle' | 'area';
 
 /** One row of a primitive's parameter schema. ROW ORDER = GLSL SIGNATURE ORDER
  *  (the derived call emitters splice arguments positionally — checked by the
@@ -212,11 +267,9 @@ export interface PrimitiveParamSpec {
     /** Generator default, baked when the author omits the param (moved here from
      *  the old inline `?? …` arms — owner-approved). Only on non-required rows. */
     default?: number | number[];
-    /** Mathematical domain required by the implementation (Validator-interpreted). */
-    constraint?:
-        | { kind: 'positive' }
-        | { kind: 'positive-components' }
-        | { kind: 'min-length'; value: number };
+    /** Mathematical domain required by the implementation (the shared RowConstraint
+     *  vocabulary — D1; Validator-interpreted, shape-agnostic). */
+    constraint?: RowConstraint;
 }
 
 /** Call-site context for emitted per-primitive expressions: the query/hit point

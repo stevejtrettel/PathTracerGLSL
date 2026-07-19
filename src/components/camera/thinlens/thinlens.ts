@@ -10,13 +10,17 @@ import thinlensGLSL from './thinlens.glsl?raw';
 export const thinlensDescriptor: CameraModelDescriptor = {
     type: 'thinlens',
     glsl: thinlensGLSL,
-    origin: 'components/camera/thinlens/thinlens.glsl',
+    authoredParams: [
+        { name: 'fov', shape: 'value-number', required: true, constraint: { kind: 'positive' } },
+        { name: 'aperture', shape: 'number', required: true, constraint: { kind: 'nonnegative' } },   // 0 ≡ pinhole (the witness anchor)
+        { name: 'focusDistance', shape: 'number', required: true, constraint: { kind: 'positive' } },
+    ],
     controls(cam: CameraDesc): CameraControl[] {
         if (cam.type !== 'thinlens') throw new Error('thinlens descriptor got a non-thinlens camera');
         // Both read RAW by the shader (pass-through) — no derivation.
         return [
-            { path: 'camera.aperture', uniform: 'u_aperture', name: 'Aperture', default: cam.aperture, range: [0, 1] },
-            { path: 'camera.focusDistance', uniform: 'u_focusDistance', name: 'Focus Distance', default: cam.focusDistance, range: [0.1, 50] },
+            { path: 'camera.aperture', uniform: 'u_aperture', name: 'Aperture', default: cam.aperture as number, range: [0, 1] },
+            { path: 'camera.focusDistance', uniform: 'u_focusDistance', name: 'Focus Distance', default: cam.focusDistance as number, range: [0.1, 50] },
         ];
     },
 };

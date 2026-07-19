@@ -8,5 +8,4 @@ import equirectGLSL from './equirect.glsl?raw';
 export const equirectDescriptor: CameraModelDescriptor = {
     type: 'equirect',
     glsl: equirectGLSL,
-    origin: 'components/camera/equirect/equirect.glsl',
 };

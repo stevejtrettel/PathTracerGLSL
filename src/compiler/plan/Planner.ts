@@ -4,9 +4,9 @@ import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription
 import { isGlslExpression, isValueParam, mediumRoutesToTracking, mediumMayScatter } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
-import { LIGHT_KINDS } from '../../components/lights/index.js';
+import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
-import { PHASE_MODELS } from '../../components/volume_scattering/index.js';
+import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
 import { PRIMITIVES, primitive, canonicalizePrimitiveParameters, foldAnalyticParameters, resolveBackend } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
@@ -131,7 +131,9 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         const e = light.emission;
         const product: Vec3 | ValueParam<number> | ValueParam<Vec3> =
             isValueParam(e) ? e : (typeof e === 'number' ? [e, e, e] : e);
-        const authored = light as unknown as Record<string, unknown>;
+        // Row defaults applied ONCE by the framework (D1) — the same record the
+        // Validator judged; toValues/region.parameters read plain values.
+        const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
         if (d.region === undefined) {
             lights.push({ id: lightIndex++, kind: light.kind, values: d.toValues(authored, product) });
             continue;
@@ -276,6 +278,9 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // (reject-not-remove), so the Planner never coerces — CameraDesc mirrors the
             // strategy's CameraDescription exactly.
             camera: strategy.measurement.camera,
+            // Ambient space rides the SCENE (the geometry-of-space is part of the
+            // integral's domain); non-registry types are Validator-rejected upstream.
+            ambient: scene.ambientSpace?.type ?? 'euclidean',
             response: strategy.measurement.response ?? 'radiance',
             maxBounces: strategy.measurement.maxBounces,
             scattering,
@@ -339,7 +344,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // generated interaction_medium_* dispatch. Only meaningful when scattering is
             // live (the phase is invoked only at scatter events); [] otherwise.
             models: scatteringArms
-                ? Object.keys(PHASE_MODELS).filter((k) =>
+                ? Object.keys(VOLUME_SCATTERING_MODELS).filter((k) =>
                     Object.values(scene.materials).some((m) => m.medium !== undefined && (m.medium.model ?? 'hg') === k))
                 : [],
         },
@@ -609,7 +614,7 @@ export function resolveMaterialValues(
 function resolveMedium(med: MediumDescription): PlannedMedium {
     const model = med.model ?? 'hg';
     const values: PlannedMedium['values'] = {};
-    for (const row of PHASE_MODELS[model]?.properties ?? []) {
+    for (const row of VOLUME_SCATTERING_MODELS[model]?.properties ?? []) {
         values[row.source] = resolveScalarProperty(
             (med as unknown as Record<string, MaterialProperty | undefined>)[row.source], row.default);
     }

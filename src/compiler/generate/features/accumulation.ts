@@ -1,25 +1,29 @@
 // compiler/generate/features/accumulation.ts
-// Progressive accumulation: the main() that averages samples, + its uniforms.
+// Progressive accumulation: the main() that folds samples in, + its uniforms.
+// D3: fully registry-driven — the occupant, its origin, and its ping-pong input
+// declarations all derive from ACCUMULATORS facts (the type→path if-chain is dead).
 
-import type { RenderPlan, ProgramDescription } from '../../plan/types.js';
+import type { RenderPlan } from '../../plan/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-
-import mainAccumulateGLSL from '../../../components/accumulator/average/average.glsl?raw';
-import mainVarianceGLSL from '../../../components/accumulator/variance/variance.glsl?raw';
-import mainOneshotGLSL from '../../../components/accumulator/oneshot/oneshot.glsl?raw';
+import { ACCUMULATORS } from '../../../components/accumulator/index.js';
 
 export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
-    const program = plan.program;
-    const type = program.estimator.accumulation.type;
+    const type = plan.program.estimator.accumulation.type;
+    const d = ACCUMULATORS[type];
+    if (d === undefined) {
+        // Backstop — the Validator gates the type against the same registry.
+        bag.error('invalid-setting', `Accumulation type '${type}' not yet supported`).add();
+        return { ...emptyContribution('accumulation'), blocks: [{ origin: `generated:main-${type}`, source: '// unsupported accumulation' }] };
+    }
 
     // The occupant's ping-pong inputs, declared HERE because the occupant reads them
-    // (exact linkage): average/variance read u_previous (variance also the second
-    // moment, bound as pathtracer pass input 'accumulation_previous:1'); oneshot reads
-    // neither and declares neither — its programs carry no dead sampler.
+    // (exact linkage, from the registry FACTS): oneshot reads neither and declares
+    // neither — its programs carry no dead sampler. The moment texture binds as the
+    // pathtracer pass input 'accumulation_previous:1'.
     const inputDecls: string[] = [];
-    if (type !== 'oneshot') inputDecls.push('uniform sampler2D u_previous;');
-    if (type === 'variance') inputDecls.push('uniform sampler2D u_previousMoment;');
+    if (d.readsPrevious) inputDecls.push('uniform sampler2D u_previous;');
+    if (d.readsMoment) inputDecls.push('uniform sampler2D u_previousMoment;');
 
     return {
         ...emptyContribution('accumulation'),
@@ -27,7 +31,7 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
             ...(inputDecls.length
                 ? [{ origin: 'generated:accumulation-inputs', source: inputDecls.join('\n') }]
                 : []),
-            { origin: accumulationOrigin(program), source: buildAccumulationSource(program, bag) },
+            { origin: `components/accumulator/${d.type}/${d.type}.glsl`, source: d.glsl },
         ],
         // Engine builtins declared where READ (the core.ts discipline).
         uniforms: [
@@ -36,21 +40,4 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
         ],
         requires: ['pixel_sample', 'camera_generateRay', 'transport_trace'],
     };
-}
-
-function accumulationOrigin(program: ProgramDescription): string {
-    const type = program.estimator.accumulation.type;
-    if (type === 'average') return 'components/accumulator/average/average.glsl';
-    if (type === 'variance') return 'components/accumulator/variance/variance.glsl';
-    if (type === 'oneshot') return 'components/accumulator/oneshot/oneshot.glsl';
-    return `generated:main-${type}`;
-}
-
-function buildAccumulationSource(program: ProgramDescription, bag: DiagnosticBag): string {
-    const type = program.estimator.accumulation.type;
-    if (type === 'average') return mainAccumulateGLSL;
-    if (type === 'variance') return mainVarianceGLSL;
-    if (type === 'oneshot') return mainOneshotGLSL;
-    bag.error('invalid-setting', `Accumulation type '${(program.estimator.accumulation as any).type}' not yet supported`).add();
-    return '// unsupported accumulation';
 }

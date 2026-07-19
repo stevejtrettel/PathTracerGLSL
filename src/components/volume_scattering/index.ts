@@ -1,17 +1,19 @@
-// Phase-model registry (mix-many family, module-anatomy §5). One occupant today (HG is
-// v1's sole phase function — every medium's phase_g feeds it); Mie/Rayleigh arrive as
+// Volume-scattering model registry (mix-many family, module-anatomy §5) — the phase
+// functions media dispatch over (hg, rayleigh; Mie is the known next occupant). ONE
+// family vocabulary (D5, owner-decided): folder, type, and registry all say
+// volume_scattering; `phase_g`-style ROW names keep the physics word. Adding a model =
 // one GLSL file + one descriptor + one line here.
 
-import type { PhaseModelDescriptor } from '../descriptors.js';
+import type { VolumeScatteringModelDescriptor } from '../descriptors.js';
 import { hgDescriptor } from './hg/hg.js';
 import { rayleighDescriptor } from './rayleigh/rayleigh.js';
 
-export const PHASE_MODELS: Record<string, PhaseModelDescriptor> = {
+export const VOLUME_SCATTERING_MODELS: Record<string, VolumeScatteringModelDescriptor> = {
     hg: hgDescriptor,
     rayleigh: rayleighDescriptor,
 };
 
 /** True iff the volume scattering model has a live occupant — the Validator's gate. */
 export function isMediumModelSupported(id: string): boolean {
-    return PHASE_MODELS[id] !== undefined;
+    return VOLUME_SCATTERING_MODELS[id] !== undefined;
 }

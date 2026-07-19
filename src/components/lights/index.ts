@@ -19,10 +19,22 @@ export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     spot: spotLightDescriptor,
 };
 
-/** Mean channel of a precomputed radiometric product (intensity or Le) — the scalar
- *  the pbrt power formulas weight by. Shared by every kind's `power` (§2.5 note: a
- *  CPU-side selection heuristic, not a radiometric reduction in GLSL —
- *  spectrum_average's discipline doesn't apply here). */
-export function radiantScalar(product: number[]): number {
-    return (product[0] + product[1] + product[2]) / 3;
+// radiantScalar lives in power.ts (D5: family-root shared part — occupants import it
+// there, killing the registry↔occupant ESM cycle); re-exported for external callers.
+export { radiantScalar } from './power.js';
+
+/** Apply the kind's authored-row defaults ONCE (D1: defaults-in-rows — the framework
+ *  step every consumer goes through, so `toValues`/`region.parameters`/`validateAuthored`
+ *  read plain values and can never disagree about a default). Returns a new record;
+ *  authored values win. Computed defaults (spot's falloffStart = 0.8·angle) are NOT
+ *  row defaults and remain the descriptor's own business. */
+export function applyAuthoredDefaults(
+    d: LightKindDescriptor,
+    authored: Record<string, unknown>,
+): Record<string, unknown> {
+    const out = { ...authored };
+    for (const p of d.authoredParams) {
+        if (out[p.name] === undefined && p.default !== undefined) out[p.name] = p.default;
+    }
+    return out;
 }

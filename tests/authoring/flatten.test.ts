@@ -84,8 +84,10 @@ describe('flattenGroups (fable-transforms §4)', () => {
                 group({ children: [sphere()] }),           // unnamed group, unnamed leaf
             ] }),
         ]);
-        // A leaf's own authored name always wins; the path fills absence only.
-        expect(out.map((o) => o.name)).toEqual(['first', 'top', 'table/#1/#0']);
+        // D5: a leaf's authored name is a PATH SEGMENT like a group's — two 'ball'
+        // leaves in different groups flatten to distinct provenance paths (the old
+        // name-replaces-path rule collided them). Root-level leaves keep bare names.
+        expect(out.map((o) => o.name)).toEqual(['first', 'table/top', 'table/#1/#0']);
     });
 
     it('an aliased node under two parents becomes two independent leaves', () => {

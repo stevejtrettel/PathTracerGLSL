@@ -8,20 +8,20 @@
 
 import type { LightKindDescriptor } from '../../descriptors.js';
 import { unitVec3 } from '../../geometry/index.js';
-import { radiantScalar } from '../index.js';
+import { radiantScalar } from '../power.js';
 import lightDiskGLSL from './disk.glsl?raw';
-
-const DEFAULT_NORMAL: [number, number, number] = [0, 1, 0];
 
 export const diskLightDescriptor: LightKindDescriptor = {
     kind: 'disk',
     glsl: lightDiskGLSL,
     delta: false,
     // Authored input (besides kind/emission): position → row `center`; optional normal.
+    // The normal's default lives ON THE ROW (D1) — applied once by the framework, so
+    // toValues and region.parameters below read a plain value and cannot disagree.
     authoredParams: [
-        { name: 'position', shape: 'vec3', required: true },
-        { name: 'radius', shape: 'number', required: true },
-        { name: 'normal', shape: 'vec3', required: false },
+        { name: 'position', shape: 'vec3', required: true, kind: 'point' },
+        { name: 'radius', shape: 'number', required: true, kind: 'length', constraint: { kind: 'positive' } },
+        { name: 'normal', shape: 'vec3', required: false, kind: 'direction', default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
     ],
     params: [
         { name: 'center', shape: 'vec3', semantic: 'geometric', kind: 'point' },
@@ -41,7 +41,7 @@ export const diskLightDescriptor: LightKindDescriptor = {
     toValues: (a, product) => ({
         center: a.position as number[],
         radius: a.radius as number,
-        normal: unitVec3((a.normal as number[] | undefined) ?? DEFAULT_NORMAL),
+        normal: unitVec3(a.normal as number[]),   // row default pre-applied (D1)
         radiance: product,
     }),
     region: {
@@ -49,17 +49,9 @@ export const diskLightDescriptor: LightKindDescriptor = {
         parameters: (a) => ({
             center: a.position as number[],
             radius: a.radius as number,
-            normal: (a.normal as number[] | undefined) ?? DEFAULT_NORMAL,
+            normal: a.normal as number[],         // row default pre-applied (D1)
         }),
     },
     valuesFromRegion: (p, Le) => ({ center: p.center, radius: p.radius, normal: p.normal, radiance: Le }),
-    validateAuthored(a) {
-        const msgs: string[] = [];
-        if ((a.radius as number) <= 0) msgs.push('disk light radius must be > 0');
-        const n = a.normal as number[] | undefined;
-        if (n !== undefined && Math.hypot(n[0], n[1], n[2]) < 1e-8) {
-            msgs.push('disk light normal must be a nonzero vector');
-        }
-        return msgs;
-    },
+    // No validateAuthored: every rule is separable and lives on the rows (D1).
 };

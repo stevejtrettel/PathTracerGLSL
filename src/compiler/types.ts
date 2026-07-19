@@ -335,79 +335,25 @@ export interface MaterialDescription {
 // (The ENVIRONMENT's `intensity` is different — a LIVE runtime multiplier slider,
 // not authored factoring — and deliberately survives.)
 
-export type LightDescription = PointLight | DirectionalLight | QuadLight | SphereLight | DiskLight | SpotLight;
+/** An authored light — the OPEN door (D2, the B1 treatment; materials' precedent).
+ *  `kind` is a LIGHT_KINDS registry key; the legal fields beyond `kind`/`emission` are
+ *  exactly the kind descriptor's `authoredParams` rows (Validator-enforced: unknown-key /
+ *  required / shape / constraint, with row defaults framework-applied). The per-kind
+ *  field documentation lives ON the descriptors, next to the math that reads it.
+ *  ('directional' remains reserved vocabulary — rejected with its own message.) */
+export interface LightDescription {
+    kind: string;
+    /** ONE radiometric word (B2): Le for area kinds, radiant intensity (W/sr) for delta
+     *  kinds; scalar broadcasts. Constant Spectrum or (driven-lights Stage A) a `{param}`
+     *  slider — for hittable kinds the SAME uniform the desugared region's material
+     *  emission reads. Geometry rows stay constant in v1. */
+    emission: LightEmission;
+    [key: string]: unknown;
+}
 
-/** Authored light radiance/intensity: a constant Spectrum (scalar broadcasts) OR, driven-
- *  lights Stage A, a `{param}` slider. It IS a SpectrumValue — the Model B split surface for a
- *  radiometric value read at a point (for hittable kinds, the SAME uniform the desugared
- *  region's material emission reads). Geometry rows stay constant in v1. */
+/** Authored light radiance/intensity — the Model B split surface for a radiometric
+ *  value read at a point. */
 export type LightEmission = SpectrumValue;
-
-export interface PointLight {
-    kind: 'point';
-    position: Vec3;
-    /** Radiant intensity I (W/sr); scalar broadcasts. */
-    emission: LightEmission;
-}
-
-export interface DirectionalLight {
-    kind: 'directional';
-    direction: Vec3;
-    emission: LightEmission;
-}
-
-/**
- * Rectangular area light (§6.2): DESUGARS to a synthesized emissive quad region — hittable,
- * visible in reflections, samplable via the registry. ONE-SIDED: emits from the
- * `cross(edge1, edge2)` side (impl-plan-area-lights pinned deviation). `emission` is the
- * emitted radiance Le (no falloff — the falloff IS the solid-angle measure, §6.1).
- */
-export interface QuadLight {
-    kind: 'quad';
-    corner: Vec3;
-    edge1: Vec3;
-    edge2: Vec3;
-    /** Emitted radiance Le; scalar broadcasts. */
-    emission: LightEmission;
-}
-
-/** Spherical area light (§6.2): desugars like the quad; sampled via the visible cone. */
-export interface SphereLight {
-    kind: 'sphere';
-    position: Vec3;
-    radius: number;
-    /** Emitted radiance Le; scalar broadcasts. */
-    emission: LightEmission;
-}
-
-/** Spot light: DELTA with a smooth cone falloff (pbrt-v4 SpotLight's smoothstep).
- *  Anisotropic — excluded from equiangular v1 (the Validator explains). */
-export interface SpotLight {
-    kind: 'spot';
-    position: Vec3;
-    /** Aim direction (need not be unit — normalized at plan time). */
-    direction: Vec3;
-    /** Outer cone HALF-angle, radians — zero intensity outside. */
-    angle: number;
-    /** Inner half-angle where the smooth band begins; default 0.8·angle. Must be
-     *  strictly < angle (a hard edge is smoothstep-undefined). */
-    falloffStart?: number;
-    /** On-axis radiant intensity I (W/sr); scalar broadcasts. */
-    emission: LightEmission;
-}
-
-/** Circular area light (§6.2): desugars to a backing disk region; ONE-SIDED, emits
- *  from the +normal side; concentric uniform-area sampling. */
-export interface DiskLight {
-    kind: 'disk';
-    position: Vec3;
-    radius: number;
-    /** Emitting-side normal (need not be unit — normalized at plan time through the
-     *  shared unitVec3, bit-identical with the backing region's). Default [0,1,0]. */
-    normal?: Vec3;
-    /** Emitted radiance Le; scalar broadcasts. */
-    emission: LightEmission;
-}
 
 // ============================================================================
 // Render Strategy
@@ -537,31 +483,24 @@ export interface CameraPose {
     target?: Vec3;
 }
 
-export type CameraDescription = CameraPose & (
-    | { type: 'pinhole'; fov: Value<number> }
-    | { type: 'thinlens'; fov: Value<number>; aperture: number; focusDistance: number }
-    | { type: 'equirect' }
-    | { type: 'orthographic'; scale: number }
-    | { type: 'fisheye'; projection: FisheyeProjection; fov: number }   // fov = full angular field (radians)
-    | { type: 'cylindrical'; hfov: number }                             // panorama: horizontal sweep (DEGREES); vertical follows the window (square pixels)
-);
+/** An authored camera — the OPEN door (D2): `type` is a CAMERA_MODELS registry key; the
+ *  legal model fields are the descriptor's `authoredParams` rows (Validator-enforced).
+ *  Numeric fields are PLAIN numbers — every camera control is always live (the
+ *  instrument principle) — EXCEPT the perspective `fov`, whose `Value<number>` spelling
+ *  is load-bearing: a `{param}` fov carries the slider's path and range (scenes use it).
+ *  Per-model field docs live on the descriptors. */
+export type CameraDescription = CameraPose & {
+    type: string;
+    [key: string]: unknown;
+};
 
-export type CameraType = CameraDescription['type'];
+/** Accumulation — OPEN (D2): `type` is an accumulator registry key ('average' /
+ *  'variance' / 'oneshot'; 'exponential' reserved-rejected). */
+export type AccumulationDescription = { type: string; [key: string]: unknown };
 
-export type AccumulationDescription =
-    | { type: 'average' }
-    | { type: 'oneshot' }   // no accumulation — each frame shows the current sample (live preview / single-frame)
-    | { type: 'exponential'; alpha: number }
-    | { type: 'variance' };
-
-export type DisplayDescription =
-    | { type: 'reinhard'; exposure?: number }
-    | { type: 'aces'; exposure?: number }
-    | { type: 'agx'; exposure?: number }
-    | { type: 'khronos'; exposure?: number }
-    | { type: 'hable'; exposure?: number }
-    | { type: 'gt'; exposure?: number }
-    | { type: 'none' };
+/** Tonemap — OPEN (D2): `type` is a TONEMAP_MODELS registry key; `exposure` is the
+ *  shared display-glue control every curve honors. */
+export type DisplayDescription = { type: string; exposure?: number; [key: string]: unknown };
 
 /**
  * GLSL shader program (vertex + fragment)

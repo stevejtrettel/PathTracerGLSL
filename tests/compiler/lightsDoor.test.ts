@@ -38,9 +38,11 @@ afterAll(() => {
     delete LIGHT_KINDS['doortest'];
 });
 
-const doortestLight = {
+// D2: the door is open at the TYPE level too — a registry-only kind authors as a plain
+// literal, no cast (the cast's disappearance is the proof the union is dead).
+const doortestLight: LightDescription = {
     kind: 'doortest', corner: [-0.5, 3.98, -0.5], edge1: [1, 0, 0], edge2: [0, 0, 1], emission: 12,
-} as unknown as LightDescription;
+};
 
 // Deliberately lambert-free: ggx floor + walls. The ONLY route for lambert into the
 // program is the desugared __light_0 backing material.

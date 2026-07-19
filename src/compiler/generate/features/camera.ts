@@ -105,7 +105,9 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     const contribution: FeatureContribution = {
         ...emptyContribution('camera'),
         provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 film, vec2 xiLens)' }],
-        blocks: [{ origin: model.origin, source: model.glsl }],
+        // Origin DERIVED from the registry key (D2: the materials way — the path
+        // convention is the one truth; no hand-written origin to drift).
+        blocks: [{ origin: `components/camera/${model.type}/${model.type}.glsl`, source: model.glsl }],
         uniforms: [
             { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: pose.position },
             basisUniform('u_cameraForward', (b) => b.forward),
@@ -137,7 +139,7 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     // Shared perspective fov: control (camera.fov slider) + u_tanFov derived. Minted in this
     // order so u_tanFov precedes any model pass-through control uniforms (aperture/focus).
     if (cam.type === 'pinhole' || cam.type === 'thinlens') {
-        const { control, tanFov } = perspectiveFov(cam.fov);
+        const { control, tanFov } = perspectiveFov(cam.fov as Value<number>);   // D2: open record; fov keeps the Value<> spelling (slider range)
         mintControl(control, contribution.uniforms, contribution.parameters);
         resolvedDefaults[control.path] = control.default;
         mintDerived(tanFov, resolvedDefaults, contribution.uniforms);
