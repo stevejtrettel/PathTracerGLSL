@@ -33,8 +33,10 @@ import {
 } from '../../../components/geometry/similarity.js';
 
 import raymarchGLSL from '../../../components/intersection/raymarch/raymarch.glsl?raw';
+import bvhCommonGLSL from '../../../components/intersection/bvh_common.glsl?raw';
 import meshGLSL from '../../../components/intersection/mesh/mesh.glsl?raw';
 import { MESH_TEX_WIDTH, meshExternNames } from '../../../components/intersection/mesh/mesh.js';
+import { BVH_STACK_DEPTH } from '../../../components/intersection/mesh/bvh.js';
 import { instanceExternNames } from '../../../components/intersection/instancing/instancing.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 import { structFromRows } from '../schema.js';
@@ -46,12 +48,11 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     if (!hasSDF && !hasAnalytic && !hasMesh && !hasInstanced) {
         return emptyContribution('intersection');
     }
-    // mesh.glsl (the triangle leaf + the shared data-texture helper mesh_texel1d + MESH_TEX_WIDTH)
-    // is needed by regular meshes, by instanced MESH prototypes (mesh_nearest_bvh on the shared
-    // BLAS), AND by EVERY instance batch — the placement-texture read uses mesh_texel1d. So any
-    // instancing pulls it wholesale (dead triangle code for analytic-only instancing is the
-    // declared cost, like sdf_intersect_any riding inside raymarch.glsl).
-    const needMeshGlsl = hasMesh || hasInstanced;
+    // bvh_common.glsl (bvh_texel1d/bvh_aabb_hit/BVH_STACK_DEPTH) is needed by any BVH walk — the
+    // mesh BLAS AND every instance TLAS (analytic-only included: placement reads use bvh_texel1d).
+    // The triangle LEAF (mesh.glsl) is needed only for actual triangle geometry.
+    const needBvhCommon = hasMesh || hasInstanced;
+    const needMeshLeaf = hasMesh || plan.instanceBatches.some((b) => b.prototype.backend === 'mesh');
     const ids = objectGlslIds(plan.objects, plan.analyticObjects);
     const blocks: ShaderBlock[] = [];
     const defines: FeatureContribution['defines'] = {};
@@ -125,15 +126,18 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects, anyQuery, ids) });
     }
 
-    // Mesh backend (impl-plan-meshes): the wholesale triangle leaf (mesh.glsl) + generated
-    // per-mesh wrappers that conjugate the world ray into each mesh's LOCAL frame (ray-into-
-    // local; vertices stay object-local). The vertex/triangle DATA arrives as extern data
-    // textures (RGBA32F, incl. the index texture — indices ≤ 16M are exact in f32) the app
-    // uploads; the loop bound (triCount) is baked (the compiler has the mesh data). v0 is a
-    // brute-force scan — the leaf is BVH-ready (the BVH wraps a node walk around it, v1).
-    // The triangle leaf is included ONCE, shared by regular meshes and instanced-mesh batches.
-    if (needMeshGlsl) {
+    // Shared BVH support (bvh_common.glsl: bvh_texel1d, bvh_aabb_hit, BVH_STACK_DEPTH) — needed by
+    // ANY BVH walk: the mesh BLAS AND every instance TLAS (incl. analytic-only, whose placement
+    // reads use bvh_texel1d). Included once, before the triangle leaf + the dispatch blocks that
+    // call it. The triangle LEAF (mesh.glsl) is pulled ONLY when real triangle geometry exists
+    // (a mesh object or a mesh-prototype instance) — so an analytic-only instanced scene no longer
+    // drags dead triangle code (impl-plan-tlas cleanup).
+    if (needBvhCommon) {
         defines.MESH_TEX_WIDTH = String(MESH_TEX_WIDTH);
+        defines.BVH_STACK_DEPTH = String(BVH_STACK_DEPTH);
+        blocks.push({ origin: 'components/intersection/bvh_common.glsl', source: bvhCommonGLSL });
+    }
+    if (needMeshLeaf) {
         blocks.push({ origin: 'components/intersection/mesh/mesh.glsl', source: meshGLSL });
     }
 
@@ -610,8 +614,8 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
 function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean): string[] {
     const o = b.ordinal;
     const read = [
-        `                vec4 q  = texelFetch(u_inst_${o}_placements, mesh_texel1d(uint(2 * i)), 0);`,
-        `                vec4 ts = texelFetch(u_inst_${o}_placements, mesh_texel1d(uint(2 * i + 1)), 0);`,
+        `                vec4 q  = texelFetch(u_inst_${o}_placements, bvh_texel1d(uint(2 * i)), 0);`,
+        `                vec4 ts = texelFetch(u_inst_${o}_placements, bvh_texel1d(uint(2 * i + 1)), 0);`,
         `                float s = placement_scale(ts);`,
     ];
     if (b.prototype.backend === 'mesh') {
@@ -659,10 +663,10 @@ function instanceTlasWalk(o: number, bound: string, leaf: string[]): string[] {
         '    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;',
         '    while (ptr >= 0) {',
         '        int ni = stack[ptr]; ptr--;',
-        `        vec4 n0 = texelFetch(u_inst_${o}_tlas, mesh_texel1d(uint(ni * 2)), 0);`,
-        `        vec4 n1 = texelFetch(u_inst_${o}_tlas, mesh_texel1d(uint(ni * 2 + 1)), 0);`,
+        `        vec4 n0 = texelFetch(u_inst_${o}_tlas, bvh_texel1d(uint(ni * 2)), 0);`,
+        `        vec4 n1 = texelFetch(u_inst_${o}_tlas, bvh_texel1d(uint(ni * 2 + 1)), 0);`,
         '        float tenter;',
-        `        if (!mesh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, ${bound}, tenter)) continue;`,
+        `        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, ${bound}, tenter)) continue;`,
         '        if (n0.w >= 0.0) {',
         '            int off = int(n1.w), cnt = int(n0.w);',
         '            for (int j = 0; j < cnt; j++) {',

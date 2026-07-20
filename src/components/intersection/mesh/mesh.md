@@ -15,7 +15,7 @@ Per mesh, keyed by ordinal (`meshExternNames`):
 | `mesh_N_normal` | 1/vertex | xyz vertex normals (zeros when unauthored; read only when smooth) |
 | `mesh_N_uv` | 1/vertex | xy vertex UVs (zeros when unauthored) |
 
-Linear index → texel via `mesh_texel1d` at the fixed `MESH_TEX_WIDTH`. The compiler and the
+Linear index → texel via `bvh_texel1d` at the fixed `MESH_TEX_WIDTH`. The compiler and the
 app both import `MESH_TEX_WIDTH`/`meshExternNames` from `mesh.ts`, so the packed layout and the
 `texelFetch` math cannot drift.
 

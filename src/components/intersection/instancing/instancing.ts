@@ -5,7 +5,7 @@
 //   - instanceExternNames(ordinal) — the extern texture names for a batch (placement texture + the
 //     prototype's mesh BLAS textures, when the prototype is a mesh).
 //   - packPlacements(similarities) — the per-instance rigid-frame pairs (q_inv, (t_rigid, s)) packed
-//     2 RGBA32F texels/instance, on the SAME rail (MESH_TEX_WIDTH + mesh_texel1d) as mesh data.
+//     2 RGBA32F texels/instance, on the SAME rail (MESH_TEX_WIDTH + bvh_texel1d) as mesh data.
 // Pure TS (components purity).
 
 import type { Similarity } from '../../geometry/similarity.js';

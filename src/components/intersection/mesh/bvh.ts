@@ -13,6 +13,11 @@
 
 export const BVH_LEAF_SIZE = 2;   // stop splitting at ≤ this many triangles
 export const BVH_BINS = 12;       // SAH candidate planes per axis
+/** GLSL traversal stack depth (bvh_common.glsl). A well-balanced SAH tree needs ~2·log₂(N)+slack,
+ *  so 64 covers millions of items; buildBVHNodes warns if a (degenerate) tree would exceed it —
+ *  the walk guards against overflow but would silently drop subtrees past the stack. ONE source:
+ *  the feature emits `#define BVH_STACK_DEPTH` from this const. */
+export const BVH_STACK_DEPTH = 64;
 
 export interface BVHResult {
     /** Flat node array, 8 floats per node (2 RGBA32F texels). */
@@ -143,6 +148,12 @@ export function buildBVHNodes(boxes: AABB[]): { nodes: Float32Array; nodeCount: 
 
     if (N > 0) emit(0, N, 0);
 
+    // The GLSL walk's fixed stack would silently drop subtrees past BVH_STACK_DEPTH (it guards the
+    // array bound, so no crash — just missing geometry). Warn if a (near-)degenerate tree risks it.
+    if (maxDepth >= BVH_STACK_DEPTH) {
+        console.warn(`BVH depth ${maxDepth} >= BVH_STACK_DEPTH ${BVH_STACK_DEPTH} for ${N} items — the GLSL walk may drop deep subtrees; raise BVH_STACK_DEPTH or check for degenerate geometry.`);
+    }
+
     return { nodes: new Float32Array(nodes), nodeCount: nodes.length / 8, order, maxDepth };
 }
 
@@ -192,4 +203,3 @@ export function transformAABB(local: AABB, apply: (p: [number, number, number]) 
 }
 
 export type { AABB };
-export { emptyAABB, growPoint };

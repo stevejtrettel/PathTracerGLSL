@@ -37,26 +37,6 @@ export const spheresScene: SceneDescription = {
     environment: { type: 'constant', color: [0.28, 0.38, 0.58], intensity: 1.0 },
 };
 
-// Comparison twin: the SAME 500 spheres authored as INDIVIDUAL analytic objects (each folds its
-// transform into params → 500 unrolled sphere_intersect blocks + 500 regions). Same image as
-// `spheres`; the point is the frame-time comparison (instanced loop vs unrolled objects, both O(N)
-// with no TLAS). impl-plan-instancing perf note.
-export const spheresIndividualScene: SceneDescription = {
-    id: 'spheres-individual',
-    name: '500 Individual Spheres (instancing A/B)',
-    ambientSpace: { type: 'euclidean' },
-    objects: [
-        { type: 'quad', parameters: { corner: [-12, 0, -12], edge1: [0, 0, 24], edge2: [24, 0, 0] }, material: 'floor' },
-        ...sphereCloud(500, 12345).map((t) => ({ type: 'sphere' as const, parameters: { radius: 1.0 }, material: 'orb', transform: t })),
-    ],
-    materials: {
-        floor: { model: 'lambert', albedo: [0.55, 0.55, 0.58] },
-        orb: { model: 'lambert', albedo: [0.85, 0.42, 0.28] },
-    },
-    lights: [{ kind: 'point', position: [7, 11, 6], emission: 320 }],
-    environment: { type: 'constant', color: [0.28, 0.38, 0.58], intensity: 1.0 },
-};
-
 // Key 1 = TLAS (per-batch BVH over the 500 instance boxes), key 2 = linear scan — the live A/B.
 // Same image; watch the StatsPanel pathtracer ms/frame collapse (500 → ~log 500).
 export const spheresStrategy: RenderStrategy = {

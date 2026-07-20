@@ -26,7 +26,7 @@ import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.
 import { meshDemoScene, meshDemoNeeStrategy, meshDemoPtStrategy } from './meshScene.js';
 import { modelsScene, modelsBvhStrategy, modelsBruteStrategy, modelsPtStrategy } from './modelsScene.js';
 import { forestScene, forestStrategy, forestLinearStrategy } from './forestScene.js';
-import { spheresScene, spheresIndividualScene, spheresStrategy, spheresLinearStrategy } from './spheresScene.js';
+import { spheresScene, spheresStrategy, spheresLinearStrategy } from './spheresScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -49,12 +49,6 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
             'DEMO — the TLAS A/B (impl-plan-tlas): 500 instanced spheres from one prototype. Key 1 = TLAS (per-batch BVH over the instance boxes), key 2 = linear scan (500 tests/ray) — SAME image, watch pathtracer ms/frame collapse (~7× on SwiftShader).',
         expected:
             'a dense cloud of ~500 warm spheres above a gray floor; keys 1 (tlas) and 2 (linear) are pixel-identical, but key 1 is dramatically faster. All 500 share one prototype (memory is one sphere).',
-    },
-    'spheres-individual': {
-        scene: spheresIndividualScene,
-        strategies: posed([0, 4.5, 13], [0, 2.3, 0], spheresStrategy),
-        exercises: 'A/B for `spheres`: the same 500 spheres as INDIVIDUAL objects (500 unrolled sphere_intersect blocks + 500 regions) — compare pathtracer ms/frame vs the instanced batch.',
-        expected: 'same image as `spheres`; frame time comparable (both O(N) per ray — no TLAS); instancing wins memory + shader size, not traversal.',
     },
     forest: {
         scene: forestScene,
