@@ -7364,6 +7364,104 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > instance-twin + pathtracer-linear 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.14,
+      0.24,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": false,
+      "sdf": false,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "linear",
+    "meshTraversal": "bvh",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        2,
+        5,
+      ],
+      "target": [
+        0,
+        0.6,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > instance-twin-ref + pathtracer 1`] = `
 {
   "emitters": {
@@ -8387,6 +8485,202 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-furnace + 
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-ref + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.14,
+      0.24,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": false,
+      "mesh": true,
+      "sdf": false,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        2.2,
+        4.8,
+      ],
+      "target": [
+        0,
+        0.4,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-twin + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.14,
+      0.24,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": false,
+      "sdf": false,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        2.2,
+        4.8,
+      ],
+      "target": [
+        0,
+        0.4,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-ref + pathtracer 1`] = `
 {
   "emitters": {
@@ -8533,6 +8827,104 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        2.2,
+        4.5,
+      ],
+      "target": [
+        0,
+        -0.6,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin + pathtracer-brute 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.04,
+      0.05,
+      0.08,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": false,
+      "instanced": false,
+      "mesh": true,
+      "sdf": false,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "brute",
   },
   "materials": {
     "models": [

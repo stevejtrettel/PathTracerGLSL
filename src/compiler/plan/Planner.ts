@@ -22,6 +22,9 @@ import {
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
+import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
+import { sceneInstanceBatches } from '../../components/intersection/instancing/instancing.js';
+import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
 import type { BlackbodyValue } from '../types.js';
 
 /** Registered primitive types — unknowns must diagnose here, not throw downstream
@@ -74,9 +77,13 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     const analyticObjects: PlannedAnalyticObject[] = [];
     const meshes: PlannedMesh[] = [];
     const instanceBatches: PlannedInstanceBatch[] = [];
+    // THE ordinal truth (audit A5): Planner (extern declaration) and App (upload) both
+    // derive mesh/batch ordinals from the SAME shared enumerators — the assignment can
+    // never diverge, including for Validator-rejected batches (which still hold their
+    // ordinal on both sides; they just never plan).
+    const meshOrdinals = new Map(sceneMeshes(scene.objects).map((m, i) => [m, i] as const));
+    const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
     let objectIndex = 0;
-    let meshOrdinal = 0;
-    let instanceOrdinal = 0;
     for (const obj of scene.objects) {
         if (isMeshObject(obj)) {
             // Mesh (impl-plan-meshes): a region in the shared id space; placement is
@@ -85,7 +92,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             // triangles) becomes extern textures the app uploads; only counts/flags plan here.
             const matId = materialIdMap.get(obj.material)!;   // validated by the Validator
             meshes.push({
-                ordinal: meshOrdinal++,
+                ordinal: meshOrdinals.get(obj)!,
                 index: objectIndex++,
                 materialId: matId,
                 name: obj.name,
@@ -107,7 +114,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             const region = objectIndex++;
             if (isMeshObject(proto)) {
                 instanceBatches.push({
-                    ordinal: instanceOrdinal++, index: region, materialId: matId, name: obj.name,
+                    ordinal: batchOrdinals.get(obj)!, index: region, materialId: matId, name: obj.name,
                     instanceCount: obj.placements.length,
                     prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined },
                 });
@@ -119,7 +126,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     continue;
                 }
                 instanceBatches.push({
-                    ordinal: instanceOrdinal++, index: region, materialId: matId, name: obj.name,
+                    ordinal: batchOrdinals.get(obj)!, index: region, materialId: matId, name: obj.name,
                     instanceCount: obj.placements.length,
                     // Prototype has NO transform → just canonicalize (no fold); s scales per instance in-shader.
                     prototype: { backend: 'analytic', shapeType: proto.type, parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters) },
@@ -391,10 +398,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
                 mesh: meshes.length > 0,
                 instanced: instanceBatches.length > 0,
             },
-            // Mesh traversal engine (impl-plan-mesh-bvh) — default bvh; brute is the A/B baseline.
-            meshTraversal: strategy.estimator.meshTraversal ?? 'bvh',
-            // Instance traversal (impl-plan-tlas) — default tlas; linear is the A/B baseline.
-            instanceAccel: strategy.estimator.instanceAccel ?? 'tlas',
+            // Traversal engines (impl-plan-mesh-bvh / impl-plan-tlas) — registry ids;
+            // defaults from the registry (components/intersection), Validator-gatekept.
+            meshTraversal: strategy.estimator.meshTraversal ?? DEFAULT_MESH_TRAVERSAL,
+            instanceAccel: strategy.estimator.instanceAccel ?? DEFAULT_INSTANCE_ACCEL,
             // The opaque shadow fast path is scene_intersect_any's only caller; the
             // media shadow walker re-spawns scene_intersect instead (§6.3).
             anyQuery: lighting !== null && !features.media.hasMedia,

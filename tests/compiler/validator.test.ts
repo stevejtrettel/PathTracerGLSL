@@ -412,3 +412,75 @@ describe('Validator — correctness domains', () => {
         expect(bag.getErrors().some(e => /transform\.position must be a vec3/.test(e.message))).toBe(true);
     });
 });
+
+// Audit batch 1 (validation): the shared per-object geometry validation (A3), the
+// bounds-required instance-prototype rule (A1), the unified transmissive-on-thin
+// warning (A2), and the meshTraversal/instanceAccel axis rules (A4).
+describe('Validator — mesh/instancing validation batch', () => {
+    const placements = [{ position: [0, 1, 0] as [number, number, number] }];
+
+    it('A1: rejects an unbounded instance prototype (plane has no bounds); accepts a bounded one', () => {
+        const bad = run(s => {
+            s.objects.push({ kind: 'instanced', prototype: { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0 }, material: 'm' }, placements });
+        });
+        expect(bad.getErrors().some(e => /declares no local bounds/.test(e.message))).toBe(true);
+        const ok = run(s => {
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'm' }, placements });
+        });
+        expect(ok.hasErrors()).toBe(false);
+    });
+
+    it('A3: an instanced ANALYTIC prototype gets full schema validation (missing required param)', () => {
+        const bag = run(s => {
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: {}, material: 'm' }, placements });
+        });
+        expect(bag.getErrors().some(e => /Object 1 prototype \(sphere\): required parameter 'radius' is missing/.test(e.message))).toBe(true);
+    });
+
+    it('A3: an instanced MESH prototype gets full buffer sanity (out-of-range index)', () => {
+        const bag = run(s => {
+            s.objects.push({
+                kind: 'instanced',
+                prototype: { kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 9]), material: 'm' },
+                placements,
+            });
+        });
+        expect(bag.getErrors().some(e => /Object 1 prototype \(mesh\): vertex index 9 out of range/.test(e.message))).toBe(true);
+    });
+
+    it('A2: warns on a transmissive material across the WHOLE thin set (quad, mesh, instanced), not on solids', () => {
+        const glassOnThin = (mutate: (s: SceneDescription) => void) => run(s => {
+            s.materials.glass = { model: 'dielectric', ior: 1.5 };
+            mutate(s);
+        }).getWarnings().some(w => /refract as η = 1/.test(w.message));
+        // Zero-thickness primitive.
+        expect(glassOnThin(s => { s.objects.push({ type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, material: 'glass' }); })).toBe(true);
+        // v0 mesh.
+        expect(glassOnThin(s => { s.objects.push({ kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2]), material: 'glass' }); })).toBe(true);
+        // v1 instanced batch (material rides the prototype).
+        expect(glassOnThin(s => { s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'glass' }, placements }); })).toBe(true);
+        // A solid (sphere object) must NOT warn — it has a real interior region.
+        expect(glassOnThin(s => { s.objects.push({ type: 'sphere', parameters: { radius: 0.5 }, material: 'glass' }); })).toBe(false);
+    });
+
+    it('A4: rejects unknown meshTraversal/instanceAccel values (JSON-sourced strategies)', () => {
+        const mesh = { kind: 'mesh' as const, positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2]), material: 'm' };
+        const bad1 = run((s, st) => { s.objects.push(mesh); st.estimator.meshTraversal = 'bvhx' as never; });
+        expect(bad1.getErrors().some(e => /meshTraversal 'bvhx' is not a mesh traversal engine/.test(e.message))).toBe(true);
+        const bad2 = run((s, st) => {
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'm' }, placements });
+            st.estimator.instanceAccel = 'fast' as never;
+        });
+        expect(bad2.getErrors().some(e => /instanceAccel 'fast' is not an instance traversal/.test(e.message))).toBe(true);
+    });
+
+    it('A4: valid values pass with the geometry present; inert knobs warn without it (C5)', () => {
+        const mesh = { kind: 'mesh' as const, positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2]), material: 'm' };
+        const ok = run((s, st) => { s.objects.push(mesh); st.estimator.meshTraversal = 'brute'; });
+        expect(ok.isEmpty()).toBe(true);
+        const inert1 = run((_s, st) => { st.estimator.meshTraversal = 'brute'; });
+        expect(inert1.getWarnings().some(w => /meshTraversal controls nothing here/.test(w.message))).toBe(true);
+        const inert2 = run((_s, st) => { st.estimator.instanceAccel = 'linear'; });
+        expect(inert2.getWarnings().some(w => /instanceAccel controls nothing here/.test(w.message))).toBe(true);
+    });
+});

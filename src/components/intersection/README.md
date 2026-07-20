@@ -20,12 +20,22 @@ closed-form dispatch (`generateAnalyticDispatch`) over the primitives' `<type>_i
 functions. The mesh backend (`mesh/` — impl-plan-meshes) is this family's second occupant:
 a triangle engine over data-texture geometry, gated by `intersection.backends.mesh`.
 
+The family REGISTRY (`index.ts` — held since founding, opened by the audit batch) holds
+the genuine one-of-N axes: `MESH_TRAVERSALS` (`estimator.meshTraversal`: brute | bvh) and
+`INSTANCE_ACCELS` (`estimator.instanceAccel`: linear | tlas). **A new traversal engine =
+one descriptor + one registry line** (the Validator's membership check and the feature's
+extern/define gating both read the registry). Geometry BACKENDS deliberately have NO
+registry — they are scene-derived capabilities that compose (`intersection.backends`),
+and a fourth geometry class is a design event, not an occupant drop.
+
 `instancing/` (impl-plan-instancing + impl-plan-tlas) is the placement-list multiplier —
 one prototype × N placements, accelerated by a per-batch TLAS — gated by
-`intersection.backends.instanced`. `bvh_common.glsl` is the shared root file: the generic
-BVH-traversal helpers (`bvh_texel1d`, `bvh_aabb_hit`, `BVH_STACK_DEPTH`) used by both the mesh
-BLAS walk and the instance TLAS walk, so an analytic-only instanced scene pulls them without the
-triangle leaf.
+`intersection.backends.instanced`. Both engines stand on two SUBSTRATES outside this
+family: the data rail (`components/data_textures.ts` + `glsl/core/data_texture.glsl` —
+`DATA_TEX_WIDTH`, `data_texel1d`) and the BVH build core + ray-walk support
+(`components/accel/bvh/` — `buildBVHNodes`, `bvh_aabb_hit`, `BVH_STACK_DEPTH`), so an
+analytic-only instanced scene pulls those without the triangle leaf, and future clients
+(light BVH, majorant grids) import the substrates without touching this family.
 
 ## Contract
 

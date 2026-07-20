@@ -5,11 +5,11 @@ import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '..
 import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
-import { packMesh, meshExternNames } from '../components/intersection/mesh/mesh.js';
-import { packInstanceBatch, instanceExternNames } from '../components/intersection/instancing/instancing.js';
+import { packMesh, meshExternNames, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
+import { packInstanceBatch, instanceExternNames, sceneInstanceBatches } from '../components/intersection/instancing/instancing.js';
 import { similarityFromTransform } from '../components/geometry/similarity.js';
 import { canonicalizePrimitiveParameters, primitiveBounds } from '../components/geometry/index.js';
-import { isMeshObject, isInstancedObject } from '../compiler/types.js';
+import { isMeshObject, type MeshObject } from '../compiler/types.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
@@ -162,8 +162,7 @@ export class App {
         // before any pass could bind them. Scene-static data → uploaded once, then only bound.
         if (config.scene !== undefined) {
             try {
-                this._uploadMeshes(config.scene);
-                this._uploadInstances(config.scene);
+                this._uploadSceneGeometry(config.scene);
             } catch (error: any) {
                 this._showErrorOverlay(error);
                 throw error;
@@ -213,58 +212,67 @@ export class App {
     }
 
     /**
-     * Pack every mesh in the scene into its four extern data textures (position/index/normal/uv,
-     * all RGBA32F) and register them under meshExternNames(ordinal) — the SAME names the compiler's
-     * `extern:` sources use, keyed by mesh ordinal in scene order. App-side (like the env load):
-     * the compiler declares the samplers, the app owns the GPU payload. impl-plan-meshes §7.
+     * Pack + register every mesh's and instanced batch's extern data textures BEFORE the
+     * renderers exist — the SAME extern names the compiler's `extern:` sources use, with
+     * ordinals from the SHARED enumerators (sceneMeshes / sceneInstanceBatches — one
+     * assignment truth for Planner and App, audit A5). App-side (like the env load): the
+     * compiler declares the samplers, the app owns the GPU payload. impl-plan-meshes §7.
+     *
+     * A pack CACHE (by object reference) means a prototype shared by several batches —
+     * or a mesh used both standalone and as a prototype — packs (and builds its BLAS)
+     * once. GPU-side dedup of the uploaded copies is Stage B (shared base-offset
+     * textures); here we only avoid recomputing.
      */
-    private _uploadMeshes(scene: SceneDescription): void {
-        let ordinal = 0;
-        for (const obj of scene.objects) {
-            if (!isMeshObject(obj)) continue;
-            const packed = packMesh(obj);
-            const names = meshExternNames(ordinal++);
-            this.engine.registerDataTexture(names.position, packed.position.data, packed.position.width, packed.position.height);
-            this.engine.registerDataTexture(names.index, packed.index.data, packed.index.width, packed.index.height);
-            this.engine.registerDataTexture(names.normal, packed.normal.data, packed.normal.width, packed.normal.height);
-            this.engine.registerDataTexture(names.uv, packed.uv.data, packed.uv.width, packed.uv.height);
+    private _uploadSceneGeometry(scene: SceneDescription): void {
+        const packCache = new Map<MeshObject, PackedMesh>();
+        const packCached = (m: MeshObject): PackedMesh => {
+            let p = packCache.get(m);
+            if (p === undefined) { p = packMesh(m); packCache.set(m, p); }
+            return p;
+        };
+        const register = (name: string, t: { data: Float32Array; width: number; height: number }): void =>
+            this.engine.registerDataTexture(name, t.data, t.width, t.height);
+
+        sceneMeshes(scene.objects).forEach((mesh, ordinal) => {
+            const packed = packCached(mesh);
+            const names = meshExternNames(ordinal);
+            register(names.position, packed.position);
+            register(names.index, packed.index);
+            register(names.normal, packed.normal);
+            register(names.uv, packed.uv);
             // The BVH node texture — bound only by bvh-traversal programs, but registered always
             // (scene-static data; a brute program simply never declares/binds it).
-            this.engine.registerDataTexture(names.bvh, packed.bvh.data, packed.bvh.width, packed.bvh.height);
-        }
-    }
+            register(names.bvh, packed.bvh);
+        });
 
-    /**
-     * Pack every instanced batch (impl-plan-instancing): the per-instance placement texture (always)
-     * + the prototype's mesh BLAS textures (mesh prototypes only). Extern names by batch ordinal —
-     * the same convention the compiler's `extern:` sources use. Placement lowering reuses the shared
-     * rigidInverse ABI (via packPlacements), so it can't drift from the driven-placement path.
-     */
-    private _uploadInstances(scene: SceneDescription): void {
-        let ordinal = 0;
-        for (const obj of scene.objects) {
-            if (!isInstancedObject(obj)) continue;
-            const names = instanceExternNames(ordinal++);
-            const placements = obj.placements.map((t) => similarityFromTransform(t));
+        sceneInstanceBatches(scene.objects).forEach((batch, ordinal) => {
+            const names = instanceExternNames(ordinal);
+            const placements = batch.placements.map((t) => similarityFromTransform(t));
             // The prototype's LOCAL box (mesh = BLAS root; analytic = primitive bounds) → the batch
             // TLAS (a BVH over the instance world boxes) + the reordered placement texture.
             let localBox: { min: [number, number, number]; max: [number, number, number] };
-            if (isMeshObject(obj.prototype)) {
-                const p = packMesh(obj.prototype);
-                this.engine.registerDataTexture(names.position, p.position.data, p.position.width, p.position.height);
-                this.engine.registerDataTexture(names.index, p.index.data, p.index.width, p.index.height);
-                this.engine.registerDataTexture(names.normal, p.normal.data, p.normal.width, p.normal.height);
-                this.engine.registerDataTexture(names.uv, p.uv.data, p.uv.width, p.uv.height);
-                this.engine.registerDataTexture(names.bvh, p.bvh.data, p.bvh.width, p.bvh.height);
+            if (isMeshObject(batch.prototype)) {
+                const p = packCached(batch.prototype);
+                register(names.position, p.position);
+                register(names.index, p.index);
+                register(names.normal, p.normal);
+                register(names.uv, p.uv);
+                register(names.bvh, p.bvh);
                 localBox = p.rootBox;
             } else {
-                const canon = canonicalizePrimitiveParameters(obj.prototype.type, obj.prototype.parameters);
-                localBox = primitiveBounds(obj.prototype.type, canon) ?? { min: [0, 0, 0], max: [0, 0, 0] };
+                const canon = canonicalizePrimitiveParameters(batch.prototype.type, batch.prototype.parameters);
+                const box = primitiveBounds(batch.prototype.type, canon);
+                // Unbounded prototypes are Validator-rejected (A1) — a fabricated box would
+                // silently drop instances under the TLAS, so absence here is a hard error.
+                if (box === null) {
+                    throw new Error(`instanced prototype '${batch.prototype.type}' declares no bounds() — unbounded primitives cannot be instanced (the Validator rejects this scene)`);
+                }
+                localBox = box;
             }
-            const batch = packInstanceBatch(localBox, placements);
-            this.engine.registerDataTexture(names.placements, batch.placements.data, batch.placements.width, batch.placements.height);
-            this.engine.registerDataTexture(names.tlas, batch.tlas.data, batch.tlas.width, batch.tlas.height);
-        }
+            const packed = packInstanceBatch(localBox, placements);
+            register(names.placements, packed.placements);
+            register(names.tlas, packed.tlas);
+        });
     }
 
     /**

@@ -2,16 +2,27 @@
 // (impl-plan-instancing). NOT an engine of its own: an instanced batch is the driven ray-into-local
 // wrapper looped over a placement texture, against a shared prototype (a mesh BLAS or an analytic
 // closed form). This file owns the TS both compiler and app depend on:
+//   - sceneInstanceBatches(objects) — THE batch-ordinal truth: the scene's instanced batches in
+//     scene order. Planner (extern declaration) and App (upload) both iterate THIS list, so the
+//     ordinal↔object assignment can never diverge (the audit's A5 replay hazard) — including when
+//     a batch is Validator-rejected (it still holds its ordinal on both sides).
 //   - instanceExternNames(ordinal) — the extern texture names for a batch (placement texture + the
 //     prototype's mesh BLAS textures, when the prototype is a mesh).
-//   - packPlacements(similarities) — the per-instance rigid-frame pairs (q_inv, (t_rigid, s)) packed
-//     2 RGBA32F texels/instance, on the SAME rail (MESH_TEX_WIDTH + bvh_texel1d) as mesh data.
-// Pure TS (components purity).
+//   - packPlacements / packInstanceBatch — the per-instance rigid-frame pairs + the batch TLAS,
+//     on the data rail (components/data_textures.ts). Build core from accel/bvh (no imports from
+//     the mesh sibling — both leaves stand on the same substrates). Pure TS (components purity;
+//     the instanced-kind predicate is restated locally, type-only compiler imports).
 
+import type { InstancedObject, ObjectDescription } from '../../../compiler/types.js';
 import type { Similarity } from '../../geometry/similarity.js';
 import { rigidInverse, similarityApplyPoint } from '../../geometry/similarity.js';
-import { MESH_TEX_WIDTH, packNodes, type PackedTexture } from '../mesh/mesh.js';
-import { buildBVHNodes, transformAABB, type AABB } from '../mesh/bvh.js';
+import { allocTexels, type PackedTexture } from '../../data_textures.js';
+import { buildBVHNodes, packNodes, transformAABB, type AABB } from '../../accel/bvh/bvh.js';
+
+/** The scene's instanced batches in scene order — index IS the batch ordinal (see header). */
+export function sceneInstanceBatches(objects: readonly ObjectDescription[]): InstancedObject[] {
+    return objects.filter((o): o is InstancedObject => 'kind' in o && o.kind === 'instanced');
+}
 
 export interface InstanceExternNames {
     /** The per-instance placement texture (2 texels/instance: q_inv, (t_rigid, s)) — in TLAS order. */
@@ -56,14 +67,11 @@ export function packInstanceBatch(localBox: AABB, placements: Similarity[]): { p
  *  reads these and conjugates the ray with the §6.1 placement ABI (placement_rigid/dir/normal). */
 export function packPlacements(placements: Similarity[]): PackedTexture<Float32Array> {
     const n = placements.length;
-    const texels = Math.max(1, n * 2);
-    const w = MESH_TEX_WIDTH;
-    const h = Math.max(1, Math.ceil(texels / w));
-    const data = new Float32Array(w * h * 4);
+    const tex = allocTexels(n * 2);
     for (let i = 0; i < n; i++) {
         const { q, ts } = rigidInverse(placements[i]);
-        data[i * 8 + 0] = q[0]; data[i * 8 + 1] = q[1]; data[i * 8 + 2] = q[2]; data[i * 8 + 3] = q[3];
-        data[i * 8 + 4] = ts[0]; data[i * 8 + 5] = ts[1]; data[i * 8 + 6] = ts[2]; data[i * 8 + 7] = ts[3];
+        tex.data[i * 8 + 0] = q[0]; tex.data[i * 8 + 1] = q[1]; tex.data[i * 8 + 2] = q[2]; tex.data[i * 8 + 3] = q[3];
+        tex.data[i * 8 + 4] = ts[0]; tex.data[i * 8 + 5] = ts[1]; tex.data[i * 8 + 6] = ts[2]; tex.data[i * 8 + 7] = ts[3];
     }
-    return { data, width: w, height: h };
+    return tex;
 }

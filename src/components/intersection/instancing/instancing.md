@@ -9,13 +9,13 @@ instance world boxes).
 - `instanceExternNames(ordinal)` — extern texture names: `placements`, `tlas`, and the prototype's
   mesh BLAS textures (mesh prototypes only).
 - `packPlacements(similarities)` — the per-instance rigid-frame pairs (`q_inv`, `(t_rigid, s)`),
-  2 RGBA32F texels/instance, on the shared data rail (`MESH_TEX_WIDTH` + `bvh_texel1d`).
+  2 RGBA32F texels/instance, on the shared data rail (`DATA_TEX_WIDTH` + `data_texel1d`).
 - `packInstanceBatch(localBox, placements)` — builds the batch TLAS: transforms the prototype box by
   each placement → `buildBVHNodes` → reorders the placements into leaf order + packs the node texture.
 
 ## GLSL (generated in `features/intersection.ts`)
 `instance_batch_k` / `_any_k` — a stack-DFS over `u_inst_k_tlas` (world ray, pruned by hit.t/maxDist,
-using `bvh_aabb_hit`/`BVH_STACK_DEPTH` from `bvh_common.glsl`); at a leaf, loops the placement range
+using `bvh_aabb_hit`/`BVH_STACK_DEPTH` from `accel/bvh/bvh.glsl`); at a leaf, loops the placement range
 and runs the per-placement conjugate + prototype intersect. Two conventions (see the code): **mesh**
 = ÷s ray (Möller–Trumbore is non-unit-safe) + unscaled BLAS; **analytic** = rigid ray (unit) +
 s-scaled shape params. `estimator.instanceAccel: 'linear' | 'tlas'` swaps the walk for a plain loop

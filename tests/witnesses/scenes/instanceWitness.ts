@@ -5,9 +5,10 @@
 // authored individually (each folding its transform into analytic params). Proves the instance
 // loop's placement read + conjugation + region against the ordinary analytic path.
 
-import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
+import type { SceneDescription, RenderStrategy, Transform } from '../../../src/compiler/types.js';
 import { instance } from '../../../src/authoring/instance.js';
 import { withPose } from '../../../src/authoring/strategy.js';
+import { boxMesh } from './meshWitness.js';
 
 const PLACEMENTS = [
     { position: [-1.2, 0.5, 0.0] as [number, number, number], scale: 1.0 },
@@ -54,3 +55,59 @@ const base: RenderStrategy = {
     view: { tonemap: { type: 'reinhard' } },
 };
 export const instanceTwinStrategy: RenderStrategy = withPose(base, [0, 2.0, 5.0], [0, 0.6, 0]);
+
+// The estimator-swap arm (impl-plan-tlas A/B): the TLAS walk and the linear scan visit
+// the same placements with the same RNG stream — near-bit-exact agreement, so any gap
+// is a real traversal bug (dropped subtrees, slab edge, wrong leaf range). Distinct id
+// (renderer-ID namespacing — collisions silently clobber programs).
+export const instanceTwinLinearStrategy: RenderStrategy = {
+    ...instanceTwinStrategy,
+    id: 'pathtracer-linear',
+    estimator: { ...instanceTwinStrategy.estimator, instanceAccel: 'linear' },
+};
+
+// ---------------------------------------------------------------------------
+// mesh-instance-twin ⇄ mesh-instance-ref — the MESH-prototype instancing gate.
+//
+// The instance loop's two backends use DIFFERENT ray-into-local conventions: the mesh
+// arm divides the rigid-conjugated ray by s (Möller–Trumbore is non-unit-safe, BLAS
+// unscaled), the analytic arm keeps a unit ray and scales the shape params. The ÷s
+// convention bug (double-transformed instances) was found only by GPU render on
+// scale≠1 instances — this twin is its durable guard: three rotated, SCALE-VARIED box
+// meshes as ONE batch (shared BLAS) must match the same three authored as individual
+// mesh objects (constant ray-into-local placement).
+// ---------------------------------------------------------------------------
+
+const MESH_PLACEMENTS: Transform[] = [
+    { position: [-1.3, 0.55, 0.0], rotation: { axis: [0, 1, 0], angle: 0.6 }, scale: 1.3 },
+    { position: [0.1, 0.35, -0.4], rotation: { axis: [1, 1, 0], angle: -0.8 }, scale: 0.8 },
+    { position: [1.2, 0.45, 0.3], rotation: { axis: [0, 0, 1], angle: 0.35 }, scale: 1.0 },
+];
+
+// Outward-wound cube, half-size 0.4, flat geometric normals (no authored normals).
+const cubeGeom = boxMesh(0.4, /*inward*/ false);
+const cubeProto = { kind: 'mesh' as const, positions: cubeGeom.positions, indices: cubeGeom.indices, material: 'ball' };
+
+export const meshInstanceTwin: SceneDescription = {
+    id: 'mesh-instance-twin',
+    name: 'Mesh Instance Twin (3 scaled cubes as one batch)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        { ...floor },
+        instance(cubeProto, MESH_PLACEMENTS, 'cubes'),
+    ],
+    materials, lights, environment,
+};
+
+export const meshInstanceRef: SceneDescription = {
+    id: 'mesh-instance-ref',
+    name: 'Mesh Instance Ref (3 individual mesh cubes)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        { ...floor },
+        ...MESH_PLACEMENTS.map((t) => ({ ...cubeProto, transform: t })),
+    ],
+    materials, lights, environment,
+};
+
+export const meshInstanceStrategy: RenderStrategy = withPose(base, [0, 2.2, 4.8], [0, 0.4, 0]);

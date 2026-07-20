@@ -533,12 +533,14 @@ export interface EstimatorDescription {
      * occupant pair): 'bvh' (default) walks the binned-SAH tree; 'brute' scans every triangle.
      * Pure computation — same converged image (§11.2), so it rides the estimator section; the
      * live A/B lets you watch the cost collapse on one scene. Meaningful only when meshes are
-     * present. Future BVH variants join here as new occupants. */
-    meshTraversal?: 'brute' | 'bvh';
+     * present. A registry id, not a union (B1 discipline): occupants live in
+     * components/intersection MESH_TRAVERSALS; the Validator gatekeeps membership. */
+    meshTraversal?: string;
     /** Instance traversal (impl-plan-tlas): 'tlas' (default) walks a per-batch BVH over the instance
      *  boxes; 'linear' scans every placement. Pure computation — same converged image; the live A/B
-     *  shows the cost collapse on a big batch. Meaningful only with instanced objects. */
-    instanceAccel?: 'linear' | 'tlas';
+     *  shows the cost collapse on a big batch. Meaningful only with instanced objects. Registry id
+     *  (INSTANCE_ACCELS), Validator-gatekept. */
+    instanceAccel?: string;
     accumulation: AccumulationDescription;
 }
 

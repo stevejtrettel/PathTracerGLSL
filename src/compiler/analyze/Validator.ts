@@ -1,7 +1,7 @@
 // compiler/analyze/Validator.ts
 
 import type { SceneFeatures } from './types.js';
-import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
+import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
 import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
@@ -11,6 +11,7 @@ import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
 import { PRIMITIVES, resolveBackend, type PrimitiveParamSpec } from '../../components/geometry/index.js';
+import { MESH_TRAVERSALS, INSTANCE_ACCELS, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
@@ -159,39 +160,16 @@ export function validate(
         }
     }
 
-    // --- Backend pins + analytic OBJECT degeneracy (B1 + audit C1). A pin the
-    // primitive can't honor is an error; quad objects that reach the analytic
-    // backend need non-degenerate edges (a zero cross product is NaN → a raw
-    // formatter throw; near-zero areas make Inf pdfs if emissive).
+    // --- Per-object GEOMETRY validation, ONE truth (validateGeometryObject): backend
+    // pins + descriptor degeneracy (B1 + audit C1), primitive parameter schemas (R3 /
+    // review C7), and mesh buffer sanity (impl-plan-meshes). Instanced batches route
+    // their PROTOTYPE through the SAME function in the instanced loop below — a
+    // prototype IS an object description, so it gets full validation, never a shallow
+    // parallel check (the audit's A3 finding).
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
-        if ('kind' in obj) continue;
-        const desc = PRIMITIVES[obj.type];
-        if (desc !== undefined && obj.backend !== undefined
-            && (obj.backend === 'sdf' ? !desc.provides.sdf : !desc.provides.analytic)) {
-            bag.error('invalid-setting',
-                `Object ${i}: backend '${obj.backend}' pinned but primitive '${obj.type}' does not provide it`)
-                .withOriginal('scene', [`objects[${i}]`, 'backend'])
-                .add();
-        }
-        // Coupled degeneracy rules come from the DESCRIPTOR (C5: the last primitive
-        // name-branch died here — quad's parallel-edges rule now lives on quad.ts,
-        // ONE formula with the quad light's). The C7 schema loop below owns shapes;
-        // this call runs only over well-shaped required rows.
-        if (desc?.validateValues !== undefined) {
-            const rowsOk = desc.params.every((s) => {
-                const v = obj.parameters[s.name];
-                if (v === undefined) return !s.required;
-                return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
-            });
-            if (rowsOk) {
-                for (const msg of desc.validateValues(obj.parameters)) {
-                    bag.error('invalid-setting', `Object ${i} (${obj.type}): ${msg}`)
-                        .withOriginal('scene', [`objects[${i}]`])
-                        .add();
-                }
-            }
-        }
+        if (isInstancedObject(obj)) continue;   // prototype validated with its batch below
+        validateGeometryObject(obj, `Object ${i}`, [`objects[${i}]`], bag);
     }
 
     // --- Finiteness (audit C6): a NaN/Inf anywhere in the scene reaches the GLSL number
@@ -522,6 +500,33 @@ export function validate(
             `This scene has media that need the null-collision arms (expression coefficients, or an emissive scattering medium) but volumeSampling is '${vs ?? 'analytic'}' — set estimator.volumeSampling: 'delta-tracking'`)
             .add();
     }
+    // meshTraversal / instanceAccel axes (impl-plan-mesh-bvh / impl-plan-tlas):
+    // estimator fields per the pinned taxonomy — pure computation, bias-free by
+    // contract (their test obligation is the estimator-swap equality witness).
+    // Membership is REGISTRY-derived (components/intersection — a new traversal engine
+    // extends the valid set with no edit here); the enum rejection guards JSON-sourced
+    // strategies, and the C5 silent-inert rule mirrors equiangular/delta-tracking above.
+    const meshTraversal = strategy.estimator.meshTraversal;
+    if (meshTraversal !== undefined && MESH_TRAVERSALS[meshTraversal] === undefined) {
+        bag.error('invalid-setting',
+            `estimator.meshTraversal '${meshTraversal}' is not a mesh traversal engine — registered: ${Object.keys(MESH_TRAVERSALS).join(', ')} (default '${DEFAULT_MESH_TRAVERSAL}')`)
+            .add();
+    } else if (meshTraversal !== undefined && !scene.objects.some(isMeshObject)) {
+        bag.warning('invalid-setting',
+            `estimator.meshTraversal controls nothing here (no mesh objects; instanced mesh prototypes always traverse their BLAS) — the knob is inert`)
+            .add();
+    }
+    const instanceAccel = strategy.estimator.instanceAccel;
+    if (instanceAccel !== undefined && INSTANCE_ACCELS[instanceAccel] === undefined) {
+        bag.error('invalid-setting',
+            `estimator.instanceAccel '${instanceAccel}' is not an instance traversal — registered: ${Object.keys(INSTANCE_ACCELS).join(', ')} (default '${DEFAULT_INSTANCE_ACCEL}')`)
+            .add();
+    } else if (instanceAccel !== undefined && !scene.objects.some(isInstancedObject)) {
+        bag.warning('invalid-setting',
+            `estimator.instanceAccel controls nothing here (no instanced objects) — the knob is inert`)
+            .add();
+    }
+
     const cameraType = strategy.measurement.camera.type;
     const cameraModelDesc = CAMERA_MODELS[cameraType];
     if (cameraModelDesc === undefined) {
@@ -684,49 +689,6 @@ export function validate(
         }
     }
 
-    // Geometry-primitive parameter schemas (R3 / review C7): `{ r: 2 }` must not silently
-    // render a unit sphere. Unknown keys warn (typo class); missing required / wrong shape
-    // error. Unimplemented primitive TYPES are the Planner's diagnostic, not ours.
-    for (let i = 0; i < scene.objects.length; i++) {
-        const obj = scene.objects[i];
-        if ('kind' in obj) continue;   // mesh: rejected elsewhere
-        const type = obj.type;
-        const params = (obj.parameters ?? {}) as Record<string, unknown>;
-        const desc = type !== undefined ? PRIMITIVES[type] : undefined;
-        // Unimplemented types/unhonorable pins are diagnosed above / by the Planner.
-        if (!desc || resolveBackend(type, obj.backend) === undefined) continue;
-        const schema = desc.params;
-        const known = new Map(schema.map((s) => [s.name, s]));
-        for (const key of Object.keys(params)) {
-            if (!known.has(key)) {
-                bag.warning('invalid-setting',
-                    `Object ${i} (${type}): unknown parameter '${key}' is ignored (valid: ${schema.map((s) => s.name).join(', ')})`)
-                    .add();
-            }
-        }
-        for (const s of schema) {
-            const v = params[s.name];
-            if (v === undefined) {
-                if (s.required) {
-                    bag.error('invalid-setting',
-                        `Object ${i} (${type}): required parameter '${s.name}' is missing`)
-                        .add();
-                }
-                continue;
-            }
-            const shapeOk = s.shape === 'number'
-                ? typeof v === 'number' && Number.isFinite(v)
-                : Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number' && Number.isFinite(c));
-            if (!shapeOk) {
-                bag.error('invalid-setting',
-                    `Object ${i} (${type}): parameter '${s.name}' must be a ${s.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
-                    .add();
-            } else {
-                validatePrimitiveConstraint(s, v, `Object ${i} (${type}): parameter '${s.name}'`, bag);
-            }
-        }
-    }
-
     // Warn on empty scene
     if (scene.objects.length === 0) {
         bag.warning('empty-scene', 'Scene has no objects — nothing will be rendered').add();
@@ -758,47 +720,10 @@ export function validate(
         }
     }
 
-    // Mesh geometry sanity (impl-plan-meshes): the arrays must be well-formed and the indices
-    // in range — a malformed buffer would silently texelFetch garbage vertices on the GPU.
-    for (let i = 0; i < scene.objects.length; i++) {
-        const obj = scene.objects[i];
-        if (!isMeshObject(obj)) continue;
-        const vertexCount = obj.positions.length / 3;
-        if (obj.positions.length === 0 || obj.positions.length % 3 !== 0) {
-            bag.error('invalid-setting', `Object ${i} (mesh): positions length ${obj.positions.length} is not a nonzero multiple of 3`)
-                .withOriginal('scene', [`objects[${i}]`, 'positions']).add();
-        }
-        if (obj.indices.length === 0 || obj.indices.length % 3 !== 0) {
-            bag.error('invalid-setting', `Object ${i} (mesh): indices length ${obj.indices.length} is not a nonzero multiple of 3`)
-                .withOriginal('scene', [`objects[${i}]`, 'indices']).add();
-        } else if (Number.isInteger(vertexCount)) {
-            let maxIdx = -1;
-            for (let k = 0; k < obj.indices.length; k++) if (obj.indices[k] > maxIdx) maxIdx = obj.indices[k];
-            if (maxIdx >= vertexCount) {
-                bag.error('invalid-setting', `Object ${i} (mesh): vertex index ${maxIdx} out of range (only ${vertexCount} vertices)`)
-                    .withOriginal('scene', [`objects[${i}]`, 'indices']).add();
-            }
-        }
-        if (obj.normals !== undefined && obj.normals.length !== obj.positions.length) {
-            bag.error('invalid-setting', `Object ${i} (mesh): normals length ${obj.normals.length} must match positions length ${obj.positions.length} (one normal per vertex)`)
-                .withOriginal('scene', [`objects[${i}]`, 'normals']).add();
-        }
-        if (obj.uvs !== undefined && obj.uvs.length !== vertexCount * 2) {
-            bag.error('invalid-setting', `Object ${i} (mesh): uvs length ${obj.uvs.length} must be 2× the vertex count (${vertexCount * 2})`)
-                .withOriginal('scene', [`objects[${i}]`, 'uvs']).add();
-        }
-        // v0 meshes are thin surfaces (no interior containment — impl-plan-meshes §3): a
-        // transmissive material has no interior region, so ior_of falls to 1.0 and the mesh
-        // refracts as vacuum. Warn (don't error) — the surface still renders; dielectric
-        // meshes await the winding-number containment batch (v2).
-        if (MATERIAL_MODELS[scene.materials[obj.material]?.model ?? '']?.capabilities.transmission) {
-            bag.warning('invalid-setting', `Object ${i} (mesh): a transmissive material on a v0 mesh has no interior (thin surface) — it will refract as η = 1; dielectric meshes are deferred (impl-plan-meshes §3)`)
-                .withOriginal('scene', [`objects[${i}]`, 'material']).add();
-        }
-    }
-
     // Instanced-batch validation (impl-plan-instancing v1: mesh + analytic prototypes, constant
     // placements, one shared material). SDF prototypes are rejected (deferred domain-repetition).
+    // The prototype gets FULL per-object validation (schema/degeneracy/mesh sanity) via the same
+    // validateGeometryObject as top-level objects; only batch-level rules live here.
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
         if (!isInstancedObject(obj)) continue;
@@ -811,12 +736,8 @@ export function validate(
                 .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
         }
         const proto = obj.prototype;
-        if (isMeshObject(proto)) {
-            if (proto.positions.length === 0 || proto.positions.length % 3 !== 0 || proto.indices.length === 0 || proto.indices.length % 3 !== 0) {
-                bag.error('invalid-setting', `Object ${i} (instanced): mesh prototype has malformed positions/indices`)
-                    .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
-            }
-        } else {
+        validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag);
+        if (!isMeshObject(proto)) {
             const backend = resolveBackend(proto.type, proto.backend);
             if (backend === undefined) {
                 bag.error('missing-geometry', `Object ${i} (instanced): prototype primitive '${proto.type}' is not implemented`)
@@ -824,11 +745,43 @@ export function validate(
             } else if (backend !== 'analytic') {
                 bag.error('invalid-setting', `Object ${i} (instanced): '${proto.type}' resolves to the SDF backend — SDF instancing is the deferred domain-repetition feature; v1 supports mesh + analytic prototypes only`)
                     .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+            } else if (PRIMITIVES[proto.type]?.bounds === undefined) {
+                // A1: the TLAS is a BVH over per-instance WORLD boxes, so the prototype
+                // must declare a finite local box (descriptors.ts `bounds` fact). Absent =
+                // unbounded (plane) — reject-not-degrade: a fabricated box would silently
+                // drop instances under the default 'tlas' traversal. Strategy-independent
+                // (a scene must not be valid under only one estimator setting).
+                bag.error('invalid-setting', `Object ${i} (instanced): primitive '${proto.type}' declares no local bounds — an instance prototype needs a finite box (the TLAS is built over per-instance world boxes; unbounded primitives cannot be instanced)`)
+                    .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
             }
         }
         if (proto.transform !== undefined) {
             bag.warning('invalid-setting', `Object ${i} (instanced): the prototype's transform is ignored — placements carry all world placement (impl-plan-instancing)`)
                 .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+        }
+    }
+
+    // Transmissive-on-thin — ONE structural rule (audit A2): a region whose owner never
+    // claims containment in scene_region_at has no interior, so ior_of falls to 1.0 and
+    // the surface refracts as η = 1. The thin set today: zero-thickness primitives (the
+    // descriptor `thin` fact), v0 meshes (surface-only — impl-plan-meshes §3), and v1
+    // instanced batches (surface-only — impl-plan-instancing). Warn, don't error — the
+    // surface still renders. When meshes gain containment (winding-number v2) they leave
+    // the thin set and this rule stops firing for them with no edit here.
+    for (let i = 0; i < scene.objects.length; i++) {
+        const obj = scene.objects[i];
+        const thinCase = isMeshObject(obj)
+            ? 'a v0 mesh (thin surface; dielectric meshes await the containment batch, impl-plan-meshes §3)'
+            : isInstancedObject(obj)
+                ? 'a v1 instanced batch (surface-only; dielectric instances await containment, like glass meshes)'
+                : PRIMITIVES[obj.type]?.thin === true
+                    ? `a zero-thickness '${obj.type}'`
+                    : null;
+        if (thinCase === null) continue;
+        const matName = isInstancedObject(obj) ? obj.prototype.material : obj.material;
+        if (MATERIAL_MODELS[scene.materials[matName]?.model ?? '']?.capabilities.transmission) {
+            bag.warning('invalid-setting', `Object ${i}: a transmissive material on ${thinCase} has no interior region — it will refract as η = 1`)
+                .withOriginal('scene', [`objects[${i}]`, 'material']).add();
         }
     }
 
@@ -888,6 +841,114 @@ export function validate(
                         .add();
                 }
             }
+        }
+    }
+}
+
+/**
+ * Per-object geometry validation — ONE truth for top-level objects AND instanced
+ * prototypes (audit A3: a prototype is an object description; shallow parallel checks
+ * silently skipped schema/degeneracy/index-range and let GPU garbage-fetches through).
+ *
+ * Primitives: backend-pin honorability (B1 + audit C1), descriptor degeneracy rules
+ * (C5 — validateValues runs only over well-shaped required rows), and the parameter
+ * schema (R3 / review C7: `{ r: 2 }` must not silently render a unit sphere — unknown
+ * keys warn, missing required / wrong shape error). Unimplemented TYPES are the
+ * caller's diagnostic (Planner for top-level, the instanced loop for prototypes).
+ *
+ * Meshes: buffer sanity — well-formed lengths and in-range indices (a malformed
+ * buffer would silently texelFetch garbage vertices on the GPU).
+ *
+ * `label` prefixes messages (`Object 3`, `Object 3 prototype`); `path` prefixes
+ * diagnostic origins (`objects[3]` / `objects[3].prototype`).
+ */
+function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag): void {
+    if ('kind' in obj) {
+        const vertexCount = obj.positions.length / 3;
+        if (obj.positions.length === 0 || obj.positions.length % 3 !== 0) {
+            bag.error('invalid-setting', `${label} (mesh): positions length ${obj.positions.length} is not a nonzero multiple of 3`)
+                .withOriginal('scene', [...path, 'positions']).add();
+        }
+        if (obj.indices.length === 0 || obj.indices.length % 3 !== 0) {
+            bag.error('invalid-setting', `${label} (mesh): indices length ${obj.indices.length} is not a nonzero multiple of 3`)
+                .withOriginal('scene', [...path, 'indices']).add();
+        } else if (Number.isInteger(vertexCount)) {
+            let maxIdx = -1;
+            for (let k = 0; k < obj.indices.length; k++) if (obj.indices[k] > maxIdx) maxIdx = obj.indices[k];
+            if (maxIdx >= vertexCount) {
+                bag.error('invalid-setting', `${label} (mesh): vertex index ${maxIdx} out of range (only ${vertexCount} vertices)`)
+                    .withOriginal('scene', [...path, 'indices']).add();
+            }
+        }
+        if (obj.normals !== undefined && obj.normals.length !== obj.positions.length) {
+            bag.error('invalid-setting', `${label} (mesh): normals length ${obj.normals.length} must match positions length ${obj.positions.length} (one normal per vertex)`)
+                .withOriginal('scene', [...path, 'normals']).add();
+        }
+        if (obj.uvs !== undefined && obj.uvs.length !== vertexCount * 2) {
+            bag.error('invalid-setting', `${label} (mesh): uvs length ${obj.uvs.length} must be 2× the vertex count (${vertexCount * 2})`)
+                .withOriginal('scene', [...path, 'uvs']).add();
+        }
+        return;
+    }
+
+    const type = obj.type;
+    const desc = type !== undefined ? PRIMITIVES[type] : undefined;
+    if (desc !== undefined && obj.backend !== undefined
+        && (obj.backend === 'sdf' ? !desc.provides.sdf : !desc.provides.analytic)) {
+        bag.error('invalid-setting',
+            `${label}: backend '${obj.backend}' pinned but primitive '${type}' does not provide it`)
+            .withOriginal('scene', [...path, 'backend'])
+            .add();
+    }
+    // Coupled degeneracy rules come from the DESCRIPTOR (C5: the last primitive
+    // name-branch died here — quad's parallel-edges rule lives on quad.ts, ONE
+    // formula with the quad light's). Runs only over well-shaped required rows.
+    if (desc?.validateValues !== undefined) {
+        const rowsOk = desc.params.every((s) => {
+            const v = obj.parameters[s.name];
+            if (v === undefined) return !s.required;
+            return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
+        });
+        if (rowsOk) {
+            for (const msg of desc.validateValues(obj.parameters)) {
+                bag.error('invalid-setting', `${label} (${type}): ${msg}`)
+                    .withOriginal('scene', path)
+                    .add();
+            }
+        }
+    }
+    // Parameter schema (C7). Unimplemented types / unhonorable pins skip it — those
+    // carry their own diagnostics.
+    if (!desc || resolveBackend(type, obj.backend) === undefined) return;
+    const params = (obj.parameters ?? {}) as Record<string, unknown>;
+    const schema = desc.params;
+    const known = new Map(schema.map((s) => [s.name, s]));
+    for (const key of Object.keys(params)) {
+        if (!known.has(key)) {
+            bag.warning('invalid-setting',
+                `${label} (${type}): unknown parameter '${key}' is ignored (valid: ${schema.map((s) => s.name).join(', ')})`)
+                .add();
+        }
+    }
+    for (const s of schema) {
+        const v = params[s.name];
+        if (v === undefined) {
+            if (s.required) {
+                bag.error('invalid-setting',
+                    `${label} (${type}): required parameter '${s.name}' is missing`)
+                    .add();
+            }
+            continue;
+        }
+        const shapeOk = s.shape === 'number'
+            ? typeof v === 'number' && Number.isFinite(v)
+            : Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number' && Number.isFinite(c));
+        if (!shapeOk) {
+            bag.error('invalid-setting',
+                `${label} (${type}): parameter '${s.name}' must be a ${s.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
+                .add();
+        } else {
+            validatePrimitiveConstraint(s, v, `${label} (${type}): parameter '${s.name}'`, bag);
         }
     }
 }

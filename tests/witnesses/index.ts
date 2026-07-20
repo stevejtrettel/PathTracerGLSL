@@ -21,8 +21,8 @@ import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '.
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
-import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy } from './scenes/meshWitness.js';
-import { instanceTwin, instanceTwinRef, instanceTwinStrategy } from './scenes/instanceWitness.js';
+import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy } from './scenes/meshWitness.js';
+import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy } from './scenes/instanceWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import {
     slabScene, slabStrategy,
@@ -146,13 +146,19 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     },
     'mesh-quad-twin': {
         scene: meshQuadTwin,
-        strategies: [meshTwinStrategy],
-        exercises: 'floor + floating blocker authored as ONE triangle mesh: primary hits, Lambert shading, and NEE occlusion (mesh_intersect_any casts the blocker\'s shadow) — twin of mesh-quad-ref (analytic quads)',
-        expected: 'converges to the same image as mesh-quad-ref (the mesh and analytic backends agree)',
+        strategies: [meshTwinStrategy, meshTwinBruteStrategy],
+        exercises: 'floor + floating blocker authored as ONE triangle mesh: primary hits, Lambert shading, and NEE occlusion (mesh_intersect_any casts the blocker\'s shadow) — twin of mesh-quad-ref (analytic quads); key 2 = the brute-force traversal arm',
+        expected: 'converges to the same image as mesh-quad-ref (the mesh and analytic backends agree); bvh ≡ brute near-exactly (same candidate set, same stream)',
         witness: {
             spp: 96,
-            // Cross-backend twin → the display-space RMSE gate (like analytic-minimal), not χ².
-            checks: [{ kind: 'twin', other: { scene: 'mesh-quad-ref' }, meanTol: 0.02, rmse: 0.08, label: 'mesh ≡ analytic quads' }],
+            checks: [
+                // Cross-backend twin → the display-space RMSE gate (like analytic-minimal), not χ².
+                { kind: 'twin', other: { scene: 'mesh-quad-ref' }, meanTol: 0.02, rmse: 0.08, label: 'mesh ≡ analytic quads' },
+                // Estimator-swap obligation (taxonomy): identical stream + identical candidate
+                // set → near-bit-exact; any gap is a real traversal bug (dropped subtrees,
+                // slab edge, wrong leaf range). Tight rmse opts out of χ² (identical-stream arms).
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'bvh ≡ brute (identical stream)' },
+            ],
         },
     },
     // Instancing (impl-plan-instancing): one prototype × N placements ≡ N individual objects.
@@ -163,12 +169,34 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     },
     'instance-twin': {
         scene: instanceTwin,
-        strategies: [instanceTwinStrategy],
-        exercises: 'three spheres as ONE instanced batch (shared prototype + placement texture, ray-into-local, one region) — the placement loop vs the ordinary analytic path',
-        expected: 'converges to the same image as instance-twin-ref (instancing changes cost + region count, not the image)',
+        strategies: [instanceTwinStrategy, instanceTwinLinearStrategy],
+        exercises: 'three spheres as ONE instanced batch (shared prototype + placement texture, ray-into-local, one region) — the placement loop vs the ordinary analytic path; key 2 = the linear-scan arm',
+        expected: 'converges to the same image as instance-twin-ref (instancing changes cost + region count, not the image); tlas ≡ linear near-exactly',
         witness: {
             spp: 96,
-            checks: [{ kind: 'twin', other: { scene: 'instance-twin-ref' }, meanTol: 0.01, rmse: 0.03, label: 'instanced ≡ individual objects' }],
+            checks: [
+                { kind: 'twin', other: { scene: 'instance-twin-ref' }, meanTol: 0.01, rmse: 0.03, label: 'instanced ≡ individual objects' },
+                // Estimator-swap obligation: the TLAS visits the same placements as the
+                // linear scan with the same stream — near-bit-exact (see mesh-quad-twin).
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'tlas ≡ linear (identical stream)' },
+            ],
+        },
+    },
+    // Mesh-prototype instancing (the ÷s-convention guard — the bug class found only by
+    // GPU render on scale≠1 instances; see impl-plan-instancing's convention record).
+    'mesh-instance-ref': {
+        scene: meshInstanceRef,
+        strategies: [meshInstanceStrategy],
+        exercises: 'reference arm of the mesh-instance twin — the three rotated/scaled cube meshes as individual mesh objects (constant ray-into-local placement)',
+    },
+    'mesh-instance-twin': {
+        scene: meshInstanceTwin,
+        strategies: [meshInstanceStrategy],
+        exercises: 'three rotated, SCALE-VARIED cube meshes as ONE instanced batch (shared BLAS, ÷s ray-into-local conjugation, per-batch TLAS) — twin of mesh-instance-ref; guards the mesh arm\'s non-unit-ray convention',
+        expected: 'converges to the same image as mesh-instance-ref (shared-BLAS instancing ≡ individual meshes, including scale ≠ 1)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'mesh-instance-ref' }, meanTol: 0.01, rmse: 0.03, label: 'instanced meshes ≡ individual meshes' }],
         },
     },
     // Fixture partner: the SDF half of the analytic-minimal twin (and the direct-only

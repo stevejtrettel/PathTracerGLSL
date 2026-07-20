@@ -33,7 +33,7 @@ function add(a: number[], b: number[]): number[] { return [a[0] + b[0], a[1] + b
 /** Axis-aligned cube [-h,h]³ as 12 triangles. Each face's (edge1, edge2) are ordered so
  *  cross(edge1, edge2) is the OUTWARD normal; `inward` reverses winding (flips every normal),
  *  giving the furnace's inward-facing faces. Verified by the winding scratch check. */
-function boxMesh(h: number, inward: boolean): { positions: Float32Array; indices: Uint32Array } {
+export function boxMesh(h: number, inward: boolean): { positions: Float32Array; indices: Uint32Array } {
     const pos: number[] = [];
     const idx: number[] = [];
     // corner, e1, e2 per face — cross(e1,e2) = OUTWARD normal (see table in the plan).
@@ -134,3 +134,15 @@ const meshTwinBase: RenderStrategy = {
 
 // Look down at the floor from the front so the blocker's shadow is visible.
 export const meshTwinStrategy: RenderStrategy = withPose(meshTwinBase, [0, 2.2, 4.5], [0, -0.6, 0]);
+
+// The estimator-swap arm (taxonomy obligation: estimator fields are bias-free by
+// contract, so swapping the traversal engine must not change the image). Identical
+// RNG stream + identical candidate set → near-bit-exact agreement; the only things
+// that can separate the arms are real traversal bugs (dropped subtrees at stack
+// depth, slab-test edge cases, a wrong leaf range). Distinct id — renderer IDs are
+// `${strategy.id}-${scene.id}` and collisions silently clobber programs.
+export const meshTwinBruteStrategy: RenderStrategy = {
+    ...meshTwinStrategy,
+    id: 'pathtracer-brute',
+    estimator: { ...meshTwinStrategy.estimator, meshTraversal: 'brute' },
+};

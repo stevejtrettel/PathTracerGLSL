@@ -1,19 +1,15 @@
-// intersection/bvh_common.glsl — shared BVH-traversal support (impl-plan-tlas).
-// The generic pieces every BVH walk needs, independent of leaf type — used by the mesh BLAS walk
-// (mesh.glsl) AND the generated instance TLAS walk. Kept separate so an analytic-only instanced
-// scene pulls these WITHOUT the triangle leaf (mesh.glsl). Provides: bvh_texel1d, bvh_aabb_hit,
-// BVH_STACK_DEPTH. Depends on: MESH_TEX_WIDTH (the data-texture width, emitted).
+// accel/bvh/bvh.glsl — ray-walk support for BVH traversal (impl-plan-tlas; audit batch 3).
+// The generic pieces every ray-query BVH walk needs, independent of leaf type — used by the
+// mesh BLAS walk (intersection/mesh/mesh.glsl) AND the generated instance TLAS walk. Non-ray
+// queries (a future light-BVH importance walk, majorant grids) write their own query GLSL next
+// to their domain — build is shared, query is local. Provides: bvh_aabb_hit, BVH_STACK_DEPTH.
+// Depends on: data_texel1d (glsl/core/data_texture.glsl, included before this file).
 
 // GLSL traversal stack depth — emitted by the feature from bvh.ts's BVH_STACK_DEPTH const; the
 // #ifndef fallback keeps standalone glslang happy. The builder warns if a tree would exceed it.
 #ifndef BVH_STACK_DEPTH
 #define BVH_STACK_DEPTH 64
 #endif
-
-// Linear texel index → 2D coordinate (data textures are row-major at the fixed width).
-ivec2 bvh_texel1d(uint i) {
-    return ivec2(int(i % uint(MESH_TEX_WIDTH)), int(i / uint(MESH_TEX_WIDTH)));
-}
 
 // Node layout (a BVH node texture, 2 RGBA32F texels/node — impl-plan-mesh-bvh §3):
 //   texel 2i = (min.xyz, A)   texel 2i+1 = (max.xyz, B)

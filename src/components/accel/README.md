@@ -1,0 +1,43 @@
+# accel/ — the spatial-index substrate
+
+**Taxonomy:** acceleration structures — the spatial indexes other families build over
+their data. NOT an engine family: an acceleration structure wears the same query
+capability as the things it indexes (PBRT's "the aggregate is a primitive" — the
+instance TLAS walk is just another `(Ray, inout Hit)` arm), so nothing above the owning
+family knows acceleration exists. This family owns the **build side**: builders are
+pure, execution-agnostic TS ("precompute the HOW"); **queries live with their
+domains** (the mesh BLAS walk in `intersection/mesh/mesh.glsl`, the generated instance
+TLAS walk in the intersection feature) because queries genuinely differ (ray-box vs
+importance vs point-radius) and are performance-critical.
+
+**Client envelope** (why this is a substrate, not a mesh detail): geometry ray queries
+(BLAS + TLAS — built), the many-lights BVH (deferred, impl-plan-area-lights ledger),
+majorant grids for heterogeneous media (the pbrt-v4 step past the single ceiling).
+Each future client imports the build core and writes its own query.
+
+## Occupants
+
+| Occupant | Role |
+|---|---|
+| `bvh/` | Binned-SAH BVH: `buildBVHNodes` (the core over ANY AABB list) + `buildBVH` (triangle feeder) + the 2-texel node format + `packNodes` (its rail emission) + `bvh.glsl` (ray-walk support: slab test, stack depth). |
+
+## Contract
+
+An occupant supplies:
+- a **builder**: pure TS, deterministic (no RNG/Date), flat-typed-array output sized
+  for the data rail (`components/data_textures.ts`);
+- its **record format** as the single documented truth (the node encoding lives here,
+  beside the code that emits and the walk support that decodes it);
+- **walk support GLSL** only for query pieces genuinely shared across its clients
+  (the ray slab test); domain-specific traversals stay with their domains.
+
+The compiler consumes occupants through the owning family's feature (intersection
+emits the walks and the `BVH_STACK_DEPTH` define from `bvh.ts`'s const); the app
+consumes builders through the owning family's packers (`packMesh`,
+`packInstanceBatch`).
+
+## Adding an occupant
+
+One folder (`accel/<name>/{<name>.ts, <name>.glsl?, <name>.md?}`) + imports from its
+client family. A registry arrives when build algorithms become a one-of-N axis
+(a second builder — median/PLOC); today presence is capability-driven.

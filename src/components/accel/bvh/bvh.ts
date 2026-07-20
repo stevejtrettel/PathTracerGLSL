@@ -1,9 +1,12 @@
-// components/intersection/mesh/bvh.ts — binned-SAH BVH builder (impl-plan-mesh-bvh v1).
+// components/accel/bvh/bvh.ts — binned-SAH BVH builder (impl-plan-mesh-bvh v1; audit
+// batch 3 moved it to accel/ — the spatial-index SUBSTRATE family).
 //
-// Pure TS ("precompute the HOW" — the GPU consumes a flat node array, never builds). Takes a
-// mesh's LOCAL positions + triangle indices, returns a flattened depth-first node array (2 texels
-// / 8 floats per node) plus the triangle index re-emitted in BVH-LEAF order (leaves reference a
-// contiguous [offset, offset+count) range). The GLSL walk (mesh.glsl) reads exactly this layout.
+// Pure TS ("precompute the HOW" — the GPU consumes a flat node array, never builds).
+// `buildBVHNodes` is the SAH core over ANY AABB list — one builder, many feeders: the
+// mesh BLAS (triangle boxes, `buildBVH` below), the instance TLAS (placement boxes,
+// intersection/instancing), and whatever indexes next (light BVH, scene TLAS). Build is
+// shared and execution-agnostic; QUERIES live with their domains (the ray walks read
+// this node layout via accel/bvh/bvh.glsl + the generated TLAS walk).
 //
 // Node encoding (2 RGBA32F texels — no bit-packing, no usampler2D; impl-plan-mesh-bvh §3):
 //   texel 0 = (min.x, min.y, min.z, A)
@@ -11,9 +14,11 @@
 //   A >= 0  → LEAF:     count = A,  offset = B
 //   A <  0  → INTERNAL: splitAxis = -A - 1 (0|1|2),  rightChild = B,  leftChild = nodeIdx + 1
 
+import { packFloatTexels, type PackedTexture } from '../../data_textures.js';
+
 export const BVH_LEAF_SIZE = 2;   // stop splitting at ≤ this many triangles
 export const BVH_BINS = 12;       // SAH candidate planes per axis
-/** GLSL traversal stack depth (bvh_common.glsl). A well-balanced SAH tree needs ~2·log₂(N)+slack,
+/** GLSL traversal stack depth (bvh.glsl). A well-balanced SAH tree needs ~2·log₂(N)+slack,
  *  so 64 covers millions of items; buildBVHNodes warns if a (degenerate) tree would exceed it —
  *  the walk guards against overflow but would silently drop subtrees past the stack. ONE source:
  *  the feature emits `#define BVH_STACK_DEPTH` from this const. */
@@ -135,9 +140,8 @@ export function buildBVHNodes(boxes: AABB[]): { nodes: Float32Array; nodeCount: 
         // Degenerate partition guard (all to one side despite a "valid" plane) → median split.
         if (mid === start || mid === end) mid = (start + end) >> 1;
 
-        const leftIdx = emit(start, mid, depth + 1);   // === nodeIdx + 1 (implicit left)
+        emit(start, mid, depth + 1);   // left lands at nodeIdx + 1 (implicit — never stored)
         const rightIdx = emit(mid, end, depth + 1);
-        void leftIdx;
 
         nodes[nodeIdx * 8 + 0] = bounds.min[0]; nodes[nodeIdx * 8 + 1] = bounds.min[1]; nodes[nodeIdx * 8 + 2] = bounds.min[2];
         nodes[nodeIdx * 8 + 3] = -1 - bestAxis;    // A < 0 → internal, axis = -A-1
@@ -187,6 +191,14 @@ export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResu
 export function rootBoxOf(nodes: Float32Array, nodeCount: number): AABB {
     if (nodeCount === 0) return emptyAABB();
     return { min: [nodes[0], nodes[1], nodes[2]], max: [nodes[4], nodes[5], nodes[6]] };
+}
+
+/** Pack a flat node array onto the data rail (2 texels/node — the encoding above). The
+ *  node FORMAT is this file's contract, so its texture emission lives beside it; the
+ *  grid/width mechanics are the rail's. Shared by the BLAS (mesh) and the TLAS
+ *  (instancing) — same node format, one packer. */
+export function packNodes(nodes: Float32Array, nodeCount: number): PackedTexture<Float32Array> {
+    return packFloatTexels(nodes, Math.max(1, nodeCount * 2));
 }
 
 /** World AABB of a local box under a similarity (8-corner transform) — for TLAS leaf boxes. */

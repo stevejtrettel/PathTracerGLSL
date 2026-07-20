@@ -3,7 +3,7 @@
 // cross-check (the TS traversal mirror must visit the same nearest triangle brute force finds).
 
 import { describe, it, expect } from 'vitest';
-import { buildBVH } from '../../src/components/intersection/mesh/bvh.js';
+import { buildBVH } from '../../src/components/accel/bvh/bvh.js';
 
 type V3 = [number, number, number];
 

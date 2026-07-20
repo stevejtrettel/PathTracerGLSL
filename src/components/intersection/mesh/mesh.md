@@ -15,8 +15,9 @@ Per mesh, keyed by ordinal (`meshExternNames`):
 | `mesh_N_normal` | 1/vertex | xyz vertex normals (zeros when unauthored; read only when smooth) |
 | `mesh_N_uv` | 1/vertex | xy vertex UVs (zeros when unauthored) |
 
-Linear index → texel via `bvh_texel1d` at the fixed `MESH_TEX_WIDTH`. The compiler and the
-app both import `MESH_TEX_WIDTH`/`meshExternNames` from `mesh.ts`, so the packed layout and the
+Linear index → texel via `data_texel1d` at the fixed `DATA_TEX_WIDTH` (the data rail,
+`components/data_textures.ts`). The compiler and the app both derive ordinals/extern names from
+`mesh.ts` (`sceneMeshes`/`meshExternNames`), so the packed layout and the
 `texelFetch` math cannot drift.
 
 ## Traversal (v0 brute force, BVH-ready)

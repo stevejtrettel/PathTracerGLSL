@@ -1,11 +1,11 @@
 // Triangle-mesh engine — the intersection family's second occupant (impl-plan-meshes).
 // Provides: mesh_nearest_local/mesh_any_local (the shared LEAF over the triangle soup) +
-//           mesh_nearest_bvh/mesh_any_bvh (the BLAS walk). Depends on bvh_common.glsl
-//           (bvh_texel1d/bvh_aabb_hit/BVH_STACK_DEPTH), included before it. The generated
-//           per-mesh wrappers (features/intersection.ts)
+//           mesh_nearest_bvh/mesh_any_bvh (the BLAS walk). Depends on data_texel1d
+//           (glsl/core/data_texture.glsl) + bvh_aabb_hit/BVH_STACK_DEPTH (accel/bvh/bvh.glsl),
+//           both included before it. The generated per-mesh wrappers (features/intersection.ts)
 //           conjugate the world ray into the mesh's LOCAL frame, call these, and assemble
 //           the world-space Hit — so this file is placement-agnostic.
-// Depends on: MESH_TEX_WIDTH (numeric knob, emitted), the data-texture layout the packer
+// Depends on: DATA_TEX_WIDTH (the rail width, emitted), the data-texture layout the packer
 //             (mesh.ts) produces — ALL FOUR are RGBA32F (vertex indices ≤ 16M are exact in
 //             f32, so the index texture stays float and needs no usampler2D): position
 //             (xyz/vertex), index (ijk/tri, read as float→uint), normal (xyz/vertex),
@@ -20,8 +20,8 @@
 // equals the world t (p_world = ambient_geodesic(world_o, world_d, t)). See the derivation in
 // impl-plan-meshes §6. Normals come back in LOCAL space; the wrapper rotates them to world.
 
-// Generic BVH support (bvh_texel1d, bvh_aabb_hit, BVH_STACK_DEPTH) lives in bvh_common.glsl,
-// included before this file. This file owns the TRIANGLE leaf + the mesh BLAS walk.
+// This file owns the TRIANGLE leaf + the mesh BLAS walk; addressing (data_texel1d) and
+// generic walk support (bvh_aabb_hit) come from the rail/accel files included before it.
 
 // Möller–Trumbore (transcribed from three-mesh-bvh bvh_ray_functions), returning barycentrics
 // (in A,B,C order) + the geometric normal + the hit's signed side. Local space.
@@ -46,9 +46,9 @@ bool mesh_tri_test(vec3 ro, vec3 rd, vec3 a, vec3 b, vec3 c,
 }
 
 // Fetch a vertex position / normal / uv by vertex index.
-vec3 mesh_pos(sampler2D posTex, uint vi)  { return texelFetch(posTex, bvh_texel1d(vi), 0).xyz; }
-vec3 mesh_nrm(sampler2D nrmTex, uint vi)  { return texelFetch(nrmTex, bvh_texel1d(vi), 0).xyz; }
-vec2 mesh_uv (sampler2D uvTex,  uint vi)  { return texelFetch(uvTex,  bvh_texel1d(vi), 0).xy;  }
+vec3 mesh_pos(sampler2D posTex, uint vi)  { return texelFetch(posTex, data_texel1d(vi), 0).xyz; }
+vec3 mesh_nrm(sampler2D nrmTex, uint vi)  { return texelFetch(nrmTex, data_texel1d(vi), 0).xyz; }
+vec2 mesh_uv (sampler2D uvTex,  uint vi)  { return texelFetch(uvTex,  data_texel1d(vi), 0).xy;  }
 
 // ── The shared triangle LEAF ─────────────────────────────────────────────────────────────
 // Both traversals (brute force AND the BVH) run these over a range [offset, offset+count) of the
@@ -62,7 +62,7 @@ void mesh_test_range(
     inout float tmax, inout vec3 nLocal, inout vec2 uvOut, inout bool found
 ) {
     for (uint i = offset; i < offset + count; i++) {
-        uvec3 tri = uvec3(texelFetch(idxTex, bvh_texel1d(i), 0).xyz);
+        uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(i), 0).xyz);
         vec3 a = mesh_pos(posTex, tri.x);
         vec3 b = mesh_pos(posTex, tri.y);
         vec3 c = mesh_pos(posTex, tri.z);
@@ -86,7 +86,7 @@ void mesh_test_range(
 // Any-hit occlusion in [offset, offset+count): first triangle strictly before maxDist blocks.
 bool mesh_any_range(sampler2D posTex, sampler2D idxTex, uint offset, uint count, vec3 ro, vec3 rd, float maxDist) {
     for (uint i = offset; i < offset + count; i++) {
-        uvec3 tri = uvec3(texelFetch(idxTex, bvh_texel1d(i), 0).xyz);
+        uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(i), 0).xyz);
         vec3 a = mesh_pos(posTex, tri.x);
         vec3 b = mesh_pos(posTex, tri.y);
         vec3 c = mesh_pos(posTex, tri.z);
@@ -111,8 +111,8 @@ bool mesh_any_local(sampler2D posTex, sampler2D idxTex, uint triCount, vec3 ro, 
     return mesh_any_range(posTex, idxTex, 0u, triCount, ro, rd, maxDist);
 }
 
-// ── BVH: a fixed-stack DFS around the shared leaf (v1). bvh_texel1d/bvh_aabb_hit/BVH_STACK_DEPTH
-//    come from bvh_common.glsl. Node layout: 2 RGBA32F texels/node (min.xyz+A, max.xyz+B);
+// ── BVH: a fixed-stack DFS around the shared leaf (v1). data_texel1d/bvh_aabb_hit/BVH_STACK_DEPTH
+//    come from the included rail/accel files. Node layout: 2 RGBA32F texels/node (min.xyz+A, max.xyz+B);
 //    A >= 0 → LEAF (count=A, offset=B);  A < 0 → INTERNAL (axis=-A-1, rightChild=B, left=i+1). ──
 
 bool mesh_nearest_bvh(
@@ -126,8 +126,8 @@ bool mesh_nearest_bvh(
     stack[0] = 0;                                  // root
     while (ptr >= 0) {
         int ni = stack[ptr]; ptr--;
-        vec4 n0 = texelFetch(bvhTex, bvh_texel1d(uint(ni * 2)), 0);
-        vec4 n1 = texelFetch(bvhTex, bvh_texel1d(uint(ni * 2 + 1)), 0);
+        vec4 n0 = texelFetch(bvhTex, data_texel1d(uint(ni * 2)), 0);
+        vec4 n1 = texelFetch(bvhTex, data_texel1d(uint(ni * 2 + 1)), 0);
         float tenter;
         if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, rd, tmax, tenter)) continue;   // prune by running nearest
         if (n0.w >= 0.0) {
@@ -151,8 +151,8 @@ bool mesh_any_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, vec3 ro,
     stack[0] = 0;
     while (ptr >= 0) {
         int ni = stack[ptr]; ptr--;
-        vec4 n0 = texelFetch(bvhTex, bvh_texel1d(uint(ni * 2)), 0);
-        vec4 n1 = texelFetch(bvhTex, bvh_texel1d(uint(ni * 2 + 1)), 0);
+        vec4 n0 = texelFetch(bvhTex, data_texel1d(uint(ni * 2)), 0);
+        vec4 n1 = texelFetch(bvhTex, data_texel1d(uint(ni * 2 + 1)), 0);
         float tenter;
         if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, rd, maxDist, tenter)) continue;
         if (n0.w >= 0.0) {
