@@ -87,7 +87,7 @@ export type EnvironmentDescription =
 // optional `backend` pin remains as per-object research/coverage annotation
 // (computation metadata riding in the scene like `name` does).
 
-export type ObjectDescription = PrimitiveObject | MeshObject;
+export type ObjectDescription = PrimitiveObject | MeshObject | InstancedObject;
 
 export interface PrimitiveObject {
     /** Primitive type — registry-validated (unknown types get a diagnostic listing
@@ -105,6 +105,12 @@ export interface PrimitiveObject {
      *  exercised on primitives that would otherwise resolve analytic. */
     backend?: 'sdf' | 'analytic';
 }
+
+/** Object-kind guards (three kinds now: primitive has no `kind`, mesh, instanced). Use these
+ *  instead of the ambiguous `'kind' in obj` where mesh vs instanced matters. */
+export function isMeshObject(o: ObjectDescription): o is MeshObject { return 'kind' in o && o.kind === 'mesh'; }
+export function isInstancedObject(o: ObjectDescription): o is InstancedObject { return 'kind' in o && o.kind === 'instanced'; }
+export function isPrimitiveObject(o: ObjectDescription): o is PrimitiveObject { return !('kind' in o); }
 
 /**
  * A triangle mesh (impl-plan-meshes). Built from incoming data (OBJ → authoring loader).
@@ -127,6 +133,26 @@ export interface MeshObject {
     uvs?: Float32Array;
     material: string;
     transform?: Transform;
+    /** Provenance only (never identity) — see PrimitiveObject.name. */
+    name?: string;
+}
+
+/**
+ * An INSTANCED batch (impl-plan-instancing): one prototype geometry placed at N transforms,
+ * sharing the geometry (one upload/emit, one region/material). Stays flat — the placement LIST
+ * is array data, not a tree (like MeshObject's vertex arrays). v1: mesh + analytic prototypes,
+ * constant placements, one shared material (the prototype's), opaque/surface-only. The prototype
+ * is LOCAL geometry — its own `transform` is ignored (owner-decided: the prototype owns no
+ * placement; the `placements` are the world similarities). SDF prototypes are Validator-rejected
+ * (SDF instancing is the deferred domain-repetition generalization).
+ */
+export interface InstancedObject {
+    kind: 'instanced';
+    /** The geometry to replicate. Its `material` becomes the batch material; its `transform`
+     *  (if any) is ignored — placements carry all world placement. */
+    prototype: PrimitiveObject | MeshObject;
+    /** N world similarities, one per instance. Constant in v1 (baked into the placement texture). */
+    placements: Transform[];
     /** Provenance only (never identity) — see PrimitiveObject.name. */
     name?: string;
 }

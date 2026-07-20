@@ -6,6 +6,9 @@ import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, meshExternNames } from '../components/intersection/mesh/mesh.js';
+import { packPlacements, instanceExternNames } from '../components/intersection/instancing/instancing.js';
+import { similarityFromTransform } from '../components/geometry/similarity.js';
+import { isMeshObject, isInstancedObject } from '../compiler/types.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
@@ -159,6 +162,7 @@ export class App {
         if (config.scene !== undefined) {
             try {
                 this._uploadMeshes(config.scene);
+                this._uploadInstances(config.scene);
             } catch (error: any) {
                 this._showErrorOverlay(error);
                 throw error;
@@ -216,7 +220,7 @@ export class App {
     private _uploadMeshes(scene: SceneDescription): void {
         let ordinal = 0;
         for (const obj of scene.objects) {
-            if (!('kind' in obj)) continue;
+            if (!isMeshObject(obj)) continue;
             const packed = packMesh(obj);
             const names = meshExternNames(ordinal++);
             this.engine.registerDataTexture(names.position, packed.position.data, packed.position.width, packed.position.height);
@@ -226,6 +230,31 @@ export class App {
             // The BVH node texture — bound only by bvh-traversal programs, but registered always
             // (scene-static data; a brute program simply never declares/binds it).
             this.engine.registerDataTexture(names.bvh, packed.bvh.data, packed.bvh.width, packed.bvh.height);
+        }
+    }
+
+    /**
+     * Pack every instanced batch (impl-plan-instancing): the per-instance placement texture (always)
+     * + the prototype's mesh BLAS textures (mesh prototypes only). Extern names by batch ordinal —
+     * the same convention the compiler's `extern:` sources use. Placement lowering reuses the shared
+     * rigidInverse ABI (via packPlacements), so it can't drift from the driven-placement path.
+     */
+    private _uploadInstances(scene: SceneDescription): void {
+        let ordinal = 0;
+        for (const obj of scene.objects) {
+            if (!isInstancedObject(obj)) continue;
+            const names = instanceExternNames(ordinal++);
+            const placements = obj.placements.map((t) => similarityFromTransform(t));
+            const packed = packPlacements(placements);
+            this.engine.registerDataTexture(names.placements, packed.data, packed.width, packed.height);
+            if (isMeshObject(obj.prototype)) {
+                const p = packMesh(obj.prototype);
+                this.engine.registerDataTexture(names.position, p.position.data, p.position.width, p.position.height);
+                this.engine.registerDataTexture(names.index, p.index.data, p.index.width, p.index.height);
+                this.engine.registerDataTexture(names.normal, p.normal.data, p.normal.width, p.normal.height);
+                this.engine.registerDataTexture(names.uv, p.uv.data, p.uv.width, p.uv.height);
+                this.engine.registerDataTexture(names.bvh, p.bvh.data, p.bvh.width, p.bvh.height);
+            }
         }
     }
 

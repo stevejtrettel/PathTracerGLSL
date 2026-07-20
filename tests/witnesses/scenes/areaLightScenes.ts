@@ -74,7 +74,7 @@ export const cornellAreaGlass: SceneDescription = {
     ...cornellArea,
     id: 'cornell-area-glass',
     name: 'Cornell + Quad + Glass (X-GLASS)',
-    objects: cornellArea.objects.map((o) => (o.material === 'clay' ? { ...o, material: 'glass' } : o)),
+    objects: cornellArea.objects.map((o) => ('material' in o && o.material === 'clay' ? { ...o, material: 'glass' } : o)),
     materials: {
         white: { model: 'lambert', albedo: [0.73, 0.73, 0.73] },
         red: { model: 'lambert', albedo: [0.65, 0.05, 0.05] },

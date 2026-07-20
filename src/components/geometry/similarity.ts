@@ -149,6 +149,16 @@ export function similarityFromTRS(translation: Vec3Tuple, rotation: Quat, scale:
     return { rotation: quatNormalize(rotation), translation, scale };
 }
 
+/** The §6.1 rigid-frame INVERSE ABI (transforms §6.1): the pair a shader conjugates a ray with —
+ *  q = inverse rotation, ts = (t_rigid = −Rᵀt, s). ONE truth shared by driven placement
+ *  (buildDrivenPlacement's per-frame closure) and instancing (per-constant-placement, packed into
+ *  the placement texture): world→local point = placement_rigid(q, ts, p) / s. */
+export function rigidInverse(g: Similarity): { q: Quat; ts: [number, number, number, number] } {
+    const q = quatConjugate(g.rotation);
+    const tr = quatRotate(q, g.translation);
+    return { q, ts: [-tr[0], -tr[1], -tr[2], g.scale] };
+}
+
 /** True when any transform field is `{param}`-driven (stage 4). Lives HERE (not in
  *  compiler types) so the Planner, Validator, AND the authoring layer share one
  *  implementation — components may not import compiler VALUES, but everyone imports

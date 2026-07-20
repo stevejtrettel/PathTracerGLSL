@@ -2,7 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3 } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -748,8 +748,10 @@ export function validate(
     const materialNames = new Set(Object.keys(scene.materials));
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
-        if (!materialNames.has(obj.material)) {
-            bag.error('missing-material', `Object ${i}: references unknown material '${obj.material}'`)
+        // Instanced batches carry the material on the prototype (it becomes the batch material).
+        const mat = isInstancedObject(obj) ? obj.prototype.material : obj.material;
+        if (!materialNames.has(mat)) {
+            bag.error('missing-material', `Object ${i}: references unknown material '${mat}'`)
                 .withOriginal('scene', [`objects[${i}]`, `material`])
                 .suggest(`Available materials: ${[...materialNames].join(', ')}`)
                 .add();
@@ -760,7 +762,7 @@ export function validate(
     // in range — a malformed buffer would silently texelFetch garbage vertices on the GPU.
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
-        if (!('kind' in obj)) continue;
+        if (!isMeshObject(obj)) continue;
         const vertexCount = obj.positions.length / 3;
         if (obj.positions.length === 0 || obj.positions.length % 3 !== 0) {
             bag.error('invalid-setting', `Object ${i} (mesh): positions length ${obj.positions.length} is not a nonzero multiple of 3`)
@@ -795,11 +797,47 @@ export function validate(
         }
     }
 
+    // Instanced-batch validation (impl-plan-instancing v1: mesh + analytic prototypes, constant
+    // placements, one shared material). SDF prototypes are rejected (deferred domain-repetition).
+    for (let i = 0; i < scene.objects.length; i++) {
+        const obj = scene.objects[i];
+        if (!isInstancedObject(obj)) continue;
+        if (obj.placements.length === 0) {
+            bag.error('invalid-setting', `Object ${i} (instanced): placements is empty — nothing to place`)
+                .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+        }
+        if (obj.placements.some((p) => isDrivenTransform(p))) {
+            bag.error('invalid-setting', `Object ${i} (instanced): {param}-driven per-instance placements are not supported in v1 (constant placements only)`)
+                .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+        }
+        const proto = obj.prototype;
+        if (isMeshObject(proto)) {
+            if (proto.positions.length === 0 || proto.positions.length % 3 !== 0 || proto.indices.length === 0 || proto.indices.length % 3 !== 0) {
+                bag.error('invalid-setting', `Object ${i} (instanced): mesh prototype has malformed positions/indices`)
+                    .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+            }
+        } else {
+            const backend = resolveBackend(proto.type, proto.backend);
+            if (backend === undefined) {
+                bag.error('missing-geometry', `Object ${i} (instanced): prototype primitive '${proto.type}' is not implemented`)
+                    .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+            } else if (backend !== 'analytic') {
+                bag.error('invalid-setting', `Object ${i} (instanced): '${proto.type}' resolves to the SDF backend — SDF instancing is the deferred domain-repetition feature; v1 supports mesh + analytic prototypes only`)
+                    .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+            }
+        }
+        if (proto.transform !== undefined) {
+            bag.warning('invalid-setting', `Object ${i} (instanced): the prototype's transform is ignored — placements carry all world placement (impl-plan-instancing)`)
+                .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+        }
+    }
+
     // Placement validation (docs/fable-transforms.md §7 + §6.1). The Transform type is
     // the first validator (scalar scale, axis-angle|quat rotation), but authored JS
     // can hand us anything — every rule re-checks at runtime with a diagnostic.
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
+        if (isInstancedObject(obj)) continue;   // instanced placements validated above
         const t = obj.transform;
         if (!t) continue;
 

@@ -149,7 +149,7 @@ export interface IntersectionDesc {
      *  "does this program contain the X backend" is answered ONCE here, symmetrically for all
      *  three, not re-derived per feature (it replaced the fake `method: 'raymarch'` singleton).
      *  scene_intersect / scene_intersect_any / the region tables emit exactly the arms flagged. */
-    backends: { sdf: boolean; analytic: boolean; mesh: boolean };
+    backends: { sdf: boolean; analytic: boolean; mesh: boolean; instanced: boolean };
     /** Mesh traversal engine (impl-plan-mesh-bvh): 'bvh' walks the SAH tree, 'brute' scans all
      *  triangles. The intersection family's first swappable occupant pair; gates which per-mesh
      *  wrapper (and whether the mesh_N_bvh extern) is emitted. Only meaningful when backends.mesh. */
@@ -266,6 +266,28 @@ export interface PlannedMesh {
     /** Constant similarity or a live driven placement — the ray is conjugated into the mesh's
      *  local frame (positions stay local; never folded into vertices). */
     placement: PlannedPlacement;
+}
+
+/**
+ * A resolved INSTANCED batch (impl-plan-instancing): one prototype placed at N transforms, sharing
+ * the geometry, as ONE region/material. `index` shares the region-id space (globally unique). The
+ * codegen view only — the actual placement values + prototype geometry are computed from the scene
+ * and uploaded by the app (like meshes); the Planner carries counts/flags/backend for the loop.
+ */
+export interface PlannedInstanceBatch {
+    /** Ordinal among instance batches (scene order) — keys the extern texture names. */
+    ordinal: number;
+    /** Region id (shared space) — one region for the whole batch (material_of(index)). */
+    index: number;
+    materialId: number;
+    name?: string;
+    /** Number of placements — the baked loop bound. */
+    instanceCount: number;
+    /** The prototype's backend + what the loop's local-intersect needs. mesh: BLAS counts (data
+     *  uploaded by the app). analytic: the canonical params, baked + scaled by s per instance. */
+    prototype:
+        | { backend: 'mesh'; triCount: number; smooth: boolean }
+        | { backend: 'analytic'; shapeType: string; parameters: Record<string, number | number[]> };
 }
 
 /** A schema-resolved property value: constant, expression, or live param (§2.8). */
@@ -399,6 +421,7 @@ export interface RenderPlan {
     objects: PlannedSDFObject[];
     analyticObjects: PlannedAnalyticObject[];
     meshes: PlannedMesh[];
+    instanceBatches: PlannedInstanceBatch[];
     materials: PlannedMaterial[];
     lights: PlannedLight[];
 

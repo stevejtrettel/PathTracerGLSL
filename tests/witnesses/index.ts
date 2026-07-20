@@ -22,6 +22,7 @@ import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/f
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
 import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy } from './scenes/meshWitness.js';
+import { instanceTwin, instanceTwinRef, instanceTwinStrategy } from './scenes/instanceWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import {
     slabScene, slabStrategy,
@@ -152,6 +153,22 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             spp: 96,
             // Cross-backend twin → the display-space RMSE gate (like analytic-minimal), not χ².
             checks: [{ kind: 'twin', other: { scene: 'mesh-quad-ref' }, meanTol: 0.02, rmse: 0.08, label: 'mesh ≡ analytic quads' }],
+        },
+    },
+    // Instancing (impl-plan-instancing): one prototype × N placements ≡ N individual objects.
+    'instance-twin-ref': {
+        scene: instanceTwinRef,
+        strategies: [instanceTwinStrategy],
+        exercises: 'reference arm of the instance twin — the three spheres as individual analytic objects',
+    },
+    'instance-twin': {
+        scene: instanceTwin,
+        strategies: [instanceTwinStrategy],
+        exercises: 'three spheres as ONE instanced batch (shared prototype + placement texture, ray-into-local, one region) — the placement loop vs the ordinary analytic path',
+        expected: 'converges to the same image as instance-twin-ref (instancing changes cost + region count, not the image)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'instance-twin-ref' }, meanTol: 0.01, rmse: 0.03, label: 'instanced ≡ individual objects' }],
         },
     },
     // Fixture partner: the SDF half of the analytic-minimal twin (and the direct-only

@@ -1,7 +1,7 @@
 // compiler/plan/Planner.ts
 
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
-import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission } from '../types.js';
+import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
@@ -11,17 +11,16 @@ import { PRIMITIVES, primitive, canonicalizePrimitiveParameters, foldAnalyticPar
 import {
     IDENTITY_QUAT,
     isDrivenTransform,
-    quatConjugate,
     quatFromAxisAngle,
     quatNormalize,
-    quatRotate,
+    rigidInverse,
     similarityCompose,
     similarityFromTransform,
     type Quat,
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import type { BlackbodyValue } from '../types.js';
 
@@ -74,10 +73,12 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     const objects: PlannedSDFObject[] = [];
     const analyticObjects: PlannedAnalyticObject[] = [];
     const meshes: PlannedMesh[] = [];
+    const instanceBatches: PlannedInstanceBatch[] = [];
     let objectIndex = 0;
     let meshOrdinal = 0;
+    let instanceOrdinal = 0;
     for (const obj of scene.objects) {
-        if ('kind' in obj) {
+        if (isMeshObject(obj)) {
             // Mesh (impl-plan-meshes): a region in the shared id space; placement is
             // ray-into-local for BOTH constant and driven (vertices stay object-LOCAL —
             // never folded, so a slider moves the mesh with no re-upload). Data (vertices/
@@ -94,6 +95,36 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     ? buildDrivenPlacement(obj.transform!, objectIndex - 1)
                     : placementOf(obj.transform),
             });
+            continue;
+        }
+        if (isInstancedObject(obj)) {
+            // Instanced batch (impl-plan-instancing): one prototype, N placements, ONE region +
+            // material (the prototype's). The prototype's backend picks the loop's local-intersect;
+            // its transform is ignored (placements carry all world placement). Placement values +
+            // prototype geometry are computed from the scene and uploaded by the app (like meshes).
+            const proto = obj.prototype;
+            const matId = materialIdMap.get(proto.material)!;   // validated by the Validator
+            const region = objectIndex++;
+            if (isMeshObject(proto)) {
+                instanceBatches.push({
+                    ordinal: instanceOrdinal++, index: region, materialId: matId, name: obj.name,
+                    instanceCount: obj.placements.length,
+                    prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined },
+                });
+            } else {
+                const backend = resolveBackend(proto.type, proto.backend);
+                if (backend !== 'analytic') {
+                    // v1: only mesh + analytic prototypes (SDF instancing = the deferred domain-rep
+                    // generalization). The Validator diagnoses; keep region ids stable and skip.
+                    continue;
+                }
+                instanceBatches.push({
+                    ordinal: instanceOrdinal++, index: region, materialId: matId, name: obj.name,
+                    instanceCount: obj.placements.length,
+                    // Prototype has NO transform → just canonicalize (no fold); s scales per instance in-shader.
+                    prototype: { backend: 'analytic', shapeType: proto.type, parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters) },
+                });
+            }
             continue;
         }
         const backend = resolveBackend(obj.type, obj.backend);
@@ -232,13 +263,14 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         : -1;
 
     // --- Build program description ---
-    const program = planProgram(features, scene, strategy, lights, materials, objects, analyticObjects, meshes);
+    const program = planProgram(features, scene, strategy, lights, materials, objects, analyticObjects, meshes, instanceBatches);
     const pipeline = planPipeline(program);
 
     return {
         objects,
         analyticObjects,
         meshes,
+        instanceBatches,
         materials,
         lights,
         ambientMedium,
@@ -251,7 +283,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[], objects: PlannedSDFObject[], analyticObjects: PlannedAnalyticObject[], meshes: PlannedMesh[]): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[], objects: PlannedSDFObject[], analyticObjects: PlannedAnalyticObject[], meshes: PlannedMesh[], instanceBatches: PlannedInstanceBatch[]): ProgramDescription {
     // Surface models = the models of the PLANNED materials — the one list that already
     // includes the desugared area lights' synthesized emitter materials, so a new hittable
     // light kind can never leave its backing model out of the program (the lights-door
@@ -357,6 +389,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
                 sdf: objects.length > 0,
                 analytic: analyticObjects.length > 0,
                 mesh: meshes.length > 0,
+                instanced: instanceBatches.length > 0,
             },
             // Mesh traversal engine (impl-plan-mesh-bvh) — default bvh; brute is the A/B baseline.
             meshTraversal: strategy.estimator.meshTraversal ?? 'bvh',
@@ -364,8 +397,9 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // media shadow walker re-spawns scene_intersect instead (§6.3).
             anyQuery: lighting !== null && !features.media.hasMedia,
             // Any leaf with a {param} transform field (fable-transforms §6) — gates
-            // glsl/core/placement.glsl + the rigid-frame query tiers.
-            drivenPlacement: scene.objects.some((o) => isDrivenTransform(o.transform)),
+            // glsl/core/placement.glsl + the rigid-frame query tiers. (Instanced batches
+            // also need placement.glsl — the feature includes it on `instanced` too.)
+            drivenPlacement: scene.objects.some((o) => !isInstancedObject(o) && isDrivenTransform(o.transform)),
         },
         materials: {
             models: brdfModels,
@@ -563,13 +597,10 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
         readScale = () => c;
     }
 
-    // The §6.1 rigid-form inverse, computed fp64 host-side: q_inv, t_rigid = −Rᵀt, s.
-    const evalQ = (p: Record<string, unknown>): number[] => quatConjugate(readRotation(p));
-    const evalTS = (p: Record<string, unknown>): number[] => {
-        const qInv = quatConjugate(readRotation(p));
-        const tr = quatRotate(qInv, readPosition(p));
-        return [-tr[0], -tr[1], -tr[2], readScale(p)];
-    };
+    // The §6.1 rigid-form inverse, computed fp64 host-side (rigidInverse = the ONE ABI truth,
+    // shared with instancing's constant-placement lowering).
+    const evalQ = (p: Record<string, unknown>): number[] => rigidInverse({ rotation: readRotation(p), translation: readPosition(p), scale: readScale(p) }).q;
+    const evalTS = (p: Record<string, unknown>): number[] => rigidInverse({ rotation: readRotation(p), translation: readPosition(p), scale: readScale(p) }).ts;
 
     const uniformQ = `u_object${index}PlacementQ`;
     const uniformTS = `u_object${index}PlacementTS`;

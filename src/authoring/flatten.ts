@@ -14,6 +14,7 @@
 // fixtures and demos call flattenGroups() at definition time.
 
 import type { ObjectDescription, Transform, Quaternion, Vec3 } from '../compiler/types.js';
+import { isInstancedObject } from '../compiler/types.js';
 import {
     IDENTITY_SIMILARITY,
     classifySimilarity,
@@ -72,6 +73,20 @@ function walk(nodes: SceneNode[], parent: Similarity, path: string[], out: Objec
             return;
         }
 
+        // Instanced batch leaf (impl-plan-instancing): it owns no top-level transform — its
+        // placements carry world placement. Under a transformed group, compose the parent
+        // similarity into EACH placement (constants only, like every other static-flatten path).
+        if (isInstancedObject(node)) {
+            const atRootI = path.length === 0;
+            const idParent = classifySimilarity(parent) === 'identity';
+            const placements = idParent
+                ? node.placements
+                : node.placements.map((t) => transformFromSimilarity(similarityCompose(parent, similarityFromTransform(t))) ?? {});
+            if (atRootI && idParent) { out.push(node); return; }
+            out.push({ ...node, placements, name: [...path, node.name ?? `#${i}`].join('/') });
+            return;
+        }
+
         // Leaf.
         const atRoot = path.length === 0;
         if (isDrivenTransform(node.transform)) {
@@ -84,18 +99,18 @@ function walk(nodes: SceneNode[], parent: Similarity, path: string[], out: Objec
                     + `C·TRS(param) (fable-transforms §4); place it outside the transformed group or `
                     + `wait for the runtime graph`);
             }
-            out.push(atRoot ? (node as ObjectDescription) : { ...(node as ObjectDescription), name: node.name ?? [...path, `#${i}`].join('/') });
+            out.push(atRoot ? node : { ...node, name: node.name ?? [...path, `#${i}`].join('/') });
             return;
         }
 
         if (atRoot) {
-            out.push(node as ObjectDescription);   // identity pass-through, by reference
+            out.push(node);   // identity pass-through, by reference
             return;
         }
 
         const composed = similarityCompose(parent, similarityFromTransform(node.transform));
         out.push({
-            ...(node as ObjectDescription),
+            ...node,
             transform: transformFromSimilarity(composed),
             // A leaf's name is a PATH SEGMENT like a group's (D5): two `ball` leaves in
             // different groups flatten to distinct provenance paths — the old

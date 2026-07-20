@@ -25,6 +25,8 @@ import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } f
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
 import { meshDemoScene, meshDemoNeeStrategy, meshDemoPtStrategy } from './meshScene.js';
 import { modelsScene, modelsBvhStrategy, modelsBruteStrategy, modelsPtStrategy } from './modelsScene.js';
+import { forestScene, forestStrategy } from './forestScene.js';
+import { spheresScene, spheresIndividualScene, spheresStrategy } from './spheresScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -40,6 +42,28 @@ const cornellOneshotStrategy: RenderStrategy = {
 };
 
 export const demoSuite: Record<string, SceneSuiteEntry> = {
+    spheres: {
+        scene: spheresScene,
+        strategies: posed([0, 4.5, 13], [0, 2.3, 0], spheresStrategy),
+        exercises:
+            'DEMO — instancing at scale (impl-plan-instancing): 500 spheres of varied size + position from ONE analytic-sphere prototype + a 500-entry placement texture, one region/material. The linear instance loop runs 500 intersects/ray — the point where a TLAS starts to matter.',
+        expected:
+            'a dense cloud of ~500 warm spheres of assorted sizes above a gray floor, one point light, correct inter-sphere shadows; all 500 share one prototype (memory is one sphere, not 500).',
+    },
+    'spheres-individual': {
+        scene: spheresIndividualScene,
+        strategies: posed([0, 4.5, 13], [0, 2.3, 0], spheresStrategy),
+        exercises: 'A/B for `spheres`: the same 500 spheres as INDIVIDUAL objects (500 unrolled sphere_intersect blocks + 500 regions) — compare pathtracer ms/frame vs the instanced batch.',
+        expected: 'same image as `spheres`; frame time comparable (both O(N) per ray — no TLAS); instancing wins memory + shader size, not traversal.',
+    },
+    forest: {
+        scene: forestScene,
+        strategies: posed([0, 3, 11], [0, 1, -2], forestStrategy),
+        exercises:
+            'DEMO — instancing (impl-plan-instancing): 20 cacti from ONE prototype BLAS + a placement texture (~23k tris for one upload), plus a row of instanced analytic spheres — both backends through the same placement-list loop. The BVH makes the per-instance traversal cheap.',
+        expected:
+            'a scatter of size-varied, rotated cacti on sand + a back row of gray spheres; one point light. All cacti share one mesh upload — memory is one cactus, not twenty.',
+    },
     models: {
         scene: modelsScene,
         strategies: posed([0, 1.8, 5.2], [0.4, 0.6, 0], modelsBvhStrategy, modelsBruteStrategy, modelsPtStrategy),

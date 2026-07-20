@@ -35,6 +35,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -132,6 +133,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -219,6 +221,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`]
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -317,6 +320,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -415,6 +419,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -508,6 +513,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtra
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -593,6 +599,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pat
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -689,6 +696,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -785,6 +793,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -875,6 +884,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -965,6 +975,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1054,6 +1065,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1145,6 +1157,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1235,6 +1248,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1330,6 +1344,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1424,6 +1439,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1519,6 +1535,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1614,6 +1631,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1706,6 +1724,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1802,6 +1821,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1898,6 +1918,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -1991,6 +2012,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2086,6 +2108,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2181,6 +2204,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2276,6 +2300,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2367,6 +2392,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2458,6 +2484,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2549,6 +2576,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2640,6 +2668,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2731,6 +2760,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2827,6 +2857,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cylinders + pat
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -2917,6 +2948,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -3012,6 +3044,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref +
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -3113,6 +3146,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven + pathtr
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -3209,6 +3243,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -3305,6 +3340,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -3401,6 +3437,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 +
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -3486,6 +3523,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit + pathtrac
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -3571,6 +3609,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-driven + p
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -3658,6 +3697,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat + path
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -3747,6 +3787,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -3839,6 +3880,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -3926,6 +3968,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pat
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -4011,6 +4054,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -4108,6 +4152,7 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -4195,6 +4240,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -4292,6 +4338,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -4389,6 +4436,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -4483,6 +4531,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -4580,6 +4629,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -4677,6 +4727,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-n
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -4764,6 +4815,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -4819,6 +4871,103 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > forest + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.3,
+      0.4,
+      0.6,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": false,
+      "sdf": false,
+    },
+    "drivenPlacement": false,
+    "meshTraversal": "bvh",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        3,
+        11,
+      ],
+      "target": [
+        0,
+        1,
+        -2,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > furnace + furnace 1`] = `
 {
   "emitters": {
@@ -4849,6 +4998,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -4934,6 +5084,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -5019,6 +5170,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -5112,6 +5264,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -5210,6 +5363,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -5308,6 +5462,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -5399,6 +5554,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -5491,6 +5647,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -5583,6 +5740,7 @@ exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -5673,6 +5831,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -5765,6 +5924,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -5857,6 +6017,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -5946,6 +6107,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt 1`]
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -6043,6 +6205,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt-nee
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -6137,6 +6300,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6229,6 +6393,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6321,6 +6486,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6410,6 +6576,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6502,6 +6669,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6594,6 +6762,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6686,6 +6855,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6778,6 +6948,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-thet
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6865,6 +7036,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-slab + path
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -6920,6 +7092,200 @@ exports[`ProgramDescription structural snapshot (the link map) > het-slab + path
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > instance-twin + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.14,
+      0.24,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": false,
+      "sdf": false,
+    },
+    "drivenPlacement": false,
+    "meshTraversal": "bvh",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        2,
+        5,
+      ],
+      "target": [
+        0,
+        0.6,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-twin-ref + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.14,
+      0.24,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": false,
+      "mesh": false,
+      "sdf": false,
+    },
+    "drivenPlacement": false,
+    "meshTraversal": "bvh",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        2,
+        5,
+      ],
+      "target": [
+        0,
+        0.6,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > light-driven + pt-mis 1`] = `
 {
   "emitters": {
@@ -6955,6 +7321,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7045,6 +7412,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7135,6 +7503,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7225,6 +7594,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7315,6 +7685,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-th
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7405,6 +7776,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off + pt-
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7495,6 +7867,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off-baked
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7588,6 +7961,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7684,6 +8058,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -7770,6 +8145,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-furnace + 
     "anyQuery": false,
     "backends": {
       "analytic": false,
+      "instanced": false,
       "mesh": true,
       "sdf": false,
     },
@@ -7866,6 +8242,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-ref +
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -7962,6 +8339,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
     "anyQuery": true,
     "backends": {
       "analytic": false,
+      "instanced": false,
       "mesh": true,
       "sdf": false,
     },
@@ -8058,6 +8436,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pathtr
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": true,
       "sdf": false,
     },
@@ -8151,6 +8530,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pt 1`]
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": true,
       "sdf": false,
     },
@@ -8245,6 +8625,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "anyQuery": true,
     "backends": {
       "analytic": false,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -8341,6 +8722,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "anyQuery": true,
     "backends": {
       "analytic": false,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -8432,6 +8814,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`]
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -8530,6 +8913,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -8630,6 +9014,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -8728,6 +9113,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -8824,6 +9210,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + brute 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": true,
       "sdf": false,
     },
@@ -8920,102 +9307,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + bvh 1`
     "anyQuery": true,
     "backends": {
       "analytic": true,
-      "mesh": true,
-      "sdf": false,
-    },
-    "drivenPlacement": false,
-    "meshTraversal": "bvh",
-  },
-  "materials": {
-    "models": [
-      "lambert",
-    ],
-    "surfaceEval": true,
-    "surfacePdf": false,
-  },
-  "measurement": {
-    "ambient": "euclidean",
-    "camera": {
-      "fov": 0.7,
-      "position": [
-        0,
-        1.8,
-        5.2,
-      ],
-      "target": [
-        0.4,
-        0.6,
-        0,
-      ],
-      "type": "pinhole",
-    },
-    "color": "rgb",
-    "maxBounces": 6,
-    "response": "radiance",
-    "scattering": "full",
-    "shadows": "opaque-dielectrics",
-  },
-  "media": {
-    "emission": false,
-    "heterogeneousArms": false,
-    "mediumEval": false,
-    "mediumPdf": false,
-    "models": [],
-    "nullInterfaces": false,
-    "present": false,
-    "scatteringArms": false,
-    "shadowWalker": false,
-  },
-  "view": {
-    "tonemap": {
-      "exposure": undefined,
-      "type": "reinhard",
-    },
-  },
-}
-`;
-
-exports[`ProgramDescription structural snapshot (the link map) > models + pathtracer 1`] = `
-{
-  "emitters": {
-    "driven": false,
-    "lightingPdf": false,
-    "samplable": false,
-  },
-  "environment": {
-    "color": [
-      0.14,
-      0.18,
-      0.3,
-    ],
-    "intensity": 1,
-    "type": "constant",
-  },
-  "environmentPdf": false,
-  "environmentSamplable": false,
-  "environmentSelectionLive": false,
-  "estimator": {
-    "accumulation": {
-      "type": "average",
-    },
-    "envSampler": {
-      "chart": "equirect",
-      "compensation": false,
-    },
-    "lighting": {
-      "method": "nee",
-      "selection": "power",
-    },
-    "mediumLightSampling": "vertex",
-    "russianRoulette": {
-      "startDepth": 4,
-    },
-    "volumeSampling": "none",
-  },
-  "intersection": {
-    "anyQuery": true,
-    "backends": {
-      "analytic": true,
+      "instanced": false,
       "mesh": true,
       "sdf": false,
     },
@@ -9109,6 +9401,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + pt 1`]
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": true,
       "sdf": false,
     },
@@ -9202,6 +9495,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -9299,6 +9593,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -9393,6 +9688,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -9495,6 +9791,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -9597,6 +9894,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -9699,6 +9997,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -9792,6 +10091,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -9891,6 +10191,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -9988,6 +10289,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -10076,6 +10378,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -10166,6 +10469,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -10256,6 +10560,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -10355,6 +10660,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -10454,6 +10760,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -10553,6 +10860,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -10649,6 +10957,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -10748,6 +11057,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -10847,6 +11157,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -10938,6 +11249,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -10993,6 +11305,103 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > spheres + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.28,
+      0.38,
+      0.58,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": false,
+      "sdf": false,
+    },
+    "drivenPlacement": false,
+    "meshTraversal": "bvh",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.85,
+      "position": [
+        0,
+        4.5,
+        13,
+      ],
+      "target": [
+        0,
+        2.3,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1`] = `
 {
   "emitters": {
@@ -11026,6 +11435,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -11115,6 +11525,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
     "anyQuery": false,
     "backends": {
       "analytic": false,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -11206,6 +11617,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -11296,6 +11708,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -11391,6 +11804,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -11490,6 +11904,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -11589,6 +12004,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -11688,6 +12104,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -11787,6 +12204,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -11886,6 +12304,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -11984,6 +12403,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -12086,6 +12506,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -12182,6 +12603,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": true,
     },
@@ -12270,6 +12692,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -12358,6 +12781,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -12451,6 +12875,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "anyQuery": false,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -12548,6 +12973,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },
@@ -12645,6 +13071,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "anyQuery": true,
     "backends": {
       "analytic": true,
+      "instanced": false,
       "mesh": false,
       "sdf": false,
     },

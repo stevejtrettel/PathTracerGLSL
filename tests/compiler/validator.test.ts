@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { validate } from '../../src/compiler/analyze/Validator.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
-import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
+import type { SceneDescription, RenderStrategy, PrimitiveObject } from '../../src/compiler/types.js';
 
 function baseScene(): SceneDescription {
     return {
@@ -147,54 +147,54 @@ describe('Validator', () => {
     });
 
     it('rejects an object referencing an unknown material (with a suggestion)', () => {
-        const bag = run(s => { s.objects[0].material = 'ghost'; });
+        const bag = run(s => { (s.objects[0] as { material: string }).material = 'ghost'; });
         const err = bag.getErrors().find(e => e.code === 'missing-material');
         expect(err).toBeDefined();
         expect(err!.suggestions?.length).toBeGreaterThan(0);
     });
 
     it('accepts rotation and scale transforms (fable-transforms §7)', () => {
-        expect(run(s => { s.objects[0].transform = { rotation: { axis: [0, 1, 0], angle: 1.2 } }; }).isEmpty()).toBe(true);
-        expect(run(s => { s.objects[0].transform = { rotation: [0, 0, 0, 1] }; }).isEmpty()).toBe(true);
-        expect(run(s => { s.objects[0].transform = { scale: 2 }; }).isEmpty()).toBe(true);
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: { axis: [0, 1, 0], angle: 1.2 } }; }).isEmpty()).toBe(true);
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: [0, 0, 0, 1] }; }).isEmpty()).toBe(true);
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { scale: 2 }; }).isEmpty()).toBe(true);
     });
 
     it('rejects a malformed rotation (3-vector Euler is not in the language)', () => {
-        expect(run(s => { s.objects[0].transform = { rotation: [0, 1, 0] as any }; }).getErrors()
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: [0, 1, 0] as any }; }).getErrors()
             .some(e => e.code === 'invalid-transform' && /axis-angle|quaternion/i.test(e.message))).toBe(true);
     });
 
     it('rejects a degenerate quaternion and a zero rotation axis', () => {
-        expect(run(s => { s.objects[0].transform = { rotation: [0, 0, 0, 0] }; }).getErrors()
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: [0, 0, 0, 0] }; }).getErrors()
             .some(e => e.code === 'invalid-transform' && /degenerate/i.test(e.message))).toBe(true);
-        expect(run(s => { s.objects[0].transform = { rotation: { axis: [0, 0, 0], angle: 1 } }; }).getErrors()
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: { axis: [0, 0, 0], angle: 1 } }; }).getErrors()
             .some(e => e.code === 'invalid-transform' && /axis/i.test(e.message))).toBe(true);
     });
 
     it('warns on a non-unit quaternion (compiler normalizes)', () => {
-        const bag = run(s => { s.objects[0].transform = { rotation: [0, 0, 0, 2] }; });
+        const bag = run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: [0, 0, 0, 2] }; });
         expect(bag.getErrors().length).toBe(0);
         expect(bag.getWarnings().some(w => /normalizing/i.test(w.message))).toBe(true);
     });
 
     it('rejects reflections (s <= 0) and nonuniform scale (§1 one-way doors)', () => {
-        expect(run(s => { s.objects[0].transform = { scale: -1 }; }).getErrors()
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { scale: -1 }; }).getErrors()
             .some(e => e.code === 'invalid-transform' && /reflection/i.test(e.message))).toBe(true);
-        expect(run(s => { s.objects[0].transform = { scale: 0 }; }).getErrors()
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { scale: 0 }; }).getErrors()
             .some(e => e.code === 'invalid-transform')).toBe(true);
-        expect(run(s => { s.objects[0].transform = { scale: [1, 2, 1] as any }; }).getErrors()
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { scale: [1, 2, 1] as any }; }).getErrors()
             .some(e => e.code === 'invalid-transform' && /nonuniform/i.test(e.message))).toBe(true);
     });
 
     it('warns on extreme scale (fixed world-space epsilons)', () => {
-        const bag = run(s => { s.objects[0].transform = { scale: 1000 }; });
+        const bag = run(s => { (s.objects[0] as PrimitiveObject).transform = { scale: 1000 }; });
         expect(bag.getErrors().length).toBe(0);
         expect(bag.getWarnings().some(w => /extreme/i.test(w.message))).toBe(true);
     });
 
     it('accepts driven transform fields (fable-transforms §6)', () => {
         const bag = run(s => {
-            s.objects[0].transform = {
+            (s.objects[0] as PrimitiveObject).transform = {
                 position: { param: 'rig.pos', default: [0, 1, 0] },
                 rotation: { axis: [0, 1, 0], angle: { param: 'rig.angle', default: 0, min: 0, max: 6.3 } },
                 scale: { param: 'rig.scale', default: 1, min: 0.1, max: 10 },
@@ -204,18 +204,18 @@ describe('Validator', () => {
     });
 
     it('accepts a driven quaternion (the graph port); rejects a degenerate default', () => {
-        expect(run(s => { s.objects[0].transform = { rotation: { param: 'rig.q', default: [0, 0, 0, 1] } }; }).getErrors().length).toBe(0);
-        expect(run(s => { s.objects[0].transform = { rotation: { param: 'rig.q', default: [0, 0, 0, 0] } }; }).getErrors()
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: { param: 'rig.q', default: [0, 0, 0, 1] } }; }).getErrors().length).toBe(0);
+        expect(run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: { param: 'rig.q', default: [0, 0, 0, 0] } }; }).getErrors()
             .some(e => /degenerate/i.test(e.message))).toBe(true);
     });
 
     it('rejects GLSL expressions in transform fields (§6.1: deformation is not a placement)', () => {
-        const bag = run(s => { s.objects[0].transform = { position: { kind: 'glsl', source: 'vec3(sin(p.x))' } as any }; });
+        const bag = run(s => { (s.objects[0] as PrimitiveObject).transform = { position: { kind: 'glsl', source: 'vec3(sin(p.x))' } as any }; });
         expect(bag.getErrors().some(e => e.code === 'invalid-transform' && /deformation/i.test(e.message))).toBe(true);
     });
 
     it('warns when driven scale has no positive min (runtime floor policy)', () => {
-        const bag = run(s => { s.objects[0].transform = { scale: { param: 'rig.s', default: 1 } }; });
+        const bag = run(s => { (s.objects[0] as PrimitiveObject).transform = { scale: { param: 'rig.s', default: 1 } }; });
         expect(bag.getErrors().length).toBe(0);
         expect(bag.getWarnings().some(w => /min/i.test(w.message))).toBe(true);
     });
@@ -408,7 +408,7 @@ describe('Validator — correctness domains', () => {
     });
 
     it('rejects malformed transform.position values from untyped scene input', () => {
-        const bag = run(s => { s.objects[0].transform = { position: [1, 2] as never }; });
+        const bag = run(s => { (s.objects[0] as PrimitiveObject).transform = { position: [1, 2] as never }; });
         expect(bag.getErrors().some(e => /transform\.position must be a vec3/.test(e.message))).toBe(true);
     });
 });
