@@ -9,12 +9,15 @@
 // Pure TS (components purity).
 
 import type { Similarity } from '../../geometry/similarity.js';
-import { rigidInverse } from '../../geometry/similarity.js';
-import { MESH_TEX_WIDTH, type PackedTexture } from '../mesh/mesh.js';
+import { rigidInverse, similarityApplyPoint } from '../../geometry/similarity.js';
+import { MESH_TEX_WIDTH, packNodes, type PackedTexture } from '../mesh/mesh.js';
+import { buildBVHNodes, transformAABB, type AABB } from '../mesh/bvh.js';
 
 export interface InstanceExternNames {
-    /** The per-instance placement texture (2 texels/instance: q_inv, (t_rigid, s)). */
+    /** The per-instance placement texture (2 texels/instance: q_inv, (t_rigid, s)) — in TLAS order. */
     placements: string;
+    /** The per-batch TLAS node texture (2 texels/node — a BVH over the instance world boxes). */
+    tlas: string;
     /** The prototype's mesh BLAS textures (used only when the prototype is a mesh). */
     position: string;
     index: string;
@@ -26,12 +29,26 @@ export interface InstanceExternNames {
 export function instanceExternNames(ordinal: number): InstanceExternNames {
     return {
         placements: `instance_${ordinal}_placements`,
+        tlas: `instance_${ordinal}_tlas`,
         position: `instance_${ordinal}_position`,
         index: `instance_${ordinal}_index`,
         normal: `instance_${ordinal}_normal`,
         uv: `instance_${ordinal}_uv`,
         bvh: `instance_${ordinal}_bvh`,
     };
+}
+
+/** Build a batch's TLAS: a BVH over the instance WORLD boxes (the prototype's local box
+ *  transformed by each placement), reordering the placements into TLAS-leaf order. Returns the
+ *  reordered placement texture + the TLAS node texture (impl-plan-tlas). The prototype-local box
+ *  is the mesh BLAS root (rootBoxOf) or the analytic primitive's bounds(). */
+export function packInstanceBatch(localBox: AABB, placements: Similarity[]): { placements: PackedTexture<Float32Array>; tlas: PackedTexture<Float32Array> } {
+    // World AABB per instance = the prototype box transformed by that placement (8 corners).
+    const boxes = placements.map((g) => transformAABB(localBox, (p) => similarityApplyPoint(g, p)));
+    const { nodes, nodeCount, order } = buildBVHNodes(boxes);
+    // Re-emit placements in TLAS-leaf order so leaves index contiguous ranges.
+    const reordered = Array.from(order, (i) => placements[i]);
+    return { placements: packPlacements(reordered), tlas: packNodes(nodes, nodeCount) };
 }
 
 /** Pack N world similarities into the placement texture: 2 RGBA32F texels per instance —

@@ -6,8 +6,9 @@ import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, meshExternNames } from '../components/intersection/mesh/mesh.js';
-import { packPlacements, instanceExternNames } from '../components/intersection/instancing/instancing.js';
+import { packInstanceBatch, instanceExternNames } from '../components/intersection/instancing/instancing.js';
 import { similarityFromTransform } from '../components/geometry/similarity.js';
+import { canonicalizePrimitiveParameters, primitiveBounds } from '../components/geometry/index.js';
 import { isMeshObject, isInstancedObject } from '../compiler/types.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
@@ -245,8 +246,9 @@ export class App {
             if (!isInstancedObject(obj)) continue;
             const names = instanceExternNames(ordinal++);
             const placements = obj.placements.map((t) => similarityFromTransform(t));
-            const packed = packPlacements(placements);
-            this.engine.registerDataTexture(names.placements, packed.data, packed.width, packed.height);
+            // The prototype's LOCAL box (mesh = BLAS root; analytic = primitive bounds) → the batch
+            // TLAS (a BVH over the instance world boxes) + the reordered placement texture.
+            let localBox: { min: [number, number, number]; max: [number, number, number] };
             if (isMeshObject(obj.prototype)) {
                 const p = packMesh(obj.prototype);
                 this.engine.registerDataTexture(names.position, p.position.data, p.position.width, p.position.height);
@@ -254,7 +256,14 @@ export class App {
                 this.engine.registerDataTexture(names.normal, p.normal.data, p.normal.width, p.normal.height);
                 this.engine.registerDataTexture(names.uv, p.uv.data, p.uv.width, p.uv.height);
                 this.engine.registerDataTexture(names.bvh, p.bvh.data, p.bvh.width, p.bvh.height);
+                localBox = p.rootBox;
+            } else {
+                const canon = canonicalizePrimitiveParameters(obj.prototype.type, obj.prototype.parameters);
+                localBox = primitiveBounds(obj.prototype.type, canon) ?? { min: [0, 0, 0], max: [0, 0, 0] };
             }
+            const batch = packInstanceBatch(localBox, placements);
+            this.engine.registerDataTexture(names.placements, batch.placements.data, batch.placements.width, batch.placements.height);
+            this.engine.registerDataTexture(names.tlas, batch.tlas.data, batch.tlas.width, batch.tlas.height);
         }
     }
 

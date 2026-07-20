@@ -393,6 +393,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             },
             // Mesh traversal engine (impl-plan-mesh-bvh) — default bvh; brute is the A/B baseline.
             meshTraversal: strategy.estimator.meshTraversal ?? 'bvh',
+            // Instance traversal (impl-plan-tlas) — default tlas; linear is the A/B baseline.
+            instanceAccel: strategy.estimator.instanceAccel ?? 'tlas',
             // The opaque shadow fast path is scene_intersect_any's only caller; the
             // media shadow walker re-spawns scene_intersect instead (§6.3).
             anyQuery: lighting !== null && !features.media.hasMedia,

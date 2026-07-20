@@ -57,9 +57,17 @@ export const spheresIndividualScene: SceneDescription = {
     environment: { type: 'constant', color: [0.28, 0.38, 0.58], intensity: 1.0 },
 };
 
+// Key 1 = TLAS (per-batch BVH over the 500 instance boxes), key 2 = linear scan — the live A/B.
+// Same image; watch the StatsPanel pathtracer ms/frame collapse (500 → ~log 500).
 export const spheresStrategy: RenderStrategy = {
-    id: 'pathtracer',
+    id: 'tlas',
     measurement: { camera: { type: 'pinhole', fov: 0.85 }, maxBounces: 5 },
-    estimator: { directLighting: 'nee', russianRoulette: { startDepth: 4 }, accumulation: { type: 'average' } },
+    estimator: { directLighting: 'nee', russianRoulette: { startDepth: 4 }, instanceAccel: 'tlas', accumulation: { type: 'average' } },
     view: { tonemap: { type: 'reinhard' } },
+};
+
+export const spheresLinearStrategy: RenderStrategy = {
+    ...spheresStrategy,
+    id: 'linear',
+    estimator: { ...spheresStrategy.estimator, instanceAccel: 'linear' },
 };

@@ -318,6 +318,11 @@ export interface PrimitiveDescriptor {
     /** §6.2 sampleAsLight eligibility (quad/sphere) — Planner registry entry +
      *  Validator V1-C2 both read this fact. Default false. */
     samplableAsLight?: boolean;
+    /** Local-space AABB of the primitive given its (canonical) values — the prototype box
+     *  when this primitive is an instance prototype (transformed per placement → the TLAS,
+     *  impl-plan-tlas). Absent = UNBOUNDED (e.g. plane): cannot be an instance prototype
+     *  (Validator-rejected). Finite analytic primitives (sphere/quad/disk) declare it. */
+    bounds?(values: PrimitiveValues): { min: [number, number, number]; max: [number, number, number] };
     /** Computed compile-time struct fields appended after the row's fields
      *  (quad: the precompiled one-sided normal — MUST stay a compile-time
      *  value so hit side and the quad light's sampler agree bit-exactly).

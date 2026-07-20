@@ -22,6 +22,8 @@ export interface BVHResult {
     reindexedTriangles: Uint32Array;
     /** Max stack depth a DFS traversal needs (for sizing BVH_STACK_DEPTH). */
     maxDepth: number;
+    /** The root node's local AABB — the prototype box when this mesh is an instance prototype. */
+    rootBox: AABB;
 }
 
 interface AABB { min: [number, number, number]; max: [number, number, number]; }
@@ -39,28 +41,23 @@ function surfaceArea(b: AABB): number {
     return 2 * (dx * dy + dy * dz + dz * dx);
 }
 
-export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResult {
-    const T = indices.length / 3;
-
-    // Per-triangle AABB + centroid.
-    const triBox: AABB[] = new Array(T);
-    const cx = new Float32Array(T), cy = new Float32Array(T), cz = new Float32Array(T);
-    for (let t = 0; t < T; t++) {
-        const box = emptyAABB();
-        for (let k = 0; k < 3; k++) {
-            const v = indices[t * 3 + k] * 3;
-            growPoint(box, [positions[v], positions[v + 1], positions[v + 2]]);
-        }
-        triBox[t] = box;
-        cx[t] = (box.min[0] + box.max[0]) * 0.5;
-        cy[t] = (box.min[1] + box.max[1]) * 0.5;
-        cz[t] = (box.min[2] + box.max[2]) * 0.5;
+/** The SAH BVH core over ANY list of item AABBs — shared by the BLAS (items = triangles) and the
+ *  TLAS (items = instance/object boxes). Returns the flat node array (2 texels/node) + the item
+ *  ORDER permutation (leaves are contiguous ranges of it) + max depth. The caller re-emits its own
+ *  per-item payload (triangle indices / placement rows) in `order`. */
+export function buildBVHNodes(boxes: AABB[]): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
+    const N = boxes.length;
+    const cx = new Float32Array(N), cy = new Float32Array(N), cz = new Float32Array(N);
+    for (let t = 0; t < N; t++) {
+        cx[t] = (boxes[t].min[0] + boxes[t].max[0]) * 0.5;
+        cy[t] = (boxes[t].min[1] + boxes[t].max[1]) * 0.5;
+        cz[t] = (boxes[t].min[2] + boxes[t].max[2]) * 0.5;
     }
     const centroid = (t: number, a: number): number => (a === 0 ? cx[t] : a === 1 ? cy[t] : cz[t]);
 
-    // order[] is the working permutation of triangle ids; leaves become contiguous slices of it.
-    const order = new Uint32Array(T);
-    for (let i = 0; i < T; i++) order[i] = i;
+    // order[] is the working permutation of item ids; leaves become contiguous slices of it.
+    const order = new Uint32Array(N);
+    for (let i = 0; i < N; i++) order[i] = i;
 
     const nodes: number[] = [];
     let maxDepth = 0;
@@ -73,7 +70,7 @@ export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResu
         nodes.push(0, 0, 0, 0, 0, 0, 0, 0);   // placeholder (filled below)
 
         const bounds = emptyAABB();
-        for (let i = start; i < end; i++) growAABB(bounds, triBox[order[i]]);
+        for (let i = start; i < end; i++) growAABB(bounds, boxes[order[i]]);
         const count = end - start;
 
         const makeLeaf = () => {
@@ -100,7 +97,7 @@ export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResu
                 const tri = order[i];
                 let b = Math.floor((centroid(tri, axis) - lo) * scale);
                 if (b < 0) b = 0; if (b >= BVH_BINS) b = BVH_BINS - 1;
-                binCnt[b]++; growAABB(binBox[b], triBox[tri]);
+                binCnt[b]++; growAABB(binBox[b], boxes[tri]);
             }
             // Prefix (left) and suffix (right) sweeps over the BVH_BINS-1 candidate planes.
             const leftArea = new Float32Array(BVH_BINS - 1), leftCnt = new Int32Array(BVH_BINS - 1);
@@ -144,9 +141,26 @@ export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResu
         return nodeIdx;
     };
 
-    if (T > 0) emit(0, T, 0);
+    if (N > 0) emit(0, N, 0);
 
-    // Re-emit the triangle index in leaf (order[]) order.
+    return { nodes: new Float32Array(nodes), nodeCount: nodes.length / 8, order, maxDepth };
+}
+
+/** BLAS: a BVH over a triangle mesh. Computes per-triangle boxes, runs the shared core, and
+ *  re-emits the triangle index in leaf order. Byte-identical to the pre-refactor builder. */
+export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResult {
+    const T = indices.length / 3;
+    const triBox: AABB[] = new Array(T);
+    for (let t = 0; t < T; t++) {
+        const box = emptyAABB();
+        for (let k = 0; k < 3; k++) {
+            const v = indices[t * 3 + k] * 3;
+            growPoint(box, [positions[v], positions[v + 1], positions[v + 2]]);
+        }
+        triBox[t] = box;
+    }
+    const { nodes, nodeCount, order, maxDepth } = buildBVHNodes(triBox);
+
     const reindexedTriangles = new Uint32Array(T * 3);
     for (let i = 0; i < T; i++) {
         const tri = order[i];
@@ -154,6 +168,28 @@ export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResu
         reindexedTriangles[i * 3 + 1] = indices[tri * 3 + 1];
         reindexedTriangles[i * 3 + 2] = indices[tri * 3 + 2];
     }
-
-    return { nodes: new Float32Array(nodes), nodeCount: nodes.length / 8, reindexedTriangles, maxDepth };
+    return { nodes, nodeCount, reindexedTriangles, maxDepth, rootBox: rootBoxOf(nodes, nodeCount) };
 }
+
+/** The root node's world-space box (index 0), or an empty box for an empty tree. Used as the
+ *  prototype-local AABB when a mesh is an instance prototype (transformed per placement → TLAS). */
+export function rootBoxOf(nodes: Float32Array, nodeCount: number): AABB {
+    if (nodeCount === 0) return emptyAABB();
+    return { min: [nodes[0], nodes[1], nodes[2]], max: [nodes[4], nodes[5], nodes[6]] };
+}
+
+/** World AABB of a local box under a similarity (8-corner transform) — for TLAS leaf boxes. */
+export function transformAABB(local: AABB, apply: (p: [number, number, number]) => [number, number, number]): AABB {
+    const out = emptyAABB();
+    for (let c = 0; c < 8; c++) {
+        growPoint(out, apply([
+            (c & 1) ? local.max[0] : local.min[0],
+            (c & 2) ? local.max[1] : local.min[1],
+            (c & 4) ? local.max[2] : local.min[2],
+        ]));
+    }
+    return out;
+}
+
+export type { AABB };
+export { emptyAABB, growPoint };

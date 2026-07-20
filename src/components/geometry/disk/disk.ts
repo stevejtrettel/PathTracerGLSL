@@ -22,7 +22,7 @@ export const diskDescriptor: PrimitiveDescriptor = {
     type: 'disk',
     params: [
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
-        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
+        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },   // bounds() below reads center+radius
         // A flat (+Y) disk is a sensible disk — normal defaults rather than requires
         // (plane's normal stays required: it IS the plane's identity).
         { name: 'normal', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
@@ -36,4 +36,10 @@ export const diskDescriptor: PrimitiveDescriptor = {
     // Unit normal — framework-applied ONCE per parameter set; folds preserve it
     // (direction kinds transform by R alone).
     canonicalize: (v) => ({ ...v, normal: unitVec3(v.normal as number[]) }),
+    // Conservative box: the disk lies within radius of its center in every axis.
+    bounds(v) {
+        const c = (v.center as number[] | undefined) ?? [0, 0, 0];
+        const r = v.radius as number;
+        return { min: [c[0] - r, c[1] - r, c[2] - r], max: [c[0] + r, c[1] + r, c[2] + r] };
+    },
 };

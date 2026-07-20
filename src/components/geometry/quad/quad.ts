@@ -54,4 +54,13 @@ export const quadDescriptor: PrimitiveDescriptor = {
             ? ['edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8']
             : [];
     },
+    // AABB of the four corners: corner, +edge1, +edge2, +edge1+edge2.
+    bounds(v) {
+        const p = v.corner as number[], e1 = v.edge1 as number[], e2 = v.edge2 as number[];
+        const corners = [p, [p[0] + e1[0], p[1] + e1[1], p[2] + e1[2]], [p[0] + e2[0], p[1] + e2[1], p[2] + e2[2]], [p[0] + e1[0] + e2[0], p[1] + e1[1] + e2[1], p[2] + e1[2] + e2[2]]];
+        const min: [number, number, number] = [Infinity, Infinity, Infinity];
+        const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+        for (const q of corners) for (let a = 0; a < 3; a++) { if (q[a] < min[a]) min[a] = q[a]; if (q[a] > max[a]) max[a] = q[a]; }
+        return { min, max };
+    },
 };

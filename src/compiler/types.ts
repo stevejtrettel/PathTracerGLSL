@@ -535,6 +535,10 @@ export interface EstimatorDescription {
      * live A/B lets you watch the cost collapse on one scene. Meaningful only when meshes are
      * present. Future BVH variants join here as new occupants. */
     meshTraversal?: 'brute' | 'bvh';
+    /** Instance traversal (impl-plan-tlas): 'tlas' (default) walks a per-batch BVH over the instance
+     *  boxes; 'linear' scans every placement. Pure computation — same converged image; the live A/B
+     *  shows the cost collapse on a big batch. Meaningful only with instanced objects. */
+    instanceAccel?: 'linear' | 'tlas';
     accumulation: AccumulationDescription;
 }
 

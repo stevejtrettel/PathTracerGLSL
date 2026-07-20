@@ -154,6 +154,9 @@ export interface IntersectionDesc {
      *  triangles. The intersection family's first swappable occupant pair; gates which per-mesh
      *  wrapper (and whether the mesh_N_bvh extern) is emitted. Only meaningful when backends.mesh. */
     meshTraversal: 'brute' | 'bvh';
+    /** Instance traversal engine (impl-plan-tlas): 'tlas' walks the per-batch BVH, 'linear' scans
+     *  every placement. Gates the instance dispatch shape + whether the tlas extern is emitted. */
+    instanceAccel: 'linear' | 'tlas';
     /** The generated scene_intersect_any occlusion query exists — its only caller is
      *  the opaque shadow fast path (NEE without media; shadow_media re-spawns
      *  scene_intersect instead). The static backend walkers (sdf_intersect_any) ride

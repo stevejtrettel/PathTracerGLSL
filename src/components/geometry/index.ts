@@ -58,6 +58,14 @@ export function structName(d: PrimitiveDescriptor): string {
     return d.type[0].toUpperCase() + d.type.slice(1);
 }
 
+/** Local-space AABB of a primitive given (canonical) values — the prototype box for instancing
+ *  (impl-plan-tlas). null = unbounded (no `bounds` declared, e.g. plane) → not an instance
+ *  prototype (Validator-rejected). */
+export function primitiveBounds(type: string, values: PrimitiveValues): { min: [number, number, number]; max: [number, number, number] } | null {
+    const d = PRIMITIVES[type];
+    return d?.bounds ? d.bounds(values) : null;
+}
+
 /** Backend resolution (B1 — shape, not backend): auto = analytic if provided, else
  *  sdf; an explicit pin wins (the Validator rejects pins the primitive can't honor).
  *  undefined = unregistered type or unhonorable pin — callers diagnose. */

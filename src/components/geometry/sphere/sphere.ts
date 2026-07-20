@@ -14,4 +14,9 @@ export const sphereDescriptor: PrimitiveDescriptor = {
     glsl: sphereGLSL,
     provides: { sdf: true, analytic: true },
     samplableAsLight: true,   // §6.2: emissive analytic spheres join the light registry
+    bounds(v) {
+        const c = (v.center as number[] | undefined) ?? [0, 0, 0];
+        const r = v.radius as number;
+        return { min: [c[0] - r, c[1] - r, c[2] - r], max: [c[0] + r, c[1] + r, c[2] + r] };
+    },
 };

@@ -158,9 +158,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // looped over a placement texture. Mesh prototypes traverse their shared BLAS (bvh); analytic
     // prototypes intersect the closed form with s-scaled params. One region per batch.
     if (hasInstanced) {
+        const instanceAccel = plan.program.intersection.instanceAccel;
         for (const b of plan.instanceBatches) {
             const n = instanceExternNames(b.ordinal);
             textures.push({ name: `u_inst_${b.ordinal}_placements`, source: `extern:${n.placements}` });
+            // The TLAS node texture is bound only by the tlas engine; the linear engine bakes the
+            // instance count instead (exact linkage — each mode declares only what it reads).
+            if (instanceAccel === 'tlas') textures.push({ name: `u_inst_${b.ordinal}_tlas`, source: `extern:${n.tlas}` });
+            else defines[`INSTANCE_COUNT_${b.ordinal}`] = String(b.instanceCount);
             if (b.prototype.backend === 'mesh') {
                 textures.push(
                     { name: `u_inst_${b.ordinal}_position`, source: `extern:${n.position}` },
@@ -170,9 +175,8 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
                     { name: `u_inst_${b.ordinal}_bvh`, source: `extern:${n.bvh}` },
                 );
             }
-            defines[`INSTANCE_COUNT_${b.ordinal}`] = String(b.instanceCount);
         }
-        blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery) });
+        blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery, instanceAccel) });
     }
 
     // region → material table spans ALL backends (regions are globally unique).
@@ -592,69 +596,108 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
 }
 
 // ============================================================================
-// Instance dispatch (per-scene) — impl-plan-instancing
+// Instance dispatch (per-scene) — impl-plan-instancing + impl-plan-tlas
 // ============================================================================
-// One prototype × N placements = the driven ray-into-local wrapper LOOPED over a placement texture.
-// Mesh prototypes traverse their shared BLAS (mesh_nearest_bvh); analytic prototypes intersect the
-// closed form with s-scaled params. One region per batch. The loop body is the driven-mesh /
-// driven-analytic arm, reading its placement from the texture per iteration instead of a uniform.
+// One prototype × N placements, accelerated by a per-batch TLAS (a BVH over the instance WORLD
+// boxes). The walk descends the TLAS with the WORLD ray (pruned by hit.t); at a leaf it loops the
+// leaf's placement range and, for each, reads the placement, conjugates the ray into that instance's
+// local frame, and intersects the shared prototype (mesh BLAS / analytic closed form). The leaf-item
+// body is the driven-mesh / driven-analytic arm. mesh uses ÷s conjugation (Möller–Trumbore is
+// non-unit-safe) + unscaled BLAS; analytic uses rigid conjugation (unit rd) + s-scaled params.
 
-function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boolean): string {
-    const lines: string[] = ['// Generated instance dispatch (placement-list × shared prototype)'];
+/** The per-placement leaf body for placement index `i` (reads texture → conjugate → intersect →
+ *  record into hit / return-true for the any variant). Indentation is cosmetic. */
+function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean): string[] {
+    const o = b.ordinal;
+    const read = [
+        `                vec4 q  = texelFetch(u_inst_${o}_placements, mesh_texel1d(uint(2 * i)), 0);`,
+        `                vec4 ts = texelFetch(u_inst_${o}_placements, mesh_texel1d(uint(2 * i + 1)), 0);`,
+        `                float s = placement_scale(ts);`,
+    ];
+    if (b.prototype.backend === 'mesh') {
+        const conj = [
+            '                vec3 ro = placement_rigid(q, ts, ray.origin) / s;',
+            '                vec3 rd = placement_dir(q, ray.direction) / s;',
+        ];
+        if (forAny) return [...read, ...conj,
+            `                if (mesh_any_bvh(u_inst_${o}_position, u_inst_${o}_index, u_inst_${o}_bvh, ro, rd, maxDist)) return true;`];
+        return [...read, ...conj,
+            '                vec3 nLocal; vec2 uv;',
+            `                if (mesh_nearest_bvh(u_inst_${o}_position, u_inst_${o}_index, u_inst_${o}_normal, u_inst_${o}_uv, u_inst_${o}_bvh, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, uv)) {`,
+            '                    found = true;',
+            '                    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
+            '                    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));',
+            `                    hit.region_owner = ${b.index};`,
+            '                    hit.uv = uv;',
+            '                }'];
+    }
+    const d = primitive(b.prototype.shapeType);
+    const conj = [
+        '                vec3 ro = placement_rigid(q, ts, ray.origin);',
+        '                vec3 rd = placement_dir(q, ray.direction);   // unit — <type>_intersect assumes it',
+        '                Ray lray = make_ray(ro, rd);',
+        `                ${structName(d)} shape = ${emitCtor(d, b.prototype.parameters, 's')};`,
+        '                float t;',
+    ];
+    if (forAny) return [...read, ...conj,
+        `                if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < maxDist) return true;`];
+    return [...read, ...conj,
+        `                if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < hit.t) {`,
+        '                    hit.t = t; found = true;',
+        '                    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
+        `                    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${b.prototype.shapeType}_normal(lray.origin + t * lray.direction, shape))));`,
+        `                    hit.region_owner = ${b.index};`,
+        '                    hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);',
+        '                }'];
+}
 
-    // The per-instance placement read (shared) + the ray-into-local conjugation, which DIFFERS by
-    // backend because analytic <type>_intersect assumes a UNIT ray direction while the mesh leaf
-    // (Möller–Trumbore) does not:
-    //   - mesh: full inverse similarity → ro/rd ÷ s (rd non-unit; local t == world t), UNSCALED BLAS.
-    //   - analytic: rigid-only conjugation (rd stays UNIT) + the shape's params scaled by s — the
-    //     driven-analytic convention (t is a world value; rigid preserves distance).
-    const readPlacement = (o: number): string[] => [
-        `        vec4 q  = texelFetch(u_inst_${o}_placements, mesh_texel1d(uint(2 * i)), 0);`,
-        `        vec4 ts = texelFetch(u_inst_${o}_placements, mesh_texel1d(uint(2 * i + 1)), 0);`,
-        `        float s = placement_scale(ts);`,
+/** The TLAS stack-DFS skeleton for a batch: descends `u_inst_o_tlas` with the WORLD ray, pruning by
+ *  `bound` (hit.t or maxDist), running `leaf` over each leaf's placement range. Same node format as
+ *  the BLAS (A<0 internal / A>=0 leaf count+offset). */
+function instanceTlasWalk(o: number, bound: string, leaf: string[]): string[] {
+    return [
+        '    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;',
+        '    while (ptr >= 0) {',
+        '        int ni = stack[ptr]; ptr--;',
+        `        vec4 n0 = texelFetch(u_inst_${o}_tlas, mesh_texel1d(uint(ni * 2)), 0);`,
+        `        vec4 n1 = texelFetch(u_inst_${o}_tlas, mesh_texel1d(uint(ni * 2 + 1)), 0);`,
+        '        float tenter;',
+        `        if (!mesh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, ${bound}, tenter)) continue;`,
+        '        if (n0.w >= 0.0) {',
+        '            int off = int(n1.w), cnt = int(n0.w);',
+        '            for (int j = 0; j < cnt; j++) {',
+        '                int i = off + j;',
+        ...leaf,
+        '            }',
+        '        } else {',
+        '            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);',
+        '            bool nf = ray.direction[axis] >= 0.0;',
+        '            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }',
+        '        }',
+        '    }',
     ];
-    const conjugateMesh = [
-        '        vec3 ro = placement_rigid(q, ts, ray.origin) / s;',
-        '        vec3 rd = placement_dir(q, ray.direction) / s;',
+}
+
+/** Linear scan over every placement (the A/B baseline) — the same leaf-item body, wrapped in a
+ *  `for i` loop instead of the TLAS walk. Reads the (TLAS-order, but order-independent) placements. */
+function instanceLinearLoop(o: number, leaf: string[]): string[] {
+    return [
+        `    for (int i = 0; i < INSTANCE_COUNT_${o}; i++) {`,
+        ...leaf,
+        '    }',
     ];
-    const conjugateAnalytic = [
-        '        vec3 ro = placement_rigid(q, ts, ray.origin);',
-        '        vec3 rd = placement_dir(q, ray.direction);   // unit — <type>_intersect assumes it',
-    ];
+}
+
+function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boolean, instanceAccel: 'linear' | 'tlas'): string {
+    const lines: string[] = [`// Generated instance dispatch (${instanceAccel} — impl-plan-tlas)`];
+    const tlas = instanceAccel === 'tlas';
+    const body = (o: number, bound: string, leaf: string[]): string[] =>
+        tlas ? instanceTlasWalk(o, bound, leaf) : instanceLinearLoop(o, leaf);
 
     for (const b of batches) {
-        const o = b.ordinal;
-        lines.push(`bool instance_batch_${o}(Ray ray, inout Hit hit) {`);
+        lines.push(`bool instance_batch_${b.ordinal}(Ray ray, inout Hit hit) {`);
         lines.push('    bool found = false;');
-        lines.push(`    for (int i = 0; i < INSTANCE_COUNT_${o}; i++) {`);
-        lines.push(...readPlacement(o));
-        if (b.prototype.backend === 'mesh') {
-            lines.push(...conjugateMesh);
-            lines.push('        vec3 nLocal; vec2 uv;');
-            lines.push(`        if (mesh_nearest_bvh(u_inst_${o}_position, u_inst_${o}_index, u_inst_${o}_normal, u_inst_${o}_uv, u_inst_${o}_bvh, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, uv)) {`);
-            lines.push('            found = true;');
-            lines.push('            hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);');
-            lines.push('            hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));');
-            lines.push(`            hit.region_owner = ${b.index};`);
-            lines.push('            hit.uv = uv;');
-            lines.push('        }');
-        } else {
-            const d = primitive(b.prototype.shapeType);
-            // Rigid conjugation + s-scaled shape params (driven-analytic convention): rd stays unit
-            // for <type>_intersect, the shape absorbs s, and t is a world value (rigid = isometry).
-            lines.push(...conjugateAnalytic);
-            lines.push('        Ray lray = make_ray(ro, rd);');
-            lines.push(`        ${structName(d)} shape = ${emitCtor(d, b.prototype.parameters, 's')};`);
-            lines.push('        float t;');
-            lines.push(`        if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < hit.t) {`);
-            lines.push('            hit.t = t; found = true;');
-            lines.push('            hit.p = ambient_geodesic(ray.origin, ray.direction, t);');
-            lines.push(`            hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${b.prototype.shapeType}_normal(lray.origin + t * lray.direction, shape))));`);
-            lines.push(`            hit.region_owner = ${b.index};`);
-            lines.push('            hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);');
-            lines.push('        }');
-        }
-        lines.push('    }');
+        lines.push(...body(b.ordinal, 'hit.t', instanceLeafItem(b, false)));
         lines.push('    return found;');
         lines.push('}');
         lines.push('');
@@ -669,22 +712,8 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
     if (anyQuery) {
         lines.push('');
         for (const b of batches) {
-            const o = b.ordinal;
-            lines.push(`bool instance_batch_any_${o}(Ray ray, float maxDist) {`);
-            lines.push(`    for (int i = 0; i < INSTANCE_COUNT_${o}; i++) {`);
-            lines.push(...readPlacement(o));
-            if (b.prototype.backend === 'mesh') {
-                lines.push(...conjugateMesh);
-                lines.push(`        if (mesh_any_bvh(u_inst_${o}_position, u_inst_${o}_index, u_inst_${o}_bvh, ro, rd, maxDist)) return true;`);
-            } else {
-                const d = primitive(b.prototype.shapeType);
-                lines.push(...conjugateAnalytic);
-                lines.push('        Ray lray = make_ray(ro, rd);');
-                lines.push(`        ${structName(d)} shape = ${emitCtor(d, b.prototype.parameters, 's')};`);
-                lines.push('        float t;');
-                lines.push(`        if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < maxDist) return true;`);
-            }
-            lines.push('    }');
+            lines.push(`bool instance_batch_any_${b.ordinal}(Ray ray, float maxDist) {`);
+            lines.push(...body(b.ordinal, 'maxDist', instanceLeafItem(b, true)));
             lines.push('    return false;');
             lines.push('}');
         }

@@ -49,6 +49,8 @@ export interface PackedMesh {
     normal: PackedTexture<Float32Array>;     // RGBA32F, xyz per vertex (zeros when unauthored)
     uv: PackedTexture<Float32Array>;         // RGBA32F, xy per vertex (zeros when unauthored)
     bvh: PackedTexture<Float32Array>;        // RGBA32F, 2 texels per node (impl-plan-mesh-bvh §3)
+    /** The BLAS root box — the mesh's local AABB, used as the prototype box when instanced. */
+    rootBox: { min: [number, number, number]; max: [number, number, number] };
 }
 
 function ceilDiv(a: number, b: number): number { return Math.ceil(a / b); }
@@ -97,8 +99,9 @@ function packIndex(indices: Uint32Array, triCount: number): PackedTexture<Float3
 }
 
 /** Pack the flat BVH node array (8 floats = 2 RGBA32F texels per node) into a texel grid. The node
- *  array is already texel-contiguous, so it copies straight in (padded to the grid). */
-function packNodes(nodes: Float32Array, nodeCount: number): PackedTexture<Float32Array> {
+ *  array is already texel-contiguous, so it copies straight in (padded to the grid). Shared by the
+ *  BLAS (mesh) and the TLAS (instancing) — same node format. */
+export function packNodes(nodes: Float32Array, nodeCount: number): PackedTexture<Float32Array> {
     const texels = Math.max(1, nodeCount * 2);
     const w = MESH_TEX_WIDTH;
     const h = Math.max(1, ceilDiv(texels, w));
@@ -122,5 +125,6 @@ export function packMesh(mesh: MeshObject): PackedMesh {
         normal: packVec3ToRGBA(mesh.normals, vertexCount),
         uv: packVec2ToRGBA(mesh.uvs, vertexCount),
         bvh: packNodes(bvh.nodes, bvh.nodeCount),
+        rootBox: bvh.rootBox,
     };
 }
