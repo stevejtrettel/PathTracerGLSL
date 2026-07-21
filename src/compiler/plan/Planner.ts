@@ -23,7 +23,8 @@ import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
-import { sceneInstanceBatches } from '../../components/intersection/instancing/instancing.js';
+import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
+import { sceneInstanceBatches, instanceAttributeRows } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
 import type { BlackbodyValue } from '../types.js';
 
@@ -98,6 +99,10 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 name: obj.name,
                 triCount: obj.indices.length / 3,
                 smooth: obj.normals !== undefined,
+                // Solid (fable-mesh-containment) — Validator-proven; the local box is the
+                // containment query's baked root-box early-out.
+                closed: obj.closed === true,
+                ...(obj.closed === true ? { localBox: meshLocalBox(obj.positions) } : {}),
                 placement: isDrivenTransform(obj.transform)
                     ? buildDrivenPlacement(obj.transform!, objectIndex - 1)
                     : placementOf(obj.transform),
@@ -112,10 +117,25 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             const proto = obj.prototype;
             const matId = materialIdMap.get(proto.material)!;   // validated by the Validator
             const region = objectIndex++;
+            const ordinal = batchOrdinals.get(obj)!;
+            // Per-instance ATTRIBUTES (fable-instance-attributes): slot order from the ONE
+            // shared helper (the app's packer calls the same one — the layout cannot drift);
+            // the batch material's rows are patched to AttributeValue refs, so the generated
+            // fill fetches instance_k_attrs by Hit.element. The Validator guaranteed the
+            // material is exclusive to this batch, so the patch cannot affect anyone else.
+            const attrRows = instanceAttributeRows(scene.materials[proto.material]?.model ?? '', obj.attributes ?? {});
+            const attributeRows = attrRows.length > 0 ? attrRows : undefined;
+            if (attributeRows !== undefined) {
+                const mat = materials.find((m) => m.id === matId)!;
+                attributeRows.forEach((r, slot) => {
+                    mat.values[r.source] = { attribute: { batch: ordinal, slot, count: attributeRows.length, shape: r.shape } };
+                });
+            }
             if (isMeshObject(proto)) {
                 instanceBatches.push({
-                    ordinal: batchOrdinals.get(obj)!, index: region, materialId: matId, name: obj.name,
+                    ordinal, index: region, materialId: matId, name: obj.name,
                     instanceCount: obj.placements.length,
+                    ...(attributeRows !== undefined ? { attributeRows } : {}),
                     prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined },
                 });
             } else {
@@ -126,8 +146,9 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     continue;
                 }
                 instanceBatches.push({
-                    ordinal: batchOrdinals.get(obj)!, index: region, materialId: matId, name: obj.name,
+                    ordinal, index: region, materialId: matId, name: obj.name,
                     instanceCount: obj.placements.length,
+                    ...(attributeRows !== undefined ? { attributeRows } : {}),
                     // Prototype has NO transform → just canonicalize (no fold); s scales per instance in-shader.
                     prototype: { backend: 'analytic', shapeType: proto.type, parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters) },
                 });

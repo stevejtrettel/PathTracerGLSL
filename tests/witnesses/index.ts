@@ -21,8 +21,8 @@ import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '.
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
-import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy } from './scenes/meshWitness.js';
-import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy } from './scenes/instanceWitness.js';
+import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy } from './scenes/meshWitness.js';
+import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy } from './scenes/instanceWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import {
     slabScene, slabStrategy,
@@ -180,6 +180,71 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // linear scan with the same stream — near-bit-exact (see mesh-quad-twin).
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'tlas ≡ linear (identical stream)' },
             ],
+        },
+    },
+    // Containment (fable-mesh-containment): a CLOSED cube mesh ≡ the same cube as an SDF
+    // box, across the three things containment unlocks (dielectric interior, interior
+    // medium, innermost-wins nesting). Cross-backend twins → display-space rmse gates.
+    'mesh-glass-box-ref': {
+        scene: meshGlassPair.ref,
+        strategies: [containStrategy],
+        exercises: 'reference arm of the mesh-glass twin — the same cube as an SDF box with the dielectric',
+    },
+    'mesh-glass-box': {
+        scene: meshGlassPair.mesh,
+        strategies: [containStrategy],
+        exercises: 'a CLOSED cube mesh with a dielectric: first-hit-facing containment + closest-distance |d| feed scene_region_at, the exit hit classifies region_from = mesh, ior_of has a mesh row — twin of mesh-glass-box-ref',
+        expected: 'converges to the same image as mesh-glass-box-ref (a solid glass mesh ≡ a solid glass SDF box)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'mesh-glass-box-ref' }, meanTol: 0.03, rmse: 0.08, label: 'mesh glass ≡ SDF glass' }],
+        },
+    },
+    'mesh-fog-ref': {
+        scene: meshFogPair.ref,
+        strategies: [containStrategy],
+        exercises: 'reference arm of the mesh-fog twin — the same cube as an SDF box with the null-interface fog material',
+    },
+    'mesh-fog': {
+        scene: meshFogPair.mesh,
+        strategies: [containStrategy],
+        exercises: 'an absorbing medium INSIDE a closed mesh (null interface + the medium walker classifying segments by mesh containment) — twin of mesh-fog-ref',
+        expected: 'converges to the same image as mesh-fog-ref (fog in a mesh ≡ fog in an SDF box)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'mesh-fog-ref' }, meanTol: 0.03, rmse: 0.08, label: 'mesh fog ≡ SDF fog' }],
+        },
+    },
+    'mesh-submerged-ref': {
+        scene: meshSubmergedPair.ref,
+        strategies: [containStrategy],
+        exercises: 'reference arm of the mesh-submerged twin — the inner solid as an SDF box inside the water sphere',
+    },
+    'mesh-submerged': {
+        scene: meshSubmergedPair.mesh,
+        strategies: [containStrategy],
+        exercises: 'a scaled CLOSED glass mesh nested INSIDE a water sphere — innermost-wins must rank the containers by |d| (the closest-distance query × the s·d correction; the R-SUBMERGED exercise with a mesh inner region) — twin of mesh-submerged-ref',
+        expected: 'converges to the same image as mesh-submerged-ref (nesting order identical across backends)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'mesh-submerged-ref' }, meanTol: 0.03, rmse: 0.08, label: 'mesh-in-water ≡ box-in-water' }],
+        },
+    },
+    // Per-instance attributes (fable-instance-attributes): one batch material, three
+    // per-instance albedos via the Hit.element-indexed attrs table.
+    'attr-twin-ref': {
+        scene: attrTwinRef,
+        strategies: [attrTwinStrategy],
+        exercises: 'reference arm of the attribute twin — the three spheres as individual objects with three materials',
+    },
+    'attr-twin': {
+        scene: attrTwin,
+        strategies: [attrTwinStrategy],
+        exercises: 'three spheres as ONE batch with per-instance albedo ATTRIBUTES (the fourth storage class: Hit.element → the TLAS-reordered instance_k_attrs table) — twin of attr-twin-ref; a reorder bug shows as swapped colors',
+        expected: 'converges to the same image as attr-twin-ref (per-instance attributes ≡ per-object materials)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'attr-twin-ref' }, meanTol: 0.01, rmse: 0.03, label: 'attribute albedos ≡ individual materials' }],
         },
     },
     // Mesh-prototype instancing (the ÷s-convention guard — the bug class found only by

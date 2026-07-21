@@ -39,6 +39,7 @@ void raymarch_commit(inout Hit hit, float t, vec3 p, int region) {
     hit.p = p;
     hit.frame = ambient_frame(p, scene_normal(p, region));   // owner's outward normal; dispatcher orients (§4.1)
     hit.region_owner = region;
+    hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)
     hit.uv = vec2(p.x * UV_PLANAR_SCALE, p.z * UV_PLANAR_SCALE);
 }
 

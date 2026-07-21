@@ -135,6 +135,84 @@ const meshTwinBase: RenderStrategy = {
 // Look down at the floor from the front so the blocker's shadow is visible.
 export const meshTwinStrategy: RenderStrategy = withPose(meshTwinBase, [0, 2.2, 4.5], [0, -0.6, 0]);
 
+// ---------------------------------------------------------------------------
+// Containment witnesses (fable-mesh-containment §7): a CLOSED cube mesh must behave
+// exactly like the same cube authored as an SDF box — the exact-geometry cross-backend
+// twin discipline, applied to the three things containment unlocks:
+//   mesh-glass-box  — a dielectric interior (ior_of row + the exit-hit classification)
+//   mesh-fog        — an interior medium behind a null interface (the medium walker)
+//   mesh-submerged  — innermost-wins ORDERING (the closed mesh nested inside water —
+//                     the closest-distance query's |d| ranks the containers)
+// ---------------------------------------------------------------------------
+
+const solidCube = boxMesh(0.7, /*inward*/ false);
+
+const containFloor = { type: 'quad', parameters: { corner: [-4, 0, -4], edge1: [0, 0, 8], edge2: [8, 0, 0] }, material: 'floor' };
+const containMaterials: SceneDescription['materials'] = {
+    floor: { model: 'lambert', albedo: [0.6, 0.6, 0.62] },
+    glass: { model: 'dielectric', ior: 1.5 },
+    fog: { model: 'none', medium: { sigma_a: [1.2, 0.7, 0.4] } },
+    water: { model: 'dielectric', ior: 1.33 },
+};
+const containLights: SceneDescription['lights'] = [{ kind: 'point', position: [2.5, 4.5, 2.5], emission: 50 }];
+const containEnv: SceneDescription['environment'] = { type: 'constant', color: [0.35, 0.42, 0.55], intensity: 1.0 };
+
+/** Scene pair builder: the centerpiece as a closed cube MESH vs the same cube as an SDF box. */
+function containPair(id: string, name: string, material: string, extra: SceneDescription['objects'] = []): { mesh: SceneDescription; ref: SceneDescription } {
+    const common = { ambientSpace: { type: 'euclidean' } as const, materials: containMaterials, lights: containLights, environment: containEnv };
+    return {
+        mesh: {
+            id, name, ...common,
+            objects: [
+                containFloor,
+                { kind: 'mesh', positions: solidCube.positions, indices: solidCube.indices, material, closed: true, transform: { position: [0, 0.75, 0] as [number, number, number] }, name: 'cube' },
+                ...extra,
+            ],
+        },
+        ref: {
+            id: `${id}-ref`, name: `${name} Ref (SDF box)`, ...common,
+            objects: [
+                containFloor,
+                { type: 'box', parameters: { center: [0, 0.75, 0], halfSize: [0.7, 0.7, 0.7] }, material },
+                ...extra,
+            ],
+        },
+    };
+}
+
+export const meshGlassPair = containPair('mesh-glass-box', 'Mesh Glass Box (closed mesh dielectric)', 'glass');
+export const meshFogPair = containPair('mesh-fog', 'Mesh Fog Box (interior medium in a closed mesh)', 'fog');
+// Submerged: the closed cube (glass) INSIDE a water sphere — the R-SUBMERGED exercise with
+// a mesh as the inner region (innermost-wins must rank mesh-vs-sphere by |d|).
+const waterSphere = { type: 'sphere', parameters: { center: [0, 0.9, 0], radius: 1.6 }, material: 'water' };
+export const meshSubmergedPair = {
+    mesh: {
+        ...containPair('mesh-submerged', 'Mesh Submerged (closed mesh inside water)', 'glass').mesh,
+        objects: [
+            containFloor,
+            waterSphere,
+            { kind: 'mesh' as const, positions: solidCube.positions, indices: solidCube.indices, material: 'glass', closed: true, transform: { position: [0, 0.9, 0] as [number, number, number], scale: 0.6 }, name: 'cube' },
+        ],
+    },
+    ref: {
+        ...containPair('mesh-submerged', 'x', 'glass').ref,
+        id: 'mesh-submerged-ref', name: 'Mesh Submerged Ref (SDF box inside water)',
+        objects: [
+            containFloor,
+            waterSphere,
+            { type: 'box' as const, parameters: { center: [0, 0.9, 0], halfSize: [0.42, 0.42, 0.42] }, material: 'glass' },
+        ],
+    },
+};
+
+const containBase: RenderStrategy = {
+    id: 'pathtracer',
+    measurement: { camera: { type: 'pinhole', fov: 0.85 }, maxBounces: 10 },
+    estimator: { directLighting: 'nee', russianRoulette: { startDepth: 4 }, accumulation: { type: 'average' } },
+    view: { tonemap: { type: 'reinhard' } },
+};
+export const containStrategy: RenderStrategy = withPose(containBase, [1.8, 2.2, 3.6], [0, 0.75, 0]);
+
 // The estimator-swap arm (taxonomy obligation: estimator fields are bias-free by
 // contract, so swapping the traversal engine must not change the image). Identical
 // RNG stream + identical candidate set → near-bit-exact agreement; the only things

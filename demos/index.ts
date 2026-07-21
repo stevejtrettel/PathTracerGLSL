@@ -46,9 +46,9 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
         scene: spheresScene,
         strategies: posed([0, 4.5, 13], [0, 2.3, 0], spheresStrategy, spheresLinearStrategy),
         exercises:
-            'DEMO — the TLAS A/B (impl-plan-tlas): 500 instanced spheres from one prototype. Key 1 = TLAS (per-batch BVH over the instance boxes), key 2 = linear scan (500 tests/ray) — SAME image, watch pathtracer ms/frame collapse (~7× on SwiftShader).',
+            'DEMO — the TLAS A/B (impl-plan-tlas) + per-instance ATTRIBUTES (fable-instance-attributes): 500 instanced spheres from one prototype with 500 per-instance albedos (ONE material; Hit.element → the attrs table). Key 1 = TLAS, key 2 = linear scan (500 tests/ray) — SAME image, watch pathtracer ms/frame collapse (~7× on SwiftShader).',
         expected:
-            'a dense cloud of ~500 warm spheres above a gray floor; keys 1 (tlas) and 2 (linear) are pixel-identical, but key 1 is dramatically faster. All 500 share one prototype (memory is one sphere).',
+            'a dense cloud of ~500 pastel multi-colored spheres above a gray floor — every color from one material + the per-instance table; keys 1 (tlas) and 2 (linear) are pixel-identical, key 1 dramatically faster. All 500 share one prototype (memory is one sphere).',
     },
     forest: {
         scene: forestScene,

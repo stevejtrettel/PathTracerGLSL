@@ -24,7 +24,10 @@ Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  �
 2. **`scene_intersect(Ray) → Hit`** — advance to the next intersection. One contract; it subsumes
    SDF marching, analytic intersection, and (future) mesh/BVH as geometry **capabilities**
    (`sdf?` / `ray?` / `instances?`), taking the nearest hit and coordinating via `tmax`.
-3. **`Hit`** — the landing record: where you arrived, the shading frame, the regions flanking the boundary.
+3. **`Hit`** — the landing record: where you arrived, the shading frame, the regions flanking
+   the boundary, and the owner's sub-element index (`element` — which PIECE of the owning
+   region's surface; owner-approved July 2026, fable-instance-attributes: placement index for
+   instanced batches, 0 elsewhere; future per-triangle/Stage-B refs ride the same channel).
 4. **Interaction** — the scattering event (surface BSDF and medium phase unified): `sample` returns
    the next direction + weight; `eval`/`emission` for NEE/MIS.
 5. **`make_ray`** — spawn the continuation ray from the hit; iterate.

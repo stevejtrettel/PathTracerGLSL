@@ -30,7 +30,7 @@
 
 import { isValueParam, isGlslExpression, isBlackbody, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata } from '../types.js';
 import { blackbodyRGB, foldBlackbody } from '../../components/lights/blackbody.js';
-import type { PlannedUniform } from '../plan/types.js';
+import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
@@ -49,6 +49,12 @@ export function emitValue(
     format: (x: never) => string,
     exprFormat: (e: GlslExpression) => string = (e) => e.source,
 ): string {
+    if (isAttributeValue(v)) {
+        // Backstop: the ATTRIBUTE storage class (fable-instance-attributes) has exactly ONE
+        // legal use site — the scene_material_properties fill, where Hit.element is in scope
+        // (emitAttributeValue). Reaching any other emitValue site is a Planner bug.
+        throw new Error('emitValue: AttributeValue reached a non-attribute site — attribute rows are legal only in the material-properties fill');
+    }
     if (isBlackbody(v)) {
         // Constant dials bake (plan entry normally folds these already — this is the
         // backstop); a driven dial reads its ONE derived vec3 uniform.
@@ -59,6 +65,17 @@ export function emitValue(
     if (isValueParam(v)) return paramToUniform(v.param);
     if (isGlslExpression(v)) return exprFormat(v);
     return format(v as never);
+}
+
+/** ATTRIBUTE use site (fable-instance-attributes — the fourth storage class: constant |
+ *  driven | expression | attribute). The ONE legal reader is the scene_material_properties
+ *  fill, where `element` (Hit.element, the TLAS-leaf placement index) is in scope:
+ *  texel = element·count + slot in batch `batch`'s instance_k_attrs table (packed in the
+ *  SAME leaf order as the placements — one reorder truth). */
+export function emitAttributeValue(a: AttributeValue): string {
+    const { batch, slot, count, shape } = a.attribute;
+    const fetch = `texelFetch(u_inst_${batch}_attrs, data_texel1d(uint(element * ${count} + ${slot})), 0)`;
+    return shape === 'vec3' ? `${fetch}.xyz` : `${fetch}.x`;
 }
 
 /** The derived vec3 uniform's name — from the driven dial's path (kelvin wins), so a

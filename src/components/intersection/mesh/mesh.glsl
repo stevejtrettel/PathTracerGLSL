@@ -145,6 +145,127 @@ bool mesh_nearest_bvh(
     nLocal = nl; uvOut = uo; return found;
 }
 
+// ── Containment point queries (fable-mesh-containment) — LOCAL space, closed meshes only. ──
+
+// Direction for the first-hit-facing inside test: FIXED and slightly irrational, so a ray
+// through a vertex/edge is an authoring coincidence, not a per-frame flicker.
+const vec3 MESH_INSIDE_DIR = vec3(0.5320544, 0.7396997, 0.4114743);
+
+// First-hit facing (amended §1): from local p, the NEAREST triangle along the fixed ray is a
+// back-face iff p is inside — valid because the Validator PROVED watertightness + consistent
+// winding. A standard tmax-pruned nearest walk tracking only the geometric side of the
+// nearest hit (dot(dir, gnorm) > 0 = exit face = inside). No hit anywhere → outside.
+bool mesh_inside_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, vec3 p) {
+    float tmax = 1.0e20;
+    float sideDot = 0.0;   // dot(dir, gnorm) at the running-nearest hit; 0 = no hit yet
+    int stack[BVH_STACK_DEPTH];
+    int ptr = 0;
+    stack[0] = 0;
+    while (ptr >= 0) {
+        int ni = stack[ptr]; ptr--;
+        vec4 n0 = texelFetch(bvhTex, data_texel1d(uint(ni * 2)), 0);
+        vec4 n1 = texelFetch(bvhTex, data_texel1d(uint(ni * 2 + 1)), 0);
+        float tenter;
+        if (!bvh_aabb_hit(n0.xyz, n1.xyz, p, MESH_INSIDE_DIR, tmax, tenter)) continue;
+        if (n0.w >= 0.0) {
+            uint off = uint(n1.w), cnt = uint(n0.w);
+            for (uint i = off; i < off + cnt; i++) {
+                uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(i), 0).xyz);
+                vec3 a = mesh_pos(posTex, tri.x);
+                vec3 b = mesh_pos(posTex, tri.y);
+                vec3 c = mesh_pos(posTex, tri.z);
+                vec3 bary, gnorm; float t;
+                // t > 0.0 (not EPSILON): the probe point is already EPS_INTERFACE off any
+                // surface by the caller's discipline; skipping near hits would misclassify
+                // probes standing just inside a face.
+                if (mesh_tri_test(p, MESH_INSIDE_DIR, a, b, c, bary, gnorm, t) && t > 0.0 && t < tmax) {
+                    tmax = t;
+                    sideDot = dot(MESH_INSIDE_DIR, gnorm);
+                }
+            }
+        } else {
+            int axis = int(-n0.w - 1.0);
+            int L = ni + 1, R = int(n1.w);
+            bool nearFirst = MESH_INSIDE_DIR[axis] >= 0.0;
+            if (ptr + 2 < BVH_STACK_DEPTH) {
+                stack[++ptr] = nearFirst ? R : L;
+                stack[++ptr] = nearFirst ? L : R;
+            }
+        }
+    }
+    return sideDot > 0.0;   // exit face first ⇒ inside
+}
+
+// Squared distance from p to an AABB (0 inside) — the branch-and-bound prune bound.
+float mesh_box_dist2(vec3 bmin, vec3 bmax, vec3 p) {
+    vec3 d = max(max(bmin - p, vec3(0.0)), p - bmax);
+    return dot(d, d);
+}
+
+// Closest point on triangle abc to p (Ericson, Real-Time Collision Detection §5.1.5),
+// returned as squared distance.
+float mesh_point_tri_dist2(vec3 p, vec3 a, vec3 b, vec3 c) {
+    vec3 ab = b - a, ac = c - a, ap = p - a;
+    float d1 = dot(ab, ap), d2 = dot(ac, ap);
+    if (d1 <= 0.0 && d2 <= 0.0) { vec3 q = p - a; return dot(q, q); }
+    vec3 bp = p - b;
+    float d3 = dot(ab, bp), d4 = dot(ac, bp);
+    if (d3 >= 0.0 && d4 <= d3) { vec3 q = p - b; return dot(q, q); }
+    float vc = d1 * d4 - d3 * d2;
+    if (vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0) { vec3 q = ap - ab * (d1 / (d1 - d3)); return dot(q, q); }
+    vec3 cp = p - c;
+    float d5 = dot(ab, cp), d6 = dot(ac, cp);
+    if (d6 >= 0.0 && d5 <= d6) { vec3 q = p - c; return dot(q, q); }
+    float vb = d5 * d2 - d1 * d6;
+    if (vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0) { vec3 q = ap - ac * (d2 / (d2 - d6)); return dot(q, q); }
+    float va = d3 * d6 - d5 * d4;
+    if (va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0) {
+        vec3 q = bp - (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+        return dot(q, q);
+    }
+    float denom = 1.0 / (va + vb + vc);
+    vec3 closest = a + ab * (vb * denom) + ac * (vc * denom);
+    vec3 q = p - closest;
+    return dot(q, q);
+}
+
+// Branch-and-bound closest-triangle distance: stack DFS, near child first by box distance,
+// pruning nodes farther than the running best. Runs ONLY for points proven inside (the lazy
+// split) — it supplies the |d| that innermost-wins ranks nested containers by.
+float mesh_closest_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, vec3 p) {
+    float best2 = 1.0e30;
+    int stack[BVH_STACK_DEPTH];
+    int ptr = 0;
+    stack[0] = 0;
+    while (ptr >= 0) {
+        int ni = stack[ptr]; ptr--;
+        vec4 n0 = texelFetch(bvhTex, data_texel1d(uint(ni * 2)), 0);
+        vec4 n1 = texelFetch(bvhTex, data_texel1d(uint(ni * 2 + 1)), 0);
+        if (mesh_box_dist2(n0.xyz, n1.xyz, p) >= best2) continue;
+        if (n0.w >= 0.0) {
+            uint off = uint(n1.w), cnt = uint(n0.w);
+            for (uint i = off; i < off + cnt; i++) {
+                uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(i), 0).xyz);
+                best2 = min(best2, mesh_point_tri_dist2(p,
+                    mesh_pos(posTex, tri.x), mesh_pos(posTex, tri.y), mesh_pos(posTex, tri.z)));
+            }
+        } else {
+            int L = ni + 1, R = int(n1.w);
+            // Push far child first so the near one is popped (and shrinks best2) first.
+            vec4 l0 = texelFetch(bvhTex, data_texel1d(uint(L * 2)), 0);
+            vec4 l1 = texelFetch(bvhTex, data_texel1d(uint(L * 2 + 1)), 0);
+            vec4 r0 = texelFetch(bvhTex, data_texel1d(uint(R * 2)), 0);
+            vec4 r1 = texelFetch(bvhTex, data_texel1d(uint(R * 2 + 1)), 0);
+            bool leftNear = mesh_box_dist2(l0.xyz, l1.xyz, p) <= mesh_box_dist2(r0.xyz, r1.xyz, p);
+            if (ptr + 2 < BVH_STACK_DEPTH) {
+                stack[++ptr] = leftNear ? R : L;
+                stack[++ptr] = leftNear ? L : R;
+            }
+        }
+    }
+    return sqrt(best2);
+}
+
 bool mesh_any_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, vec3 ro, vec3 rd, float maxDist) {
     int stack[BVH_STACK_DEPTH];
     int ptr = 0;

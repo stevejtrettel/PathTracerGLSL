@@ -484,3 +484,109 @@ describe('Validator — mesh/instancing validation batch', () => {
         expect(inert2.getWarnings().some(w => /instanceAccel controls nothing here/.test(w.message))).toBe(true);
     });
 });
+
+// Per-instance attributes (fable-instance-attributes): the fourth storage class's rules.
+describe('Validator — instance attributes', () => {
+    const placements = [{ position: [0, 1, 0] as [number, number, number] }, { position: [2, 1, 0] as [number, number, number] }];
+    const batch = (attributes: Record<string, unknown>, material = 'balls') => (s: SceneDescription) => {
+        s.materials.balls = { model: 'lambert', albedo: [0.5, 0.5, 0.5] };
+        s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material }, placements, attributes } as never);
+    };
+
+    it('accepts a well-formed per-instance albedo (scalar broadcast included)', () => {
+        const bag = run(batch({ albedo: [[0.8, 0.2, 0.2], 0.5] }));
+        expect(bag.hasErrors()).toBe(false);
+    });
+
+    it('rejects unknown rows, emission, and region-indexed rows', () => {
+        expect(run(batch({ shininess: [1, 2] })).getErrors().some(e => /attributes\.shininess.*not a row of model 'lambert'/.test(e.message))).toBe(true);
+        expect(run(batch({ emission: [[1, 1, 1], [2, 2, 2]] })).getErrors().some(e => /per-instance emission is not supported/.test(e.message))).toBe(true);
+        const iorBag = run(s => {
+            s.materials.glassy = { model: 'dielectric', ior: 1.5 };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'glassy' }, placements, attributes: { ior: [1.4, 1.6] } } as never);
+        });
+        expect(iorBag.getErrors().some(e => /attributes\.ior.*region-indexed/.test(e.message))).toBe(true);
+    });
+
+    it('rejects rows feeding a derived field (ggx roughness → alpha)', () => {
+        const bag = run(s => {
+            s.materials.metal = { model: 'ggx', roughness: 0.3, f0: [0.9, 0.9, 0.9] };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'metal' }, placements, attributes: { roughness: [0.1, 0.5] } } as never);
+        });
+        expect(bag.getErrors().some(e => /feeds the derived field/.test(e.message))).toBe(true);
+    });
+
+    it('rejects length mismatch and non-finite entries', () => {
+        expect(run(batch({ albedo: [[0.8, 0.2, 0.2]] })).getErrors().some(e => /2 placements.*must be parallel|1 entries for 2 placements/.test(e.message))).toBe(true);
+        expect(run(batch({ albedo: [[0.8, 0.2, NaN], 0.5] })).getErrors().some(e => /albedo\[0\] must be a finite/.test(e.message))).toBe(true);
+    });
+
+    it('rejects sharing an attribute-carrying batch material with another object', () => {
+        const bag = run(s => {
+            batch({ albedo: [[0.8, 0.2, 0.2], 0.5] })(s);
+            s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'balls' });
+        });
+        expect(bag.getErrors().some(e => /must be exclusive/.test(e.message))).toBe(true);
+    });
+});
+
+// Closed-mesh proof (fable-mesh-containment): closed = intent, the Validator makes it fact.
+describe('Validator — mesh closedness', () => {
+    // The witness cube helper's shape, inlined: an outward unit cube as 12 triangles with
+    // SPLIT corners (4 verts/face) — the position-welding case.
+    const cube = (inward: boolean) => {
+        const pos: number[] = []; const idx: number[] = [];
+        const h = 0.5;
+        const faces: Array<[number[], number[], number[]]> = [
+            [[h, -h, -h], [0, 2 * h, 0], [0, 0, 2 * h]], [[-h, -h, h], [0, 2 * h, 0], [0, 0, -2 * h]],
+            [[-h, h, -h], [0, 0, 2 * h], [2 * h, 0, 0]], [[-h, -h, -h], [2 * h, 0, 0], [0, 0, 2 * h]],
+            [[-h, -h, h], [2 * h, 0, 0], [0, 2 * h, 0]], [[h, -h, -h], [-2 * h, 0, 0], [0, 2 * h, 0]],
+        ];
+        for (const [c, e1r, e2r] of faces) {
+            const [e1, e2] = inward ? [e2r, e1r] : [e1r, e2r];
+            const base = pos.length / 3;
+            pos.push(...c, c[0] + e1[0], c[1] + e1[1], c[2] + e1[2],
+                c[0] + e1[0] + e2[0], c[1] + e1[1] + e2[1], c[2] + e1[2] + e2[2],
+                c[0] + e2[0], c[1] + e2[1], c[2] + e2[2]);
+            idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        }
+        return { positions: new Float32Array(pos), indices: new Uint32Array(idx) };
+    };
+
+    it('accepts a watertight outward closed mesh (welded across split corners)', () => {
+        const g = cube(false);
+        const bag = run(s => { s.objects.push({ kind: 'mesh', ...g, material: 'm', closed: true }); });
+        expect(bag.hasErrors()).toBe(false);
+    });
+
+    it('rejects closed: true on a holed mesh, an inward mesh, and a flipped-patch mesh', () => {
+        const g = cube(false);
+        const holed = run(s => { s.objects.push({ kind: 'mesh', positions: g.positions, indices: g.indices.slice(0, 33), material: 'm', closed: true }); });
+        expect(holed.getErrors().some(e => /not watertight.*boundary edge/.test(e.message))).toBe(true);
+        const inward = cube(true);
+        expect(run(s => { s.objects.push({ kind: 'mesh', ...inward, material: 'm', closed: true }); })
+            .getErrors().some(e => /winding is INWARD/.test(e.message))).toBe(true);
+        const flipped = new Uint32Array(g.indices);
+        [flipped[0], flipped[1]] = [flipped[1], flipped[0]];
+        expect(run(s => { s.objects.push({ kind: 'mesh', positions: g.positions, indices: flipped, material: 'm', closed: true }); })
+            .getErrors().some(e => /same-direction winding/.test(e.message))).toBe(true);
+    });
+
+    it('rejects a closed mesh prototype on an instanced batch (surface-only v1)', () => {
+        const g = cube(false);
+        const bag = run(s => {
+            s.objects.push({ kind: 'instanced', prototype: { kind: 'mesh', ...g, material: 'm', closed: true }, placements: [{ position: [0, 1, 0] }] });
+        });
+        expect(bag.getErrors().some(e => /closed \(solid\) mesh prototype is not supported/.test(e.message))).toBe(true);
+    });
+
+    it('transmissive warning: fires on an OPEN mesh, silent on a CLOSED one (the fact flipped)', () => {
+        const g = cube(false);
+        const warn = (closed: boolean) => run(s => {
+            s.materials.glass = { model: 'dielectric', ior: 1.5 };
+            s.objects.push({ kind: 'mesh', ...g, material: 'glass', ...(closed ? { closed: true } : {}) });
+        }).getWarnings().some(w => /refract as η = 1/.test(w.message));
+        expect(warn(false)).toBe(true);
+        expect(warn(true)).toBe(false);
+    });
+});

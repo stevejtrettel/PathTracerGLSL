@@ -161,7 +161,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
                 { name: `u_mesh_${m.ordinal}_normal`, source: `extern:${n.normal}` },
                 { name: `u_mesh_${m.ordinal}_uv`, source: `extern:${n.uv}` },
             );
-            if (engine.nodeTexture) textures.push({ name: `u_mesh_${m.ordinal}_bvh`, source: `extern:${n.bvh}` });
+            // The node texture serves the bvh TRAVERSAL and the CONTAINMENT point queries
+            // (fable-mesh-containment) — a closed mesh declares it even under 'brute'.
+            if (engine.nodeTexture || m.closed) textures.push({ name: `u_mesh_${m.ordinal}_bvh`, source: `extern:${n.bvh}` });
         }
         blocks.push({ origin: 'generated:mesh-dispatch', source: generateMeshDispatch(plan.meshes, anyQuery, plan.program.intersection.meshTraversal, ids) });
     }
@@ -198,11 +200,11 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // region → IOR table (§2.3 generated-tables family) — only when a transmissive model
     // reads it (capability-driven, R1a — the far side's IOR has no shading point).
     if (plan.materials.some((m) => modelTransmission(m.model))) {
-        blocks.push({ origin: 'generated:ior-of', source: generateIorOf(plan.objects, plan.analyticObjects, plan.materials) });
+        blocks.push({ origin: 'generated:ior-of', source: generateIorOf(plan.objects, plan.analyticObjects, plan.meshes, plan.materials) });
     }
 
     // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
-    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects, ids) });
+    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects, plan.meshes, ids) });
 
     // The top-level dispatcher, combining only the backends present (declared after all).
     // Zero-thickness regions (descriptor `thin` fact): they never claim containment, so
@@ -211,7 +213,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // so their regions join the thin set: a back-face mesh hit probes the entering side.
     const thinRegions = [
         ...plan.analyticObjects.filter((o) => primitive(o.shapeType).thin).map((o) => o.index),
-        ...plan.meshes.map((m) => m.index),
+        // Open meshes are thin; CLOSED meshes have a proven interior (fable-mesh-containment)
+        // and claim containment in scene_region_at instead.
+        ...plan.meshes.filter((m) => !m.closed).map((m) => m.index),
         // Instanced batches are opaque surface-only in v1 (like meshes) → thin-like.
         ...plan.instanceBatches.map((b) => b.index),
     ];
@@ -235,6 +239,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // helpers follow the same pattern: provided by the included core file, consumed by
     // the generated wrappers/arms of this same feature.
     const requires = ['scene_region_at'];
+    if (needDataRail) {
+        // The rail's addressing: provided by the included glsl/core/data_texture.glsl,
+        // consumed by this feature's generated walks AND (cross-feature) by the materials
+        // fill's attribute fetches — declared so the interface header forward-declares it
+        // (order-independence) and seam-unused stays honest.
+        provides.push({ name: 'data_texel1d', signature: 'ivec2 data_texel1d(uint i)' });
+        requires.push('data_texel1d');
+    }
     if (plan.program.intersection.drivenPlacement || hasInstanced) {
         // Only the helpers the EMITTED code calls (dir/normal are analytic-arm
         // vocabulary; a driven-SDF-only program leaves them as unlisted wholesale
@@ -443,6 +455,7 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
             lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
             lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${g.uniformQ}, ${d.type}_normal(lray.origin + t * lray.direction, shape)));`);
             lines.push(`            hit.region_owner = ${obj.index};`);
+            lines.push(`            hit.element = 0;`);
             lines.push(`            hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);`);
             lines.push(`        }`);
             lines.push(`    }`);
@@ -459,6 +472,7 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
         lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
         lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, ${shapeRef}));`);
         lines.push(`            hit.region_owner = ${obj.index};`);
+        lines.push(`            hit.element = 0;`);
         lines.push(`            hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);`);
         lines.push(`        }`);
         lines.push(`    }`);
@@ -570,6 +584,7 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
         lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);`);
         lines.push(`        hit.frame = ambient_frame(hit.p, normalize(${pl.nWorld('nLocal')}));`);
         lines.push(`        hit.region_owner = ${m.index};`);
+        lines.push(`        hit.element = 0;   // per-triangle refs are a future tenant`);
         lines.push(`        hit.uv = uv;`);
         lines.push(`        return true;`);
         lines.push(`    }`);
@@ -634,6 +649,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean): string[] {
             '                vec3 nLocal; vec2 uv;',
             `                if (mesh_nearest_bvh(u_inst_${o}_position, u_inst_${o}_index, u_inst_${o}_normal, u_inst_${o}_uv, u_inst_${o}_bvh, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, uv)) {`,
             '                    found = true;',
+            '                    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
             '                    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
             '                    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));',
             `                    hit.region_owner = ${b.index};`,
@@ -653,6 +669,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean): string[] {
     return [...read, ...conj,
         `                if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < hit.t) {`,
         '                    hit.t = t; found = true;',
+        '                    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
         '                    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
         `                    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${b.prototype.shapeType}_normal(lray.origin + t * lray.direction, shape))));`,
         `                    hit.region_owner = ${b.index};`,
@@ -706,7 +723,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
 // flipped inequality away: `d > best` among negatives — deepest-wins made a submerged sphere
 // invisible (verification T2 / R-SUBMERGED). Spans both backends.
 
-function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], ids: Map<number, string>): string {
+function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], ids: Map<number, string>): string {
     const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
     lines.push('int scene_region_at(vec3 p) {');
     lines.push('    int region = -1;');
@@ -730,9 +747,57 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
         }
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
+    // CLOSED meshes (fable-mesh-containment §1, amended): the lazy three-tier query —
+    // (1) outside the baked local box → outside, free; (2) first-hit-facing nearest walk
+    // (Validator-proven winding makes the cheap query sufficient); (3) only when INSIDE,
+    // the closest-triangle distance supplies the |d| innermost-wins ranks by (× s → the
+    // world-exact value the §5.2 discipline requires).
+    for (const m of meshes) {
+        if (!m.closed) continue;
+        const box = m.localBox!;
+        const u = `u_mesh_${m.ordinal}`;
+        lines.push(`    { // closed mesh ${ids.get(m.index) ?? m.index}`);
+        lines.push('      vec3 lp = p; float ms = 1.0;');
+        lines.push(...emitMeshPointQuery(m.placement).map((l) => `      ${l}`));
+        lines.push('      d = 1.0e20;');
+        lines.push(`      if (all(greaterThanEqual(lp, ${formatVec3(box.min)})) && all(lessThanEqual(lp, ${formatVec3(box.max)}))`);
+        lines.push(`          && mesh_inside_bvh(${u}_position, ${u}_index, ${u}_bvh, lp)) {`);
+        lines.push(`          d = -ms * mesh_closest_bvh(${u}_position, ${u}_index, ${u}_bvh, lp);`);
+        lines.push('      } }');
+        lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${m.index}; }`);
+    }
     lines.push('    return region;');
     lines.push('}');
     return lines.join('\n');
+}
+
+/** World→LOCAL point conjugation lines for a mesh containment query: transform `lp` in
+ *  place and set `ms` (the uniform scale — the s·d world-distance correction, §5.2).
+ *  Constant tiers mirror emitPlacementQuery; driven reuses the §6.1 placement helpers.
+ *  Unlike the SDF wrapper (rigid frame + s-scaled params), the mesh's vertex data is in
+ *  the UNSCALED local frame, so the point divides by s and the distance multiplies back. */
+function emitMeshPointQuery(pl: PlannedPlacement): string[] {
+    if (isDrivenPlacement(pl)) {
+        return [
+            `lp = placement_rigid(${pl.uniformQ}, ${pl.uniformTS}, lp);`,
+            `ms = placement_scale(${pl.uniformTS});`,
+            'lp /= ms;',
+        ];
+    }
+    const g = pl as Similarity;
+    const kind = classifySimilarity(g);
+    if (kind === 'identity') return [];
+    const t = g.translation;
+    const centered = isIdentityTranslation(t) ? 'lp' : `(lp - ${formatVec3(t)})`;
+    if (kind === 'translation') return [`lp = lp - ${formatVec3(t)};`];
+    if (kind === 'rigid') return [`lp = ${formatMat3(quatToMat3(quatConjugate(g.rotation)))} * ${centered};`];
+    // similarity: fold 1/s into the matrix (or a plain division when rotation is trivial);
+    // ms carries s for the world-distance correction.
+    if (isIdentityRotation(g.rotation)) {
+        return [`lp = ${centered} / ${formatFloat(g.scale)};`, `ms = ${formatFloat(g.scale)};`];
+    }
+    const M = quatToMat3(quatConjugate(g.rotation)).map((v) => v / g.scale);
+    return [`lp = ${formatMat3(M)} * ${centered};`, `ms = ${formatFloat(g.scale)};`];
 }
 
 // ============================================================================
@@ -756,11 +821,13 @@ function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticOb
 // side's IOR without a full material-properties fetch). Non-dielectric materials are 1.0
 // (vacuum-like — pinned in the Planner), ior_of(-1) = 1.0 (ambient; ambientMedium is a media-era
 // concern, §2.4). Value<T>-driven ior reads its uniform (declared via the materials {param} scan).
-function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], materials: PlannedMaterial[]): string {
+function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], materials: PlannedMaterial[]): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
     const lines: string[] = ['// Generated region -> IOR table (§2.3 family)'];
     lines.push('float ior_of(int region) {');
-    for (const obj of [...sdf, ...analytic].sort((a, b) => a.index - b.index)) {
+    // CLOSED meshes have a real interior (fable-mesh-containment) and earn rows like any
+    // solid; open meshes stay off the table (thin — the Validator's warning covers them).
+    for (const obj of [...sdf, ...analytic, ...meshes.filter((m) => m.closed)].sort((a, b) => a.index - b.index)) {
         const mat = byId.get(obj.materialId);
         // Non-transmissive materials are PINNED to 1.0 (fall through to the default), even if the
         // author set an ior on them — an authored lambert ior leaking into the table silently

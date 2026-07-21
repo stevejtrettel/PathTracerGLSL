@@ -7,9 +7,20 @@
 import type { InstancedObject, PrimitiveObject, MeshObject, Transform, Vec3 } from '../compiler/types.js';
 
 /** One prototype placed at N transforms, sharing the geometry. The prototype's material becomes
- *  the batch material; its transform (if any) is ignored — the placements carry world placement. */
-export function instance(prototype: PrimitiveObject | MeshObject, placements: Transform[], name?: string): InstancedObject {
-    return { kind: 'instanced', prototype, placements, ...(name !== undefined ? { name } : {}) };
+ *  the batch material; its transform (if any) is ignored — the placements carry world placement.
+ *  The third argument is a provenance name, or an options record carrying `name` and/or
+ *  per-instance `attributes` (fable-instance-attributes — arrays parallel to placements). */
+export function instance(
+    prototype: PrimitiveObject | MeshObject,
+    placements: Transform[],
+    opts?: string | { name?: string; attributes?: InstancedObject['attributes'] },
+): InstancedObject {
+    const o = typeof opts === 'string' ? { name: opts } : opts ?? {};
+    return {
+        kind: 'instanced', prototype, placements,
+        ...(o.name !== undefined ? { name: o.name } : {}),
+        ...(o.attributes !== undefined ? { attributes: o.attributes } : {}),
+    };
 }
 
 /** Axis-aligned lattice of placements: counts per axis, uniform spacing, centred at `center`.

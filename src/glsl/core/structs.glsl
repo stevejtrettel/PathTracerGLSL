@@ -37,6 +37,13 @@ struct Hit {
     vec2 uv;            // surface parameterization — PLACEHOLDER planar xz chart today (all
                         // writers use UV_PLANAR_SCALE); no reader yet — the first consumer
                         // will be a procedural material, which owns making this chart real.
+    int element;        // sub-element of the OWNING region that produced this hit (owner-
+                        // approved contract edit, fable-instance-attributes): the region says
+                        // WHOSE surface, element says WHICH PIECE of it. Instanced batch →
+                        // placement index; every other backend → 0 today. Future tenants:
+                        // per-triangle index (multi-material meshes), Stage B object refs.
+                        // Reader: scene_material_properties' attribute rows. Every arm that
+                        // fills a Hit fills this too (the fill-the-whole-Hit protocol).
 };
 
 // Placeholder planar-uv chart scale — the ONE truth for every Hit.uv writer (the SDF

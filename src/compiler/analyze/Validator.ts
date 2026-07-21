@@ -5,13 +5,14 @@ import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObjec
 import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { MATERIAL_MODELS } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
 import { PRIMITIVES, resolveBackend, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { MESH_TRAVERSALS, INSTANCE_ACCELS, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
+import { meshClosedness } from '../../components/intersection/mesh/topology.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
@@ -737,6 +738,10 @@ export function validate(
         }
         const proto = obj.prototype;
         validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag);
+        if (isMeshObject(proto) && proto.closed === true) {
+            bag.error('invalid-setting', `Object ${i} (instanced): a closed (solid) mesh prototype is not supported — instanced batches are surface-only in v1 (fable-mesh-containment §6; solid instances need per-instance containment)`)
+                .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+        }
         if (!isMeshObject(proto)) {
             const backend = resolveBackend(proto.type, proto.backend);
             if (backend === undefined) {
@@ -759,6 +764,62 @@ export function validate(
             bag.warning('invalid-setting', `Object ${i} (instanced): the prototype's transform is ignored — placements carry all world placement (impl-plan-instancing)`)
                 .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
         }
+        // Per-instance ATTRIBUTES (fable-instance-attributes): keys must be field rows of
+        // the prototype material's model; arrays parallel to placements; entries row-shaped
+        // and finite. Excluded: emission (per-instance emission needs per-instance power-CDF
+        // rows — deferred) and region-indexed rows (ior — batches are thin, and ior_of is
+        // region-keyed by construction). All reject-not-degrade.
+        if (obj.attributes !== undefined && Object.keys(obj.attributes).length > 0) {
+            const model = scene.materials[proto.material]?.model ?? '';
+            const props = MATERIAL_MODELS[model]?.properties ?? [];
+            const validKeys = props.filter((f) => f.storage === 'field' && f.source !== EMISSION_KEY).map((f) => f.source);
+            for (const [key, arr] of Object.entries(obj.attributes)) {
+                const row = props.find((f) => f.source === key);
+                if (key === EMISSION_KEY) {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} — per-instance emission is not supported (the power CDF and light samplers would need per-instance rows; deferred)`)
+                        .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                    continue;
+                }
+                if (row === undefined || row.storage !== 'field') {
+                    const why = row !== undefined
+                        ? `${key} is region-indexed (${key}_of) — batches are thin (no interior); dielectric instances await containment`
+                        : `not a row of model '${model}' (valid: ${validKeys.join(', ')})`;
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} cannot vary per instance — ${why}`)
+                        .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                    continue;
+                }
+                // Rows feeding a DERIVED field (ggx roughness → alpha) are CPU-derived once
+                // per material — a per-instance input would need per-instance derived slots
+                // (precompute-and-ship an extra table column). Deferred; reject-not-degrade.
+                const derived = MATERIAL_MODELS[model]?.derived?.find((d) => d.inputs.includes(key));
+                if (derived !== undefined) {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}' — per-instance derived rows are deferred (the derived value is computed once per material)`)
+                        .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                    continue;
+                }
+                if (arr.length !== obj.placements.length) {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} has ${arr.length} entries for ${obj.placements.length} placements — the arrays must be parallel`)
+                        .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                }
+                const spectrum = row.glslType === 'Spectrum';
+                const bad = (arr as Array<number | number[]>).findIndex((v) =>
+                    typeof v === 'number' ? !Number.isFinite(v)
+                        : !(spectrum && isVec3(v) && v.every((c) => Number.isFinite(c))));
+                if (bad !== -1) {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${bad}] must be a finite ${spectrum ? 'number or vec3' : 'number'}`)
+                        .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                }
+            }
+            // Exclusivity: the fill for this materialId becomes element-dependent, so sharing
+            // it with any other object would silently change that object's shading. Explicit
+            // error, never an auto-clone.
+            const sharedWith = scene.objects.findIndex((o, j) => j !== i
+                && (isInstancedObject(o) ? o.prototype.material : o.material) === proto.material);
+            if (sharedWith !== -1) {
+                bag.error('invalid-setting', `Object ${i} (instanced): material '${proto.material}' carries per-instance attributes but is also used by object ${sharedWith} — an attribute-carrying batch's material must be exclusive (give the batch its own material)`)
+                    .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+            }
+        }
     }
 
     // Transmissive-on-thin — ONE structural rule (audit A2): a region whose owner never
@@ -771,7 +832,8 @@ export function validate(
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
         const thinCase = isMeshObject(obj)
-            ? 'a v0 mesh (thin surface; dielectric meshes await the containment batch, impl-plan-meshes §3)'
+            ? (obj.closed === true ? null   // solid mesh: has an interior — the rule stops firing (the fact flipped)
+                : 'an OPEN mesh (thin surface — declare `closed: true` on watertight geometry to give it an interior)')
             : isInstancedObject(obj)
                 ? 'a v1 instanced batch (surface-only; dielectric instances await containment, like glass meshes)'
                 : PRIMITIVES[obj.type]?.thin === true
@@ -865,17 +927,20 @@ export function validate(
 function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag): void {
     if ('kind' in obj) {
         const vertexCount = obj.positions.length / 3;
-        if (obj.positions.length === 0 || obj.positions.length % 3 !== 0) {
+        const positionsOk = obj.positions.length > 0 && obj.positions.length % 3 === 0;
+        if (!positionsOk) {
             bag.error('invalid-setting', `${label} (mesh): positions length ${obj.positions.length} is not a nonzero multiple of 3`)
                 .withOriginal('scene', [...path, 'positions']).add();
         }
-        if (obj.indices.length === 0 || obj.indices.length % 3 !== 0) {
+        let indicesOk = obj.indices.length > 0 && obj.indices.length % 3 === 0;
+        if (!indicesOk) {
             bag.error('invalid-setting', `${label} (mesh): indices length ${obj.indices.length} is not a nonzero multiple of 3`)
                 .withOriginal('scene', [...path, 'indices']).add();
         } else if (Number.isInteger(vertexCount)) {
             let maxIdx = -1;
             for (let k = 0; k < obj.indices.length; k++) if (obj.indices[k] > maxIdx) maxIdx = obj.indices[k];
             if (maxIdx >= vertexCount) {
+                indicesOk = false;
                 bag.error('invalid-setting', `${label} (mesh): vertex index ${maxIdx} out of range (only ${vertexCount} vertices)`)
                     .withOriginal('scene', [...path, 'indices']).add();
             }
@@ -887,6 +952,23 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
         if (obj.uvs !== undefined && obj.uvs.length !== vertexCount * 2) {
             bag.error('invalid-setting', `${label} (mesh): uvs length ${obj.uvs.length} must be 2× the vertex count (${vertexCount * 2})`)
                 .withOriginal('scene', [...path, 'uvs']).add();
+        }
+        // `closed: true` — INTENT proven as FACT (fable-mesh-containment §2): watertight,
+        // consistently wound, outward. Position-welded edge accounting (topology.ts), so
+        // split-corner meshes check correctly. Reject-not-degrade: a leaky "solid" must
+        // error loudly, never silently render η=1. Runs only on well-formed buffers.
+        if (obj.closed === true && positionsOk && indicesOk) {
+            const c = meshClosedness(obj.positions, obj.indices);
+            if (!c.watertight) {
+                bag.error('invalid-setting', `${label} (mesh): closed: true but the mesh is not watertight — ${c.boundaryEdges} boundary edge(s), ${c.nonManifoldEdges} non-manifold edge(s); a solid must bound a volume (leave \`closed\` off for open surfaces)`)
+                    .withOriginal('scene', [...path, 'closed']).add();
+            } else if (!c.consistent) {
+                bag.error('invalid-setting', `${label} (mesh): closed: true but ${c.flippedEdges} edge(s) have same-direction winding — faces disagree on which side is out; fix the flipped patch`)
+                    .withOriginal('scene', [...path, 'closed']).add();
+            } else if (!c.outward) {
+                bag.error('invalid-setting', `${label} (mesh): closed: true but the winding is INWARD (signed volume ${c.volume.toPrecision(4)} <= 0) — reverse the winding so normals face out`)
+                    .withOriginal('scene', [...path, 'closed']).add();
+            }
         }
         return;
     }

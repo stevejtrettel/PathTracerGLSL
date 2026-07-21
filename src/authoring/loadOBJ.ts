@@ -19,6 +19,9 @@ export interface MeshAuthoring {
      *  OBJ carries none — a model like the Utah teapot ships position-only. Ignored if the
      *  file already has normals. Off by default (faithful → flat geometric shading). */
     smoothNormals?: boolean;
+    /** Declare the mesh a SOLID (fable-mesh-containment) — Validator-proven watertight/
+     *  consistently-wound/outward, then it owns an interior region (dielectric/media). */
+    closed?: boolean;
 }
 
 /** Area-weighted vertex normals from an indexed triangle soup (the cross product's magnitude
@@ -119,6 +122,7 @@ export function parseOBJ(text: string, opts: MeshAuthoring): MeshObject {
     if (usedUvs) mesh.uvs = new Float32Array(outUv);
     if (opts.transform !== undefined) mesh.transform = opts.transform;
     if (opts.name !== undefined) mesh.name = opts.name;
+    if (opts.closed !== undefined) mesh.closed = opts.closed;
     return mesh;
 }
 

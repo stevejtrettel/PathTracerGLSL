@@ -9,7 +9,9 @@ import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum } from '../../../components/glsl-format.js';
-import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
+import { emitValue, emitAttributeValue, mintValueUniform, type ParamValue } from '../values.js';
+import { isAttributeValue } from '../../plan/types.js';
+import { instanceExternNames } from '../../../components/intersection/instancing/instancing.js';
 
 import { MATERIAL_MODELS, materialModel, modelStructFields, EMISSION_KEY } from '../../../components/materials/index.js';
 import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
@@ -212,7 +214,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     // Each entry mirrors its emission condition above — the interface header is truthful.
     const provides = [
-        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p)' },
+        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p, int element)' },
         { name: 'interaction_surface_sample', signature: 'InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u)' },
         { name: 'interaction_surface_emission', signature: 'Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp)' },
         { name: 'material_is_emissive', signature: 'bool material_is_emissive(int mat)' },
@@ -257,7 +259,19 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
     }
 
-    return { ...emptyContribution('materials'), blocks, defines, uniforms, parameters, provides, requires };
+    // ATTRIBUTE batches (fable-instance-attributes): this feature READS the per-instance
+    // tables (the fill's texelFetch by Hit.element), so it declares the externs — exact
+    // linkage: declared where consumed; the app registers the payload under the same name.
+    // The rail's addressing (data_texel1d) is provided by the intersection feature (which
+    // always includes the rail when instanced geometry exists — attributes imply it).
+    const textures: FeatureContribution['textures'] = [];
+    for (const b of plan.instanceBatches) {
+        if (b.attributeRows === undefined) continue;
+        textures.push({ name: `u_inst_${b.ordinal}_attrs`, source: `extern:${instanceExternNames(b.ordinal).attrs}` });
+    }
+    if (textures.length > 0) requires.push('data_texel1d');
+
+    return { ...emptyContribution('materials'), blocks, defines, uniforms, parameters, textures, provides, requires };
 }
 
 // ============================================================================
@@ -304,8 +318,9 @@ function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec): Deri
 function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySchema[], derivedByMat: Map<number, DerivedExpr[]>): string {
     const lines: string[] = [];
     lines.push('// Generated material properties lookup — assignments follow the models\' schemas (§3.4):');
-    lines.push('// a material sets exactly the fields its model reads, nothing else.');
-    lines.push('MaterialProperties scene_material_properties(int id, vec3 p) {');
+    lines.push('// a material sets exactly the fields its model reads, nothing else. `element` =');
+    lines.push('// Hit.element (the owner\'s sub-element index) — read only by ATTRIBUTE rows.');
+    lines.push('MaterialProperties scene_material_properties(int id, vec3 p, int element) {');
     lines.push('    MaterialProperties props;');
     // Defaults from the union schemas — the GLSL expression DERIVED from the row's
     // numeric default.
@@ -319,8 +334,16 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             .filter((f) => f.storage === 'field');
         const body: string[] = [];
         for (const f of schemas) {
-            const value = mat.values[f.source] as ParamValue;
+            const raw = mat.values[f.source];
             const target = `        props.${f.name}`;
+            // ATTRIBUTE row (fable-instance-attributes): per-instance value fetched by
+            // Hit.element from the batch's attrs table — the fourth storage class's one
+            // legal use site (emission/ior/derived-inputs Validator-excluded).
+            if (isAttributeValue(raw)) {
+                body.push(`${target} = ${emitAttributeValue(raw)};`);
+                continue;
+            }
+            const value = raw as ParamValue;
             const fmt = (f.glslType === 'Spectrum' ? formatSpectrum : formatFloat) as (x: never) => string;
             // Constant emission is assigned only when nonzero (the gate's `> 0` twin); a
             // driven/expression emission always assigns (it may be nonzero at runtime).

@@ -268,6 +268,12 @@ export interface PlannedMesh {
     triCount: number;
     /** Authored vertex normals present → smooth (barycentric) shading; else flat geometric. */
     smooth: boolean;
+    /** Validator-PROVEN solid (fable-mesh-containment): joins scene_region_at, leaves the
+     *  thin set, earns ior_of rows. False = v0 thin surface. */
+    closed: boolean;
+    /** The mesh's LOCAL AABB (baked literals) — the containment query's root-box early-out.
+     *  Present iff closed (the compiler has the positions; O(V) at plan time). */
+    localBox?: { min: [number, number, number]; max: [number, number, number] };
     /** Constant similarity or a live driven placement — the ray is conjugated into the mesh's
      *  local frame (positions stay local; never folded into vertices). */
     placement: PlannedPlacement;
@@ -288,6 +294,10 @@ export interface PlannedInstanceBatch {
     name?: string;
     /** Number of placements — the baked loop bound. */
     instanceCount: number;
+    /** Per-instance attribute rows (fable-instance-attributes), in SLOT order (model-schema
+     *  order — the ONE order truth shared with the app's packer via instanceAttributeRows).
+     *  Present iff the batch authored attributes; gates the instance_k_attrs extern. */
+    attributeRows?: Array<{ source: string; shape: 'float' | 'vec3' }>;
     /** The prototype's backend + what the loop's local-intersect needs. mesh: BLAS counts (data
      *  uploaded by the app). analytic: the canonical params, baked + scaled by s per instance. */
     prototype:
@@ -295,8 +305,22 @@ export interface PlannedInstanceBatch {
         | { backend: 'analytic'; shapeType: string; parameters: Record<string, number | number[]> };
 }
 
-/** A schema-resolved property value: constant, expression, or live param (§2.8). */
-export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue;   // BlackbodyValue survives resolution ONLY when driven (constants fold at plan entry)
+/** A per-instance ATTRIBUTE reference (fable-instance-attributes — the fourth storage
+ *  class): the row's value lives in batch `batch`'s instance_k_attrs texture at slot
+ *  `slot` of `count` rows, indexed by Hit.element. Never authored — the Planner mints it
+ *  onto the batch material's values from InstancedObject.attributes. Its ONLY legal use
+ *  site is the scene_material_properties fill (emitAttributeValue); emitValue throws on it. */
+export interface AttributeValue {
+    attribute: { batch: number; slot: number; count: number; shape: 'float' | 'vec3' };
+}
+
+export function isAttributeValue(v: unknown): v is AttributeValue {
+    return typeof v === 'object' && v !== null && 'attribute' in v;
+}
+
+/** A schema-resolved property value: constant, expression, live param (§2.8), or a
+ *  per-instance attribute reference. */
+export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue | AttributeValue;   // BlackbodyValue survives resolution ONLY when driven (constants fold at plan entry)
 
 /**
  * Resolved interior medium (§3.5) — sigma_a/sigma_s/model are the RTE partition CORE, read

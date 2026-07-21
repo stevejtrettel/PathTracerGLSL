@@ -6,7 +6,7 @@ import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, meshExternNames, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
-import { packInstanceBatch, instanceExternNames, sceneInstanceBatches } from '../components/intersection/instancing/instancing.js';
+import { packInstanceBatch, instanceExternNames, sceneInstanceBatches, instanceAttributeRows, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
 import { similarityFromTransform } from '../components/geometry/similarity.js';
 import { canonicalizePrimitiveParameters, primitiveBounds } from '../components/geometry/index.js';
 import { isMeshObject, type MeshObject } from '../compiler/types.js';
@@ -269,9 +269,17 @@ export class App {
                 }
                 localBox = box;
             }
-            const packed = packInstanceBatch(localBox, placements);
+            // Per-instance attributes (fable-instance-attributes): slot order from the SAME
+            // shared helper the Planner used — the texel layout cannot drift from the
+            // generated fetches. Packed in TLAS-leaf order alongside the placements.
+            const attrs: AttributeRowSpec[] | undefined = batch.attributes !== undefined
+                ? instanceAttributeRows(scene.materials[batch.prototype.material]?.model ?? '', batch.attributes)
+                    .map((r) => ({ shape: r.shape, values: batch.attributes![r.source] }))
+                : undefined;
+            const packed = packInstanceBatch(localBox, placements, attrs);
             register(names.placements, packed.placements);
             register(names.tlas, packed.tlas);
+            if (packed.attributes !== undefined) register(names.attrs, packed.attributes);
         });
     }
 

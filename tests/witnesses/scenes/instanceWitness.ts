@@ -111,3 +111,53 @@ export const meshInstanceRef: SceneDescription = {
 };
 
 export const meshInstanceStrategy: RenderStrategy = withPose(base, [0, 2.2, 4.8], [0, 0.4, 0]);
+
+// ---------------------------------------------------------------------------
+// attr-twin ⇄ attr-twin-ref — per-instance material attributes (fable-instance-attributes).
+//
+// One batch, one lambert material, three DIFFERENT per-instance albedos via the attribute
+// table (read by Hit.element) ≡ the same three spheres authored individually with three
+// materials. Proves the whole chain: Validator → Planner slot minting → the generated
+// element-indexed fetch → the TLAS-reordered attrs texture (leaf order ≠ scene order, so a
+// reorder bug shows as swapped colors, caught by the rmse gate).
+// ---------------------------------------------------------------------------
+
+const ATTR_ALBEDOS: [number, number, number][] = [
+    [0.85, 0.35, 0.25],
+    [0.30, 0.78, 0.35],
+    [0.30, 0.42, 0.85],
+];
+
+export const attrTwin: SceneDescription = {
+    id: 'attr-twin',
+    name: 'Attribute Twin (3 albedos, one batch)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        { ...floor },
+        instance(
+            { type: 'sphere', parameters: { radius: 0.5 }, material: 'ball' },
+            PLACEMENTS,
+            { name: 'balls', attributes: { albedo: ATTR_ALBEDOS } },
+        ),
+    ],
+    materials, lights, environment,
+};
+
+export const attrTwinRef: SceneDescription = {
+    id: 'attr-twin-ref',
+    name: 'Attribute Twin Ref (3 individual materials)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        { ...floor },
+        ...PLACEMENTS.map((p, i) => ({ type: 'sphere' as const, parameters: { radius: 0.5 }, material: `ball${i}`, transform: p })),
+    ],
+    materials: {
+        floor: materials.floor,
+        ball0: { model: 'lambert', albedo: ATTR_ALBEDOS[0] },
+        ball1: { model: 'lambert', albedo: ATTR_ALBEDOS[1] },
+        ball2: { model: 'lambert', albedo: ATTR_ALBEDOS[2] },
+    },
+    lights, environment,
+};
+
+export const attrTwinStrategy: RenderStrategy = instanceTwinStrategy;

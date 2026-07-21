@@ -1,24 +1,39 @@
-// demos/spheresScene.ts — an instancing stress/showcase (impl-plan-instancing): 500 spheres of
-// varied size and position, ALL from one analytic-sphere prototype + a 500-entry placement texture.
-// One region/material (v1 batch), one point light, on a floor. 500 instances × one intersect each
-// per ray through the linear instance loop — the "before a TLAS" scale point.
+// demos/spheresScene.ts — an instancing stress/showcase (impl-plan-instancing +
+// fable-instance-attributes): 500 spheres of varied size, position, AND COLOR, all from one
+// analytic-sphere prototype + a 500-entry placement texture + a 500-entry per-instance albedo
+// table (the fourth storage class — one region, ONE material, Hit.element picks the color).
+// One point light, on a floor. Keys 1/2 = tlas/linear (same image, cost A/B).
 
 import type { SceneDescription, RenderStrategy, Transform } from '../src/compiler/types.js';
 import { instance } from '../src/authoring/instance.js';
 
-/** `count` spheres scattered in a box volume with random position + uniform scale (seeded). */
-function sphereCloud(count: number, seed: number): Transform[] {
+/** hue [0,1) → pastel-ish RGB (fixed s/v — variation reads as one palette, not noise). */
+function hueRGB(h: number, s: number, v: number): [number, number, number] {
+    const f = (n: number) => {
+        const k = (n + h * 6) % 6;
+        return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+    };
+    return [f(5), f(3), f(1)];
+}
+
+/** `count` spheres scattered in a box volume: random position + uniform scale + a palette
+ *  color per instance, all from ONE seeded stream (reproducible; arrays stay parallel). */
+function sphereCloud(count: number, seed: number): { placements: Transform[]; albedos: [number, number, number][] } {
     let s = seed >>> 0;
     const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    const out: Transform[] = [];
+    const placements: Transform[] = [];
+    const albedos: [number, number, number][] = [];
     for (let i = 0; i < count; i++) {
-        out.push({
+        placements.push({
             position: [(rnd() * 2 - 1) * 4.5, 0.5 + rnd() * 4.0, (rnd() * 2 - 1) * 4.5],
             scale: 0.35 + rnd() * 0.75,
         });
+        albedos.push(hueRGB(rnd(), 0.45 + rnd() * 0.3, 0.8));
     }
-    return out;
+    return { placements, albedos };
 }
+
+const cloud = sphereCloud(500, 12345);
 
 export const spheresScene: SceneDescription = {
     id: 'spheres',
@@ -26,8 +41,13 @@ export const spheresScene: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: [
         { type: 'quad', parameters: { corner: [-12, 0, -12], edge1: [0, 0, 24], edge2: [24, 0, 0] }, material: 'floor' },
-        // 500 spheres from ONE prototype + a placement texture — the whole cloud is one batch.
-        instance({ type: 'sphere', parameters: { radius: 1.0 }, material: 'orb' }, sphereCloud(500, 12345), 'cloud'),
+        // 500 spheres from ONE prototype + a placement texture + a per-instance albedo
+        // table — the whole cloud is one batch with ONE material.
+        instance(
+            { type: 'sphere', parameters: { radius: 1.0 }, material: 'orb' },
+            cloud.placements,
+            { name: 'cloud', attributes: { albedo: cloud.albedos } },
+        ),
     ],
     materials: {
         floor: { model: 'lambert', albedo: [0.55, 0.55, 0.58] },

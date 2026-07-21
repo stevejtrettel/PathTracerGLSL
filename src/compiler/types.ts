@@ -133,6 +133,14 @@ export interface MeshObject {
     uvs?: Float32Array;
     material: string;
     transform?: Transform;
+    /**
+     * This mesh bounds a SOLID region (fable-mesh-containment): it joins scene_region_at
+     * (dielectric/interior-media capable) and leaves the thin set. AUTHORED INTENT,
+     * validated as FACT — the Validator proves watertightness, consistent winding, and
+     * outward orientation (signed volume > 0), reject-not-degrade. Absent/false = the v0
+     * thin surface (open geometry like the teapot stays thin; both kinds coexist).
+     */
+    closed?: boolean;
     /** Provenance only (never identity) — see PrimitiveObject.name. */
     name?: string;
 }
@@ -153,6 +161,16 @@ export interface InstancedObject {
     prototype: PrimitiveObject | MeshObject;
     /** N world similarities, one per instance. Constant in v1 (baked into the placement texture). */
     placements: Transform[];
+    /**
+     * Per-instance values for schema rows of the prototype material's model — the FOURTH
+     * property storage class (fable-instance-attributes: constant | driven | expression |
+     * ATTRIBUTE). Each array is parallel to `placements` (length N; Spectrum rows accept
+     * scalar broadcast per entry). Excluded rows (Validator): the region-table row (ior —
+     * batches are thin) and emission (per-instance emission would need per-instance power
+     * CDF rows — deferred). The batch's material must not be shared with other objects.
+     * Read at shading via Hit.element → the instance_k_attrs data-rail texture.
+     */
+    attributes?: Record<string, number[] | [number, number, number][]>;
     /** Provenance only (never identity) — see PrimitiveObject.name. */
     name?: string;
 }

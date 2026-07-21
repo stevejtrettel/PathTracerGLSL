@@ -211,7 +211,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         );
     }
     lines.push(
-        '        MaterialProperties props = scene_material_properties(mat, hit.p);',
+        '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.element);',
         '        Direction wo = -s.ray.direction;',
         '',
         '        kernel_score_emitter_hit(s, hit, mat, wo, props);   // settle last bounce\'s deferred estimate',
