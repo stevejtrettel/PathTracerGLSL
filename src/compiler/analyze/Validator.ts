@@ -11,7 +11,7 @@ import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
 import { PRIMITIVES, resolveBackend, type PrimitiveParamSpec } from '../../components/geometry/index.js';
-import { MESH_TRAVERSALS, INSTANCE_ACCELS, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
+import { MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
@@ -515,6 +515,12 @@ export function validate(
     } else if (meshTraversal !== undefined && !scene.objects.some(isMeshObject)) {
         bag.warning('invalid-setting',
             `estimator.meshTraversal controls nothing here (no mesh objects; instanced mesh prototypes always traverse their BLAS) — the knob is inert`)
+            .add();
+    }
+    const objectDispatch = strategy.estimator.objectDispatch;
+    if (objectDispatch !== undefined && OBJECT_DISPATCHES[objectDispatch] === undefined) {
+        bag.error('invalid-setting',
+            `estimator.objectDispatch '${objectDispatch}' is not a dispatch regime — registered: ${Object.keys(OBJECT_DISPATCHES).join(', ')} (default '${DEFAULT_OBJECT_DISPATCH}')`)
             .add();
     }
     const instanceAccel = strategy.estimator.instanceAccel;

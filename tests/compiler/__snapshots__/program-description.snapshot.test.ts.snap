@@ -42,6 +42,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -141,6 +142,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -239,6 +241,7 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin + pat
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -337,6 +340,7 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin-ref +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -357,6 +361,204 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin-ref +
       "target": [
         0,
         0.6,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > bazaar + table 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.13,
+      0.2,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": true,
+      "sdf": false,
+    },
+    "drivenPlacement": true,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "table",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.85,
+      "position": [
+        0.5,
+        3.2,
+        6.2,
+      ],
+      "target": [
+        0,
+        0.5,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > bazaar + unrolled 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.13,
+      0.2,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": true,
+      "sdf": false,
+    },
+    "drivenPlacement": true,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.85,
+      "position": [
+        0.5,
+        3.2,
+        6.2,
+      ],
+      "target": [
+        0,
+        0.5,
         0,
       ],
       "type": "pinhole",
@@ -435,6 +637,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtra
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -534,6 +737,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtra
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -624,6 +828,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`]
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -724,6 +929,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -824,6 +1030,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -919,6 +1126,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtra
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1006,6 +1214,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pat
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1104,6 +1313,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1202,6 +1412,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1294,6 +1505,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1386,6 +1598,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1477,6 +1690,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1570,6 +1784,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1662,6 +1877,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1759,6 +1975,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1855,6 +2072,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -1952,6 +2170,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2049,6 +2268,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2143,6 +2363,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2241,6 +2462,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2339,6 +2561,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2434,6 +2657,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2531,6 +2755,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2628,6 +2853,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2725,6 +2951,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2818,6 +3045,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -2911,6 +3139,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3004,6 +3233,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3097,6 +3327,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3190,6 +3421,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3288,6 +3520,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cylinders + pat
     "drivenPlacement": true,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3380,6 +3613,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3477,6 +3711,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3580,6 +3815,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven + pathtr
     "drivenPlacement": true,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3678,6 +3914,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3776,6 +4013,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3874,6 +4112,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 +
     "drivenPlacement": true,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -3961,6 +4200,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit + pathtrac
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4048,6 +4288,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-driven + p
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4137,6 +4378,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat + path
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4228,6 +4470,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4322,6 +4565,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4411,6 +4655,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pat
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4498,6 +4743,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4597,6 +4843,7 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4686,6 +4933,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4785,6 +5033,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4884,6 +5133,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -4980,6 +5230,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5079,6 +5330,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5178,6 +5430,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-n
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5267,6 +5520,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5365,6 +5619,7 @@ exports[`ProgramDescription structural snapshot (the link map) > forest + linear
     "drivenPlacement": false,
     "instanceAccel": "linear",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5463,6 +5718,7 @@ exports[`ProgramDescription structural snapshot (the link map) > forest + tlas 1
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5550,6 +5806,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5637,6 +5894,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5724,6 +5982,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5819,6 +6078,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -5919,6 +6179,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6019,6 +6280,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6112,6 +6374,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6206,6 +6469,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6258,6 +6522,206 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + table 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.16,
+      0.2,
+      0.3,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": true,
+      "sdf": false,
+    },
+    "drivenPlacement": true,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "table",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "mirror",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        6.5,
+        13.5,
+      ],
+      "target": [
+        0,
+        1.2,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + table-mis 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.16,
+      0.2,
+      0.3,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "backends": {
+      "analytic": true,
+      "instanced": true,
+      "mesh": true,
+      "sdf": false,
+    },
+    "drivenPlacement": true,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "table",
+  },
+  "materials": {
+    "models": [
+      "lambert",
+      "mirror",
+    ],
+    "surfaceEval": true,
+    "surfacePdf": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        6.5,
+        13.5,
+      ],
+      "target": [
+        0,
+        1.2,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 5,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-nee-het 1`] = `
 {
   "emitters": {
@@ -6300,6 +6764,7 @@ exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6392,6 +6857,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6486,6 +6952,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6580,6 +7047,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6671,6 +7139,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt 1`]
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6770,6 +7239,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt-nee
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6866,6 +7336,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -6960,6 +7431,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7054,6 +7526,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7145,6 +7618,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7239,6 +7713,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7333,6 +7808,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7427,6 +7903,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7521,6 +7998,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-thet
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7610,6 +8088,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-slab + path
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7708,6 +8187,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7806,6 +8286,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
     "drivenPlacement": false,
     "instanceAccel": "linear",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7904,6 +8385,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin-r
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -7996,6 +8478,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8088,6 +8571,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8180,6 +8664,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8272,6 +8757,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8364,6 +8850,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-th
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8456,6 +8943,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8548,6 +9036,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off-baked
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8643,6 +9132,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8741,6 +9231,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8840,6 +9331,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-fog + path
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -8939,6 +9431,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-fog-ref + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9027,6 +9520,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-furnace + 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9125,6 +9619,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9224,6 +9719,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9323,6 +9819,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-r
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9421,6 +9918,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-t
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9510,6 +10008,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9602,6 +10101,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9694,6 +10194,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9783,6 +10284,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9875,6 +10377,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -9967,6 +10470,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10065,6 +10569,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-ref +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10163,6 +10668,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10261,6 +10767,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "brute",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10359,6 +10866,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10458,6 +10966,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10557,6 +11066,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pathtr
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10652,6 +11162,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pt 1`]
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10748,6 +11259,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10846,6 +11358,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -10939,6 +11452,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`]
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11039,6 +11553,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11141,6 +11656,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11241,6 +11757,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11339,6 +11856,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + brute 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "brute",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11437,6 +11955,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + bvh 1`
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11532,6 +12051,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + pt 1`]
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11627,6 +12147,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11726,6 +12247,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11822,6 +12344,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -11926,6 +12449,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12030,6 +12554,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12134,6 +12659,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12229,6 +12755,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12330,6 +12857,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12429,6 +12957,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12519,6 +13048,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12611,6 +13141,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12703,6 +13234,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12804,6 +13336,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -12905,6 +13438,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13006,6 +13540,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13104,6 +13639,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13205,6 +13741,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13306,6 +13843,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13399,6 +13937,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13497,6 +14036,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spheres + linea
     "drivenPlacement": false,
     "instanceAccel": "linear",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13595,6 +14135,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spheres + tlas 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13685,6 +14226,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13776,6 +14318,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13869,6 +14412,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -13961,6 +14505,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14058,6 +14603,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14159,6 +14705,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14260,6 +14807,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14361,6 +14909,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14462,6 +15011,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14563,6 +15113,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14663,6 +15214,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14767,6 +15319,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14865,6 +15418,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -14955,6 +15509,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -15045,6 +15600,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -15140,6 +15696,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -15239,6 +15796,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [
@@ -15338,6 +15896,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "drivenPlacement": false,
     "instanceAccel": "tlas",
     "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
   },
   "materials": {
     "models": [

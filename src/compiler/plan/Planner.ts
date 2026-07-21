@@ -21,7 +21,7 @@ import {
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
@@ -30,7 +30,7 @@ import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
 import { dataTenantsOf } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows } from '../../components/intersection/instancing/instancing.js';
-import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
+import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import type { BlackbodyValue } from '../types.js';
 
 /** Registered primitive types — unknowns must diagnose here, not throw downstream
@@ -91,7 +91,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
     // Rail v2 (fable-data-rail): THE layout truth — the same adapter+ledger call the App
     // makes, so baked bases and packed bytes can never disagree.
-    const { tenants: dataTenants, batchGeometrySlot } = dataTenantsOf(scene);
+    const { tenants: dataTenants, batchGeometrySlot, table: sceneTableTruth } = dataTenantsOf(scene);
     const dataLayout = planDataLayout(dataTenants);
     let objectIndex = 0;
     for (const obj of scene.objects) {
@@ -331,6 +331,24 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         ? materialIdMap.get(scene.ambientMedium) ?? -1   // unknown name already errored in the Validator
         : -1;
 
+    // --- The planned scene table (fable-object-tables) — bases + counts + kind codes
+    // from the adapter's ONE truth; tabled analytic objects marked for the feature's
+    // residual/table split. Present whether or not this strategy tables (the data is
+    // strategy-independent; 'unrolled' programs never read it).
+    let sceneTable: PlannedSceneTable | undefined;
+    if (sceneTableTruth !== null && dataLayout.sceneTable !== undefined) {
+        const tabledSet = new Set(sceneTableTruth.analytic.map((a) => a.sceneIndex));
+        for (const a of analyticObjects) if (tabledSet.has(a.index)) a.tabled = true;
+        sceneTable = {
+            slot: dataLayout.sceneTable,
+            leafCount: sceneTableTruth.leaves.length,
+            analyticCount: sceneTableTruth.analytic.length,
+            solidCount: sceneTableTruth.solidCount,
+            kinds: [...sceneTableTruth.kindCodes].map(([type, code]) => ({ type, code })),
+            tabledMeshOrdinals: sceneTableTruth.leaves.filter((l) => l.kind === 1).map((l) => l.ref),
+        };
+    }
+
     // --- Build program description ---
     const program = planProgram(features, scene, strategy, lights, materials, objects, analyticObjects, meshes, instanceBatches);
     const pipeline = planPipeline(program);
@@ -340,6 +358,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         analyticObjects,
         meshes,
         instanceBatches,
+        ...(sceneTable !== undefined ? { sceneTable } : {}),
         materials,
         lights,
         ambientMedium,
@@ -464,6 +483,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // defaults from the registry (components/intersection), Validator-gatekept.
             meshTraversal: strategy.estimator.meshTraversal ?? DEFAULT_MESH_TRAVERSAL,
             instanceAccel: strategy.estimator.instanceAccel ?? DEFAULT_INSTANCE_ACCEL,
+            objectDispatch: strategy.estimator.objectDispatch ?? DEFAULT_OBJECT_DISPATCH,
             // The opaque shadow fast path is scene_intersect_any's only caller; the
             // media shadow walker re-spawns scene_intersect instead (§6.3).
             anyQuery: lighting !== null && !features.media.hasMedia,

@@ -97,3 +97,32 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
         ],
     },
 };
+
+/** Object dispatch regimes — occupants of `estimator.objectDispatch` (fable-object-tables).
+ *  Bias-free by contract; the bazaar equality witness is the gate. The regimes differ
+ *  structurally throughout the intersection feature, so the registry carries membership +
+ *  default (the Validator's enum source), not emitters. */
+export interface ObjectDispatchDescriptor { }
+
+export const DEFAULT_OBJECT_DISPATCH = 'unrolled';
+
+export const OBJECT_DISPATCHES: Record<string, ObjectDispatchDescriptor> = {
+    /** The research regime: params baked into GLSL, named symbols, linear arms. */
+    unrolled: {},
+    /** The scale regime: typed records + ONE scene TLAS; residual arm for driven/unbounded. */
+    table: {},
+};
+
+// ── Scene-table wire format (fable-object-tables §2/§3) — shared by the adapter (sizes),
+//    the Planner/feature (baked bases + generated readers), and the App (packing). ──
+
+/** Fixed analytic record stride: 1 header texel (primKindCode, regionId, 0, 0) + up to
+ *  4 payload texels (quad, the widest registered kind, needs 13 floats). A new primitive
+ *  whose rows exceed 16 payload floats is a compile-time error in the record generator —
+ *  raise the stride deliberately, never silently. */
+export const ANALYTIC_RECORD_TEXELS = 5;
+
+/** Scene-TLAS leaf kinds (the leaf-list texel's .x). */
+export const LEAF_ANALYTIC = 0;
+export const LEAF_MESH = 1;
+export const LEAF_BATCH = 2;

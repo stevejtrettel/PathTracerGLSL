@@ -7,8 +7,11 @@ import { resampleEquirectToOctahedral } from '../components/env/octahedral/octah
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
 import { packInstanceBatch, sceneInstanceBatches, instanceAttributeRows, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
-import { similarityFromTransform } from '../components/geometry/similarity.js';
-import { canonicalizePrimitiveParameters, primitiveBounds } from '../components/geometry/index.js';
+import { similarityFromTransform, similarityApplyPoint } from '../components/geometry/similarity.js';
+import { canonicalizePrimitiveParameters, primitiveBounds, foldAnalyticParameters, primitive } from '../components/geometry/index.js';
+import { buildBVHNodes, rootBoxOf, transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
+import { recordPack } from '../compiler/generate/records.js';
+import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH } from '../components/intersection/index.js';
 import { packMeshLight } from '../components/lights/mesh/mesh.js';
 import { isMeshObject, type MeshObject } from '../compiler/types.js';
 import { dataTenantsOf } from '../compiler/plan/dataTenants.js';
@@ -226,7 +229,7 @@ export class App {
      * batches — or used standalone too — builds its BVH once.
      */
     private _uploadSceneGeometry(scene: SceneDescription): void {
-        const { tenants, batchGeometrySlot } = dataTenantsOf(scene);
+        const { tenants, batchGeometrySlot, table } = dataTenantsOf(scene);
         if (tenants.meshes.length === 0 && tenants.batches.length === 0) return;
         const layout = planDataLayout(tenants);
         const ch: Record<(typeof DATA_CHANNELS)[number], PackedChannel> = {
@@ -271,6 +274,7 @@ export class App {
             }
         });
 
+        const batchRoots: AABB[] = [];
         sceneInstanceBatches(scene.objects).forEach((batch, ordinal) => {
             const slot = layout.batches[ordinal];
             // The prototype's LOCAL box (mesh = BLAS root; analytic = primitive bounds) → the
@@ -298,7 +302,50 @@ export class App {
             assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placements.length));
             writeTexels(ch.nodes, slot.tlasBase, packed.nodes.subarray(0, packed.nodeCount * 8));
             if (packed.attributes !== undefined) writeTexels(ch.records, slot.attrsBase, packed.attributes);
+            batchRoots.push(rootBoxOf(packed.nodes, packed.nodeCount));
         });
+
+        // The scene TABLE (fable-object-tables): analytic records (folded via the SAME
+        // canonicalize+fold chain the Planner bakes — bake ≡ ship), the leaf list in
+        // TLAS-leaf order, and the scene TLAS itself.
+        if (table !== null && layout.sceneTable !== undefined) {
+            const S = layout.sceneTable;
+            const meshList = sceneMeshes(scene.objects);
+            // Folded values per analytic record (record order) + their world boxes.
+            const foldedByRecord = table.analytic.map((a) => {
+                const obj = scene.objects[a.sceneIndex];
+                if (!('type' in obj)) throw new Error('scene table: analytic record points at a non-primitive');
+                return foldAnalyticParameters(obj.type, obj.parameters, similarityFromTransform(obj.transform));
+            });
+            table.analytic.forEach((a, slot) => {
+                const header = [table.kindCodes.get(a.type)!, a.sceneIndex, 0, 0];
+                const payload = recordPack(primitive(a.type), foldedByRecord[slot]);
+                writeTexels(ch.records, S.analyticBase + slot * ANALYTIC_RECORD_TEXELS, [...header, ...payload]);
+            });
+            // Leaf world boxes in the adapter's canonical leaf order.
+            const leafBoxes: AABB[] = table.leaves.map((L) => {
+                if (L.kind === LEAF_ANALYTIC) {
+                    const a = table.analytic[L.ref];
+                    return primitiveBounds(a.type, foldedByRecord[L.ref])!;   // bounded by eligibility
+                }
+                if (L.kind === LEAF_MESH) {
+                    const mesh = meshList[L.ref];
+                    const root = packCached(mesh).rootBox;
+                    return transformAABB(root, (pt) => similarityApplyPoint(similarityFromTransform(mesh.transform), pt));
+                }
+                return batchRoots[L.ref];
+            });
+            const tlas = buildBVHNodes(leafBoxes);
+            assertFits('scene TLAS nodes', tlas.nodeCount * 2, nodeTexelBound(table.leaves.length));
+            writeTexels(ch.nodes, S.tlasBase, tlas.nodes.subarray(0, tlas.nodeCount * 8));
+            // Leaf list in TLAS-leaf order (the tree's permutation over the canonical list).
+            const leafTexels = new Float32Array(table.leaves.length * 4);
+            for (let i = 0; i < table.leaves.length; i++) {
+                const L = table.leaves[tlas.order[i]];
+                leafTexels[i * 4] = L.kind; leafTexels[i * 4 + 1] = L.ref;
+            }
+            writeTexels(ch.records, S.leafListBase, leafTexels);
+        }
 
         for (const c of DATA_CHANNELS) {
             if (layout.totals[c] > 0) {

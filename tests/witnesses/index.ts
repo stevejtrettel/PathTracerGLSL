@@ -21,6 +21,7 @@ import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '.
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
+import { bazaarScene, bazaarTableStrategy, bazaarUnrolledStrategy } from './scenes/tableWitness.js';
 import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies } from './scenes/meshWitness.js';
 import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy } from './scenes/instanceWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
@@ -180,6 +181,18 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // linear scan with the same stream — near-bit-exact (see mesh-quad-twin).
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'tlas ≡ linear (identical stream)' },
             ],
+        },
+    },
+    // The scene table (fable-object-tables): 'table' ≡ 'unrolled' on a many-unique-object
+    // scene with residual tenants (plane floor + driven sphere) — identical-stream gate.
+    bazaar: {
+        scene: bazaarScene,
+        strategies: [bazaarTableStrategy, bazaarUnrolledStrategy],
+        exercises: 'the SCENE TABLE (fable-object-tables): ~35 unique objects as typed records under ONE scene TLAS (analytic + mesh + batch leaves) beside the residual unrolled arm (plane floor, driven sphere) — key 1 = table, key 2 = unrolled',
+        expected: 'the two dispatch regimes are near-bit-identical (same stream, same candidates — only addressing differs)',
+        witness: {
+            spp: 64,
+            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'table ≡ unrolled (identical stream)' }],
         },
     },
     // Mesh area light (fable-mesh-lights): an emissive 2-triangle panel ≡ the analytic

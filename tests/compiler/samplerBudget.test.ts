@@ -9,6 +9,7 @@ import { Compiler } from '../../src/compiler/Compiler.js';
 import { cactiScene, cactiStrategy, cactiMisStrategy } from '../../demos/cactiScene.js';
 import { forestScene, forestStrategy } from '../../demos/forestScene.js';
 import { skyScene, skyMisStrategy } from '../witnesses/scenes/envScenes.js';
+import { bazaarScene, bazaarTableStrategy } from '../witnesses/scenes/tableWitness.js';
 
 const compiler = new Compiler();
 
@@ -32,6 +33,10 @@ describe('sampler budget (fable-data-rail §5)', () => {
 
     it('instancing + meshes (forest) fits', () => {
         expect(maxSamplers(forestScene, forestStrategy)).toBeLessThanOrEqual(13);
+    });
+
+    it('the scene table (bazaar, ~35 unique objects) fits the role-shaped budget', () => {
+        expect(maxSamplers(bazaarScene, bazaarTableStrategy)).toBeLessThanOrEqual(13);
     });
 
     it('an env-heavy scene fits (the other big sampler spender)', () => {

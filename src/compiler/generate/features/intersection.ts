@@ -6,7 +6,7 @@
 // so "swapping the details of intersect" is exactly what the codegen does. Region ids are
 // globally unique across both backends (§2.3), so material_of() spans them.
 
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, DrivenPlacement, PlannedPlacement } from '../../plan/types.js';
+import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedSceneTable, DrivenPlacement, PlannedPlacement } from '../../plan/types.js';
 import { isDrivenPlacement } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -35,7 +35,8 @@ import {
 import raymarchGLSL from '../../../components/intersection/raymarch/raymarch.glsl?raw';
 import bvhWalkGLSL from '../../../components/accel/bvh/bvh.glsl?raw';
 import meshGLSL from '../../../components/intersection/mesh/mesh.glsl?raw';
-import { MESH_TRAVERSALS, INSTANCE_ACCELS } from '../../../components/intersection/index.js';
+import { MESH_TRAVERSALS, INSTANCE_ACCELS, ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH } from '../../../components/intersection/index.js';
+import { generateRecordReader } from '../records.js';
 import { DATA_TEX_WIDTH } from '../../../components/data/pack.js';
 import { BVH_STACK_DEPTH } from '../../../components/accel/bvh/bvh.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
@@ -53,7 +54,12 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // are needed by any BVH walk — the mesh BLAS AND every instance TLAS (analytic-only
     // included: placement reads use data_texel1d). The triangle LEAF (mesh.glsl) is needed
     // only for actual triangle geometry.
-    const needDataRail = hasMesh || hasInstanced;
+    // Table dispatch (fable-object-tables): the SCALE regime — tabled objects leave the
+    // unrolled arms for the scene-TLAS walk; driven/unbounded objects stay in the
+    // RESIDUAL unrolled arms beside it (plus the SDF arm, unchanged).
+    const tableMode = plan.program.intersection.objectDispatch === 'table' && plan.sceneTable !== undefined;
+    const table = tableMode ? plan.sceneTable : undefined;
+    const needDataRail = hasMesh || hasInstanced || tableMode;
     const needMeshLeaf = hasMesh || plan.instanceBatches.some((b) => b.prototype.backend === 'mesh');
     const ids = objectGlslIds(plan.objects, plan.analyticObjects, plan.meshes, plan.instanceBatches);
     const blocks: ShaderBlock[] = [];
@@ -123,9 +129,11 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // regardless (whole-component inclusion — the declared cost).
     const anyQuery = plan.program.intersection.anyQuery;
 
-    // Analytic backend: per-scene analytic_intersect* dispatch over the closed forms.
-    if (hasAnalytic) {
-        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(plan.analyticObjects, anyQuery, ids) });
+    // Analytic backend: per-scene analytic_intersect* dispatch over the closed forms —
+    // under table dispatch, only the RESIDUAL subset (driven/unbounded) unrolls here.
+    const residualAnalytic = tableMode ? plan.analyticObjects.filter((o) => o.tabled !== true) : plan.analyticObjects;
+    if (hasAnalytic && residualAnalytic.length > 0) {
+        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(residualAnalytic, anyQuery, ids) });
     }
 
     // The rail's addressing (glsl/core/data_texture.glsl: data_texel1d at DATA_TEX_WIDTH)
@@ -163,12 +171,16 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const needNodes = (hasMesh && meshEngine.nodeTexture)
         || plan.meshes.some((m) => m.closed)
         || plan.instanceBatches.some((b) => b.prototype.backend === 'mesh')
-        || (hasInstanced && instAccel.tlasTexture);
+        || (hasInstanced && instAccel.tlasTexture)
+        || tableMode;   // the scene TLAS
     if (needNodes) textures.push({ name: 'u_data_nodes', source: 'extern:data_nodes' });
-    if (hasInstanced) textures.push({ name: 'u_data_records', source: 'extern:data_records' });
+    if (hasInstanced || tableMode) textures.push({ name: 'u_data_records', source: 'extern:data_records' });
 
+    const residualMeshes = tableMode
+        ? plan.meshes.filter((m) => !table!.tabledMeshOrdinals.includes(m.ordinal))
+        : plan.meshes;
     if (hasMesh) {
-        blocks.push({ origin: 'generated:mesh-dispatch', source: generateMeshDispatch(plan.meshes, anyQuery, plan.program.intersection.meshTraversal, ids) });
+        blocks.push({ origin: 'generated:mesh-dispatch', source: generateMeshDispatch(plan.meshes, anyQuery, plan.program.intersection.meshTraversal, ids, residualMeshes) });
     }
 
     // Instanced batches (impl-plan-instancing): one prototype × N placements = the driven wrapper
@@ -179,7 +191,13 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         if (instAccel.countDefine) {
             for (const b of plan.instanceBatches) defines[`INSTANCE_COUNT_${b.ordinal}`] = String(b.instanceCount);
         }
-        blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery, plan.program.intersection.instanceAccel, ids) });
+        blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery, plan.program.intersection.instanceAccel, ids, !tableMode) });
+    }
+
+    // The scene table (fable-object-tables): record readers + leaf dispatch + the scene
+    // TLAS walk. Emitted AFTER the mesh/batch wrappers it dispatches into.
+    if (tableMode) {
+        blocks.push({ origin: 'generated:scene-table', source: generateSceneTable(table!, plan, ids, anyQuery) });
     }
 
     // region → material table spans ALL backends (regions are globally unique).
@@ -192,7 +210,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     }
 
     // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
-    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects, plan.meshes, ids) });
+    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects, plan.meshes, ids, table) });
 
     // The top-level dispatcher, combining only the backends present (declared after all).
     // Zero-thickness regions (descriptor `thin` fact): they never claim containment, so
@@ -207,7 +225,16 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         // Instanced batches are opaque surface-only in v1 (like meshes) → thin-like.
         ...plan.instanceBatches.map((b) => b.index),
     ];
-    blocks.push({ origin: 'generated:scene-intersect', source: generateSceneIntersect(hasSDF, hasAnalytic, hasMesh, hasInstanced, thinRegions, anyQuery) });
+    blocks.push({
+        origin: 'generated:scene-intersect',
+        source: generateSceneIntersect({
+            analytic: hasAnalytic && residualAnalytic.length > 0,
+            sdf: hasSDF,
+            mesh: hasMesh && residualMeshes.length > 0,
+            instanced: hasInstanced && !tableMode,
+            table: tableMode,
+        }, thinRegions, anyQuery),
+    });
 
     // T4 seams: the geometry/region contract surface (§2.3 tables + the trace-loop queries).
     const provides = [
@@ -554,7 +581,7 @@ function emitMeshPlacement(pl: PlannedPlacement): { setup: string[]; ro: string;
     return { setup: [], ro: `${formatMat3(M)} * ${centered}`, rd: `${formatMat3(M)} * ray.direction`, nWorld };
 }
 
-function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTraversal: string, ids: Map<number, string>): string {
+function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTraversal: string, ids: Map<number, string>, aggregateOver: PlannedMesh[]): string {
     const lines: string[] = [`// Generated mesh dispatch (ray-into-local; ${meshTraversal} engine)`];
     const engine = MESH_TRAVERSALS[meshTraversal];
 
@@ -581,11 +608,15 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
         lines.push('');
     }
 
-    lines.push('bool mesh_intersect(Ray ray, inout Hit hit) {');
-    lines.push('    bool found = false;');
-    for (const m of meshes) lines.push(`    if (mesh_${ids.get(m.index)!}(ray, hit)) found = true;`);   // bounded by hit.t
-    lines.push('    return found;');
-    lines.push('}');
+    // The aggregator spans only the RESIDUAL subset under table dispatch (tabled meshes
+    // are reached through the scene-TLAS leaf switch instead); empty → no aggregator.
+    if (aggregateOver.length > 0) {
+        lines.push('bool mesh_intersect(Ray ray, inout Hit hit) {');
+        lines.push('    bool found = false;');
+        for (const m of aggregateOver) lines.push(`    if (mesh_${ids.get(m.index)!}(ray, hit)) found = true;`);   // bounded by hit.t
+        lines.push('    return found;');
+        lines.push('}');
+    }
 
     if (anyQuery) {
         lines.push('');
@@ -598,10 +629,12 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
             lines.push(`    return ${any};`);
             lines.push(`}`);
         }
-        lines.push('bool mesh_intersect_any(Ray ray, float maxDist) {');
-        for (const m of meshes) lines.push(`    if (mesh_any_${ids.get(m.index)!}(ray, maxDist)) return true;`);
-        lines.push('    return false;');
-        lines.push('}');
+        if (aggregateOver.length > 0) {
+            lines.push('bool mesh_intersect_any(Ray ray, float maxDist) {');
+            for (const m of aggregateOver) lines.push(`    if (mesh_any_${ids.get(m.index)!}(ray, maxDist)) return true;`);
+            lines.push('    return false;');
+            lines.push('}');
+        }
     }
 
     return lines.join('\n');
@@ -666,7 +699,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean): string[] {
         '                }'];
 }
 
-function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boolean, instanceAccel: string, ids: Map<number, string>): string {
+function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boolean, instanceAccel: string, ids: Map<number, string>, emitAggregator: boolean): string {
     const lines: string[] = [`// Generated instance dispatch (${instanceAccel} — impl-plan-tlas)`];
     // The walk skeleton comes from the registry occupant (components/intersection
     // INSTANCE_ACCELS: tlas = stack-DFS over the batch's node texture, linear = the
@@ -682,11 +715,14 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
         lines.push('');
     }
 
-    lines.push('bool instanced_intersect(Ray ray, inout Hit hit) {');
-    lines.push('    bool found = false;');
-    for (const b of batches) lines.push(`    if (instance_${ids.get(b.index)!}(ray, hit)) found = true;`);
-    lines.push('    return found;');
-    lines.push('}');
+    // Under table dispatch every batch is a scene-TLAS leaf — no linear aggregator.
+    if (emitAggregator) {
+        lines.push('bool instanced_intersect(Ray ray, inout Hit hit) {');
+        lines.push('    bool found = false;');
+        for (const b of batches) lines.push(`    if (instance_${ids.get(b.index)!}(ray, hit)) found = true;`);
+        lines.push('    return found;');
+        lines.push('}');
+    }
 
     if (anyQuery) {
         lines.push('');
@@ -696,10 +732,12 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
             lines.push('    return false;');
             lines.push('}');
         }
-        lines.push('bool instanced_intersect_any(Ray ray, float maxDist) {');
-        for (const b of batches) lines.push(`    if (instance_any_${ids.get(b.index)!}(ray, maxDist)) return true;`);
-        lines.push('    return false;');
-        lines.push('}');
+        if (emitAggregator) {
+            lines.push('bool instanced_intersect_any(Ray ray, float maxDist) {');
+            for (const b of batches) lines.push(`    if (instance_any_${ids.get(b.index)!}(ray, maxDist)) return true;`);
+            lines.push('    return false;');
+            lines.push('}');
+        }
     }
 
     return lines.join('\n');
@@ -712,7 +750,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
 // flipped inequality away: `d > best` among negatives — deepest-wins made a submerged sphere
 // invisible (verification T2 / R-SUBMERGED). Spans both backends.
 
-function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], ids: Map<number, string>): string {
+function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], ids: Map<number, string>, table?: PlannedSceneTable): string {
     const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
     lines.push('int scene_region_at(vec3 p) {');
     lines.push('    int region = -1;');
@@ -723,6 +761,7 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
     for (const obj of analytic) {
+        if (table !== undefined && obj.tabled === true) continue;   // containment via the record loop below
         if (obj.placement !== undefined && !primitive(obj.shapeType).thin) {
             // Driven (§6.1): classify in the rigid frame with s-scaled params — d stays
             // an exact WORLD signed distance, so innermost-wins compares correctly
@@ -736,6 +775,24 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
         }
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
+    // Tabled SOLIDS (fable-object-tables §4 — ONE param truth): a generated loop over
+    // the record range [0, solidCount), reading each solid's struct from its record and
+    // ranking its signed distance in the SAME innermost-wins comparison. O(1) code size
+    // regardless of object count; the region id rides the record header.
+    if (table !== undefined && table.solidCount > 0) {
+        const solidKinds = table.kinds.filter((k) => primitive(k.type).thin !== true);
+        lines.push(`    for (uint ri = 0u; ri < ${table.solidCount}u; ri++) {`);
+        lines.push(`        uint rbase = ${table.slot.analyticBase}u + ri * ${ANALYTIC_RECORD_TEXELS}u;`);
+        lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+        lines.push('        float ds = 1.0e20;');
+        for (const k of solidKinds) {
+            const d = primitive(k.type);
+            lines.push(`        if (int(hdr.x) == ${k.code}) { ${structName(d)} shape = ${k.type}_from_record(u_data_records, rbase); ds = ${k.type}_sdf(p, shape); }`);
+        }
+        lines.push('        if (ds < 0.0 && ds > best) { best = ds; region = int(hdr.y); }');
+        lines.push('    }');
+    }
+
     // CLOSED meshes (fable-mesh-containment §1, amended): the lazy three-tier query —
     // (1) outside the baked local box → outside, free; (2) first-hit-facing nearest walk
     // (Validator-proven winding makes the cheap query sufficient); (3) only when INSIDE,
@@ -788,6 +845,136 @@ function emitMeshPointQuery(pl: PlannedPlacement): string[] {
     }
     const M = quatToMat3(quatConjugate(g.rotation)).map((v) => v / g.scale);
     return [`lp = ${formatMat3(M)} * ${centered};`, `ms = ${formatFloat(g.scale)};`];
+}
+
+// ============================================================================
+// The scene table (fable-object-tables): record readers + leaf dispatch + the TLAS walk
+// ============================================================================
+// One tree over every tabled placed thing. Leaf-list texel: (leafKind, ref, 0, 0) —
+// analytic ref = record slot (header carries primKind + regionId), mesh/batch ref =
+// ordinal, dispatched into the SAME generated wrappers the unrolled arms use. The
+// analytic leaf reads its struct from the record and runs the SAME <type>_intersect
+// the unrolled arm calls — one math, two addressings.
+
+function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map<number, string>, anyQuery: boolean): string {
+    const lines: string[] = ['// Generated scene table (fable-object-tables)'];
+    const S = table.slot;
+    const STRIDE = ANALYTIC_RECORD_TEXELS;
+
+    // Record readers for the present tabled kinds — generated from the SAME rows as the
+    // structs/ctors (records.ts), so pack and read cannot drift.
+    for (const k of table.kinds) {
+        lines.push(generateRecordReader(primitive(k.type)));
+    }
+    lines.push('');
+
+    const tabledMeshes = plan.meshes.filter((m) => table.tabledMeshOrdinals.includes(m.ordinal));
+
+    // Nearest-hit leaf: kind switch → analytic record / mesh wrapper / batch walk.
+    lines.push('bool scene_table_leaf(uint li, Ray ray, inout Hit hit) {');
+    lines.push(`    vec4 L = texelFetch(u_data_records, data_texel1d(${S.leafListBase}u + li), 0);`);
+    lines.push('    int lk = int(L.x); int ref = int(L.y);');
+    lines.push('    bool found = false;');
+    lines.push(`    if (lk == ${LEAF_ANALYTIC}) {`);
+    lines.push(`        uint rbase = ${S.analyticBase}u + uint(ref) * ${STRIDE}u;`);
+    lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+    lines.push('        float t;');
+    for (const k of table.kinds) {
+        const d = primitive(k.type);
+        lines.push(`        if (int(hdr.x) == ${k.code}) {`);
+        lines.push(`            ${structName(d)} shape = ${k.type}_from_record(u_data_records, rbase);`);
+        lines.push(`            if (${k.type}_intersect(ray, shape, t) && t < hit.t) {`);
+        lines.push('                hit.t = t; found = true;');
+        lines.push('                hit.p = ambient_geodesic(ray.origin, ray.direction, t);');
+        lines.push(`                hit.frame = ambient_frame(hit.p, ${k.type}_normal(hit.p, shape));`);
+        lines.push('                hit.region_owner = int(hdr.y);');
+        lines.push('                hit.element = 0;');
+        lines.push('                hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);');
+        lines.push('            }');
+        lines.push('        }');
+    }
+    lines.push(`    } else if (lk == ${LEAF_MESH}) {`);
+    for (const m of tabledMeshes) {
+        lines.push(`        if (ref == ${m.ordinal}) { if (mesh_${ids.get(m.index)!}(ray, hit)) found = true; }`);
+    }
+    lines.push('    } else {');
+    for (const b of plan.instanceBatches) {
+        lines.push(`        if (ref == ${b.ordinal}) { if (instance_${ids.get(b.index)!}(ray, hit)) found = true; }`);
+    }
+    lines.push('    }');
+    lines.push('    return found;');
+    lines.push('}');
+    lines.push('');
+
+    // The walk: standard stack DFS over the scene TLAS, pruned by the running nearest.
+    lines.push('bool scene_table_intersect(Ray ray, inout Hit hit) {');
+    lines.push('    bool found = false;');
+    lines.push('    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;');
+    lines.push('    while (ptr >= 0) {');
+    lines.push('        int ni = stack[ptr]; ptr--;');
+    lines.push(`        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2)), 0);`);
+    lines.push(`        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2 + 1)), 0);`);
+    lines.push('        float tenter;');
+    lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, hit.t, tenter)) continue;');
+    lines.push('        if (n0.w >= 0.0) {');
+    lines.push('            int off = int(n1.w), cnt = int(n0.w);');
+    lines.push('            for (int j = 0; j < cnt; j++) { if (scene_table_leaf(uint(off + j), ray, hit)) found = true; }');
+    lines.push('        } else {');
+    lines.push('            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);');
+    lines.push('            bool nf = ray.direction[axis] >= 0.0;');
+    lines.push('            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }');
+    lines.push('        }');
+    lines.push('    }');
+    lines.push('    return found;');
+    lines.push('}');
+
+    if (anyQuery) {
+        lines.push('');
+        lines.push('bool scene_table_leaf_any(uint li, Ray ray, float maxDist) {');
+        lines.push(`    vec4 L = texelFetch(u_data_records, data_texel1d(${S.leafListBase}u + li), 0);`);
+        lines.push('    int lk = int(L.x); int ref = int(L.y);');
+        lines.push(`    if (lk == ${LEAF_ANALYTIC}) {`);
+        lines.push(`        uint rbase = ${S.analyticBase}u + uint(ref) * ${STRIDE}u;`);
+        lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+        lines.push('        float t;');
+        for (const k of table.kinds) {
+            const d = primitive(k.type);
+            lines.push(`        if (int(hdr.x) == ${k.code}) { ${structName(d)} shape = ${k.type}_from_record(u_data_records, rbase); if (${k.type}_intersect(ray, shape, t) && t < maxDist) return true; }`);
+        }
+        lines.push(`    } else if (lk == ${LEAF_MESH}) {`);
+        for (const m of tabledMeshes) {
+            lines.push(`        if (ref == ${m.ordinal}) { if (mesh_any_${ids.get(m.index)!}(ray, maxDist)) return true; }`);
+        }
+        lines.push('    } else {');
+        for (const b of plan.instanceBatches) {
+            lines.push(`        if (ref == ${b.ordinal}) { if (instance_any_${ids.get(b.index)!}(ray, maxDist)) return true; }`);
+        }
+        lines.push('    }');
+        lines.push('    return false;');
+        lines.push('}');
+        lines.push('');
+        lines.push('bool scene_table_intersect_any(Ray ray, float maxDist) {');
+        lines.push('    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;');
+        lines.push('    while (ptr >= 0) {');
+        lines.push('        int ni = stack[ptr]; ptr--;');
+        lines.push(`        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2)), 0);`);
+        lines.push(`        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2 + 1)), 0);`);
+        lines.push('        float tenter;');
+        lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, maxDist, tenter)) continue;');
+        lines.push('        if (n0.w >= 0.0) {');
+        lines.push('            int off = int(n1.w), cnt = int(n0.w);');
+        lines.push('            for (int j = 0; j < cnt; j++) { if (scene_table_leaf_any(uint(off + j), ray, maxDist)) return true; }');
+        lines.push('        } else {');
+        lines.push('            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);');
+        lines.push('            bool nf = ray.direction[axis] >= 0.0;');
+        lines.push('            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }');
+        lines.push('        }');
+        lines.push('    }');
+        lines.push('    return false;');
+        lines.push('}');
+    }
+
+    return lines.join('\n');
 }
 
 // ============================================================================
@@ -855,7 +1042,7 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
 // residual (EPS_INTERFACE = 10× MARCH_EPSILON). Entering ⇒ region_to = owner; exiting ⇒
 // region_from = owner and the frame flips so n faces region_from (§4.1).
 
-function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, hasMesh: boolean, hasInstanced: boolean, thinRegions: number[], anyQuery: boolean): string {
+function generateSceneIntersect(arms: { analytic: boolean; sdf: boolean; mesh: boolean; instanced: boolean; table: boolean }, thinRegions: number[], anyQuery: boolean): string {
     const lines: string[] = ['// Generated scene_intersect dispatcher'];
 
     // Zero-thickness owners (quads) never claim containment in scene_region_at, so
@@ -873,10 +1060,11 @@ function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, hasMesh: 
     lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
     lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
     lines.push('    bool found = false;');
-    if (hasAnalytic) lines.push('    if (analytic_intersect(ray, hit)) found = true;');
-    if (hasSDF) lines.push('    if (sdf_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
-    if (hasMesh) lines.push('    if (mesh_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
-    if (hasInstanced) lines.push('    if (instanced_intersect(ray, hit)) found = true;');
+    if (arms.analytic) lines.push('    if (analytic_intersect(ray, hit)) found = true;');
+    if (arms.sdf) lines.push('    if (sdf_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
+    if (arms.mesh) lines.push('    if (mesh_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
+    if (arms.instanced) lines.push('    if (instanced_intersect(ray, hit)) found = true;');
+    if (arms.table) lines.push('    if (scene_table_intersect(ray, hit)) found = true;');   // the scene TLAS (fable-object-tables)
     lines.push('    if (found) {');
     lines.push('        // §4.2/§4.3: one outside-probe along the outward normal; owner covers its own side.');
     lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.frame.n, EPS_INTERFACE));');
@@ -904,10 +1092,11 @@ function generateSceneIntersect(hasSDF: boolean, hasAnalytic: boolean, hasMesh: 
     // fast path links it; the media shadow walker re-spawns scene_intersect instead).
     if (anyQuery) {
         lines.push('bool scene_intersect_any(Ray ray, float maxDist) {');
-        if (hasAnalytic) lines.push('    if (analytic_intersect_any(ray, maxDist)) return true;');
-        if (hasSDF) lines.push('    if (sdf_intersect_any(ray, maxDist)) return true;');
-        if (hasMesh) lines.push('    if (mesh_intersect_any(ray, maxDist)) return true;');
-        if (hasInstanced) lines.push('    if (instanced_intersect_any(ray, maxDist)) return true;');
+        if (arms.analytic) lines.push('    if (analytic_intersect_any(ray, maxDist)) return true;');
+        if (arms.sdf) lines.push('    if (sdf_intersect_any(ray, maxDist)) return true;');
+        if (arms.mesh) lines.push('    if (mesh_intersect_any(ray, maxDist)) return true;');
+        if (arms.instanced) lines.push('    if (instanced_intersect_any(ray, maxDist)) return true;');
+        if (arms.table) lines.push('    if (scene_table_intersect_any(ray, maxDist)) return true;');
         lines.push('    return false;');
         lines.push('}');
     }

@@ -15,7 +15,7 @@ export type ResolvedEnvironment =
     | { type: 'image'; url: string; intensity: number; rotation: number }
     | { type: 'procedural'; glsl: GlslExpression; intensity: number; rotation: number };
 import type { Similarity } from '../../components/geometry/similarity.js';
-import type { MeshSlot, BatchSlot } from '../../components/data/ledger.js';
+import type { MeshSlot, BatchSlot, SceneTableSlot } from '../../components/data/ledger.js';
 
 // ============================================================================
 // Program Description — what the generated program does
@@ -160,6 +160,10 @@ export interface IntersectionDesc {
      *  walks the per-batch BVH, 'linear' scans every placement). Gates the instance
      *  dispatch shape + whether the tlas extern is emitted. */
     instanceAccel: string;
+    /** Object dispatch regime (fable-object-tables): an OBJECT_DISPATCHES registry id —
+     *  'unrolled' emits today's per-object arms; 'table' emits the scene-TLAS walk +
+     *  typed-record leaf dispatch + the residual unrolled arm. */
+    objectDispatch: string;
     /** The generated scene_intersect_any occlusion query exists — its only caller is
      *  the opaque shadow fast path (NEE without media; shadow_media re-spawns
      *  scene_intersect instead). The static backend walkers (sdf_intersect_any) ride
@@ -234,6 +238,21 @@ export interface PlannedSDFObject {
  * geometry backend behind scene_intersect). `index` shares the region-id space with SDF
  * objects (regions are globally unique — §2.3), so material_of() spans both.
  */
+/** The planned SCENE TABLE (fable-object-tables): everything the table-mode codegen
+ *  bakes — ledger bases + counts + the present-kind header codes. Built from the
+ *  dataTenantsOf adapter's table (the one truth the App packs from too). */
+export interface PlannedSceneTable {
+    slot: SceneTableSlot;
+    leafCount: number;
+    analyticCount: number;
+    /** Records [0, solidCount) are SOLID (the containment loop's range). */
+    solidCount: number;
+    /** Present tabled primitive kinds with their record-header codes. */
+    kinds: Array<{ type: string; code: number }>;
+    /** Mesh ordinals with table leaves (constant-placement meshes). */
+    tabledMeshOrdinals: number[];
+}
+
 export interface PlannedAnalyticObject {
     index: number;
     materialId: number;
@@ -245,6 +264,10 @@ export interface PlannedAnalyticObject {
      *  and the generated arm conjugates the ray into the rigid frame. Constant
      *  placements fold entirely into `parameters` and this stays undefined. */
     placement?: DrivenPlacement;
+    /** This object has a scene-table record (fable-object-tables): under 'table' dispatch
+     *  it leaves the unrolled arms (intersect via the TLAS leaf, containment via the
+     *  record loop). Constant + bounded, per the adapter's ONE eligibility predicate. */
+    tabled?: boolean;
 }
 
 /**
@@ -468,6 +491,9 @@ export interface RenderPlan {
     analyticObjects: PlannedAnalyticObject[];
     meshes: PlannedMesh[];
     instanceBatches: PlannedInstanceBatch[];
+    /** Present when the scene has table-eligible objects (fable-object-tables) —
+     *  read ONLY by 'table'-dispatch programs; 'unrolled' ignores it. */
+    sceneTable?: PlannedSceneTable;
     materials: PlannedMaterial[];
     lights: PlannedLight[];
 

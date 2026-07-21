@@ -14,6 +14,7 @@ const T: DataTenants = {
         { instanceCount: 500, attrTexels: 0 },
     ],
     meshLights: [{ meshOrdinal: 1, vertexCount: 594, triCount: 1152 }],
+    sceneTable: { leafCount: 4, analyticTexels: 10 },   // 2 analytic × stride 5
 };
 
 describe('data rail ledger', () => {
@@ -32,10 +33,14 @@ describe('data rail ledger', () => {
         expect(L.batches[1].placementsBase).toBe(9);
         expect(L.batches[1].attrsBase).toBe(-1);
         expect(L.meshLights.get(1)!.cdfBase).toBe(9 + 1000);
-        expect(L.totals.records).toBe(9 + 1000 + 1152);
-        // Nodes: BLAS bounds then TLAS bounds, disjoint.
+        // Scene table: leaf list then analytic records after the CDF; TLAS after batch TLASes.
+        expect(L.sceneTable!.leafListBase).toBe(9 + 1000 + 1152);
+        expect(L.sceneTable!.analyticBase).toBe(9 + 1000 + 1152 + 4);
+        expect(L.totals.records).toBe(9 + 1000 + 1152 + 4 + 10);
+        // Nodes: BLAS bounds then TLAS bounds, then the scene TLAS, disjoint.
         expect(L.batches[0].tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152));
-        expect(L.totals.nodes).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500));
+        expect(L.sceneTable!.tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500));
+        expect(L.totals.nodes).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500) + nodeTexelBound(4));
     });
 
     it('the node bound holds for real SAH trees (LEAF_SIZE ≥ 1 ⇒ ≤ 2T−1 nodes)', () => {

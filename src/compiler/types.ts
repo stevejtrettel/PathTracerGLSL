@@ -559,6 +559,14 @@ export interface EstimatorDescription {
      *  shows the cost collapse on a big batch. Meaningful only with instanced objects. Registry id
      *  (INSTANCE_ACCELS), Validator-gatekept. */
     instanceAccel?: string;
+    /**
+     * Object dispatch regime (fable-object-tables — Stage B): 'unrolled' (default — the
+     * RESEARCH regime: params baked, named symbols, readable dumps) or 'table' (the SCALE
+     * regime: bounded constant objects become typed records in `data_records`, intersected
+     * through ONE scene TLAS in `data_nodes`; driven/unbounded objects ride a residual
+     * unrolled arm). Pure computation — same converged image; registry id
+     * (OBJECT_DISPATCHES), Validator-gatekept. */
+    objectDispatch?: string;
     accumulation: AccumulationDescription;
 }
 

@@ -48,6 +48,20 @@ export interface DataTenants {
     /** Samplable mesh emitters, keyed by MESH ordinal (fable-mesh-lights) — the
      *  dataTenantsOf adapter is the ONE predicate that builds this list. */
     meshLights: ReadonlyArray<{ meshOrdinal: number; vertexCount: number; triCount: number }>;
+    /** The scene TABLE (fable-object-tables — Stage B): leaf-list + analytic-record
+     *  regions in `records`, the scene TLAS in `nodes`. Allocated whenever eligible
+     *  objects exist (strategy-independent — 'unrolled' programs simply never read
+     *  them, the always-upload precedent). null = no eligible objects. */
+    sceneTable: { leafCount: number; analyticTexels: number } | null;
+}
+
+export interface SceneTableSlot {
+    /** Records-channel base of the leaf list (1 texel per leaf, TLAS-leaf order). */
+    leafListBase: number;
+    /** Records-channel base of the analytic records (fixed stride, solids-first order). */
+    analyticBase: number;
+    /** Nodes-channel base of the scene TLAS (padded to 2(2L−1) texels). */
+    tlasBase: number;
 }
 
 export interface DataLayout {
@@ -57,6 +71,7 @@ export interface DataLayout {
     batches: BatchSlot[];
     /** By MESH ordinal. */
     meshLights: Map<number, MeshLightSlot>;
+    sceneTable?: SceneTableSlot;
 }
 
 /** ≤ 2T−1 nodes over T leaves, 2 texels/node — the declared BLAS/TLAS padding bound. */
@@ -86,9 +101,17 @@ export function planDataLayout(t: DataTenants): DataLayout {
         v += l.vertexCount;
         r += l.triCount;
     }
+    let sceneTable: SceneTableSlot | undefined;
+    if (t.sceneTable !== null && t.sceneTable.leafCount > 0) {
+        const leafListBase = r; r += t.sceneTable.leafCount;
+        const analyticBase = r; r += t.sceneTable.analyticTexels;
+        const tlasBase = n; n += nodeTexelBound(t.sceneTable.leafCount);
+        sceneTable = { leafListBase, analyticBase, tlasBase };
+    }
     return {
         totals: { vertices: v, normals: vertexChannelTotal(t), uvs: vertexChannelTotal(t), indices: tr, nodes: n, records: r },
         meshes, batches, meshLights,
+        ...(sceneTable !== undefined ? { sceneTable } : {}),
     };
 }
 

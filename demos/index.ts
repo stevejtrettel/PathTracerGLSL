@@ -28,6 +28,7 @@ import { modelsScene, modelsBvhStrategy, modelsBruteStrategy, modelsPtStrategy }
 import { forestScene, forestStrategy, forestLinearStrategy } from './forestScene.js';
 import { spheresScene, spheresStrategy, spheresLinearStrategy } from './spheresScene.js';
 import { cactiScene, cactiStrategy, cactiMisStrategy } from './cactiScene.js';
+import { grandBazaarScene, grandBazaarStrategy, grandBazaarMisStrategy } from './grandBazaarScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -50,6 +51,14 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
             'DEMO — the TLAS A/B (impl-plan-tlas) + per-instance ATTRIBUTES (fable-instance-attributes): 500 instanced spheres from one prototype with 500 per-instance albedos (ONE material; Hit.element → the attrs table). Key 1 = TLAS, key 2 = linear scan (500 tests/ray) — SAME image, watch pathtracer ms/frame collapse (~7× on SwiftShader).',
         expected:
             'a dense cloud of ~500 pastel multi-colored spheres above a gray floor — every color from one material + the per-instance table; keys 1 (tlas) and 2 (linear) are pixel-identical, key 1 dramatically faster. All 500 share one prototype (memory is one sphere).',
+    },
+    'grand-bazaar': {
+        scene: grandBazaarScene,
+        strategies: [grandBazaarStrategy, grandBazaarMisStrategy],
+        exercises:
+            'DEMO — the Stage B payoff (fable-object-tables): ~350 UNIQUE objects (250 spheres + 60 quads + 40 disks, no two alike) + 3 cactus meshes + a 150-instance batch, ALL leaves of ONE scene TLAS — plus the residual arm live (plane floor, slider-driven chrome orb). Table-only strategies ON PURPOSE: an unrolled arm at this count would stall compile at load, which is exactly the pain the table retires (the A/B lives on the moderate bazaar witness). Keys 1/2 = nee/mis.',
+        expected:
+            'a dusk field of ~500 varied objects — colored spheres, floating tiles, tilted disks, three cacti, a pebble carpet — compiling as fast as a 5-object scene and tracing at ~log N. Drive grand.orb to fly the chrome ball with zero recompiles.',
     },
     cacti: {
         scene: cactiScene,
