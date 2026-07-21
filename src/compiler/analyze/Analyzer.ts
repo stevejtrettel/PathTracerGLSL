@@ -1,7 +1,8 @@
 // compiler/analyze/Analyzer.ts
 
 import type { SceneDescription } from '../types.js';
-import { isEmissiveMedium, isValueParam, isBlackbody, mediumMayScatter, hasConstantNonzeroEmission } from '../types.js';
+import { isEmissiveMedium, isValueParam, isBlackbody, isMeshObject, mediumMayScatter, hasConstantNonzeroEmission } from '../types.js';
+import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import type { SceneFeatures } from './types.js';
 import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
 
@@ -40,6 +41,14 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         const mat = scene.materials[obj.material];
         if (mat === undefined || mat.sampleAsLight === false) continue;
         if (hasConstantNonzeroEmission(mat.emission)) totalLightCount++;   // C3: the ONE predicate
+    }
+    // Mesh emitters (fable-mesh-lights): the same material route — constant-placement
+    // emissive meshes join the registry (driven placement = the §6 pin's exclusion).
+    for (const obj of scene.objects) {
+        if (!isMeshObject(obj) || isDrivenTransform(obj.transform)) continue;
+        const mat = scene.materials[obj.material];
+        if (mat === undefined || mat.sampleAsLight === false) continue;
+        if (hasConstantNonzeroEmission(mat.emission)) totalLightCount++;
     }
 
     // --- Environment as a light (T3/T4, D6): tabulated kinds default TRUE, constant opt-in, none never.

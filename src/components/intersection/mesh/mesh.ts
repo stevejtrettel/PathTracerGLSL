@@ -44,6 +44,9 @@ export function meshExternNames(ordinal: number): MeshExternNames {
 export interface PackedMesh {
     position: PackedTexture<Float32Array>;   // RGBA32F, xyz per vertex
     index: PackedTexture<Float32Array>;      // RGBA32F, ijk per triangle — in BVH-LEAF order (≤16M exact)
+    /** The BVH-leaf-order triangle index as raw ints — the mesh-light CDF packer reads it
+     *  so the CDF and the index texture agree by construction (fable-mesh-lights). */
+    reindexedTriangles: Uint32Array;
     normal: PackedTexture<Float32Array>;     // RGBA32F, xyz per vertex (zeros when unauthored)
     uv: PackedTexture<Float32Array>;         // RGBA32F, xy per vertex (zeros when unauthored)
     bvh: PackedTexture<Float32Array>;        // RGBA32F, 2 texels per node (accel/bvh node format)
@@ -75,6 +78,7 @@ export function packMesh(mesh: MeshObject): PackedMesh {
     return {
         position: packVec3PerTexel(mesh.positions, vertexCount),
         index: packIndex(bvh.reindexedTriangles, bvh.reindexedTriangles.length / 3),
+        reindexedTriangles: bvh.reindexedTriangles,
         normal: packVec3PerTexel(mesh.normals, vertexCount),
         uv: packVec2PerTexel(mesh.uvs, vertexCount),
         bvh: packNodes(bvh.nodes, bvh.nodeCount),

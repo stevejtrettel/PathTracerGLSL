@@ -239,9 +239,9 @@ export function validate(
     // path-only (they still glow; they converge slower — the honest open-question-#10 answer).
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.sampleAsLight !== true) continue;
-        if (!analyticSamplableObjectUses(scene, name)) {
+        if (!samplableObjectUses(scene, name)) {
             bag.error('invalid-setting',
-                `Material '${name}': sampleAsLight requires an ANALYTIC samplable object using it (${Object.entries(PRIMITIVES).filter(([, d]) => d.samplableAsLight === true).map(([t]) => t).join(', ')}) — V1-C2: emissive SDF/custom shapes are path-only and still glow`)
+                `Material '${name}': sampleAsLight requires a samplable object using it — an analytic ${Object.entries(PRIMITIVES).filter(([, d]) => d.samplableAsLight === true).map(([t]) => t).join('/')} or a constant-placement MESH (fable-mesh-lights) — V1-C2: emissive SDF/custom shapes are path-only and still glow`)
                 .add();
         }
         if (!hasConstantNonzeroEmission(mat.emission)) {   // C3: the ONE predicate
@@ -269,7 +269,7 @@ export function validate(
             bag.error('invalid-setting', `Material '${name}': emission components must be >= 0`).add();
         }
         if (nonzeroEmission && !EMITTING_MODELS.has(mat.model)) {
-            const wouldRegister = mat.sampleAsLight !== false && analyticSamplableObjectUses(scene, name);
+            const wouldRegister = mat.sampleAsLight !== false && samplableObjectUses(scene, name);
             if (wouldRegister) {
                 bag.error('invalid-setting',
                     `Material '${name}': model '${mat.model}' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (${[...EMITTING_MODELS].join(', ')}) or set sampleAsLight: false`)
@@ -764,6 +764,15 @@ export function validate(
             bag.warning('invalid-setting', `Object ${i} (instanced): the prototype's transform is ignored — placements carry all world placement (impl-plan-instancing)`)
                 .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
         }
+        // Instanced emitters are NOT samplable (batch region ≠ per-instance light identity —
+        // fable-mesh-lights §5 / the per-instance-emission deferral): they still glow, path-found.
+        {
+            const pm = scene.materials[proto.material];
+            if (pm !== undefined && pm.sampleAsLight !== false && hasConstantNonzeroEmission(pm.emission)) {
+                bag.warning('invalid-setting', `Object ${i} (instanced): the batch's emissive material is not samplable — instanced emitters are path-found only (per-instance light identity is deferred). Set sampleAsLight: false to silence this`)
+                    .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+            }
+        }
         // Per-instance ATTRIBUTES (fable-instance-attributes): keys must be field rows of
         // the prototype material's model; arrays parallel to placements; entries row-shaped
         // and finite. Excluded: emission (per-instance emission needs per-instance power-CDF
@@ -888,7 +897,20 @@ export function validate(
         // §6 pin: driven placement excludes SAMPLABLE emitters — their geometry is
         // baked as literals into the sampler/pdf arms and the compile-time power CDF.
         // Live light geometry is the deferred Value<T>-light-params batch (and must be
-        // RIGID there — driven scale would silently stale the CDF).
+        // RIGID there — driven scale would silently stale the CDF). The MESH arm
+        // (fable-mesh-lights): a driven-transform mesh with a samplable emissive material
+        // silently degrades to path-only (the Planner skips it) — surface that as an error.
+        if (isDrivenTransform(t) && isMeshObject(obj)) {
+            const mat = scene.materials[obj.material];
+            if (mat !== undefined && mat.sampleAsLight !== false && hasConstantNonzeroEmission(mat.emission)) {
+                bag.error('invalid-transform',
+                    `Object ${i}: a {param}-driven transform on a samplable MESH emitter is not supported — `
+                    + `the light's world-space vertex/CDF tables are baked under constant placement (fable-mesh-lights §5). `
+                    + `Set sampleAsLight: false to keep it path-traced only`)
+                    .withOriginal('scene', [`objects[${i}]`, 'transform'])
+                    .add();
+            }
+        }
         if (isDrivenTransform(t) && !('kind' in obj)
             && resolveBackend(obj.type, obj.backend) === 'analytic') {
             if (PRIMITIVES[obj.type]?.samplableAsLight === true) {
@@ -1035,13 +1057,16 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
     }
 }
 
-/** "Some analytic samplable object uses material `name`" — the geometry leg of the
- *  §6.2 emitter condition, shared by the sampleAsLight rule and the phantom-light rule
- *  (C3: the two inline scans were byte-identical and drifted only by luck). */
-function analyticSamplableObjectUses(scene: SceneDescription, name: string): boolean {
+/** "Some SAMPLABLE object uses material `name`" — the geometry leg of the §6.2 emitter
+ *  condition, shared by the sampleAsLight rule and the phantom-light rule (C3: the two
+ *  inline scans were byte-identical and drifted only by luck). Samplable geometry =
+ *  analytic samplable primitives (quad/sphere/disk) + MESH objects with constant
+ *  placement (fable-mesh-lights — driven placement is the §6 pin's exclusion). */
+function samplableObjectUses(scene: SceneDescription, name: string): boolean {
     return scene.objects.some((o) =>
-        !('kind' in o) && resolveBackend(o.type, o.backend) === 'analytic'
-        && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name);
+        (!('kind' in o) && resolveBackend(o.type, o.backend) === 'analytic'
+            && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name)
+        || (isMeshObject(o) && o.material === name && !isDrivenTransform(o.transform)));
 }
 
 /** §7 rules 2: quaternion normalized-within-tolerance (warn + the Planner normalizes),

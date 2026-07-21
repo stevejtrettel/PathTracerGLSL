@@ -7,9 +7,10 @@ import { resampleEquirectToOctahedral } from '../components/env/octahedral/octah
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, meshExternNames, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
 import { packInstanceBatch, instanceExternNames, sceneInstanceBatches, instanceAttributeRows, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
-import { similarityFromTransform } from '../components/geometry/similarity.js';
+import { similarityFromTransform, isDrivenTransform } from '../components/geometry/similarity.js';
 import { canonicalizePrimitiveParameters, primitiveBounds } from '../components/geometry/index.js';
-import { isMeshObject, type MeshObject } from '../compiler/types.js';
+import { packMeshLight, meshLightExternNames } from '../components/lights/mesh/mesh.js';
+import { isMeshObject, hasConstantNonzeroEmission, type MeshObject } from '../compiler/types.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
@@ -243,6 +244,19 @@ export class App {
             // The BVH node texture — bound only by bvh-traversal programs, but registered always
             // (scene-static data; a brute program simply never declares/binds it).
             register(names.bvh, packed.bvh);
+            // Mesh emitter (fable-mesh-lights): a samplable emissive mesh gets its two light
+            // textures — WORLD vertex positions + the cumulative-area CDF in the reordered
+            // triangle order. The predicate is deliberately PERMISSIVE (an unused upload is
+            // harmless; a missing extern is a loud executor error). Driven placement excluded
+            // (the §6 pin — the world bake needs a constant transform).
+            const mat = scene.materials[mesh.material];
+            if (mat !== undefined && mat.sampleAsLight !== false
+                && hasConstantNonzeroEmission(mat.emission) && !isDrivenTransform(mesh.transform)) {
+                const light = packMeshLight(mesh, similarityFromTransform(mesh.transform), packed.reindexedTriangles);
+                const ln = meshLightExternNames(ordinal);
+                register(ln.lightpos, light.lightpos);
+                register(ln.lightcdf, light.lightcdf);
+            }
         });
 
         sceneInstanceBatches(scene.objects).forEach((batch, ordinal) => {

@@ -175,6 +175,7 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
         };
         const lights: LightDescription[] = [];
         for (const kind of Object.keys(LIGHT_KINDS)) {
+            if (LIGHT_KINDS[kind].authoredParams.length === 0) continue;   // sampleAsLight-route-only (mesh) — compile-covered by the mesh-light suite scenes
             const sample = sampleLights[kind];
             if (sample === undefined) {
                 throw new Error(`kitchen sink: light kind '${kind}' has no sample authored form — add one so its GLSL stays compile-covered`);

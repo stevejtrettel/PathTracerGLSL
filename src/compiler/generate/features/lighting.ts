@@ -12,6 +12,7 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
+import { meshLightExternNames } from '../../../components/lights/mesh/mesh.js';
 import { PRIMITIVES } from '../../../components/geometry/index.js';
 import type { LightKindDescriptor } from '../../../components/descriptors.js';
 import { structFromRows } from '../schema.js';
@@ -184,6 +185,22 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         provides.push({ name: 'lighting_query_delta', signature: 'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity)' });
     }
     const requires: string[] = [];
+    // DATA-DRIVEN mesh lights (fable-mesh-lights): declare the sampler's rail textures —
+    // declared where consumed; the index texture reuses the intersection feature's extern
+    // name (merge dedups), lightpos/lightcdf are this feature's own. The rail's addressing
+    // (data_texel1d) is provided by the intersection feature (a mesh light implies meshes).
+    const textures: FeatureContribution['textures'] = [];
+    for (const l of plan.lights) {
+        if (l.mesh === undefined) continue;
+        const k = l.mesh.ordinal;
+        const n = meshLightExternNames(k);
+        textures.push(
+            { name: `u_mesh_${k}_index`, source: `extern:mesh_${k}_index` },
+            { name: `u_mesh_${k}_lightpos`, source: `extern:${n.lightpos}` },
+            { name: `u_mesh_${k}_lightcdf`, source: `extern:${n.lightcdf}` },
+        );
+    }
+    if (textures.length > 0 && !requires.includes('data_texel1d')) requires.push('data_texel1d');
     if (envSamplable) requires.push('environment_sample');
     // The env pdf query links only from the MIS sites (the environmentPdf decision):
     // under plain NEE the sampler carries its own ls.pdf and nothing queries by direction.
@@ -195,7 +212,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         requires.push('scene_intersect_any');   // the §6.3 boolean fast path
     }
 
-    return { ...emptyContribution('lighting'), blocks, defines, uniforms, parameters, provides, requires };
+    return { ...emptyContribution('lighting'), blocks, defines, uniforms, parameters, textures, provides, requires };
 }
 
 // ============================================================================
@@ -382,8 +399,15 @@ function generateLightAccessors(lights: PlannedLight[]): string {
     return lines.join('\n');
 }
 
-/** GLSL call that samples light `l` at point `p` — kind sampler over the const/accessor. */
+/** GLSL call that samples light `l` at point `p` — kind sampler over the const/accessor.
+ *  DATA-DRIVEN kinds (mesh — fable-mesh-lights) take their rail textures as args: the
+ *  shared index texture (the intersection feature's extern, merge-deduped) + the light's
+ *  world-position and area-CDF textures. */
 function sampleCall(l: PlannedLight, xiExpr: string): string {
+    if (l.mesh !== undefined) {
+        const k = l.mesh.ordinal;
+        return `mesh_light_sample(${lightRef(l)}, u_mesh_${k}_index, u_mesh_${k}_lightpos, u_mesh_${k}_lightcdf, ${l.mesh.triCount}, p, ${xiExpr})`;
+    }
     return `${lightKind(l).kind}_light_sample(${lightRef(l)}, p, ${xiExpr})`;
 }
 
@@ -589,7 +613,13 @@ function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSam
         const select = selBase + stage0;
         // The kind's density lives in its GLSL file, ADJACENT to its sampler (the §6.1
         // byte-match invariant is now two functions over one struct) — the arm here is
-        // pure composition: selection pdf × the kind's solid-angle pdf.
+        // pure composition: selection pdf × the kind's solid-angle pdf. The mesh kind's
+        // emitting normal varies per hit (unlike the quad's struct field), so its arm
+        // passes the emitter hit's frame normal (a front hit: n IS the outward normal).
+        if (l.mesh !== undefined) {
+            lines.push(`    if (light_id == ${l.id}) return ${select} * mesh_light_pdf(${lightRef(l)}, p, light_hit.p, light_hit.frame.n, wi);`);
+            continue;
+        }
         lines.push(`    if (light_id == ${l.id}) return ${select} * ${d.kind}_light_pdf(${lightRef(l)}, p, light_hit.p, wi);`);
     }
     lines.push('    return 0.0;');

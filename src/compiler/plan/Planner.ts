@@ -17,11 +17,14 @@ import {
     similarityCompose,
     similarityFromTransform,
     type Quat,
+    type Similarity,
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
+import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
+import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
 import { sceneInstanceBatches, instanceAttributeRows } from '../../components/intersection/instancing/instancing.js';
@@ -282,6 +285,30 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         lights.push({
             id: lightIndex++, kind: kindEntry.kind, regionId: planned.index,
             values: kindEntry.valuesFromRegion(planned.parameters, Le),
+        });
+    }
+
+    // Mesh emitters (fable-mesh-lights): the SAME sampleAsLight material route — an
+    // emissive-material mesh OBJECT joins the registry as the data-driven 'mesh' kind.
+    // Uniform-area: values carry Le + the WORLD total area (the identity-free pdf's one
+    // constant, s²-folded) + triCount (the CDF walk's range). Driven placement excluded
+    // (the §6 pin, Validator-enforced; the skip is the stale-literal backstop).
+    for (const planned of meshes) {
+        const mat = materials[planned.materialId];
+        if (mat === undefined) continue;
+        if (isDrivenPlacement(planned.placement)) continue;
+        const sceneMat = scene.materials[mat.name];
+        if (sceneMat === undefined || sceneMat.sampleAsLight === false) continue;
+        const emission = mat.values[EMISSION_KEY];
+        if (!hasConstantNonzeroEmission(emission)) continue;   // C3: the ONE predicate
+        const src = sceneMeshes(scene.objects)[planned.ordinal];   // the ordinal truth
+        lights.push({
+            id: lightIndex++, kind: 'mesh', regionId: planned.index,
+            mesh: { ordinal: planned.ordinal, triCount: planned.triCount },
+            values: {
+                radiance: emission as Vec3,
+                area: meshWorldArea(src.positions, src.indices, (planned.placement as Similarity).scale),
+            },
         });
     }
 

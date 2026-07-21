@@ -10,6 +10,7 @@ import { quadLightDescriptor } from './quad/quad.js';
 import { sphereLightDescriptor } from './sphere/sphere.js';
 import { diskLightDescriptor } from './disk/disk.js';
 import { spotLightDescriptor } from './spot/spot.js';
+import { meshLightDescriptor } from './mesh/mesh.js';
 
 export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     point: pointLightDescriptor,
@@ -17,6 +18,7 @@ export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     sphere: sphereLightDescriptor,
     disk: diskLightDescriptor,
     spot: spotLightDescriptor,
+    mesh: meshLightDescriptor,   // data-driven; sampleAsLight-route only (fable-mesh-lights)
 };
 
 // radiantScalar lives in power.ts (D5: family-root shared part — occupants import it

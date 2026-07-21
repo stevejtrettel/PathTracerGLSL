@@ -213,6 +213,70 @@ const containBase: RenderStrategy = {
 };
 export const containStrategy: RenderStrategy = withPose(containBase, [1.8, 2.2, 3.6], [0, 0.75, 0]);
 
+// ---------------------------------------------------------------------------
+// mesh-light-twin ⇄ mesh-light-ref — the mesh AREA LIGHT (fable-mesh-lights §7).
+//
+// An emissive TWO-TRIANGLE mesh panel with identical corner/edges/Le vs the analytic
+// quad (both via the sampleAsLight material route) — an EXACT cross-kind twin: the
+// mesh kind's CDF sampler, identity-free pdf (r²/(cosθ·A_total)), and power formula
+// must all agree with the quad's closed forms, under pt-nee, pt-mis, AND pt. The
+// panel faces DOWN (cross(e1,e2) = −y — the one-sided pin, same convention both kinds).
+// ---------------------------------------------------------------------------
+
+const PANEL = { c: [-0.75, 2.49, -0.75], e1: [1.5, 0, 0], e2: [0, 0, 1.5] };   // cross(e1,e2) = (0,−2.25,0) ↓
+
+function panelMesh(): { positions: Float32Array; indices: Uint32Array } {
+    const pos: number[] = [];
+    const idx: number[] = [];
+    pushQuad(pos, idx, PANEL.c, PANEL.e1, PANEL.e2);
+    return { positions: new Float32Array(pos), indices: new Uint32Array(idx) };
+}
+const panelGeom = panelMesh();
+
+const lampMaterials: SceneDescription['materials'] = {
+    floor: { model: 'lambert', albedo: [0.62, 0.62, 0.64] },
+    ball: { model: 'lambert', albedo: [0.75, 0.45, 0.3] },
+    lamp: { model: 'lambert', albedo: [0.78, 0.78, 0.78], emission: [5, 5, 5] },   // sampleAsLight defaults ON
+};
+const lampObjects: SceneDescription['objects'] = [
+    { type: 'quad', parameters: { corner: [-4, 0, -4], edge1: [0, 0, 8], edge2: [8, 0, 0] }, material: 'floor' },
+    { type: 'sphere', parameters: { center: [0, 0.6, 0], radius: 0.6 }, material: 'ball' },
+];
+
+export const meshLightTwin: SceneDescription = {
+    id: 'mesh-light-twin',
+    name: 'Mesh Light Twin (emissive 2-triangle panel)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        ...lampObjects,
+        { kind: 'mesh', positions: panelGeom.positions, indices: panelGeom.indices, material: 'lamp', name: 'panel' },
+    ],
+    materials: lampMaterials,
+    lights: [],
+    environment: { type: 'none' },
+};
+
+export const meshLightRef: SceneDescription = {
+    id: 'mesh-light-ref',
+    name: 'Mesh Light Ref (analytic quad emitter)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        ...lampObjects,
+        { type: 'quad', parameters: { corner: PANEL.c, edge1: PANEL.e1, edge2: PANEL.e2 }, material: 'lamp' },
+    ],
+    materials: lampMaterials,
+    lights: [],
+    environment: { type: 'none' },
+};
+
+const lampBase = (id: string, direct: 'nee' | 'mis' | 'none'): RenderStrategy => withPose({
+    id,
+    measurement: { camera: { type: 'pinhole', fov: 0.9 }, maxBounces: 5 },
+    estimator: { directLighting: direct, russianRoulette: { startDepth: 3 }, accumulation: { type: 'average' } },
+    view: { tonemap: { type: 'reinhard' } },
+}, [0, 2.2, 4.2], [0, 0.8, 0]);
+export const meshLightStrategies: RenderStrategy[] = [lampBase('pt-nee', 'nee'), lampBase('pt-mis', 'mis'), lampBase('pt', 'none')];
+
 // The estimator-swap arm (taxonomy obligation: estimator fields are bias-free by
 // contract, so swapping the traversal engine must not change the image). Identical
 // RNG stream + identical candidate set → near-bit-exact agreement; the only things

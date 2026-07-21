@@ -80,6 +80,16 @@ describe('light kind desugar totality (authoredParams ↔ toValues/region/power)
         });
 
         describe(kind, () => {
+            if (d.authoredParams.length === 0) {
+                // sampleAsLight-route-ONLY kinds (mesh — fable-mesh-lights): never authored
+                // as light records, so the desugar legs don't apply; the totality contract
+                // is instead "validateAuthored rejects every attempt".
+                it('an unauthorable kind rejects every authored record', () => {
+                    expect(d.validateAuthored, 'unauthorable kinds must declare validateAuthored').toBeDefined();
+                    expect(d.validateAuthored!(fullAuthored()).length).toBeGreaterThan(0);
+                });
+                return;
+            }
             it('a complete declared record produces complete, well-shaped registry values', () => {
                 const values = d.toValues(fullAuthored(), PRODUCT);
                 for (const row of d.params) {

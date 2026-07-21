@@ -1,6 +1,8 @@
 # fable-mesh-lights.md — NEE/MIS sampling of emissive meshes
 
-**STATUS: DRAFT — owner review pending.** Decision forks in §8. Nothing built.
+**STATUS: BUILT Jul 20 2026 — GPU-render-verified; numeric sweep owner-gated.** All §8 forks
+owner-approved at the marked picks (the placement/instancing exclusions carry the owner's
+"we should think about this" flag on the deferred ledger). Build record §9.
 
 **Goal:** an emissive mesh becomes a real samplable light — triangle-area-CDF NEE, full MIS —
 instead of path-found-only. The first **data-driven light kind**: its sampler reads textures.
@@ -104,3 +106,37 @@ selected by walks) — mesh lights pilot it at the single-light scale.
    same outward-normal convention) vs two-sided emitters (the deferred quad aside applies).
 4. **Sequencing** — after containment (my pick: the mesh region story settles first; also
    the glass-mesh + mesh-light demos compose into one showcase scene).
+
+---
+
+## 9. Build record (BUILT Jul 20 2026 — GPU-render-verified; numeric sweep owner-gated)
+
+Built as designed, two deviations found at build (both simplifications):
+- **World-space light textures** (supersedes §2's local-point + in-shader transform): under
+  the constant-placement pin the App bakes a WORLD vertex-position texture per mesh light
+  (`mesh_K_lightpos`), so the sampler does ZERO placement math and the MeshLight struct
+  carries no transform rows (precompute-and-ship). The CDF is computed from the PACKED
+  world positions (exactly what the sampler fetches).
+- **triCount is a literal sampler arg**, not a schema row (`PlannedLight.mesh.triCount`) —
+  rows are the light's physical vocabulary (radiance + area only; the contract test's
+  "geometric rows declare a kind" enforced this).
+
+Pieces: `components/lights/mesh/{mesh.glsl, mesh.ts}` (CDF binary search + √-trick sampler,
+`mesh_light_pdf(l, p, q, n, wi)` — the mesh arm passes the emitter hit's frame normal since
+it varies per hit; `packMeshLight`, `meshWorldArea` = local·s², `meshLightExternNames`);
+registry line; Planner mesh route (the same sampleAsLight predicate as the analytic route,
+default-ON); lighting.ts data-driven `sampleCall` + pdf arm + extern declarations (the
+index texture reuses the intersection extern, merge-deduped); Analyzer census + Validator
+(`samplableObjectUses` grew the mesh leg, V1-C2 message, driven-transform mesh-emitter
+error, instanced-emitter path-only warning, `validateAuthored` rejects `{kind:'mesh'}`
+records); App packs/uploads under the permissive predicate. Contract tests taught the
+"unauthorable kind" shape (totality = validateAuthored rejects everything); kitchen sink
+skips unauthorable kinds (the suite scenes compile-cover the mesh sampler).
+
+Gates: tsc clean; vitest 1207 (contract 42/42; glslang through all six mesh-light pairs).
+One legitimate program flip audited: mesh-furnace's `emitters.samplable` false→true (the
+furnace cube is now a registered emitter — the established cornell-area-pt shape; the 0.4
+gate re-asserts at sweep). **GPU:** mesh-light-twin under pt-nee — the panel lights the
+scene via NEE (soft shadows, low noise, 41 fps); frame means agree with the quad ref to
+0.001% at ~370 spp. Witnesses (`mesh-light-twin ⇄ mesh-light-ref`: twin + nee≡mis + pt
+tripwire) await the owner's sweep.

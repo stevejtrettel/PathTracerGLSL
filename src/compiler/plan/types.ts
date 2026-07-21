@@ -385,8 +385,12 @@ export interface PlannedLight {
      *  is CPU-recomputed on change (`resolveLightValues` → `computeSelectPdf`). Geometry rows
      *  stay constant in v1 (driven light geometry = Stage B). Mirrors PlannedMedium.values. */
     values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
-    /** The emitter's region id (quad/sphere) — feeds the generated light_of table. */
+    /** The emitter's region id (quad/sphere/mesh) — feeds the generated light_of table. */
     regionId?: number;
+    /** DATA-DRIVEN kind (mesh — fable-mesh-lights): the backing mesh's ordinal (keys the
+     *  sampler's texture args — index/lightpos/lightcdf externs) + the CDF walk's baked
+     *  triangle count (a literal sampler arg, deliberately NOT a schema row). */
+    mesh?: { ordinal: number; triCount: number };
 }
 
 /**

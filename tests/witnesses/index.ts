@@ -21,7 +21,7 @@ import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '.
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
-import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy } from './scenes/meshWitness.js';
+import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies } from './scenes/meshWitness.js';
 import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy } from './scenes/instanceWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import {
@@ -179,6 +179,28 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // Estimator-swap obligation: the TLAS visits the same placements as the
                 // linear scan with the same stream — near-bit-exact (see mesh-quad-twin).
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'tlas ≡ linear (identical stream)' },
+            ],
+        },
+    },
+    // Mesh area light (fable-mesh-lights): an emissive 2-triangle panel ≡ the analytic
+    // quad light with identical corner/edges/Le — the EXACT cross-kind twin (sampler,
+    // identity-free pdf, and power must all match the quad's closed forms).
+    'mesh-light-ref': {
+        scene: meshLightRef,
+        strategies: meshLightStrategies,
+        exercises: 'reference arm of the mesh-light twin — the same panel as the analytic quad emitter (material route)',
+    },
+    'mesh-light-twin': {
+        scene: meshLightTwin,
+        strategies: meshLightStrategies,
+        exercises: 'the lights family\'s first DATA-DRIVEN kind: an emissive 2-triangle mesh panel sampled via the cumulative-area CDF texture (uniform-area, identity-free pdf r²/(cosθ·A_total), one-sided) — exact twin of mesh-light-ref; keys 1/2/3 = pt-nee/pt-mis/pt',
+        expected: 'pt-nee, pt-mis, and pt all converge to mesh-light-ref\'s image (every mesh-light formula must agree with the quad\'s closed forms)',
+        witness: {
+            spp: 96,
+            checks: [
+                { kind: 'twin', other: { scene: 'mesh-light-ref' }, meanTol: 0.02, label: 'mesh light ≡ quad light (nee)' },
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'mesh light nee ≡ mis' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.4, label: 'mesh light pt tripwire' },
             ],
         },
     },
