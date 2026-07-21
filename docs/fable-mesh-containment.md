@@ -1,6 +1,6 @@
 # fable-mesh-containment.md — solid meshes (dielectric + interior media)
 
-**STATUS: BUILT Jul 20 2026 — GPU-render-verified; numeric sweep owner-gated.** §1 AMENDED
+**STATUS: BUILT & SWEPT Jul 20 2026** — owner's numeric sweep green (mesh-glass-box, mesh-fog, mesh-submerged twins all pass). §1 AMENDED
 at approval: the inside test is FIRST-HIT FACING (not parity) — the Validator's winding
 proof makes the cheaper query sufficient — plus the root-box early-out. Forks resolved to
 the marked picks. Build record §9; the design follows as approved.

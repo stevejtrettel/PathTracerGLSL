@@ -5,12 +5,16 @@ import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '..
 import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
-import { packMesh, meshExternNames, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
-import { packInstanceBatch, instanceExternNames, sceneInstanceBatches, instanceAttributeRows, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
-import { similarityFromTransform, isDrivenTransform } from '../components/geometry/similarity.js';
+import { packMesh, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
+import { packInstanceBatch, sceneInstanceBatches, instanceAttributeRows, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
+import { similarityFromTransform } from '../components/geometry/similarity.js';
 import { canonicalizePrimitiveParameters, primitiveBounds } from '../components/geometry/index.js';
-import { packMeshLight, meshLightExternNames } from '../components/lights/mesh/mesh.js';
-import { isMeshObject, hasConstantNonzeroEmission, type MeshObject } from '../compiler/types.js';
+import { packMeshLight } from '../components/lights/mesh/mesh.js';
+import { isMeshObject, type MeshObject } from '../compiler/types.js';
+import { dataTenantsOf } from '../compiler/plan/dataTenants.js';
+import { planDataLayout, nodeTexelBound, assertFits, type MeshSlot } from '../components/data/ledger.js';
+import { allocChannel, writeTexels, writeVec3s, writeVec2s, writeScalars, writeUvec3s, type PackedChannel } from '../components/data/pack.js';
+import { DATA_CHANNELS, channelExtern } from '../components/data/channels.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
@@ -213,66 +217,67 @@ export class App {
     }
 
     /**
-     * Pack + register every mesh's and instanced batch's extern data textures BEFORE the
-     * renderers exist — the SAME extern names the compiler's `extern:` sources use, with
-     * ordinals from the SHARED enumerators (sceneMeshes / sceneInstanceBatches — one
-     * assignment truth for Planner and App, audit A5). App-side (like the env load): the
-     * compiler declares the samplers, the app owns the GPU payload. impl-plan-meshes §7.
-     *
-     * A pack CACHE (by object reference) means a prototype shared by several batches —
-     * or a mesh used both standalone and as a prototype — packs (and builds its BLAS)
-     * once. GPU-side dedup of the uploaded copies is Stage B (shared base-offset
-     * textures); here we only avoid recomputing.
+     * Rail v2 (fable-data-rail): assemble + register the SIX shared data channels for the
+     * whole scene — meshes, instance batches, mesh-light tables — at the LEDGER's region
+     * bases (the SAME dataTenantsOf + planDataLayout call the Planner bakes literals from,
+     * so bytes and baked bases can never disagree). Texture count is role-shaped (≤6),
+     * never tenant-shaped. Runs BEFORE the renderers exist (the executor hard-errors on a
+     * missing extern). A pack CACHE (by object reference) means a prototype shared by
+     * batches — or used standalone too — builds its BVH once.
      */
     private _uploadSceneGeometry(scene: SceneDescription): void {
+        const { tenants, batchGeometrySlot } = dataTenantsOf(scene);
+        if (tenants.meshes.length === 0 && tenants.batches.length === 0) return;
+        const layout = planDataLayout(tenants);
+        const ch: Record<(typeof DATA_CHANNELS)[number], PackedChannel> = {
+            vertices: allocChannel(layout.totals.vertices),
+            normals: allocChannel(layout.totals.normals),
+            uvs: allocChannel(layout.totals.uvs),
+            indices: allocChannel(layout.totals.indices),
+            nodes: allocChannel(layout.totals.nodes),
+            records: allocChannel(layout.totals.records),
+        };
+
         const packCache = new Map<MeshObject, PackedMesh>();
         const packCached = (m: MeshObject): PackedMesh => {
             let p = packCache.get(m);
             if (p === undefined) { p = packMesh(m); packCache.set(m, p); }
             return p;
         };
-        const register = (name: string, t: { data: Float32Array; width: number; height: number }): void =>
-            this.engine.registerDataTexture(name, t.data, t.width, t.height);
+        // Write one mesh's payloads at its geometry slot (LOCAL ids stored; bases baked
+        // compiler-side). Normals/uvs regions stay zero-filled when unauthored (the leaf
+        // reads them only under useSmooth / a uv reader — the v0 pin, unchanged).
+        const writeMesh = (mesh: MeshObject, slot: MeshSlot): PackedMesh => {
+            const p = packCached(mesh);
+            writeVec3s(ch.vertices, slot.vbase, mesh.positions, p.vertexCount);
+            if (mesh.normals !== undefined) writeVec3s(ch.normals, slot.vbase, mesh.normals, p.vertexCount);
+            if (mesh.uvs !== undefined) writeVec2s(ch.uvs, slot.vbase, mesh.uvs, p.vertexCount);
+            writeUvec3s(ch.indices, slot.tbase, p.reindexedTriangles, p.triCount);
+            assertFits('mesh BLAS nodes', p.nodeCount * 2, nodeTexelBound(p.triCount));
+            writeTexels(ch.nodes, slot.nbase, p.nodes.subarray(0, p.nodeCount * 8));
+            return p;
+        };
 
         sceneMeshes(scene.objects).forEach((mesh, ordinal) => {
-            const packed = packCached(mesh);
-            const names = meshExternNames(ordinal);
-            register(names.position, packed.position);
-            register(names.index, packed.index);
-            register(names.normal, packed.normal);
-            register(names.uv, packed.uv);
-            // The BVH node texture — bound only by bvh-traversal programs, but registered always
-            // (scene-static data; a brute program simply never declares/binds it).
-            register(names.bvh, packed.bvh);
-            // Mesh emitter (fable-mesh-lights): a samplable emissive mesh gets its two light
-            // textures — WORLD vertex positions + the cumulative-area CDF in the reordered
-            // triangle order. The predicate is deliberately PERMISSIVE (an unused upload is
-            // harmless; a missing extern is a loud executor error). Driven placement excluded
-            // (the §6 pin — the world bake needs a constant transform).
-            const mat = scene.materials[mesh.material];
-            if (mat !== undefined && mat.sampleAsLight !== false
-                && hasConstantNonzeroEmission(mat.emission) && !isDrivenTransform(mesh.transform)) {
-                const light = packMeshLight(mesh, similarityFromTransform(mesh.transform), packed.reindexedTriangles);
-                const ln = meshLightExternNames(ordinal);
-                register(ln.lightpos, light.lightpos);
-                register(ln.lightcdf, light.lightcdf);
+            const p = writeMesh(mesh, layout.meshes[ordinal]);
+            // Samplable mesh emitter (fable-mesh-lights): the world-position bake rides the
+            // vertices channel, the area CDF the records channel — regions the ledger
+            // allocated iff the ONE adapter predicate (meshIsSamplableEmitter) said so.
+            const lslot = layout.meshLights.get(ordinal);
+            if (lslot !== undefined) {
+                const light = packMeshLight(mesh, similarityFromTransform(mesh.transform), p.reindexedTriangles);
+                writeVec3s(ch.vertices, lslot.wposBase, light.wpos, p.vertexCount);
+                writeScalars(ch.records, lslot.cdfBase, light.cdf, p.triCount);
             }
         });
 
         sceneInstanceBatches(scene.objects).forEach((batch, ordinal) => {
-            const names = instanceExternNames(ordinal);
-            const placements = batch.placements.map((t) => similarityFromTransform(t));
-            // The prototype's LOCAL box (mesh = BLAS root; analytic = primitive bounds) → the batch
-            // TLAS (a BVH over the instance world boxes) + the reordered placement texture.
+            const slot = layout.batches[ordinal];
+            // The prototype's LOCAL box (mesh = BLAS root; analytic = primitive bounds) → the
+            // batch TLAS over the instance world boxes.
             let localBox: { min: [number, number, number]; max: [number, number, number] };
             if (isMeshObject(batch.prototype)) {
-                const p = packCached(batch.prototype);
-                register(names.position, p.position);
-                register(names.index, p.index);
-                register(names.normal, p.normal);
-                register(names.uv, p.uv);
-                register(names.bvh, p.bvh);
-                localBox = p.rootBox;
+                localBox = writeMesh(batch.prototype, layout.meshes[batchGeometrySlot[ordinal]!]).rootBox;
             } else {
                 const canon = canonicalizePrimitiveParameters(batch.prototype.type, batch.prototype.parameters);
                 const box = primitiveBounds(batch.prototype.type, canon);
@@ -283,18 +288,23 @@ export class App {
                 }
                 localBox = box;
             }
-            // Per-instance attributes (fable-instance-attributes): slot order from the SAME
-            // shared helper the Planner used — the texel layout cannot drift from the
-            // generated fetches. Packed in TLAS-leaf order alongside the placements.
+            const placements = batch.placements.map((t) => similarityFromTransform(t));
             const attrs: AttributeRowSpec[] | undefined = batch.attributes !== undefined
                 ? instanceAttributeRows(scene.materials[batch.prototype.material]?.model ?? '', batch.attributes)
                     .map((r) => ({ shape: r.shape, values: batch.attributes![r.source] }))
                 : undefined;
             const packed = packInstanceBatch(localBox, placements, attrs);
-            register(names.placements, packed.placements);
-            register(names.tlas, packed.tlas);
-            if (packed.attributes !== undefined) register(names.attrs, packed.attributes);
+            writeTexels(ch.records, slot.placementsBase, packed.placements);
+            assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placements.length));
+            writeTexels(ch.nodes, slot.tlasBase, packed.nodes.subarray(0, packed.nodeCount * 8));
+            if (packed.attributes !== undefined) writeTexels(ch.records, slot.attrsBase, packed.attributes);
         });
+
+        for (const c of DATA_CHANNELS) {
+            if (layout.totals[c] > 0) {
+                this.engine.registerDataTexture(channelExtern(c), ch[c].data, ch[c].width, ch[c].height);
+            }
+        }
     }
 
     /**

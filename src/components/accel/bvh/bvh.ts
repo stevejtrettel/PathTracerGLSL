@@ -14,8 +14,6 @@
 //   A >= 0  → LEAF:     count = A,  offset = B
 //   A <  0  → INTERNAL: splitAxis = -A - 1 (0|1|2),  rightChild = B,  leftChild = nodeIdx + 1
 
-import { packFloatTexels, type PackedTexture } from '../../data_textures.js';
-
 export const BVH_LEAF_SIZE = 2;   // stop splitting at ≤ this many triangles
 export const BVH_BINS = 12;       // SAH candidate planes per axis
 /** GLSL traversal stack depth (bvh.glsl). A well-balanced SAH tree needs ~2·log₂(N)+slack,
@@ -191,14 +189,6 @@ export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResu
 export function rootBoxOf(nodes: Float32Array, nodeCount: number): AABB {
     if (nodeCount === 0) return emptyAABB();
     return { min: [nodes[0], nodes[1], nodes[2]], max: [nodes[4], nodes[5], nodes[6]] };
-}
-
-/** Pack a flat node array onto the data rail (2 texels/node — the encoding above). The
- *  node FORMAT is this file's contract, so its texture emission lives beside it; the
- *  grid/width mechanics are the rail's. Shared by the BLAS (mesh) and the TLAS
- *  (instancing) — same node format, one packer. */
-export function packNodes(nodes: Float32Array, nodeCount: number): PackedTexture<Float32Array> {
-    return packFloatTexels(nodes, Math.max(1, nodeCount * 2));
 }
 
 /** World AABB of a local box under a similarity (8-corner transform) — for TLAS leaf boxes. */

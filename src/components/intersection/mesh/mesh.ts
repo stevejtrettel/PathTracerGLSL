@@ -1,87 +1,51 @@
-// Triangle-mesh engine — packer + shared contract (impl-plan-meshes).
-// The GLSL leaf (mesh.glsl) is imported by the intersection feature; this file owns the
-// TS side both the compiler and the app depend on:
+// Triangle-mesh engine — packer + shared contract (impl-plan-meshes; rail v2 per
+// fable-data-rail). The GLSL leaf (mesh.glsl) is imported by the intersection feature;
+// this file owns the TS side both the compiler and the app depend on:
 //   - sceneMeshes(objects) — THE mesh-ordinal truth: the scene's meshes in scene order.
-//     Planner (extern declaration) and App (upload) both iterate THIS list, so the
-//     ordinal↔object assignment can never diverge (the audit's A5 replay hazard).
-//   - meshExternNames(ordinal) — the extern texture names, keyed by mesh ordinal, so the
-//     compiler's `extern:` sources and the app's registry names match by construction.
-//   - packMesh(mesh) — a MeshObject's flat arrays → data-rail textures (RGBA32F
-//     position/index/normal/uv + the BLAS node texture). App-side only.
-// Encoding rides the data rail (components/data_textures.ts: DATA_TEX_WIDTH, packers);
-// the BVH build + node format live in accel/bvh. Pure TS — compiler types imported
-// type-only (components purity), so the mesh-kind predicate is restated locally
-// (the similarity.ts/isDrivenTransform precedent).
+//     Planner and App both iterate THIS list (the A5 pattern); the LEDGER
+//     (components/data — via the dataTenantsOf adapter) assigns where each mesh's bytes
+//     live in the shared channels.
+//   - packMesh(mesh) — a MeshObject's flat arrays → RAW payloads (BVH-built, leaf-order
+//     index) that the App writes into the channels at the mesh's ledger slot. The rail
+//     owns encoding; this packer owns what mesh bytes MEAN.
+// Pure TS — compiler types imported type-only (components purity), so the mesh-kind
+// predicate is restated locally (the similarity.ts/isDrivenTransform precedent).
 
 import type { MeshObject, ObjectDescription } from '../../../compiler/types.js';
-import { packVec3PerTexel, packVec2PerTexel, allocTexels, type PackedTexture } from '../../data_textures.js';
-import { buildBVH, packNodes } from '../../accel/bvh/bvh.js';
+import { buildBVH } from '../../accel/bvh/bvh.js';
 
 /** The scene's meshes in scene order — index IS the mesh ordinal (see header). */
 export function sceneMeshes(objects: readonly ObjectDescription[]): MeshObject[] {
     return objects.filter((o): o is MeshObject => 'kind' in o && o.kind === 'mesh');
 }
 
-/** Extern texture names for a mesh, keyed by its ordinal among the scene's meshes. */
-export interface MeshExternNames {
-    position: string;
-    index: string;
-    normal: string;
-    uv: string;
-    bvh: string;
-}
-
-export function meshExternNames(ordinal: number): MeshExternNames {
-    return {
-        position: `mesh_${ordinal}_position`,
-        index: `mesh_${ordinal}_index`,
-        normal: `mesh_${ordinal}_normal`,
-        uv: `mesh_${ordinal}_uv`,
-        bvh: `mesh_${ordinal}_bvh`,
-    };
-}
-
+/** A mesh's RAW rail payloads (rail v2): tenant-LOCAL ids throughout — the channel
+ *  writes add the ledger bases. */
 export interface PackedMesh {
-    position: PackedTexture<Float32Array>;   // RGBA32F, xyz per vertex
-    index: PackedTexture<Float32Array>;      // RGBA32F, ijk per triangle — in BVH-LEAF order (≤16M exact)
-    /** The BVH-leaf-order triangle index as raw ints — the mesh-light CDF packer reads it
-     *  so the CDF and the index texture agree by construction (fable-mesh-lights). */
+    vertexCount: number;
+    triCount: number;
+    /** BVH-leaf-order triangle index (LOCAL vertex ids, length 3·T) — the index channel's
+     *  payload AND the order truth the mesh-light CDF packer follows. */
     reindexedTriangles: Uint32Array;
-    normal: PackedTexture<Float32Array>;     // RGBA32F, xyz per vertex (zeros when unauthored)
-    uv: PackedTexture<Float32Array>;         // RGBA32F, xy per vertex (zeros when unauthored)
-    bvh: PackedTexture<Float32Array>;        // RGBA32F, 2 texels per node (accel/bvh node format)
-    /** The BLAS root box — the mesh's local AABB, used as the prototype box when instanced. */
+    /** Flat BVH node array (8 floats per node; LOCAL leaf/child refs). */
+    nodes: Float32Array;
+    nodeCount: number;
+    /** The BLAS root box — the mesh's local AABB (prototype box when instanced). */
     rootBox: { min: [number, number, number]; max: [number, number, number] };
 }
 
-/** Pack triangle indices (length 3·T) into an RGBA32F texel grid (w = 0). Indices are ≤ 16M,
- *  exactly representable in f32 — so the index texture stays float (no usampler2D). */
-function packIndex(indices: Uint32Array, triCount: number): PackedTexture<Float32Array> {
-    const tex = allocTexels(triCount);
-    for (let i = 0; i < triCount; i++) {
-        tex.data[i * 4 + 0] = indices[i * 3 + 0];
-        tex.data[i * 4 + 1] = indices[i * 3 + 1];
-        tex.data[i * 4 + 2] = indices[i * 3 + 2];
-    }
-    return tex;
-}
-
-/** Turn a MeshObject's flat arrays into the five padded data textures the engine uploads.
- *  Normals/UVs are always emitted (zero-filled when unauthored — the leaf reads them only
- *  when the mesh is smooth / a uv reader exists; useSmooth is a compile-time fact). */
+/** Build the mesh's BVH + leaf-order index (positions/normals/uvs ride the MeshObject
+ *  itself — the App writes them into the vertex channels directly). The BVH is built
+ *  ALWAYS (cheap at these sizes): brute traversal scans the reordered index whole
+ *  (order-independent); the walk indexes leaf ranges into it — one index, both engines. */
 export function packMesh(mesh: MeshObject): PackedMesh {
-    const vertexCount = mesh.positions.length / 3;
-    // Build the BVH always (cheap for these sizes): its reordered triangle index becomes the index
-    // texture — brute force scans it whole (order-independent), the BVH walk indexes leaf ranges
-    // into it. So one index texture serves both traversals; only the node texture is BVH-specific.
     const bvh = buildBVH(mesh.positions, mesh.indices);
     return {
-        position: packVec3PerTexel(mesh.positions, vertexCount),
-        index: packIndex(bvh.reindexedTriangles, bvh.reindexedTriangles.length / 3),
+        vertexCount: mesh.positions.length / 3,
+        triCount: bvh.reindexedTriangles.length / 3,
         reindexedTriangles: bvh.reindexedTriangles,
-        normal: packVec3PerTexel(mesh.normals, vertexCount),
-        uv: packVec2PerTexel(mesh.uvs, vertexCount),
-        bvh: packNodes(bvh.nodes, bvh.nodeCount),
+        nodes: bvh.nodes,
+        nodeCount: bvh.nodeCount,
         rootBox: bvh.rootBox,
     };
 }

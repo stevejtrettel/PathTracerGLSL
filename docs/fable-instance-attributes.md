@@ -1,7 +1,7 @@
 # fable-instance-attributes.md — per-instance material properties
 
-**STATUS: BUILT — owner-approved Jul 20 2026 (all §7 forks resolved to the marked picks);
-GPU numeric sweep owner-gated.** Build record in §8; the §1–§7 design follows as approved.
+**STATUS: BUILT & SWEPT Jul 20 2026** (owner-approved, all §7 forks at the marked picks;
+attr-twin passed the owner's numeric sweep). Build record in §8; the §1–§7 design follows as approved.
 
 **Goal:** one instanced batch, one material MODEL, chosen properties varying per instance —
 500 lambert spheres with 500 albedos, a forest of color-jittered cacti — without per-instance

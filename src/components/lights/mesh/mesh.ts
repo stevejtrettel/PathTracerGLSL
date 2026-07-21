@@ -14,7 +14,6 @@ import type { LightKindDescriptor } from '../../descriptors.js';
 import type { MeshObject } from '../../../compiler/types.js';
 import type { Similarity } from '../../geometry/similarity.js';
 import { similarityApplyPoint } from '../../geometry/similarity.js';
-import { allocTexels, type PackedTexture } from '../../data_textures.js';
 import { radiantScalar } from '../power.js';
 import lightMeshGLSL from './mesh.glsl?raw';
 
@@ -43,15 +42,6 @@ export const meshLightDescriptor: LightKindDescriptor = {
     ],
 };
 
-/** Extern names for a mesh light's textures, keyed by the backing MESH ordinal (the
- *  index texture is the intersection feature's, reused by name — merge dedups). */
-export function meshLightExternNames(meshOrdinal: number): { lightpos: string; lightcdf: string } {
-    return {
-        lightpos: `mesh_${meshOrdinal}_lightpos`,
-        lightcdf: `mesh_${meshOrdinal}_lightcdf`,
-    };
-}
-
 /** WORLD total surface area under a constant similarity: local Σ|cross|/2 × s² (rotation
  *  and translation are area-preserving; uniform scale is exactly s²). The ONE constant the
  *  identity-free pdf and the power formula read — Planner-baked. */
@@ -67,36 +57,35 @@ export function meshWorldArea(positions: Float32Array, indices: Uint32Array, sca
     return local * scale * scale;
 }
 
-/** Pack a mesh light's two rail textures: WORLD vertex positions (one texel per vertex)
- *  and the normalized cumulative WORLD-area CDF over the REORDERED triangles (one texel
- *  per triangle — `reindexed` is packMesh's BVH-leaf-order index, so the CDF and the
- *  shared index texture agree by construction). */
-export function packMeshLight(mesh: MeshObject, placement: Similarity, reindexed: Uint32Array): { lightpos: PackedTexture<Float32Array>; lightcdf: PackedTexture<Float32Array> } {
+/** Pack a mesh light's RAW rail payloads (rail v2): WORLD vertex positions (length 3·V —
+ *  the App writes them into the `vertices` channel at the light's wposBase) and the
+ *  normalized cumulative WORLD-area CDF over the REORDERED triangles (length T, one
+ *  scalar per triangle → the `records` channel at cdfBase). `reindexed` is packMesh's
+ *  BVH-leaf-order index, so the CDF and the shared index channel agree by construction. */
+export function packMeshLight(mesh: MeshObject, placement: Similarity, reindexed: Uint32Array): { wpos: Float32Array; cdf: Float32Array } {
     const vertexCount = mesh.positions.length / 3;
-    const lightpos = allocTexels(vertexCount);
+    const wpos = new Float32Array(vertexCount * 3);
     for (let i = 0; i < vertexCount; i++) {
         const w = similarityApplyPoint(placement, [mesh.positions[i * 3], mesh.positions[i * 3 + 1], mesh.positions[i * 3 + 2]]);
-        lightpos.data[i * 4 + 0] = w[0]; lightpos.data[i * 4 + 1] = w[1]; lightpos.data[i * 4 + 2] = w[2];
+        wpos[i * 3] = w[0]; wpos[i * 3 + 1] = w[1]; wpos[i * 3 + 2] = w[2];
     }
     const T = reindexed.length / 3;
-    const lightcdf = allocTexels(T);
-    let acc = 0;
     const areas = new Float64Array(T);
+    let acc = 0;
     for (let t = 0; t < T; t++) {
         // World areas from the PACKED world positions (exactly what the sampler fetches).
-        const ax = lightpos.data[(reindexed[t * 3]) * 4], ay = lightpos.data[(reindexed[t * 3]) * 4 + 1], az = lightpos.data[(reindexed[t * 3]) * 4 + 2];
-        const bx = lightpos.data[(reindexed[t * 3 + 1]) * 4], by = lightpos.data[(reindexed[t * 3 + 1]) * 4 + 1], bz = lightpos.data[(reindexed[t * 3 + 1]) * 4 + 2];
-        const cx = lightpos.data[(reindexed[t * 3 + 2]) * 4], cy = lightpos.data[(reindexed[t * 3 + 2]) * 4 + 1], cz = lightpos.data[(reindexed[t * 3 + 2]) * 4 + 2];
-        const ux = bx - ax, uy = by - ay, uz = bz - az;
-        const vx = cx - ax, vy = cy - ay, vz = cz - az;
+        const a = reindexed[t * 3] * 3, b = reindexed[t * 3 + 1] * 3, c = reindexed[t * 3 + 2] * 3;
+        const ux = wpos[b] - wpos[a], uy = wpos[b + 1] - wpos[a + 1], uz = wpos[b + 2] - wpos[a + 2];
+        const vx = wpos[c] - wpos[a], vy = wpos[c + 1] - wpos[a + 1], vz = wpos[c + 2] - wpos[a + 2];
         areas[t] = Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
         acc += areas[t];
     }
+    const cdf = new Float32Array(T);
     let run = 0;
     for (let t = 0; t < T; t++) {
         run += areas[t];
-        lightcdf.data[t * 4] = acc > 0 ? run / acc : (t + 1) / T;
+        cdf[t] = acc > 0 ? run / acc : (t + 1) / T;
     }
-    if (T > 0) lightcdf.data[(T - 1) * 4] = 1.0;   // exact closure (fp sum drift)
-    return { lightpos, lightcdf };
+    if (T > 0) cdf[T - 1] = 1.0;   // exact closure (fp sum drift)
+    return { wpos, cdf };
 }

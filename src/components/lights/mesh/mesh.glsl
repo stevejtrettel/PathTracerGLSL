@@ -1,9 +1,11 @@
 // Mesh area light (fable-mesh-lights) — the family's first DATA-DRIVEN kind: uniform-area
 // sampling over a triangle mesh via a cumulative-area CDF texture. Struct rows (generated):
 // radiance (Le), area (WORLD total — the identity-free pdf's one constant), triCount.
-// Textures (rail): the mesh's index texture (shared with intersection), a WORLD-space
-// vertex-position texture, and the normalized cumulative world-area CDF (one texel per
-// triangle, in the BVH-reordered triangle order — the ONE order truth).
+// Rail v2 (fable-data-rail): reads the shared index channel (tbase = the mesh's index
+// region), the WORLD-position bake (a `vertices`-channel region at wposBase), and the
+// normalized cumulative world-area CDF (a `records`-channel region at cdfBase; one texel
+// per triangle, BVH-reordered order — the ONE order truth). All bases are baked literal
+// args from the ledger.
 // ONE-SIDED: emits from the cross(b−a, c−a) side (the quad pin; similarity placement with
 // s > 0 and det R = +1 preserves the authored winding, so the hit side agrees).
 // The §6.1 BYTE-MATCH INVARIANT: mesh_light_pdf mirrors mesh_light_sample's density —
@@ -13,26 +15,26 @@
 // Depends on: data_texel1d (glsl/core/data_texture.glsl).
 // Provides: mesh_light_sample(), mesh_light_pdf().
 
-LightSample mesh_light_sample(MeshLight l, sampler2D idxTex, sampler2D wposTex, sampler2D cdfTex, int triCount, Point p, vec2 xi) {
+LightSample mesh_light_sample(MeshLight l, sampler2D idxTex, sampler2D wposTex, sampler2D cdfTex, int tbase, int wposBase, int cdfBase, int triCount, Point p, vec2 xi) {
     // Binary search the normalized cumulative-area CDF: smallest tri with cdf[tri] >= xi.x.
     int lo = 0, hi = triCount - 1;
     while (lo < hi) {
         int mid = (lo + hi) / 2;
-        if (texelFetch(cdfTex, data_texel1d(uint(mid)), 0).x < xi.x) lo = mid + 1;
+        if (texelFetch(cdfTex, data_texel1d(uint(cdfBase + mid)), 0).x < xi.x) lo = mid + 1;
         else hi = mid;
     }
     int tri = lo;
     // Rescale xi.x within the triangle's CDF span (pitfall 4: never reuse the selection
     // random raw — recover a fresh stratified coordinate).
-    float c0 = tri > 0 ? texelFetch(cdfTex, data_texel1d(uint(tri - 1)), 0).x : 0.0;
-    float c1 = texelFetch(cdfTex, data_texel1d(uint(tri)), 0).x;
+    float c0 = tri > 0 ? texelFetch(cdfTex, data_texel1d(uint(cdfBase + tri - 1)), 0).x : 0.0;
+    float c1 = texelFetch(cdfTex, data_texel1d(uint(cdfBase + tri)), 0).x;
     float xr = clamp((xi.x - c0) / max(c1 - c0, 1.0e-12), 0.0, 0.9999999);
 
     // Uniform point in the triangle (the sqrt trick), on WORLD vertices.
-    uvec3 t = uvec3(texelFetch(idxTex, data_texel1d(uint(tri)), 0).xyz);
-    vec3 a = texelFetch(wposTex, data_texel1d(t.x), 0).xyz;
-    vec3 b = texelFetch(wposTex, data_texel1d(t.y), 0).xyz;
-    vec3 c = texelFetch(wposTex, data_texel1d(t.z), 0).xyz;
+    uvec3 t = uvec3(texelFetch(idxTex, data_texel1d(uint(tbase + tri)), 0).xyz);
+    vec3 a = texelFetch(wposTex, data_texel1d(uint(wposBase) + t.x), 0).xyz;
+    vec3 b = texelFetch(wposTex, data_texel1d(uint(wposBase) + t.y), 0).xyz;
+    vec3 c = texelFetch(wposTex, data_texel1d(uint(wposBase) + t.z), 0).xyz;
     float su = sqrt(xr);
     Point q = a * (1.0 - su) + b * (su * (1.0 - xi.y)) + c * (su * xi.y);
 

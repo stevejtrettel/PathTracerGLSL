@@ -17,14 +17,13 @@
  *  Bias-free by contract (estimator section): every occupant must produce the SAME
  *  converged image — the estimator-swap equality witness (mesh-quad-twin) is the gate. */
 export interface MeshTraversalDescriptor {
-    /** Declares the per-mesh node-texture extern (`mesh_N_bvh`) — exact linkage: only
-     *  engines that read it bind it. */
+    /** This engine walks the nodes channel (exact linkage: gates `data_nodes`). */
     nodeTexture: boolean;
-    /** The nearest-hit call for one mesh wrapper. `u` = the mesh's uniform prefix
-     *  (`u_mesh_0`); ro/rd are LOCAL-frame GLSL exprs; writes hit.t/nLocal/uv. */
-    nearestCall(u: string, opts: { smooth: boolean; triCount: number; ro: string; rd: string }): string;
+    /** The nearest-hit call for one mesh wrapper — rail v2: fixed channel uniforms +
+     *  the mesh's baked ledger slot; ro/rd are LOCAL-frame GLSL exprs. */
+    nearestCall(slot: { vbase: number; tbase: number; nbase: number }, opts: { smooth: boolean; triCount: number; ro: string; rd: string }): string;
     /** The any-hit (occlusion) call: first triangle strictly before maxDist blocks. */
-    anyCall(u: string, opts: { triCount: number; ro: string; rd: string }): string;
+    anyCall(slot: { vbase: number; tbase: number; nbase: number }, opts: { triCount: number; ro: string; rd: string }): string;
 }
 
 export const DEFAULT_MESH_TRAVERSAL = 'bvh';
@@ -32,27 +31,27 @@ export const DEFAULT_MESH_TRAVERSAL = 'bvh';
 export const MESH_TRAVERSALS: Record<string, MeshTraversalDescriptor> = {
     brute: {
         nodeTexture: false,
-        nearestCall: (u, o) => `mesh_nearest_local(${u}_position, ${u}_index, ${u}_normal, ${u}_uv, ${o.triCount}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, uv)`,
-        anyCall: (u, o) => `mesh_any_local(${u}_position, ${u}_index, ${o.triCount}u, ${o.ro}, ${o.rd}, maxDist)`,
+        nearestCall: (s, o) => `mesh_nearest_local(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, ${s.vbase}u, ${s.tbase}u, ${o.triCount}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, uv)`,
+        anyCall: (s, o) => `mesh_any_local(u_data_vertices, u_data_indices, ${s.vbase}u, ${s.tbase}u, ${o.triCount}u, ${o.ro}, ${o.rd}, maxDist)`,
     },
     bvh: {
         nodeTexture: true,
-        nearestCall: (u, o) => `mesh_nearest_bvh(${u}_position, ${u}_index, ${u}_normal, ${u}_uv, ${u}_bvh, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, uv)`,
-        anyCall: (u, o) => `mesh_any_bvh(${u}_position, ${u}_index, ${u}_bvh, ${o.ro}, ${o.rd}, maxDist)`,
+        nearestCall: (s, o) => `mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${s.vbase}u, ${s.tbase}u, ${s.nbase}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, uv)`,
+        anyCall: (s, o) => `mesh_any_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${s.vbase}u, ${s.tbase}u, ${s.nbase}u, ${o.ro}, ${o.rd}, maxDist)`,
     },
 };
 
 /** Instance traversal engines — occupants of `estimator.instanceAccel` (impl-plan-tlas).
  *  Same bias-free contract; the estimator-swap witness is instance-twin's equality arm. */
 export interface InstanceAccelDescriptor {
-    /** Declares the per-batch TLAS node-texture extern (`instance_k_tlas`). */
+    /** This engine walks the nodes channel (exact linkage: gates `data_nodes`). */
     tlasTexture: boolean;
     /** Bakes the `INSTANCE_COUNT_k` define (the linear loop's bound). */
     countDefine: boolean;
-    /** The batch walk skeleton: visit placements (index var `i`), running the `leaf`
-     *  lines per placement, pruned by `bound` (hit.t or maxDist). The leaf body is the
-     *  per-placement conjugate+intersect emitted by the intersection feature. */
-    walk(ordinal: number, bound: string, leaf: string[]): string[];
+    /** The batch walk skeleton — rail v2: fixed channel uniforms + the batch's baked
+     *  ledger slot (tlasBase into `nodes`). Visits placements (index var `i`), running
+     *  the `leaf` lines per placement, pruned by `bound` (hit.t or maxDist). */
+    walk(slot: { tlasBase: number }, ordinal: number, bound: string, leaf: string[]): string[];
 }
 
 export const DEFAULT_INSTANCE_ACCEL = 'tlas';
@@ -63,7 +62,7 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
     linear: {
         tlasTexture: false,
         countDefine: true,
-        walk: (o, _bound, leaf) => [
+        walk: (_s, o, _bound, leaf) => [
             `    for (int i = 0; i < INSTANCE_COUNT_${o}; i++) {`,
             ...leaf,
             '    }',
@@ -75,12 +74,12 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
     tlas: {
         tlasTexture: true,
         countDefine: false,
-        walk: (o, bound, leaf) => [
+        walk: (s, _o, bound, leaf) => [
             '    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;',
             '    while (ptr >= 0) {',
             '        int ni = stack[ptr]; ptr--;',
-            `        vec4 n0 = texelFetch(u_inst_${o}_tlas, data_texel1d(uint(ni * 2)), 0);`,
-            `        vec4 n1 = texelFetch(u_inst_${o}_tlas, data_texel1d(uint(ni * 2 + 1)), 0);`,
+            `        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${s.tlasBase} + ni * 2)), 0);`,
+            `        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${s.tlasBase} + ni * 2 + 1)), 0);`,
             '        float tenter;',
             `        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, ${bound}, tenter)) continue;`,
             '        if (n0.w >= 0.0) {',

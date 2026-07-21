@@ -12,7 +12,6 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
-import { meshLightExternNames } from '../../../components/lights/mesh/mesh.js';
 import { PRIMITIVES } from '../../../components/geometry/index.js';
 import type { LightKindDescriptor } from '../../../components/descriptors.js';
 import { structFromRows } from '../schema.js';
@@ -185,22 +184,19 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         provides.push({ name: 'lighting_query_delta', signature: 'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity)' });
     }
     const requires: string[] = [];
-    // DATA-DRIVEN mesh lights (fable-mesh-lights): declare the sampler's rail textures —
-    // declared where consumed; the index texture reuses the intersection feature's extern
-    // name (merge dedups), lightpos/lightcdf are this feature's own. The rail's addressing
-    // (data_texel1d) is provided by the intersection feature (a mesh light implies meshes).
+    // DATA-DRIVEN mesh lights (fable-mesh-lights, rail v2): the sampler reads three
+    // CHANNELS — declared where consumed (merge dedups with the intersection feature's
+    // declarations of the same channels). The rail's addressing (data_texel1d) is
+    // provided by the intersection feature (a mesh light implies meshes).
     const textures: FeatureContribution['textures'] = [];
-    for (const l of plan.lights) {
-        if (l.mesh === undefined) continue;
-        const k = l.mesh.ordinal;
-        const n = meshLightExternNames(k);
+    if (plan.lights.some((l) => l.mesh !== undefined)) {
         textures.push(
-            { name: `u_mesh_${k}_index`, source: `extern:mesh_${k}_index` },
-            { name: `u_mesh_${k}_lightpos`, source: `extern:${n.lightpos}` },
-            { name: `u_mesh_${k}_lightcdf`, source: `extern:${n.lightcdf}` },
+            { name: 'u_data_indices', source: 'extern:data_indices' },
+            { name: 'u_data_vertices', source: 'extern:data_vertices' },
+            { name: 'u_data_records', source: 'extern:data_records' },
         );
+        requires.push('data_texel1d');
     }
-    if (textures.length > 0 && !requires.includes('data_texel1d')) requires.push('data_texel1d');
     if (envSamplable) requires.push('environment_sample');
     // The env pdf query links only from the MIS sites (the environmentPdf decision):
     // under plain NEE the sampler carries its own ls.pdf and nothing queries by direction.
@@ -405,8 +401,8 @@ function generateLightAccessors(lights: PlannedLight[]): string {
  *  world-position and area-CDF textures. */
 function sampleCall(l: PlannedLight, xiExpr: string): string {
     if (l.mesh !== undefined) {
-        const k = l.mesh.ordinal;
-        return `mesh_light_sample(${lightRef(l)}, u_mesh_${k}_index, u_mesh_${k}_lightpos, u_mesh_${k}_lightcdf, ${l.mesh.triCount}, p, ${xiExpr})`;
+        const m = l.mesh;
+        return `mesh_light_sample(${lightRef(l)}, u_data_indices, u_data_vertices, u_data_records, ${m.tbase}, ${m.wposBase}, ${m.cdfBase}, ${m.triCount}, p, ${xiExpr})`;
     }
     return `${lightKind(l).kind}_light_sample(${lightRef(l)}, p, ${xiExpr})`;
 }

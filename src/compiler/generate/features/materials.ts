@@ -11,7 +11,6 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum } from '../../../components/glsl-format.js';
 import { emitValue, emitAttributeValue, mintValueUniform, type ParamValue } from '../values.js';
 import { isAttributeValue } from '../../plan/types.js';
-import { instanceExternNames } from '../../../components/intersection/instancing/instancing.js';
 
 import { MATERIAL_MODELS, materialModel, modelStructFields, EMISSION_KEY } from '../../../components/materials/index.js';
 import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
@@ -259,17 +258,15 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
     }
 
-    // ATTRIBUTE batches (fable-instance-attributes): this feature READS the per-instance
-    // tables (the fill's texelFetch by Hit.element), so it declares the externs — exact
-    // linkage: declared where consumed; the app registers the payload under the same name.
-    // The rail's addressing (data_texel1d) is provided by the intersection feature (which
-    // always includes the rail when instanced geometry exists — attributes imply it).
+    // ATTRIBUTE batches (fable-instance-attributes, rail v2): the fill's element-indexed
+    // fetches read the records CHANNEL — declared where consumed (merge dedups with the
+    // intersection feature's declaration). The rail's addressing (data_texel1d) is
+    // provided by the intersection feature (attributes imply instanced geometry).
     const textures: FeatureContribution['textures'] = [];
-    for (const b of plan.instanceBatches) {
-        if (b.attributeRows === undefined) continue;
-        textures.push({ name: `u_inst_${b.ordinal}_attrs`, source: `extern:${instanceExternNames(b.ordinal).attrs}` });
+    if (plan.instanceBatches.some((b) => b.attributeRows !== undefined)) {
+        textures.push({ name: 'u_data_records', source: 'extern:data_records' });
+        requires.push('data_texel1d');
     }
-    if (textures.length > 0) requires.push('data_texel1d');
 
     return { ...emptyContribution('materials'), blocks, defines, uniforms, parameters, textures, provides, requires };
 }

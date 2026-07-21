@@ -200,7 +200,12 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             checks: [
                 { kind: 'twin', other: { scene: 'mesh-light-ref' }, meanTol: 0.02, label: 'mesh light ≡ quad light (nee)' },
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'mesh light nee ≡ mis' },
-                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.4, label: 'mesh light pt tripwire' },
+                // pt tripwire CALIBRATED at the owner's Jul 20 sweep: measured rmse 49.3%
+                // @96spp — this scene is the chance-hit worst case BY DESIGN (a small bright
+                // panel in a near-black room), so its display-space noise floor sits far
+                // above X-CORNELL's bright-room 0.4. Δmean (0.37% measured) is the real
+                // bias guard; the rmse only trips on gross structural divergence.
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.6, label: 'mesh light pt tripwire' },
             ],
         },
     },

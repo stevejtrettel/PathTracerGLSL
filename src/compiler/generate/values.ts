@@ -73,8 +73,8 @@ export function emitValue(
  *  texel = element·count + slot in batch `batch`'s instance_k_attrs table (packed in the
  *  SAME leaf order as the placements — one reorder truth). */
 export function emitAttributeValue(a: AttributeValue): string {
-    const { batch, slot, count, shape } = a.attribute;
-    const fetch = `texelFetch(u_inst_${batch}_attrs, data_texel1d(uint(element * ${count} + ${slot})), 0)`;
+    const { base, slot, count, shape } = a.attribute;
+    const fetch = `texelFetch(u_data_records, data_texel1d(uint(${base} + element * ${count} + ${slot})), 0)`;
     return shape === 'vec3' ? `${fetch}.xyz` : `${fetch}.x`;
 }
 

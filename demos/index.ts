@@ -27,6 +27,7 @@ import { meshDemoScene, meshDemoNeeStrategy, meshDemoPtStrategy } from './meshSc
 import { modelsScene, modelsBvhStrategy, modelsBruteStrategy, modelsPtStrategy } from './modelsScene.js';
 import { forestScene, forestStrategy, forestLinearStrategy } from './forestScene.js';
 import { spheresScene, spheresStrategy, spheresLinearStrategy } from './spheresScene.js';
+import { cactiScene, cactiStrategy, cactiMisStrategy } from './cactiScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -49,6 +50,14 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
             'DEMO — the TLAS A/B (impl-plan-tlas) + per-instance ATTRIBUTES (fable-instance-attributes): 500 instanced spheres from one prototype with 500 per-instance albedos (ONE material; Hit.element → the attrs table). Key 1 = TLAS, key 2 = linear scan (500 tests/ray) — SAME image, watch pathtracer ms/frame collapse (~7× on SwiftShader).',
         expected:
             'a dense cloud of ~500 pastel multi-colored spheres above a gray floor — every color from one material + the per-instance table; keys 1 (tlas) and 2 (linear) are pixel-identical, key 1 dramatically faster. All 500 share one prototype (memory is one sphere).',
+    },
+    cacti: {
+        scene: cactiScene,
+        strategies: [cactiStrategy, cactiMisStrategy],
+        exercises:
+            'DEMO — the mesh-story showcase (fable-mesh-containment + fable-mesh-lights): three COLORED-GLASS cacti (dielectric over a Beer–Lambert absorbing interior — real colored glass through proven-closed meshes) lit by a GLOWING cactus (an emissive mesh, NEE-sampled via its triangle-area CDF). Key 1 = nee, key 2 = mis.',
+        expected:
+            'a warm glowing cactus at center lighting three tinted glass cacti (green/amber/blue) on a dark stage under a faint night sky — tint deepens where the glass is thick (Beer–Lambert), refraction and soft mesh-light shadows throughout.',
     },
     forest: {
         scene: forestScene,

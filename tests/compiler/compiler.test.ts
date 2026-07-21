@@ -121,7 +121,10 @@ describe('Compiler', () => {
             const result = compiler.compile(meshScene, minimalStrategy);
             const frag = result.shaders.get('pathtracer-minimal-main')!.fragment;
             expect(frag).toContain('mesh_intersect');
-            expect(frag).toContain('u_mesh_0_position');
+            // Rail v2 (fable-data-rail): mesh data rides the shared channels, not
+            // per-mesh externs — the wrapper fetches at ledger-baked bases.
+            expect(frag).toContain('u_data_vertices');
+            expect(frag).toContain('u_data_indices');
         });
 
         it('rejects directional lights', () => {

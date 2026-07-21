@@ -27,6 +27,8 @@ import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
+import { dataTenantsOf } from './dataTenants.js';
+import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
 import type { BlackbodyValue } from '../types.js';
@@ -87,6 +89,10 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     // ordinal on both sides; they just never plan).
     const meshOrdinals = new Map(sceneMeshes(scene.objects).map((m, i) => [m, i] as const));
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
+    // Rail v2 (fable-data-rail): THE layout truth — the same adapter+ledger call the App
+    // makes, so baked bases and packed bytes can never disagree.
+    const { tenants: dataTenants, batchGeometrySlot } = dataTenantsOf(scene);
+    const dataLayout = planDataLayout(dataTenants);
     let objectIndex = 0;
     for (const obj of scene.objects) {
         if (isMeshObject(obj)) {
@@ -106,6 +112,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 // containment query's baked root-box early-out.
                 closed: obj.closed === true,
                 ...(obj.closed === true ? { localBox: meshLocalBox(obj.positions) } : {}),
+                slot: dataLayout.meshes[meshOrdinals.get(obj)!],
                 placement: isDrivenTransform(obj.transform)
                     ? buildDrivenPlacement(obj.transform!, objectIndex - 1)
                     : placementOf(obj.transform),
@@ -131,7 +138,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             if (attributeRows !== undefined) {
                 const mat = materials.find((m) => m.id === matId)!;
                 attributeRows.forEach((r, slot) => {
-                    mat.values[r.source] = { attribute: { batch: ordinal, slot, count: attributeRows.length, shape: r.shape } };
+                    mat.values[r.source] = { attribute: { batch: ordinal, base: dataLayout.batches[ordinal].attrsBase, slot, count: attributeRows.length, shape: r.shape } };
                 });
             }
             if (isMeshObject(proto)) {
@@ -139,7 +146,8 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     ordinal, index: region, materialId: matId, name: obj.name,
                     instanceCount: obj.placements.length,
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
-                    prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined },
+                    slot: dataLayout.batches[ordinal],
+                    prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined, geometrySlot: dataLayout.meshes[batchGeometrySlot[ordinal]!] },
                 });
             } else {
                 const backend = resolveBackend(proto.type, proto.backend);
@@ -152,6 +160,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     ordinal, index: region, materialId: matId, name: obj.name,
                     instanceCount: obj.placements.length,
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
+                    slot: dataLayout.batches[ordinal],
                     // Prototype has NO transform → just canonicalize (no fold); s scales per instance in-shader.
                     prototype: { backend: 'analytic', shapeType: proto.type, parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters) },
                 });
@@ -302,9 +311,14 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         const emission = mat.values[EMISSION_KEY];
         if (!hasConstantNonzeroEmission(emission)) continue;   // C3: the ONE predicate
         const src = sceneMeshes(scene.objects)[planned.ordinal];   // the ordinal truth
+        const lslot = dataLayout.meshLights.get(planned.ordinal);
+        if (lslot === undefined) continue;   // backstop: the route predicate ≡ the adapter's (meshIsSamplableEmitter)
         lights.push({
             id: lightIndex++, kind: 'mesh', regionId: planned.index,
-            mesh: { ordinal: planned.ordinal, triCount: planned.triCount },
+            mesh: {
+                ordinal: planned.ordinal, triCount: planned.triCount,
+                tbase: planned.slot.tbase, wposBase: lslot.wposBase, cdfBase: lslot.cdfBase,
+            },
             values: {
                 radiance: emission as Vec3,
                 area: meshWorldArea(src.positions, src.indices, (planned.placement as Similarity).scale),

@@ -15,6 +15,7 @@ export type ResolvedEnvironment =
     | { type: 'image'; url: string; intensity: number; rotation: number }
     | { type: 'procedural'; glsl: GlslExpression; intensity: number; rotation: number };
 import type { Similarity } from '../../components/geometry/similarity.js';
+import type { MeshSlot, BatchSlot } from '../../components/data/ledger.js';
 
 // ============================================================================
 // Program Description — what the generated program does
@@ -271,6 +272,9 @@ export interface PlannedMesh {
     /** Validator-PROVEN solid (fable-mesh-containment): joins scene_region_at, leaves the
      *  thin set, earns ior_of rows. False = v0 thin surface. */
     closed: boolean;
+    /** The mesh's baked ledger slot (rail v2, fable-data-rail): base offsets into the
+     *  shared channels — the ONE layout truth (planDataLayout via dataTenantsOf). */
+    slot: MeshSlot;
     /** The mesh's LOCAL AABB (baked literals) — the containment query's root-box early-out.
      *  Present iff closed (the compiler has the positions; O(V) at plan time). */
     localBox?: { min: [number, number, number]; max: [number, number, number] };
@@ -296,12 +300,15 @@ export interface PlannedInstanceBatch {
     instanceCount: number;
     /** Per-instance attribute rows (fable-instance-attributes), in SLOT order (model-schema
      *  order — the ONE order truth shared with the app's packer via instanceAttributeRows).
-     *  Present iff the batch authored attributes; gates the instance_k_attrs extern. */
+     *  Present iff the batch authored attributes; gates the records-channel fetches. */
     attributeRows?: Array<{ source: string; shape: 'float' | 'vec3' }>;
+    /** The batch's baked ledger slot (rail v2): placements/attrs bases in `records`,
+     *  the TLAS base in `nodes`. */
+    slot: BatchSlot;
     /** The prototype's backend + what the loop's local-intersect needs. mesh: BLAS counts (data
      *  uploaded by the app). analytic: the canonical params, baked + scaled by s per instance. */
     prototype:
-        | { backend: 'mesh'; triCount: number; smooth: boolean }
+        | { backend: 'mesh'; triCount: number; smooth: boolean; geometrySlot: MeshSlot }
         | { backend: 'analytic'; shapeType: string; parameters: Record<string, number | number[]> };
 }
 
@@ -311,7 +318,12 @@ export interface PlannedInstanceBatch {
  *  onto the batch material's values from InstancedObject.attributes. Its ONLY legal use
  *  site is the scene_material_properties fill (emitAttributeValue); emitValue throws on it. */
 export interface AttributeValue {
-    attribute: { batch: number; slot: number; count: number; shape: 'float' | 'vec3' };
+    attribute: {
+        batch: number;
+        /** Records-channel base of the batch's attrs region (rail v2 — ledger-baked). */
+        base: number;
+        slot: number; count: number; shape: 'float' | 'vec3';
+    };
 }
 
 export function isAttributeValue(v: unknown): v is AttributeValue {
@@ -387,10 +399,11 @@ export interface PlannedLight {
     values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
     /** The emitter's region id (quad/sphere/mesh) — feeds the generated light_of table. */
     regionId?: number;
-    /** DATA-DRIVEN kind (mesh — fable-mesh-lights): the backing mesh's ordinal (keys the
-     *  sampler's texture args — index/lightpos/lightcdf externs) + the CDF walk's baked
-     *  triangle count (a literal sampler arg, deliberately NOT a schema row). */
-    mesh?: { ordinal: number; triCount: number };
+    /** DATA-DRIVEN kind (mesh — fable-mesh-lights, rail v2): the backing mesh's ordinal +
+     *  the CDF walk's triangle count + the baked channel bases (tbase = the mesh's index
+     *  region; wposBase = the world-position bake in `vertices`; cdfBase in `records`).
+     *  All literal sampler args, deliberately NOT schema rows. */
+    mesh?: { ordinal: number; triCount: number; tbase: number; wposBase: number; cdfBase: number };
 }
 
 /**

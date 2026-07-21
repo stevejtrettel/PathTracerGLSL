@@ -1,6 +1,6 @@
 # fable-mesh-lights.md — NEE/MIS sampling of emissive meshes
 
-**STATUS: BUILT Jul 20 2026 — GPU-render-verified; numeric sweep owner-gated.** All §8 forks
+**STATUS: BUILT & SWEPT Jul 20 2026** — owner's numeric sweep green (twin + nee≡mis χ²; the pt tripwire recalibrated to the measured chance-hit floor: rmse 49.3% @96spp → gate 0.6, Δmean 0.37%). All §8 forks
 owner-approved at the marked picks (the placement/instancing exclusions carry the owner's
 "we should think about this" flag on the deferred ledger). Build record §9.
 

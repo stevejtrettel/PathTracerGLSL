@@ -21,6 +21,23 @@ export function generate(
 
     const variance = plan.program.estimator.accumulation.type === 'variance';
     const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.view.tonemap, variance);
+
+    // The sampler BUDGET (fable-data-rail §5): count the REAL roster in each assembled
+    // program against the WebGL2 spec floor of 16 fragment units — an over-budget program
+    // is an itemized compile-time error, never a driver link mystery. Checked here (not
+    // the Planner) because the assembled source is the one true roster (feature textures
+    // + framebuffer inputs + loaders), so the check can never drift from what ships.
+    // Rail v2 makes the count role-shaped (≤ ~13 worst case), so this is the tripwire
+    // against future channel/texture creep, not a working constraint.
+    const SAMPLER_FLOOR = 16;
+    for (const [shaderId, shader] of shaders) {
+        const samplers = [...shader.fragment.matchAll(/uniform\s+sampler2D\s+(\w+)/g)].map((m) => m[1]);
+        if (samplers.length > SAMPLER_FLOOR) {
+            bag.error('invalid-setting',
+                `Program '${shaderId}' binds ${samplers.length} sampler2D uniforms — over the guaranteed WebGL2 floor of ${SAMPLER_FLOOR} fragment texture units (MAX_TEXTURE_IMAGE_UNITS). Roster: ${samplers.join(', ')}. Scenes must fit the portability floor (fable-data-rail §5).`)
+                .add();
+        }
+    }
     const pipeline = buildPipeline(rendererId, plan, merged.textures);
     // The display pass's own resources ride here, not in a feature: the main program no
     // longer declares u_resolution (nothing in it reads the builtin — exact linkage), but

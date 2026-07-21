@@ -35,11 +35,9 @@ import {
 import raymarchGLSL from '../../../components/intersection/raymarch/raymarch.glsl?raw';
 import bvhWalkGLSL from '../../../components/accel/bvh/bvh.glsl?raw';
 import meshGLSL from '../../../components/intersection/mesh/mesh.glsl?raw';
-import { meshExternNames } from '../../../components/intersection/mesh/mesh.js';
 import { MESH_TRAVERSALS, INSTANCE_ACCELS } from '../../../components/intersection/index.js';
-import { DATA_TEX_WIDTH } from '../../../components/data_textures.js';
+import { DATA_TEX_WIDTH } from '../../../components/data/pack.js';
 import { BVH_STACK_DEPTH } from '../../../components/accel/bvh/bvh.js';
-import { instanceExternNames } from '../../../components/intersection/instancing/instancing.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
@@ -147,24 +145,29 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'components/intersection/mesh/mesh.glsl', source: meshGLSL });
     }
 
+    // Rail v2 channel declarations (fable-data-rail §3) — role-shaped, tenant-count-free.
+    // The vertex-ish quartet declares together whenever triangle geometry exists (the
+    // leaf's fixed sampler signature — the v0 "all four present" pin). The nodes channel
+    // is exact-linkage gated: bvh traversal, containment queries, mesh prototypes (always
+    // BLAS-walked), or a live TLAS. The records channel serves the instance reads.
+    if (needMeshLeaf) {
+        textures.push(
+            { name: 'u_data_vertices', source: 'extern:data_vertices' },
+            { name: 'u_data_indices', source: 'extern:data_indices' },
+            { name: 'u_data_normals', source: 'extern:data_normals' },
+            { name: 'u_data_uvs', source: 'extern:data_uvs' },
+        );
+    }
+    const meshEngine = MESH_TRAVERSALS[plan.program.intersection.meshTraversal];
+    const instAccel = INSTANCE_ACCELS[plan.program.intersection.instanceAccel];
+    const needNodes = (hasMesh && meshEngine.nodeTexture)
+        || plan.meshes.some((m) => m.closed)
+        || plan.instanceBatches.some((b) => b.prototype.backend === 'mesh')
+        || (hasInstanced && instAccel.tlasTexture);
+    if (needNodes) textures.push({ name: 'u_data_nodes', source: 'extern:data_nodes' });
+    if (hasInstanced) textures.push({ name: 'u_data_records', source: 'extern:data_records' });
+
     if (hasMesh) {
-        // The traversal engine is a registry occupant (components/intersection
-        // MESH_TRAVERSALS) — membership Validator-gatekept, descriptor facts gate the
-        // externs (exact linkage: a brute program never declares the node texture, so
-        // the executor never binds it).
-        const engine = MESH_TRAVERSALS[plan.program.intersection.meshTraversal];
-        for (const m of plan.meshes) {
-            const n = meshExternNames(m.ordinal);
-            textures.push(
-                { name: `u_mesh_${m.ordinal}_position`, source: `extern:${n.position}` },
-                { name: `u_mesh_${m.ordinal}_index`, source: `extern:${n.index}` },
-                { name: `u_mesh_${m.ordinal}_normal`, source: `extern:${n.normal}` },
-                { name: `u_mesh_${m.ordinal}_uv`, source: `extern:${n.uv}` },
-            );
-            // The node texture serves the bvh TRAVERSAL and the CONTAINMENT point queries
-            // (fable-mesh-containment) — a closed mesh declares it even under 'brute'.
-            if (engine.nodeTexture || m.closed) textures.push({ name: `u_mesh_${m.ordinal}_bvh`, source: `extern:${n.bvh}` });
-        }
         blocks.push({ origin: 'generated:mesh-dispatch', source: generateMeshDispatch(plan.meshes, anyQuery, plan.program.intersection.meshTraversal, ids) });
     }
 
@@ -172,26 +175,11 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // looped over a placement texture. Mesh prototypes traverse their shared BLAS (bvh); analytic
     // prototypes intersect the closed form with s-scaled params. One region per batch.
     if (hasInstanced) {
-        const instanceAccel = plan.program.intersection.instanceAccel;
-        const accel = INSTANCE_ACCELS[instanceAccel];
-        for (const b of plan.instanceBatches) {
-            const n = instanceExternNames(b.ordinal);
-            textures.push({ name: `u_inst_${b.ordinal}_placements`, source: `extern:${n.placements}` });
-            // Descriptor facts gate the extern/define (exact linkage — each engine
-            // declares only what it reads: tlas the node texture, linear the count).
-            if (accel.tlasTexture) textures.push({ name: `u_inst_${b.ordinal}_tlas`, source: `extern:${n.tlas}` });
-            if (accel.countDefine) defines[`INSTANCE_COUNT_${b.ordinal}`] = String(b.instanceCount);
-            if (b.prototype.backend === 'mesh') {
-                textures.push(
-                    { name: `u_inst_${b.ordinal}_position`, source: `extern:${n.position}` },
-                    { name: `u_inst_${b.ordinal}_index`, source: `extern:${n.index}` },
-                    { name: `u_inst_${b.ordinal}_normal`, source: `extern:${n.normal}` },
-                    { name: `u_inst_${b.ordinal}_uv`, source: `extern:${n.uv}` },
-                    { name: `u_inst_${b.ordinal}_bvh`, source: `extern:${n.bvh}` },
-                );
-            }
+        // The linear engine bakes the loop bounds (exact linkage: tlas bakes none).
+        if (instAccel.countDefine) {
+            for (const b of plan.instanceBatches) defines[`INSTANCE_COUNT_${b.ordinal}`] = String(b.instanceCount);
         }
-        blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery, instanceAccel, ids) });
+        blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery, plan.program.intersection.instanceAccel, ids) });
     }
 
     // region → material table spans ALL backends (regions are globally unique).
@@ -574,7 +562,7 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
         const pl = emitMeshPlacement(m.placement);
         // The traversal call comes from the registry occupant (bvh walks the node tree,
         // no triCount; brute scans the whole soup).
-        const nearest = engine.nearestCall(`u_mesh_${m.ordinal}`, { smooth: m.smooth, triCount: m.triCount, ro: pl.ro, rd: pl.rd });
+        const nearest = engine.nearestCall(m.slot, { smooth: m.smooth, triCount: m.triCount, ro: pl.ro, rd: pl.rd });
         lines.push(`bool mesh_${ids.get(m.index)!}(Ray ray, inout Hit hit) {`);
         lines.push(...pl.setup.map((s) => `    ${s}`));
         lines.push(`    vec3 nLocal; vec2 uv;`);
@@ -604,7 +592,7 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
         for (const m of meshes) {
             const pl = emitMeshPlacement(m.placement);
             // maxDist is a WORLD distance; local t == world t (rd unnormalized), so compare directly.
-            const any = engine.anyCall(`u_mesh_${m.ordinal}`, { triCount: m.triCount, ro: pl.ro, rd: pl.rd });
+            const any = engine.anyCall(m.slot, { triCount: m.triCount, ro: pl.ro, rd: pl.rd });
             lines.push(`bool mesh_any_${ids.get(m.index)!}(Ray ray, float maxDist) {`);
             lines.push(...pl.setup.map((s) => `    ${s}`));
             lines.push(`    return ${any};`);
@@ -632,22 +620,23 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
 /** The per-placement leaf body for placement index `i` (reads texture → conjugate → intersect →
  *  record into hit / return-true for the any variant). Indentation is cosmetic. */
 function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean): string[] {
-    const o = b.ordinal;
+    const pb = b.slot.placementsBase;
     const read = [
-        `                vec4 q  = texelFetch(u_inst_${o}_placements, data_texel1d(uint(2 * i)), 0);`,
-        `                vec4 ts = texelFetch(u_inst_${o}_placements, data_texel1d(uint(2 * i + 1)), 0);`,
+        `                vec4 q  = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i)), 0);`,
+        `                vec4 ts = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i + 1)), 0);`,
         `                float s = placement_scale(ts);`,
     ];
     if (b.prototype.backend === 'mesh') {
+        const g = b.prototype.geometrySlot;
         const conj = [
             '                vec3 ro = placement_rigid(q, ts, ray.origin) / s;',
             '                vec3 rd = placement_dir(q, ray.direction) / s;',
         ];
         if (forAny) return [...read, ...conj,
-            `                if (mesh_any_bvh(u_inst_${o}_position, u_inst_${o}_index, u_inst_${o}_bvh, ro, rd, maxDist)) return true;`];
+            `                if (mesh_any_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ro, rd, maxDist)) return true;`];
         return [...read, ...conj,
             '                vec3 nLocal; vec2 uv;',
-            `                if (mesh_nearest_bvh(u_inst_${o}_position, u_inst_${o}_index, u_inst_${o}_normal, u_inst_${o}_uv, u_inst_${o}_bvh, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, uv)) {`,
+            `                if (mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, uv)) {`,
             '                    found = true;',
             '                    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
             '                    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
@@ -687,7 +676,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
     for (const b of batches) {
         lines.push(`bool instance_${ids.get(b.index)!}(Ray ray, inout Hit hit) {`);
         lines.push('    bool found = false;');
-        lines.push(...accel.walk(b.ordinal, 'hit.t', instanceLeafItem(b, false)));
+        lines.push(...accel.walk(b.slot, b.ordinal, 'hit.t', instanceLeafItem(b, false)));
         lines.push('    return found;');
         lines.push('}');
         lines.push('');
@@ -703,7 +692,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
         lines.push('');
         for (const b of batches) {
             lines.push(`bool instance_any_${ids.get(b.index)!}(Ray ray, float maxDist) {`);
-            lines.push(...accel.walk(b.ordinal, 'maxDist', instanceLeafItem(b, true)));
+            lines.push(...accel.walk(b.slot, b.ordinal, 'maxDist', instanceLeafItem(b, true)));
             lines.push('    return false;');
             lines.push('}');
         }
@@ -755,14 +744,15 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
     for (const m of meshes) {
         if (!m.closed) continue;
         const box = m.localBox!;
-        const u = `u_mesh_${m.ordinal}`;
+        const sl = m.slot;
+        const bases = `${sl.vbase}u, ${sl.tbase}u, ${sl.nbase}u`;
         lines.push(`    { // closed mesh ${ids.get(m.index) ?? m.index}`);
         lines.push('      vec3 lp = p; float ms = 1.0;');
         lines.push(...emitMeshPointQuery(m.placement).map((l) => `      ${l}`));
         lines.push('      d = 1.0e20;');
         lines.push(`      if (all(greaterThanEqual(lp, ${formatVec3(box.min)})) && all(lessThanEqual(lp, ${formatVec3(box.max)}))`);
-        lines.push(`          && mesh_inside_bvh(${u}_position, ${u}_index, ${u}_bvh, lp)) {`);
-        lines.push(`          d = -ms * mesh_closest_bvh(${u}_position, ${u}_index, ${u}_bvh, lp);`);
+        lines.push(`          && mesh_inside_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${bases}, lp)) {`);
+        lines.push(`          d = -ms * mesh_closest_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${bases}, lp);`);
         lines.push('      } }');
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${m.index}; }`);
     }

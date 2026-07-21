@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 const ROOT = resolve(__dirname, '../../src/components');
 
 const FAMILIES = [
-    'materials', 'lights', 'volume_scattering', 'geometry', 'intersection', 'accel', 'ambient',
+    'materials', 'lights', 'volume_scattering', 'geometry', 'intersection', 'accel', 'data', 'ambient',
     'sampler', 'sensor', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport',
 ];
 
@@ -25,6 +25,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'combiner.ts', 'flags.ts',            // transport shared parts
     'math_mis.glsl',                       // transport shared part (β=2 power heuristic)
     'sampler_cdf.glsl',                    // env shared CDF walk
+    'channels.ts', 'ledger.ts', 'pack.ts', // data substrate parts (fable-data-rail — roster/layout truth/assembly)
     'importance.ts',                       // env shared part (importance-table math — E6: mirrors the charts' Jacobians)
     'similarity.ts',                       // geometry shared part (placement algebra — fable-transforms §2)
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
