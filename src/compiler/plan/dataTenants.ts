@@ -7,14 +7,40 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, MeshObject } from '../types.js';
-import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission } from '../types.js';
-import { isDrivenTransform } from '../../components/geometry/similarity.js';
+import type { SceneDescription, MeshObject, PrimitiveObject } from '../types.js';
+import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression } from '../types.js';
+import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
 import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
+import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { sceneInstanceBatches, instanceAttributeRows } from '../../components/intersection/instancing/instancing.js';
 import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH } from '../../components/intersection/index.js';
 import type { DataTenants } from '../../components/data/ledger.js';
+
+/** Does material `name` read Hit.uv? — i.e. is it a PROCEDURAL material: the checker model
+ *  (readsUv capability) OR any material carrying a GLSL formula (fable-imagery P2 expression
+ *  materials). COARSE by choice (owner Jul 21): a formula reading only `p` counts too, matching
+ *  the materialsReadUv gate — correctness-safe, slightly over-eager. THE ONE "reads uv" notion,
+ *  shared by the chart-EMISSION gate (materialsReadUv) and the rotation-tracking gate
+ *  (keepsLocalFrame), so a uv-formula on a ROTATED shape can never silently fall back to an
+ *  axis-aligned chart. Precise per-formula uv-detection is the noted follow-up. */
+export function materialReadsUv(name: string, scene: SceneDescription): boolean {
+    const mat = scene.materials[name];
+    if (mat === undefined) return false;
+    return (MATERIAL_MODELS[mat.model ?? '']?.capabilities.readsUv ?? false)
+        || Object.values(mat).some(isGlslExpression);
+}
+
+/** A PATTERNED + rotated analytic shape keeps its own LOCAL frame (fable-imagery P1b): its
+ *  material reads Hit.uv and it carries a rotation, so it is NOT folded (the chart needs the
+ *  frame the fold would dissolve). Like a driven object it therefore cannot be TABLED (records
+ *  assume folded params) and stays in the unrolled wrapper arm. THE ONE predicate both the
+ *  table adapter (exclude) and the Planner (retain the similarity) read — so the two decisions
+ *  cannot drift. */
+export function keepsLocalFrame(obj: PrimitiveObject, scene: SceneDescription): boolean {
+    if (PRIMITIVES[obj.type]?.uvChart !== true) return false;
+    return materialReadsUv(obj.material, scene) && !isIdentityRotation(similarityFromTransform(obj.transform).rotation);
+}
 
 /** One scene-TLAS leaf (canonical pre-TLAS order; the App reorders by the tree). */
 export interface SceneTableLeaf {
@@ -87,7 +113,7 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
     const analyticEligible: Array<{ sceneIndex: number; type: string; solid: boolean }> = [];
     scene.objects.forEach((o, i) => {
         if (!isPrimitiveObject(o)) return;
-        if (isDrivenTransform(o.transform)) return;
+        if (isDrivenTransform(o.transform) || keepsLocalFrame(o, scene)) return;   // not folded → residual, never tabled
         if (resolveBackend(o.type, o.backend) !== 'analytic') return;
         const d = PRIMITIVES[o.type];
         if (d?.bounds === undefined) return;   // unbounded (plane) → residual

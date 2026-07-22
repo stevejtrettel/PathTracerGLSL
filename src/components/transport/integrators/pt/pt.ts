@@ -170,12 +170,39 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             );
         }
         lines.push('            s.throughput *= ms.weight;');
+        if (f.deflecting) {
+            lines.push(
+                '            if (ms.deflected) {',
+                '                // ---- GRIN HANDOFF (impl-plan-grin-interface) ---- the ODE walker carried the',
+                '                // ray along the bent path to just INSIDE the wall; spawn the continuation and',
+                '                // let the NEXT iteration\'s surface hit own the crossing — the wall\'s material',
+                '                // (\'none\' pass-through or dielectric Fresnel/TIR with the local n) fires there,',
+                '                // so current_medium is deliberately UNCHANGED here. THE GLASS RULE: the bend is',
+                '                // a deterministic DELTA event — record it so a subsequent emitter hit scores at',
+                '                // full weight (NEE cannot sample bent connections; its shadow rays see the',
+                '                // region as opaque — the transmittance twin of this line). The traversal',
+                '                // CONSUMES a bounce deliberately: the budget bounds trapped closed orbits',
+                '                // (e.g. a Maxwell fisheye) across exhaustion returns AND whispering-gallery',
+                '                // TIR loops.',
+                '                kernel_record(s, 1.0, ms.exit_p, true);',
+            );
+            if (f.transmission) {
+                lines.push('                s.eta_scale *= ms.eta_scale;   // interior L/n² compression (§7.2)');
+            }
+            lines.push(
+                '                s.ray = make_ray(ms.exit_p, ms.exit_dir);',
+                '                continue;',
+                '            }',
+            );
+        }
         if (f.scattering) {
             lines.push(
                 '            if (ms.scattered) {',
-                '                // ---- MEDIUM EVENT ----',
-                '                Point p_evt = ambient_geodesic(s.ray.origin, s.ray.direction, ms.t);',
-                '                Direction wo_med = -s.ray.direction;',
+                '                // ---- MEDIUM EVENT ---- The event ray comes FROM THE ARM (impl-plan-grin-media:',
+                '                // a bent event is not recomputable from (origin, dir, t), so every scattering',
+                '                // arm reports position + incident direction on exit_p/exit_dir).',
+                '                Point p_evt = ms.exit_p;',
+                '                Direction wo_med = -ms.exit_dir;',
             );
             if (f.nee && !f.equiangular) lines.push('                light_sample_direct_medium(s, med_mat, p_evt, wo_med);');
             lines.push('                kernel_sample_phase(s, med_mat, p_evt, wo_med);');
@@ -211,7 +238,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         );
     }
     lines.push(
-        '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.element);',
+        '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element);',
         '        Direction wo = -s.ray.direction;',
         '',
         '        kernel_score_emitter_hit(s, hit, mat, wo, props);   // settle last bounce\'s deferred estimate',
@@ -226,7 +253,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         lines.push(
             '        // Accumulate the η² compression this crossing added (§7.2).',
             '        if ((bs.flags & LOBE_TRANSMISSION) != 0u) {',
-            '            float r = ior_of(hit.region_to) / ior_of(hit.region_from);',
+            '            float r = ior_of(hit.region_to, hit.p) / ior_of(hit.region_from, hit.p);',
             '            s.eta_scale *= r * r;',
             '        }',
         );

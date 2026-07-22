@@ -244,6 +244,72 @@ describe('Validator', () => {
 });
 
 // --- Audit-hardening H1: the July 2026 validator pack ---
+describe('Validator — variable-IOR (deflecting) media, GRIN v1 scope (fable-variable-ior §7)', () => {
+    // A GRIN region: model 'none' container whose medium carries an ior formula over p.
+    const grinMedium = (extra: object = {}) => ({
+        model: 'none',
+        medium: { ior: { kind: 'glsl' as const, source: 'sqrt(max(2.0 - dot(p, p), 0.0))' }, ...extra },
+    });
+
+    it('accepts an ior expression WITHOUT a majorant (n is not extinction — nothing clamps it)', () => {
+        const bag = run(s => { s.materials.lens = grinMedium(); s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' }); });
+        expect(bag.hasErrors()).toBe(false);
+    });
+
+    // --- impl-plan-grin-media: the emission/scattering batches flipped the v1 blankets ---
+
+    it('accepts constant sigma_s on a deflecting medium (batch 2: arc-length channel-MIS)', () => {
+        const bag = run(s => { s.materials.lens = grinMedium({ sigma_s: [0.5, 0.5, 0.5], phase_g: 0.3 }); s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' }); });
+        expect(bag.hasErrors()).toBe(false);
+    });
+
+    it('accepts emission on a deflecting medium (batch 1: per-step collection), expression ε sans majorant', () => {
+        const bag = run(s => { s.materials.lens = grinMedium({ emission: { kind: 'glsl', source: '0.16 * max(2.0 - dot(p, p), 0.0)' } }); s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' }); });
+        expect(bag.hasErrors()).toBe(false);
+    });
+
+    it('rejects emission AND sigma_s together on a deflecting medium (emissive bent scattering deferred)', () => {
+        const bag = run(s => { s.materials.lens = grinMedium({ emission: [1, 1, 1], sigma_s: [0.5, 0.5, 0.5] }); s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' }); });
+        expect(bag.getErrors().some(e => /scatter AND emit/i.test(e.message))).toBe(true);
+    });
+
+    it('rejects EXPRESSION sigma_s on a deflecting medium (null-collision on bent arcs deferred)', () => {
+        const bag = run(s => { s.materials.lens = grinMedium({ sigma_s: { kind: 'glsl', source: '0.5 + p.y' }, majorant: 4 }); s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' }); });
+        expect(bag.getErrors().some(e => /CONSTANT.*coefficients|bent arc/i.test(e.message))).toBe(true);
+    });
+
+    it('accepts sigma_a alongside ior (Beer–Lambert along the bent path is v1)', () => {
+        const bag = run(s => { s.materials.lens = grinMedium({ sigma_a: [0.0, 0.02, 0.05] }); s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' }); });
+        expect(bag.hasErrors()).toBe(false);
+    });
+
+    // --- The hard-interface batch (impl-plan-grin-interface) ---
+
+    it('accepts a dielectric wall on a deflecting medium (the hard-interface authoring)', () => {
+        const bag = run(s => {
+            s.materials.lens = { model: 'dielectric', medium: { ior: { kind: 'glsl', source: 'sqrt(max(2.0 - dot(p, p), 0.0))' } } };
+            s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' });
+        });
+        expect(bag.hasErrors()).toBe(false);
+    });
+
+    it('rejects ior authored on BOTH the material and its medium (one interface truth)', () => {
+        const bag = run(s => {
+            s.materials.lens = { model: 'dielectric', ior: 1.5, medium: { ior: { kind: 'glsl', source: 'sqrt(max(2.0 - dot(p, p), 0.0))' } } };
+            s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' });
+        });
+        expect(bag.getErrors().some(e => /both the material and its medium/i.test(e.message))).toBe(true);
+    });
+
+    it('accepts a constant-number medium ior on a dielectric wall (the glass-twin degenerate case)', () => {
+        const bag = run(s => {
+            s.materials.lens = { model: 'dielectric', medium: { ior: 1.5 } };
+            s.objects.push({ type: 'sphere', parameters: { radius: 1 }, material: 'lens' });
+        });
+        expect(bag.hasErrors()).toBe(false);
+    });
+});
+
 describe('Validator — hardening pack (H1)', () => {
     it('rejects a samplable emitter whose model cannot emit (the phantom-light rule)', () => {
         const bag = run(s => {

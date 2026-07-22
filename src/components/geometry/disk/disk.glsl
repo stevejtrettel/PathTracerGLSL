@@ -20,3 +20,16 @@ bool disk_intersect(Ray ray, Disk d, out float t) {
 vec3 disk_normal(vec3 p, Disk d) {
     return d.normal;
 }
+
+// Surface parameterization — polar (r/R, θ/2π) in the disk's plane. The RADIAL coordinate is
+// orientation-free; the ANGULAR reference comes from build_basis(normal) (fable-imagery P1
+// §7.2 v1): the fold dissolves the disk's in-plane rotation, so θ=0 is a derived direction,
+// not an authored one — the chart-frame carry is the deferred fix.
+vec2 disk_uv(vec3 p, Disk d) {
+    vec3 local = p - d.center;
+    vec3 t, b;
+    build_basis(d.normal, t, b);
+    float r = length(local) / d.radius;
+    float theta = atan(dot(local, b), dot(local, t)) / TWO_PI + 0.5;
+    return vec2(r, theta);
+}

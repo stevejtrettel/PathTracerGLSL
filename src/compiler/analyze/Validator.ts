@@ -2,7 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
@@ -310,15 +310,23 @@ export function validate(
                     // ceiling — D1: the rendered medium IS the field min-scaled to σ̄
                     // (an expression ε needs per-position evaluation at σ̄-paced points,
                     // so it rides the same rule — impl-plan-medium-emission P5).
-                    if (mat.medium.majorant === undefined) {
+                    // DEFLECTING carve (impl-plan-grin-media): the GRIN walker paces by the
+                    // ODE, not σ̄ — expression σ_a/ε there involve no ceiling and need no
+                    // majorant (the D1 clamp never applies). Expression σ_s on a deflecting
+                    // medium is rejected below regardless.
+                    if (mat.medium.majorant === undefined && !mediumIsDeflecting(mat.medium)) {
                         bag.error('invalid-setting',
                             `Material '${name}': medium.${prop} is a GLSL expression but the medium declares no majorant — heterogeneous media require a density ceiling σ̄ (D1: the rendered medium IS min(σ, σ̄); fable-heterogeneous-media.md). Add majorant: <finite number > 0>`)
                             .add();
                     }
+                } else if (prop === 'ior') {
+                    // GRIN (fable-variable-ior): a spatial refractive index n(x) is the whole
+                    // point of a deflecting medium — allowed, and needs NO majorant (n is not
+                    // extinction; nothing clamps it). Deferred: n(λ) dispersion (no `λ` yet).
                 } else {
                     // Rule 7: spatially-varying phase parameters are not in v1.
                     bag.error('invalid-setting',
-                        `Material '${name}': medium.${prop} cannot be a GLSL expression — only σ_a/σ_s/emission may vary spatially; phase parameters are constants or {param}`)
+                        `Material '${name}': medium.${prop} cannot be a GLSL expression — only σ_a/σ_s/emission (and ior) may vary spatially; phase parameters are constants or {param}`)
                         .add();
                 }
             }
@@ -334,6 +342,10 @@ export function validate(
                     bag.error('invalid-setting',
                         `Material '${name}': medium.majorant must be a finite number > 0 (got ${String(maj)})`)
                         .add();
+                } else if (mediumIsDeflecting(mat.medium)) {
+                    bag.warning('invalid-setting',
+                        `Material '${name}': medium.majorant is declared on a DEFLECTING medium — the GRIN walker paces by the ODE, not σ̄, so the ceiling is ignored (impl-plan-grin-media)`)
+                        .add();
                 } else if (!isHeterogeneousMedium(mat.medium)) {
                     bag.warning('invalid-setting',
                         `Material '${name}': medium.majorant is declared but every coefficient is constant/{param} — σ̄ derives from the (live) values and the declaration is ignored`)
@@ -343,6 +355,35 @@ export function validate(
             if (mat.medium.model !== undefined && !isMediumModelSupported(mat.medium.model)) {
                 bag.error('invalid-setting',
                     `Material '${name}': medium.model '${mat.medium.model}' is not a registered volume scattering model`)
+                    .add();
+            }
+            // GRIN media matrix (impl-plan-grin-media — the Jul 22 batches lifted the v1
+            // blanket rejections): a deflecting medium may EMIT (per-step collection with
+            // the (n₀/n)² source factor) and SCATTER (channel-MIS in arc length), with two
+            // declared cuts:
+            // (a) emissive SCATTERING on bent arcs — the tracking-arm route the straight
+            //     case uses does not exist for curves; reject the combination.
+            if (mediumIsDeflecting(mat.medium) && mediumMayScatter(mat.medium) && isEmissiveMedium(mat.medium)) {
+                bag.error('invalid-setting',
+                    `Material '${name}': a deflecting medium cannot scatter AND emit in one region yet — remove sigma_s or emission (impl-plan-grin-media: emissive scattering along bent arcs is deferred)`)
+                    .add();
+            }
+            // (b) HETEROGENEOUS scattering on bent arcs (the null-collision lottery along
+            //     the curve) — the arc sampler's free-flight law needs constant σ_t; reject
+            //     expression coefficients on a scattering deflecting medium.
+            if (mediumIsDeflecting(mat.medium) && mediumMayScatter(mat.medium)
+                && (isGlslExpression(mat.medium.sigma_s) || isGlslExpression(mat.medium.sigma_a))) {
+                bag.error('invalid-setting',
+                    `Material '${name}': a scattering deflecting medium needs CONSTANT (or {param}) coefficients — expression σ along a bent arc is the null-collision-on-curves sequel (impl-plan-grin-media)`)
+                    .add();
+            }
+            // ONE ior truth (impl-plan-grin-interface): a deflecting medium's formula IS the
+            // region's interface index — ior_of(region, p) emits it, and the wall's
+            // Snell/Fresnel reads it at the hit point. A surface ior row authored ALONGSIDE
+            // it would silently lose to the formula in the table — reject the ambiguity.
+            if (mediumIsDeflecting(mat.medium) && (mat as unknown as Record<string, unknown>).ior !== undefined) {
+                bag.error('invalid-setting',
+                    `Material '${name}': ior is authored on both the material and its medium — the medium's ior (the n(x) field) is the ONE interface index, evaluated at the wall point; remove the material-level ior (impl-plan-grin-interface)`)
                     .add();
             }
             // |g| = 1 exactly is deterministic NaN in the HG sampler (d = 0 at the sampled pole)
@@ -447,6 +488,17 @@ export function validate(
         if (anisotropicDelta !== undefined) {
             bag.error('incompatible-options',
                 `mediumLightSampling 'equiangular' requires ISOTROPIC delta lights — kind '${anisotropicDelta.kind}' declares no delta query (its intensity is direction-dependent; the queried on-axis value would bias the estimate). Use 'vertex', or remove the '${anisotropicDelta.kind}' light`)
+                .add();
+        }
+        // Deflecting media (impl-plan-grin-media): equiangular places its sample on the
+        // STRAIGHT segment, but a scattering deflecting region's segments are BENT — the
+        // placed point is not on the path. Reject the combination (the vertex estimator
+        // handles bent events correctly via the arm-reported event ray).
+        const deflectingScatterer = Object.entries(scene.materials).find(([, m]) =>
+            m.medium !== undefined && mediumIsDeflecting(m.medium) && mediumMayScatter(m.medium));
+        if (deflectingScatterer !== undefined) {
+            bag.error('incompatible-options',
+                `mediumLightSampling 'equiangular' cannot place samples inside a DEFLECTING medium (material '${deflectingScatterer[0]}' scatters along bent arcs — the straight-segment placement is off the path). Use 'vertex'`)
                 .add();
         }
         // The C5 silent-inert rule: the knob must control something.
@@ -640,7 +692,7 @@ export function validate(
         const ownRegionRow = MATERIAL_MODELS[mat.model]?.properties.find((p) => p.storage === 'region-table');
         if (ownRegionRow !== undefined && isGlslExpression((mat as unknown as Record<string, unknown>)[ownRegionRow.source])) {
             bag.error('invalid-setting',
-                `Material '${name}': ${ownRegionRow.source} cannot be a GLSL expression — ${ownRegionRow.source}_of(region) is a region-indexed table with no shading point (use a constant or {param})`)
+                `Material '${name}': ${ownRegionRow.source} cannot be a GLSL expression on the surface row — a spatial index is a medium: author it as medium: { ior: <formula> } (fable-variable-ior; use a constant or {param} here)`)
                 .add();
         }
         for (const source of regionTableSources) {

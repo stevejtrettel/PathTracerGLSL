@@ -6,6 +6,8 @@ import {
     resolveScalarProperty,
 } from '../../src/compiler/plan/Planner.js';
 import { isDrivenPlacement, type PlannedPlacement } from '../../src/compiler/plan/types.js';
+import { keepsLocalFrame } from '../../src/compiler/plan/dataTenants.js';
+import type { SceneDescription, PrimitiveObject } from '../../src/compiler/types.js';
 import { foldAnalyticParameters } from '../../src/components/geometry/index.js';
 import { classifySimilarity, similarityApplyPoint, type Similarity } from '../../src/components/geometry/similarity.js';
 import type { GlslExpression, ValueParam, Vec3 } from '../../src/compiler/types.js';
@@ -133,6 +135,39 @@ describe('foldAnalyticParameters (fable-transforms §5.1: the primitive set is s
         const world = similarityApplyPoint(g, [2.5, 0, -1]);
         const d = Math.hypot(world[0] - center[0], world[1] - center[1], world[2] - center[2]);
         expect(d).toBeCloseTo(folded.radius as number, 9);
+    });
+});
+
+describe('keepsLocalFrame (fable-imagery P1b — patterned+rotated shapes are not folded, so never tabled)', () => {
+    const scene = (model: string): SceneDescription => ({
+        id: 't', name: 't', ambientSpace: { type: 'euclidean' }, objects: [], lights: [],
+        materials: { m: { model } as SceneDescription['materials'][string] },
+    });
+    const rot = { rotation: { axis: [1, 0, 0] as [number, number, number], angle: 0.5 } };
+    const sphere = (transform?: PrimitiveObject['transform']): PrimitiveObject =>
+        ({ type: 'sphere', parameters: { radius: 1 }, material: 'm', transform });
+
+    it('checker + rotated sphere → keeps its frame (retained placement, residual arm)', () => {
+        expect(keepsLocalFrame(sphere(rot), scene('checker'))).toBe(true);
+    });
+    it('checker + UNrotated sphere → folds (no rotation to preserve)', () => {
+        expect(keepsLocalFrame(sphere({ position: [1, 0, 0] }), scene('checker'))).toBe(false);
+    });
+    it('lambert + rotated sphere → folds (material does not read uv)', () => {
+        expect(keepsLocalFrame(sphere(rot), scene('lambert'))).toBe(false);
+    });
+    it('checker + rotated PLANE → folds (plane declares no uv chart)', () => {
+        const plane: PrimitiveObject = { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0 }, material: 'm', transform: rot };
+        expect(keepsLocalFrame(plane, scene('checker'))).toBe(false);
+    });
+    // P2: an EXPRESSION material is procedural — a uv-formula on a rotated shape must keep its
+    // frame too, else it silently falls back to an axis-aligned chart (re-introducing the P1b limit).
+    const exprScene = (): SceneDescription => ({
+        id: 't', name: 't', ambientSpace: { type: 'euclidean' }, objects: [], lights: [],
+        materials: { m: { model: 'lambert', albedo: { kind: 'glsl', source: 'vec3(uv.x)' } } as SceneDescription['materials'][string] },
+    });
+    it('formula (lambert + expression albedo) + rotated sphere → keeps its frame (P2)', () => {
+        expect(keepsLocalFrame(sphere(rot), exprScene())).toBe(true);
     });
 });
 

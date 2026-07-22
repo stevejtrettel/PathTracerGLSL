@@ -25,3 +25,17 @@ bool quad_intersect(Ray ray, Quad q, out float t) {
 vec3 quad_normal(vec3 p, Quad q) {
     return q.normal;
 }
+
+// Surface parameterization — the natural [0,1]² along the quad's own edges (edge1 = u,
+// edge2 = v). Placement-correct for FREE: the similarity fold carries the quad's orientation
+// in its edge vectors, so no chart frame is needed. Same 2×2 Gram solve as quad_intersect
+// (edges need not be orthogonal).
+vec2 quad_uv(vec3 p, Quad q) {
+    vec3 local = p - q.corner;
+    float e11 = dot(q.edge1, q.edge1), e22 = dot(q.edge2, q.edge2), e12 = dot(q.edge1, q.edge2);
+    float d1 = dot(local, q.edge1), d2 = dot(local, q.edge2);
+    float det = e11 * e22 - e12 * e12;
+    float u = (d1 * e22 - d2 * e12) / det;
+    float v = (d2 * e11 - d1 * e12) / det;
+    return vec2(u, v);
+}

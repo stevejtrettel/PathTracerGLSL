@@ -77,6 +77,11 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                     .toBe(d.provides.analytic);
             });
 
+            it(`defines ${key}_uv(vec3, ${sn}) iff uvChart (fable-imagery P1)`, () => {
+                expect(new RegExp(`vec2\\s+${key}_uv\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${sn}\\b`).test(d.glsl))
+                    .toBe(d.uvChart === true);
+            });
+
             it('rows are well-formed (names unique, defaults shape-consistent, required XOR default)', () => {
                 const names = d.params.map((p) => p.name);
                 expect(new Set(names).size).toBe(names.length);

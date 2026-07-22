@@ -57,6 +57,9 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         // Emission ε joins the RTE core iff some medium emits (impl-plan-medium-emission;
         // the exact-linkage rule — the field, its accessor, and its readers co-exist).
         if (plan.program.media.emission) extra.push('Spectrum emission;   // volume emission coefficient ε (W·sr⁻¹·m⁻³, dL/ds = ε)');
+        // NB: IOR is NOT a MediumProperties field — it is consumed by its GRADIENT (the ray
+        // bends by ∇n, evaluated at many nearby points per step), not by value at a collision
+        // like σ_a/σ_s/ε. It lives in its own `ior_at(med, p)` accessor (fable-variable-ior).
         if (models.length > 0) extra.push('int model;   // volume_scattering registry index (interaction_medium_* dispatch)');
         blocks.push({
             origin: 'generated:medium-properties',

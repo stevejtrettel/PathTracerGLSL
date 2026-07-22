@@ -298,7 +298,7 @@ export function isGlslExpression(v: unknown): v is GlslExpression {
  * Classification is by AUTHORED TYPE — an expression that happens to evaluate to a
  * constant still routes to the null-collision arms (that is F-HET-CONST's whole
  * point). Shaped to accept authored MediumDescription and PlannedMedium alike. */
-export function isHeterogeneousMedium(med: { sigma_a: unknown; sigma_s?: unknown; emission?: unknown }): boolean {
+export function isHeterogeneousMedium(med: { sigma_a?: unknown; sigma_s?: unknown; emission?: unknown }): boolean {
     return isGlslExpression(med.sigma_a) || isGlslExpression(med.sigma_s) || isGlslExpression(med.emission);
 }
 
@@ -321,6 +321,13 @@ export function mediumMayScatter(med: { sigma_s?: unknown }): boolean {
     return mediumPropertyMayBeNonzero(med.sigma_s);
 }
 
+/** DEFLECTING (gradient-index / GRIN) medium: an authored refractive index makes the region
+ *  bend rays along the ray ODE instead of the straight scatter/absorb walk (fable-variable-ior).
+ *  Presence of `ior` is the marker — a constant `ior` is a valid (bending-free) degenerate case. */
+export function mediumIsDeflecting(med: { ior?: unknown }): boolean {
+    return med.ior !== undefined;
+}
+
 /** CONSTANT nonzero emission — the v1 samplable-emitter leg (compiler-pass C3: ONE body
  *  for the Analyzer census, the Validator's sampleAsLight/phantom/driven-transform rules,
  *  and the Planner's registry route — these jointly guard pt ≡ pt-nee, so agreeing by
@@ -340,9 +347,13 @@ export function hasConstantNonzeroEmission(emission: unknown): boolean {
  * auto-derived for constants). `scatters` = σ_s may be nonzero AND scattering is
  * computed — the caller resolves the measurement side. */
 export function mediumRoutesToTracking(
-    med: { sigma_a: unknown; sigma_s?: unknown; emission?: unknown },
+    med: { sigma_a?: unknown; sigma_s?: unknown; emission?: unknown; ior?: unknown },
     scatters: boolean,
 ): boolean {
+    // DEFLECTING media never route to the null-collision arms — the GRIN dispatch owns them
+    // (impl-plan-grin-media: the walker paces by the ODE, not σ̄; expression ε/σ_a there are
+    // majorant-free by the Validator carve, so the tracking route's σ̄ machinery must not fire).
+    if (mediumIsDeflecting(med)) return false;
     return isHeterogeneousMedium(med) || (isEmissiveMedium(med) && scatters);
 }
 
@@ -363,8 +374,9 @@ export type MaterialModel = string;
  * volumetric-component seams (fable-volumetric-component.md).
  */
 export interface MediumDescription {
-    /** Absorption coefficient σ_a (per unit arc length). */
-    sigma_a: SpectrumProperty;
+    /** Absorption coefficient σ_a (per unit arc length). Default 0 (e.g. a pure GRIN lens or a
+     *  purely scattering medium declares none). */
+    sigma_a?: SpectrumProperty;
     /** Scattering coefficient σ_s. Default 0 (absorbing-only, e.g. tinted glass interior). */
     sigma_s?: SpectrumProperty;
     /** Density ceiling σ̄ (heterogeneous D1): the rendered medium IS the proportionally
@@ -378,6 +390,13 @@ export interface MediumDescription {
      *  glow needs no absorption (Kirchhoff coupling is authoring sugar: ε = σ_a·Le).
      *  The D1 scale applies to ε too (P2: clamped regions preserve ε/σ_t). */
     emission?: SpectrumProperty;
+    /** Refractive index n(x) — a scalar FORMULA over `p` (or a constant) making the region a
+     *  gradient-index (GRIN) DEFLECTING medium: rays bend along the ODE geodesic of the optical
+     *  metric n²·δ instead of scattering (fable-variable-ior.md). Presence marks the medium
+     *  deflecting; v1 requires n → 1 at the region boundary (continuous, no Fresnel) and rejects
+     *  σ_s (no scattering-in-GRIN yet). Spectral-ready: the accessor gains `λ` under a future
+     *  spectral axis. Absent = a normal (straight-ray) scattering/absorbing medium. */
+    ior?: ScalarProperty;
     /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). Read only by 'hg'. */
     phase_g?: ScalarProperty;
     /** The volume's scattering model (which phase function). Default 'hg'. 'rayleigh' is

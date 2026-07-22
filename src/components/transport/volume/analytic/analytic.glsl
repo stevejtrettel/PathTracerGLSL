@@ -6,7 +6,7 @@
 // Grayscale degeneracy check: scatter weight → σ_s/σ_t (single-scatter albedo), survival
 // weight → 1 — the §7.2 "no weight on survival" pin is the special case of these formulas.
 
-MediumSample medium_sample_analytic(MediumProperties m, float t_max, vec2 xi) {
+MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, vec2 xi) {
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = min(int(xi.x * 3.0), 2);               // uniform channel selection
@@ -14,6 +14,8 @@ MediumSample medium_sample_analytic(MediumProperties m, float t_max, vec2 xi) {
     float t  = -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
+    ms.deflected = false;                             // straight-ray arm — never a GRIN exit
+    ms.eta_scale = 1.0;                               // no index change on a straight segment
     ms.radiance = SPECTRUM_ZERO;                      // mandatory (§3 partition rule)
     if (t < t_max) {
         // Scatter event at t. pdf = (1/3) Σ_c σ_c e^{−σ_c t} (one-sample MIS over channels).
@@ -21,6 +23,11 @@ MediumSample medium_sample_analytic(MediumProperties m, float t_max, vec2 xi) {
         float    pdf = spectrum_average(sigma_t * tr);
         ms.scattered = true;
         ms.t         = t;
+        // The EVENT RAY (impl-plan-grin-media): every scattering arm reports its event's
+        // position + incident direction — this one trivially (straight flight), the GRIN
+        // arm because a bent event is not recomputable from (origin, dir, t).
+        ms.exit_p    = ambient_geodesic(ray.origin, ray.direction, t);
+        ms.exit_dir  = ray.direction;
         ms.weight    = m.sigma_s * tr / max(pdf, 1e-20);
     } else {
         // Survived to the boundary. pdf = P(t ≥ t_max) = (1/3) Σ_c e^{−σ_c t_max}.

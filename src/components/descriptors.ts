@@ -100,6 +100,10 @@ export interface MaterialModelDescriptor {
         /** May emit — eligibility for the emission gate + light registry (§6.2);
          *  whether a given MATERIAL emits stays a per-value analysis. */
         emissive: boolean;
+        /** Reads Hit.uv (procedural charts — checker/expression, fable-imagery P1). A shape
+         *  carrying such a material keeps its LOCAL frame when placed with rotation (P1b),
+         *  so the chart tracks the shape instead of an axis-aligned world map. Default false. */
+        readsUv?: boolean;
     };
 }
 
@@ -306,6 +310,12 @@ export interface PrimitiveDescriptor {
      *  test checks symbols exist iff declared). sdf also serves analytic containment
      *  (scene_region_at) — the sdf slot's three clauses bind approximate SDFs too. */
     provides: { sdf: boolean; analytic: boolean };
+    /** Declares a real per-primitive UV chart (fable-imagery P1): the occupant provides
+     *  `vec2 <type>_uv(vec3 p, <Type>)`, and hit-fill sites call it instead of the planar
+     *  placeholder WHEN some scene material reads uv (the scene-level program.materials.
+     *  materialsReadUv gate — no chart trig when nothing consumes it). Contract-test-checked
+     *  (symbol exists iff declared). Absent/false = planar-placeholder uv only. */
+    uvChart?: boolean;
     /** Declared derived struct fields (A1) — the generated struct's tail; values
      *  computed by derivedCtorFields in the same order. */
     derivedFields?: DerivedFieldSpec[];

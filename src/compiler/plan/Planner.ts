@@ -27,7 +27,7 @@ import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
@@ -199,16 +199,23 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 placement: buildDrivenPlacement(obj.transform!, regionId),
             });
         } else {
+            // A PATTERNED + rotated shape must NOT bake its rotation away — the chart needs the
+            // frame the fold dissolves (fable-imagery P1b). Emit it like a movable shape but with
+            // CONSTANT placement: canonical params + retained similarity, so hit-finding AND the
+            // uv chart both run in the shape's own frame (the per-ray un-rotate is paid ONLY
+            // here). Everything else folds ENTIRELY into canonical parameters (the analytic set
+            // is similarity-closed — fable-transforms §5.1; folding keeps the light registry on
+            // resolved params so a sampleAsLight emitter cannot drift from its geometry). ONE
+            // predicate with the table adapter (keepsLocalFrame) — a retained shape is never
+            // tabled. (Patterned ⟹ checker/expression ⟹ non-emissive, so no light drift.)
             analyticObjects.push({
                 index: objectIndex++,
                 materialId: matId,
                 shapeType: obj.type,
                 name: obj.name,
-                // Constant transforms fold ENTIRELY into canonical parameters (the
-                // analytic primitive set is similarity-closed — fable-transforms §5.1).
-                // Keeping the light registry on these same resolved parameters ensures a
-                // sampleAsLight emitter cannot drift away from its hittable geometry.
-                parameters: foldAnalyticParameters(obj.type, obj.parameters, placementOf(obj.transform)),
+                ...(keepsLocalFrame(obj, scene)
+                    ? { parameters: canonicalizePrimitiveParameters(obj.type, obj.parameters), placement: placementOf(obj.transform) }
+                    : { parameters: foldAnalyticParameters(obj.type, obj.parameters, placementOf(obj.transform)) }),
             });
         }
     }
@@ -496,6 +503,13 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             models: brdfModels,
             surfaceEval: lighting !== null,
             surfacePdf: mis,
+            // Gates the REAL uv charts (fable-imagery P1/P2): a scene with no uv-reading
+            // material keeps the cheap planar placeholder everywhere (no wasted chart trig).
+            // ONE "reads uv" notion, shared with keepsLocalFrame (materialReadsUv): a PROCEDURAL
+            // material — checker OR any formula. COARSE by choice (owner Jul 21): a formula
+            // reading only `p` still turns charts on — correctness-safe (a uv-formula is NEVER
+            // missed), slightly wasteful. Precise per-formula uv-detection is the noted follow-up.
+            materialsReadUv: Object.keys(scene.materials).some((name) => materialReadsUv(name, scene)),
         },
         media: {
             present: features.media.hasMedia,
@@ -507,6 +521,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // truncation does not suppress it).
             emission: features.media.hasMedia && features.media.hasEmissiveMedia,
             nullInterfaces: features.media.hasNullInterfaces,
+            // GRIN (fable-variable-ior.md): any planned medium carries a refractive index.
+            deflecting: materials.some((m) => m.medium !== null && m.medium.ior !== undefined),
             shadowWalker: features.media.hasMedia && lighting !== null,
             mediumEval: scatteringArms && lighting !== null,
             mediumPdf: scatteringArms && mis,
@@ -800,6 +816,9 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
         ...(med.majorant !== undefined ? { majorant: med.majorant } : {}),
         emission: noBB(resolveColorProperty(med.emission, [0.0, 0.0, 0.0])),
         values,
+        // GRIN (fable-variable-ior.md): present ⇒ deflecting. Default n = 1 (vacuum) is the
+        // continuous-boundary convention; a scalar constant/{param}/formula over p.
+        ...(med.ior !== undefined ? { ior: resolveScalarProperty(med.ior, 1.0) } : {}),
     };
 }
 

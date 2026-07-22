@@ -16,6 +16,10 @@ export function formatVec3(v: number[]): string {
     return `vec3(${formatFloat(v[0])}, ${formatFloat(v[1])}, ${formatFloat(v[2])})`;
 }
 
+export function formatVec4(v: number[]): string {
+    return `vec4(${formatFloat(v[0])}, ${formatFloat(v[1])}, ${formatFloat(v[2])}, ${formatFloat(v[3])})`;
+}
+
 /**
  * Format a RADIOMETRIC constant (albedo, emission, light radiance, sky color) — §2.5.
  * The SINGLE point spectral mode overrides: RGB mode emits `vec3(r,g,b)` (identical to

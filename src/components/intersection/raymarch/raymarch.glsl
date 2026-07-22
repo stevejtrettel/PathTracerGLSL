@@ -1,7 +1,7 @@
 // Raymarching Scene Infrastructure — the SDF geometry backend behind scene_intersect.
 // Provides: scene_normal(), sdf_intersect(inout Hit), sdf_intersect_any(float maxDist)
 // Depends on: scene_march_bound() (generated, unsigned), scene_object_sdf() (generated, per-owner
-//             signed field), ambient_geodesic(), ambient_frame()
+//             signed field), scene_object_uv() (generated, per-owner chart), ambient_geodesic(), ambient_frame()
 // The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these and
 // performs the once-per-hit region classification (§4.2) — the marcher only reports geometry + owner.
 
@@ -40,7 +40,7 @@ void raymarch_commit(inout Hit hit, float t, vec3 p, int region) {
     hit.frame = ambient_frame(p, scene_normal(p, region));   // owner's outward normal; dispatcher orients (§4.1)
     hit.region_owner = region;
     hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)
-    hit.uv = vec2(p.x * UV_PLANAR_SCALE, p.z * UV_PLANAR_SCALE);
+    hit.uv = scene_object_uv(p, region);   // per-owner chart (fable-imagery P1); planar fallback for uncharted owners
 }
 
 // March bounded by the running nearest (hit.t); on a closer surface fill the hit's GEOMETRY

@@ -23,6 +23,11 @@ import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js'
 import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
+import { uvChartsScene, uvChartsNeeStrategy, uvChartsPtStrategy } from './uvChartsScene.js';
+import { exprMaterialsScene, exprMaterialsNeeStrategy, exprMaterialsPtStrategy } from './exprMaterialsScene.js';
+import { grinScene, grinNeeStrategy, grinPtStrategy, glassGrinScene, glassGrinStrategy, maxwellScene, maxwellStrategy } from './grinScene.js';
+import { blackholeScene, blackholeStrategy } from './blackholeScene.js';
+import { accretionScene, accretionStrategy } from './accretionScene.js';
 import { meshDemoScene, meshDemoNeeStrategy, meshDemoPtStrategy } from './meshScene.js';
 import { modelsScene, modelsBvhStrategy, modelsBruteStrategy, modelsPtStrategy } from './modelsScene.js';
 import { forestScene, forestStrategy, forestLinearStrategy } from './forestScene.js';
@@ -99,6 +104,62 @@ export const demoSuite: Record<string, SceneSuiteEntry> = {
             'DEMO — the blackbody lamp + the FIRST Hit.uv reader (impl-plan-blackbody-uv): a quad lamp whose emission is {blackbody: {kelvin, scale}} — both dials DRIVEN (kelvin → chroma is a CPU Planck-locus fold into u_lamp_kelvin_rgb; the power CDF re-weights live) — over a `checker` floor mixing two albedos in Hit.uv (today the placeholder planar xz chart, visibly)',
         expected:
             'a candle-warm (2900 K) pool over ivory/slate tiles; drag lamp.kelvin toward 1500 K → ember-red, toward 9000 K → blue-white, with ZERO recompiles (the chrome ball re-reflects the shift); lamp.power scales brightness independently of color; keys 1 (pt-nee) and 2 (pt) converge to the same image',
+    },
+    charts: {
+        scene: uvChartsScene,
+        strategies: posed([0, 1.5, 5.5], [0, 0.85, 0], uvChartsNeeStrategy, uvChartsPtStrategy),
+        exercises:
+            'DEMO — real per-primitive UV charts (fable-imagery P1): ONE `checker` material on a sphere, a quad, and a disk, so the same albedo pair reveals THREE parameterizations. sphere → (θ,φ) equirect · quad → natural [0,1]² along its edges · disk → polar (r/R, θ/2π). Before P1 all three showed the identical planar xz placeholder; now Hit.uv is real. Keys 1 (pt-nee) / 2 (pt).',
+        expected:
+            'a checkered sphere whose cells crowd toward its top/bottom poles (longitude/latitude) · a checkered panel with a perfectly even grid square-on to its edges · a checkered disk of concentric rings cut into angular wedges — three DIFFERENT patterns from one material; keys 1 and 2 converge',
+    },
+    grin: {
+        scene: grinScene,
+        strategies: posed([0, 2.1, 4.6], [0, 0.75, 0], grinNeeStrategy, grinPtStrategy),
+        exercises:
+            'DEMO — variable-IOR (gradient-index) media (fable-variable-ior.md): the tracer\'s FIRST curved-space feature. A Luneburg lens n(r)=√(2−(r/R)²) — a deflecting region whose rays integrate the Sharma ray ODE (velocity Verlet) instead of scattering, bending along the optical metric n²·δ. An INVISIBLE lens (continuous n, no Fresnel); you see the checker floor BENT and magnified through it. Keys 1 (pt-nee) / 2 (pt).',
+        expected:
+            'a checkered floor with a lens-shaped patch where the pattern is strongly warped/magnified (the rays bending through the invisible sphere) — the checker squeezes and inverts inside the lens silhouette; keys 1 and 2 converge',
+    },
+    maxwell: {
+        scene: maxwellScene,
+        strategies: posed([0, 2.1, 4.6], [0, 0.75, 0], maxwellStrategy),
+        exercises:
+            'DEMO — Maxwell\'s fisheye n(r) = 2/(1 + r²/R²): the classic absolute instrument. n = 1 EXACTLY at the rim (seamless \'none\' wall), n = 2 at the center; every interior ray is a CIRCLE and rim points image perfectly onto their antipodes. The closed-photon-orbit field the walk\'s bounce budget bounds — deep windings near the rim terminate by budget.',
+        expected:
+            'an invisible sphere showing a strongly inverted, wrapped image of the checker floor and sky — more extreme than the Luneburg card (rays can wind around inside before exiting); no Fresnel rim (the wall is seamless)',
+    },
+    blackhole: {
+        scene: blackholeScene,
+        strategies: posed([0, 1.9, 4.6], [0, 1.0, 0], blackholeStrategy),
+        exercises:
+            'DEMO — Majumdar–Papapetrou black holes in a glass block (the reference PathTracer\'s blackholeCube/Multi, idiomatic): two extremal holes in static equilibrium, n = U² = (1 + M/r₁ + M/r₂)² as the medium\'s ior formula. The dielectric wall refracts with the LOCAL field value per hit point; the interior runs the adaptive-step Verlet walker (DS_MAX/DTOL limiters); the shadows are PURE CAPTURE (n > GRIN_CAPTURE, inside the photon sphere) — dynamics, not geometry. Drag bh.mass live: 0 = plain glass block, up = stronger lensing.',
+        expected:
+            'a glassy block (Fresnel rim, refraction at the faces) containing TWO black disks — the hole shadows — surrounded by strong checker-floor/sky lensing (Einstein-ring-like distortion around each shadow); bh.mass → 0 relaxes it to an ordinary glass block',
+    },
+    accretion: {
+        scene: accretionScene,
+        strategies: posed([0, 1.75, 3.6], [0, 1.25, 0], accretionStrategy),
+        exercises:
+            'DEMO — a black hole with a glowing accretion disk in a crystal ball (impl-plan-grin-media batch 1): the disk is EMISSIVE MEDIUM (a thin equatorial ε torus in the hole\'s deflecting field, n = (1 + M/r)²) — the lensed disk image needs NO embedded geometry. Per-step collection along the bent path × the (n₀/n)² source factor; captured rays keep the glow they crossed. Drag bh.mass live.',
+        expected:
+            'the classic shot: a glowing ring with the black shadow disk at its center, the disk\'s FAR side lensed into arcs OVER and UNDER the shadow (light bent around the hole), all inside a subtly glassy sphere; bh.mass → 0 relaxes to a flat glowing torus in glass',
+    },
+    glassball: {
+        scene: glassGrinScene,
+        strategies: posed([0, 2.1, 4.6], [0, 0.75, 0], glassGrinStrategy),
+        exercises:
+            'DEMO — the HARD-INTERFACE GRIN (impl-plan-grin-interface): a VISIBLE glass ball whose interior index falls from 1.6 (center) to ~1.15 (wall). The dielectric wall fires with the LOCAL field value (ior_of(region, p) = the medium formula at the hit point) — Fresnel reflections and TIR at the surface — while the interior bends continuously through the Verlet walker. Glass and mirage in one object.',
+        expected:
+            'a recognizably GLASSY ball (bright Fresnel rim, floor reflections) whose refracted checker image is warped MORE than a uniform glass ball would show — the interior gradient adds continuous magnification on top of the surface refraction',
+    },
+    paint: {
+        scene: exprMaterialsScene,
+        strategies: posed([0, 1.5, 5.2], [0, 0.8, 0], exprMaterialsNeeStrategy, exprMaterialsPtStrategy),
+        exercises:
+            'DEMO — expression-driven materials (fable-imagery P2): albedo as a FORMULA over the surface chart `uv` (P1) and the shading point `p`, live sliders, zero recompiles. Left sphere = a cosine palette over uv (rainbow bands following the (θ,φ) chart); right sphere = a 3D sinusoid over the world point p (works chart-or-not). Same GlslExpression idiom the fog uses, pointed at material rows. Drag paint.freq. Keys 1 (pt-nee) / 2 (pt).',
+        expected:
+            'two spheres painted by math over a gray floor — the left one banded in rainbow stripes that wrap its surface, the right one a soft multicolor blob field; drag paint.freq to add bands/detail LIVE with no recompile; keys 1 and 2 converge',
     },
     chrome: {
         scene: chromeScene,

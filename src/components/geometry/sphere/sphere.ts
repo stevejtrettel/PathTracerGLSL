@@ -13,6 +13,7 @@ export const sphereDescriptor: PrimitiveDescriptor = {
     ],
     glsl: sphereGLSL,
     provides: { sdf: true, analytic: true },
+    uvChart: true,            // (θ,φ) chart — sphere_uv (fable-imagery P1)
     samplableAsLight: true,   // §6.2: emissive analytic spheres join the light registry
     bounds(v) {
         const c = (v.center as number[] | undefined) ?? [0, 0, 0];

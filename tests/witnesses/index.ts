@@ -25,6 +25,8 @@ import { bazaarScene, bazaarTableStrategy, bazaarUnrolledStrategy } from './scen
 import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies } from './scenes/meshWitness.js';
 import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy } from './scenes/instanceWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
+import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
+import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
 import {
     slabScene, slabStrategy,
     furnaceScatterScene, furnaceScatterStrategy,
@@ -137,6 +139,163 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         witness: {
             spp: 48,
             checks: [{ kind: 'mean', value: 0.4, tol: 0.01, label: 'mesh F-BOX 0.4' }],
+        },
+    },
+    // Fixture partner: the constant-albedo half of the expression-material twin (P2).
+    'expr-const-ref': {
+        scene: exprConstRef,
+        strategies: [exprTwinStrategy],
+        exercises: 'constant-albedo reference arm of the expr-const twin (sphere albedo = plain vec3)',
+    },
+    'expr-const': {
+        scene: exprConst,
+        strategies: [exprTwinStrategy],
+        exercises: 'sphere albedo authored as a GLSL FORMULA that evaluates to the reference constant (fable-imagery P2): the expression fill path + the (unread) chart gate must be transport-neutral — twin of expr-const-ref',
+        expected: 'pixel-identical to expr-const-ref — a formula that computes a constant shades exactly like that constant; the expression scene turns real uv charts on but this formula never reads uv, so it cannot move the image',
+        witness: {
+            spp: 64,
+            checks: [
+                // Identical integrand + identical stream → near-bit-exact; the small tolerances
+                // only absorb float-formatting of the literal. Any real gap = the expression fill
+                // (or the chart-on gate) perturbing transport.
+                { kind: 'twin', other: { scene: 'expr-const-ref' }, meanTol: 0.002, rmse: 0.01, label: 'formula ≡ constant albedo' },
+            ],
+        },
+    },
+    // Fixture partner: the lens-free half of the GRIN vacuum twin.
+    'grin-vacuum-ref': {
+        scene: grinVacuumRef,
+        strategies: posed([0, 1.4, 4], [0, 1, 0], grinVacuumStrategy),
+        exercises: 'reference arm of the grin-vacuum twin — the same scene with NO lens object',
+    },
+    'grin-vacuum': {
+        scene: grinVacuum,
+        strategies: posed([0, 1.4, 4], [0, 1, 0], grinVacuumStrategy),
+        exercises:
+            'constant-n ≡ vacuum (fable-variable-ior §6): an ior:1 lens routes rays through the GRIN Verlet walker (entry null crossing, ODE steps, refined boundary exit, delta record, current_medium recompute) and must be transport-INVISIBLE; the constant absorbing fog box puts the dispatcher\'s INLINE arm in the same program (the ms.deflected coexistence config of the Jul 21 bug)',
+        expected:
+            'converges to the SAME image as grin-vacuum-ref — n ≡ 1 bends nothing and weighs nothing. Any lens-shaped difference implicates the exit-ray spawn, boundary refinement, or medium re-classification; any FOG-shaped difference implicates dispatcher-ms initialization',
+        witness: {
+            spp: 128,
+            checks: [
+                // Same integrand, but streams diverge on lens-crossing pixels (the walk draws
+                // random2() the ref arm never consumes) and pt is chance-hit → the display-space
+                // RMSE tripwire, not χ². PROVISIONAL until calibrated at the pinned salt on the
+                // first sweep; converged pt equality stays the owner's GPU check.
+                { kind: 'twin', other: { scene: 'grin-vacuum-ref' }, meanTol: 0.02, rmse: 0.08, label: 'ior:1 lens ≡ no lens' },
+            ],
+        },
+    },
+    'grin-furnace': {
+        scene: grinFurnaceScene,
+        strategies: posed([0, 0, 0.6], [0, 0, -1], grinFurnaceStrategy),
+        exercises:
+            'F-BOX-M + a REAL Luneburg lens (n: √2 → 1, formula ior) inside the haze: genuine bending through the Verlet walker coexisting with the chromatic scattering arms; each traversal consumes a bounce (the orbit budget)',
+        expected:
+            'per-channel mean stays EXACTLY 0.4 — a weight-1 deflector cannot change the furnace equilibrium. Mean below 0.4 ⇒ bounce starvation or absorption sneaking into the GRIN arm; channels splitting ⇒ chromatic weight bug. NOTE: deliberately BLIND to wrong bending (any lossless field gives 0.4) — trajectory geometry is pinned by grin.test.ts (exact parabola + Bouguer); the F-LUNEBURG focal gate waits on probe checks',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'mean', value: 0.4, tol: 0.006, label: 'GRIN furnace 0.4/channel' }],
+        },
+    },
+    // Fixture partner: the plain-dielectric half of the hard-interface glass twin.
+    'grin-glass-ref': {
+        scene: grinGlassRef,
+        strategies: posed([0, 1.4, 4], [0, 1, 0], grinGlassStrategy),
+        exercises: 'reference arm of the grin-glass twin — the SAME sphere as a plain ior:1.5 dielectric (region-table constant, no ODE code in the program)',
+    },
+    'grin-glass': {
+        scene: grinGlass,
+        strategies: posed([0, 1.4, 4], [0, 1, 0], grinGlassStrategy),
+        exercises:
+            'THE HARD-INTERFACE TWIN (impl-plan-grin-interface): a constant-FORMULA medium ior on a dielectric wall routes through the FULL new pipeline — entry Fresnel reading ior_of(region, p), the Verlet walker on a straight line (∇n = 0), the t_max guard, the inside-exit handoff, exit Fresnel/TIR, the interior L/n² factor (= 1 at constant n)',
+        expected:
+            'converges to the SAME image as grin-glass-ref (plain glass through the GPU-verified F-ETA-class machinery). A lens-shaped difference implicates the handoff/guard/factor; a brightness difference in the ball implicates the η² bookkeeping split across entry/interior/exit',
+        witness: {
+            spp: 128,
+            checks: [
+                // Streams diverge (the GRIN arm consumes the medium branch's random2() and an
+                // extra bounce per traversal) and pt is chance-hit → the display-space RMSE
+                // tripwire, not χ². PROVISIONAL until calibrated at the pinned salt on the
+                // first sweep; converged pt equality stays the owner's GPU check.
+                { kind: 'twin', other: { scene: 'grin-glass-ref' }, meanTol: 0.02, rmse: 0.08, label: 'formula-ior glass ≡ plain glass' },
+            ],
+        },
+    },
+    // Fixture partner: the closed-form-arm half of the emission twin.
+    'grin-emit-ref': {
+        scene: grinEmitRef,
+        strategies: posed([0, 1.4, 4], [0, 1, 0], grinEmitStrategy),
+        exercises: 'reference arm of the grin-emit twin — the same emissive absorbing medium through the INLINE closed-form arm (no ior)',
+    },
+    'grin-emit': {
+        scene: grinEmit,
+        strategies: posed([0, 1.4, 4], [0, 1, 0], grinEmitStrategy),
+        exercises:
+            'EMISSION ALONG THE BENT PATH (impl-plan-grin-media batch 1): an ior:1 emissive absorbing medium through the GRIN walker\'s PER-STEP collection (E1.5 closed form each step × the (n₀/n)² source factor, ≡ 1 at constant n)',
+        expected:
+            'converges to the SAME image as grin-emit-ref — for constant coefficients the per-step sum TELESCOPES to the closed-form arm\'s exact integral. A glow-brightness difference implicates the per-step collection or the source factor',
+        witness: {
+            spp: 128,
+            checks: [
+                { kind: 'twin', other: { scene: 'grin-emit-ref' }, meanTol: 0.02, rmse: 0.08, label: 'per-step emission ≡ closed form' },
+            ],
+        },
+    },
+    'grin-furnace-emit': {
+        scene: grinFurnaceEmitScene,
+        strategies: posed([0, 0, 0.6], [0, 0, -1], grinFurnaceEmitStrategy),
+        exercises:
+            'THE KIRCHHOFF GATE (impl-plan-grin-media batch 1): an absorbing Luneburg region authored with its local thermal source ε(x) = σ_a·L₀·n²(x) (an expression ε on a deflecting medium — majorant-free by the carve). Radiance inside index n is n²·L₀, so equilibrium holds ONLY if emission carries the (n₀/n)² source factor',
+        expected:
+            'per-channel mean stays EXACTLY 0.4 — without the source factor the re-emitted term mis-scales by n² (up to 2× at the lens center) and the mean drifts. Every other furnace witness is blind to this term',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'mean', value: 0.4, tol: 0.006, label: 'Kirchhoff GRIN furnace 0.4/channel' }],
+        },
+    },
+    // Fixture partner: the analytic-arm half of the scattering twin.
+    'grin-scatter-ref': {
+        scene: grinScatterRef,
+        strategies: posed([0, 1.4, 4], [0, 1, 0], grinScatterStrategy),
+        exercises: 'reference arm of the grin-scatter twin — the same scattering medium through the analytic channel-MIS arm (no ior)',
+    },
+    'grin-scatter': {
+        scene: grinScatter,
+        strategies: posed([0, 1.4, 4], [0, 1, 0], grinScatterStrategy),
+        exercises:
+            'SCATTERING ALONG THE BENT PATH (impl-plan-grin-media batch 2): an ior:1 scattering medium through the GRIN arc-length channel-MIS sampler (the analytic arm\'s math with t → arc, the walk discovering the exit, the EVENT RAY riding exit_p/exit_dir)',
+        expected:
+            'converges to the SAME image as grin-scatter-ref (the analytic arm). A fog-brightness difference implicates the arc sampler\'s weights; a fog-SHAPE difference implicates the event-ray unification (the walk reading ms.exit_p/exit_dir)',
+        witness: {
+            spp: 128,
+            checks: [
+                { kind: 'twin', other: { scene: 'grin-scatter-ref' }, meanTol: 0.02, rmse: 0.08, label: 'arc channel-MIS ≡ analytic arm' },
+            ],
+        },
+    },
+    'grin-furnace-scatter': {
+        scene: grinFurnaceScatterScene,
+        strategies: posed([0, 0, 0.6], [0, 0, -1], grinFurnaceScatterStrategy),
+        exercises:
+            'the haze INSIDE the deflecting region (impl-plan-grin-media batch 2): a Luneburg lens whose OWN medium scatters (chromatic σ_s, HG g=0.7) — genuine bending × genuine scattering in one region walker',
+        expected:
+            'per-channel mean stays EXACTLY 0.4 — lossless scattering × lossless bending preserves the furnace equilibrium; channels splitting ⇒ chromatic weight bug in the arc sampler; low mean ⇒ bounce starvation (scatter events + traversals both consume bounces)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'mean', value: 0.4, tol: 0.006, label: 'scattering-interior GRIN furnace 0.4/channel' }],
+        },
+    },
+    'grin-furnace-hard': {
+        scene: grinFurnaceHardScene,
+        strategies: posed([0, 0, 0.6], [0, 0, -1], grinFurnaceHardStrategy),
+        exercises:
+            'the CONSERVATION gate for the hard interface: a dielectric-walled blob with a LINEAR field n(p) = 1.5 + 0.9·(y − c_y) — real Fresnel (η ≠ 1 at every wall point), TIR, genuine bending (constant vertical force), and DIFFERENT n at each path\'s entry and exit points',
+        expected:
+            'per-channel mean stays EXACTLY 0.4 — enter (1/n_A)² · interior (n_A/n_B)² · exit (n_B)² = 1 only if the interior L/n² factor is present and right; without it this reads visibly off 0.4 (grin-furnace, whose walls sit at n = 1, is blind to it). Mean below 0.4 ⇒ bounce starvation (TIR loops) before physics — raise maxBounces first',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'mean', value: 0.4, tol: 0.006, label: 'hard-interface GRIN furnace 0.4/channel' }],
         },
     },
     // Fixture partner: the analytic-quad half of the mesh-quad twin.

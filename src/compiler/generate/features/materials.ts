@@ -3,7 +3,7 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
-import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumMayScatter, isValueParam, isBlackbody, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumMayScatter, mediumIsDeflecting, isValueParam, isBlackbody, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -19,6 +19,7 @@ import { unionFields, defaultExpr } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
 import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
 import mediumDeltaTrackingGLSL from '../../../components/transport/volume/delta_tracking/delta_tracking.glsl?raw';
+import mediumGrinGLSL from '../../../components/transport/volume/grin/grin.glsl?raw';
 
 /** Capability lookup over the descriptor registry (R1a — replaces the inline
  *  MODEL_HAS_NONDELTA_LOBES map). 'none' is a boundary classification, not a model:
@@ -114,6 +115,12 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     if (media.present) {
         blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials, wantsNullTable) });
         blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models, phaseFields, media.emission) });
+        // IOR is consumed by its GRADIENT (the ray bends by ∇n), evaluated at many nearby points
+        // per GRIN step — so it gets its OWN cheap accessor, NOT a MediumProperties field (which
+        // bundles the value-consumed σ_a/σ_s/ε, read once per collision). fable-variable-ior.
+        if (media.deflecting) {
+            blocks.push({ origin: 'generated:ior-at', source: generateIorAt(plan.materials) });
+        }
         // The 'analytic' strategy bodies (volumetric-component §4) — needed by the scattering
         // arms (seam 1) and by the spectral shadow walker's per-segment form (seam 2).
         if (scatteringLive || wantsShadowMedia) {
@@ -122,11 +129,13 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         // The null-collision bodies (fable-heterogeneous-media.md): included wholesale
         // (§2.12) iff some medium routes to them — a Planner decision. Must follow the
         // generated properties lookup (the loops re-fetch at every tentative collision).
-        if (media.heterogeneousArms) {
-            // medium_emission (generated, impl-plan-medium-emission): the occupant's ONE
+        if (media.heterogeneousArms || media.deflecting) {
+            // medium_emission (generated, impl-plan-medium-emission): the occupants' ONE
             // program-dependent field access, behind a generated body per the static-file
             // rule — ε when emissive media exist, the folded constant ZERO otherwise
-            // (the combiner-weight pattern). Precedes the occupant that calls it.
+            // (the combiner-weight pattern). Precedes the occupants that call it: the
+            // null-collision loops AND the GRIN walker's per-step collection
+            // (impl-plan-grin-media batch 1).
             blocks.push({
                 origin: 'generated:medium-emission',
                 source: [
@@ -137,6 +146,8 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                     '}',
                 ].join('\n'),
             });
+        }
+        if (media.heterogeneousArms) {
             blocks.push({ origin: 'components/transport/volume/delta_tracking/delta_tracking.glsl', source: mediumDeltaTrackingGLSL });
         }
         if (scatteringLive) {
@@ -147,6 +158,12 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                 blocks.push({ origin: `components/volume_scattering/${m}/${m}.glsl`, source: VOLUME_SCATTERING_MODELS[m].glsl });
             }
             blocks.push({ origin: 'generated:medium-dispatch', source: generateMediumDispatch(plan.program.media.models, media.mediumEval, media.mediumPdf) });
+        }
+        // The GRIN region walker (fable-variable-ior): the ODE integrator behind the deflecting
+        // arm of medium_sample. Wholesale (§2.12), iff a deflecting medium exists. Precedes the
+        // dispatch that calls it; reads the generated medium-properties (.ior/.sigma_a) above.
+        if (media.deflecting) {
+            blocks.push({ origin: 'components/transport/volume/grin/grin.glsl', source: mediumGrinGLSL });
         }
         blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan, majorants) });
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).
@@ -181,6 +198,8 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             // ε rides the same machinery ({param} → vec3 uniform; expression → declared
             // float params) — but only when the field has a reader (media.emission, C5).
             if (media.emission) mintValueUniform(mat.medium.emission, 'vec3', 'color', uniforms, parameters, seen, true);   // ε: HDR
+            // GRIN n(x) — a scalar {param}/formula mints its slider(s) (fable-variable-ior).
+            if (media.deflecting && mat.medium.ior !== undefined) mintValueUniform(mat.medium.ior, 'float', 'float', uniforms, parameters, seen);
             // Phase params follow the schemas — the medium's OWN model's rows, and only
             // when that model is LIVE in this program (media.models): a driven phase_g
             // in an absorbing-only program has no reader, so it earns no uniform (C5).
@@ -213,7 +232,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     // Each entry mirrors its emission condition above — the interface header is truthful.
     const provides = [
-        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p, int element)' },
+        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element)' },
         { name: 'interaction_surface_sample', signature: 'InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u)' },
         { name: 'interaction_surface_emission', signature: 'Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp)' },
         { name: 'material_is_emissive', signature: 'bool material_is_emissive(int mat)' },
@@ -237,6 +256,12 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, vec3 p)' },
             { name: 'medium_sample', signature: 'MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi)' },
         );
+        if (media.deflecting) {
+            // The GRIN arm (grin.glsl) calls ior_at (self-provided) + scene_region_at (its own
+            // exit test) — honest linkage (fable-variable-ior).
+            provides.push({ name: 'ior_at', signature: 'float ior_at(int med, vec3 p)' });
+            requires.push('ior_at', 'scene_region_at');
+        }
         if (wantsNullTable) {
             provides.push({ name: 'is_null_interface', signature: 'bool is_null_interface(int mat)' });
         }
@@ -315,9 +340,10 @@ function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec): Deri
 function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySchema[], derivedByMat: Map<number, DerivedExpr[]>): string {
     const lines: string[] = [];
     lines.push('// Generated material properties lookup — assignments follow the models\' schemas (§3.4):');
-    lines.push('// a material sets exactly the fields its model reads, nothing else. `element` =');
-    lines.push('// Hit.element (the owner\'s sub-element index) — read only by ATTRIBUTE rows.');
-    lines.push('MaterialProperties scene_material_properties(int id, vec3 p, int element) {');
+    lines.push('// a material sets exactly the fields its model reads, nothing else. `p` (shading point)');
+    lines.push('// and `uv` (surface chart, fable-imagery P2) are the coordinates an expression row may');
+    lines.push('// reference; `element` = Hit.element (the owner\'s sub-element) — read only by ATTRIBUTE rows.');
+    lines.push('MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element) {');
     lines.push('    MaterialProperties props;');
     // Defaults from the union schemas — the GLSL expression DERIVED from the row's
     // numeric default.
@@ -492,12 +518,13 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
         if (wantsEmission && isEmissiveMedium(med)) {
             lines.push(`        m.emission = ${mediumPropertyExpr(med.emission, 'emission', formatSpectrum)};`);
         }
-        if (isHeterogeneousMedium(med)) {
+        if (isHeterogeneousMedium(med) && !mediumIsDeflecting(med)) {
             // D1 clamp IN THE LOOKUP (fable-heterogeneous-media.md, amended Jul 17): the
             // rendered medium IS the proportionally clamped field — no caller can observe
             // the unclamped formula. Proportional scale preserves the albedo field; only
             // extinction saturates. Emitted ONLY for expression media (constant branches
-            // are byte-identical to before).
+            // are byte-identical to before). DEFLECTING media are exempt (impl-plan-grin-
+            // media): the GRIN walker paces by the ODE, not σ̄ — no ceiling exists there.
             const maj = med.majorant;
             if (maj === undefined) {
                 // Backstop — the Validator pairs expressions with a declared majorant.
@@ -566,6 +593,25 @@ function generateMediumDispatch(models: string[], wantsEval: boolean, wantsPdf: 
 //   expression × absorbing  → ratio-tracked pass-through (delta_tracking occupant)
 //   expression × scattering → delta tracking (Kutz Alg. 4, delta_tracking occupant)
 // Every arm assigns ms.radiance (mandatory — §3 partition rule; uninitialized GLSL is garbage).
+// Generated IOR accessor (fable-variable-ior): the refractive index n(x) of a deflecting (GRIN)
+// medium — a scalar formula over `p` (raw: no Spectrum wrap, no clamp; the walker floors its own
+// divisions). SEPARATE from scene_medium_properties because ior is consumed by its GRADIENT (the
+// ray bends by ∇n, sampled at many nearby points per step), not by value alongside σ_a/σ_s/ε.
+// Default 1.0 = vacuum / non-deflecting. Spectral-ready: a `float lambda` arg joins here under a
+// future spectral axis (dispersion n(λ)), the same one-arg extension `uv` used for materials.
+function generateIorAt(materials: PlannedMaterial[]): string {
+    const deflecting = materials.filter((m) => m.medium !== null && m.medium.ior !== undefined);
+    const lines: string[] = ['// Generated IOR accessor (fable-variable-ior; consumed by ∇n, so NOT a MediumProperties field)'];
+    lines.push('float ior_at(int med, vec3 p) {');
+    deflecting.forEach((mat, i) => {
+        const cond = i === 0 ? 'if' : 'else if';
+        lines.push(`    ${cond} (med == ${mat.id}) return ${emitValue(mat.medium!.ior as ParamValue, formatFloat)};   // '${mat.name}'`);
+    });
+    lines.push('    return 1.0;   // vacuum / non-deflecting');
+    lines.push('}');
+    return lines.join('\n');
+}
+
 function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantSpec>): string {
     const withMedium = plan.materials.filter((m) => m.medium !== null);
     const scatteringLive = plan.program.media.scatteringArms;
@@ -574,12 +620,23 @@ function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantS
     lines.push('MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {');
     lines.push('    MediumSample ms;');
     lines.push('    ms.scattered = false;');
+    lines.push('    ms.deflected = false;   // every arm assigns it (structs_media rule) — this ms serves the inline arms + fallthrough');
+    lines.push('    ms.eta_scale = 1.0;     // ditto (impl-plan-grin-interface): only the GRIN arm folds an η² factor');
     lines.push('    ms.t = t_max;');
     lines.push('    ms.weight = SPECTRUM_ONE;');
     lines.push('    ms.radiance = SPECTRUM_ZERO;');
     const wantsEmission = plan.program.media.emission;
     for (const mat of withMedium) {
         const med = mat.medium!;
+        if (mediumIsDeflecting(med)) {
+            // Deflecting (GRIN, fable-variable-ior / impl-plan-grin-media): the ODE walker.
+            // Absorbing(+emitting) media take the deterministic walker; scattering media take
+            // the arc-length channel-MIS sampler (compile-time routing — policy generated,
+            // math static in grin.glsl). Precedes the straight scatter/absorb routing.
+            const grinScatters = scatteringLive && mediumMayScatter(med);
+            lines.push(`    if (med == ${mat.id}) return ${grinScatters ? 'medium_sample_grin_scatter' : 'medium_sample_grin'}(${mat.id}, ray, t_max, xi);   // '${mat.name}' — variable-IOR (GRIN, ${grinScatters ? 'scattering' : 'deterministic'})`);
+            continue;
+        }
         const scatters = scatteringLive && mediumMayScatter(med);   // the ONE census predicate (types.ts)
         if (mediumRoutesToTracking(med, scatters)) {
             const maj = majorants.get(mat.id)!.expr;
@@ -590,7 +647,7 @@ function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantS
         } else {
             lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — ${scatters ? 'scattering (analytic channel-MIS)' : 'absorbing-only (deterministic)'}`);
             if (scatters) {
-                lines.push(`        return medium_sample_analytic(scene_medium_properties(${mat.id}, ray.origin), t_max, xi);`);
+                lines.push(`        return medium_sample_analytic(scene_medium_properties(${mat.id}, ray.origin), ray, t_max, xi);`);
             } else {
                 lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, ray.origin);`);
                 if (wantsEmission && isEmissiveMedium(med)) {
@@ -671,6 +728,16 @@ function generateMediumTransmittance(materials: PlannedMaterial[]): string {
     const lines: string[] = ['// Generated volumetric-component dispatch (seam 2, fable-volumetric-component §2)'];
     lines.push('Spectrum medium_transmittance(int med, Ray ray, float len) {');
     for (const mat of withMedium) {
+        if (mediumIsDeflecting(mat.medium!)) {
+            // THE GLASS RULE (owner, Jul 21): a deflecting region is estimator-policy-wise a
+            // specular refractor. Light does not cross it in a straight line, so a straight
+            // shadow ray reporting transmittance would be MODEL BIAS (the exact class the
+            // glass-shadows decision ruled out) — and the kernel arm already carries the bent
+            // paths at full weight (deflection records as a delta event). OPAQUE, declared
+            // under the same measurement.shadows truncation dielectrics ride.
+            lines.push(`    if (med == ${mat.id}) return SPECTRUM_ZERO;   // '${mat.name}' — deflecting (GRIN): opaque to shadow rays`);
+            continue;
+        }
         if (isHeterogeneousMedium(mat.medium!)) {
             // Expression media only on this arm — the AUTHORED ceiling (Validator-paired);
             // {param}/constant media take the exact analytic branch below.

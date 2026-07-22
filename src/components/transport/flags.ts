@@ -16,6 +16,9 @@ export function flags(p: ProgramDescription) {
         /** Emissive media exist (impl-plan-medium-emission): the walk adds ms.radiance. */
         mediumEmission: p.media.emission,
         nulls: p.media.nullInterfaces,
+        /** A deflecting (GRIN) medium exists (fable-variable-ior): the walk handles the
+         *  ms.deflected outcome — spawn the bent exit ray, recompute current_medium. */
+        deflecting: p.media.deflecting,
         transmission: p.materials.models.some(modelTransmission),
         envSamplable: p.environmentSamplable,
         /** The env-vs-finite selection draw is live (u_envSelectProb exists); false in

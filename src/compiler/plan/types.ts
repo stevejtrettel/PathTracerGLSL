@@ -115,6 +115,10 @@ export interface MediaDesc {
     emission: boolean;
     /** Some material is model 'none' (§3.6): the null-crossing branch exists. */
     nullInterfaces: boolean;
+    /** A DEFLECTING (gradient-index) medium is present (fable-variable-ior.md): the
+     *  MediumProperties `ior` field, the GRIN arm in medium_sample, the grin.glsl walker,
+     *  and the walk's `deflected` branch exist. Exact-linkage — off ⇒ zero GRIN surface. */
+    deflecting: boolean;
     /** Media AND NEE: the spectral segment walker (shadow_media) replaces the boolean
      *  fast path (shadow_opaque) behind the §6.3 contract. */
     shadowWalker: boolean;
@@ -182,6 +186,12 @@ export interface MaterialsDesc {
     /** The interaction_surface_pdf dispatch exists — its only caller is the surface
      *  MIS weight. The surface twin of emitters.lightingPdf. */
     surfacePdf: boolean;
+    /** Some present material reads Hit.uv (checker/expression — fable-imagery P1). Gates
+     *  emission of the REAL per-primitive uv charts: when false (the common case — no scene
+     *  material reads uv), every hit-fill keeps the cheap planar placeholder, so a scene
+     *  with no uv materials pays zero chart cost (pre-P1 behavior). Not a linkage seam —
+     *  hit.uv is core state — purely the "don't derive what nothing consumes" gate. */
+    materialsReadUv: boolean;
 }
 
 export type LightingDesc =
@@ -260,10 +270,12 @@ export interface PlannedAnalyticObject {
     /** Authored provenance name (naming batch N5) — see PlannedSDFObject.name. */
     name?: string;
     parameters: Record<string, number | number[]>;
-    /** Present ONLY for driven placement (§6): parameters are then LOCAL (unfolded)
-     *  and the generated arm conjugates the ray into the rigid frame. Constant
-     *  placements fold entirely into `parameters` and this stays undefined. */
-    placement?: DrivenPlacement;
+    /** Present when the object keeps a LOCAL frame (parameters are then canonical/unfolded
+     *  and the generated arm conjugates the ray into the rigid frame): a DrivenPlacement for
+     *  {param} transforms (§6), OR a constant Similarity retained for a PATTERNED + rotated
+     *  shape (fable-imagery P1b — the chart needs the frame the fold would dissolve). Plain
+     *  constant placements fold entirely into `parameters` and this stays undefined. */
+    placement?: PlannedPlacement;
     /** This object has a scene-table record (fable-object-tables): under 'table' dispatch
      *  it leaves the unrolled arms (intersect via the TLAS leaf, containment via the
      *  record loop). Constant + bounded, per the adapter's ONE eligibility predicate. */
@@ -382,6 +394,9 @@ export interface PlannedMedium {
     /** Phase params of THIS medium's model (union fields of OTHER present models fall
      *  back to their row defaults at emit time). */
     values: Record<string, number | GlslExpression | ValueParam<number>>;
+    /** Refractive index n(x) — present iff this is a DEFLECTING (GRIN) medium
+     *  (fable-variable-ior.md); a scalar constant/{param}/formula over `p`. */
+    ior?: number | GlslExpression | ValueParam<number>;
 }
 
 /**

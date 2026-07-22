@@ -30,3 +30,14 @@ bool sphere_intersect(Ray ray, Sphere sp, out float t) {
 vec3 sphere_normal(vec3 p, Sphere sp) {
     return normalize(p - sp.center);
 }
+
+// Surface parameterization — the (θ,φ) equirectangular chart from the outward direction.
+// u = longitude ∈ [0,1), v = latitude (v=0 at the +y pole). AXIS-ALIGNED (fable-imagery P1
+// §7.2 v1): the analytic fold dissolves a sphere's rotation (a sphere IS rotation-invariant),
+// so this chart has no authored orientation to inherit — a chart-frame carry is the deferred fix.
+vec2 sphere_uv(vec3 p, Sphere sp) {
+    vec3 d = normalize(p - sp.center);
+    float u = atan(d.z, d.x) / TWO_PI + 0.5;
+    float v = acos(clamp(d.y, -1.0, 1.0)) / PI;
+    return vec2(u, v);
+}

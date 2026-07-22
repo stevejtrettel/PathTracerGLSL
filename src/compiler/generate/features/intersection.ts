@@ -10,7 +10,7 @@ import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, 
 import { isDrivenPlacement } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatMat3, formatVec3 } from '../../../components/glsl-format.js';
+import { formatFloat, formatMat3, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
 import { emitValue, type ParamValue } from '../values.js';
 import { MATERIAL_MODELS, modelTransmission } from '../../../components/materials/index.js';
 import {
@@ -29,6 +29,7 @@ import {
     isIdentityTranslation,
     quatConjugate,
     quatToMat3,
+    rigidInverse,
     type Similarity,
 } from '../../../components/geometry/similarity.js';
 
@@ -71,14 +72,19 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // constant-only scenes carry ZERO placement machinery (exact linkage).
     const drivenRecords: DrivenPlacement[] = [
         ...plan.objects.map((o) => o.placement).filter(isDrivenPlacement),
-        ...plan.analyticObjects.map((o) => o.placement).filter((p): p is DrivenPlacement => p !== undefined),
+        ...plan.analyticObjects.map((o) => o.placement).filter((p): p is DrivenPlacement => p !== undefined && isDrivenPlacement(p)),
         ...plan.meshes.map((m) => m.placement).filter(isDrivenPlacement),
     ];
+    // A patterned + rotated constant analytic shape keeps a similarity placement (P1b) and
+    // calls the SAME placement_* helpers as a driven object — but bakes constant vec4s, so it
+    // needs the ABI block WITHOUT being authored-driven (no uniforms). Broaden the placement
+    // gate to any PLACED analytic object; the driven-uniform machinery above stays uniform-only.
+    const placedAnalytic = plan.analyticObjects.some((o) => o.placement !== undefined);
     const uniforms: FeatureContribution['uniforms'] = [];
     const parameters: FeatureContribution['parameters'] = {};
     // placement.glsl (the rigid-frame ABI) is needed by driven placement AND by every instance
     // batch (the loop conjugates the ray with placement_rigid/dir/normal/scale).
-    if (plan.program.intersection.drivenPlacement || hasInstanced) {
+    if (plan.program.intersection.drivenPlacement || hasInstanced || placedAnalytic) {
         blocks.push({ origin: 'glsl/core/placement.glsl', source: placementGLSL });
         for (const rec of drivenRecords) {
             uniforms.push(...rec.uniforms);
@@ -117,9 +123,13 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'generated:named-shapes', source: namedShapes });
     }
 
+    // Real uv charts (fable-imagery P1) emit only when some scene material reads uv — else
+    // every hit-fill keeps the cheap planar placeholder (no wasted chart trig).
+    const chartUv = plan.program.materials.materialsReadUv;
+
     // SDF backend: per-scene march-bound dispatch + the marcher (sdf_intersect*).
     if (hasSDF) {
-        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects, ids) });
+        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects, ids, chartUv) });
         blocks.push({ origin: 'components/intersection/raymarch/raymarch.glsl', source: raymarchGLSL });
     }
 
@@ -133,7 +143,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // under table dispatch, only the RESIDUAL subset (driven/unbounded) unrolls here.
     const residualAnalytic = tableMode ? plan.analyticObjects.filter((o) => o.tabled !== true) : plan.analyticObjects;
     if (hasAnalytic && residualAnalytic.length > 0) {
-        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(residualAnalytic, anyQuery, ids) });
+        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(residualAnalytic, anyQuery, ids, chartUv) });
     }
 
     // The rail's addressing (glsl/core/data_texture.glsl: data_texel1d at DATA_TEX_WIDTH)
@@ -191,7 +201,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         if (instAccel.countDefine) {
             for (const b of plan.instanceBatches) defines[`INSTANCE_COUNT_${b.ordinal}`] = String(b.instanceCount);
         }
-        blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery, plan.program.intersection.instanceAccel, ids, !tableMode) });
+        blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery, plan.program.intersection.instanceAccel, ids, !tableMode, chartUv) });
     }
 
     // The scene table (fable-object-tables): record readers + leaf dispatch + the scene
@@ -204,7 +214,8 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects, plan.meshes, plan.instanceBatches, plan.ambientMedium) });
 
     // region → IOR table (§2.3 generated-tables family) — only when a transmissive model
-    // reads it (capability-driven, R1a — the far side's IOR has no shading point).
+    // reads it (capability-driven, R1a; both readers — dielectric_sample and the walk's
+    // eta_scale site — pass the hit point since the GRIN-interface unification).
     if (plan.materials.some((m) => modelTransmission(m.model))) {
         blocks.push({ origin: 'generated:ior-of', source: generateIorOf(plan.objects, plan.analyticObjects, plan.meshes, plan.materials) });
     }
@@ -246,7 +257,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         provides.push({ name: 'scene_intersect_any', signature: 'bool scene_intersect_any(Ray ray, float maxDist)' });
     }
     if (plan.materials.some((m) => modelTransmission(m.model))) {
-        provides.push({ name: 'ior_of', signature: 'float ior_of(int region)' });
+        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, vec3 p)' });
     }
 
     // Self-require: the generated scene_intersect classifies its boundary through
@@ -262,14 +273,13 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         provides.push({ name: 'data_texel1d', signature: 'ivec2 data_texel1d(uint i)' });
         requires.push('data_texel1d');
     }
-    if (plan.program.intersection.drivenPlacement || hasInstanced) {
+    if (plan.program.intersection.drivenPlacement || hasInstanced || placedAnalytic) {
         // Only the helpers the EMITTED code calls (dir/normal are analytic-arm
         // vocabulary; a driven-SDF-only program leaves them as unlisted wholesale
         // residue of the core file, like sdf_intersect_any inside raymarch.glsl).
         // Instance batches always use all four (rigid/dir/normal/scale) in the loop.
-        const anaDriven = plan.analyticObjects.some((o) => o.placement !== undefined);
         const meshDriven = plan.meshes.some((m) => isDrivenPlacement(m.placement));
-        const used = ['placement_rigid', 'placement_scale', ...((anaDriven || meshDriven || hasInstanced) ? ['placement_dir', 'placement_normal'] : [])];
+        const used = ['placement_rigid', 'placement_scale', ...((placedAnalytic || meshDriven || hasInstanced) ? ['placement_dir', 'placement_normal'] : [])];
         const sigs: Record<string, string> = {
             placement_rigid: 'vec3 placement_rigid(vec4 q, vec4 ts, vec3 p)',
             placement_dir: 'vec3 placement_dir(vec4 q, vec3 d)',
@@ -343,7 +353,7 @@ function generateNamedShapes(sdf: PlannedSDFObject[], analytic: PlannedAnalyticO
 // SDF backend dispatch (per-scene)
 // ============================================================================
 
-function generateSDFDispatch(objects: PlannedSDFObject[], ids: Map<number, string>): string {
+function generateSDFDispatch(objects: PlannedSDFObject[], ids: Map<number, string>, chartUv: boolean): string {
     const lines: string[] = [];
     lines.push('// Generated SDF dispatch');
 
@@ -364,6 +374,28 @@ function generateSDFDispatch(objects: PlannedSDFObject[], ids: Map<number, strin
             // ray_spawn) valid unchanged (fable-transforms §5.2). s > 0 by Validator pin.
             const scalePrefix = isIdentityScale(obj.placement.scale) ? '' : `${formatFloat(obj.placement.scale)} * `;
             lines.push(`    return ${scalePrefix}${generateSDFCall(obj, ids)};`);
+        }
+        lines.push(`}`);
+        lines.push('');
+    }
+
+    // Per-owner UV chart helpers (fable-imagery P1) — mirror sdf_<id>: the SAME world→local
+    // placement wrapper (so the chart inherits the placement's rotation — an SDF sphere gets an
+    // oriented chart for free, unlike the constant-folded analytic path, P1b), but NO scale
+    // prefix (uv is dimensionless; the shape ctor still absorbs s so (p−center)/radius is
+    // consistent). Only charted owners emit one; the dispatch below falls back to planar.
+    for (const obj of objects) {
+        const d = primitive(obj.sdfType);
+        if (!d.uvChart || !chartUv) continue;
+        lines.push(`vec2 uv_${ids.get(obj.index)!}(vec3 p) {`);
+        if (isDrivenPlacement(obj.placement)) {
+            const g = obj.placement;
+            lines.push(`    p = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p);`);
+            lines.push(`    float s = placement_scale(${g.uniformTS});`);
+            lines.push(`    return ${d.type}_uv(p, ${uvShapeRef(obj, ids, 's')});`);
+        } else {
+            lines.push(...emitPlacementQuery(obj.placement));
+            lines.push(`    return ${d.type}_uv(p, ${uvShapeRef(obj, ids)});`);
         }
         lines.push(`}`);
         lines.push('');
@@ -394,6 +426,20 @@ function generateSDFDispatch(objects: PlannedSDFObject[], ids: Map<number, strin
         lines.push(`    if (region == ${obj.index}) return sdf_${ids.get(obj.index)!}(p);`);
     }
     lines.push('    return 1e20;');
+    lines.push('}');
+    lines.push('');
+
+    // Per-owner UV chart dispatch (fable-imagery P1) — scene_object_sdf's sibling: the marcher's
+    // hit-fill dispatches on the hit owner. Charted owners route to uv_<id>; the rest keep the
+    // planar placeholder. Always emitted alongside scene_object_sdf (the static marcher calls it
+    // unconditionally, same as scene_object_sdf).
+    lines.push('vec2 scene_object_uv(vec3 p, int region) {');
+    for (const obj of objects) {
+        if (chartUv && primitive(obj.sdfType).uvChart) {
+            lines.push(`    if (region == ${obj.index}) return uv_${ids.get(obj.index)!}(p);`);
+        }
+    }
+    lines.push('    return vec2(p.x * UV_PLANAR_SCALE, p.z * UV_PLANAR_SCALE);');
     lines.push('}');
 
     return lines.join('\n');
@@ -437,13 +483,45 @@ function generateSDFCall(obj: PlannedSDFObject, ids: Map<number, string>, scaleE
     return emitSdfCall(primitive(obj.sdfType), obj.parameters, { point: 'p', scale: scaleExpr });
 }
 
+/** Hit.uv fill for an analytic hit-fill site (fable-imagery P1). The primitive's real chart
+ *  when it declares `uvChart` AND some scene material reads uv (`chartUv` = the scene-level
+ *  materialsReadUv gate — no chart trig when nothing consumes it); the planar-placeholder
+ *  (world xz) fallback otherwise. `chartPoint` is the point in the primitive's OWN frame —
+ *  world `hit.p` for the folded constant arm, the rigid-frame local point for the placed
+ *  arm (driven or a patterned shape's retained constant placement, P1b) so the chart tracks
+ *  the placement's rotation. */
+function uvFill(d: ReturnType<typeof primitive>, chartPoint: string, shapeRef: string, chartUv: boolean): string {
+    return d.uvChart && chartUv
+        ? `hit.uv = ${d.type}_uv(${chartPoint}, ${shapeRef});`
+        : `hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);`;
+}
+
+/** The rigid-frame ABI (§6.1) references for a placed analytic object — driven OR constant.
+ *  Driven objects forward their two uniform names; a CONSTANT placement retained for a
+ *  patterned shape (fable-imagery P1b) bakes the SAME `rigidInverse` payloads as compile-time
+ *  vec4 literals, so the ONE wrapper arm serves both — a patterned shape is a movable shape
+ *  with constant numbers. `placement_scale`/`_rigid`/`_dir`/`_normal` accept const args
+ *  identically, so the arm body below is untouched. */
+function placementRefs(p: PlannedPlacement): { q: string; ts: string } {
+    if (isDrivenPlacement(p)) return { q: p.uniformQ, ts: p.uniformTS };
+    const inv = rigidInverse(p);
+    return { q: formatVec4(inv.q), ts: formatVec4(inv.ts) };
+}
+
+/** The shape reference for a per-owner `uv_<id>` helper (SDF marcher path): the hoisted const
+ *  for a named constant object, else the inline ctor (s-scaled under the driven tier — the
+ *  same ctor sdf_<id> uses, so chart and distance field read one shape). */
+function uvShapeRef(obj: PlannedSDFObject, ids: Map<number, string>, scaleExpr?: string): string {
+    return hoistedShapeName(obj, ids) ?? emitCtor(primitive(obj.sdfType), obj.parameters, scaleExpr);
+}
+
 // ============================================================================
 // Analytic backend dispatch (per-scene)
 // ============================================================================
 // Nearest-hit over the analytic objects, and a first-blocker any-hit. p and the shading frame
 // come from ambient_geodesic/ambient_frame so they agree with the SDF path (cross-method match).
 
-function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: boolean, ids: Map<number, string>): string {
+function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: boolean, ids: Map<number, string>, chartUv: boolean): string {
     const lines: string[] = ['// Generated analytic dispatch'];
 
     // Nearest-hit bounded by the incoming hit.t (the running nearest — set by the caller / a prior
@@ -456,22 +534,25 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
         const d = primitive(obj.shapeType);
         const sn = structName(d);
         if (obj.placement !== undefined) {
-            // Driven (§6.1): conjugate into the RIGID frame once; the struct's
-            // length-like fields absorb s in-shader, so t is a WORLD value —
-            // comparable on hit.t unchanged, and the primitives' internal EPSILON
-            // guards stay world-correct.
-            const g = obj.placement;
+            // Placed arm — DRIVEN (§6.1) or a CONSTANT placement retained for a patterned
+            // shape (fable-imagery P1b): conjugate into the RIGID frame once, so hit-finding
+            // AND the uv chart both run in the shape's own frame. The struct's length-like
+            // fields absorb s in-shader, so t is a WORLD value — comparable on hit.t unchanged,
+            // and the primitives' internal EPSILON guards stay world-correct. The chart inherits
+            // the placement's rotation for free (no rotation-dissolution — that only bites the
+            // FOLDED constant arm below).
+            const { q, ts } = placementRefs(obj.placement);
             lines.push(`    {`);
-            lines.push(`        Ray lray = make_ray(placement_rigid(${g.uniformQ}, ${g.uniformTS}, ray.origin), placement_dir(${g.uniformQ}, ray.direction));`);
-            lines.push(`        float s = placement_scale(${g.uniformTS});`);
+            lines.push(`        Ray lray = make_ray(placement_rigid(${q}, ${ts}, ray.origin), placement_dir(${q}, ray.direction));`);
+            lines.push(`        float s = placement_scale(${ts});`);
             lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters, 's')};`);
             lines.push(`        if (${d.type}_intersect(lray, shape, t) && t < hit.t) {`);
             lines.push(`            hit.t = t; found = true;`);
             lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
-            lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${g.uniformQ}, ${d.type}_normal(lray.origin + t * lray.direction, shape)));`);
+            lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${q}, ${d.type}_normal(lray.origin + t * lray.direction, shape)));`);
             lines.push(`            hit.region_owner = ${obj.index};`);
             lines.push(`            hit.element = 0;`);
-            lines.push(`            hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);`);
+            lines.push(`            ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`);
             lines.push(`        }`);
             lines.push(`    }`);
             continue;
@@ -488,7 +569,7 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
         lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, ${shapeRef}));`);
         lines.push(`            hit.region_owner = ${obj.index};`);
         lines.push(`            hit.element = 0;`);
-        lines.push(`            hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);`);
+        lines.push(`            ${uvFill(d, 'hit.p', shapeRef, chartUv)}`);
         lines.push(`        }`);
         lines.push(`    }`);
     }
@@ -501,10 +582,10 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
         lines.push('    float t;');
         for (const obj of objects) {
             if (obj.placement !== undefined) {
-                const g = obj.placement;
+                const { q, ts } = placementRefs(obj.placement);
                 lines.push(`    {`);
-                lines.push(`        Ray lray = make_ray(placement_rigid(${g.uniformQ}, ${g.uniformTS}, ray.origin), placement_dir(${g.uniformQ}, ray.direction));`);
-                lines.push(`        float s = placement_scale(${g.uniformTS});`);
+                lines.push(`        Ray lray = make_ray(placement_rigid(${q}, ${ts}, ray.origin), placement_dir(${q}, ray.direction));`);
+                lines.push(`        float s = placement_scale(${ts});`);
                 lines.push(`        if (${analyticTest(obj, 'lray', ids, 's')} && t < maxDist) return true;`);
                 lines.push(`    }`);
                 continue;
@@ -652,7 +733,7 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
 
 /** The per-placement leaf body for placement index `i` (reads texture → conjugate → intersect →
  *  record into hit / return-true for the any variant). Indentation is cosmetic. */
-function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean): string[] {
+function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boolean): string[] {
     const pb = b.slot.placementsBase;
     const read = [
         `                vec4 q  = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i)), 0);`,
@@ -695,11 +776,11 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean): string[] {
         '                    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
         `                    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${b.prototype.shapeType}_normal(lray.origin + t * lray.direction, shape))));`,
         `                    hit.region_owner = ${b.index};`,
-        '                    hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);',
+        `                    ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`,
         '                }'];
 }
 
-function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boolean, instanceAccel: string, ids: Map<number, string>, emitAggregator: boolean): string {
+function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boolean, instanceAccel: string, ids: Map<number, string>, emitAggregator: boolean, chartUv: boolean): string {
     const lines: string[] = [`// Generated instance dispatch (${instanceAccel} — impl-plan-tlas)`];
     // The walk skeleton comes from the registry occupant (components/intersection
     // INSTANCE_ACCELS: tlas = stack-DFS over the batch's node texture, linear = the
@@ -709,7 +790,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
     for (const b of batches) {
         lines.push(`bool instance_${ids.get(b.index)!}(Ray ray, inout Hit hit) {`);
         lines.push('    bool found = false;');
-        lines.push(...accel.walk(b.slot, b.ordinal, 'hit.t', instanceLeafItem(b, false)));
+        lines.push(...accel.walk(b.slot, b.ordinal, 'hit.t', instanceLeafItem(b, false, chartUv)));
         lines.push('    return found;');
         lines.push('}');
         lines.push('');
@@ -728,7 +809,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
         lines.push('');
         for (const b of batches) {
             lines.push(`bool instance_any_${ids.get(b.index)!}(Ray ray, float maxDist) {`);
-            lines.push(...accel.walk(b.slot, b.ordinal, 'maxDist', instanceLeafItem(b, true)));
+            lines.push(...accel.walk(b.slot, b.ordinal, 'maxDist', instanceLeafItem(b, true, chartUv)));
             lines.push('    return false;');
             lines.push('}');
         }
@@ -763,12 +844,13 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
     for (const obj of analytic) {
         if (table !== undefined && obj.tabled === true) continue;   // containment via the record loop below
         if (obj.placement !== undefined && !primitive(obj.shapeType).thin) {
-            // Driven (§6.1): classify in the rigid frame with s-scaled params — d stays
-            // an exact WORLD signed distance, so innermost-wins compares correctly
-            // across constant and driven objects. (Driven THIN primitives fall through:
-            // zero thickness never claims containment, placement irrelevant.)
-            const g = obj.placement;
-            lines.push(`    { vec3 lp = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p); float s = placement_scale(${g.uniformTS});`);
+            // Placed (§6.1) — driven OR a patterned-shape's retained constant placement (P1b):
+            // classify in the rigid frame with s-scaled params — d stays an exact WORLD signed
+            // distance, so innermost-wins compares correctly across constant and placed objects.
+            // (THIN primitives fall through: zero thickness never claims containment, placement
+            // irrelevant.)
+            const { q, ts } = placementRefs(obj.placement);
+            lines.push(`    { vec3 lp = placement_rigid(${q}, ${ts}, p); float s = placement_scale(${ts});`);
             lines.push(`      d = ${emitSignedDistance(primitive(obj.shapeType), obj.parameters, { point: 'lp', scale: 's' })}; }`);
         } else {
             lines.push(`    d = ${analyticSignedDistance(obj, ids)};`);
@@ -889,7 +971,7 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         lines.push(`                hit.frame = ambient_frame(hit.p, ${k.type}_normal(hit.p, shape));`);
         lines.push('                hit.region_owner = int(hdr.y);');
         lines.push('                hit.element = 0;');
-        lines.push('                hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);');
+        lines.push(`                ${uvFill(d, 'hit.p', 'shape', plan.program.materials.materialsReadUv)}`);
         lines.push('            }');
         lines.push('        }');
     }
@@ -994,22 +1076,36 @@ function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticOb
     return lines.join('\n');
 }
 
-// region → IOR of the region's interior (reference-implementations §2: dielectrics read the far
-// side's IOR without a full material-properties fetch). Non-dielectric materials are 1.0
-// (vacuum-like — pinned in the Planner), ior_of(-1) = 1.0 (ambient; ambientMedium is a media-era
-// concern, §2.4). Value<T>-driven ior reads its uniform (declared via the materials {param} scan).
+// region → IOR of the region's interior at a point (reference-implementations §2: dielectrics
+// read the far side's IOR without a full material-properties fetch). The point argument is the
+// GRIN-interface unification (impl-plan-grin-interface): a region whose material carries a
+// deflecting medium answers with the medium's n(x) FORMULA evaluated at p — Snell/Fresnel at a
+// curved-index wall is ordinary Snell with the LOCAL n on each side — while constant rows ignore
+// p (fold away). Non-dielectric materials are 1.0 (vacuum-like — pinned in the Planner),
+// ior_of(-1, p) = 1.0 (ambient; ambientMedium is a media-era concern, §2.4). Value<T>-driven ior
+// reads its uniform (declared via the materials {param} scan — same for formula params).
 function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], materials: PlannedMaterial[]): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
-    const lines: string[] = ['// Generated region -> IOR table (§2.3 family)'];
-    lines.push('float ior_of(int region) {');
+    const lines: string[] = ['// Generated region -> IOR table (§2.3 family; p = the GRIN-interface point argument)'];
+    lines.push('float ior_of(int region, vec3 p) {');
     // CLOSED meshes have a real interior (fable-mesh-containment) and earn rows like any
     // solid; open meshes stay off the table (thin — the Validator's warning covers them).
     for (const obj of [...sdf, ...analytic, ...meshes.filter((m) => m.closed)].sort((a, b) => a.index - b.index)) {
         const mat = byId.get(obj.materialId);
+        if (!mat) continue;
+        // ONE ior truth (impl-plan-grin-interface): a deflecting medium's formula IS the
+        // region's index — the surface row is superseded (the Validator rejects authoring
+        // both). Emitted for ANY wall model ('none' too: correct for the deferred nested
+        // case, ≈ 1.0 under the v1 continuous-wall contract, and exact linkage keeps ior_of
+        // out of programs with no transmission).
+        if (mat.medium?.ior !== undefined) {
+            lines.push(`    if (region == ${obj.index}) return ${emitValue(mat.medium.ior as ParamValue, formatFloat)};   // '${mat.name}' — deflecting: the medium's n(p)`);
+            continue;
+        }
         // Non-transmissive materials are PINNED to 1.0 (fall through to the default), even if the
         // author set an ior on them — an authored lambert ior leaking into the table silently
         // yields η = 1 at adjacent dielectric boundaries (review finding). The Validator warns.
-        if (!mat || !modelTransmission(mat.model)) continue;
+        if (!modelTransmission(mat.model)) continue;
         // No property name here (materials-§7): the transmission capability implies a
         // region-table row on the declaring model's schema — found structurally.
         const row = MATERIAL_MODELS[mat.model]?.properties.find((p) => p.storage === 'region-table');
@@ -1019,7 +1115,7 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
         // (no shading point, so it can't ride scene_material_properties, but the read obeys the
         // same one split point). An expression is rejected (the Validator already diagnosed it).
         const expr = emitValue(ior as ParamValue, formatFloat as (x: never) => string, () => {
-            throw new Error(`intersection: material '${mat.name}': ior cannot be a GLSL expression (ior_of is region-indexed, no shading point)`);
+            throw new Error(`intersection: material '${mat.name}': the surface ior row cannot be a GLSL expression — a spatial index is a medium: author it as medium: { ior: <formula> } (fable-variable-ior)`);
         });
         lines.push(`    if (region == ${obj.index}) return ${expr};`);
     }

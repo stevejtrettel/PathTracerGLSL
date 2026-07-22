@@ -41,6 +41,8 @@
 MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max, vec2 xi) {
     MediumSample ms;
     ms.scattered = false;
+    ms.deflected = false;
+    ms.eta_scale = 1.0;
     ms.t = t_max;
     ms.weight = SPECTRUM_ONE;
     ms.radiance = SPECTRUM_ZERO;
@@ -87,6 +89,11 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
             // Real scatter (Alg. 4 line 8): w ⊙ sigma_s / (sigma_bar · P_s).
             ms.scattered = true;
             ms.t = t;
+            // The EVENT RAY (impl-plan-grin-media): every scattering arm reports its event's
+            // position + incident direction — straight arms trivially, the GRIN arm because
+            // a bent event is not recomputable from (origin, dir, t).
+            ms.exit_p   = ambient_geodesic(ray.origin, ray.direction, t);
+            ms.exit_dir = ray.direction;
             ms.weight = w * m.sigma_s / (sigma_bar * max(ps, 1e-20));
             return ms;
         }
@@ -107,6 +114,8 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
 MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float t_max) {
     MediumSample ms;
     ms.scattered = false;
+    ms.deflected = false;
+    ms.eta_scale = 1.0;
     ms.t = t_max;
     ms.radiance = SPECTRUM_ZERO;
 

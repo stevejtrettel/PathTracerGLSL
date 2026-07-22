@@ -20,9 +20,12 @@ float    dielectric_pdf (Direction wi, Direction wo, Hit hit, MaterialProperties
 Spectrum dielectric_emission(Direction wo, Hit hit, MaterialProperties mp) { return SPECTRUM_ZERO; }
 
 InteractionSample dielectric_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
-    // Media on both sides come from the HIT (§4.1), not from the material:
-    float n_i = ior_of(hit.region_from);
-    float n_t = ior_of(hit.region_to);
+    // Media on both sides come from the HIT (§4.1), not from the material. The point argument
+    // is the GRIN-interface unification (impl-plan-grin-interface): a deflecting region answers
+    // with its n(x) evaluated AT THE WALL POINT — Snell/Fresnel with the local index on each
+    // side; constant regions ignore p.
+    float n_i = ior_of(hit.region_from, hit.p);
+    float n_t = ior_of(hit.region_to, hit.p);
     float eta = n_i / n_t;
 
     Direction n = hit.frame.n;                        // oriented toward region_from (§4.1)
