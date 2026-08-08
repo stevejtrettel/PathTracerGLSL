@@ -33,6 +33,11 @@ export function parseInstances(buffer: ArrayBuffer): InstanceTable {
     const count = view.getUint32(8, true);
     if (count === 0) throw new Error('inst: count is 0 — nothing to place');
     const flags = view.getUint32(12, true);
+    // Bits 3–31 are reserved: an unknown bit means an optional block this loader cannot
+    // place, so the byte arithmetic below would misdiagnose the file as corrupt.
+    if ((flags & ~0x7) !== 0) {
+        throw new Error(`inst: unknown flag bits 0x${(flags & ~0x7).toString(16)} — file written by a newer format version`);
+    }
     const aabbF = new Float32Array(buffer, 16, 6);
     const aabb = {
         min: [aabbF[0], aabbF[1], aabbF[2]] as [number, number, number],

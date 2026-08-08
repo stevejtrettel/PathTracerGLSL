@@ -90,6 +90,13 @@ describe('parseInstances rejects corrupt input loudly', () => {
         new DataView(buf).setUint32(8, 0, true);
         expect(() => parseInstances(buf)).toThrow(/count is 0/);
     });
+
+    it('unknown flag bits (a newer writer), not the misleading length error', () => {
+        const buf = good();
+        const view = new DataView(buf);
+        view.setUint32(12, view.getUint32(12, true) | 0x8, true);
+        expect(() => parseInstances(buf)).toThrow(/unknown flag bits 0x8.*newer format version/);
+    });
 });
 
 describe('encoder input validation', () => {
@@ -102,6 +109,10 @@ describe('encoder input validation', () => {
             positions: new Float32Array(3),
             scalars: { ['x'.repeat(40)]: new Float32Array(1) },
         })).toThrow(/1\.\.31/);
+    });
+    it('rejects non-finite positions (NaN would silently escape the header AABB)', () => {
+        expect(() => encodeInstances({ positions: new Float32Array([0, 0, 0, 1, NaN, 2]) }))
+            .toThrow(/positions\[4\] \(instance 1\) is not finite/);
     });
 });
 

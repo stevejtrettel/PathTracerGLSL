@@ -76,6 +76,14 @@ describe('instanceCloud hook semantics', () => {
         expect((hooked.placements as PackedPlacements).sizes![0]).toBeCloseTo(1, 6);
     });
 
+    it('sizeScale with NO per-instance size source folds into the prototype radius (no sizes column)', () => {
+        const sizeless = { ...table };
+        delete (sizeless as { sizes?: Float32Array }).sizes;
+        const o = instanceCloud(sizeless, { shape: 'sphere', material: 'point', sizeScale: 0.25 });
+        expect((o.placements as PackedPlacements).sizes).toBeUndefined();
+        expect((o.prototype as { parameters: Record<string, unknown> }).parameters.radius).toBe(0.25);
+    });
+
     it('color hook + colorDrives override the baked column and the target row', () => {
         const o = instanceCloud(table, {
             shape: 'sphere', material: 'point',

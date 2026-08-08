@@ -49,6 +49,8 @@ offset            size    field
 12                4       u32 flags              bit0 = sizes present
                                                  bit1 = colors present
                                                  bit2 = orientations present
+                                                 bits 3–31 RESERVED (must be 0;
+                                                 readers reject unknown bits)
 16                24      f32×6 AABB of the POSITIONS: min.x min.y min.z max.x max.y max.z
                           (positions only — do NOT inflate by radii; must be finite)
 40                4       u32 K                  scalar column count (0 allowed)
@@ -60,7 +62,8 @@ offset            size    field
                           2026-08-07") — the renderer stamps this string into every
                           exported image, so a render is traceable to its data.
 —— payload blocks, in exactly this order, each present iff flagged ——
-positions         f32 × 3N     x0 y0 z0 x1 y1 z1 …
+positions         f32 × 3N     x0 y0 z0 x1 y1 z1 …  (must be finite — the encoder
+                               rejects NaN/Inf, which would escape the header AABB)
 sizes             f32 × N
 colors            f32 × 3N     r0 g0 b0 …  (linear RGB)
 orientations      f32 × 4N     x0 y0 z0 w0 …  (unit quaternions)

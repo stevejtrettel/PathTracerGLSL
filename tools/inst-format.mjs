@@ -87,6 +87,11 @@ export function encodeInstances(table) {
     for (let i = 0; i < positions.length; i += 3) {
         for (let a = 0; a < 3; a++) {
             const v = positions[i + a];
+            // NaN compares false both ways — without this guard a bad row silently
+            // falls outside the header AABB and only surfaces at render time.
+            if (!Number.isFinite(v)) {
+                throw new Error(`inst encode: positions[${i + a}] (instance ${i / 3}) is not finite`);
+            }
             if (v < aabb[a]) aabb[a] = v;
             if (v > aabb[3 + a]) aabb[3 + a] = v;
         }

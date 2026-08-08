@@ -5,6 +5,8 @@
 // placement lists so a forest or a lattice is one call. Constant placements only (v1).
 
 import type { InstancedObject, PrimitiveObject, MeshObject, Transform, Vec3 } from '../compiler/types.js';
+import { foldAnalyticParameters } from '../components/geometry/index.js';
+import type { PrimitiveValues } from '../components/descriptors.js';
 import type { InstanceTable } from './loadInstances.js';
 
 /** One prototype placed at N transforms, sharing the geometry. The prototype's material becomes
@@ -52,7 +54,7 @@ export function grid(counts: [number, number, number], spacing: number, center: 
  *  SDF-only today (params not closed under rotation — the top-level analytic fold would
  *  silently drop a rotated box's rotation). The instanced local-frame arm is rotation-safe,
  *  so cube's real prerequisite is a per-context backend fact (fable-instance-clouds §8). */
-const CLOUD_SHAPES: Record<string, { type: string; parameters: Record<string, unknown> }> = {
+const CLOUD_SHAPES: Record<string, { type: string; parameters: PrimitiveValues }> = {
     sphere: { type: 'sphere', parameters: { radius: 1.0 } },
 };
 
@@ -65,7 +67,8 @@ export interface InstanceCloudOptions {
     /** Which schema row the color column overrides ('albedo' on lambert, 'f0' on
      *  mirror, …). Default 'albedo' when colors exist. */
     colorDrives?: string;
-    /** The cheap dial: multiplies baked/hooked sizes (uniform rescale needs no source data). */
+    /** The cheap dial: multiplies baked/hooked sizes; with NO per-instance size source it
+     *  folds into the unit prototype's parameters instead (no sizes column, s = 1 records). */
     sizeScale?: number;
     /** CPU size hook (pack-time, NEVER on the GPU — pin 3): overrides baked sizes,
      *  reading named scalar columns. A hook touching an absent column yields NaN and the
@@ -90,10 +93,20 @@ export function instanceCloud(table: InstanceTable, opts: InstanceCloudOptions):
         sizes = new Float32Array(n);
         for (let i = 0; i < n; i++) sizes[i] = opts.size(table.scalars, i);
     }
+    let parameters = { ...proto.parameters };
     if (opts.sizeScale !== undefined && opts.sizeScale !== 1) {
-        const scaled = new Float32Array(n);
-        for (let i = 0; i < n; i++) scaled[i] = opts.sizeScale * (sizes !== undefined ? sizes[i] : 1);
-        sizes = scaled;
+        if (sizes !== undefined) {
+            const scaled = new Float32Array(n);
+            for (let i = 0; i < n; i++) scaled[i] = opts.sizeScale * sizes[i];
+            sizes = scaled;
+        } else {
+            // No per-instance size source: fold the uniform scale into the UNIT
+            // prototype's parameters (the ONE kind-derived fold, under a pure-scale
+            // similarity) instead of materializing an N-array of one constant.
+            parameters = foldAnalyticParameters(proto.type, parameters, {
+                rotation: [0, 0, 0, 1], translation: [0, 0, 0], scale: opts.sizeScale,
+            });
+        }
     }
 
     let colors = table.colors;
@@ -107,7 +120,7 @@ export function instanceCloud(table: InstanceTable, opts: InstanceCloudOptions):
 
     return {
         kind: 'instanced',
-        prototype: { type: proto.type, parameters: { ...proto.parameters }, material: opts.material } as PrimitiveObject,
+        prototype: { type: proto.type, parameters, material: opts.material } as PrimitiveObject,
         placements: {
             count: n,
             positions: table.positions,
