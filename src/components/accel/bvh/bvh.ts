@@ -232,7 +232,13 @@ export function buildBVHNodesFlat(boxes: Float64Array, n: number): { nodes: Floa
         console.warn(`BVH depth ${maxDepth} >= BVH_STACK_DEPTH ${BVH_STACK_DEPTH} for ${n} items — the GLSL walk may drop deep subtrees; raise BVH_STACK_DEPTH or check for degenerate geometry.`);
     }
 
-    return { nodes: nodes.slice(0, nodeCount * 8), nodeCount, order, maxDepth };
+    // A VIEW, not a copy: `.slice` here copied ~90MB at 1.4M items (nodeCount ≈ 1.4N at
+    // leaf size 2), doubling peak memory inside the pack worker right before transfer.
+    // Every consumer handles views (App writes via subarray; the worker transfer moves
+    // the whole underlying buffer — a move, not a copy). Accepted trade-off: a caller
+    // that CACHES the result (App's packCached meshes) retains the oversized buffer —
+    // bounded, since mesh BLAS node counts are far below cloud TLAS scale.
+    return { nodes: nodes.subarray(0, nodeCount * 8), nodeCount, order, maxDepth };
 }
 
 /** Object-input adapter for callers holding AABB[] (App-side world boxes etc.). */

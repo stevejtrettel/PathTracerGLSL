@@ -6,7 +6,7 @@ import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
-import { sceneInstanceBatches, instanceAttributeRows, placementCount, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
+import { sceneInstanceBatches, instanceAttributeRows, placementCount, type AttributeRowSpec, type PackedInstanceBatch } from '../components/intersection/instancing/instancing.js';
 import { packInstanceBatchOffThread } from './utils/instancePack.js';
 import { similarityFromTransform, similarityApplyPoint } from '../components/geometry/similarity.js';
 import { canonicalizePrimitiveParameters, primitiveBounds, foldAnalyticParameters, primitive } from '../components/geometry/index.js';
@@ -277,9 +277,12 @@ export class App {
 
         const batchRoots: AABB[] = [];
         const batches = sceneInstanceBatches(scene.objects);
+        // Prep serially (writeMesh's channel writes stay on-thread, in ordinal order),
+        // launching each batch's pack as soon as its inputs are ready — a multi-cloud
+        // scene runs its SAH builds in CONCURRENT workers instead of one after another.
+        const packs: Array<Promise<PackedInstanceBatch>> = [];
         for (let ordinal = 0; ordinal < batches.length; ordinal++) {
             const batch = batches[ordinal];
-            const slot = layout.batches[ordinal];
             // The prototype's LOCAL box (mesh = BLAS root; analytic = primitive bounds) → the
             // batch TLAS over the instance world boxes.
             let localBox: { min: [number, number, number]; max: [number, number, number] };
@@ -306,13 +309,16 @@ export class App {
                 : undefined;
             // Off the main thread (fable-instance-clouds §8 stage 2) — a 1M-instance SAH
             // build must not freeze the page; byte-identical output, sync fallback inside.
-            const packed = await packInstanceBatchOffThread(localBox, placements, attrs);
+            packs.push(packInstanceBatchOffThread(localBox, placements, attrs));
+        }
+        (await Promise.all(packs)).forEach((packed, ordinal) => {
+            const slot = layout.batches[ordinal];
             writeTexels(ch.records, slot.placementsBase, packed.placements);
-            assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placementCount(batch.placements)));
+            assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placementCount(batches[ordinal].placements)));
             writeTexels(ch.nodes, slot.tlasBase, packed.nodes.subarray(0, packed.nodeCount * 8));
             if (packed.attributes !== undefined) writeTexels(ch.records, slot.attrsBase, packed.attributes);
             batchRoots.push(rootBoxOf(packed.nodes, packed.nodeCount));
-        }
+        });
 
         // The scene TABLE (fable-object-tables): analytic records (folded via the SAME
         // canonicalize+fold chain the Planner bakes — bake ≡ ship), the leaf list in

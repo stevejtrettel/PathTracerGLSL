@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { packInstanceBatch, placementCount, isPackedPlacements, type AttributeRowSpec } from '../../src/components/intersection/instancing/instancing.js';
-import { similarityFromTransform, type Similarity } from '../../src/components/geometry/similarity.js';
+import { similarityFromTransform, rigidInverse, type Similarity } from '../../src/components/geometry/similarity.js';
 import type { PackedPlacements, Transform } from '../../src/compiler/types.js';
 
 const LOCAL_BOX = { min: [-1, -1, -1] as [number, number, number], max: [1, 1, 1] as [number, number, number] };
@@ -81,6 +81,27 @@ describe('packInstanceBatch: packed arm ≡ Similarity[] arm', () => {
         const a = packInstanceBatch(LOCAL_BOX, transforms.map((t) => similarityFromTransform(t)), rowsLit);
         const b = packInstanceBatch(LOCAL_BOX, packed, rowsPacked);
         expect(Array.from(b.attributes!)).toEqual(Array.from(a.attributes!));
+    });
+});
+
+describe('packInstanceBatch: flat record transcription', () => {
+    it('a single-instance record equals rigidInverse of the placement (the op-for-op gate)', () => {
+        // n = 1 → the TLAS permutation is trivially [0], so record 0 addresses placement 0.
+        const q: [number, number, number, number] = [0.1, -0.4, 0.2, 0.88];
+        const packed: PackedPlacements = {
+            count: 1,
+            positions: new Float32Array([1.5, -2.25, 3.125]),
+            sizes: new Float32Array([0.75]),
+            orientations: new Float32Array(q),
+        };
+        const b = packInstanceBatch(LOCAL_BOX, packed);
+        const g = similarityFromTransform({
+            position: [1.5, -2.25, 3.125],
+            scale: 0.75,
+            rotation: [Math.fround(q[0]), Math.fround(q[1]), Math.fround(q[2]), Math.fround(q[3])],
+        });
+        const inv = rigidInverse(g);
+        expect(Array.from(b.placements)).toEqual([...inv.q, ...inv.ts].map(Math.fround));
     });
 });
 
