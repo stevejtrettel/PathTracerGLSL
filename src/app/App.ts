@@ -6,7 +6,8 @@ import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
-import { packInstanceBatch, sceneInstanceBatches, instanceAttributeRows, placementCount, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
+import { sceneInstanceBatches, instanceAttributeRows, placementCount, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
+import { packInstanceBatchOffThread } from './utils/instancePack.js';
 import { similarityFromTransform, similarityApplyPoint } from '../components/geometry/similarity.js';
 import { canonicalizePrimitiveParameters, primitiveBounds, foldAnalyticParameters, primitive } from '../components/geometry/index.js';
 import { buildBVHNodes, rootBoxOf, transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
@@ -170,7 +171,7 @@ export class App {
         // before any pass could bind them. Scene-static data → uploaded once, then only bound.
         if (config.scene !== undefined) {
             try {
-                this._uploadSceneGeometry(config.scene);
+                await this._uploadSceneGeometry(config.scene);
             } catch (error: any) {
                 this._showErrorOverlay(error);
                 throw error;
@@ -228,7 +229,7 @@ export class App {
      * missing extern). A pack CACHE (by object reference) means a prototype shared by
      * batches — or used standalone too — builds its BVH once.
      */
-    private _uploadSceneGeometry(scene: SceneDescription): void {
+    private async _uploadSceneGeometry(scene: SceneDescription): Promise<void> {
         const { tenants, batchGeometrySlot, table } = dataTenantsOf(scene);
         if (tenants.meshes.length === 0 && tenants.batches.length === 0) return;
         const layout = planDataLayout(tenants);
@@ -275,7 +276,9 @@ export class App {
         });
 
         const batchRoots: AABB[] = [];
-        sceneInstanceBatches(scene.objects).forEach((batch, ordinal) => {
+        const batches = sceneInstanceBatches(scene.objects);
+        for (let ordinal = 0; ordinal < batches.length; ordinal++) {
+            const batch = batches[ordinal];
             const slot = layout.batches[ordinal];
             // The prototype's LOCAL box (mesh = BLAS root; analytic = primitive bounds) → the
             // batch TLAS over the instance world boxes.
@@ -301,13 +304,15 @@ export class App {
                 ? instanceAttributeRows(scene.materials[batch.prototype.material]?.model ?? '', batch.attributes)
                     .map((r) => ({ shape: r.shape, values: batch.attributes![r.source] }))
                 : undefined;
-            const packed = packInstanceBatch(localBox, placements, attrs);
+            // Off the main thread (fable-instance-clouds §8 stage 2) — a 1M-instance SAH
+            // build must not freeze the page; byte-identical output, sync fallback inside.
+            const packed = await packInstanceBatchOffThread(localBox, placements, attrs);
             writeTexels(ch.records, slot.placementsBase, packed.placements);
             assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placementCount(batch.placements)));
             writeTexels(ch.nodes, slot.tlasBase, packed.nodes.subarray(0, packed.nodeCount * 8));
             if (packed.attributes !== undefined) writeTexels(ch.records, slot.attrsBase, packed.attributes);
             batchRoots.push(rootBoxOf(packed.nodes, packed.nodeCount));
-        });
+        }
 
         // The scene TABLE (fable-object-tables): analytic records (folded via the SAME
         // canonicalize+fold chain the Planner bakes — bake ≡ ship), the leaf list in

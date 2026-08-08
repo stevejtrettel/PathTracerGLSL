@@ -233,7 +233,7 @@ entries render through this seam.
 | Item | Trigger |
 |---|---|
 | **'cube' shape** | needs an analytic box intersector, and box is DELIBERATELY SDF-only (params not closed under rotation — the top-level fold would silently drop a rotated box's rotation, which is WHY `provides.analytic` is false). The instanced local-frame arm is rotation-safe, so the prerequisite is a per-context backend fact ("analytic under instancing, SDF top-level") — a descriptor-axis design discussion, not a build-batch improvisation. v1 = sphere-only; found at build time (§9.3). |
-| Typed-array/iterative SAH builder (+ Web Worker pack) | first real ~500k+ dataset (recursive AABB[] builder proven to 300k @ 2–5 s) |
+| ~~Typed-array SAH builder + Web Worker pack~~ **DONE Aug 8 2026** | trigger fired at steiner/crixxi/octic (724k/745k/1.4M). Flat core (fused bounds+centroid pass, tri-axis single-pass binning) is BYTE-IDENTICAL to the old builder (reference-twin gate `tests/components/bvhFlat.test.ts`) at 2.8× (1M boxes 5.3s→1.9s; octic full pack 6.4→4.0s node-side); the pack runs in a Web Worker (`src/app/utils/packWorker.ts` — App-side plumbing, sync core stays in components; copy-in/transfer-out so table views never detach; loud sync fallback), so the page stays interactive during load. |
 | ~~`DATA_TEX_WIDTH` 2048 → 4096~~ **DONE Aug 7 2026** | the 1.4M-instance octic cloud tripped the ceiling the same day — trigger fired as written; vitest 1355 green, zero snapshot churn |
 | In-app retune (re-run hooks + repack + re-upload, no reload) | wanting to PLAY with laws; pin 4 makes it a data-only op |
 | Drag-drop `File` into the page | owner want; loader already accepts `File` |

@@ -12,7 +12,7 @@
 import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 import type { AsyncSceneSuiteEntry } from '../tests/witnesses/types.js';
 import { loadInstances } from '../src/authoring/loadInstances.js';
-import { instanceCloud } from '../src/authoring/instance.js';
+import { instanceCloud, type InstanceCloudOptions } from '../src/authoring/instance.js';
 import { withPose } from '../src/authoring/strategy.js';
 
 interface CloudSceneConfig {
@@ -28,6 +28,11 @@ interface CloudSceneConfig {
     /** Batch albedo for files WITHOUT a colors column (steiner: all points one class —
      *  the converter omits the column, the material carries the look). */
     pointAlbedo?: [number, number, number];
+    /** Per-entry instanceCloud overrides — size/color HOOKS against the file's scalar
+     *  columns (CPU-only at pack time), sizeScale, colorDrives. The retune surface:
+     *  edit + reload, never re-convert (c32 is the first user — sizing/colormapping
+     *  a limit set by its `hits` density column). */
+    cloud?: Partial<InstanceCloudOptions>;
 }
 
 const CONFIGS: Record<string, CloudSceneConfig> = {
@@ -76,6 +81,26 @@ const CONFIGS: Record<string, CloudSceneConfig> = {
         fov: 0.85,
         room: { floorY: -19, ceilingY: 40, wallX: 50, wallZ: 50, lampHalf: 7, lampEmission: 32 },
     },
+    c32: {
+        url: '/test-data/c32.inst',
+        // 5.6k points of a Kleinian limit set (limit-sets sp6/c32, depth 14) — the FIRST
+        // externally-generated .inst (the one-pager doing its job). Flat cloud (x ±10,
+        // y ±0.3, z ±2.2); baked sizes are a uniform 0.01 floor, but the file ships a
+        // `hits` density column (1 → 234k) — hooks below size AND colormap by log-hits.
+        // Floor sits close under the flat set for shadow contact.
+        pose: { position: [5, 4, 8], target: [0, 0, 0] },
+        fov: 0.85,
+        room: { floorY: -1.5, ceilingY: 12, wallX: 16, wallZ: 16, lampHalf: 3, lampEmission: 14 },
+        cloud: {
+            // t = log-normalized visitation density in [0,1] (max hits 234598 → log10 ≈ 5.37).
+            size: (cols, i) => 0.018 + 0.022 * (Math.log10(cols.hits[i]) / 5.37),
+            color: (cols, i) => {
+                const t = Math.log10(cols.hits[i]) / 5.37;
+                // Ember→gold ramp: rarely-visited points smolder dark, dense core glows.
+                return [0.15 + 0.85 * t, 0.04 + 0.66 * Math.pow(t, 1.5), 0.02 + 0.30 * Math.pow(t, 2.5)];
+            },
+        },
+    },
 };
 
 async function buildCloudScene(id: string, cfg: CloudSceneConfig): Promise<SceneDescription> {
@@ -95,7 +120,7 @@ async function buildCloudScene(id: string, cfg: CloudSceneConfig): Promise<Scene
             { type: 'plane', parameters: { normal: [-1, 0, 0], offset: wallX }, material: 'teal' },  // x = +wallX
             { type: 'plane', parameters: { normal: [0, 0, 1], offset: wallZ }, material: 'navy' },   // z = -wallZ (facing camera)
             { type: 'plane', parameters: { normal: [0, 0, -1], offset: wallZ }, material: 'teal' },  // z = +wallZ (behind camera)
-            instanceCloud(table, { shape: 'sphere', material: 'point', name: 'cloud' }),
+            instanceCloud(table, { shape: 'sphere', material: 'point', name: 'cloud', ...cfg.cloud }),
         ],
         materials: {
             // Overridden per instance when the file carries colors; THE look otherwise.
@@ -154,4 +179,6 @@ export const dataScenes: Record<string, AsyncSceneSuiteEntry> = {
         'DATA — 744k points of the sextic Crixxi surface: pink S4 shell with rare classes (8.8k rationals + handfuls of green/blue/orange) — needle-in-haystack coloring at scale.'),
     octic: cloudEntry('octic',
         'DATA — the 1.4M-point ceiling-breaker (fable-instance-clouds §8): the hyperoctahedral octic, the batch that triggered DATA_TEX_WIDTH 2048→4096. One-time TLAS build at load takes tens of seconds (the SoA SAH builder is the deferred fix).'),
+    c32: cloudEntry('c32',
+        'DATA — the first EXTERNALLY-generated .inst (the inst-onepager interchange working): a Kleinian limit set from the limit-sets tool, 5.6k points. Both HOOKS live against the shipped `hits` scalar column — size + ember→gold colormap by log visitation density; edit the hooks in dataScenes.ts + reload to retune (never re-convert).'),
 };

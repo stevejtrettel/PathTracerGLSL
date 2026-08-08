@@ -13,8 +13,8 @@
 
 import type { InstancedObject, ObjectDescription, PackedPlacements } from '../../../compiler/types.js';
 import type { Similarity } from '../../geometry/similarity.js';
-import { rigidInverse, similarityApplyPoint, quatNormalize, IDENTITY_QUAT } from '../../geometry/similarity.js';
-import { buildBVHNodes, transformAABB, type AABB } from '../../accel/bvh/bvh.js';
+import { rigidInverse, quatNormalize, IDENTITY_QUAT } from '../../geometry/similarity.js';
+import { buildBVHNodesFlat, type AABB } from '../../accel/bvh/bvh.js';
 import { MATERIAL_MODELS } from '../../materials/index.js';
 
 /** The scene's instanced batches in scene order — index IS the batch ordinal (see header). */
@@ -89,12 +89,48 @@ export function packInstanceBatch(localBox: AABB, placements: Similarity[] | Pac
     const sim = Array.isArray(placements)
         ? (i: number): Similarity => placements[i]
         : (i: number): Similarity => packedSimilarity(placements, i);
-    const boxes: AABB[] = new Array(n);
+    // World boxes, FLAT (Aug 8 allocation-discipline rewrite — no per-instance AABB
+    // objects or corner tuples at 1M instances). The corner transform below transcribes
+    // quatRotate ∘ similarityApplyPoint op-for-op, and the packed arm normalizes its
+    // quat like packedSimilarity — output is byte-identical to the old
+    // transformAABB(similarityApplyPoint) path (the bvhFlat reference-twin gate).
+    const boxes = new Float64Array(6 * n);
+    const packed = Array.isArray(placements) ? undefined : placements;
     for (let i = 0; i < n; i++) {
-        const g = sim(i);
-        boxes[i] = transformAABB(localBox, (p) => similarityApplyPoint(g, p));
+        let qx = 0, qy = 0, qz = 0, qw = 1, s = 1, tx: number, ty: number, tz: number;
+        if (packed === undefined) {
+            const g = (placements as Similarity[])[i];
+            qx = g.rotation[0]; qy = g.rotation[1]; qz = g.rotation[2]; qw = g.rotation[3];
+            s = g.scale; tx = g.translation[0]; ty = g.translation[1]; tz = g.translation[2];
+        } else {
+            if (packed.orientations !== undefined) {
+                const o = packed.orientations;
+                const len = Math.hypot(o[4 * i], o[4 * i + 1], o[4 * i + 2], o[4 * i + 3]);
+                qx = o[4 * i] / len; qy = o[4 * i + 1] / len; qz = o[4 * i + 2] / len; qw = o[4 * i + 3] / len;
+            }
+            if (packed.sizes !== undefined) s = packed.sizes[i];
+            tx = packed.positions[3 * i]; ty = packed.positions[3 * i + 1]; tz = packed.positions[3 * i + 2];
+        }
+        let minx = Infinity, miny = Infinity, minz = Infinity, maxx = -Infinity, maxy = -Infinity, maxz = -Infinity;
+        for (let c = 0; c < 8; c++) {
+            const px = (c & 1) ? localBox.max[0] : localBox.min[0];
+            const py = (c & 2) ? localBox.max[1] : localBox.min[1];
+            const pz = (c & 4) ? localBox.max[2] : localBox.min[2];
+            // quatRotate (v' = v + 2·qv × (qv × v + w·v), the no-trig expansion) then ·s + t.
+            const rtx = 2 * (qy * pz - qz * py);
+            const rty = 2 * (qz * px - qx * pz);
+            const rtz = 2 * (qx * py - qy * px);
+            const wx = (px + qw * rtx + qy * rtz - qz * rty) * s + tx;
+            const wy = (py + qw * rty + qz * rtx - qx * rtz) * s + ty;
+            const wz = (pz + qw * rtz + qx * rty - qy * rtx) * s + tz;
+            if (wx < minx) minx = wx; if (wx > maxx) maxx = wx;
+            if (wy < miny) miny = wy; if (wy > maxy) maxy = wy;
+            if (wz < minz) minz = wz; if (wz > maxz) maxz = wz;
+        }
+        boxes[6 * i] = minx; boxes[6 * i + 1] = miny; boxes[6 * i + 2] = minz;
+        boxes[6 * i + 3] = maxx; boxes[6 * i + 4] = maxy; boxes[6 * i + 5] = maxz;
     }
-    const { nodes, nodeCount, order } = buildBVHNodes(boxes);
+    const { nodes, nodeCount, order } = buildBVHNodesFlat(boxes, n);
     const place = new Float32Array(n * 8);
     for (let i = 0; i < n; i++) {
         const { q, ts } = rigidInverse(sim(order[i]));

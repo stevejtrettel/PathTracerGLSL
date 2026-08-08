@@ -1,12 +1,22 @@
 // components/accel/bvh/bvh.ts — binned-SAH BVH builder (impl-plan-mesh-bvh v1; audit
-// batch 3 moved it to accel/ — the spatial-index SUBSTRATE family).
+// batch 3 moved it to accel/ — the spatial-index SUBSTRATE family; typed-array core
+// Aug 8 2026 — the fable-instance-clouds §8 "~500k+ dataset" trigger, fired by
+// steiner/crixxi/octic at 724k/745k/1.4M).
 //
 // Pure TS ("precompute the HOW" — the GPU consumes a flat node array, never builds).
-// `buildBVHNodes` is the SAH core over ANY AABB list — one builder, many feeders: the
-// mesh BLAS (triangle boxes, `buildBVH` below), the instance TLAS (placement boxes,
-// intersection/instancing), and whatever indexes next (light BVH, scene TLAS). Build is
+// `buildBVHNodesFlat` is the SAH core over ANY flat AABB list — one builder, many
+// feeders: the mesh BLAS (triangle boxes, `buildBVH` below), the instance TLAS
+// (placement boxes, intersection/instancing), and whatever indexes next. Build is
 // shared and execution-agnostic; QUERIES live with their domains (the ray walks read
 // this node layout via accel/bvh/bvh.glsl + the generated TLAS walk).
+//
+// ALLOCATION DISCIPLINE (the Aug 8 rewrite): the old core built per-item AABB objects,
+// per-split bin-box object arrays, and a growing number[] — tens of millions of
+// short-lived allocations at 1M items, and GC dominated build time. This core touches
+// ONLY preallocated flat arrays. The ALGORITHM is unchanged and every float op keeps
+// its original order/precision (f64 box math, f32 centroid/area stores — matching the
+// old object fields), so output is BYTE-IDENTICAL to the previous builder — enforced
+// by the reference-twin gate in tests/components/bvhFlat.test.ts.
 //
 // Node encoding (2 RGBA32F texels — no bit-packing, no usampler2D; impl-plan-mesh-bvh §3):
 //   texel 0 = (min.x, min.y, min.z, A)
@@ -17,9 +27,9 @@
 export const BVH_LEAF_SIZE = 2;   // stop splitting at ≤ this many triangles
 export const BVH_BINS = 12;       // SAH candidate planes per axis
 /** GLSL traversal stack depth (bvh.glsl). A well-balanced SAH tree needs ~2·log₂(N)+slack,
- *  so 64 covers millions of items; buildBVHNodes warns if a (degenerate) tree would exceed it —
- *  the walk guards against overflow but would silently drop subtrees past the stack. ONE source:
- *  the feature emits `#define BVH_STACK_DEPTH` from this const. */
+ *  so 64 covers millions of items; buildBVHNodesFlat warns if a (degenerate) tree would
+ *  exceed it — the walk guards against overflow but would silently drop subtrees past the
+ *  stack. ONE source: the feature emits `#define BVH_STACK_DEPTH` from this const. */
 export const BVH_STACK_DEPTH = 64;
 
 export interface BVHResult {
@@ -40,139 +50,220 @@ function emptyAABB(): AABB { return { min: [Infinity, Infinity, Infinity], max: 
 function growPoint(b: AABB, p: [number, number, number]): void {
     for (let a = 0; a < 3; a++) { if (p[a] < b.min[a]) b.min[a] = p[a]; if (p[a] > b.max[a]) b.max[a] = p[a]; }
 }
-function growAABB(b: AABB, o: AABB): void {
-    for (let a = 0; a < 3; a++) { if (o.min[a] < b.min[a]) b.min[a] = o.min[a]; if (o.max[a] > b.max[a]) b.max[a] = o.max[a]; }
-}
-function surfaceArea(b: AABB): number {
-    const dx = b.max[0] - b.min[0], dy = b.max[1] - b.min[1], dz = b.max[2] - b.min[2];
-    if (dx < 0 || dy < 0 || dz < 0) return 0;   // empty
-    return 2 * (dx * dy + dy * dz + dz * dx);
-}
-
-/** The SAH BVH core over ANY list of item AABBs — shared by the BLAS (items = triangles) and the
- *  TLAS (items = instance/object boxes). Returns the flat node array (2 texels/node) + the item
- *  ORDER permutation (leaves are contiguous ranges of it) + max depth. The caller re-emits its own
- *  per-item payload (triangle indices / placement rows) in `order`. */
-export function buildBVHNodes(boxes: AABB[]): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
-    const N = boxes.length;
-    const cx = new Float32Array(N), cy = new Float32Array(N), cz = new Float32Array(N);
-    for (let t = 0; t < N; t++) {
-        cx[t] = (boxes[t].min[0] + boxes[t].max[0]) * 0.5;
-        cy[t] = (boxes[t].min[1] + boxes[t].max[1]) * 0.5;
-        cz[t] = (boxes[t].min[2] + boxes[t].max[2]) * 0.5;
+/** The SAH core over a FLAT box list — `boxes` is 6 f64 per item (min.xyz, max.xyz).
+ *  Float64Array deliberately: the old core held box coords as f64 object fields, and the
+ *  SAH cost comparisons see f64 values — an f32 store here would perturb splits and break
+ *  the byte gate. Returns the flat node array (2 texels/node) + the item ORDER permutation
+ *  (leaves are contiguous ranges of it) + max depth. The caller re-emits its own per-item
+ *  payload (triangle indices / placement rows) in `order`. */
+export function buildBVHNodesFlat(boxes: Float64Array, n: number): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
+    // Centroids: f32 stores (matching the old core's Float32Array centroids exactly).
+    const cx = new Float32Array(n), cy = new Float32Array(n), cz = new Float32Array(n);
+    for (let t = 0; t < n; t++) {
+        cx[t] = (boxes[6 * t] + boxes[6 * t + 3]) * 0.5;
+        cy[t] = (boxes[6 * t + 1] + boxes[6 * t + 4]) * 0.5;
+        cz[t] = (boxes[6 * t + 2] + boxes[6 * t + 5]) * 0.5;
     }
-    const centroid = (t: number, a: number): number => (a === 0 ? cx[t] : a === 1 ? cy[t] : cz[t]);
+    // Hot loops select the axis ARRAY once, never per item (the old per-item
+    // `centroid(t, axis)` closure was a branchy call in the innermost pass).
+    const centroidOf = (a: number): Float32Array => (a === 0 ? cx : a === 1 ? cy : cz);
 
     // order[] is the working permutation of item ids; leaves become contiguous slices of it.
-    const order = new Uint32Array(N);
-    for (let i = 0; i < N; i++) order[i] = i;
+    const order = new Uint32Array(n);
+    for (let i = 0; i < n; i++) order[i] = i;
 
-    const nodes: number[] = [];
+    // ONE allocation per build for every scratch the old core allocated per NODE:
+    const nodes = new Float32Array(n > 0 ? 8 * (2 * n - 1) : 0);   // ≤ 2N−1 nodes over N leaves
+    let nodeCount = 0;
+    const bounds = new Float64Array(6);                 // current node's box
+    const cb = new Float64Array(6);                     // centroid bounds
+    const acc = new Float64Array(6);                    // sweep accumulator box
+    const binBox = new Float64Array(3 * BVH_BINS * 6);   // all three axes, one binning pass
+    const binCnt = new Int32Array(3 * BVH_BINS);
+    // f32 area/count stores — matching the old core's Float32Array sweeps (the SAH cost
+    // comparisons happen on these f32-rounded values; keeping that keeps the tree).
+    const leftArea = new Float32Array(BVH_BINS - 1), rightArea = new Float32Array(BVH_BINS - 1);
+    const leftCnt = new Int32Array(BVH_BINS - 1), rightCnt = new Int32Array(BVH_BINS - 1);
     let maxDepth = 0;
+
+    const resetBox = (b: Float64Array, at: number): void => {
+        b[at] = Infinity; b[at + 1] = Infinity; b[at + 2] = Infinity;
+        b[at + 3] = -Infinity; b[at + 4] = -Infinity; b[at + 5] = -Infinity;
+    };
+    const growBox = (b: Float64Array, at: number, src: Float64Array, sat: number): void => {
+        for (let a = 0; a < 3; a++) {
+            if (src[sat + a] < b[at + a]) b[at + a] = src[sat + a];
+            if (src[sat + 3 + a] > b[at + 3 + a]) b[at + 3 + a] = src[sat + 3 + a];
+        }
+    };
+    const area = (b: Float64Array, at: number): number => {
+        const dx = b[at + 3] - b[at], dy = b[at + 4] - b[at + 1], dz = b[at + 5] - b[at + 2];
+        if (dx < 0 || dy < 0 || dz < 0) return 0;   // empty
+        return 2 * (dx * dy + dy * dz + dz * dx);
+    };
 
     // Emit the subtree over order[start, end); returns the node's index. Left child is always the
     // node immediately after this one (implicit node+1), so we recurse LEFT first.
     const emit = (start: number, end: number, depth: number): number => {
         if (depth > maxDepth) maxDepth = depth;
-        const nodeIdx = nodes.length / 8;
-        nodes.push(0, 0, 0, 0, 0, 0, 0, 0);   // placeholder (filled below)
+        const nodeIdx = nodeCount++;
 
-        const bounds = emptyAABB();
-        for (let i = start; i < end; i++) growAABB(bounds, boxes[order[i]]);
+        // ONE fused pass: node bounds AND centroid bounds (independent min/max chains —
+        // fusing cannot change either result).
+        resetBox(bounds, 0);
+        resetBox(cb, 0);
+        for (let i = start; i < end; i++) {
+            const t = order[i];
+            const at = 6 * t;
+            if (boxes[at] < bounds[0]) bounds[0] = boxes[at];
+            if (boxes[at + 1] < bounds[1]) bounds[1] = boxes[at + 1];
+            if (boxes[at + 2] < bounds[2]) bounds[2] = boxes[at + 2];
+            if (boxes[at + 3] > bounds[3]) bounds[3] = boxes[at + 3];
+            if (boxes[at + 4] > bounds[4]) bounds[4] = boxes[at + 4];
+            if (boxes[at + 5] > bounds[5]) bounds[5] = boxes[at + 5];
+            if (cx[t] < cb[0]) cb[0] = cx[t]; if (cx[t] > cb[3]) cb[3] = cx[t];
+            if (cy[t] < cb[1]) cb[1] = cy[t]; if (cy[t] > cb[4]) cb[4] = cy[t];
+            if (cz[t] < cb[2]) cb[2] = cz[t]; if (cz[t] > cb[5]) cb[5] = cz[t];
+        }
         const count = end - start;
 
-        const makeLeaf = () => {
-            nodes[nodeIdx * 8 + 0] = bounds.min[0]; nodes[nodeIdx * 8 + 1] = bounds.min[1]; nodes[nodeIdx * 8 + 2] = bounds.min[2];
+        const makeLeaf = (): void => {
+            nodes[nodeIdx * 8 + 0] = bounds[0]; nodes[nodeIdx * 8 + 1] = bounds[1]; nodes[nodeIdx * 8 + 2] = bounds[2];
             nodes[nodeIdx * 8 + 3] = count;         // A = count (>= 1 → leaf)
-            nodes[nodeIdx * 8 + 4] = bounds.max[0]; nodes[nodeIdx * 8 + 5] = bounds.max[1]; nodes[nodeIdx * 8 + 6] = bounds.max[2];
+            nodes[nodeIdx * 8 + 4] = bounds[3]; nodes[nodeIdx * 8 + 5] = bounds[4]; nodes[nodeIdx * 8 + 6] = bounds[5];
             nodes[nodeIdx * 8 + 7] = start;         // B = offset
         };
 
         if (count <= BVH_LEAF_SIZE) { makeLeaf(); return nodeIdx; }
 
-        // Binned SAH over the CENTROID bounds, best of all three axes.
-        const cb = emptyAABB();
-        for (let i = start; i < end; i++) growPoint(cb, [cx[order[i]], cy[order[i]], cz[order[i]]]);
-
+        // Binned SAH, best of all three axes. ALL THREE axes bin in ONE pass over the
+        // range (the old core re-walked the range per axis — 3 passes). Per-axis bin
+        // contents are accumulated in the same ascending item order as the per-axis
+        // loops were, so every bin box/count — and hence every cost — is value-identical.
         let bestAxis = -1, bestSplit = -1, bestCost = Infinity;
-        for (let axis = 0; axis < 3; axis++) {
-            const lo = cb.min[axis], hi = cb.max[axis];
-            if (hi - lo < 1e-12) continue;   // degenerate on this axis — no useful split
-            const scale = BVH_BINS / (hi - lo);
-            const binBox: AABB[] = Array.from({ length: BVH_BINS }, emptyAABB);
-            const binCnt = new Int32Array(BVH_BINS);
+        const v0 = cb[3] - cb[0] >= 1e-12, v1 = cb[4] - cb[1] >= 1e-12, v2 = cb[5] - cb[2] >= 1e-12;
+        if (v0 || v1 || v2) {
+            const s0 = v0 ? BVH_BINS / (cb[3] - cb[0]) : 0;
+            const s1 = v1 ? BVH_BINS / (cb[4] - cb[1]) : 0;
+            const s2 = v2 ? BVH_BINS / (cb[5] - cb[2]) : 0;
+            const lo0 = cb[0], lo1 = cb[1], lo2 = cb[2];
+            for (let b = 0; b < 3 * BVH_BINS; b++) { resetBox(binBox, 6 * b); binCnt[b] = 0; }
             for (let i = start; i < end; i++) {
                 const tri = order[i];
-                let b = Math.floor((centroid(tri, axis) - lo) * scale);
-                if (b < 0) b = 0; if (b >= BVH_BINS) b = BVH_BINS - 1;
-                binCnt[b]++; growAABB(binBox[b], boxes[tri]);
+                const at = 6 * tri;
+                const bx0 = boxes[at], bx1 = boxes[at + 1], bx2 = boxes[at + 2];
+                const bx3 = boxes[at + 3], bx4 = boxes[at + 4], bx5 = boxes[at + 5];
+                for (let axis = 0; axis < 3; axis++) {
+                    let b: number;
+                    if (axis === 0) { if (!v0) continue; b = Math.floor((cx[tri] - lo0) * s0); }
+                    else if (axis === 1) { if (!v1) continue; b = Math.floor((cy[tri] - lo1) * s1); }
+                    else { if (!v2) continue; b = Math.floor((cz[tri] - lo2) * s2); }
+                    if (b < 0) b = 0; if (b >= BVH_BINS) b = BVH_BINS - 1;
+                    const slot = axis * BVH_BINS + b;
+                    binCnt[slot]++;
+                    const bt = 6 * slot;
+                    if (bx0 < binBox[bt]) binBox[bt] = bx0;
+                    if (bx1 < binBox[bt + 1]) binBox[bt + 1] = bx1;
+                    if (bx2 < binBox[bt + 2]) binBox[bt + 2] = bx2;
+                    if (bx3 > binBox[bt + 3]) binBox[bt + 3] = bx3;
+                    if (bx4 > binBox[bt + 4]) binBox[bt + 4] = bx4;
+                    if (bx5 > binBox[bt + 5]) binBox[bt + 5] = bx5;
+                }
             }
-            // Prefix (left) and suffix (right) sweeps over the BVH_BINS-1 candidate planes.
-            const leftArea = new Float32Array(BVH_BINS - 1), leftCnt = new Int32Array(BVH_BINS - 1);
-            const rightArea = new Float32Array(BVH_BINS - 1), rightCnt = new Int32Array(BVH_BINS - 1);
-            let accBox = emptyAABB(), accCnt = 0;
-            for (let b = 0; b < BVH_BINS - 1; b++) { growAABB(accBox, binBox[b]); accCnt += binCnt[b]; leftArea[b] = surfaceArea(accBox); leftCnt[b] = accCnt; }
-            accBox = emptyAABB(); accCnt = 0;
-            for (let b = BVH_BINS - 1; b > 0; b--) { growAABB(accBox, binBox[b]); accCnt += binCnt[b]; rightArea[b - 1] = surfaceArea(accBox); rightCnt[b - 1] = accCnt; }
-            for (let b = 0; b < BVH_BINS - 1; b++) {
-                if (leftCnt[b] === 0 || rightCnt[b] === 0) continue;
-                const cost = leftArea[b] * leftCnt[b] + rightArea[b] * rightCnt[b];
-                if (cost < bestCost) { bestCost = cost; bestAxis = axis; bestSplit = b; }
+            // Per-axis sweeps over the BVH_BINS-1 candidate planes (bins only — cheap).
+            // Axis order ascending, bins ascending, strict `<` — the old tie-breaking.
+            for (let axis = 0; axis < 3; axis++) {
+                if (axis === 0 ? !v0 : axis === 1 ? !v1 : !v2) continue;
+                const base = axis * BVH_BINS;
+                resetBox(acc, 0); let accCnt = 0;
+                for (let b = 0; b < BVH_BINS - 1; b++) {
+                    growBox(acc, 0, binBox, 6 * (base + b)); accCnt += binCnt[base + b];
+                    leftArea[b] = area(acc, 0); leftCnt[b] = accCnt;
+                }
+                resetBox(acc, 0); accCnt = 0;
+                for (let b = BVH_BINS - 1; b > 0; b--) {
+                    growBox(acc, 0, binBox, 6 * (base + b)); accCnt += binCnt[base + b];
+                    rightArea[b - 1] = area(acc, 0); rightCnt[b - 1] = accCnt;
+                }
+                for (let b = 0; b < BVH_BINS - 1; b++) {
+                    if (leftCnt[b] === 0 || rightCnt[b] === 0) continue;
+                    const cost = leftArea[b] * leftCnt[b] + rightArea[b] * rightCnt[b];
+                    if (cost < bestCost) { bestCost = cost; bestAxis = axis; bestSplit = b; }
+                }
             }
         }
 
         // SAH says don't split (or no valid split) → leaf. (parentSA·count is the no-split cost;
         // compare the raw split cost against it, both missing the shared /parentSA factor.)
-        const leafCost = surfaceArea(bounds) * count;
+        const leafCost = area(bounds, 0) * count;
         if (bestAxis === -1 || bestCost >= leafCost) { makeLeaf(); return nodeIdx; }
 
         // Partition order[start,end) by the winning axis/plane (Hoare-style in place).
-        const lo = cb.min[bestAxis], scale = BVH_BINS / (cb.max[bestAxis] - cb.min[bestAxis]);
+        const lo = cb[bestAxis], scale = BVH_BINS / (cb[3 + bestAxis] - cb[bestAxis]);
+        const cen = centroidOf(bestAxis);
         let mid = start;
         for (let i = start; i < end; i++) {
             const tri = order[i];
-            let b = Math.floor((centroid(tri, bestAxis) - lo) * scale);
+            let b = Math.floor((cen[tri] - lo) * scale);
             if (b < 0) b = 0; if (b >= BVH_BINS) b = BVH_BINS - 1;
             if (b <= bestSplit) { const tmp = order[i]; order[i] = order[mid]; order[mid] = tmp; mid++; }
         }
         // Degenerate partition guard (all to one side despite a "valid" plane) → median split.
         if (mid === start || mid === end) mid = (start + end) >> 1;
 
+        // Emission fields cached BEFORE recursion (bounds/scratch are shared — children clobber them).
+        const minx = bounds[0], miny = bounds[1], minz = bounds[2];
+        const maxx = bounds[3], maxy = bounds[4], maxz = bounds[5];
         emit(start, mid, depth + 1);   // left lands at nodeIdx + 1 (implicit — never stored)
         const rightIdx = emit(mid, end, depth + 1);
 
-        nodes[nodeIdx * 8 + 0] = bounds.min[0]; nodes[nodeIdx * 8 + 1] = bounds.min[1]; nodes[nodeIdx * 8 + 2] = bounds.min[2];
+        nodes[nodeIdx * 8 + 0] = minx; nodes[nodeIdx * 8 + 1] = miny; nodes[nodeIdx * 8 + 2] = minz;
         nodes[nodeIdx * 8 + 3] = -1 - bestAxis;    // A < 0 → internal, axis = -A-1
-        nodes[nodeIdx * 8 + 4] = bounds.max[0]; nodes[nodeIdx * 8 + 5] = bounds.max[1]; nodes[nodeIdx * 8 + 6] = bounds.max[2];
+        nodes[nodeIdx * 8 + 4] = maxx; nodes[nodeIdx * 8 + 5] = maxy; nodes[nodeIdx * 8 + 6] = maxz;
         nodes[nodeIdx * 8 + 7] = rightIdx;         // B = right child index
         return nodeIdx;
     };
 
-    if (N > 0) emit(0, N, 0);
+    if (n > 0) emit(0, n, 0);
 
     // The GLSL walk's fixed stack would silently drop subtrees past BVH_STACK_DEPTH (it guards the
     // array bound, so no crash — just missing geometry). Warn if a (near-)degenerate tree risks it.
     if (maxDepth >= BVH_STACK_DEPTH) {
-        console.warn(`BVH depth ${maxDepth} >= BVH_STACK_DEPTH ${BVH_STACK_DEPTH} for ${N} items — the GLSL walk may drop deep subtrees; raise BVH_STACK_DEPTH or check for degenerate geometry.`);
+        console.warn(`BVH depth ${maxDepth} >= BVH_STACK_DEPTH ${BVH_STACK_DEPTH} for ${n} items — the GLSL walk may drop deep subtrees; raise BVH_STACK_DEPTH or check for degenerate geometry.`);
     }
 
-    return { nodes: new Float32Array(nodes), nodeCount: nodes.length / 8, order, maxDepth };
+    return { nodes: nodes.slice(0, nodeCount * 8), nodeCount, order, maxDepth };
 }
 
-/** BLAS: a BVH over a triangle mesh. Computes per-triangle boxes, runs the shared core, and
- *  re-emits the triangle index in leaf order. Byte-identical to the pre-refactor builder. */
+/** Object-input adapter for callers holding AABB[] (App-side world boxes etc.). */
+export function buildBVHNodes(boxes: AABB[]): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
+    const n = boxes.length;
+    const flat = new Float64Array(6 * n);
+    for (let t = 0; t < n; t++) {
+        flat[6 * t] = boxes[t].min[0]; flat[6 * t + 1] = boxes[t].min[1]; flat[6 * t + 2] = boxes[t].min[2];
+        flat[6 * t + 3] = boxes[t].max[0]; flat[6 * t + 4] = boxes[t].max[1]; flat[6 * t + 5] = boxes[t].max[2];
+    }
+    return buildBVHNodesFlat(flat, n);
+}
+
+/** BLAS: a BVH over a triangle mesh. Computes per-triangle boxes (flat — no per-triangle
+ *  objects), runs the shared core, and re-emits the triangle index in leaf order. */
 export function buildBVH(positions: Float32Array, indices: Uint32Array): BVHResult {
     const T = indices.length / 3;
-    const triBox: AABB[] = new Array(T);
+    const triBox = new Float64Array(6 * T);
     for (let t = 0; t < T; t++) {
-        const box = emptyAABB();
+        let minx = Infinity, miny = Infinity, minz = Infinity, maxx = -Infinity, maxy = -Infinity, maxz = -Infinity;
         for (let k = 0; k < 3; k++) {
             const v = indices[t * 3 + k] * 3;
-            growPoint(box, [positions[v], positions[v + 1], positions[v + 2]]);
+            const x = positions[v], y = positions[v + 1], z = positions[v + 2];
+            if (x < minx) minx = x; if (x > maxx) maxx = x;
+            if (y < miny) miny = y; if (y > maxy) maxy = y;
+            if (z < minz) minz = z; if (z > maxz) maxz = z;
         }
-        triBox[t] = box;
+        triBox[6 * t] = minx; triBox[6 * t + 1] = miny; triBox[6 * t + 2] = minz;
+        triBox[6 * t + 3] = maxx; triBox[6 * t + 4] = maxy; triBox[6 * t + 5] = maxz;
     }
-    const { nodes, nodeCount, order, maxDepth } = buildBVHNodes(triBox);
+    const { nodes, nodeCount, order, maxDepth } = buildBVHNodesFlat(triBox, T);
 
     const reindexedTriangles = new Uint32Array(T * 3);
     for (let i = 0; i < T; i++) {
