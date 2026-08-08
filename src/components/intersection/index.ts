@@ -46,12 +46,13 @@ export const MESH_TRAVERSALS: Record<string, MeshTraversalDescriptor> = {
 export interface InstanceAccelDescriptor {
     /** This engine walks the nodes channel (exact linkage: gates `data_nodes`). */
     tlasTexture: boolean;
-    /** Bakes the `INSTANCE_COUNT_k` define (the linear loop's bound). */
-    countDefine: boolean;
     /** The batch walk skeleton — rail v2: fixed channel uniforms + the batch's baked
      *  ledger slot (tlasBase into `nodes`). Visits placements (index var `i`), running
-     *  the `leaf` lines per placement, pruned by `bound` (hit.t or maxDist). */
-    walk(slot: { tlasBase: number }, ordinal: number, bound: string, leaf: string[]): string[];
+     *  the `leaf` lines per placement, pruned by `bound` (hit.t or maxDist). `count`
+     *  is the batch's instance count — linear bakes it as the loop-bound LITERAL
+     *  (define-cleanup Aug 8: a define consumed only by generated code was pure
+     *  indirection); tlas ignores it (bounds live in the node texture). */
+    walk(slot: { tlasBase: number }, count: number, bound: string, leaf: string[]): string[];
 }
 
 export const DEFAULT_INSTANCE_ACCEL = 'tlas';
@@ -61,9 +62,8 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
      *  order-independent) placement texture. */
     linear: {
         tlasTexture: false,
-        countDefine: true,
-        walk: (_s, o, _bound, leaf) => [
-            `    for (int i = 0; i < INSTANCE_COUNT_${o}; i++) {`,
+        walk: (_s, count, _bound, leaf) => [
+            `    for (int i = 0; i < ${count}; i++) {`,
             ...leaf,
             '    }',
         ],
@@ -73,8 +73,7 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
      *  internal / A>=0 leaf count+offset). */
     tlas: {
         tlasTexture: true,
-        countDefine: false,
-        walk: (s, _o, bound, leaf) => [
+        walk: (s, _count, bound, leaf) => [
             '    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;',
             '    while (ptr >= 0) {',
             '        int ni = stack[ptr]; ptr--;',

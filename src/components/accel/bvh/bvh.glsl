@@ -5,11 +5,11 @@
 // to their domain — build is shared, query is local. Provides: bvh_aabb_hit, BVH_STACK_DEPTH.
 // Depends on: data_texel1d (glsl/core/data_texture.glsl, included before this file).
 
-// GLSL traversal stack depth — emitted by the feature from bvh.ts's BVH_STACK_DEPTH const; the
-// #ifndef fallback keeps standalone glslang happy. The builder warns if a tree would exceed it.
-#ifndef BVH_STACK_DEPTH
-#define BVH_STACK_DEPTH 64
-#endif
+// GLSL traversal stack depth: BVH_STACK_DEPTH is ALWAYS emitted by the intersection
+// feature (from bvh.ts's const, same needDataRail gate that includes this file) — no
+// fallback here: we are writing a compiler, it emits the correct define or this file is
+// absent (define-cleanup Aug 8; the old #ifndef was dead defensive code). The builder
+// warns if a tree would exceed the depth.
 
 // Node layout (a BVH node texture, 2 RGBA32F texels/node — impl-plan-mesh-bvh §3):
 //   texel 2i = (min.xyz, A)   texel 2i+1 = (max.xyz, B)

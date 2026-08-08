@@ -5,9 +5,10 @@
 // The generated scene_intersect/scene_intersect_any dispatcher (intersection.ts) calls these and
 // performs the once-per-hit region classification (§4.2) — the marcher only reports geometry + owner.
 
-#ifndef MAX_MARCH_STEPS
+// Static-file-internal numeric knobs (like PI in math.glsl) — plain defines: the
+// compiler never overrides these (the old #ifndef guard was dead; define-cleanup
+// Aug 8). Making one compiler-ownable later = emit it + delete the line here.
 #define MAX_MARCH_STEPS 512
-#endif
 #define MARCH_EPSILON 0.0001
 #define NORMAL_EPSILON 0.001
 

@@ -18,7 +18,7 @@ import { pathToFileURL } from 'node:url';
 import { Compiler } from '../src/compiler/Compiler.js';
 import { annotateWithProvenance } from '../src/compiler/generate/ShaderProvenance.js';
 import type { CompiledRenderer, SceneDescription, RenderStrategy } from '../src/compiler/types.js';
-import { sceneSuite } from '../pages/registry.js';
+import { sceneSuite, isAsyncSceneEntry } from '../pages/registry.js';
 
 const args = process.argv.slice(2);
 const sceneFlagAt = args.indexOf('--scene');
@@ -39,6 +39,9 @@ if (scenePath !== undefined) {
 } else {
     // The whole merged suite — the dump covers exactly what the gallery renders.
     for (const [key, entry] of Object.entries(sceneSuite)) {
+        // Data-scene thunks fetch untracked .inst files at runtime — nothing to dump
+        // node-side (their codegen is count-invariant with the fixture-covered path).
+        if (isAsyncSceneEntry(entry)) continue;
         for (const strategy of entry.strategies) {
             CASES.push([`${key}-${strategy.id}`, entry.scene, strategy]);
         }

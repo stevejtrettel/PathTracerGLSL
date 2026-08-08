@@ -197,10 +197,6 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // looped over a placement texture. Mesh prototypes traverse their shared BLAS (bvh); analytic
     // prototypes intersect the closed form with s-scaled params. One region per batch.
     if (hasInstanced) {
-        // The linear engine bakes the loop bounds (exact linkage: tlas bakes none).
-        if (instAccel.countDefine) {
-            for (const b of plan.instanceBatches) defines[`INSTANCE_COUNT_${b.ordinal}`] = String(b.instanceCount);
-        }
         blocks.push({ origin: 'generated:instance-dispatch', source: generateInstanceDispatch(plan.instanceBatches, anyQuery, plan.program.intersection.instanceAccel, ids, !tableMode, chartUv) });
     }
 
@@ -790,7 +786,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
     for (const b of batches) {
         lines.push(`bool instance_${ids.get(b.index)!}(Ray ray, inout Hit hit) {`);
         lines.push('    bool found = false;');
-        lines.push(...accel.walk(b.slot, b.ordinal, 'hit.t', instanceLeafItem(b, false, chartUv)));
+        lines.push(...accel.walk(b.slot, b.instanceCount, 'hit.t', instanceLeafItem(b, false, chartUv)));
         lines.push('    return found;');
         lines.push('}');
         lines.push('');
@@ -809,7 +805,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
         lines.push('');
         for (const b of batches) {
             lines.push(`bool instance_any_${ids.get(b.index)!}(Ray ray, float maxDist) {`);
-            lines.push(...accel.walk(b.slot, b.ordinal, 'maxDist', instanceLeafItem(b, true, chartUv)));
+            lines.push(...accel.walk(b.slot, b.instanceCount, 'maxDist', instanceLeafItem(b, true, chartUv)));
             lines.push('    return false;');
             lines.push('}');
         }
