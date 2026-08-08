@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
-import { sceneSuite, DEFAULT_SCENE } from '../../pages/registry.js';
+import { sceneSuite as mergedSuite, DEFAULT_SCENE, isAsyncSceneEntry, type SceneSuiteEntry } from '../../pages/registry.js';
+
+// Data-scene thunk entries fetch untracked .inst files — skipped here; their codegen
+// coverage is the committed fixture (tests/authoring/instanceCloud.test.ts).
+const sceneSuite = Object.fromEntries(
+    Object.entries(mergedSuite).filter(([, e]) => !isAsyncSceneEntry(e)),
+) as Record<string, SceneSuiteEntry>;
 
 describe('scene suite', () => {
-    it('DEFAULT_SCENE is a registered scene', () => {
+    it('DEFAULT_SCENE is a registered SYNC scene', () => {
         expect(sceneSuite[DEFAULT_SCENE]).toBeDefined();
     });
 

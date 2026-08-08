@@ -26,6 +26,12 @@ export interface SceneDescription {
      * vacuum. A foggy world is just `ambientMedium: 'fog'`. material_of(-1) resolves to it.
      */
     ambientMedium?: string;
+    /**
+     * Data provenance (fable-instance-clouds §7): for scenes built from external data
+     * files, the `.inst` header provenance string(s) — (scene id, strategy) alone no
+     * longer determines the image, so exports stamp this too. Never affects compilation.
+     */
+    provenance?: string;
 }
 
 export interface AmbientSpaceDescription {
@@ -159,21 +165,43 @@ export interface InstancedObject {
     /** The geometry to replicate. Its `material` becomes the batch material; its `transform`
      *  (if any) is ignored — placements carry all world placement. */
     prototype: PrimitiveObject | MeshObject;
-    /** N world similarities, one per instance. Constant in v1 (baked into the placement texture). */
-    placements: Transform[];
+    /** N world similarities, one per instance. Constant in v1 (baked into the placement
+     *  texture). Two forms: `Transform[]` (the hand-authoring arm) or the PACKED
+     *  struct-of-arrays form (fable-instance-clouds — `.inst` data flows as typed arrays
+     *  end to end; 300k Transform objects are never manufactured just to be torn down). */
+    placements: Transform[] | PackedPlacements;
     /**
      * Per-instance values for schema rows of the prototype material's model — the FOURTH
      * property storage class (fable-instance-attributes: constant | driven | expression |
      * ATTRIBUTE). Each array is parallel to `placements` (length N; Spectrum rows accept
-     * scalar broadcast per entry). Excluded rows (Validator): the region-table row (ior —
-     * batches are thin) and emission (per-instance emission would need per-instance power
-     * CDF rows — deferred). The batch's material must not be shared with other objects.
-     * Read at shading via Hit.element → the instance_k_attrs data-rail texture.
+     * scalar broadcast per entry). A `Float32Array` is the packed arm: length N for float
+     * rows, 3N interleaved for Spectrum rows (fable-instance-clouds §4). Excluded rows
+     * (Validator): the region-table row (ior — batches are thin) and emission (per-instance
+     * emission would need per-instance power CDF rows — deferred). The batch's material
+     * must not be shared with other objects. Read at shading via Hit.element → the
+     * instance_k_attrs data-rail texture.
      */
-    attributes?: Record<string, number[] | [number, number, number][]>;
+    attributes?: Record<string, number[] | [number, number, number][] | Float32Array>;
     /** Provenance only (never identity) — see PrimitiveObject.name. */
     name?: string;
 }
+
+/**
+ * PACKED constant placements (fable-instance-clouds §4): the struct-of-arrays twin of
+ * `Transform[]`, sized for 10⁵–10⁶-instance data clouds. World-space; arrays are parallel.
+ * Absent sizes → 1.0; absent orientations → identity. Quats are [x, y, z, w] (Hamilton,
+ * matching similarity.ts); sizes are the uniform similarity scale, strictly > 0.
+ */
+export interface PackedPlacements {
+    count: number;
+    positions: Float32Array;      // 3N
+    sizes?: Float32Array;         // N
+    orientations?: Float32Array;  // 4N
+}
+
+// The value-side helpers (isPackedPlacements/placementCount) live in
+// components/intersection/instancing/instancing.ts — components import compiler TYPES
+// only (purity), and everyone imports components.
 
 /** RESERVED (future custom-geometry door): a user-authored per-object body filling
  *  the same compiled surface (sdf_object_i / analytic arm). Not in ObjectDescription

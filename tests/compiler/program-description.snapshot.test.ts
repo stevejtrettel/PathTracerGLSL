@@ -5,9 +5,14 @@ import { plan } from '../../src/compiler/plan/Planner.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import { witnessSuite } from '../witnesses/index.js';
 import { demoSuite } from '../../demos/index.js';
+import { isAsyncSceneEntry, type SceneSuiteEntry } from '../witnesses/types.js';
 
 // Codegen coverage spans BOTH registries: the durable witnesses and the demo layer.
-const sceneSuite = { ...witnessSuite, ...demoSuite };
+// Data-scene thunk entries fetch untracked .inst files — skipped here; their codegen
+// coverage is the committed fixture (tests/authoring/instanceCloud.test.ts).
+const sceneSuite = Object.fromEntries(
+    Object.entries({ ...witnessSuite, ...demoSuite }).filter(([, e]) => !isAsyncSceneEntry(e)),
+) as Record<string, SceneSuiteEntry>;
 
 /**
  * Structural snapshot of the ProgramDescription — the compiler's "link map"

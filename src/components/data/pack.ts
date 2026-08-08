@@ -5,9 +5,11 @@
 // data_texel1d (glsl/core/data_texture.glsl) — the ONE width both sides share.
 // Pure TS, no imports (components purity).
 
-/** Fixed width for every data channel (row-major linear layout). 2048² texels ≈ 4M
- *  items per channel — ample; a knob, not a structural gate. */
-export const DATA_TEX_WIDTH = 2048;
+/** Fixed width for every data channel (row-major linear layout). A knob, not a
+ *  structural gate — bumped 2048 → 4096 on Aug 7 2026 when the 1.4M-instance octic
+ *  cloud tripped the Validator's nodes-channel ceiling (the declared trigger,
+ *  fable-instance-clouds §8). 4096² texels ≈ 16.7M per channel → ~4M instances/batch. */
+export const DATA_TEX_WIDTH = 4096;
 
 /** One packed channel ready for a WebGL2 RGBA32F upload. */
 export interface PackedChannel {

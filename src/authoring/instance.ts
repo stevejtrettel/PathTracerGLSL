@@ -5,6 +5,7 @@
 // placement lists so a forest or a lattice is one call. Constant placements only (v1).
 
 import type { InstancedObject, PrimitiveObject, MeshObject, Transform, Vec3 } from '../compiler/types.js';
+import type { InstanceTable } from './loadInstances.js';
 
 /** One prototype placed at N transforms, sharing the geometry. The prototype's material becomes
  *  the batch material; its transform (if any) is ignored — the placements carry world placement.
@@ -44,6 +45,78 @@ export function grid(counts: [number, number, number], spacing: number, center: 
         }
     }
     return out;
+}
+
+/** UNIT prototypes for instanceCloud — `size` multiplies these, so size = sphere RADIUS.
+ *  v1 is sphere-only: 'cube' needs an analytic box intersector, and box is DELIBERATELY
+ *  SDF-only today (params not closed under rotation — the top-level analytic fold would
+ *  silently drop a rotated box's rotation). The instanced local-frame arm is rotation-safe,
+ *  so cube's real prerequisite is a per-context backend fact (fable-instance-clouds §8). */
+const CLOUD_SHAPES: Record<string, { type: string; parameters: Record<string, unknown> }> = {
+    sphere: { type: 'sphere', parameters: { radius: 1.0 } },
+};
+
+export interface InstanceCloudOptions {
+    /** Global shape choice (fable-instance-clouds pin 6 — scene-side, never in the file). */
+    shape: keyof typeof CLOUD_SHAPES | string;
+    /** Scene material id — the batch material (the file stays renderer-agnostic). */
+    material: string;
+    name?: string;
+    /** Which schema row the color column overrides ('albedo' on lambert, 'f0' on
+     *  mirror, …). Default 'albedo' when colors exist. */
+    colorDrives?: string;
+    /** The cheap dial: multiplies baked/hooked sizes (uniform rescale needs no source data). */
+    sizeScale?: number;
+    /** CPU size hook (pack-time, NEVER on the GPU — pin 3): overrides baked sizes,
+     *  reading named scalar columns. A hook touching an absent column yields NaN and the
+     *  Validator rejects loudly. */
+    size?: (cols: Record<string, Float32Array>, i: number) => number;
+    /** CPU color hook (colormaps) — overrides the baked color column, LINEAR RGB. */
+    color?: (cols: Record<string, Float32Array>, i: number) => [number, number, number];
+}
+
+/** One `.inst` instance table as ONE batch (fable-instance-clouds §4): packed placements
+ *  (never 300k Transform objects), colors as a packed per-instance attribute on
+ *  `colorDrives`. Priority per the doc: hook > baked column > default (size 1 / no color). */
+export function instanceCloud(table: InstanceTable, opts: InstanceCloudOptions): InstancedObject {
+    const proto = CLOUD_SHAPES[opts.shape];
+    if (proto === undefined) {
+        throw new Error(`instanceCloud: unknown shape '${opts.shape}' — known: ${Object.keys(CLOUD_SHAPES).join(', ')}`);
+    }
+    const n = table.count;
+
+    let sizes = table.sizes;
+    if (opts.size !== undefined) {
+        sizes = new Float32Array(n);
+        for (let i = 0; i < n; i++) sizes[i] = opts.size(table.scalars, i);
+    }
+    if (opts.sizeScale !== undefined && opts.sizeScale !== 1) {
+        const scaled = new Float32Array(n);
+        for (let i = 0; i < n; i++) scaled[i] = opts.sizeScale * (sizes !== undefined ? sizes[i] : 1);
+        sizes = scaled;
+    }
+
+    let colors = table.colors;
+    if (opts.color !== undefined) {
+        colors = new Float32Array(3 * n);
+        for (let i = 0; i < n; i++) {
+            const [r, g, b] = opts.color(table.scalars, i);
+            colors[3 * i] = r; colors[3 * i + 1] = g; colors[3 * i + 2] = b;
+        }
+    }
+
+    return {
+        kind: 'instanced',
+        prototype: { type: proto.type, parameters: { ...proto.parameters }, material: opts.material } as PrimitiveObject,
+        placements: {
+            count: n,
+            positions: table.positions,
+            ...(sizes !== undefined ? { sizes } : {}),
+            ...(table.orientations !== undefined ? { orientations: table.orientations } : {}),
+        },
+        ...(colors !== undefined ? { attributes: { [opts.colorDrives ?? 'albedo']: colors } } : {}),
+        ...(opts.name !== undefined ? { name: opts.name } : {}),
+    };
 }
 
 /** `count` placements scattered on the y=`y` plane within a `[-extent, extent]²` square, with a

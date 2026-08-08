@@ -6,7 +6,7 @@ import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
-import { packInstanceBatch, sceneInstanceBatches, instanceAttributeRows, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
+import { packInstanceBatch, sceneInstanceBatches, instanceAttributeRows, placementCount, type AttributeRowSpec } from '../components/intersection/instancing/instancing.js';
 import { similarityFromTransform, similarityApplyPoint } from '../components/geometry/similarity.js';
 import { canonicalizePrimitiveParameters, primitiveBounds, foldAnalyticParameters, primitive } from '../components/geometry/index.js';
 import { buildBVHNodes, rootBoxOf, transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
@@ -292,14 +292,18 @@ export class App {
                 }
                 localBox = box;
             }
-            const placements = batch.placements.map((t) => similarityFromTransform(t));
+            // Two placement forms (fable-instance-clouds §4): authored Transform[] lowers to
+            // Similarity[]; the packed struct-of-arrays passes straight through to the pack.
+            const placements = Array.isArray(batch.placements)
+                ? batch.placements.map((t) => similarityFromTransform(t))
+                : batch.placements;
             const attrs: AttributeRowSpec[] | undefined = batch.attributes !== undefined
                 ? instanceAttributeRows(scene.materials[batch.prototype.material]?.model ?? '', batch.attributes)
                     .map((r) => ({ shape: r.shape, values: batch.attributes![r.source] }))
                 : undefined;
             const packed = packInstanceBatch(localBox, placements, attrs);
             writeTexels(ch.records, slot.placementsBase, packed.placements);
-            assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placements.length));
+            assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placementCount(batch.placements)));
             writeTexels(ch.nodes, slot.tlasBase, packed.nodes.subarray(0, packed.nodeCount * 8));
             if (packed.attributes !== undefined) writeTexels(ch.records, slot.attrsBase, packed.attributes);
             batchRoots.push(rootBoxOf(packed.nodes, packed.nodeCount));
@@ -827,7 +831,12 @@ export class App {
     buildRenderStamp(): RenderStamp {
         const [width, height] = this.getCanvasSize();
         return {
-            scene: this.rendererManager.getScene()?.id ?? 'unknown',
+            // Data scenes append the .inst provenance — the scene id alone does not
+            // determine a data-built image (fable-instance-clouds §7).
+            scene: (() => {
+                const s = this.rendererManager.getScene();
+                return s == null ? 'unknown' : s.provenance !== undefined ? `${s.id} [${s.provenance}]` : s.id;
+            })(),
             strategy: this.rendererManager.getActiveStrategy(),
             parameters: this.parameterStore.serialize(),
             spp: this.coordinator.getSampleCount(),

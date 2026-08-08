@@ -4,11 +4,16 @@ import { Compiler } from '../../src/compiler/Compiler.js';
 import { TONEMAP_MODELS } from '../../src/components/tonemap/index.js';
 import { witnessSuite } from '../witnesses/index.js';
 import { demoSuite } from '../../demos/index.js';
+import { isAsyncSceneEntry, type SceneSuiteEntry } from '../witnesses/types.js';
 import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import type { MeshObject } from '../../src/compiler/types.js';
 
 // Codegen coverage spans BOTH registries: the durable witnesses and the demo layer.
-const sceneSuite = { ...witnessSuite, ...demoSuite };
+// Data-scene thunk entries fetch untracked .inst files — skipped here; their codegen
+// coverage is the committed fixture (tests/authoring/instanceCloud.test.ts).
+const sceneSuite = Object.fromEntries(
+    Object.entries({ ...witnessSuite, ...demoSuite }).filter(([, e]) => !isAsyncSceneEntry(e)),
+) as Record<string, SceneSuiteEntry>;
 
 /**
  * Static compile check for every generated shader (impl-plan-decision-hoist T3).

@@ -14,6 +14,9 @@ import { PRIMITIVES, resolveBackend, type PrimitiveParamSpec } from '../../compo
 import { MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
+import { placementCount } from '../../components/intersection/instancing/instancing.js';
+import { nodeTexelBound } from '../../components/data/ledger.js';
+import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
@@ -786,13 +789,58 @@ export function validate(
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
         if (!isInstancedObject(obj)) continue;
-        if (obj.placements.length === 0) {
+        const count = placementCount(obj.placements);
+        if (count === 0) {
             bag.error('invalid-setting', `Object ${i} (instanced): placements is empty — nothing to place`)
                 .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
         }
-        if (obj.placements.some((p) => isDrivenTransform(p))) {
-            bag.error('invalid-setting', `Object ${i} (instanced): {param}-driven per-instance placements are not supported in v1 (constant placements only)`)
-                .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+        if (Array.isArray(obj.placements)) {
+            if (obj.placements.some((p) => isDrivenTransform(p))) {
+                bag.error('invalid-setting', `Object ${i} (instanced): {param}-driven per-instance placements are not supported in v1 (constant placements only)`)
+                    .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+            }
+        } else {
+            // PACKED placements (fable-instance-clouds §4): array-length arithmetic, the
+            // s>0 similarity pin, unit orientations, finite positions, and the nodes-channel
+            // ceiling — all reject-not-degrade (a NaN box or s≤0 would silently drop
+            // instances from the TLAS; an oversized batch would fail at upload, not compile).
+            const p = obj.placements;
+            const badLen = (arr: Float32Array | undefined, per: number): boolean =>
+                arr !== undefined && arr.length !== per * count;
+            if (p.positions.length !== 3 * count || badLen(p.sizes, 1) || badLen(p.orientations, 4)) {
+                bag.error('invalid-setting', `Object ${i} (instanced): packed placement arrays are not parallel — positions must be 3N, sizes N, orientations 4N for count ${count}`)
+                    .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+            } else {
+                let finite = true;
+                for (let j = 0; j < p.positions.length; j++) if (!Number.isFinite(p.positions[j])) { finite = false; break; }
+                if (!finite) {
+                    bag.error('invalid-setting', `Object ${i} (instanced): packed positions contain a non-finite value`)
+                        .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+                }
+                if (p.sizes !== undefined) {
+                    let ok = true;
+                    for (let j = 0; j < p.sizes.length; j++) if (!(p.sizes[j] > 0) || !Number.isFinite(p.sizes[j])) { ok = false; break; }
+                    if (!ok) {
+                        bag.error('invalid-setting', `Object ${i} (instanced): packed sizes must be finite and > 0 (the similarity-scale pin, fable-transforms)`)
+                            .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+                    }
+                }
+                if (p.orientations !== undefined) {
+                    let unit = true;
+                    for (let j = 0; j < count; j++) {
+                        const norm = Math.hypot(p.orientations[4 * j], p.orientations[4 * j + 1], p.orientations[4 * j + 2], p.orientations[4 * j + 3]);
+                        if (Math.abs(norm - 1) > 1e-3) { unit = false; break; }
+                    }
+                    if (!unit) {
+                        bag.error('invalid-setting', `Object ${i} (instanced): packed orientations must be unit quaternions ([x,y,z,w], |q| = 1 within 1e-3)`)
+                            .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+                    }
+                }
+            }
+            if (nodeTexelBound(count) > DATA_TEX_WIDTH * DATA_TEX_WIDTH) {
+                bag.error('invalid-setting', `Object ${i} (instanced): ${count} instances exceed the nodes-channel ceiling (~${Math.floor((DATA_TEX_WIDTH * DATA_TEX_WIDTH + 2) / 4)} per batch at DATA_TEX_WIDTH ${DATA_TEX_WIDTH}) — raise the width knob (fable-instance-clouds §8) or split the batch`)
+                    .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+            }
         }
         const proto = obj.prototype;
         validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag);
@@ -864,11 +912,27 @@ export function validate(
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }
-                if (arr.length !== obj.placements.length) {
-                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} has ${arr.length} entries for ${obj.placements.length} placements — the arrays must be parallel`)
+                const spectrum = row.glslType === 'Spectrum';
+                if (arr instanceof Float32Array) {
+                    // Packed arm (fable-instance-clouds §4): N floats or 3N interleaved.
+                    const expected = (spectrum ? 3 : 1) * count;
+                    if (arr.length !== expected) {
+                        bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) has ${arr.length} floats — a ${spectrum ? 'Spectrum' : 'float'} row over ${count} placements needs ${expected}`)
+                            .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                    } else {
+                        let ok = true;
+                        for (let j = 0; j < arr.length; j++) if (!Number.isFinite(arr[j])) { ok = false; break; }
+                        if (!ok) {
+                            bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) contains a non-finite value`)
+                                .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                        }
+                    }
+                    continue;
+                }
+                if (arr.length !== count) {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} has ${arr.length} entries for ${count} placements — the arrays must be parallel`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                 }
-                const spectrum = row.glslType === 'Spectrum';
                 const bad = (arr as Array<number | number[]>).findIndex((v) =>
                     typeof v === 'number' ? !Number.isFinite(v)
                         : !(spectrum && isVec3(v) && v.every((c) => Number.isFinite(c))));

@@ -15,6 +15,9 @@ dist-ssr
 # Generated shader dumps (npm run dump:shaders) — regenerable, for local review
 generated-shaders/
 
+# Local example datasets (sphere-cloud JSON etc.) — never committed
+test-data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -13,7 +13,7 @@ import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '
 import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
-import { sceneInstanceBatches, instanceAttributeRows } from '../../components/intersection/instancing/instancing.js';
+import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH } from '../../components/intersection/index.js';
 import type { DataTenants } from '../../components/data/ledger.js';
 
@@ -96,8 +96,8 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
     }
 
     const batchTenants = batches.map((b) => ({
-        instanceCount: b.placements.length,
-        attrTexels: instanceAttributeRows(scene.materials[b.prototype.material]?.model ?? '', b.attributes ?? {}).length * b.placements.length,
+        instanceCount: placementCount(b.placements),
+        attrTexels: instanceAttributeRows(scene.materials[b.prototype.material]?.model ?? '', b.attributes ?? {}).length * placementCount(b.placements),
     }));
 
     const meshLights = meshes

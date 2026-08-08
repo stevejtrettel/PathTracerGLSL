@@ -29,7 +29,7 @@ import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
 import { dataTenantsOf, keepsLocalFrame, materialReadsUv } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
-import { sceneInstanceBatches, instanceAttributeRows } from '../../components/intersection/instancing/instancing.js';
+import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import type { BlackbodyValue } from '../types.js';
 
@@ -144,7 +144,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             if (isMeshObject(proto)) {
                 instanceBatches.push({
                     ordinal, index: region, materialId: matId, name: obj.name,
-                    instanceCount: obj.placements.length,
+                    instanceCount: placementCount(obj.placements),
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
                     slot: dataLayout.batches[ordinal],
                     prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined, geometrySlot: dataLayout.meshes[batchGeometrySlot[ordinal]!] },
@@ -158,7 +158,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 }
                 instanceBatches.push({
                     ordinal, index: region, materialId: matId, name: obj.name,
-                    instanceCount: obj.placements.length,
+                    instanceCount: placementCount(obj.placements),
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
                     slot: dataLayout.batches[ordinal],
                     // Prototype has NO transform → just canonicalize (no fold); s scales per instance in-shader.

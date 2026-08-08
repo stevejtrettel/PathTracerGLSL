@@ -6,9 +6,10 @@
 
 import { witnessSuite } from '../tests/witnesses/index.js';
 import { demoSuite } from '../demos/index.js';
-import type { SceneSuiteEntry } from '../tests/witnesses/types.js';
+import type { SceneSuiteEntry, AnySceneSuiteEntry } from '../tests/witnesses/types.js';
+export { isAsyncSceneEntry } from '../tests/witnesses/types.js';
 
-export type { SceneSuiteEntry };
+export type { SceneSuiteEntry, AnySceneSuiteEntry };
 export { witnessSuite, demoSuite };
 
 // A demo key colliding with a witness key would silently WIN in this merge (audit
@@ -19,7 +20,7 @@ for (const key of Object.keys(demoSuite)) {
     }
 }
 
-export const sceneSuite: Record<string, SceneSuiteEntry> = {
+export const sceneSuite: Record<string, AnySceneSuiteEntry> = {
     ...witnessSuite,
     ...demoSuite,
 };

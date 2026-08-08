@@ -4,7 +4,8 @@
 // never the reverse), and pages/registry.ts merges both suites into the view the
 // gallery and lab render.
 
-import type { SceneSuiteEntry } from '../tests/witnesses/types.js';
+import type { AnySceneSuiteEntry } from '../tests/witnesses/types.js';
+import { dataScenes } from './dataScenes.js';
 import type { RenderStrategy, Vec3 } from '../src/compiler/types.js';
 import { withPose } from '../src/authoring/strategy.js';
 import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBox.js';
@@ -48,7 +49,10 @@ const cornellOneshotStrategy: RenderStrategy = {
     view: { tonemap: { type: 'reinhard' } },
 };
 
-export const demoSuite: Record<string, SceneSuiteEntry> = {
+// Sync demos + the ASYNC data-scene entries (fable-instance-clouds §7 — thunks over
+// untracked .inst files; registry-iterating tests skip them via isAsyncSceneEntry).
+export const demoSuite: Record<string, AnySceneSuiteEntry> = {
+    ...dataScenes,
     spheres: {
         scene: spheresScene,
         strategies: posed([0, 4.5, 13], [0, 2.3, 0], spheresStrategy, spheresLinearStrategy),

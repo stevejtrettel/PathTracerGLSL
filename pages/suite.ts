@@ -11,7 +11,7 @@
  * `npm run witness` (the §11 harness, built July 2026).
  */
 
-import { sceneSuite } from './registry.js';
+import { sceneSuite, isAsyncSceneEntry } from './registry.js';
 
 const style = document.createElement('style');
 style.textContent = `
@@ -62,7 +62,7 @@ for (const [id, entry] of Object.entries(sceneSuite)) {
         .join('   ');
 
     card.innerHTML = `
-        <h2>${entry.scene.name} <span class="id">${id}</span></h2>
+        <h2>${isAsyncSceneEntry(entry) ? entry.name : entry.scene.name} <span class="id">${id}</span></h2>
         <div class="strategies">${strategies}</div>
         <p class="exercises">${entry.exercises}</p>
         ${entry.expected ? `<div class="expected"><b>Expect:</b> ${entry.expected}</div>` : ''}

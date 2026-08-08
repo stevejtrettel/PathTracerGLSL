@@ -81,6 +81,31 @@ export interface WitnessSpec {
     checks: WitnessCheck[];
 }
 
+/**
+ * A DATA-SCENE entry (fable-instance-clouds §7): the scene is an async thunk — it
+ * fetches multi-MB untracked `.inst` files at runtime, so it is built only when the
+ * lab page resolves it on click-through. Display metadata lives at ENTRY level (cards
+ * never await). Demo-registry only: the witness runner and the registry-iterating
+ * vitest files handle sync entries; structural coverage of the data path comes from
+ * the committed fixture (tests/authoring/instanceCloud.test.ts).
+ */
+export interface AsyncSceneSuiteEntry {
+    scene: () => Promise<SceneDescription>;
+    /** Gallery-card name (the sync entries' `scene.name`). */
+    name: string;
+    strategies: RenderStrategy[];
+    exercises: string;
+    expected?: string;
+    initialParameters?: Record<string, unknown>;
+}
+
+export type AnySceneSuiteEntry = SceneSuiteEntry | AsyncSceneSuiteEntry;
+
+/** Discriminates data-scene thunk entries from plain (witness-capable) entries. */
+export function isAsyncSceneEntry(e: AnySceneSuiteEntry): e is AsyncSceneSuiteEntry {
+    return typeof e.scene === 'function';
+}
+
 export interface SceneSuiteEntry {
     scene: SceneDescription;
     /** One renderer per strategy; the dev app binds them to keys 1-9 in order. */

@@ -16,16 +16,21 @@
 import type { ObjectDescription, Transform, Quaternion, Vec3 } from '../compiler/types.js';
 import { isInstancedObject } from '../compiler/types.js';
 import {
+    IDENTITY_QUAT,
     IDENTITY_SIMILARITY,
     classifySimilarity,
     isDrivenTransform,
     isIdentityRotation,
     isIdentityScale,
     isIdentityTranslation,
+    quatMultiply,
+    quatNormalize,
+    similarityApplyPoint,
     similarityCompose,
     similarityFromTransform,
     type Similarity,
 } from '../components/geometry/similarity.js';
+import type { PackedPlacements } from '../compiler/types.js';
 
 export interface GroupNode {
     kind: 'group';
@@ -81,7 +86,9 @@ function walk(nodes: SceneNode[], parent: Similarity, path: string[], out: Objec
             const idParent = classifySimilarity(parent) === 'identity';
             const placements = idParent
                 ? node.placements
-                : node.placements.map((t) => transformFromSimilarity(similarityCompose(parent, similarityFromTransform(t))) ?? {});
+                : Array.isArray(node.placements)
+                    ? node.placements.map((t) => transformFromSimilarity(similarityCompose(parent, similarityFromTransform(t))) ?? {})
+                    : composePackedPlacements(parent, node.placements);
             if (atRootI && idParent) { out.push(node); return; }
             out.push({ ...node, placements, name: [...path, node.name ?? `#${i}`].join('/') });
             return;
@@ -130,6 +137,42 @@ export function transformFromSimilarity(g: Similarity): Transform | undefined {
     if (!isIdentityRotation(g.rotation)) t.rotation = g.rotation as Quaternion;
     if (!isIdentityScale(g.scale)) t.scale = g.scale;
     return t;
+}
+
+/** Compose a constant parent similarity over PACKED placements array-wise
+ *  (fable-instance-clouds §4 under fable-transforms §4 static composition): position
+ *  through the parent map, size × parent scale, quaternion left-multiplied. Fresh
+ *  arrays — the source table (often views over a fetched `.inst` buffer) stays intact. */
+function composePackedPlacements(parent: Similarity, p: PackedPlacements): PackedPlacements {
+    const n = p.count;
+    const positions = new Float32Array(3 * n);
+    for (let i = 0; i < n; i++) {
+        const w = similarityApplyPoint(parent, [p.positions[3 * i], p.positions[3 * i + 1], p.positions[3 * i + 2]]);
+        positions[3 * i] = w[0]; positions[3 * i + 1] = w[1]; positions[3 * i + 2] = w[2];
+    }
+    let sizes: Float32Array | undefined;
+    if (parent.scale !== 1 || p.sizes !== undefined) {
+        sizes = new Float32Array(n);
+        for (let i = 0; i < n; i++) sizes[i] = parent.scale * (p.sizes !== undefined ? p.sizes[i] : 1);
+    }
+    let orientations: Float32Array | undefined;
+    if (!isIdentityRotation(parent.rotation)) {
+        orientations = new Float32Array(4 * n);
+        for (let i = 0; i < n; i++) {
+            const q = p.orientations !== undefined
+                ? [p.orientations[4 * i], p.orientations[4 * i + 1], p.orientations[4 * i + 2], p.orientations[4 * i + 3]] as const
+                : IDENTITY_QUAT;
+            const c = quatNormalize(quatMultiply(parent.rotation, [q[0], q[1], q[2], q[3]]));
+            orientations[4 * i] = c[0]; orientations[4 * i + 1] = c[1]; orientations[4 * i + 2] = c[2]; orientations[4 * i + 3] = c[3];
+        }
+    } else {
+        orientations = p.orientations;
+    }
+    return {
+        count: n, positions,
+        ...(sizes !== undefined ? { sizes } : {}),
+        ...(orientations !== undefined ? { orientations } : {}),
+    };
 }
 
 // Driven detection (`isDrivenTransform`) is shared from components/geometry/similarity —
