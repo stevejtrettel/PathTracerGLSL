@@ -728,52 +728,53 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
 // non-unit-safe) + unscaled BLAS; analytic uses rigid conjugation (unit rd) + s-scaled params.
 
 /** The per-placement leaf body for placement index `i` (reads texture → conjugate → intersect →
- *  record into hit / return-true for the any variant). Indentation is cosmetic. */
+ *  record into hit / return-true for the any variant). Lines are at RELATIVE indent (0 = leaf
+ *  scope); the accel occupant's walk() pads them to its own nesting depth. */
 function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boolean): string[] {
     const pb = b.slot.placementsBase;
     const read = [
-        `                vec4 q  = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i)), 0);`,
-        `                vec4 ts = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i + 1)), 0);`,
-        `                float s = placement_scale(ts);`,
+        `vec4 q  = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i)), 0);`,
+        `vec4 ts = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i + 1)), 0);`,
+        `float s = placement_scale(ts);`,
     ];
     if (b.prototype.backend === 'mesh') {
         const g = b.prototype.geometrySlot;
         const conj = [
-            '                vec3 ro = placement_rigid(q, ts, ray.origin) / s;',
-            '                vec3 rd = placement_dir(q, ray.direction) / s;',
+            'vec3 ro = placement_rigid(q, ts, ray.origin) / s;',
+            'vec3 rd = placement_dir(q, ray.direction) / s;',
         ];
         if (forAny) return [...read, ...conj,
-            `                if (mesh_any_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ro, rd, maxDist)) return true;`];
+            `if (mesh_any_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ro, rd, maxDist)) return true;`];
         return [...read, ...conj,
-            '                vec3 nLocal; vec2 uv;',
-            `                if (mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, uv)) {`,
-            '                    found = true;',
-            '                    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
-            '                    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
-            '                    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));',
-            `                    hit.region_owner = ${b.index};`,
-            '                    hit.uv = uv;',
-            '                }'];
+            'vec3 nLocal; vec2 uv;',
+            `if (mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, uv)) {`,
+            '    found = true;',
+            '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
+            '    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
+            '    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));',
+            `    hit.region_owner = ${b.index};`,
+            '    hit.uv = uv;',
+            '}'];
     }
     const d = primitive(b.prototype.shapeType);
     const conj = [
-        '                vec3 ro = placement_rigid(q, ts, ray.origin);',
-        '                vec3 rd = placement_dir(q, ray.direction);   // unit — <type>_intersect assumes it',
-        '                Ray lray = make_ray(ro, rd);',
-        `                ${structName(d)} shape = ${emitCtor(d, b.prototype.parameters, 's')};`,
-        '                float t;',
+        'vec3 ro = placement_rigid(q, ts, ray.origin);',
+        'vec3 rd = placement_dir(q, ray.direction);   // unit — <type>_intersect assumes it',
+        'Ray lray = make_ray(ro, rd);',
+        `${structName(d)} shape = ${emitCtor(d, b.prototype.parameters, 's')};`,
+        'float t;',
     ];
     if (forAny) return [...read, ...conj,
-        `                if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < maxDist) return true;`];
+        `if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < maxDist) return true;`];
     return [...read, ...conj,
-        `                if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < hit.t) {`,
-        '                    hit.t = t; found = true;',
-        '                    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
-        '                    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
-        `                    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${b.prototype.shapeType}_normal(lray.origin + t * lray.direction, shape))));`,
-        `                    hit.region_owner = ${b.index};`,
-        `                    ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`,
-        '                }'];
+        `if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < hit.t) {`,
+        '    hit.t = t; found = true;',
+        '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
+        '    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
+        `    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${b.prototype.shapeType}_normal(lray.origin + t * lray.direction, shape))));`,
+        `    hit.region_owner = ${b.index};`,
+        `    ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`,
+        '}'];
 }
 
 function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boolean, instanceAccel: string, ids: Map<number, string>, emitAggregator: boolean, chartUv: boolean): string {
@@ -992,8 +993,7 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
     lines.push('        int ni = stack[ptr]; ptr--;');
     lines.push(`        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2)), 0);`);
     lines.push(`        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2 + 1)), 0);`);
-    lines.push('        float tenter;');
-    lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, hit.t, tenter)) continue;');
+    lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, hit.t)) continue;');
     lines.push('        if (n0.w >= 0.0) {');
     lines.push('            int off = int(n1.w), cnt = int(n0.w);');
     lines.push('            for (int j = 0; j < cnt; j++) { if (scene_table_leaf(uint(off + j), ray, hit)) found = true; }');
@@ -1037,8 +1037,7 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         lines.push('        int ni = stack[ptr]; ptr--;');
         lines.push(`        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2)), 0);`);
         lines.push(`        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2 + 1)), 0);`);
-        lines.push('        float tenter;');
-        lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, maxDist, tenter)) continue;');
+        lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, maxDist)) continue;');
         lines.push('        if (n0.w >= 0.0) {');
         lines.push('            int off = int(n1.w), cnt = int(n0.w);');
         lines.push('            for (int j = 0; j < cnt; j++) { if (scene_table_leaf_any(uint(off + j), ray, maxDist)) return true; }');

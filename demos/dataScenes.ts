@@ -73,8 +73,8 @@ const CONFIGS: Record<string, CloudSceneConfig> = {
     octic: {
         url: '/test-data/octic.inst',
         // 1.4M points of the hyperoctahedral octic — the batch that triggered the
-        // DATA_TEX_WIDTH 4096 bump. Gold-recolored (v2); expect a LONG one-time TLAS
-        // build at load (~half a minute — the SoA SAH builder is the deferred fix).
+        // DATA_TEX_WIDTH 4096 bump. Gold-recolored (v2); the one-time TLAS build at
+        // load is ~4s off-thread (the Aug 8 flat SAH builder + pack worker).
         // Converter scale ×8 (v3: cloud doubled so ALL points — floor-dust included —
         // halve relative to the surface) → extent ±16; room/pose doubled to match.
         pose: { position: [27, 18, 33], target: [0, 0, 0] },

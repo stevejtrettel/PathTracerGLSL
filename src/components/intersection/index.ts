@@ -51,7 +51,9 @@ export interface InstanceAccelDescriptor {
      *  the `leaf` lines per placement, pruned by `bound` (hit.t or maxDist). `count`
      *  is the batch's instance count — linear bakes it as the loop-bound LITERAL
      *  (define-cleanup Aug 8: a define consumed only by generated code was pure
-     *  indirection); tlas ignores it (bounds live in the node texture). */
+     *  indirection); tlas ignores it (bounds live in the node texture). Leaf lines
+     *  arrive at RELATIVE indent (0 = leaf scope); the walk pads them to its own
+     *  nesting depth, so each occupant's dump indents like hand-written code. */
     walk(slot: { tlasBase: number }, count: number, bound: string, leaf: string[]): string[];
 }
 
@@ -64,7 +66,7 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
         tlasTexture: false,
         walk: (_s, count, _bound, leaf) => [
             `    for (int i = 0; i < ${count}; i++) {`,
-            ...leaf,
+            ...leaf.map((l) => '        ' + l),
             '    }',
         ],
     },
@@ -79,13 +81,12 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
             '        int ni = stack[ptr]; ptr--;',
             `        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${s.tlasBase} + ni * 2)), 0);`,
             `        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${s.tlasBase} + ni * 2 + 1)), 0);`,
-            '        float tenter;',
-            `        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, ${bound}, tenter)) continue;`,
+            `        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, ${bound})) continue;`,
             '        if (n0.w >= 0.0) {',
             '            int off = int(n1.w), cnt = int(n0.w);',
             '            for (int j = 0; j < cnt; j++) {',
             '                int i = off + j;',
-            ...leaf,
+            ...leaf.map((l) => '                ' + l),
             '            }',
             '        } else {',
             '            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);',

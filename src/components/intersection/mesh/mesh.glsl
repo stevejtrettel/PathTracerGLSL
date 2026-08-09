@@ -136,8 +136,7 @@ bool mesh_nearest_bvh(
         int ni = stack[ptr]; ptr--;
         vec4 n0 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2)), 0);
         vec4 n1 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2 + 1)), 0);
-        float tenter;
-        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, rd, tmax, tenter)) continue;   // prune by running nearest
+        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, rd, tmax)) continue;   // prune by running nearest
         if (n0.w >= 0.0) {
             mesh_test_range(posTex, idxTex, nrmTex, uvTex, vbase, tbase, uint(n1.w), uint(n0.w), useSmooth, ro, rd, tmax, nl, uo, found);
         } else {
@@ -173,8 +172,7 @@ bool mesh_inside_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uint 
         int ni = stack[ptr]; ptr--;
         vec4 n0 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2)), 0);
         vec4 n1 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2 + 1)), 0);
-        float tenter;
-        if (!bvh_aabb_hit(n0.xyz, n1.xyz, p, MESH_INSIDE_DIR, tmax, tenter)) continue;
+        if (!bvh_aabb_hit(n0.xyz, n1.xyz, p, MESH_INSIDE_DIR, tmax)) continue;
         if (n0.w >= 0.0) {
             uint off = uint(n1.w), cnt = uint(n0.w);
             for (uint i = off; i < off + cnt; i++) {
@@ -282,8 +280,7 @@ bool mesh_any_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uint vba
         int ni = stack[ptr]; ptr--;
         vec4 n0 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2)), 0);
         vec4 n1 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2 + 1)), 0);
-        float tenter;
-        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, rd, maxDist, tenter)) continue;
+        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, rd, maxDist)) continue;
         if (n0.w >= 0.0) {
             if (mesh_any_range(posTex, idxTex, vbase, tbase, uint(n1.w), uint(n0.w), ro, rd, maxDist)) return true;
         } else if (ptr + 2 < BVH_STACK_DEPTH) {
