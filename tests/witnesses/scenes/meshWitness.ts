@@ -277,6 +277,17 @@ const lampBase = (id: string, direct: 'nee' | 'mis' | 'none'): RenderStrategy =>
 }, [0, 2.2, 4.2], [0, 0.8, 0]);
 export const meshLightStrategies: RenderStrategy[] = [lampBase('pt-nee', 'nee'), lampBase('pt-mis', 'mis'), lampBase('pt', 'none')];
 
+// Mesh light under the TREE (the mesh-treeBounds batch, Aug 10 2026): the same panel
+// selected via lightSelection 'bvh' — a one-leaf tree (selection pmf ≡ 1), so these
+// arms gate the mesh TABLE ROW (radiance/area loader) + the per-light baked rail-base
+// dispatch inside the tree regime's mesh arm; the real multi-light descent with a mesh
+// row is accel-triple's job.
+const lampBvh = (id: string, direct: 'nee' | 'mis'): RenderStrategy => {
+    const s = lampBase(id, direct);
+    return { ...s, id, estimator: { ...s.estimator, lightSelection: 'bvh' } };
+};
+export const meshLightBvhStrategies: RenderStrategy[] = [lampBvh('nee-bvh', 'nee'), lampBvh('mis-bvh', 'mis')];
+
 // The estimator-swap arm (taxonomy obligation: estimator fields are bias-free by
 // contract, so swapping the traversal engine must not change the image). Identical
 // RNG stream + identical candidate set → near-bit-exact agreement; the only things

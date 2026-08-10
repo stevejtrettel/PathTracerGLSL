@@ -31,7 +31,7 @@ import mathMisGLSL from '../../math_mis.glsl?raw';
 export function contributeTransport(program: ProgramDescription): FeatureContribution {
     const f = flags(program);
 
-    const blocks: ShaderBlock[] = [pathState(f)];
+    const blocks: ShaderBlock[] = [lightQueryFns(), pathState(f)];
     // MIS math (β=2 power heuristic) — transport family property: its only callers are
     // the combiner-emitted weights, so it precedes them (definition-before-use keeps it
     // out of the interface header: an internal helper, not a cross-feature seam).
@@ -57,6 +57,8 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
         textures: [],
         provides: [
             { name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' },
+            { name: 'light_query_surface', signature: 'LightQuery light_query_surface(int mat, Hit hit)' },
+            { name: 'light_query_medium', signature: 'LightQuery light_query_medium(Point p)' },
         ],
         requires: [...walkRequires(f), ...kernelRequires(f), ...lightRequires(f), ...equiangularRequires(f)],
     };
@@ -70,6 +72,31 @@ function walkRequires(f: Flags): string[] {
     if (f.nulls) req.push('is_null_interface');
     if (f.transmission) req.push('ior_of');
     return req;
+}
+
+// ============================================================================
+// Light-query constructors (fable-light-bvh §3.2 v1.5) — the POLICY site for the
+// selection context: static technique files pass "everything they have" (mat, hit)
+// through these instead of constructing LightQuery themselves, so future context
+// growth (per-material normal policy, spectral, curved frames) changes ONLY these
+// bodies. `mat` is deliberately in the signature ahead of need: today every
+// transmissive model is pure-delta and never runs NEE (the lightQuery contract test
+// pins this), so the surface query always carries the shading normal.
+// ============================================================================
+
+function lightQueryFns(): ShaderBlock {
+    return {
+        origin: 'generated:transport/light-query',
+        source: [
+            '// ── Light-query constructors (generated policy — fable-light-bvh §3.2) ──',
+            'LightQuery light_query_surface(int mat, Hit hit) {',
+            '    return LightQuery(hit.p, hit.frame.n);',
+            '}',
+            'LightQuery light_query_medium(Point p) {',
+            '    return LightQuery(p, vec3(0.0));   // no orientation at a medium event',
+            '}',
+        ].join('\n'),
+    };
 }
 
 // ============================================================================
@@ -184,7 +211,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
                 '                // CONSUMES a bounce deliberately: the budget bounds trapped closed orbits',
                 '                // (e.g. a Maxwell fisheye) across exhaustion returns AND whispering-gallery',
                 '                // TIR loops.',
-                '                kernel_record(s, 1.0, ms.exit_p, true);',
+                '                kernel_record(s, 1.0, light_query_medium(ms.exit_p), true);',
             );
             if (f.transmission) {
                 lines.push('                s.eta_scale *= ms.eta_scale;   // interior L/n² compression (§7.2)');

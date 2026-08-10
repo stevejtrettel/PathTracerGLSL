@@ -30,7 +30,7 @@
 // internal bits land in 24..31 (slot ^ octinv keeps them there), leaf item bits land
 // at their offsets in 0..23 — one bit per ITEM.
 
-import { buildBVHNodesFlat } from '../bvh/bvh.js';
+import { buildBVHNodesFlat, bvhNodeBound, BVH_TFAR_PAD } from '../bvh/bvh.js';
 
 /** u32 words per packed wide node (5 RGBA32UI texels). */
 export const CWBVH_NODE_WORDS = 20;
@@ -52,7 +52,7 @@ export const CWBVH_STACK_DEPTH = 24;
  *  (a DP distribute always yields ≥ 2 members) and item-carrying nodes number ≤ N,
  *  so nodeCount ≤ 2N−1; texels = 5 per node. The packer assertFits the real count. */
 export function cwbvhNodeTexelBound(itemCount: number): number {
-    return itemCount > 0 ? CWBVH_NODE_TEXELS * (2 * itemCount - 1) : 0;
+    return CWBVH_NODE_TEXELS * bvhNodeBound(itemCount);
 }
 
 export interface CWBVHResult {
@@ -469,7 +469,7 @@ export function cwbvhNearestRef(
                 tn = Math.max(tn, Math.min(lo, hi));
                 tf = Math.min(tf, Math.max(lo, hi));
             }
-            tf *= 1.00000024;   // the Ize guard, matching the binary walk
+            tf *= BVH_TFAR_PAD;   // the Ize guard, matching the binary walk
             if (tf < tn) continue;
             const isInternal = (m & 0b11100000) === 0b00100000 && (m & 0x1f) >= 24;
             if (isInternal) hits |= 1 << ((((m & 0x1f) - 24) ^ octinv) & 7);

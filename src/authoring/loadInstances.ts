@@ -4,11 +4,13 @@
 // files are render-ready). The write-side layout truth is tools/inst-format.mjs; the vitest
 // round-trip gate keeps the two from drifting. Mirrors loadOBJ.ts in layer and shape.
 
+import type { AABB } from '../components/accel/bvh/bvh.js';
+
 /** A parsed `.inst` file — typed-array views (sharing the source buffer), never objects. */
 export interface InstanceTable {
     count: number;
     /** POSITIONS-ONLY world AABB from the header (hook-invariant — see the format doc §2). */
-    aabb: { min: [number, number, number]; max: [number, number, number] };
+    aabb: AABB;
     /** Converter id + date + source — carried into the export reproducibility stamp. */
     provenance: string;
     positions: Float32Array;         // 3N

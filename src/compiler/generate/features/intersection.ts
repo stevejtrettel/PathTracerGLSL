@@ -42,7 +42,7 @@ import meshGLSL from '../../../components/intersection/mesh/mesh.glsl?raw';
 import { MESH_TRAVERSALS, INSTANCE_ACCELS, ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH } from '../../../components/intersection/index.js';
 import { generateRecordReader } from '../records.js';
 import { DATA_TEX_WIDTH } from '../../../components/data/pack.js';
-import { BVH_STACK_DEPTH } from '../../../components/accel/bvh/bvh.js';
+import { BVH_STACK_DEPTH, BVH_TFAR_PAD, bvhWalkLines } from '../../../components/accel/bvh/bvh.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
@@ -63,7 +63,12 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // RESIDUAL unrolled arms beside it (plus the SDF arm, unchanged).
     const tableMode = plan.program.intersection.objectDispatch === 'table' && plan.sceneTable !== undefined;
     const table = tableMode ? plan.sceneTable : undefined;
-    const needDataRail = hasMesh || hasInstanced || tableMode;
+    // Light-tree selection (fable-light-bvh §5): the lighting feature's generated walks
+    // read nodes/records through the rail — this feature owns the addressing
+    // (data_texel1d + DATA_TEX_WIDTH), so a rail-free scene under 'bvh' still gets it.
+    const bvhLighting = plan.program.estimator.lighting?.selection === 'bvh'
+        && plan.lights.length > 0 && plan.lightTree !== undefined;
+    const needDataRail = hasMesh || hasInstanced || tableMode || bvhLighting;
     const needMeshLeaf = hasMesh || plan.instanceBatches.some((b) => b.prototype.backend === 'mesh');
     const ids = objectGlslIds(plan.objects, plan.analyticObjects, plan.meshes, plan.instanceBatches);
     const blocks: ShaderBlock[] = [];
@@ -159,6 +164,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     if (needDataRail) {
         defines.DATA_TEX_WIDTH = String(DATA_TEX_WIDTH);
         defines.BVH_STACK_DEPTH = String(BVH_STACK_DEPTH);
+        defines.BVH_TFAR_PAD = String(BVH_TFAR_PAD);
         blocks.push({ origin: 'glsl/core/data_texture.glsl', source: dataTextureGLSL });
         blocks.push({ origin: 'components/accel/bvh/bvh.glsl', source: bvhWalkGLSL });
     }
@@ -923,7 +929,6 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
         lines.push('        if (ds < 0.0 && ds > best) { best = ds; region = int(hdr.y); }');
         lines.push('    }');
     }
-
     // CLOSED meshes (fable-mesh-containment §1, amended): the lazy three-tier query —
     // (1) outside the baked local box → outside, free; (2) first-hit-facing nearest walk
     // (Validator-proven winding makes the cheap query sufficient); (3) only when INSIDE,
@@ -999,6 +1004,7 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
     }
     lines.push('');
 
+
     const tabledMeshes = plan.meshes.filter((m) => table.tabledMeshOrdinals.includes(m.ordinal));
 
     // Nearest-hit leaf: kind switch → analytic record / mesh wrapper / batch walk.
@@ -1037,25 +1043,13 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
     lines.push('}');
     lines.push('');
 
-    // The walk: standard stack DFS over the scene TLAS, pruned by the running nearest.
+    // The walk: standard stack DFS over the scene TLAS, pruned by the running nearest —
+    // the shared skeleton (accel/bvh bvhWalkLines, same emitter as the instance TLAS walk).
     lines.push('bool scene_table_intersect(Ray ray, inout Hit hit) {');
     lines.push('    bool found = false;');
-    lines.push('    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it');
-    lines.push('    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;');
-    lines.push('    while (ptr >= 0) {');
-    lines.push('        int ni = stack[ptr]; ptr--;');
-    lines.push(`        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2)), 0);`);
-    lines.push(`        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2 + 1)), 0);`);
-    lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, hit.t)) continue;');
-    lines.push('        if (n0.w >= 0.0) {');
-    lines.push('            int off = int(n1.w), cnt = int(n0.w);');
-    lines.push('            for (int j = 0; j < cnt; j++) { if (scene_table_leaf(uint(off + j), ray, hit)) found = true; }');
-    lines.push('        } else {');
-    lines.push('            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);');
-    lines.push('            bool nf = ray.direction[axis] >= 0.0;');
-    lines.push('            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }');
-    lines.push('        }');
-    lines.push('    }');
+    lines.push(...bvhWalkLines(S.tlasBase, 'hit.t', [
+        'for (int j = 0; j < cnt; j++) { if (scene_table_leaf(uint(off + j), ray, hit)) found = true; }',
+    ]));
     lines.push('    return found;');
     lines.push('}');
 
@@ -1085,22 +1079,9 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         lines.push('}');
         lines.push('');
         lines.push('bool scene_table_intersect_any(Ray ray, float maxDist) {');
-        lines.push('    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it');
-        lines.push('    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;');
-        lines.push('    while (ptr >= 0) {');
-        lines.push('        int ni = stack[ptr]; ptr--;');
-        lines.push(`        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2)), 0);`);
-        lines.push(`        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2 + 1)), 0);`);
-        lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, maxDist)) continue;');
-        lines.push('        if (n0.w >= 0.0) {');
-        lines.push('            int off = int(n1.w), cnt = int(n0.w);');
-        lines.push('            for (int j = 0; j < cnt; j++) { if (scene_table_leaf_any(uint(off + j), ray, maxDist)) return true; }');
-        lines.push('        } else {');
-        lines.push('            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);');
-        lines.push('            bool nf = ray.direction[axis] >= 0.0;');
-        lines.push('            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }');
-        lines.push('        }');
-        lines.push('    }');
+        lines.push(...bvhWalkLines(S.tlasBase, 'maxDist', [
+            'for (int j = 0; j < cnt; j++) { if (scene_table_leaf_any(uint(off + j), ray, maxDist)) return true; }',
+        ]));
         lines.push('    return false;');
         lines.push('}');
     }

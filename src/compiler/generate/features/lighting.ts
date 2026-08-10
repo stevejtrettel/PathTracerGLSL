@@ -4,7 +4,8 @@
 // Mirrors the material pattern: fixed per-kind GLSL (light_point/quad/sphere.glsl) + a
 // generated `lighting_sample` that CDF-selects a light and calls its kind sampler (§6.1/§3.3).
 
-import type { RenderPlan, PlannedLight } from '../../plan/types.js';
+import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
+import { isAttributeValue } from '../../plan/types.js';
 import { isValueParam, isBlackbody } from '../../types.js';
 import { blackbodyRGB } from '../../../components/lights/blackbody.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -12,12 +13,15 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
+import { EMISSION_KEY } from '../../../components/materials/index.js';
 import { PRIMITIVES } from '../../../components/geometry/index.js';
 import type { LightKindDescriptor } from '../../../components/descriptors.js';
 import { structFromRows } from '../schema.js';
 
 import shadowOpaqueGLSL from '../../../components/transport/shadow/opaque/opaque.glsl?raw';
 import shadowMediaGLSL from '../../../components/transport/shadow/media/media.glsl?raw';
+import lightTreeGLSL from '../../../components/accel/light_tree/light_tree.glsl?raw';
+import { lightTableLayout, type LightTableLayout } from '../../../components/lights/table.js';
 
 export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (plan.program.estimator.lighting === null) {
@@ -74,9 +78,32 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'components/transport/shadow/opaque/opaque.glsl', source: shadowOpaqueGLSL });
     }
 
+    // Selection occupant (fable-light-bvh §2/§7 — LIGHT_SELECTIONS registry id),
+    // resolved BEFORE the kind census: batch instance lights (stage 2) exist only
+    // under 'bvh' and pull the sphere kind in even when no registry light is one.
+    const selection = plan.program.estimator.lighting.selection;
+    const instanceLights = selection === 'bvh' ? (plan.lightTree?.instanceLights ?? []) : [];
+    const bvh = selection === 'bvh' && (plan.lights.length > 0 || instanceLights.length > 0);
+    if (bvh && plan.lightTree === undefined) {
+        // The Validator's eligibility pin guarantees the tenant; this is the backstop.
+        throw new Error("lighting: lightSelection 'bvh' but the plan carries no lightTree slot (roster ineligible — Validator should have rejected)");
+    }
+    // Batch light arms (fable-light-bvh §7/§7.1): the params-tier placement record IS
+    // the sphere-light row; Le is the batch material's constant literal OR the minted
+    // per-instance emission ATTRIBUTE ref (the same records row the hit-side fill
+    // reads — sampler, pdf, and chance-hit emission share one storage truth).
+    const batchArms: BatchLightArm[] = instanceLights.map((il) => {
+        const b = plan.instanceBatches.find((x) => x.ordinal === il.ordinal);
+        if (b === undefined) throw new Error(`lighting: instanceLights ordinal ${il.ordinal} has no planned batch`);
+        const le = plan.materials[b.materialId]?.values[EMISSION_KEY];
+        if (!Array.isArray(le) && !isAttributeValue(le)) throw new Error(`lighting: batch ${il.ordinal} light arm needs a constant or attribute vec3 emission (eligibility should have guaranteed it)`);
+        return { base: il.base, count: il.count, region: b.index, placementsBase: b.slot.placementsBase, le: Array.isArray(le) ? le as number[] : le };
+    });
+
     // Per-kind sampler libraries for the kinds present (registry-driven, R1b; declared
     // before the dispatcher). Structs generated from the rows first (A1).
-    const presentKinds = Object.keys(LIGHT_KINDS).filter((kind) => plan.lights.some((l) => l.kind === kind));
+    const presentKinds = Object.keys(LIGHT_KINDS).filter((kind) =>
+        plan.lights.some((l) => l.kind === kind) || (kind === 'sphere' && batchArms.length > 0));
     if (presentKinds.length > 0) {
         blocks.push({
             origin: 'generated:light-structs',
@@ -92,19 +119,31 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: `components/lights/${kind}/${kind}.glsl`, source: LIGHT_KINDS[kind].glsl });
     }
 
+    // Under 'bvh' the registry lights are TABLE-resident and selection is the
+    // generated tree-walk pair; the accessor/CDF machinery below is structurally
+    // absent. Under 'power'/'uniform' nothing changes (the carve gate).
+    const layout = bvh ? lightTableLayout(plan.lights.map((l) => l.kind)) : null;
+
     // Hoisted light consts (struct-alignment batch, the N5 pattern): every light is
     // One accessor per light (`light_get_<id>()`), the single construction site shared by the
     // sampler dispatcher, the MIS pdf query, and the delta query — constants baked inside,
-    // driven rows reading their uniforms (Model B).
-    if (plan.lights.length > 0) {
+    // driven rows reading their uniforms (Model B). Table-resident (bvh) programs read
+    // records rows through the generated loaders instead — no accessors emitted.
+    if (plan.lights.length > 0 && !bvh) {
         blocks.push({ origin: 'generated:light-accessors', source: generateLightAccessors(plan.lights) });
+    }
+    if (bvh && layout !== null && plan.lightTree !== undefined) {
+        blocks.push({ origin: 'components/accel/light_tree/light_tree.glsl', source: lightTreeGLSL });
+        if (plan.lights.length > 0) {
+            blocks.push({ origin: 'generated:light-table-loaders', source: generateLightRowLoaders(layout, plan.lightTree) });
+        }
+        blocks.push({ origin: 'generated:light-tree-walks', source: generateLightTreeWalks(plan.lightTree) });
     }
 
     // Selection pdfs are computed ONCE and shared by the sampler and the MIS pdf query —
     // lighting_pdf must byte-match lighting_sample's selection (the env-sampling lesson,
-    // pitfall 11, applied to the CDF).
-    const selection = plan.program.estimator.lighting.selection;
-    const selectPdf = computeSelectPdf(plan.lights, selection);
+    // pitfall 11, applied to the CDF). Inert under bvh (the tree IS the selection pdf).
+    const selectPdf = bvh ? [] : computeSelectPdf(plan.lights, selection);
 
     // Driven-lights Stage A: literal→uniform substitutions + the CPU-recomputed selection
     // arrays. Constant scenes have driven=false → nothing below fires, byte-identical.
@@ -147,7 +186,9 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
 
     blocks.push({
         origin: 'generated:light-sampling',
-        source: generateLightSampling(plan.lights, selectPdf, envSamplable, driven),
+        source: bvh && layout !== null && plan.lightTree !== undefined
+            ? generateLightSamplingBvh(layout, plan.lightTree, envSamplable, batchArms, plan.lights.filter((l) => l.mesh !== undefined))
+            : generateLightSampling(plan.lights, selectPdf, envSamplable, driven),
     });
 
     // Equiangular placement needs the light's POSITION before choosing t — a query the
@@ -162,23 +203,29 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // The DECISIONS are Planner-made (program.emitters, T2); the list is codegen data.
     const samplable = plan.lights.filter((l) => l.regionId !== undefined);
     if (plan.program.emitters.samplable) {
-        blocks.push({ origin: 'generated:light-of', source: generateLightOf(samplable) });
+        blocks.push({ origin: 'generated:light-of', source: generateLightOf(samplable, batchArms) });
         // The MIS pdf query (§6.1): only under 'mis' — its sole reader is the emitter-hit weight.
         if (plan.program.emitters.lightingPdf) {
-            blocks.push({ origin: 'generated:lighting-pdf', source: generateLightingPdf(plan.lights, selectPdf, envSamplable, driven) });
+            blocks.push({
+                origin: 'generated:lighting-pdf',
+                source: bvh && layout !== null && plan.lightTree !== undefined
+                    ? generateLightingPdfBvh(layout, plan.lightTree, envSamplable, batchArms)
+                    : generateLightingPdf(plan.lights, selectPdf, envSamplable, driven),
+                // (mesh pdf arms need no per-light bases — the mesh pdf is identity-free)
+            });
         }
     }
 
     // T4 seams: the §6.1/§6.2/§6.3 direct-lighting contract surface.
     const provides = [
-        { name: 'lighting_sample', signature: 'LightSample lighting_sample(Point p, vec2 xi)' },
+        { name: 'lighting_sample', signature: 'LightSample lighting_sample(LightQuery q, vec2 xi)' },
         { name: 'shadow_transmittance', signature: 'Spectrum shadow_transmittance(Ray shadow_ray, Point light_p)' },
     ];
     if (plan.program.emitters.samplable) {
-        provides.push({ name: 'light_of', signature: 'int light_of(int region)' });
+        provides.push({ name: 'light_of', signature: 'int light_of(int region, int element)' });
     }
     if (plan.program.emitters.lightingPdf) {
-        provides.push({ name: 'lighting_pdf', signature: 'float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit)' });
+        provides.push({ name: 'lighting_pdf', signature: 'float lighting_pdf(LightQuery q, Direction wi, int light_id, Hit light_hit)' });
     }
     if (plan.program.estimator.mediumLightSampling === 'equiangular') {
         provides.push({ name: 'lighting_query_delta', signature: 'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity)' });
@@ -193,6 +240,17 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         textures.push(
             { name: 'u_data_indices', source: 'extern:data_indices' },
             { name: 'u_data_vertices', source: 'extern:data_vertices' },
+            { name: 'u_data_records', source: 'extern:data_records' },
+        );
+        requires.push('data_texel1d');
+    }
+    // The light tree (fable-light-bvh §5): nodes + table/trails ride the shared
+    // channels — declared where consumed (merge dedups with the intersection feature's
+    // declarations); the rail's addressing comes from intersection's needDataRail,
+    // which learned the bvh-selection condition.
+    if (bvh) {
+        textures.push(
+            { name: 'u_data_nodes', source: 'extern:data_nodes' },
             { name: 'u_data_records', source: 'extern:data_records' },
         );
         requires.push('data_texel1d');
@@ -216,11 +274,15 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
 // two panels sharing one emissive material are two lights)
 // ============================================================================
 
-function generateLightOf(samplable: PlannedLight[]): string {
-    const lines: string[] = ['// Generated region -> samplable-light table (§6.2; -1 = path-only or non-emitter)'];
-    lines.push('int light_of(int region) {');
+function generateLightOf(samplable: PlannedLight[], batchArms: BatchLightArm[]): string {
+    const lines: string[] = ['// Generated (region, element) -> samplable-light table (§6.2 + fable-light-bvh §7;'];
+    lines.push('// -1 = path-only or non-emitter; element indexes batch instances, ignored elsewhere)');
+    lines.push('int light_of(int region, int element) {');
     for (const l of samplable) {
         lines.push(`    if (region == ${l.regionId}) return ${l.id};`);
+    }
+    for (const a of batchArms) {
+        lines.push(`    if (region == ${a.region}) return ${a.base} + element;   // batch instances (record order = element)`);
     }
     lines.push('    return -1;');
     lines.push('}');
@@ -278,7 +340,7 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[],
  *  the plan-time bake calls it with `{}` (defaults) and the CDF compute closure with live
  *  store values, so `computeSelectPdf`/`power` see identical resolved values on both paths
  *  (the `similarityFromTransform` bake≡ship precedent). No-op for constant lights. */
-export function resolveLightValues(l: PlannedLight, params: Record<string, unknown> = {}): Record<string, number | number[]> {
+export function resolveLightValues(l: Pick<PlannedLight, 'values'>, params: Record<string, unknown> = {}): Record<string, number | number[]> {
     const out: Record<string, number | number[]> = {};
     for (const [k, v] of Object.entries(l.values)) {
         if (isValueParam(v)) {
@@ -402,9 +464,9 @@ function generateLightAccessors(lights: PlannedLight[]): string {
 function sampleCall(l: PlannedLight, xiExpr: string): string {
     if (l.mesh !== undefined) {
         const m = l.mesh;
-        return `mesh_light_sample(${lightRef(l)}, u_data_indices, u_data_vertices, u_data_records, ${m.tbase}, ${m.wposBase}, ${m.cdfBase}, ${m.triCount}, p, ${xiExpr})`;
+        return `mesh_light_sample(${lightRef(l)}, u_data_indices, u_data_vertices, u_data_records, ${m.tbase}, ${m.wposBase}, ${m.cdfBase}, ${m.triCount}, q.p, ${xiExpr})`;
     }
-    return `${lightKind(l).kind}_light_sample(${lightRef(l)}, p, ${xiExpr})`;
+    return `${lightKind(l).kind}_light_sample(${lightRef(l)}, q.p, ${xiExpr})`;
 }
 
 // ============================================================================
@@ -489,8 +551,9 @@ function envSelectionDeps(plan: RenderPlan): string[] {
 }
 
 /** Compile-time selection pdfs — shared by lighting_sample and lighting_pdf.
- *  Exported for the H6 invariant tests. */
-export function computeSelectPdf(lights: PlannedLight[], selection: 'uniform' | 'power', params: Record<string, unknown> = {}): number[] {
+ *  Exported for the H6 invariant tests. ('bvh' never calls this — the tree walk IS
+ *  its selection pdf; any non-'uniform' id weighs by power.) */
+export function computeSelectPdf(lights: PlannedLight[], selection: string, params: Record<string, unknown> = {}): number[] {
     if (lights.length === 0) return [];
     const weights = lights.map((l) => (selection === 'uniform' ? 1 : lightPower(l, params)));
     const total = weights.reduce((a, b) => a + b, 0);
@@ -503,12 +566,12 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
     if (lights.length === 0) {
         if (envSamplable) {
             // Env-only: selection probability 1 — lighting_sample IS the env sampler.
-            lines.push('LightSample lighting_sample(Point p, vec2 xi) {');
-            lines.push('    return environment_sample(p, xi);');
+            lines.push('LightSample lighting_sample(LightQuery q, vec2 xi) {');
+            lines.push('    return environment_sample(q.p, xi);');
             lines.push('}');
             return lines.join('\n');
         }
-        lines.push('LightSample lighting_sample(Point p, vec2 xi) {');
+        lines.push('LightSample lighting_sample(LightQuery q, vec2 xi) {');
         lines.push('    LightSample ls; ls.pdf = 0.0; return ls;'); // no samplable light → NEE skipped
         lines.push('}');
         return lines.join('\n');
@@ -519,7 +582,7 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
     // random — pitfall 4 applies across stages too).
     const finiteName = envSamplable ? 'lighting_sample_finite' : 'lighting_sample';
 
-    lines.push(`LightSample ${finiteName}(Point p, vec2 xi) {`);
+    lines.push(`LightSample ${finiteName}(LightQuery q, vec2 xi) {`);
     lines.push('    LightSample ls;');
 
     if (lights.length === 1) {
@@ -565,15 +628,15 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
         lines.push('// Two-stage selection (env-as-light D3): stage 0 picks env vs the finite set;');
         lines.push('// pdfs scale by the SAME uniform on both sides (and in lighting_pdf and the');
         lines.push("// miss-MIS weight) — the byte-match invariant extends across the stage.");
-        lines.push('LightSample lighting_sample(Point p, vec2 xi) {');
+        lines.push('LightSample lighting_sample(LightQuery q, vec2 xi) {');
         lines.push('    if (xi.x < u_envSelectProb) {');
         lines.push('        vec2 env_xi = vec2(clamp(xi.x / u_envSelectProb, 0.0, 0.9999999), xi.y);');
-        lines.push('        LightSample ls = environment_sample(p, env_xi);');
+        lines.push('        LightSample ls = environment_sample(q.p, env_xi);');
         lines.push('        ls.pdf *= u_envSelectProb;');
         lines.push('        return ls;');
         lines.push('    }');
         lines.push('    float finite_x = clamp((xi.x - u_envSelectProb) / (1.0 - u_envSelectProb), 0.0, 0.9999999);');
-        lines.push('    LightSample ls = lighting_sample_finite(p, vec2(finite_x, xi.y));');
+        lines.push('    LightSample ls = lighting_sample_finite(q, vec2(finite_x, xi.y));');
         lines.push('    ls.pdf *= (1.0 - u_envSelectProb);');
         lines.push('    return ls;');
         lines.push('}');
@@ -583,7 +646,7 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
 }
 
 // ============================================================================
-// Generated MIS pdf query (§6.1): the density with which lighting_sample(p, ·) would have
+// Generated MIS pdf query (§6.1): the density with which lighting_sample(q, ·) would have
 // produced direction wi TOWARD THE LIGHT THAT WAS HIT — identity is known (light_of at the
 // emitter hit), no search. Per-kind solid-angle pdf recomputed from the hit geometry, × the
 // SAME baked selection pdf as the sampler. Delta lights are never queried (pitfall 12) and
@@ -597,7 +660,7 @@ function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSam
     // branch queries u_envSelectProb * environment_pdf directly, reference §8 line 3).
     const stage0 = envSamplable ? ' * (1.0 - u_envSelectProb)' : '';
     const sel = selectionExprs(selectPdf, driven && lights.length > 1);
-    lines.push('float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit) {');
+    lines.push('float lighting_pdf(LightQuery q, Direction wi, int light_id, Hit light_hit) {');
     for (let i = 0; i < lights.length; i++) {
         const l = lights[i];
         if (l.regionId === undefined) continue;   // delta: not hittable, never queried
@@ -613,10 +676,265 @@ function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSam
         // emitting normal varies per hit (unlike the quad's struct field), so its arm
         // passes the emitter hit's frame normal (a front hit: n IS the outward normal).
         if (l.mesh !== undefined) {
-            lines.push(`    if (light_id == ${l.id}) return ${select} * mesh_light_pdf(${lightRef(l)}, p, light_hit.p, light_hit.frame.n, wi);`);
+            lines.push(`    if (light_id == ${l.id}) return ${select} * mesh_light_pdf(${lightRef(l)}, q.p, light_hit.p, light_hit.frame.n, wi);`);
             continue;
         }
-        lines.push(`    if (light_id == ${l.id}) return ${select} * ${d.kind}_light_pdf(${lightRef(l)}, p, light_hit.p, wi);`);
+        lines.push(`    if (light_id == ${l.id}) return ${select} * ${d.kind}_light_pdf(${lightRef(l)}, q.p, light_hit.p, wi);`);
+    }
+    lines.push('    return 0.0;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// ============================================================================
+// Light-tree selection (fable-light-bvh) — the 'bvh' occupant: table-resident lights
+// + the generated walk pair. All bases/strides are ledger-baked literals; the ONLY
+// shared math (the importance measure) is the static light_tree.glsl, called from
+// both walks with the SAME p_l arithmetic — the selectionExprs byte-match discipline
+// transported to the tree.
+// ============================================================================
+
+type LightTreeSlotBaked = {
+    treeBase: number; tableBase: number; trailsBase: number;
+    strideTexels: number; count: number; registryCount: number;
+    instanceLights: Array<{ ordinal: number; base: number; count: number }>;
+};
+
+/** One batch's instance-light arm (fable-light-bvh §7/§7.1): the global-index window
+ *  [base, base+count), the batch's region, its placement-record base (the record IS
+ *  the sphere-light row: center.xyz, radius), and Le — a baked constant, or the
+ *  minted per-instance emission attribute ref (base/slot/count into records). */
+interface BatchLightArm { base: number; count: number; region: number; placementsBase: number; le: number[] | AttributeValue }
+
+/** The batch instance's SphereLight ctor from its placement record (params tier);
+ *  attribute Le fetches the SAME records texel the hit-side fill reads (one truth). */
+function batchSphereExpr(a: BatchLightArm, indexExpr: string): { fetch: string; ctor: string } {
+    const leExpr = Array.isArray(a.le)
+        ? formatSpectrum(a.le)
+        : `texelFetch(u_data_records, data_texel1d(uint(${a.le.attribute.base} + (${indexExpr}) * ${a.le.attribute.count} + ${a.le.attribute.slot})), 0).xyz`;
+    return {
+        fetch: `vec4 rec = texelFetch(u_data_records, data_texel1d(uint(${a.placementsBase} + (${indexExpr}))), 0);`,
+        ctor: `SphereLight(rec.xyz, rec.w, ${leExpr})`,
+    };
+}
+
+function lightStructName(kind: string): string {
+    return kind[0].toUpperCase() + kind.slice(1) + 'Light';
+}
+
+/** t<idx>.<comp> for payload float f (floats are packed 4/texel after the header). */
+function texelFloatExpr(f: number): string {
+    return `t${f >> 2}.${'xyzw'[f & 3]}`;
+}
+
+/** A row field's expression: swizzle when the vec3 sits inside one texel, gather when
+ *  it spans a boundary (the layout packs floats positionally — fable-light-bvh §4). */
+function fieldExpr(f: number, vec3: boolean): string {
+    if (!vec3) return texelFloatExpr(f);
+    const o = f & 3;
+    if (o === 0) return `t${f >> 2}.xyz`;
+    if (o === 1) return `t${f >> 2}.yzw`;
+    return `vec3(${texelFloatExpr(f)}, ${texelFloatExpr(f + 1)}, ${texelFloatExpr(f + 2)})`;
+}
+
+/** One loader per present kind: `<Kind>Light <kind>_light_row(int li)` — positional
+ *  float reads in ctor order (rows then derived), mirroring packLightTable exactly
+ *  (the ONE layout truth on both sides). */
+function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked): string {
+    const lines: string[] = ['// Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable'];
+    for (const kind of layout.kinds) {
+        const d = LIGHT_KINDS[kind];
+        const rows = [...d.params.map((r) => ({ vec3: r.shape === 'vec3' })), ...(d.derivedFields ?? []).map((r) => ({ vec3: r.shape === 'vec3' }))];
+        const floats = rows.reduce((acc, r) => acc + (r.vec3 ? 3 : 1), 0);
+        const texels = Math.ceil(floats / 4);
+        lines.push(`${lightStructName(kind)} ${kind}_light_row(int li) {`);
+        lines.push(`    int rb = ${slot.tableBase} + li * ${slot.strideTexels} + 1;`);
+        for (let t = 0; t < texels; t++) {
+            lines.push(`    vec4 t${t} = texelFetch(u_data_records, data_texel1d(uint(rb + ${t})), 0);`);
+        }
+        let f = 0;
+        const args = rows.map((r) => { const e = fieldExpr(f, r.vec3); f += r.vec3 ? 3 : 1; return e; });
+        lines.push(`    return ${lightStructName(kind)}(${args.join(', ')});`);
+        lines.push('}');
+    }
+    return lines.join('\n');
+}
+
+/** The walk pair (fable-light-bvh §3.3) — BORN ADJACENT: same node fetches, same
+ *  importance call, same `p_l` / `1.0 - p_l` expressions (never IR/sum — not bit-equal
+ *  to 1 − IL/sum), so the pmf the MIS weight reads IS the pmf the sampler drew from.
+ *  Fresh RNG per level (§3.4: pcg4d is counter-based — no stratification to preserve,
+ *  and the papers' ξ-rescale exhausts fp32 by ~24 levels). The 48-iteration bound is
+ *  the builder's enforced trail cap. */
+function generateLightTreeWalks(slot: LightTreeSlotBaked): string {
+    const TB = slot.treeBase;
+    // The four child fetches + both importances, shared VERBATIM by the two walks.
+    const step = [
+        '        int L = ni + 1;',
+        '        int R = int(n1.w);',
+        `        vec4 l0 = texelFetch(u_data_nodes, data_texel1d(uint(${TB} + 2 * L)), 0);`,
+        `        vec4 l1 = texelFetch(u_data_nodes, data_texel1d(uint(${TB} + 2 * L + 1)), 0);`,
+        `        vec4 r0 = texelFetch(u_data_nodes, data_texel1d(uint(${TB} + 2 * R)), 0);`,
+        `        vec4 r1 = texelFetch(u_data_nodes, data_texel1d(uint(${TB} + 2 * R + 1)), 0);`,
+        '        float iw_l = light_tree_importance(l0.xyz, l1.xyz, l0.w, q);',
+        '        float iw_r = light_tree_importance(r0.xyz, r1.xyz, r0.w, q);',
+        '        float isum = iw_l + iw_r;',
+    ];
+    return [
+        '// Generated light-tree walk pair (fable-light-bvh §3.3) — adjacent by construction.',
+        'float random();   // ambient RNG (sampler family) — forward-declared, order-independent',
+        '',
+        '// Stochastic descent: importance-weighted child choice, product pmf out.',
+        'int light_tree_pick(LightQuery q, float xi, out float pmf) {',
+        '    pmf = 1.0;',
+        '    int ni = 0;',
+        `    vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${TB} + 1)), 0);`,
+        '    for (int lvl = 0; lvl < 48; lvl++) {',
+        '        if (n1.w < 0.0) break;',
+        ...step,
+        '        if (isum <= 0.0) { pmf = 0.0; return -1; }',
+        '        float p_l = iw_l / isum;',
+        '        if (xi < p_l) { pmf *= p_l; ni = L; n1 = l1; }',
+        '        else { pmf *= (1.0 - p_l); ni = R; n1 = r1; }',
+        '        xi = random();',
+        '    }',
+        '    return int(-n1.w - 1.0);',
+        '}',
+        '',
+        '// MIS pmf: replay the light\'s stored bit trail (two u24 halves, LSB-first),',
+        '// with the STORED query — the exact context the sampler drew from.',
+        'float light_tree_pmf(LightQuery q, int light_index) {',
+        `    vec4 trail = texelFetch(u_data_records, data_texel1d(uint(${slot.trailsBase} + light_index)), 0);`,
+        '    uint tw = uint(trail.x);',
+        '    float pmf = 1.0;',
+        '    int ni = 0;',
+        `    vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${TB} + 1)), 0);`,
+        '    for (int lvl = 0; lvl < 48; lvl++) {',
+        '        if (n1.w < 0.0) break;',
+        '        if (lvl == 24) tw = uint(trail.y);',
+        ...step,
+        '        if (isum <= 0.0) return 0.0;',
+        '        float p_l = iw_l / isum;',
+        '        if ((tw & 1u) == 0u) { pmf *= p_l; ni = L; n1 = l1; }',
+        '        else { pmf *= (1.0 - p_l); ni = R; n1 = r1; }',
+        '        tw >>= 1u;',
+        '    }',
+        '    return pmf;',
+        '}',
+    ].join('\n');
+}
+
+/** The kind-dispatch header read, shared by the sampler and the pdf query. */
+function lightKindHeaderExpr(slot: LightTreeSlotBaked): string {
+    return `int(texelFetch(u_data_records, data_texel1d(uint(${slot.tableBase} + light_id * ${slot.strideTexels})), 0).x)`;
+}
+
+function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, envSamplable: boolean, batchArms: BatchLightArm[], meshLights: PlannedLight[]): string {
+    const finiteName = envSamplable ? 'lighting_sample_finite' : 'lighting_sample';
+    const R = slot.registryCount;
+    const lines: string[] = ['// Generated light selection dispatcher (fable-light-bvh §3/§7): tree descent over'];
+    lines.push('// the GLOBAL index space — [0, R) table-resident registry lights, then per-batch');
+    lines.push('// instance windows whose placement records ARE the sphere-light rows.');
+    lines.push(`LightSample ${finiteName}(LightQuery q, vec2 xi) {`);
+    lines.push('    LightSample ls;');
+    lines.push('    float select_pdf;');
+    lines.push('    int light_id = light_tree_pick(q, xi.x, select_pdf);');
+    lines.push('    if (light_id < 0) { ls.pdf = 0.0; return ls; }   // dead descent: unbiased zero-contribution event');
+    lines.push('    vec2 light_xi = vec2(random(), xi.y);');
+    let opened = false;
+    if (R > 0) {
+        lines.push(`    if (light_id < ${R}) {`);
+        lines.push(`        int kind = ${lightKindHeaderExpr(slot)};`);
+        layout.kinds.forEach((kind, code) => {
+            const kw = code === 0 ? 'if' : 'else if';
+            if (kind === 'mesh') {
+                // DATA-DRIVEN kind (fable-mesh-lights): the row carries (radiance, area);
+                // the CDF walk's rail bases are per-LIGHT baked constants — an id chain
+                // inside the kind arm (mesh lights are few; the CDF-regime shape).
+                lines.push(`        ${kw} (kind == ${code}) {`);
+                lines.push('            MeshLight mrow = mesh_light_row(light_id);');
+                meshLights.forEach((l, i) => {
+                    const m = l.mesh!;
+                    const mkw = i === 0 ? 'if' : 'else if';
+                    lines.push(`            ${mkw} (light_id == ${l.id}) ls = mesh_light_sample(mrow, u_data_indices, u_data_vertices, u_data_records, ${m.tbase}, ${m.wposBase}, ${m.cdfBase}, ${m.triCount}, q.p, light_xi);`);
+                });
+                lines.push('            else { ls.pdf = 0.0; return ls; }   // defensive, never packed');
+                lines.push('        }');
+                return;
+            }
+            lines.push(`        ${kw} (kind == ${code}) ls = ${kind}_light_sample(${kind}_light_row(light_id), q.p, light_xi);`);
+        });
+        lines.push('        else { ls.pdf = 0.0; return ls; }   // unknown header — defensive, never packed');
+        lines.push('    }');
+        opened = true;
+    }
+    for (const a of batchArms) {
+        const kw = opened ? 'else if' : 'if';
+        lines.push(`    ${kw} (light_id < ${a.base + a.count}) {   // batch (region ${a.region}) instances`);
+        const e = batchSphereExpr(a, `light_id - ${a.base}`);
+        lines.push(`        ${e.fetch}`);
+        lines.push(`        ls = sphere_light_sample(${e.ctor}, q.p, light_xi);`);
+        lines.push('    }');
+        opened = true;
+    }
+    lines.push('    else { ls.pdf = 0.0; return ls; }   // out of range — defensive, never picked');
+    lines.push('    ls.light_id = light_id;');
+    lines.push('    ls.pdf *= select_pdf;   // total = per-light × selection (§6.1)');
+    lines.push('    return ls;');
+    lines.push('}');
+    if (envSamplable) {
+        lines.push('');
+        lines.push('// Two-stage selection (env-as-light D3): identical to the CDF regime — the tree');
+        lines.push('// replaces only the finite stage; u_envSelectProb is the pInfinite stage.');
+        lines.push('LightSample lighting_sample(LightQuery q, vec2 xi) {');
+        lines.push('    if (xi.x < u_envSelectProb) {');
+        lines.push('        vec2 env_xi = vec2(clamp(xi.x / u_envSelectProb, 0.0, 0.9999999), xi.y);');
+        lines.push('        LightSample ls = environment_sample(q.p, env_xi);');
+        lines.push('        ls.pdf *= u_envSelectProb;');
+        lines.push('        return ls;');
+        lines.push('    }');
+        lines.push('    float finite_x = clamp((xi.x - u_envSelectProb) / (1.0 - u_envSelectProb), 0.0, 0.9999999);');
+        lines.push('    LightSample ls = lighting_sample_finite(q, vec2(finite_x, xi.y));');
+        lines.push('    ls.pdf *= (1.0 - u_envSelectProb);');
+        lines.push('    return ls;');
+        lines.push('}');
+    }
+    return lines.join('\n');
+}
+
+function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, envSamplable: boolean, batchArms: BatchLightArm[]): string {
+    // Registry arms exist only for HITTABLE kinds present; delta kinds are never
+    // queried, so the header check runs BEFORE the pmf walk (no wasted descent).
+    // Batch arms replay the instance's trail and recompute the sphere pdf from its
+    // placement record — the same row the sampler read.
+    const stage0 = envSamplable ? ' * (1.0 - u_envSelectProb)' : '';
+    const R = slot.registryCount;
+    const lines: string[] = ['// Generated MIS pdf query (fable-light-bvh §3.3/§7) — the trail-replayed selection pmf'];
+    lines.push('float lighting_pdf(LightQuery q, Direction wi, int light_id, Hit light_hit) {');
+    if (R > 0) {
+        lines.push(`    if (light_id < ${R}) {`);
+        lines.push(`        int kind = ${lightKindHeaderExpr(slot)};`);
+        layout.kinds.forEach((kind, code) => {
+            const d = LIGHT_KINDS[kind];
+            if (d.delta) return;   // delta: not hittable, never queried
+            if (kind === 'mesh') {
+                // The mesh pdf is IDENTITY-FREE (area measure over the row's world total)
+                // — no rail bases needed; the emitting normal varies per hit, so the arm
+                // passes the emitter hit's frame normal (the CDF-regime shape).
+                lines.push(`        if (kind == ${code}) return light_tree_pmf(q, light_id)${stage0} * mesh_light_pdf(mesh_light_row(light_id), q.p, light_hit.p, light_hit.frame.n, wi);`);
+                return;
+            }
+            lines.push(`        if (kind == ${code}) return light_tree_pmf(q, light_id)${stage0} * ${kind}_light_pdf(${kind}_light_row(light_id), q.p, light_hit.p, wi);`);
+        });
+        lines.push('        return 0.0;');
+        lines.push('    }');
+    }
+    for (const a of batchArms) {
+        lines.push(`    if (light_id < ${a.base + a.count}) {   // batch (region ${a.region}) instances`);
+        const e = batchSphereExpr(a, `light_id - ${a.base}`);
+        lines.push(`        ${e.fetch}`);
+        lines.push(`        return light_tree_pmf(q, light_id)${stage0} * sphere_light_pdf(${e.ctor}, q.p, light_hit.p, wi);`);
+        lines.push('    }');
     }
     lines.push('    return 0.0;');
     lines.push('}');

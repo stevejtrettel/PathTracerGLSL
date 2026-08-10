@@ -12,9 +12,10 @@
 import { packInstanceBatch, type AttributeRowSpec, type ParamsRecordSpec } from '../../components/intersection/instancing/instancing.js';
 import type { Similarity } from '../../components/geometry/similarity.js';
 import type { PackedPlacements } from '../../compiler/types.js';
+import type { AABB } from '../../components/accel/bvh/bvh.js';
 
 export interface PackRequest {
-    localBox: { min: [number, number, number]; max: [number, number, number] };
+    localBox: AABB;
     placements: Similarity[] | PackedPlacements;
     attrs?: AttributeRowSpec[];
     /** Present iff the batch's tier is 'params' (impl-plan-placement-fold stage 3). */

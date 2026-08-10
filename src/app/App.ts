@@ -15,7 +15,14 @@ import { recordPack } from '../compiler/generate/records.js';
 import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH } from '../components/intersection/index.js';
 import { packMeshLight } from '../components/lights/mesh/mesh.js';
 import { isMeshObject, type MeshObject } from '../compiler/types.js';
-import { dataTenantsOf } from '../compiler/plan/dataTenants.js';
+import { dataTenantsOf, lightRosterOf, meshIsSamplableEmitter } from '../compiler/plan/dataTenants.js';
+import { buildLightTreeOffThread } from './utils/lightTreePack.js';
+import { lightTableLayout, packLightTable } from '../components/lights/table.js';
+import { LIGHT_KINDS, radiantScalar } from '../components/lights/index.js';
+import { EMISSION_KEY } from '../components/materials/index.js';
+import { foldBlackbody } from '../components/lights/blackbody.js';
+import { isBlackbody, type PrimitiveObject } from '../compiler/types.js';
+import { resolveLightValues } from '../compiler/generate/features/lighting.js';
 import { planDataLayout, nodeTexelBound, assertFits, type MeshSlot } from '../components/data/ledger.js';
 import { allocChannel, allocChannelU32, writeTexels, writeTexelsU32, writeVec3s, writeVec2s, writeScalars, writeUvec3s, type PackedChannel } from '../components/data/pack.js';
 import { DATA_CHANNELS, channelExtern, NODESQ_EXTERN } from '../components/data/channels.js';
@@ -231,8 +238,8 @@ export class App {
      * batches — or used standalone too — builds its BVH once.
      */
     private async _uploadSceneGeometry(scene: SceneDescription): Promise<void> {
-        const { tenants, batchGeometrySlot, batchPlacementRecord, table } = dataTenantsOf(scene);
-        if (tenants.meshes.length === 0 && tenants.batches.length === 0) return;
+        const { tenants, batchGeometrySlot, batchPlacementRecord, table, lightBatches } = dataTenantsOf(scene);
+        if (tenants.meshes.length === 0 && tenants.batches.length === 0 && tenants.lightTree === null) return;
         const layout = planDataLayout(tenants);
         const ch: Record<(typeof DATA_CHANNELS)[number], PackedChannel> = {
             vertices: allocChannel(layout.totals.vertices),
@@ -289,7 +296,7 @@ export class App {
             const batch = batches[ordinal];
             // The prototype's LOCAL box (mesh = BLAS root; analytic = primitive bounds) → the
             // batch TLAS over the instance world boxes.
-            let localBox: { min: [number, number, number]; max: [number, number, number] };
+            let localBox: AABB;
             if (isMeshObject(batch.prototype)) {
                 localBox = writeMesh(batch.prototype, layout.meshes[batchGeometrySlot[ordinal]!]).rootBox;
             } else {
@@ -321,7 +328,8 @@ export class App {
             // build must not freeze the page; byte-identical output, sync fallback inside.
             packs.push(packInstanceBatchOffThread(localBox, placements, attrs, paramsRecord));
         }
-        (await Promise.all(packs)).forEach((packed, ordinal) => {
+        const packedBatches = await Promise.all(packs);
+        packedBatches.forEach((packed, ordinal) => {
             const slot = layout.batches[ordinal];
             writeTexels(ch.records, slot.placementsBase, packed.placements);
             assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placementCount(batches[ordinal].placements)));
@@ -377,6 +385,79 @@ export class App {
                 leafTexels[i * 4] = L.kind; leafTexels[i * 4 + 1] = L.ref;
             }
             writeTexels(ch.records, S.leafListBase, leafTexels);
+        }
+
+        // The light tree (fable-light-bvh §5/§7): table rows + tree nodes + bit trails
+        // at the ledger's bases. Leaves span the GLOBAL light-index space — the
+        // registry roster first (the Planner asserts plan.lights matches it kind-for-
+        // kind), then each light-eligible batch's instances in RECORD order (the
+        // packed params records: center.xyz, radius — the same rows the generated
+        // arms read, so leaf k's box/Φ and leaf k's sampler agree by construction).
+        if (layout.lightTree !== undefined) {
+            const roster = lightRosterOf(scene);
+            const resolved = roster.map((l) => ({ kind: l.kind, values: resolveLightValues(l) }));
+            if (roster.length > 0) {
+                writeTexels(ch.records, layout.lightTree.tableBase, packLightTable(resolved, lightTableLayout(roster.map((l) => l.kind))));
+            }
+            const total = roster.length + lightBatches.reduce((a, b) => a + b.count, 0);
+            const lb = new Float64Array(6 * total);
+            const pw = new Float64Array(total);
+            // 'data'-form treeBounds (mesh): the box is PACK-side — the BLAS root box
+            // under the constant placement. Roster route-3 order IS filtered sceneMeshes
+            // order (the ONE census truth), so the k-th 'data' entry is the k-th
+            // samplable mesh emitter.
+            const meshEmitters = sceneMeshes(scene.objects).filter((m) => meshIsSamplableEmitter(scene, m));
+            let meshIdx = 0;
+            resolved.forEach((l, i) => {
+                const d = LIGHT_KINDS[l.kind];
+                const tb = d.treeBounds!;   // tenant eligibility guarantees the fact
+                let b: AABB;
+                if (tb === 'data') {
+                    const m = meshEmitters[meshIdx++];
+                    const sim = similarityFromTransform(m.transform);
+                    b = transformAABB(packCached(m).rootBox, (p) => similarityApplyPoint(sim, p));
+                } else {
+                    b = tb(l.values);
+                }
+                lb.set(b.min, 6 * i); lb.set(b.max, 6 * i + 3);
+                pw[i] = d.power(l.values);
+            });
+            let li = roster.length;
+            for (const { ordinal, count } of lightBatches) {
+                const proto = batches[ordinal].prototype as PrimitiveObject;
+                const mat = scene.materials[proto.material];
+                const emRaw = isBlackbody(mat.emission) ? foldBlackbody(mat.emission) : mat.emission;
+                const em = typeof emRaw === 'number' ? [emRaw, emRaw, emRaw] : (emRaw as number[] | undefined);
+                // PER-INSTANCE emission (fable-light-bvh §7.1): when the batch carries an
+                // emission attribute, Φ reads each instance's color from the PACKED attrs
+                // (leaf order — the same rows the generated arms fetch); else the material
+                // constant. The sphere kind's formulas, inlined for the hot loop
+                // (descriptor-cited: Φ = π·4π·r²·avg(Le); box = center ± r).
+                const attrRows = instanceAttributeRows(mat.model ?? '', batches[ordinal].attributes ?? {});
+                const emSlot = attrRows.findIndex((r) => r.source === EMISSION_KEY);
+                const attrData = packedBatches[ordinal].attributes;
+                const A = attrRows.length;
+                const constLeAvg = em !== undefined ? radiantScalar(em) : 0;
+                const recs = packedBatches[ordinal].placements;   // params tier: (cx, cy, cz, r)
+                for (let k = 0; k < count; k++) {
+                    const cx = recs[4 * k], cy = recs[4 * k + 1], cz = recs[4 * k + 2], r = recs[4 * k + 3];
+                    lb[6 * li] = cx - r; lb[6 * li + 1] = cy - r; lb[6 * li + 2] = cz - r;
+                    lb[6 * li + 3] = cx + r; lb[6 * li + 4] = cy + r; lb[6 * li + 5] = cz + r;
+                    let leAvg = constLeAvg;
+                    if (emSlot >= 0 && attrData !== undefined) {
+                        const t = (k * A + emSlot) * 4;
+                        leAvg = (attrData[t] + attrData[t + 1] + attrData[t + 2]) / 3;
+                    }
+                    pw[li] = Math.max(1e-8, Math.PI * 4 * Math.PI * r * r * leAvg);
+                    li++;
+                }
+            }
+            // Off the main thread at cloud scale (fable-light-bvh §7 — clebsch-glow's
+            // 194k-leaf tree fired the trigger); small rosters build synchronously.
+            const tree = await buildLightTreeOffThread(lb, pw, total);
+            assertFits('light tree nodes', tree.nodeCount * 2, nodeTexelBound(total));
+            writeTexels(ch.nodes, layout.lightTree.treeBase, tree.nodes.subarray(0, tree.nodeCount * 8));
+            writeTexels(ch.records, layout.lightTree.trailsBase, tree.trails);
         }
 
         for (const c of DATA_CHANNELS) {

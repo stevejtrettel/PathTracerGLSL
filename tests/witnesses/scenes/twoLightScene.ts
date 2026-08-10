@@ -85,3 +85,13 @@ export const twoLightUniformStrategy: RenderStrategy = {
     estimator: { ...baseEstimator, lightSelection: 'uniform' },
     view: baseViewSection,
 };
+
+// The light tree at n = 2 (fable-light-bvh): the SMALL-N sanity arm — two DELTA lights
+// through the table-resident rows + the one-level descent. The hundred-spheres witness
+// owns the many-lights story; this pins the degenerate end of the same machinery.
+export const twoLightBvhStrategy: RenderStrategy = {
+    id: 'bvh',
+    measurement: baseMeasurement,
+    estimator: { ...baseEstimator, lightSelection: 'bvh' },
+    view: baseViewSection,
+};

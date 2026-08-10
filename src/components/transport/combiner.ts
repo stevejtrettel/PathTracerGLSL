@@ -29,11 +29,14 @@ export function combinerFns(f: Flags): ShaderBlock {
         lines.push(
             '    // §6.2: a SAMPLABLE emitter found by a non-delta bounce competes with last',
             '    // vertex\'s light sample. Path-only emitters and post-delta hits stay full-weight.',
-            '    int lid = light_of(hit.region_to);',
+            '    // element resolves batch INSTANCE identity (fable-light-bvh §7); ignored elsewhere.',
+            '    int lid = light_of(hit.region_to, hit.element);',
             '    if (lid < 0 || s.prev_was_delta) return 1.0;',
         );
         if (f.mis) {
-            lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_p, s.ray.direction, lid, hit));');
+            // The STORED query (fable-light-bvh §3.2 v1.5): the pmf replays exactly the
+            // context the previous vertex's sampler used — byte-identical by construction.
+            lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_query, s.ray.direction, lid, hit));');
         } else {
             lines.push('    return 0.0;   // NEE already counted it at the previous vertex');
         }

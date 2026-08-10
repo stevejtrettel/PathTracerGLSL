@@ -26,6 +26,7 @@ import {
     type Vec3Tuple,
 } from './similarity.js';
 import { formatFloat, formatVec3 } from '../glsl-format.js';
+import type { AABB } from '../accel/bvh/bvh.js';
 import { sphereDescriptor } from './sphere/sphere.js';
 import { planeDescriptor } from './plane/plane.js';
 import { boxDescriptor } from './box/box.js';
@@ -64,7 +65,7 @@ export function structName(d: PrimitiveDescriptor): string {
 /** Local-space AABB of a primitive given (canonical) values — the prototype box for instancing
  *  (impl-plan-tlas). null = unbounded (no `bounds` declared, e.g. plane) → not an instance
  *  prototype (Validator-rejected). */
-export function primitiveBounds(type: string, values: PrimitiveValues): { min: [number, number, number]; max: [number, number, number] } | null {
+export function primitiveBounds(type: string, values: PrimitiveValues): AABB | null {
     const d = PRIMITIVES[type];
     return d?.bounds ? d.bounds(values) : null;
 }

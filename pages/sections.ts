@@ -34,7 +34,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'Instance clouds',
         blurb: 'external .inst datasets — hundreds of thousands of instanced spheres per scene (untracked data files, async load)',
-        entries: [e('clebsch'), e('croissant'), e('steiner'), e('crixxi'), e('octic'), e('c32')],
+        entries: [e('clebsch'), e('clebsch-glow'), e('croissant'), e('steiner'), e('crixxi'), e('octic'), e('c32')],
     },
     {
         title: 'GRIN & curved light',
@@ -67,6 +67,7 @@ export const gallerySections: GallerySection[] = [
         entries: [
             e('spheres'), e('forest'), e('grand-bazaar'), e('bazaar'),
             e('instance-twin', 'instance-twin-ref'),
+            e('cube-cloud', 'cube-cloud-ref'),
             e('instance-params-twin', 'instance-params-frame'),
             e('perf-cloud', 'perf-cloud-frame'),
             e('mesh-instance-twin', 'mesh-instance-ref'),
@@ -96,13 +97,14 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Area lights & MIS',
-        blurb: 'samplable emitters — quad, disk, sphere, spot, and the delta-direction pair (sun, beam) — the power CDF, and the pt/pt-nee/pt-mis convergence gates',
+        blurb: 'samplable emitters — quad, disk, sphere, spot, and the delta-direction pair (sun, beam) — the power CDF, the light tree (many lights), and the pt/pt-nee/pt-mis convergence gates',
         entries: [
-            e('two-light'), e('cornell-area'), e('cornell-area-glass'), e('fog-area'),
+            e('two-light'), e('hundred-spheres'), e('instance-lights', 'instance-lights-ref'), e('glow-shell'), e('accel-triple'), e('embers'), e('cornell-area'), e('cornell-area-glass'), e('fog-area'),
             e('orb'), e('cornell-disk'),
             e('disk-bake', 'disk-bake-ref'),
             e('spot'), e('veach-mis'),
             e('sun'), e('beam-wall'), e('beam-slab'), e('beam-fog'), e('laser'),
+            e('softbeam-wall'), e('laser-soft'),
         ],
     },
     {
@@ -149,7 +151,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'Core validation',
         blurb: 'the first-principles anchors: the furnace, the minimal cross-backend twins, combined-backend shadows',
-        entries: [e('furnace'), e('minimal'), e('analytic-minimal'), e('mixed')],
+        entries: [e('furnace'), e('minimal'), e('analytic-minimal'), e('solids-analytic', 'solids-sdf'), e('mixed')],
     },
 ];
 

@@ -27,10 +27,10 @@ export function lightBlocks(f: Flags): ShaderBlock[] {
 /** The seams T2's emitted code calls under these flags. */
 export function lightRequires(f: Flags): string[] {
     if (!f.nee) return [];
-    const req = ['lighting_sample', 'shadow_transmittance', 'material_has_nondelta_lobes', 'interaction_surface_eval'];
+    const req = ['lighting_sample', 'light_query_surface', 'shadow_transmittance', 'material_has_nondelta_lobes', 'interaction_surface_eval'];
     if (f.mis) req.push('interaction_surface_pdf');
     if (f.scattering && !f.equiangular) {
-        req.push('interaction_medium_eval');
+        req.push('interaction_medium_eval', 'light_query_medium');
         if (f.mis) req.push('interaction_medium_pdf');
     }
     return req;

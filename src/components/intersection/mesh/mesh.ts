@@ -12,7 +12,7 @@
 // predicate is restated locally (the similarity.ts/isDrivenTransform precedent).
 
 import type { MeshObject, ObjectDescription } from '../../../compiler/types.js';
-import { buildBVH } from '../../accel/bvh/bvh.js';
+import { buildBVH, type AABB } from '../../accel/bvh/bvh.js';
 
 /** The scene's meshes in scene order — index IS the mesh ordinal (see header). */
 export function sceneMeshes(objects: readonly ObjectDescription[]): MeshObject[] {
@@ -31,7 +31,7 @@ export interface PackedMesh {
     nodes: Float32Array;
     nodeCount: number;
     /** The BLAS root box — the mesh's local AABB (prototype box when instanced). */
-    rootBox: { min: [number, number, number]; max: [number, number, number] };
+    rootBox: AABB;
 }
 
 /** Build the mesh's BVH + leaf-order index (positions/normals/uvs ride the MeshObject

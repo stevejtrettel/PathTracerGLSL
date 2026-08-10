@@ -6,7 +6,9 @@ import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, med
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
-import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
+import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
+import { lightRosterOf, batchLightEligible } from '../plan/dataTenants.js';
+import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
@@ -49,11 +51,17 @@ export function validate(
             .add();
     }
 
+    // Batch instance lights count as lights ONLY under the tree (fable-light-bvh §7):
+    // under 'power' they are path-found, so an otherwise-unlit scene truly has no NEE
+    // target and the error stands.
+    const hasBatchLightsUnderTree = (strategy.estimator.lightSelection ?? DEFAULT_LIGHT_SELECTION) === 'bvh'
+        && scene.objects.some((o) => isInstancedObject(o) && batchLightEligible(o, scene));
     if (strategy.estimator.directLighting !== 'none'
         && features.lighting.totalLightCount === 0
-        && !features.environment.samplable) {
+        && !features.environment.samplable
+        && !hasBatchLightsUnderTree) {
         bag.error('incompatible-options',
-            `Direct lighting '${strategy.estimator.directLighting}' requested but scene has no lights (a samplable environment counts — image env, or constant with sampleAsLight: true)`)
+            `Direct lighting '${strategy.estimator.directLighting}' requested but scene has no lights (a samplable environment counts — image env, or constant with sampleAsLight: true; instanced sphere emitters count under lightSelection 'bvh')`)
             .add();
     }
 
@@ -551,6 +559,51 @@ export function validate(
             `This scene has media that need the null-collision arms (expression coefficients, or an emissive scattering medium) but volumeSampling is '${vs ?? 'analytic'}' — set estimator.volumeSampling: 'delta-tracking'`)
             .add();
     }
+    // lightSelection axis (fable-light-bvh §2/§6): membership is REGISTRY-derived
+    // (LIGHT_SELECTIONS — components/lights), and the 'bvh' occupant carries its v1
+    // pins: constant emission only (the tree's Φ payload and the table rows are baked;
+    // refit is a future batch), no equiangular (the medium-vertex pick entry lands with
+    // the mis/tally batch), and every roster kind must declare treeBounds
+    // (directional/beam are tree-ineligible — unbounded position; mesh is eligible
+    // since the treeBounds 'data' form — reject-not-degrade).
+    const lightSelection = strategy.estimator.lightSelection;
+    if (lightSelection !== undefined && LIGHT_SELECTIONS[lightSelection] === undefined) {
+        bag.error('invalid-setting',
+            `estimator.lightSelection '${lightSelection}' is not a light-selection occupant — registered: ${Object.keys(LIGHT_SELECTIONS).join(', ')} (default '${DEFAULT_LIGHT_SELECTION}')`)
+            .add();
+    } else if (lightSelection === 'bvh') {
+        const roster = lightRosterOf(scene);
+        if (roster.length === 0 && !scene.objects.some((o) => isInstancedObject(o) && batchLightEligible(o, scene))) {
+            // The C5 silent-inert rule (selection needs finite lights to select among).
+            // Light-eligible batches count: a batch-lights-only scene (lights: [], one
+            // emissive cloud — clebsch-glow) has an empty roster and a non-inert tree.
+            bag.warning('invalid-setting',
+                "estimator.lightSelection 'bvh' controls nothing here (no finite lights in the registry — an env-only or unlit scene never selects) — the knob is inert")
+                .add();
+        }
+        for (const entry of roster) {
+            if (LIGHT_KINDS[entry.kind]?.treeBounds === undefined) {
+                bag.error('incompatible-options',
+                    `estimator.lightSelection 'bvh' (v1) cannot serve light kind '${entry.kind}' — it declares no treeBounds fact (unbounded position or rail-resident geometry); registered tree-eligible kinds: ${Object.keys(LIGHT_KINDS).filter((k) => LIGHT_KINDS[k].treeBounds !== undefined).join(', ')}. Use 'power' for this scene.`)
+                    .add();
+            }
+        }
+        const drivenLight = scene.lights.find((l) => {
+            const e = (l as { emission?: unknown }).emission;
+            return isValueParam(e) || (isBlackbody(e) && (isValueParam(e.blackbody.kelvin) || isValueParam(e.blackbody.scale)));
+        });
+        if (drivenLight !== undefined) {
+            bag.error('incompatible-options',
+                `estimator.lightSelection 'bvh' (v1) requires CONSTANT light emission — a driven emission would need the tree's Φ payload and table rows refit on change (deferred). Use 'power', or make the '${drivenLight.kind}' light's emission constant.`)
+                .add();
+        }
+        if (strategy.estimator.mediumLightSampling === 'equiangular') {
+            bag.error('incompatible-options',
+                "estimator.lightSelection 'bvh' with mediumLightSampling 'equiangular' is reserved — the delta-light query keeps the CDF path until the medium-vertex tree entry lands (fable-light-bvh §6). Use 'vertex'.")
+                .add();
+        }
+    }
+
     // meshTraversal / instanceAccel axes (impl-plan-mesh-bvh / impl-plan-tlas):
     // estimator fields per the pinned taxonomy — pure computation, bias-free by
     // contract (their test obligation is the estimator-swap equality witness).
@@ -597,6 +650,18 @@ export function validate(
             if (why !== null) {
                 bag.error('invalid-setting',
                     `estimator.instanceAccel 'cwbvh' (v1) cannot serve batch '${o.name ?? '<unnamed>'}' — it has ${why}; the cwbvh leaf order excludes these (fable-accel-cwbvh §6). Use 'tlas' for this scene.`)
+                    .add();
+            }
+            // Instance lights under the tree bake light identity in BINARY-TLAS record
+            // order (fable-light-bvh §7: Hit.element IS the light index — light_of is
+            // `base + element`, and the tree/trails/pdf arms all read the binary-order
+            // records). The cwbvh walk reports Hit.element in ITS OWN leaf order, so the
+            // identity channel is wrong for every hit. Reject the combination outright
+            // (strategy-independent of directLighting — the I12 precedent: an invariant
+            // that only some estimator settings consume is still an invariant).
+            if (lightSelection === 'bvh' && batchLightEligible(o, scene)) {
+                bag.error('incompatible-options',
+                    `estimator.instanceAccel 'cwbvh' with lightSelection 'bvh' cannot serve batch '${o.name ?? '<unnamed>'}' — its instances are tree lights, and light identity (Hit.element -> light_of) is baked in binary-TLAS record order, which the cwbvh leaf permutation does not preserve. Use 'tlas', or set sampleAsLight: false on the batch material.`)
                     .add();
             }
         }
@@ -883,28 +948,42 @@ export function validate(
             bag.warning('invalid-setting', `Object ${i} (instanced): the prototype's transform is ignored — placements carry all world placement (impl-plan-instancing)`)
                 .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
         }
-        // Instanced emitters are NOT samplable (batch region ≠ per-instance light identity —
-        // fable-mesh-lights §5 / the per-instance-emission deferral): they still glow, path-found.
+        // Instanced emitters (fable-light-bvh §7 stage 2): a LIGHT-ELIGIBLE batch
+        // (params-tier sphere prototype, constant emission) is samplable — but ONLY
+        // under lightSelection 'bvh' (the power CDF never meets a 100k-entry bake;
+        // path-found under 'power' is the same converged image, estimator-only).
+        // Ineligible emissive batches stay path-found everywhere.
         {
             const pm = scene.materials[proto.material];
-            if (pm !== undefined && pm.sampleAsLight !== false && hasConstantNonzeroEmission(pm.emission)) {
-                bag.warning('invalid-setting', `Object ${i} (instanced): the batch's emissive material is not samplable — instanced emitters are path-found only (per-instance light identity is deferred). Set sampleAsLight: false to silence this`)
-                    .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+            if (pm !== undefined && pm.sampleAsLight !== false && hasConstantNonzeroEmission(
+                isBlackbody(pm.emission) ? foldBlackbody(pm.emission) : pm.emission)) {
+                const selection = strategy.estimator.lightSelection ?? DEFAULT_LIGHT_SELECTION;
+                if (!batchLightEligible(obj, scene)) {
+                    bag.warning('invalid-setting', `Object ${i} (instanced): the batch's emissive material is not samplable — only params-tier SPHERE batches carry per-instance light identity (fable-light-bvh §7); this batch is path-found only. Set sampleAsLight: false to silence this`)
+                        .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+                } else if (selection !== 'bvh' && strategy.estimator.directLighting !== 'none') {
+                    // Under directLighting 'none' the whole program is path-found —
+                    // the hint would be noise on a deliberate pt arm.
+                    bag.warning('invalid-setting', `Object ${i} (instanced): the batch's emitters are path-found under lightSelection '${selection}' — set estimator.lightSelection: 'bvh' to sample them per-instance (fable-light-bvh §7), or sampleAsLight: false to silence this`)
+                        .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
+                }
             }
         }
         // Per-instance ATTRIBUTES (fable-instance-attributes): keys must be field rows of
         // the prototype material's model; arrays parallel to placements; entries row-shaped
-        // and finite. Excluded: emission (per-instance emission needs per-instance power-CDF
-        // rows — deferred) and region-indexed rows (ior — batches are thin, and ior_of is
-        // region-keyed by construction). All reject-not-degrade.
+        // and finite. Emission is allowed ONLY on light-eligible batch shapes (fable-light-bvh
+        // §7.1: the tree's per-instance Φ IS the per-instance selection structure the old
+        // deferral was waiting for; under 'power' such a batch is path-found and the
+        // hit-side attribute read is already exact). Region-indexed rows (ior) stay
+        // excluded — batches are thin, and ior_of is region-keyed by construction.
         if (obj.attributes !== undefined && Object.keys(obj.attributes).length > 0) {
             const model = scene.materials[proto.material]?.model ?? '';
             const props = MATERIAL_MODELS[model]?.properties ?? [];
             const validKeys = props.filter((f) => f.storage === 'field' && f.source !== EMISSION_KEY).map((f) => f.source);
             for (const [key, arr] of Object.entries(obj.attributes)) {
                 const row = props.find((f) => f.source === key);
-                if (key === EMISSION_KEY) {
-                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} — per-instance emission is not supported (the power CDF and light samplers would need per-instance rows; deferred)`)
+                if (key === EMISSION_KEY && !(row !== undefined && !isMeshObject(proto) && proto.type === 'sphere' && batchPlacementRecordOf(obj, scene) === 'params')) {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} — per-instance emission is supported only on params-tier SPHERE batches (the light tree's per-instance rows, fable-light-bvh §7.1); this batch is ${isMeshObject(proto) ? 'a mesh prototype' : `'${proto.type}' / frame tier`}`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }

@@ -34,6 +34,10 @@ export const meshLightDescriptor: LightKindDescriptor = {
     power(v) {
         return Math.max(1e-8, Math.PI * (v.area as number) * radiantScalar(v.radiance as number[]));
     },
+    // Tree-boundable, but the box is PACK-side data (the BLAS root box under the
+    // constant placement — the §6 pin guarantees constancy), not a values formula:
+    // the 'data' form of the fact (fable-light-bvh mesh-treeBounds batch).
+    treeBounds: 'data',
     toValues: () => {
         throw new Error("mesh lights are not authored directly (unreachable: validateAuthored rejects '{ kind: 'mesh' }')");
     },

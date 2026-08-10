@@ -29,6 +29,6 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
     bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
     if (spectrum_is_black(bs.weight)) return false;
     s.throughput *= bs.weight;
-    kernel_record(s, bs.pdf, hit.p, (bs.flags & LOBE_DELTA) != 0u);
+    kernel_record(s, bs.pdf, light_query_surface(mat, hit), (bs.flags & LOBE_DELTA) != 0u);
     return true;
 }

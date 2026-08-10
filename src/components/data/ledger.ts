@@ -11,7 +11,10 @@
 // Padding bounds (each with its proof sketch):
 //   BLAS nodes: a binary tree over T leaves (LEAF_SIZE ≥ 1) has ≤ 2T−1 nodes → 2(2T−1)
 //   node texels (2 texels/node). TLAS over N instance boxes: same bound with T = N.
-// Pure TS, no imports (components purity).
+//   The 2T−1 bound itself is the tree family's fact — imported from accel/bvh.
+// Pure TS, components-internal imports only (components purity).
+
+import { bvhNodeBound } from '../accel/bvh/bvh.js';
 
 export interface MeshSlot {
     /** Vertex-texel base (vertices/normals/uvs channels) — fetches add it to LOCAL vertex ids. */
@@ -65,6 +68,11 @@ export interface DataTenants {
      *  objects exist (strategy-independent — 'unrolled' programs simply never read
      *  them, the always-upload precedent). null = no eligible objects. */
     sceneTable: { leafCount: number; analyticTexels: number } | null;
+    /** The LIGHT tree (fable-light-bvh §5): the table rows + bit trails in `records`,
+     *  the tree nodes in `nodes`. Allocated whenever the light roster is non-empty and
+     *  tree-eligible (every kind declares treeBounds) — strategy-independent; 'power'
+     *  programs never read it. tableTexels = count × the layout truth's row stride. */
+    lightTree: { count: number; tableTexels: number } | null;
 }
 
 export interface SceneTableSlot {
@@ -76,6 +84,15 @@ export interface SceneTableSlot {
     tlasBase: number;
 }
 
+export interface LightTreeSlot {
+    /** Records-channel base of the light table (count × stride texels, light-id order). */
+    tableBase: number;
+    /** Records-channel base of the bit trails (1 texel per light: two u24 halves). */
+    trailsBase: number;
+    /** Nodes-channel base of the light tree (2(2n−1) texels — EXACT at leaf = 1). */
+    treeBase: number;
+}
+
 export interface DataLayout {
     /** Total texels per channel (0 = channel unused by this scene). */
     totals: { vertices: number; normals: number; uvs: number; indices: number; nodes: number; records: number; nodesq: number };
@@ -84,11 +101,12 @@ export interface DataLayout {
     /** By MESH ordinal. */
     meshLights: Map<number, MeshLightSlot>;
     sceneTable?: SceneTableSlot;
+    lightTree?: LightTreeSlot;
 }
 
 /** ≤ 2T−1 nodes over T leaves, 2 texels/node — the declared BLAS/TLAS padding bound. */
 export function nodeTexelBound(leafCount: number): number {
-    return leafCount > 0 ? 2 * (2 * leafCount - 1) : 0;
+    return 2 * bvhNodeBound(leafCount);
 }
 
 export function planDataLayout(t: DataTenants): DataLayout {
@@ -123,10 +141,20 @@ export function planDataLayout(t: DataTenants): DataLayout {
         const tlasBase = n; n += nodeTexelBound(t.sceneTable.leafCount);
         sceneTable = { leafListBase, analyticBase, tlasBase };
     }
+    // The light tree (fable-light-bvh §5) — APPENDED LAST deliberately: every
+    // pre-existing tenant's bases stay byte-stable under the carve gate.
+    let lightTree: LightTreeSlot | undefined;
+    if (t.lightTree !== null && t.lightTree.count > 0) {
+        const tableBase = r; r += t.lightTree.tableTexels;
+        const trailsBase = r; r += t.lightTree.count;
+        const treeBase = n; n += nodeTexelBound(t.lightTree.count);
+        lightTree = { tableBase, trailsBase, treeBase };
+    }
     return {
         totals: { vertices: v, normals: vertexChannelTotal(t), uvs: vertexChannelTotal(t), indices: tr, nodes: n, records: r, nodesq: nq },
         meshes, batches, meshLights,
         ...(sceneTable !== undefined ? { sceneTable } : {}),
+        ...(lightTree !== undefined ? { lightTree } : {}),
     };
 }
 

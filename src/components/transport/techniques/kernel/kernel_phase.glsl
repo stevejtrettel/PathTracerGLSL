@@ -10,6 +10,6 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // ratio in ps.weight and this line already honors it.
     InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
     s.throughput *= ps.weight;
-    kernel_record(s, ps.pdf, p_evt, false);
+    kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
 }

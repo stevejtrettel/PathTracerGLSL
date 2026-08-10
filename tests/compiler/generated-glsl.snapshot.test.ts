@@ -3,7 +3,7 @@ import { Compiler } from '../../src/compiler/Compiler.js';
 import type { CompiledRenderer, SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from '../witnesses/scenes/minimalScene.js';
 import { cornellBox, cornellStrategy } from '../witnesses/scenes/cornellBox.js';
-import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from '../witnesses/scenes/twoLightScene.js';
+import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy, twoLightBvhStrategy } from '../witnesses/scenes/twoLightScene.js';
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from '../witnesses/scenes/furnaceBox.js';
 import { analyticMinimal, analyticStrategy } from '../witnesses/scenes/analyticMinimal.js';
 import { mixedScene } from '../../demos/analyticScenes.js';
@@ -60,6 +60,10 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     // and the furnace emitter (energy conservation).
     ['two-light + power', twoLightScene, twoLightPowerStrategy],
     ['two-light + uniform', twoLightScene, twoLightUniformStrategy],
+    // The light tree (fable-light-bvh): table-resident lights + the generated walk
+    // pair (pick + trail pmf, adjacent) at the degenerate n = 2 end — the emitted-text
+    // pin for the 'bvh' occupant (hundred-spheres owns the scale story + GPU gates).
+    ['two-light + bvh', twoLightScene, twoLightBvhStrategy],
     ['furnace + no-direct', furnaceBox, furnaceStrategy],
     // Variance accumulation occupant (measurement bench): MRT header (fragMoment),
     // u_previousMoment sampler, the Welford main, dual-output pipeline + variance export.

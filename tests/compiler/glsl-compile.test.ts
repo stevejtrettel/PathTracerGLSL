@@ -179,6 +179,7 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
             spot: { kind: 'spot', position: [12, 6, 0], direction: [0, -1, 0], angle: 0.6, emission: 15 },
             directional: { kind: 'directional', direction: [0.3, -1, 0.2], emission: 2 },
             beam: { kind: 'beam', position: [16, 6, 0], direction: [0, -1, 0], radius: 0.25, emission: 40 },
+            softbeam: { kind: 'softbeam', position: [20, 6, 0], direction: [0, -1, 0], radius: 0.3, divergence: 0.1, emission: 50 },
         };
         const lights: LightDescription[] = [];
         for (const kind of Object.keys(LIGHT_KINDS)) {

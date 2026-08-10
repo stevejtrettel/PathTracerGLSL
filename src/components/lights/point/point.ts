@@ -26,4 +26,9 @@ export const pointLightDescriptor: LightKindDescriptor = {
     },
     // Desugar (A3): delta — registry entry only, no region.
     toValues: (a, product) => ({ position: a.position as number[], intensity: product }),
+    // Light-tree leaf box (fable-light-bvh §5): a point light is its position.
+    treeBounds(v) {
+        const p = v.position as [number, number, number];
+        return { min: [p[0], p[1], p[2]], max: [p[0], p[1], p[2]] };
+    },
 };

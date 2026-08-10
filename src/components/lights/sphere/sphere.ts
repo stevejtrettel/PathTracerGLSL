@@ -33,4 +33,10 @@ export const sphereLightDescriptor: LightKindDescriptor = {
     },
     valuesFromRegion: (p, Le) => ({ center: p.center, radius: p.radius, radiance: Le }),
     // No validateAuthored: every rule is separable and lives on the rows (D1).
+    // Light-tree leaf box (fable-light-bvh §5): center ± r.
+    treeBounds(v) {
+        const c = v.center as [number, number, number];
+        const r = v.radius as number;
+        return { min: [c[0] - r, c[1] - r, c[2] - r], max: [c[0] + r, c[1] + r, c[2] + r] };
+    },
 };

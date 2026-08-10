@@ -49,13 +49,15 @@ export function grid(counts: [number, number, number], spacing: number, center: 
     return out;
 }
 
-/** UNIT prototypes for instanceCloud — `size` multiplies these, so size = sphere RADIUS.
- *  v1 is sphere-only: 'cube' needs an analytic box intersector, and box is DELIBERATELY
- *  SDF-only today (params not closed under rotation — the top-level analytic fold would
- *  silently drop a rotated box's rotation). The instanced local-frame arm is rotation-safe,
- *  so cube's real prerequisite is a per-context backend fact (fable-instance-clouds §8). */
+/** UNIT prototypes for instanceCloud — `size` multiplies these, so size = sphere RADIUS
+ *  and cube HALF-EDGE. 'cube' landed with placement-fold stage 4 (Aug 10 2026): box
+ *  carries an analytic slab intersector, and the old "per-context backend fact" worry
+ *  is dissolved — the fold THROWS on rotated non-closed shapes instead of silently
+ *  dropping R, and instanced boxes ride the rotation-safe FRAME tier (2-texel rigid
+ *  records; the params tier stays sphere-only — box is not similarityClosed). */
 const CLOUD_SHAPES: Record<string, { type: string; parameters: PrimitiveValues }> = {
     sphere: { type: 'sphere', parameters: { radius: 1.0 } },
+    cube: { type: 'box', parameters: { halfSize: [1.0, 1.0, 1.0] } },
 };
 
 export interface InstanceCloudOptions {

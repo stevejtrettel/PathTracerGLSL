@@ -51,14 +51,17 @@ describe('light kind GLSL contract (struct-alignment batch — the _light_ infix
 // ============================================================================
 
 describe('light kind registry invariants', () => {
-    it('no two kinds share a backing region primitive (the sampleAsLight inverse is a first-wins lookup)', () => {
+    it('no two INVERSE-declaring kinds share a backing region primitive (the sampleAsLight inverse lookup is scoped to valuesFromRegion-bearing kinds — softbeam backs onto disk without joining the inverse)', () => {
         // Planner.ts resolves an emissive object's kind via find(k => k.region?.primitive
-        // === shape) — FIRST match wins. Two kinds backing one primitive would silently
+        // === shape && k.valuesFromRegion !== undefined) — FIRST match wins over kinds
+        // that DECLARE the inverse. Two such kinds backing one primitive would silently
         // mis-route the sampleAsLight authoring path; when that day comes (two-sided
         // quads?), the inverse lookup needs a real disambiguation design, not a dedupe.
+        // Kinds WITHOUT valuesFromRegion (softbeam) may share a primitive freely — the
+        // explicit-light route is their only door, keyed by authored kind.
         const byPrimitive = new Map<string, string>();
         for (const [kind, d] of Object.entries(LIGHT_KINDS)) {
-            if (d.region === undefined) continue;
+            if (d.region === undefined || d.valuesFromRegion === undefined) continue;
             const prior = byPrimitive.get(d.region.primitive);
             expect(prior, `kinds '${prior}' and '${kind}' both back onto primitive '${d.region.primitive}'`).toBeUndefined();
             byPrimitive.set(d.region.primitive, kind);

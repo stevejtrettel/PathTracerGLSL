@@ -23,7 +23,8 @@
 // that tf < tn by an ulp on a true hit (grazing the box edge / finely tessellated
 // geometry) — the multiply guarantees the interval survives rounding. Conservative
 // only: a spurious accept costs one extra leaf test; a spurious REJECT loses
-// geometry.
+// geometry. BVH_TFAR_PAD is emitted from bvh.ts's const (one source — the cwbvh
+// walk's quantized slab test and the TS reference walk read the same number).
 // (No entry-distance out param until a walk consumes one — front-to-back leaf
 // ordering would reintroduce it; every current walk orders by axis sign alone.)
 bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
@@ -31,7 +32,8 @@ bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
     vec3 t1 = (bmax - ro) * inv;
     vec3 tsm = min(t0, t1), tbg = max(t0, t1);
     float tn = max(max(tsm.x, tsm.y), tsm.z);
-    float tf = min(min(tbg.x, tbg.y), tbg.z) * 1.00000024;
+    float tf = min(min(tbg.x, tbg.y), tbg.z) * BVH_TFAR_PAD;
     float tenter = max(tn, 0.0);
     return tf >= tenter && tenter < tmax;
 }
+

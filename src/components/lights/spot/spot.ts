@@ -64,4 +64,10 @@ export const spotLightDescriptor: LightKindDescriptor = {
         }
         return msgs;
     },
+    // Light-tree leaf box (fable-light-bvh §5): the emitting POSITION (the cone's
+    // directionality is the deferred cone term — omitting it is conservative).
+    treeBounds(v) {
+        const p = v.position as [number, number, number];
+        return { min: [p[0], p[1], p[2]], max: [p[0], p[1], p[2]] };
+    },
 };

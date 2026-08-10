@@ -556,6 +556,36 @@ describe('Validator — mesh/instancing validation batch', () => {
         const inert2 = run((_s, st) => { st.estimator.instanceAccel = 'linear'; });
         expect(inert2.getWarnings().some(w => /instanceAccel controls nothing here/.test(w.message))).toBe(true);
     });
+
+    it("rejects cwbvh × lightSelection 'bvh' on a light-eligible batch (Hit.element light identity rides binary-TLAS order)", () => {
+        const glowBatch = (s: SceneDescription) => {
+            s.materials.glow = { model: 'lambert', albedo: [0.5, 0.5, 0.5], emission: [5, 5, 5] };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'glow' }, placements });
+        };
+        const bad = run((s, st) => { glowBatch(s); st.estimator.instanceAccel = 'cwbvh'; st.estimator.lightSelection = 'bvh'; });
+        expect(bad.getErrors().some(e => /'cwbvh' with lightSelection 'bvh'/.test(e.message))).toBe(true);
+        // The same batch under 'tlas', or a non-emissive batch under cwbvh, is fine.
+        const okTlas = run((s, st) => { glowBatch(s); st.estimator.instanceAccel = 'tlas'; st.estimator.lightSelection = 'bvh'; });
+        expect(okTlas.hasErrors()).toBe(false);
+        const okDark = run((s, st) => {
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'm' }, placements });
+            st.estimator.instanceAccel = 'cwbvh'; st.estimator.lightSelection = 'bvh';
+        });
+        expect(okDark.getErrors().some(e => /'cwbvh' with lightSelection 'bvh'/.test(e.message))).toBe(false);
+    });
+
+    it("the 'bvh' inert warning counts batch instance lights (a batch-lights-only scene is NOT inert)", () => {
+        // lights: [] + one emissive cloud — the clebsch-glow shape. The roster is empty
+        // but the tree serves every instance; the knob is anything but inert.
+        const bag = run((s, st) => {
+            s.lights = [];
+            s.materials.glow = { model: 'lambert', albedo: [0.5, 0.5, 0.5], emission: [5, 5, 5] };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'glow' }, placements });
+            st.estimator.lightSelection = 'bvh';
+        });
+        expect(bag.getWarnings().some(w => /lightSelection 'bvh' controls nothing here/.test(w.message))).toBe(false);
+        expect(bag.hasErrors()).toBe(false);   // L6: batch lights count as NEE targets under the tree
+    });
 });
 
 // Per-instance attributes (fable-instance-attributes): the fourth storage class's rules.
@@ -571,14 +601,23 @@ describe('Validator — instance attributes', () => {
         expect(bag.hasErrors()).toBe(false);
     });
 
-    it('rejects unknown rows, emission, and region-indexed rows', () => {
+    it('rejects unknown rows and region-indexed rows', () => {
         expect(run(batch({ shininess: [1, 2] })).getErrors().some(e => /attributes\.shininess.*not a row of model 'lambert'/.test(e.message))).toBe(true);
-        expect(run(batch({ emission: [[1, 1, 1], [2, 2, 2]] })).getErrors().some(e => /per-instance emission is not supported/.test(e.message))).toBe(true);
         const iorBag = run(s => {
             s.materials.glassy = { model: 'dielectric', ior: 1.5 };
             s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'glassy' }, placements, attributes: { ior: [1.4, 1.6] } } as never);
         });
         expect(iorBag.getErrors().some(e => /attributes\.ior.*region-indexed/.test(e.message))).toBe(true);
+    });
+
+    it('per-instance emission: allowed on params-tier sphere batches, rejected elsewhere (fable-light-bvh §7.1)', () => {
+        expect(run(batch({ emission: [[1, 1, 1], [2, 2, 2]] })).hasErrors()).toBe(false);
+        // A frame-tier pin makes the same batch ineligible — the tree cannot sample it.
+        const framed = run(s => {
+            s.materials.balls = { model: 'lambert', albedo: [0.5, 0.5, 0.5] };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'balls' }, placements, placementRecord: 'frame', attributes: { emission: [[1, 1, 1], [2, 2, 2]] } } as never);
+        });
+        expect(framed.getErrors().some(e => /per-instance emission is supported only on params-tier SPHERE batches/.test(e.message))).toBe(true);
     });
 
     it('rejects rows feeding a derived field (ggx roughness → alpha)', () => {
@@ -661,5 +700,63 @@ describe('Validator — mesh closedness', () => {
         }).getWarnings().some(w => /refract as η = 1/.test(w.message));
         expect(warn(false)).toBe(true);
         expect(warn(true)).toBe(false);
+    });
+});
+
+describe('Validator — lightSelection axis (fable-light-bvh §2/§6)', () => {
+    it('rejects an unregistered selection id (registry-derived membership)', () => {
+        const bag = run((_, st) => { st.estimator.lightSelection = 'lightcuts'; });
+        expect(bag.getErrors().some((e) => e.message.includes("'lightcuts'") && e.message.includes('power, uniform, bvh'))).toBe(true);
+    });
+
+    it('accepts bvh on a tree-eligible scene (point light)', () => {
+        const bag = run((_, st) => { st.estimator.lightSelection = 'bvh'; });
+        expect(bag.getErrors()).toEqual([]);
+    });
+
+    it("accepts bvh with a MESH emitter in the roster (treeBounds 'data' — the mesh-treeBounds batch)", () => {
+        const bag = run((s, st) => {
+            s.materials.lampMesh = { model: 'lambert', albedo: [0, 0, 0], emission: [5, 5, 5] };
+            s.objects.push({ kind: 'mesh', positions: new Float32Array([0, 2, 0, 1, 2, 0, 0, 2, 1]), indices: new Uint32Array([0, 1, 2]), material: 'lampMesh' });
+            st.estimator.lightSelection = 'bvh';
+        });
+        expect(bag.getErrors().some((e) => e.message.includes('treeBounds'))).toBe(false);
+    });
+
+    it('rejects bvh when a roster kind declares no treeBounds (directional)', () => {
+        const bag = run((s, st) => {
+            st.estimator.lightSelection = 'bvh';
+            s.lights = [{ kind: 'directional', direction: [0, -1, 0], emission: 2 } as never];
+        });
+        expect(bag.getErrors().some((e) => e.message.includes("'directional'") && e.message.includes('treeBounds'))).toBe(true);
+    });
+
+    it('rejects bvh with driven emission (v1: constant Φ payload)', () => {
+        const bag = run((s, st) => {
+            st.estimator.lightSelection = 'bvh';
+            s.lights = [{ kind: 'point', position: [0, 5, 0], emission: { param: 'lamp.e', default: 5 } } as never];
+        });
+        expect(bag.getErrors().some((e) => e.message.includes('CONSTANT light emission'))).toBe(true);
+    });
+
+    it('rejects bvh × equiangular (the medium-vertex tree entry is the mis/tally batch)', () => {
+        const bag = run((s, st) => {
+            st.estimator.lightSelection = 'bvh';
+            st.estimator.mediumLightSampling = 'equiangular';
+            s.materials.fog = { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [0.4, 0.4, 0.4] } };
+            s.objects.push({ type: 'sphere', parameters: { center: [0, 1, 0], radius: 0.8 }, material: 'fog' });
+        });
+        expect(bag.getErrors().some((e) => e.message.includes("'equiangular'") && e.message.includes('bvh'))).toBe(true);
+    });
+
+    it('warns (inert) for bvh with no finite lights', () => {
+        const bag = run((s, st) => {
+            st.estimator.lightSelection = 'bvh';
+            s.lights = [];
+            s.materials.m = { model: 'lambert', albedo: [0.5, 0.5, 0.5] };
+            s.environment = { type: 'constant', color: [1, 1, 1], sampleAsLight: true };
+        });
+        expect(bag.getErrors()).toEqual([]);
+        expect(bag.getWarnings().some((w) => w.message.includes('bvh') && w.message.includes('inert'))).toBe(true);
     });
 });

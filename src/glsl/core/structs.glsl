@@ -53,6 +53,20 @@ struct Hit {
 // Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
 const uint LIGHT_DELTA = 1u;
 
+// Light-selection query context (fable-light-bvh §3.2 v1.5 — pbrt's LightSampleContext
+// transcribed as DESIGN): everything selection may know about the query point. Pinned
+// fields; static technique files NEVER construct it directly — the generated
+// constructors (light_query_surface/light_query_medium) are the policy site, and the
+// MIS pmf replays the STORED query (PathState.prev_query), so sampler and pmf see
+// byte-identical context by construction. n = 0 means "no orientation information"
+// (medium events; future rough-transmissive receivers): selection falls back to the
+// normal-free importance. Future context (spectral, curved frames) extends THIS
+// struct + the constructors — the seams and techniques never churn again.
+struct LightQuery {
+    Point p;
+    Direction n;
+};
+
 struct LightSample {
     Direction wi;         // toward the light, unit
     float distance;       // to the sampled point (1e20 for directional/environment)

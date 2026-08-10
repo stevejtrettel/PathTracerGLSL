@@ -23,7 +23,7 @@ import {
 import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js';
 import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
-import { laserScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
+import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
 import { uvChartsScene, uvChartsNeeStrategy, uvChartsPtStrategy } from './uvChartsScene.js';
 import { exprMaterialsScene, exprMaterialsNeeStrategy, exprMaterialsPtStrategy } from './exprMaterialsScene.js';
@@ -36,6 +36,7 @@ import { forestScene, forestStrategy, forestLinearStrategy } from './forestScene
 import { spheresScene, spheresStrategy, spheresLinearStrategy } from './spheresScene.js';
 import { cactiScene, cactiStrategy, cactiMisStrategy } from './cactiScene.js';
 import { grandBazaarScene, grandBazaarStrategy, grandBazaarMisStrategy } from './grandBazaarScene.js';
+import { embersScene, embersStrategy, embersMisStrategy, embersPtStrategy } from './embersScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -54,6 +55,20 @@ const cornellOneshotStrategy: RenderStrategy = {
 // untracked .inst files; registry-iterating tests skip them via isAsyncSceneEntry).
 export const demoSuite: Record<string, AnySceneSuiteEntry> = {
     ...dataScenes,
+    embers: {
+        scene: embersScene,
+        strategies: posed([9, 2.6, 9], [0, 0.8, 0], embersStrategy, embersMisStrategy, embersPtStrategy),
+        exercises:
+            'DEMO — the many-lights payoff at cloud scale (fable-light-bvh stage 2): 3000 instanced ember spheres, '
+            + 'each ITS OWN tree light (the params placement record is the light row; per-instance Φ ∝ r²), lighting '
+            + '2500 instanced rocks with no other light in the scene. Selection at any rock is dominated by the '
+            + 'nearest handful of embers out of 3000 — stochastic tree descent finds them at O(log n). '
+            + 'Keys 1/2 = nee/mis under the tree; key 3 = plain pt (path-found glow — the "before" picture).',
+        expected:
+            'a smoldering field: dark rocks rim-lit in ember orange, pools of glow around each cluster. '
+            + 'Keys 1 and 2 resolve the lighting within seconds; key 3 is dramatically noisier at equal time '
+            + '(every glow found by chance bounces). All three converge to the same image.',
+    },
     spheres: {
         scene: spheresScene,
         strategies: posed([0, 4.5, 13], [0, 2.3, 0], spheresStrategy, spheresLinearStrategy),
@@ -170,9 +185,17 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
         scene: laserScene,
         strategies: posed([0, 1.6, 5.5], [0, 1.2, -0.5], laserNeeStrategy, laserMisStrategy),
         exercises:
-            'DEMO — the beam kind (impl-plan-directional-beam): three colored lasers crossing a foggy room. Shafts = medium-vertex NEE inside each cylinder; wall spots = the surface evaluation; the GREEN beam terminates on a chrome MIRROR ball (occlusion IS the range) and carves a fog shadow tunnel behind it, while the ball reflects all three shafts through the fog. NO stamp on the ball (mirror = no diffuse lobe) and NO secondary green shaft (a curved mirror diverges a delta beam into a cone NEE cannot sample — the delta² argument). Drag fog.sigma_s to thicken the air. Keys 1 (pt-nee) / 2 (pt-mis) converge. v1 caveat: thin beams firefly at low spp (plan P7 — the beam-segment technique is the deferred fix)',
+            'DEMO — the beam kind (impl-plan-directional-beam) + the ROUGHNESS-VS-SAMPLING experiment: three colored lasers crossing a foggy room, the green one striking a near-mirror GGX ball. Non-delta makes the reflected glow reachable (phase sample → ball vertex → beam NEE weighted by the GGX eval), but the eval concentrates on a surface patch ∝ α² — drag ball.roughness from 0.6 down toward 0.02 and watch the reflected glow trade width for noise, approaching the delta×delta probability-zero limit continuously. Drag fog.sigma_s to thicken the air. Keys 1 (pt-nee) / 2 (pt-mis). v1 caveat: thin beams firefly at low spp (plan P7)',
         expected:
-            'three neon shafts (red/green/blue) fanning through the fog; red and blue end in hot wall/floor spots; the green one stops AT the chrome ball — no stamp, but a dark beam-shadow tunnel in the fog behind it, and the ball mirrors the shafts and the room; black sky, dim cool wash',
+            'three neon shafts fanning through the fog; the green one stamps a glint on the chrome ball with a fog shadow tunnel behind it, plus a faint wide green gloss-glow off the ball at higher roughness that sharpens AND gets noisier as roughness drops — near 0.02 it is fireflies-or-nothing (the delta limit); black sky, dim cool wash',
+    },
+    'laser-soft': {
+        scene: laserSoftScene,
+        strategies: posed([0, 1.6, 5.5], [0, 1.2, -0.5], laserNeeStrategy, laserMisStrategy),
+        exercises:
+            'DEMO — the SOFT BEAM twin (fable-emitter-profiles v0): the green laser is a `softbeam` (δ = 2°, Le matched so the shaft brightness equals the delta card\'s), red/blue stay delta as in-frame references. The hittable-laser experiment: the ball\'s reflected glow is now reachable BOTH by vertex NEE × GGX eval AND by chance hits through the specular lobe onto the aperture (MIS-weighted) — compare noise against `laser` at equal time, and drag ball.roughness down: this card should degrade more gracefully than the delta one',
+        expected:
+            'same room as `laser`; the green shaft\'s edge softens with distance (divergence), its wall spot has a penumbra, and the rough ball\'s green reflection is less fireflies-or-nothing than the delta card at low roughness',
     },
     chrome: {
         scene: chromeScene,

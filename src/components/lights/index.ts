@@ -13,6 +13,7 @@ import { spotLightDescriptor } from './spot/spot.js';
 import { meshLightDescriptor } from './mesh/mesh.js';
 import { directionalLightDescriptor } from './directional/directional.js';
 import { beamLightDescriptor } from './beam/beam.js';
+import { softbeamLightDescriptor } from './softbeam/softbeam.js';
 
 export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     point: pointLightDescriptor,
@@ -23,11 +24,29 @@ export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     mesh: meshLightDescriptor,   // data-driven; sampleAsLight-route only (fable-mesh-lights)
     directional: directionalLightDescriptor,   // delta-direction class (impl-plan-directional-beam)
     beam: beamLightDescriptor,                 // delta-direction class (impl-plan-directional-beam)
+    softbeam: softbeamLightDescriptor,         // hittable finite-divergence beam (fable-emitter-profiles v0)
 };
 
 // radiantScalar lives in power.ts (D5: family-root shared part — occupants import it
 // there, killing the registry↔occupant ESM cycle); re-exported for external callers.
 export { radiantScalar } from './power.js';
+
+/** NEE light-selection occupants (fable-light-bvh §2 — the carved axis). Membership +
+ *  default only, the OBJECT_DISPATCHES precedent: the selection regimes differ
+ *  structurally throughout the lighting feature (baked CDF chain vs the table-resident
+ *  tree walk), so there is nothing per-occupant to emit — the Validator gatekeeps
+ *  membership from these keys and the feature branches on the id.
+ *  'power'   — the area-aware power CDF (position-blind; the founding occupant).
+ *  'uniform' — the naive baseline CDF.
+ *  'bvh'     — stochastic light-tree descent (spatially-aware O(log n) selection;
+ *              accel/light_tree builds, the lighting feature emits the walk pair). */
+export interface LightSelectionDescriptor { id: string; }
+export const DEFAULT_LIGHT_SELECTION = 'power';
+export const LIGHT_SELECTIONS: Record<string, LightSelectionDescriptor> = {
+    power: { id: 'power' },
+    uniform: { id: 'uniform' },
+    bvh: { id: 'bvh' },
+};
 
 /** Apply the kind's authored-row defaults ONCE (D1: defaults-in-rows — the framework
  *  step every consumer goes through, so `toValues`/`region.parameters`/`validateAuthored`

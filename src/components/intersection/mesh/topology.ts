@@ -10,6 +10,8 @@
 // "full of holes." All edge accounting therefore runs on POSITION-WELDED canonical ids
 // (exact float match — split corners carry bit-identical coordinates by construction).
 
+import type { AABB } from '../../accel/bvh/bvh.js';
+
 export interface MeshClosedness {
     /** Every welded edge is shared by exactly two triangles (no holes, no fins). */
     watertight: boolean;
@@ -77,7 +79,7 @@ export function meshClosedness(positions: Float32Array, indices: Uint32Array): M
 
 /** The mesh's local AABB (min/max over positions) — baked into the generated containment
  *  query as the root-box early-out (outside the box IS outside the mesh, no traversal). */
-export function meshLocalBox(positions: Float32Array): { min: [number, number, number]; max: [number, number, number] } {
+export function meshLocalBox(positions: Float32Array): AABB {
     const min: [number, number, number] = [Infinity, Infinity, Infinity];
     const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
     for (let i = 0; i < positions.length; i += 3) {

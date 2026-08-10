@@ -7,7 +7,7 @@
 void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase EVAL, NO cosine (§2.2 — the cosine is a surface Jacobian).
     MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
-    LightSample ls = lighting_sample(p_evt, random2());
+    LightSample ls = lighting_sample(light_query_medium(p_evt), random2());
     if (ls.pdf <= 0.0) return;
     // Pass the LIGHT POINT (drift-free target); the walker measures its back-off against it.
     Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);

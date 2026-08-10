@@ -17,14 +17,21 @@ import type { SceneSuiteEntry } from './types.js';
 import type { RenderStrategy, Vec3 } from '../../src/compiler/types.js';
 import { withPose } from '../../src/authoring/strategy.js';
 
-import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy } from './scenes/twoLightScene.js';
+import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy, twoLightBvhStrategy } from './scenes/twoLightScene.js';
+import { hundredSpheres, hundredNeePowerStrategy, hundredNeeBvhStrategy, hundredMisPowerStrategy, hundredMisBvhStrategy } from './scenes/hundredSpheres.js';
+import {
+    instanceLightsTwin, instanceLightsRef, instanceLightsNeeStrategy, instanceLightsMisStrategy, instanceLightsRefStrategy,
+    glowShell, glowShellNeeStrategy, glowShellMisStrategy, glowShellPtStrategy,
+} from './scenes/instanceLightsWitness.js';
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
 import { bazaarScene, bazaarTableStrategy, bazaarUnrolledStrategy } from './scenes/tableWitness.js';
-import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies } from './scenes/meshWitness.js';
+import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies, meshLightBvhStrategies } from './scenes/meshWitness.js';
 import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy, instanceParamsTwin, instanceParamsFrame, instanceParamsStrategy, instanceParamsCwbvhStrategy } from './scenes/instanceWitness.js';
 import { perfCloud, perfCloudFrame, perfCloudStrategy, perfCloudCwbvhStrategy, PERF_CLOUD_COUNT } from './scenes/perfCloud.js';
+import { accelTriple, accelTripleNeeStrategy, accelTripleMisStrategy, accelTriplePtStrategy } from './scenes/accelTriple.js';
+import { solidsAnalytic, solidsSdf, solidsStrategy, cubeCloud, cubeCloudRef, cubeCloudStrategy } from './scenes/solidsWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
@@ -59,6 +66,7 @@ import {
     beamWallScene, beamSlabScene, beamNeeStrategy,
     beamFogScene, beamFogNeeStrategy, beamFogMisStrategy,
 } from './scenes/directionalBeamWitness.js';
+import { softbeamWallScene, softbeamNeeStrategy, softbeamMisStrategy } from './scenes/softbeamWitness.js';
 import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
 import {
     transformBake, transformBakeRef, transformNeeStrategy, flattenTree,
@@ -107,13 +115,99 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     },
     'two-light': {
         scene: twoLightScene,
-        strategies: posed([0, 1.2, 4], [0, 0.5, 0], twoLightPowerStrategy, twoLightUniformStrategy),
+        strategies: posed([0, 1.2, 4], [0, 0.5, 0], twoLightPowerStrategy, twoLightUniformStrategy, twoLightBvhStrategy),
         exercises:
-            'multi-light CDF dispatcher (lights.length>1); lightSelection power (key 1) vs uniform (key 2)',
-        expected: 'power (key 1) and uniform (key 2) converge to the SAME image; power is lower-variance',
+            'multi-light CDF dispatcher (lights.length>1); lightSelection power (key 1) vs uniform (key 2) vs the light tree (key 3 — table-resident delta lights, one-level descent)',
+        expected: 'power (key 1), uniform (key 2), and bvh (key 3) converge to the SAME image; power/bvh are lower-variance',
         witness: {
             spp: 192,
-            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'power ≡ uniform' }],
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'power ≡ uniform' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.02, label: 'power ≡ bvh (n = 2 delta lights)' },
+            ],
+        },
+    },
+    'hundred-spheres': {
+        scene: hundredSpheres,
+        strategies: posed([-7.5, 1.8, -7.5], [-4, 0.6, -4], hundredNeePowerStrategy, hundredNeeBvhStrategy, hundredMisPowerStrategy, hundredMisBvhStrategy),
+        exercises:
+            'the many-lights regime (fable-light-bvh): 100 sampleAsLight sphere emitters, table-resident '
+            + 'lights + stochastic tree descent (keys 2/4) vs the position-blind power CDF (keys 1/3); '
+            + 'objectDispatch table on all arms; pt-mis bvh replays the stored bit trail for the emitter-hit MIS weight',
+        expected:
+            'all four arms converge to the SAME image; the bvh arms are visibly cleaner near the camera corner '
+            + 'at equal spp (selection follows 1/d² instead of power alone). Key 4 diverging from key 3 = pick/pmf drift.',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'nee: power ≡ bvh' },
+                { kind: 'equality', strategies: [2, 3], meanTol: 0.02, label: 'mis: power ≡ bvh (THE trail-pmf gate)' },
+                { kind: 'noise', strategies: [1, 0], assertFirstLowest: true, label: 'σ/µ(bvh) < σ/µ(power) at equal spp — the win metric' },
+            ],
+        },
+    },
+    'instance-lights': {
+        scene: instanceLightsTwin,
+        strategies: posed([-6.5, 1.6, -6.5], [-3, 0.5, -3], instanceLightsNeeStrategy, instanceLightsMisStrategy),
+        exercises:
+            'stage-2 instance lights (fable-light-bvh §7): ONE instanced batch of 64 emissive spheres = 64 tree lights; '
+            + 'light identity = (batch region, Hit.element); the params-tier placement record IS the sphere-light row; '
+            + 'the mis arm (key 2) replays the ELEMENT-indexed bit trail at emitter hits',
+        expected:
+            'converges to the instance-lights-ref image (same spheres as 64 individual objects); '
+            + 'key 1 ≡ key 2 (any drift = element trail-pmf bug)',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'twin', other: { scene: 'instance-lights-ref' }, meanTol: 0.02, label: 'batch instances ≡ individual objects (both bvh)' },
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'nee ≡ mis (the ELEMENT trail-pmf gate)' },
+            ],
+        },
+    },
+    'instance-lights-ref': {
+        scene: instanceLightsRef,
+        strategies: posed([-6.5, 1.6, -6.5], [-3, 0.5, -3], instanceLightsRefStrategy),
+        exercises: 'the instance-lights twin\'s other half: the SAME 64 spheres as individual sampleAsLight objects (stage-1 table lights, scene-table dispatch)',
+        expected: 'the twin target — see instance-lights',
+    },
+    'glow-shell': {
+        scene: glowShell,
+        strategies: posed([0, 0.2, 2.2], [0, 0, 0], glowShellNeeStrategy, glowShellMisStrategy, glowShellPtStrategy),
+        exercises:
+            'the near-field regime (fable-light-bvh §3.2): the camera INSIDE a shell of 100 instanced emitters — '
+            + 'the d² clamp is the active importance term; nee-bvh (key 1) vs mis-bvh (key 2) vs path-found pt (key 3)',
+        expected:
+            'keys 1 and 2 converge to the same image (the clamp is variance-only, never bias); key 3 converges to it too '
+            + 'but MUCH noisier (path-found emitters). σ/µ report quantifies the near-field win.',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'inside-the-cloud: nee ≡ mis under the near-field clamp' },
+                { kind: 'noise', strategies: [0, 2], label: 'σ/µ report: sampled (bvh) vs path-found (pt) inside the shell' },
+            ],
+        },
+    },
+    'accel-triple': {
+        scene: accelTriple,
+        strategies: posed([-6.2, 3.2, -6.2], [0, 0.4, 0], accelTripleNeeStrategy, accelTripleMisStrategy, accelTriplePtStrategy),
+        exercises:
+            'the accel COMPOSITION (Aug 10 review gap): an EMISSIVE standalone mesh (BLAS walk + a MESH row in '
+            + 'the light tree — mesh treeBounds) + an instanced MESH batch (frame-tier, BLAS-under-TLAS conjugation) '
+            + '+ an emissive SPHERE batch (params tier, 24 instance lights) — mesh BLAS × instance TLAS × light tree '
+            + 'in one program, mixed-kind tree leaves; NEE shadow rays thread the mesh AND batch any-hit walks',
+        expected:
+            'keys 1 and 2 converge to the same image (trail-pmf across mesh + element arms with all three accel '
+            + 'structures live); key 3 (path-found pt) converges to it too, noisier',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'nee ≡ mis with mesh BLAS + instance TLAS + light tree composed' },
+                // Chance-hit pt arm: coverage-mismatched with the NEE arms → RMSE tripwire,
+                // CALIBRATED at the owner's Aug 10 sweep: Δmean 0.11%, rmse 52.44% @192spp
+                // (small bright emitters, chance-hit noise floor — the mesh-light-twin story).
+                // Δmean is the bias guard; the rmse trips only on gross structural divergence.
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.6, label: 'pt anchor (path-found emitters) tripwire' },
+            ],
         },
     },
     furnace: {
@@ -417,9 +511,9 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     },
     'mesh-light-twin': {
         scene: meshLightTwin,
-        strategies: meshLightStrategies,
-        exercises: 'the lights family\'s first DATA-DRIVEN kind: an emissive 2-triangle mesh panel sampled via the cumulative-area CDF texture (uniform-area, identity-free pdf r²/(cosθ·A_total), one-sided) — exact twin of mesh-light-ref; keys 1/2/3 = pt-nee/pt-mis/pt',
-        expected: 'pt-nee, pt-mis, and pt all converge to mesh-light-ref\'s image (every mesh-light formula must agree with the quad\'s closed forms)',
+        strategies: [...meshLightStrategies, ...meshLightBvhStrategies],
+        exercises: 'the lights family\'s first DATA-DRIVEN kind: an emissive 2-triangle mesh panel sampled via the cumulative-area CDF texture (uniform-area, identity-free pdf r²/(cosθ·A_total), one-sided) — exact twin of mesh-light-ref; keys 1/2/3 = pt-nee/pt-mis/pt; keys 4/5 = the same panel under lightSelection bvh (the mesh TABLE ROW + tree-regime rail-base dispatch — mesh treeBounds)',
+        expected: 'pt-nee, pt-mis, and pt all converge to mesh-light-ref\'s image (every mesh-light formula must agree with the quad\'s closed forms); keys 4/5 match key 1 exactly (one-leaf tree: selection ≡ 1)',
         witness: {
             spp: 96,
             checks: [
@@ -431,6 +525,9 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // above X-CORNELL's bright-room 0.4. Δmean (0.37% measured) is the real
                 // bias guard; the rmse only trips on gross structural divergence.
                 { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.6, label: 'mesh light pt tripwire' },
+                // Mesh under the tree (mesh treeBounds): same estimand, tree-regime arms.
+                { kind: 'equality', strategies: [0, 3], meanTol: 0.02, label: 'nee: power ≡ bvh (the mesh table row)' },
+                { kind: 'equality', strategies: [3, 4], meanTol: 0.02, label: 'bvh: nee ≡ mis (mesh under the tree)' },
             ],
         },
     },
@@ -522,6 +619,45 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         scene: minimalScene,
         strategies: posed([0, 1, 5], [0, 0, 0], minimalStrategy, directOnlyStrategy),
         exercises: 'constant environment; pathtracer vs direct-only strategy from one scene; twin partner of analytic-minimal',
+    },
+    'solids-analytic': {
+        scene: solidsAnalytic,
+        strategies: posed([-3.4, 3.2, 4.6], [0, 0.5, 0], solidsStrategy),
+        exercises:
+            'placement-fold stage 4: box slab + cylinder interval ANALYTIC intersectors — the rotated box/cylinder '
+            + 'ride the rigid-residual analytic arm (the first NON-closed constant shapes there: baked quat, T,s folded), '
+            + 'the unrotated box the bare params-folded arm; twin of solids-sdf (the same scene under backend pins)',
+        expected: 'converges to solids-sdf\'s image (closed forms ≡ marcher on every face and silhouette)',
+        witness: {
+            spp: 96,
+            // Cross-backend twin → display-space gate, not χ² (the analytic-minimal note).
+            checks: [{ kind: 'twin', other: { scene: 'solids-sdf' }, meanTol: 0.02, rmse: 0.08, label: 'box/cylinder analytic ≡ SDF backend' }],
+        },
+    },
+    'solids-sdf': {
+        scene: solidsSdf,
+        strategies: posed([-3.4, 3.2, 4.6], [0, 0.5, 0], solidsStrategy),
+        exercises: 'the solids twin\'s marcher arm (backend: sdf pins — deliberate marcher coverage, the minimal/submerged pattern)',
+        expected: 'the twin target — see solids-analytic',
+    },
+    'cube-cloud': {
+        scene: cubeCloud,
+        strategies: posed([-5.2, 4.0, 5.2], [0, 0.5, 0], cubeCloudStrategy),
+        exercises:
+            'the cube-clouds door (fable-instance-clouds §8, closed by stage 4): 48 rotated scale-varied boxes as ONE '
+            + 'instanced batch — FRAME-tier records (box is not similarityClosed) conjugating the world ray into the '
+            + 'prototype frame per instance, box_intersect with s-scaled params, TLAS over the world boxes',
+        expected: 'converges to cube-cloud-ref\'s image (batch ≡ 48 individual boxes)',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'cube-cloud-ref' }, meanTol: 0.01, rmse: 0.03, label: 'instanced cubes ≡ individual boxes' }],
+        },
+    },
+    'cube-cloud-ref': {
+        scene: cubeCloudRef,
+        strategies: posed([-5.2, 4.0, 5.2], [0, 0.5, 0], cubeCloudStrategy),
+        exercises: 'the cube-cloud twin\'s other half: the same 48 boxes as individual rigid-residual analytic objects',
+        expected: 'the twin target — see cube-cloud',
     },
     'analytic-minimal': {
         scene: analyticMinimal,
@@ -1048,6 +1184,30 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 region: { x: 0.47, y: 0.47, w: 0.06, h: 0.06 },
                 label: 'F-BEAM-T walker-supplied e^{−σ_a·D}',
             }],
+        },
+    },
+    'softbeam-wall': {
+        scene: softbeamWallScene,
+        strategies: posed([0, 0, 1.2], [0, 0, 0], softbeamNeeStrategy, softbeamMisStrategy),
+        exercises:
+            'F-SOFTBEAM: the finite-divergence beam (fable-emitter-profiles v0) — the HITTABLE laser. Cone-gated radiance over the disk light\'s geometric pdf (gate on radiance ONLY — a gated pdf would poison MIS); the hit-side emission dispatch arm shares the same step(cosδ, axis·ω) literals (one profile truth). nee ≡ mis is load-bearing: mis adds real BSDF-side aperture hits through the gate',
+        expected:
+            'spot CORE (r < 0.4) = ρ·Le·sin²δ = 0.9992 in linear HDR — the near-field plateau, independent of r and d; a PENUMBRA annulus 0.4 → 0.6 (the soft edge the delta beam cannot make); EXACTLY black outside 0.6; keys 1 (pt-nee) and 2 (pt-mis) converge to the same image',
+        witness: {
+            spp: 96,
+            checks: [
+                {
+                    kind: 'mean', value: 0.99917, tol: 0.012,
+                    region: { x: 0.47, y: 0.47, w: 0.06, h: 0.06 },
+                    label: 'F-SOFTBEAM core ρ·Le·sin²δ',
+                },
+                {
+                    kind: 'mean', value: 0.0, tol: 0.002,
+                    region: { x: 0.02, y: 0.9, w: 0.08, h: 0.08 },
+                    label: 'F-SOFTBEAM outside-cone = 0 exactly',
+                },
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'F-SOFTBEAM nee ≡ mis (hittable + cone gate)' },
+            ],
         },
     },
     'beam-fog': {

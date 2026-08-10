@@ -17,6 +17,8 @@ const T: DataTenants = {
     ],
     meshLights: [{ meshOrdinal: 1, vertexCount: 594, triCount: 1152 }],
     sceneTable: { leafCount: 4, analyticTexels: 10 },   // 2 analytic × stride 5
+    // 5 lights at row stride 3 (fable-light-bvh §5) — appended LAST by contract.
+    lightTree: { count: 5, tableTexels: 15 },
 };
 
 describe('data rail ledger', () => {
@@ -43,11 +45,16 @@ describe('data rail ledger', () => {
         // Scene table: leaf list then analytic records after the CDF; TLAS after batch TLASes.
         expect(L.sceneTable!.leafListBase).toBe(9 + 500 + 500 + 1152);
         expect(L.sceneTable!.analyticBase).toBe(9 + 500 + 500 + 1152 + 4);
-        expect(L.totals.records).toBe(9 + 500 + 500 + 1152 + 4 + 10);
+        // The light tree APPENDS LAST (fable-light-bvh §5 — pre-existing bases stay
+        // byte-stable): table rows, then trails, then its nodes region.
+        expect(L.lightTree!.tableBase).toBe(9 + 500 + 500 + 1152 + 4 + 10);
+        expect(L.lightTree!.trailsBase).toBe(9 + 500 + 500 + 1152 + 4 + 10 + 15);
+        expect(L.totals.records).toBe(9 + 500 + 500 + 1152 + 4 + 10 + 15 + 5);
         // Nodes: BLAS bounds then TLAS bounds, then the scene TLAS, disjoint.
         expect(L.batches[0].tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152));
         expect(L.sceneTable!.tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500));
-        expect(L.totals.nodes).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500) + nodeTexelBound(4));
+        expect(L.lightTree!.treeBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500) + nodeTexelBound(4));
+        expect(L.totals.nodes).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500) + nodeTexelBound(4) + nodeTexelBound(5));
     });
 
     it('the node bound holds for real SAH trees (LEAF_SIZE ≥ 1 ⇒ ≤ 2T−1 nodes)', () => {

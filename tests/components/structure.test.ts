@@ -31,6 +31,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)
     'blackbody.ts',                        // lights shared part (kelvin → RGB parameterization — impl-plan-blackbody-uv)
+    'table.ts',                            // lights shared part (light-table layout truth — fable-light-bvh §4)
 ]);
 
 describe('components structure', () => {

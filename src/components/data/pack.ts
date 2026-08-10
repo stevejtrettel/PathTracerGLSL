@@ -18,12 +18,27 @@ export interface PackedChannel {
     height: number;
 }
 
+/** Channel dimensions for at least `texelCount` texels — THE one rounding rule both
+ *  element types share. */
+function channelHeight(texelCount: number): number {
+    return Math.max(1, Math.ceil(Math.max(1, texelCount) / DATA_TEX_WIDTH));
+}
+
+/** Write a comps-per-item payload at a base texel (remaining texel components stay 0) —
+ *  THE one strided-write loop (the pack consolidation, Aug 10 2026: the vec3/vec2/uvec3
+ *  writers were byte-identical loop bodies differing only in element type and stride). */
+function writeItems(dst: Float32Array, baseTexel: number, src: ArrayLike<number>, comps: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+        const t = (baseTexel + i) * 4;
+        for (let c = 0; c < comps; c++) dst[t + c] = src[i * comps + c];
+    }
+}
+
 /** Allocate a zero-filled channel holding at least `texelCount` texels (zero-fill = safe
  *  default for padding and unauthored regions). */
 export function allocChannel(texelCount: number): PackedChannel {
-    const w = DATA_TEX_WIDTH;
-    const h = Math.max(1, Math.ceil(Math.max(1, texelCount) / w));
-    return { data: new Float32Array(w * h * 4), width: w, height: h };
+    const h = channelHeight(texelCount);
+    return { data: new Float32Array(DATA_TEX_WIDTH * h * 4), width: DATA_TEX_WIDTH, height: h };
 }
 
 /** Write raw texel floats (length 4·n) at a base texel. */
@@ -41,9 +56,8 @@ export interface PackedChannelU32 {
 }
 
 export function allocChannelU32(texelCount: number): PackedChannelU32 {
-    const w = DATA_TEX_WIDTH;
-    const h = Math.max(1, Math.ceil(Math.max(1, texelCount) / w));
-    return { data: new Uint32Array(w * h * 4), width: w, height: h };
+    const h = channelHeight(texelCount);
+    return { data: new Uint32Array(DATA_TEX_WIDTH * h * 4), width: DATA_TEX_WIDTH, height: h };
 }
 
 /** Write raw texel words (length 4·n) at a base texel. */
@@ -53,30 +67,21 @@ export function writeTexelsU32(ch: PackedChannelU32, baseTexel: number, words: U
 
 /** Write a vec3-per-item payload (length 3·count) at a base texel (w = 0). */
 export function writeVec3s(ch: PackedChannel, baseTexel: number, src: Float32Array, count: number): void {
-    for (let i = 0; i < count; i++) {
-        const t = (baseTexel + i) * 4;
-        ch.data[t] = src[i * 3]; ch.data[t + 1] = src[i * 3 + 1]; ch.data[t + 2] = src[i * 3 + 2];
-    }
+    writeItems(ch.data, baseTexel, src, 3, count);
 }
 
 /** Write a vec2-per-item payload (length 2·count) at a base texel (zw = 0). */
 export function writeVec2s(ch: PackedChannel, baseTexel: number, src: Float32Array, count: number): void {
-    for (let i = 0; i < count; i++) {
-        const t = (baseTexel + i) * 4;
-        ch.data[t] = src[i * 2]; ch.data[t + 1] = src[i * 2 + 1];
-    }
+    writeItems(ch.data, baseTexel, src, 2, count);
 }
 
 /** Write one scalar per texel (.x; yzw = 0) at a base texel — CDF tables. */
 export function writeScalars(ch: PackedChannel, baseTexel: number, src: Float32Array | Float64Array, count: number): void {
-    for (let i = 0; i < count; i++) ch.data[(baseTexel + i) * 4] = src[i];
+    writeItems(ch.data, baseTexel, src, 1, count);
 }
 
 /** Write uvec3-per-item ids as exact floats (≤16M — no usampler2D) at a base texel.
  *  `.w` stays 0 — RESERVED as the per-triangle material-group slot (fable-data-rail §3). */
 export function writeUvec3s(ch: PackedChannel, baseTexel: number, src: Uint32Array, count: number): void {
-    for (let i = 0; i < count; i++) {
-        const t = (baseTexel + i) * 4;
-        ch.data[t] = src[i * 3]; ch.data[t + 1] = src[i * 3 + 1]; ch.data[t + 2] = src[i * 3 + 2];
-    }
+    writeItems(ch.data, baseTexel, src, 3, count);
 }

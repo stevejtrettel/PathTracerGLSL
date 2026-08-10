@@ -143,6 +143,40 @@ async function buildCloudScene(id: string, cfg: CloudSceneConfig): Promise<Scene
     };
 }
 
+/** The GLOW variant (fable-light-bvh stage 2/§7.1 at DATA scale): the cloud's points
+ *  are EMISSIVE — every instance is its own tree light, and there is no other light
+ *  in the scene (lights: [], no lamp). The file's baked LINEAR colors column drives
+ *  PER-INSTANCE EMISSION (each point glows its own color — Galois classes as light),
+ *  scaled by `glowScale` at scene build (retune = edit + reload; driven emission is
+ *  rejected under 'bvh'). Files without colors fall back to one constant emission. */
+async function buildGlowScene(id: string, cfg: CloudSceneConfig, glowScale: number, fallback: [number, number, number]): Promise<SceneDescription> {
+    const scene = await buildCloudScene(id, cfg);
+    const objects = scene.objects.map((o) => {
+        if (!('kind' in o && o.kind === 'instanced')) return o;
+        const colors = o.attributes?.albedo as Float32Array | undefined;
+        if (colors === undefined) return { ...o, attributes: undefined };
+        const emission = new Float32Array(colors.length);
+        for (let i = 0; i < colors.length; i++) emission[i] = colors[i] * glowScale;
+        return { ...o, attributes: { emission } };
+    });
+    return {
+        ...scene,
+        id,
+        name: `${id} — every point a light`,
+        objects,
+        materials: {
+            ...scene.materials,
+            point: {
+                model: 'lambert', albedo: [0.05, 0.04, 0.03],
+                // Constant fallback for no-colors files; with a colors column the
+                // per-instance emission attribute overrides it everywhere.
+                emission: fallback,
+            },
+        },
+        lights: [],
+    };
+}
+
 function cloudStrategy(id: string, cfg: CloudSceneConfig): RenderStrategy {
     const base: RenderStrategy = {
         id: `pt-nee-${id}`,
@@ -171,6 +205,22 @@ function cloudEntry(id: string, blurb: string): AsyncSceneSuiteEntry {
 export const dataScenes: Record<string, AsyncSceneSuiteEntry> = {
     clebsch: cloudEntry('clebsch',
         'DATA — instance clouds end to end (fable-instance-clouds): 194k algebraic points of the Clebsch cubic from an untracked .inst file (runtime fetch → packed placements → per-instance albedo → per-batch TLAS). Baked sizes encode arithmetic height; the height scalar column enables size: hooks without re-conversion.'),
+    'clebsch-glow': {
+        scene: () => buildGlowScene('clebsch-glow', CONFIGS.clebsch, 8.0, [4.0, 2.2, 1.0]),
+        name: 'clebsch glow (194k instance lights)',
+        strategies: [
+            { ...cloudStrategy('clebsch-glow', CONFIGS.clebsch), id: 'nee-bvh', estimator: { directLighting: 'nee', lightSelection: 'bvh', russianRoulette: { startDepth: 3 }, instanceAccel: 'tlas', accumulation: { type: 'average' } } },
+            { ...cloudStrategy('clebsch-glow', CONFIGS.clebsch), id: 'mis-bvh', estimator: { directLighting: 'mis', lightSelection: 'bvh', russianRoulette: { startDepth: 3 }, instanceAccel: 'tlas', accumulation: { type: 'average' } } },
+            { ...cloudStrategy('clebsch-glow', CONFIGS.clebsch), id: 'pt', estimator: { directLighting: 'none', russianRoulette: { startDepth: 3 }, instanceAccel: 'tlas', accumulation: { type: 'average' } } },
+        ],
+        exercises:
+            'DATA — the light tree at DATA scale (fable-light-bvh stage 2/§7.1): the Clebsch cubic\'s 194k points made '
+            + 'EMISSIVE, each glowing ITS OWN baked color (the .inst colors column drives PER-INSTANCE emission — white '
+            + 'rationals and orange quadratics as individually-colored lights; per-instance Φ from color × r²). Every '
+            + 'instance is its own tree light (194k-leaf tree, element-indexed bit trails), no other light in the scene. '
+            + 'Keys 1/2 = nee/mis under the tree; key 3 = plain pt (path-found — the "before" picture). glowScale in '
+            + 'dataScenes.ts is the brightness dial: edit + reload.',
+    },
     croissant: cloudEntry('croissant',
         'DATA — the 289k-point arm (fable-instance-clouds): the S4-quartic torus shell + the rational skewer along z.'),
     steiner: cloudEntry('steiner',

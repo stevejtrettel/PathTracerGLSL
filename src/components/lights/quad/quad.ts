@@ -62,4 +62,18 @@ export const quadLightDescriptor: LightKindDescriptor = {
             ? [`quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8`]
             : [];
     },
+    // Light-tree leaf box (fable-light-bvh §5): the four corners.
+    treeBounds(v) {
+        const c = v.corner as number[], e1 = v.edge1 as number[], e2 = v.edge2 as number[];
+        const min: [number, number, number] = [Infinity, Infinity, Infinity];
+        const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+        for (const [s1, s2] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+            for (let a = 0; a < 3; a++) {
+                const x = c[a] + s1 * e1[a] + s2 * e2[a];
+                if (x < min[a]) min[a] = x;
+                if (x > max[a]) max[a] = x;
+            }
+        }
+        return { min, max };
+    },
 };

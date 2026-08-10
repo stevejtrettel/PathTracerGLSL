@@ -16,6 +16,7 @@ export type ResolvedEnvironment =
     | { type: 'procedural'; glsl: GlslExpression; intensity: number; rotation: number };
 import type { Similarity } from '../../components/geometry/similarity.js';
 import type { MeshSlot, BatchSlot, SceneTableSlot } from '../../components/data/ledger.js';
+import type { AABB } from '../../components/accel/bvh/bvh.js';
 
 // ============================================================================
 // Program Description — what the generated program does
@@ -192,12 +193,20 @@ export interface MaterialsDesc {
      *  with no uv materials pays zero chart cost (pre-P1 behavior). Not a linkage seam —
      *  hit.uv is core state — purely the "don't derive what nothing consumes" gate. */
     materialsReadUv: boolean;
+    /** Directional-emission gates (softbeam v0 — fable-emitter-profiles.md): backing
+     *  materials whose hit-side emission dispatch arm multiplies the kind's cone gate,
+     *  with the SAME direction/cosδ literals the light struct's sampler reads (one
+     *  profile truth — pt ≡ pt-nee). Baked constants (light geometry rows are never
+     *  driven, the v1 pin). PRESENT only when non-empty — programs without cone-gated
+     *  emitters carry no field and no dispatch arms (exact linkage, zero churn). */
+    emissionCones?: Array<{ materialId: number; direction: [number, number, number]; cosDivergence: number }>;
 }
 
 export type LightingDesc =
     | {
         method: 'nee' | 'mis';
-        selection: 'uniform' | 'power';
+        /** LIGHT_SELECTIONS registry id (fable-light-bvh §2) — Validator-gatekept. */
+        selection: string;
         /** Authored OVERRIDE of the env selection probability (estimator.envSelectWeight,
          *  Validator-checked (0,1)). Absent = derived power partition (the closure). */
         envSelectWeight?: number;
@@ -312,7 +321,7 @@ export interface PlannedMesh {
     slot: MeshSlot;
     /** The mesh's LOCAL AABB (baked literals) — the containment query's root-box early-out.
      *  Present iff closed (the compiler has the positions; O(V) at plan time). */
-    localBox?: { min: [number, number, number]; max: [number, number, number] };
+    localBox?: AABB;
     /** Constant similarity or a live driven placement — the ray is conjugated into the mesh's
      *  local frame (positions stay local; never folded into vertices). */
     placement: PlannedPlacement;
@@ -516,6 +525,19 @@ export interface RenderPlan {
     /** Present when the scene has table-eligible objects (fable-object-tables) —
      *  read ONLY by 'table'-dispatch programs; 'unrolled' ignores it. */
     sceneTable?: PlannedSceneTable;
+    /** The light tree's baked rail slot (fable-light-bvh §5/§7) — present whenever the
+     *  scene's lights (registry roster + light-eligible batch instances) are non-empty
+     *  and tree-eligible (allocated strategy-independently, the always-upload
+     *  precedent); read ONLY by lightSelection 'bvh' programs. `count` spans the GLOBAL
+     *  light-index space: [0, registryCount) = table-resident roster lights;
+     *  [base, base+count) per instanceLights entry = batch instances in RECORD order
+     *  (= Hit.element). strideTexels restates the table-layout truth (0 when no
+     *  registry lights). */
+    lightTree?: {
+        treeBase: number; tableBase: number; trailsBase: number;
+        strideTexels: number; count: number; registryCount: number;
+        instanceLights: Array<{ ordinal: number; base: number; count: number }>;
+    };
     materials: PlannedMaterial[];
     lights: PlannedLight[];
 

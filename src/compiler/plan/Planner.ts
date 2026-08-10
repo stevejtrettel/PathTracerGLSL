@@ -4,13 +4,15 @@ import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription
 import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
-import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
+import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
+import { lightTableLayout } from '../../components/lights/table.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
-import { PRIMITIVES, primitive, canonicalizePrimitiveParameters, classifyPlacement, foldPlacementIntoParameters, resolveBackend } from '../../components/geometry/index.js';
+import { PRIMITIVES, primitive, canonicalizePrimitiveParameters, classifyPlacement, resolveBackend } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
     isDrivenTransform,
+    isIdentityRotation,
     quatFromAxisAngle,
     quatNormalize,
     rigidInverse,
@@ -27,7 +29,7 @@ import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
@@ -91,7 +93,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
     // Rail v2 (fable-data-rail): THE layout truth — the same adapter+ledger call the App
     // makes, so baked bases and packed bytes can never disagree.
-    const { tenants: dataTenants, batchGeometrySlot, batchPlacementRecord, table: sceneTableTruth } = dataTenantsOf(scene);
+    const { tenants: dataTenants, batchGeometrySlot, batchPlacementRecord, table: sceneTableTruth, lightBatches: sceneLightBatches } = dataTenantsOf(scene);
     const dataLayout = planDataLayout(dataTenants);
     let objectIndex = 0;
     for (const obj of scene.objects) {
@@ -211,14 +213,27 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             // resolved params so a sampleAsLight emitter cannot drift from its geometry). ONE
             // predicate with the table adapter (keepsLocalFrame) — a retained shape is never
             // tabled. (Patterned ⟹ checker/expression ⟹ non-emissive, so no light drift.)
+            // Non-patterned constants route through classifyPlacement (the ONE fold
+            // truth, stage-4 amendment): similarity-closed shapes fold ENTIRELY;
+            // non-closed analytic shapes (box/cylinder — placement-fold stage 4) fold
+            // T,s and keep the pure-rotation residual as a CONSTANT placement (the
+            // P1b emission shape — baked vec4s, no uniforms). Identity residuals bake
+            // no placement at all, so closed shapes keep their bare params-folded arms.
+            const cl = keepsLocalFrame(obj, scene)
+                ? null
+                : classifyPlacement(obj.type, obj.parameters, placementOf(obj.transform));
+            const residualLive = cl !== null && !(isIdentityRotation(cl.residual.rotation) && cl.residual.scale === 1
+                && cl.residual.translation[0] === 0 && cl.residual.translation[1] === 0 && cl.residual.translation[2] === 0);
             analyticObjects.push({
                 index: objectIndex++,
                 materialId: matId,
                 shapeType: obj.type,
                 name: obj.name,
-                ...(keepsLocalFrame(obj, scene)
+                ...(cl === null
                     ? { parameters: canonicalizePrimitiveParameters(obj.type, obj.parameters), placement: placementOf(obj.transform) }
-                    : { parameters: foldPlacementIntoParameters(obj.type, obj.parameters, placementOf(obj.transform)) }),
+                    : residualLive
+                        ? { parameters: cl.parameters, placement: cl.residual }
+                        : { parameters: cl.parameters }),
             });
         }
     }
@@ -299,7 +314,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         // Registry-driven (A3): the kind whose backing region primitive matches this
         // object's shape converts the FOLDED parameters back to registry values —
         // both authoring routes share one kind definition.
-        const kindEntry = Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === planned.shapeType);
+        // Only kinds DECLARING the inverse participate (softbeam backs onto 'disk' too,
+        // but an emissive disk OBJECT is a disk light — the first-wins lookup is scoped
+        // to valuesFromRegion-bearing kinds, and the contract test enforces uniqueness
+        // over exactly that set).
+        const kindEntry = Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === planned.shapeType && k.valuesFromRegion !== undefined);
         if (kindEntry?.valuesFromRegion === undefined) continue;   // backstop; samplableAsLight already gated
         lights.push({
             id: lightIndex++, kind: kindEntry.kind, regionId: planned.index,
@@ -366,8 +385,41 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         };
     }
 
+    // --- The light tree's baked slot + the roster ⇄ plan consistency assert
+    // (fable-light-bvh §5): the ledger allocated regions from lightRosterOf(scene) —
+    // entry k there must BE planned light k, or the App packs at bases the generated
+    // walk doesn't read. Kind-for-kind is the runtime check (cheap, loud); values
+    // equality is the vitest invariant's job.
+    const lightRoster = lightRosterOf(scene);
+    if (lightRoster.length !== lights.length || lightRoster.some((rl, i) => rl.kind !== lights[i].kind)) {
+        throw new Error(
+            `light roster drift: lightRosterOf(scene) = [${lightRoster.map((rl) => rl.kind).join(', ')}] `
+            + `vs plan.lights = [${lights.map((l) => l.kind).join(', ')}] — the census in dataTenants.ts `
+            + `must mirror the Planner's desugar routes (fable-light-bvh §5)`);
+    }
+    // Batch instance lights (fable-light-bvh §7 stage 2): the adapter's eligibility
+    // list lowers to the GLOBAL light-index bases — registry roster first, then each
+    // eligible batch's instances in record order.
+    let lightBase = lightRoster.length;
+    const instanceLights = sceneLightBatches.map(({ ordinal, count }) => {
+        const entry = { ordinal, base: lightBase, count };
+        lightBase += count;
+        return entry;
+    });
+    const lightTree = dataLayout.lightTree !== undefined
+        ? {
+            treeBase: dataLayout.lightTree.treeBase,
+            tableBase: dataLayout.lightTree.tableBase,
+            trailsBase: dataLayout.lightTree.trailsBase,
+            strideTexels: lightRoster.length > 0 ? lightTableLayout(lightRoster.map((rl) => rl.kind)).strideTexels : 0,
+            count: lightBase,
+            registryCount: lightRoster.length,
+            instanceLights,
+        }
+        : undefined;
+
     // --- Build program description ---
-    const program = planProgram(features, scene, strategy, lights, materials, objects, analyticObjects, meshes, instanceBatches);
+    const program = planProgram(features, scene, strategy, lights, materials, objects, analyticObjects, meshes, instanceBatches, instanceLights.reduce((a, b) => a + b.count, 0));
     const pipeline = planPipeline(program);
 
     return {
@@ -376,6 +428,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         meshes,
         instanceBatches,
         ...(sceneTable !== undefined ? { sceneTable } : {}),
+        ...(lightTree !== undefined ? { lightTree } : {}),
         materials,
         lights,
         ambientMedium,
@@ -388,7 +441,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[], objects: PlannedSDFObject[], analyticObjects: PlannedAnalyticObject[], meshes: PlannedMesh[], instanceBatches: PlannedInstanceBatch[]): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[], objects: PlannedSDFObject[], analyticObjects: PlannedAnalyticObject[], meshes: PlannedMesh[], instanceBatches: PlannedInstanceBatch[], batchLightTotal: number): ProgramDescription {
     // Surface models = the models of the PLANNED materials — the one list that already
     // includes the desugared area lights' synthesized emitter materials, so a new hittable
     // light kind can never leave its backing model out of the program (the lights-door
@@ -398,18 +451,36 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     const present = new Set(materials.map((m) => m.model));
     const brdfModels = (Object.keys(MATERIAL_MODELS) as MaterialModel[]).filter((m) => present.has(m));
 
+    // Directional-emission gates (softbeam v0): kinds declaring the emissionCone fact
+    // gate their backing material's hit-side emission by the SAME cone the sampler
+    // reads (one profile truth — pt ≡ pt-nee). Registry-driven: no kind branch; the
+    // backing material is found through the light's region (the desugar's own record).
+    const emissionCones = lights.flatMap((l) => {
+        const fact = LIGHT_KINDS[l.kind]?.emissionCone;
+        if (fact === undefined || l.regionId === undefined) return [];
+        const backing = analyticObjects.find((o) => o.index === l.regionId);
+        return backing === undefined ? [] : [{ materialId: backing.materialId, ...fact(l.values) }];
+    });
+
     // A samplable environment is a light for NEE purposes (T3) — an env-only scene under
     // 'nee'/'mis' gets the lighting infrastructure with an env-only lighting_sample.
     // `envKindSamplable` is the analyzer's SCENE FACT (the kind supports sampling); the
     // program DECISION (`environmentSamplable` below) also needs the NEE machinery to
     // exist at all (impl-plan-exact-linkage: under 'none' nothing can call the sampler).
     const envKindSamplable = features.environment.samplable;
-    const hasLights = features.lighting.totalLightCount > 0 || envKindSamplable;
+    // Batch instance lights are samplable ONLY under the tree (fable-light-bvh §7):
+    // under 'power' they stay path-found — an estimator-only difference (§11.2), and
+    // the power CDF never meets a 100k-entry bake. batchLights true ⇒ NEE is on ⇒
+    // lighting below is non-null.
+    const selection = strategy.estimator.lightSelection ?? DEFAULT_LIGHT_SELECTION;
+    const batchLights = selection === 'bvh' && batchLightTotal > 0
+        && strategy.estimator.directLighting !== 'none';
+    const hasLights = features.lighting.totalLightCount > 0 || envKindSamplable || batchLights;
     const wantsNEE = strategy.estimator.directLighting !== 'none' && hasLights;
     const lighting = wantsNEE
         ? {
               method: (strategy.estimator.directLighting === 'mis' ? 'mis' : 'nee') as 'mis' | 'nee',
-              selection: strategy.estimator.lightSelection ?? 'power',
+              selection,
               // The env selection OVERRIDE rides only when authored — absent means the
               // derived power partition (impl-plan-env-power-selection).
               ...(strategy.estimator.envSelectWeight !== undefined
@@ -442,8 +513,9 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             m.medium, scattering === 'full' && mediumMayScatter(m.medium)));
 
     // §6.2: samplable-emitter machinery exists iff some light entered the registry with a
-    // region (delta-only scenes compile to the pre-area-light program).
-    const samplableEmitters = lights.some((l) => l.regionId !== undefined);
+    // region (delta-only scenes compile to the pre-area-light program) — or batch
+    // instance lights are live under the tree (their region is the batch's).
+    const samplableEmitters = lights.some((l) => l.regionId !== undefined) || batchLights;
 
     return {
         measurement: {
@@ -513,6 +585,11 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             models: brdfModels,
             surfaceEval: lighting !== null,
             surfacePdf: mis,
+            // Directional-emission gates (softbeam v0, fable-emitter-profiles): backing
+            // materials whose hit-side emission is cone-gated by the kind's emissionCone
+            // fact — registry-driven, baked literals (light geometry rows are constant).
+            // OMITTED when empty so programs without softbeams are byte-identical.
+            ...(emissionCones.length > 0 ? { emissionCones } : {}),
             // Gates the REAL uv charts (fable-imagery P1/P2): a scene with no uv-reading
             // material keeps the cheap planar placeholder everywhere (no wasted chart trig).
             // ONE "reads uv" notion, shared with keepsLocalFrame (materialReadsUv): a PROCEDURAL

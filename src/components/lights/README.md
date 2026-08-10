@@ -78,6 +78,14 @@ Explicit area lights DESUGAR in the Planner through the descriptor's `region` fa
 to synthesized emissive regions (`__light_n`), so every hittable light is real
 geometry.
 
+**Selection is a carved axis** (`LIGHT_SELECTIONS` in index.ts — fable-light-bvh):
+`power`/`uniform` are the baked-CDF regime above; `bvh` makes every light
+TABLE-resident (`table.ts` is the row-layout truth; rows + bit trails ride the
+records channel, the tree rides nodes — `accel/light_tree` builds) and replaces the
+CDF with the generated pick/trail-pmf walk pair. Kinds opt into the tree via the
+`treeBounds` descriptor fact; kinds without it (mesh, directional, beam) are
+Validator-rejected under 'bvh'.
+
 ## Invariants & witnesses
 
 pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2); shadow-ray

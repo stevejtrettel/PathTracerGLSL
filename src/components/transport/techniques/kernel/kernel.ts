@@ -21,7 +21,8 @@ export function kernelStateFields(f: Flags): string[] {
     if (f.mis) {
         fields.push(
             '    float prev_bsdf_pdf;     // kernel\'s record, MIS: the BSDF side of the power heuristic',
-            '    Point prev_p;            //   (reference §8) — written at surface AND medium events',
+            '    LightQuery prev_query;   //   (reference §8) — the STORED selection context (fable-light-bvh',
+            '                             //   §3.2 v1.5): the pmf replays exactly what the sampler saw.',
         );
     }
     return fields;
@@ -31,7 +32,7 @@ export function kernelStateFields(f: Flags): string[] {
 export function kernelStateInit(f: Flags): string[] {
     const lines = ['    s.prev_was_delta = true;'];
     if (f.mis) {
-        lines.push('    s.prev_bsdf_pdf = 0.0;', '    s.prev_p = ray.origin;');
+        lines.push('    s.prev_bsdf_pdf = 0.0;', '    s.prev_query = LightQuery(ray.origin, vec3(0.0));');
     }
     return lines;
 }
@@ -41,11 +42,13 @@ export function kernelStateInit(f: Flags): string[] {
 export function kernelRecordFn(f: Flags): ShaderBlock {
     const lines = [
         '// ── Kernel record (generated): the ONE writer of T1\'s carried state ──',
-        'void kernel_record(inout PathState s, float pdf, Point p, bool is_delta) {',
+        '// The query arrives from the SAME generated constructor the NEE call used at',
+        '// this vertex — stored-context replay (fable-light-bvh §3.2 v1.5).',
+        'void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {',
         '    s.prev_was_delta = is_delta;',
     ];
     if (f.mis) {
-        lines.push('    s.prev_bsdf_pdf = pdf;', '    s.prev_p = p;');
+        lines.push('    s.prev_bsdf_pdf = pdf;', '    s.prev_query = q;');
     }
     lines.push('}');
     return { origin: 'generated:transport/kernel-record', source: lines.join('\n') };
@@ -64,10 +67,10 @@ export function kernelBlocks(f: Flags): ShaderBlock[] {
 
 /** The seams T1's emitted code calls under these flags. */
 export function kernelRequires(f: Flags): string[] {
-    const req = ['interaction_surface_sample', 'interaction_surface_emission', 'material_is_emissive', 'environment_radiance'];
+    const req = ['interaction_surface_sample', 'interaction_surface_emission', 'material_is_emissive', 'environment_radiance', 'light_query_surface'];
     if (f.nee && f.emitters) req.push('light_of');
     if (f.emittersPdf) req.push('lighting_pdf');
-    if (f.scattering) req.push('interaction_medium_sample');
+    if (f.scattering) req.push('interaction_medium_sample', 'light_query_medium');
     if (f.envSamplable && f.mis) req.push('environment_pdf');
     return req;
 }

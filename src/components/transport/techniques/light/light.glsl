@@ -8,7 +8,7 @@
 void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props) {
     // Pure-delta materials skip NEE: their eval is zero, the march would be wasted.
     if (!material_has_nondelta_lobes(mat)) return;
-    LightSample ls = lighting_sample(hit.p, random2());
+    LightSample ls = lighting_sample(light_query_surface(mat, hit), random2());
     if (ls.pdf <= 0.0) return;
     // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
     // back-off is measured against the fixed target — drift-free across null-interface crossings.

@@ -55,6 +55,17 @@ vec3 mesh_pos(sampler2D posTex, uint vi)  { return texelFetch(posTex, data_texel
 vec3 mesh_nrm(sampler2D nrmTex, uint vi)  { return texelFetch(nrmTex, data_texel1d(vi), 0).xyz; }
 vec2 mesh_uv (sampler2D uvTex,  uint vi)  { return texelFetch(uvTex,  data_texel1d(vi), 0).xy;  }
 
+// Fetch triangle i's index triple + vertex positions — THE one leaf prologue (the walk
+// consolidation, Aug 10 2026: this 4-line fetch existed in four copies; the containment
+// walks' inline leaves had begun to drift from the ray leaves).
+uvec3 mesh_tri_fetch(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase, uint i, out vec3 a, out vec3 b, out vec3 c) {
+    uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(tbase + i), 0).xyz);
+    a = mesh_pos(posTex, vbase + tri.x);
+    b = mesh_pos(posTex, vbase + tri.y);
+    c = mesh_pos(posTex, vbase + tri.z);
+    return tri;
+}
+
 // ── The shared triangle LEAF ─────────────────────────────────────────────────────────────
 // Both traversals (brute force AND the BVH) run these over a range [offset, offset+count) of the
 // index texture — ONE triangle test, so the two engines can never drift (impl-plan-mesh-bvh §4).
@@ -68,10 +79,8 @@ void mesh_test_range(
     inout float tmax, inout vec3 nLocal, inout vec2 uvOut, inout bool found
 ) {
     for (uint i = offset; i < offset + count; i++) {
-        uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(tbase + i), 0).xyz);
-        vec3 a = mesh_pos(posTex, vbase + tri.x);
-        vec3 b = mesh_pos(posTex, vbase + tri.y);
-        vec3 c = mesh_pos(posTex, vbase + tri.z);
+        vec3 a, b, c;
+        uvec3 tri = mesh_tri_fetch(posTex, idxTex, vbase, tbase, i, a, b, c);
         vec3 bary, gnorm; float t;
         if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > EPSILON && t < tmax) {
             tmax = t;
@@ -92,14 +101,28 @@ void mesh_test_range(
 // Any-hit occlusion in [offset, offset+count): first triangle strictly before maxDist blocks.
 bool mesh_any_range(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase, uint offset, uint count, vec3 ro, vec3 rd, float maxDist) {
     for (uint i = offset; i < offset + count; i++) {
-        uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(tbase + i), 0).xyz);
-        vec3 a = mesh_pos(posTex, vbase + tri.x);
-        vec3 b = mesh_pos(posTex, vbase + tri.y);
-        vec3 c = mesh_pos(posTex, vbase + tri.z);
+        vec3 a, b, c;
+        mesh_tri_fetch(posTex, idxTex, vbase, tbase, i, a, b, c);
         vec3 bary, gnorm; float t;
         if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > EPSILON && t < maxDist) return true;
     }
     return false;
+}
+
+// Side-of-nearest in [offset, offset+count) along the fixed containment probe ray: tracks the
+// geometric side (dot(dir, gnorm)) of the running-nearest hit. t > 0.0 (not EPSILON): the probe
+// point is already EPS_INTERFACE off any surface by the caller's discipline; skipping near hits
+// would misclassify probes standing just inside a face.
+void mesh_side_range(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase, uint offset, uint count, vec3 p, vec3 dir, inout float tmax, inout float sideDot) {
+    for (uint i = offset; i < offset + count; i++) {
+        vec3 a, b, c;
+        mesh_tri_fetch(posTex, idxTex, vbase, tbase, i, a, b, c);
+        vec3 bary, gnorm; float t;
+        if (mesh_tri_test(p, dir, a, b, c, bary, gnorm, t) && t > 0.0 && t < tmax) {
+            tmax = t;
+            sideDot = dot(dir, gnorm);
+        }
+    }
 }
 
 // ── Brute force: the whole soup as one range (v0) ────────────────────────────────────────────
@@ -176,21 +199,7 @@ bool mesh_inside_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uint 
         vec4 n1 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2 + 1)), 0);
         if (!bvh_aabb_hit(n0.xyz, n1.xyz, p, inv, tmax)) continue;
         if (n0.w >= 0.0) {
-            uint off = uint(n1.w), cnt = uint(n0.w);
-            for (uint i = off; i < off + cnt; i++) {
-                uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(tbase + i), 0).xyz);
-                vec3 a = mesh_pos(posTex, vbase + tri.x);
-                vec3 b = mesh_pos(posTex, vbase + tri.y);
-                vec3 c = mesh_pos(posTex, vbase + tri.z);
-                vec3 bary, gnorm; float t;
-                // t > 0.0 (not EPSILON): the probe point is already EPS_INTERFACE off any
-                // surface by the caller's discipline; skipping near hits would misclassify
-                // probes standing just inside a face.
-                if (mesh_tri_test(p, MESH_INSIDE_DIR, a, b, c, bary, gnorm, t) && t > 0.0 && t < tmax) {
-                    tmax = t;
-                    sideDot = dot(MESH_INSIDE_DIR, gnorm);
-                }
-            }
+            mesh_side_range(posTex, idxTex, vbase, tbase, uint(n1.w), uint(n0.w), p, MESH_INSIDE_DIR, tmax, sideDot);
         } else {
             int axis = int(-n0.w - 1.0);
             int L = ni + 1, R = int(n1.w);
@@ -253,9 +262,9 @@ float mesh_closest_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uin
         if (n0.w >= 0.0) {
             uint off = uint(n1.w), cnt = uint(n0.w);
             for (uint i = off; i < off + cnt; i++) {
-                uvec3 tri = uvec3(texelFetch(idxTex, data_texel1d(tbase + i), 0).xyz);
-                best2 = min(best2, mesh_point_tri_dist2(p,
-                    mesh_pos(posTex, vbase + tri.x), mesh_pos(posTex, vbase + tri.y), mesh_pos(posTex, vbase + tri.z)));
+                vec3 a, b, c;
+                mesh_tri_fetch(posTex, idxTex, vbase, tbase, i, a, b, c);
+                best2 = min(best2, mesh_point_tri_dist2(p, a, b, c));
             }
         } else {
             int L = ni + 1, R = int(n1.w);
@@ -287,6 +296,9 @@ bool mesh_any_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uint vba
         if (n0.w >= 0.0) {
             if (mesh_any_range(posTex, idxTex, vbase, tbase, uint(n1.w), uint(n0.w), ro, rd, maxDist)) return true;
         } else if (ptr + 2 < BVH_STACK_DEPTH) {
+            // DELIBERATE deviation from the nearest walk: any-hit terminates on the FIRST
+            // blocker, so near-first ordering buys nothing — the axis decode is skipped
+            // and children push unordered (declared, not drift — Aug 10 2026).
             stack[++ptr] = ni + 1;
             stack[++ptr] = int(n1.w);
         }

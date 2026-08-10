@@ -13,6 +13,7 @@
 
 import type { MaterialModel, ValueParam, BlackbodyValue } from '../compiler/types.js';
 import type { Similarity } from './geometry/similarity.js';
+import type { AABB } from './accel/bvh/bvh.js';
 
 /** THE one constraint vocabulary (descriptor-unification D1): a rule a machine can READ —
  *  one checker, one error voice, one contract test, UI-consumable ranges. Shared by every
@@ -218,6 +219,14 @@ export interface LightKindDescriptor {
      *  precompiled one-sided normal + area — the normal MUST stay the same
      *  compile-time literal geometry's quad bakes; bit-exact one-sided pin). */
     derivedCtorFields?(values: Record<string, number | number[]>): (number | number[])[];
+    /** DIRECTIONAL EMISSION fact (softbeam v0 — the emitter-profile axis's miniature,
+     *  fable-emitter-profiles.md): the kind's backing region emits only inside a cone,
+     *  and the HIT-SIDE emission dispatch must gate by the same numbers the NEE sampler
+     *  reads (the one-profile-truth invariant, pt ≡ pt-nee). Returns the cone from the
+     *  registry values; the Planner records it per backing material into
+     *  ProgramDescription.materials.emissionCones — registry-driven, no kind branch.
+     *  Constant by the v1 pin (light geometry rows are never driven). */
+    emissionCone?(values: Record<string, number | number[] | unknown>): { direction: [number, number, number]; cosDivergence: number };
     /** Emitted power for CDF selection (pbrt PowerLightSampler formulas) over the
      *  resolved values — a CPU selection heuristic, returns a number. `ctx` is the
      *  Planner-stamped scene context (impl-plan-directional-beam P6): stamped on EVERY
@@ -226,6 +235,15 @@ export interface LightKindDescriptor {
      *  (cdf_rescale keeps every choice unbiased), so ctx-reading kinds carry their own
      *  fallback for the optional argument. */
     power(values: Record<string, number | number[]>, ctx?: LightPowerContext): number;
+    /** World AABB of the emitter for light-TREE leaves (fable-light-bvh §5). Two forms:
+     *  a FUNCTION over the RESOLVED values (degenerate boxes fine — point/spot: the
+     *  position), or the marker `'data'` for rail-resident geometry whose box the App
+     *  PACKER supplies (mesh: the BLAS root box under the constant placement — the
+     *  mesh-treeBounds batch, Aug 10 2026). A kind WITHOUT this fact is tree-INELIGIBLE
+     *  (directional/beam: unbounded position) — the lightTree tenant is not allocated
+     *  for scenes carrying one, and lightSelection 'bvh' rejects them
+     *  (reject-not-degrade; the Validator pin mirrors this fact's absence). */
+    treeBounds?: ((values: Record<string, number | number[]>) => AABB) | 'data';
 }
 
 /** Scene-scale context for light selection power (impl-plan-directional-beam P6) —
@@ -357,7 +375,7 @@ export interface PrimitiveDescriptor {
      *  when this primitive is an instance prototype (transformed per placement → the TLAS,
      *  impl-plan-tlas). Absent = UNBOUNDED (e.g. plane): cannot be an instance prototype
      *  (Validator-rejected). Finite analytic primitives (sphere/quad/disk) declare it. */
-    bounds?(values: PrimitiveValues): { min: [number, number, number]; max: [number, number, number] };
+    bounds?(values: PrimitiveValues): AABB;
     /** Computed compile-time struct fields appended after the row's fields
      *  (quad: the precompiled one-sided normal — MUST stay a compile-time
      *  value so hit side and the quad light's sampler agree bit-exactly).

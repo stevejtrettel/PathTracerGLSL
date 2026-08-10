@@ -176,8 +176,9 @@ export interface InstancedObject {
      * ATTRIBUTE). Each array is parallel to `placements` (length N; Spectrum rows accept
      * scalar broadcast per entry). A `Float32Array` is the packed arm: length N for float
      * rows, 3N interleaved for Spectrum rows (fable-instance-clouds §4). Excluded rows
-     * (Validator): the region-table row (ior — batches are thin) and emission (per-instance
-     * emission would need per-instance power CDF rows — deferred). The batch's material
+     * (Validator): the region-table row (ior — batches are thin); emission is allowed on
+     * params-tier SPHERE batches only (fable-light-bvh §7.1 — the light tree's per-instance
+     * Φ is the selection structure per-instance emission needs). The batch's material
      * must not be shared with other objects. Read at shading via Hit.element → the
      * instance_k_attrs data-rail texture.
      */
@@ -550,9 +551,13 @@ export interface MeasurementDescription {
  */
 export interface EstimatorDescription {
     directLighting: 'none' | 'nee' | 'mis';
-    /** Light-selection metric for NEE (compile-time). 'power' importance-samples brighter
-     *  lights (spectrum_average(color·intensity)); 'uniform' is the naive baseline. Default 'power'. */
-    lightSelection?: 'uniform' | 'power';
+    /** NEE light-selection occupant (fable-light-bvh §2 — a registry id, not a union;
+     *  B1 discipline: LIGHT_SELECTIONS in components/lights gatekeeps via the Validator).
+     *  'power' (default) importance-samples brighter lights via the area-aware power CDF;
+     *  'uniform' is the naive baseline; 'bvh' descends the light tree stochastically —
+     *  spatially-aware O(log n) selection for many-light scenes. Pure estimator: every
+     *  occupant converges to the same image (§11.2 equality witnesses are the gate). */
+    lightSelection?: string;
     /** OVERRIDE of the env-vs-finite selection probability P(sample env) in two-stage NEE.
      *  ESTIMATOR section, variance-only by construction (selection pdfs match on every
      *  side — sampler, lighting_pdf, miss-MIS weight — so it can never move the converged

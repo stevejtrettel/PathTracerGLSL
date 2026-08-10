@@ -7,11 +7,15 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject } from '../types.js';
-import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression } from '../types.js';
+import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue } from '../types.js';
+import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression, isValueParam, isBlackbody } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
-import { PRIMITIVES, paramsRecordFloats, resolveBackend } from '../../components/geometry/index.js';
-import { MATERIAL_MODELS } from '../../components/materials/index.js';
+import { PRIMITIVES, paramsRecordFloats, resolveBackend, foldPlacementIntoParameters } from '../../components/geometry/index.js';
+import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
+import { foldBlackbody } from '../../components/lights/blackbody.js';
+import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
+import { lightTableLayout } from '../../components/lights/table.js';
+import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { cwbvhNodeTexelBound } from '../../components/accel/cwbvh/cwbvh.js';
@@ -77,6 +81,10 @@ export interface SceneDataTenants {
     batchPlacementRecord: Array<'frame' | 'params'>;
     /** The scene table, or null when no eligible objects exist. */
     table: SceneTable | null;
+    /** Light-eligible batches (fable-light-bvh §7 stage 2), by BATCH ordinal with
+     *  instance counts — the eligibility truth's output, consumed by the Planner's
+     *  instanceLights slot and the App's tree pack. Empty when none. */
+    lightBatches: Array<{ ordinal: number; count: number }>;
 }
 
 /** The params-tier decision for one batch: shape facts (paramsRecordFloats — closed ∧
@@ -97,6 +105,108 @@ export function meshIsSamplableEmitter(scene: SceneDescription, mesh: MeshObject
     const mat = scene.materials[mesh.material];
     return mat !== undefined && mat.sampleAsLight !== false
         && hasConstantNonzeroEmission(mat.emission) && !isDrivenTransform(mesh.transform);
+}
+
+/** One light-roster entry: the kind + its UNRESOLVED registry values (driven rows stay
+ *  ValueParam/Blackbody; consumers resolve). Mesh entries carry empty values — their
+ *  geometry lives in the rail; radiance/area are real row values (mesh treeBounds). */
+export interface LightRosterEntry {
+    kind: string;
+    values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
+}
+
+/** The scene-side light CENSUS (fable-light-bvh §5) — the ONE roster truth feeding the
+ *  lightTree tenant AND the App's table/tree/trails pack. It mirrors the Planner's
+ *  three desugar routes IN ORDER (authored lights → sampleAsLight analytics → mesh
+ *  emitters), so entry k here IS planned light k; the Planner asserts the kinds match
+ *  (drift = loud error), and a vitest invariant pins values equality across the suite. */
+export function lightRosterOf(scene: SceneDescription): LightRosterEntry[] {
+    const roster: LightRosterEntry[] = [];
+
+    // Route 1 — authored lights (unregistered kinds are Validator-rejected; skipped
+    // exactly as the Planner skips them).
+    for (const light of scene.lights) {
+        const d = LIGHT_KINDS[light.kind];
+        if (d === undefined) continue;
+        const e = light.emission;
+        const product = isValueParam(e) ? e
+            : isBlackbody(e) ? foldBlackbody(e)
+            : (typeof e === 'number' ? [e, e, e] : e);
+        const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
+        roster.push({ kind: light.kind, values: d.toValues(authored, product as number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue) });
+    }
+
+    // Route 2 — sampleAsLight analytic objects (scene order; every Planner skip
+    // mirrored: SDF backend, driven transform, retained local frame, non-samplable
+    // primitive, sampleAsLight: false, non-constant emission, no kind inverse).
+    for (const o of scene.objects) {
+        if (!isPrimitiveObject(o)) continue;
+        if (resolveBackend(o.type, o.backend) !== 'analytic') continue;
+        if (isDrivenTransform(o.transform) || keepsLocalFrame(o, scene)) continue;
+        if (PRIMITIVES[o.type]?.samplableAsLight !== true) continue;
+        const mat = scene.materials[o.material];
+        if (mat === undefined || mat.sampleAsLight === false) continue;
+        // The Planner reads the RESOLVED material emission (constant blackbody dials
+        // fold to a Vec3 there) — fold here too before the C3 predicate.
+        const raw = mat.emission;
+        const em = isBlackbody(raw) ? foldBlackbody(raw) : raw;
+        if (!hasConstantNonzeroEmission(em)) continue;
+        const Le = (typeof em === 'number' ? [em, em, em] : em) as number[];
+        const kindEntry = Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === o.type);
+        if (kindEntry?.valuesFromRegion === undefined) continue;
+        roster.push({
+            kind: kindEntry.kind,
+            values: kindEntry.valuesFromRegion(
+                foldPlacementIntoParameters(o.type, o.parameters, similarityFromTransform(o.transform)), Le),
+        });
+    }
+
+    // Route 3 — mesh emitters (the shared adapter predicate). Values mirror the
+    // Planner's mesh route exactly (radiance = the constant material emission,
+    // scalar-broadcast; area = the s²-folded WORLD total) — real values, because the
+    // mesh kind is tree-eligible (treeBounds: 'data') and its table row/power read
+    // them; only the BOX is pack-side (the App's 'data' route).
+    for (const m of sceneMeshes(scene.objects)) {
+        if (!meshIsSamplableEmitter(scene, m)) continue;
+        const e = scene.materials[m.material]!.emission as number | number[];
+        roster.push({
+            kind: 'mesh',
+            values: {
+                radiance: typeof e === 'number' ? [e, e, e] : e,
+                area: meshWorldArea(m.positions, m.indices, similarityFromTransform(m.transform).scale),
+            },
+        });
+    }
+
+    return roster;
+}
+
+/** Every roster kind declares treeBounds → the scene can carry a light tree.
+ *  (lightSelection 'bvh' Validator-rejects scenes where this is false.) */
+export function lightRosterTreeEligible(roster: readonly LightRosterEntry[]): boolean {
+    return roster.every((l) => LIGHT_KINDS[l.kind]?.treeBounds !== undefined);
+}
+
+/** Stage-2 batch light-eligibility — THE ONE predicate (fable-light-bvh §7), shared by
+ *  the tenant counts, the Planner's decisions, the Validator's warnings, and the App
+ *  pack: an instanced batch whose instances become individual tree lights. Analytic
+ *  SPHERE prototype on the params tier (the record (center.xyz, r) IS the light row)
+ *  with a constant nonzero emissive material that hasn't opted out. Blackbody folds
+ *  before the C3 predicate, mirroring the sampleAsLight route. */
+export function batchLightEligible(b: InstancedObject, scene: SceneDescription): boolean {
+    if (isMeshObject(b.prototype) || b.prototype.type !== 'sphere') return false;
+    if (batchPlacementRecordOf(b, scene) !== 'params') return false;
+    const mat = scene.materials[b.prototype.material];
+    if (mat === undefined || mat.sampleAsLight === false) return false;
+    // PER-INSTANCE emission (fable-light-bvh §7.1): an emission attribute on the batch
+    // makes every instance an individually-colored light — the tree's per-instance Φ
+    // is exactly the selection structure the old attribute deferral was waiting for.
+    if (b.attributes !== undefined && EMISSION_KEY in b.attributes
+        && (MATERIAL_MODELS[mat.model ?? '']?.properties ?? []).some((f) => f.source === EMISSION_KEY && f.storage === 'field')) {
+        return true;
+    }
+    const em = isBlackbody(mat.emission) ? foldBlackbody(mat.emission) : mat.emission;
+    return hasConstantNonzeroEmission(em);
 }
 
 export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
@@ -149,6 +259,13 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
         if (resolveBackend(o.type, o.backend) !== 'analytic') return;
         const d = PRIMITIVES[o.type];
         if (d?.bounds === undefined) return;   // unbounded (plane) → residual
+        // A NON-closed analytic shape (box/cylinder — placement-fold stage 4) tables
+        // only under IDENTITY rotation: the analytic record is FOLDED params, and the
+        // fold cannot absorb R (foldPlacementIntoParameters throws on rotated
+        // non-closed). Rotated ones stay in the residual rigid arm — their tabled
+        // form is the quat-carrying record the boxed-SDF design defers
+        // (fable-sdf-accel §2.1).
+        if (d.similarityClosed !== true && !isIdentityRotation(similarityFromTransform(o.transform).rotation)) return;
         analyticEligible.push({ sceneIndex: i, type: o.type, solid: d.thin !== true });
     });
     const analytic = [...analyticEligible.filter((a) => a.solid), ...analyticEligible.filter((a) => !a.solid)];
@@ -165,15 +282,33 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
         ? { leaves, analytic, solidCount: analytic.filter((a) => a.solid).length, kindCodes }
         : null;
 
+    // The light tree (fable-light-bvh §5/§7): leaves = the registry roster PLUS every
+    // light-eligible batch's instances (the global light-index space). Allocated
+    // whenever that total is non-empty and the roster is tree-eligible (every kind has
+    // treeBounds) — the always-upload precedent, one scene layout serves every
+    // strategy; 'power' programs simply never read it. Table rows exist ONLY for the
+    // roster (batch lights read their placement records); trails cover the total.
+    const roster = lightRosterOf(scene);
+    const lightBatches = batches
+        .map((b, ordinal) => ({ ordinal, count: placementCount(b.placements), eligible: batchLightEligible(b, scene) }))
+        .filter((b) => b.eligible)
+        .map(({ ordinal, count }) => ({ ordinal, count }));
+    const totalLights = roster.length + lightBatches.reduce((a, b) => a + b.count, 0);
+    const lightTree = totalLights > 0 && lightRosterTreeEligible(roster)
+        ? { count: totalLights, tableTexels: roster.length * (roster.length > 0 ? lightTableLayout(roster.map((l) => l.kind)).strideTexels : 0) }
+        : null;
+
     return {
         tenants: {
             meshes: geo, batches: batchTenants, meshLights,
             sceneTable: table !== null
                 ? { leafCount: table.leaves.length, analyticTexels: table.analytic.length * ANALYTIC_RECORD_TEXELS }
                 : null,
+            lightTree,
         },
         batchGeometrySlot,
         batchPlacementRecord,
         table,
+        lightBatches,
     };
 }

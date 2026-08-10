@@ -13,6 +13,8 @@
 // plan. The static math they call lives in mesh.glsl (leaf + BLAS walk) and
 // accel/bvh/bvh.glsl (slab test, stack depth).
 
+import { bvhWalkLines } from '../accel/bvh/bvh.js';
+
 /** Mesh traversal engines — occupants of `estimator.meshTraversal` (impl-plan-mesh-bvh).
  *  Bias-free by contract (estimator section): every occupant must produce the SAME
  *  converged image — the estimator-swap equality witness (mesh-quad-twin) is the gate. */
@@ -76,30 +78,16 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
     },
     /** Stack-DFS over the batch TLAS (a BVH over the instance WORLD boxes) with the
      *  world ray; leaves loop their placement range. Node format: accel/bvh (A<0
-     *  internal / A>=0 leaf count+offset). */
+     *  internal / A>=0 leaf count+offset). The skeleton is THE shared emitter
+     *  (bvhWalkLines — the scene-table walks ride the same one). */
     tlas: {
         tlasTexture: true,
-        walk: (s, _count, bound, leaf) => [
-            '    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it',
-            '    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;',
-            '    while (ptr >= 0) {',
-            '        int ni = stack[ptr]; ptr--;',
-            `        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${s.tlasBase} + ni * 2)), 0);`,
-            `        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${s.tlasBase} + ni * 2 + 1)), 0);`,
-            `        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, ${bound})) continue;`,
-            '        if (n0.w >= 0.0) {',
-            '            int off = int(n1.w), cnt = int(n0.w);',
-            '            for (int j = 0; j < cnt; j++) {',
-            '                int i = off + j;',
-            ...leaf.map((l) => '                ' + l),
-            '            }',
-            '        } else {',
-            '            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);',
-            '            bool nf = ray.direction[axis] >= 0.0;',
-            '            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }',
-            '        }',
-            '    }',
-        ],
+        walk: (s, _count, bound, leaf) => bvhWalkLines(s.tlasBase, bound, [
+            'for (int j = 0; j < cnt; j++) {',
+            '    int i = off + j;',
+            ...leaf.map((l) => '    ' + l),
+            '}',
+        ]),
     },
     /** Compressed wide (8-ary) BVH walk — the scalar Alg. 1 port (fable-accel-cwbvh
      *  §5; TS blueprint cwbvh.ts cwbvhNearestRef, bit layout pinned by the round-trip
@@ -153,7 +141,7 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
             '            float loy = qly * dq.y + oq.y; float hiy = qhy * dq.y + oq.y;',
             '            float loz = qlz * dq.z + oq.z; float hiz = qhz * dq.z + oq.z;',
             '            float tn = max(max(min(lox, hix), min(loy, hiy)), max(min(loz, hiz), 0.0));',
-            `            float tf = min(min(max(lox, hix), max(loy, hiy)), min(max(loz, hiz), ${bound})) * 1.00000024;`,
+            `            float tf = min(min(max(lox, hix), max(loy, hiy)), min(max(loz, hiz), ${bound})) * BVH_TFAR_PAD;`,
             '            if (tf < tn) continue;',
             '            if ((m & 0xE0u) == 0x20u && (m & 0x1Fu) >= 24u) hits |= 1u << ((((m & 0x1Fu) - 24u) ^ octinv) & 7u);',
             '            else leafBits |= (m >> 5) << (m & 0x1Fu);',

@@ -8,7 +8,7 @@ import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from 
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatSpectrum } from '../../../components/glsl-format.js';
+import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, emitAttributeValue, mintValueUniform, type ParamValue } from '../values.js';
 import { isAttributeValue } from '../../plan/types.js';
 
@@ -44,6 +44,7 @@ function isEmissive(mat: PlannedMaterial): boolean {
     const e = mat.values[EMISSION_KEY];
     if (e === undefined) return false;   // model declares no emission row
     if (isValueParam(e) || isGlslExpression(e) || isBlackbody(e)) return true;   // driven blackbody: may be nonzero
+    if (isAttributeValue(e)) return true;   // per-instance emission (fable-light-bvh §7.1): may be nonzero
     return Array.isArray(e) && e.some((c) => c > 0);
 }
 
@@ -77,7 +78,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // decisions (impl-plan-exact-linkage): eval's only caller is the light technique,
     // pdf's the surface MIS weight — a dispatch nothing links is not emitted.
     const { surfaceEval, surfacePdf } = plan.program.materials;
-    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials, surfaceEval, surfacePdf) });
+    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials, surfaceEval, surfacePdf, plan.program.materials.emissionCones ?? []) });
 
     // NEE guard (§6.2 / reference loop): at a pure-delta hit the eval is zero — transport skips
     // the shadow march. Constant-folds when the scene's materials are uniform in delta-ness.
@@ -762,7 +763,7 @@ function generateMediumTransmittance(materials: PlannedMaterial[]): string {
 // present. Lambert-only collapses to a passthrough; a second model (dielectric)
 // is additive — it just adds `if (mat == <ids>) return <model>_<op>(...)`.
 
-function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: boolean, wantsPdf: boolean): string {
+function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: boolean, wantsPdf: boolean, emissionCones: Array<{ materialId: number; direction: [number, number, number]; cosDivergence: number }>): string {
     // Group SURFACE material ids by model, preserving first-appearance order. 'none' materials
     // never reach this dispatch: transport's null-interface branch continues before any surface
     // op (§3.6), so they contribute no arm.
@@ -785,6 +786,7 @@ function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: bo
     ];
 
     const lines: string[] = ['// Generated surface-interaction dispatch (§3.3)'];
+    const modelOf = new Map(surface.map((m) => [m.id, m.model]));
     for (const op of ops) {
         lines.push(`${op.ret} interaction_surface_${op.name}(${op.params}) {`);
         if (order.length === 0) {
@@ -792,6 +794,17 @@ function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: bo
             // no surface ops exist — zeroed stubs keep the transport template linkable.
             lines.push(`    ${op.zero}`);
         } else {
+            // Directional-emission gates (softbeam v0, fable-emitter-profiles): cone-gated
+            // backing materials get a dedicated arm — the model's emission × the SAME
+            // step(cosδ, axis·wo) the kind's sampler applies (one profile truth). Baked
+            // literals from the program decision; emitted only when the field exists.
+            if (op.name === 'emission') {
+                for (const cone of emissionCones) {
+                    const model = modelOf.get(cone.materialId);
+                    if (model === undefined) continue;
+                    lines.push(`    if (mat == ${cone.materialId}) return ${model}_emission(${op.args}) * step(${formatFloat(cone.cosDivergence)}, dot(wo, ${formatVec3(cone.direction)}));`);
+                }
+            }
             for (const model of order) {
                 if (model === fallback) continue;
                 const cond = idsByModel.get(model)!.map((id) => `mat == ${id}`).join(' || ');
