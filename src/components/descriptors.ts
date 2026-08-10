@@ -376,6 +376,26 @@ export interface PrimitiveDescriptor {
      *  impl-plan-tlas). Absent = UNBOUNDED (e.g. plane): cannot be an instance prototype
      *  (Validator-rejected). Finite analytic primitives (sphere/quad/disk) declare it. */
     bounds?(values: PrimitiveValues): AABB;
+    /** THE MARCH BOUND (impl-plan-sdf-as-shape §2.2, owner-decided Aug 10 2026): the
+     *  ANALYTIC OBJECT that bounds this shape's surface, so a marched intersect runs
+     *  only over the interval where the ray is inside it. Required of every primitive
+     *  with `provides.sdf` — never inferred, and a missing declaration is a compile
+     *  error naming the shape (§2.3):
+     *
+     *    'self'       — the shape's own analytic form bounds it exactly (sphere, box,
+     *                   cylinder: the marched arm is confined to precisely the shape).
+     *    'unbounded'  — no bound exists (plane). Always visited; the march runs over
+     *                   [near, running nearest].
+     *    { type, values } — a DIFFERENT analytic primitive, with its parameters
+     *                   computed from THIS shape's moduli: a torus (R, r) bounds with
+     *                   a sphere of radius R + r, or a box of half-extent
+     *                   (R + r, r, R + r). A sphere bound is rotation-invariant, so a
+     *                   shape that declares one needs no refitting under placement.
+     *
+     *  The bound must CONTAIN the surface: too loose only costs march steps, too tight
+     *  silently clips geometry — which is why the field-containment vitest samples each
+     *  shape's field against its declared bound. */
+    marchBound?: 'self' | 'unbounded' | { type: string; values(v: PrimitiveValues): PrimitiveValues };
     /** Computed compile-time struct fields appended after the row's fields
      *  (quad: the precompiled one-sided normal — MUST stay a compile-time
      *  value so hit side and the quad light's sampler agree bit-exactly).

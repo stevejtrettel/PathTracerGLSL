@@ -37,3 +37,46 @@ vec3 box_normal(vec3 p, Box b) {
     if (a.y >= a.z) return vec3(0.0, sign(q.y), 0.0);
     return vec3(0.0, 0.0, sign(q.z));
 }
+
+// The INTERVAL form (impl-plan-sdf-as-shape T2) — entry/exit of the slab intersection,
+// the shape a marched arm consumes. Entry clamped to 0; sibling of box_intersect, which
+// stays untouched.
+bool box_interval(Ray ray, Box b, out float t0, out float t1) {
+    vec3 inv = 1.0 / ray.direction;
+    vec3 ta = (b.center - b.halfSize - ray.origin) * inv;
+    vec3 tb = (b.center + b.halfSize - ray.origin) * inv;
+    vec3 tsm = min(ta, tb), tbg = max(ta, tb);
+    float tn = max(max(tsm.x, tsm.y), tsm.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z);
+    if (tf < tn || tf <= EPSILON) return false;
+    t0 = max(tn, 0.0);
+    t1 = tf;
+    return true;
+}
+
+// ---- the marching intersect (impl-plan-sdf-as-shape T1) ---------------------
+// The iterating twin of box_intersect: march |box_sdf| within the [t0, t1] interval
+// the shape's bound produced. Rules and their derivations: see sphere.glsl's copy
+// (one transcription, four shapes — the same accepted repetition as each shape's
+// closed form).
+bool box_sdf_intersect(Ray ray, Box b, float t0, float t1, out float t) {
+    t = max(t0, EPSILON);
+    float t_stop = t1 + march_epsilon(t1);
+    float bound = 1e20;
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        if (t > t_stop) return false;
+        bound = abs(box_sdf(ray.origin + t * ray.direction, b));
+        if (bound < march_epsilon(t)) return true;
+        t += bound;
+    }
+    return bound < 16.0 * march_epsilon(t) && t <= t_stop;
+}
+
+// Gradient normal of THIS field (six taps), in the shape's own frame.
+vec3 box_sdf_normal(vec3 p, Box b) {
+    vec2 e = vec2(NORMAL_EPSILON, 0.0);
+    return normalize(vec3(
+        box_sdf(p + e.xyy, b) - box_sdf(p - e.xyy, b),
+        box_sdf(p + e.yxy, b) - box_sdf(p - e.yxy, b),
+        box_sdf(p + e.yyx, b) - box_sdf(p - e.yyx, b)));
+}

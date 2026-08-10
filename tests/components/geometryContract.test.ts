@@ -67,6 +67,40 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                     .toBe(d.provides.sdf);
             });
 
+            // ---- the march bound + the marching half (impl-plan-sdf-as-shape T1/T2) ----
+            // An SDF object is a shape whose intersect ITERATES, so a shape that marches
+            // owes three things: the iterating intersect, its gradient normal, and an
+            // explicit statement of what BOUNDS it. The bound is never inferred — a
+            // marchable shape that declares nothing fails here, which is the "you must
+            // say" rule (§2.3) in its enforceable form.
+            it(`declares marchBound iff provides.sdf`, () => {
+                expect(d.marchBound !== undefined, `${key}: provides.sdf ⇒ declare marchBound ('self' | 'unbounded' | { type, values })`)
+                    .toBe(d.provides.sdf);
+            });
+
+            it(`defines ${key}_sdf_intersect(Ray, ${sn}, float, float, out float) iff provides.sdf`, () => {
+                expect(new RegExp(`bool\\s+${key}_sdf_intersect\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${sn}\\b[^)]*out\\s+float`).test(d.glsl))
+                    .toBe(d.provides.sdf);
+            });
+
+            it(`defines ${key}_sdf_normal(vec3, ${sn}) iff provides.sdf`, () => {
+                expect(new RegExp(`vec3\\s+${key}_sdf_normal\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${sn}\\b`).test(d.glsl))
+                    .toBe(d.provides.sdf);
+            });
+
+            it(`the march bound resolves to an analytic primitive with an interval form`, () => {
+                const b = d.marchBound;
+                if (b === undefined || b === 'unbounded') return;
+                // 'self' means this shape's own analytic form; otherwise a named one.
+                const boundType = b === 'self' ? d.type : b.type;
+                const bd = PRIMITIVES[boundType];
+                expect(bd, `${key}: marchBound names unregistered primitive '${boundType}'`).toBeDefined();
+                expect(bd.provides.analytic, `${key}: bound '${boundType}' must be analytic`).toBe(true);
+                const bsn = structName(bd);
+                expect(new RegExp(`bool\\s+${boundType}_interval\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${bsn}\\b[^)]*out\\s+float\\s+\\w+\\s*,\\s*out\\s+float`).test(bd.glsl),
+                    `${boundType}: used as a march bound, so it owes ${boundType}_interval(Ray, ${bsn}, out float t0, out float t1)`).toBe(true);
+            });
+
             it(`defines ${key}_intersect(Ray, ${sn}, out float t) iff provides.analytic`, () => {
                 expect(new RegExp(`bool\\s+${key}_intersect\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${sn}\\b[^)]*out\\s+float`).test(d.glsl))
                     .toBe(d.provides.analytic);

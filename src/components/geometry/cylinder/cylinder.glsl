@@ -56,3 +56,60 @@ vec3 cylinder_normal(vec3 p, Cylinder c) {
     if (dy < dr) return vec3(0.0, sign(q.y), 0.0);
     return normalize(vec3(q.x, 0.0, q.z));
 }
+
+// The INTERVAL form (impl-plan-sdf-as-shape T2) — the slab ∩ tube interval that
+// cylinder_intersect already computes internally, exposed as entry/exit for a marched
+// arm. Entry clamped to 0; cylinder_intersect stays untouched.
+bool cylinder_interval(Ray ray, Cylinder c, out float t0, out float t1) {
+    vec3 q = ray.origin - c.center;
+    vec3 d = ray.direction;
+    float tn, tf;
+    if (abs(d.y) > 1e-12) {
+        float ta = (-c.halfHeight - q.y) / d.y;
+        float tb = ( c.halfHeight - q.y) / d.y;
+        tn = min(ta, tb); tf = max(ta, tb);
+    } else {
+        if (abs(q.y) > c.halfHeight) return false;
+        tn = -1.0e30; tf = 1.0e30;
+    }
+    float a  = d.x * d.x + d.z * d.z;
+    float bq = q.x * d.x + q.z * d.z;
+    float cc = q.x * q.x + q.z * q.z - c.radius * c.radius;
+    if (a > 1e-12) {
+        float disc = bq * bq - a * cc;
+        if (disc < 0.0) return false;
+        float s = sqrt(disc);
+        tn = max(tn, (-bq - s) / a);
+        tf = min(tf, (-bq + s) / a);
+    } else if (cc > 0.0) {
+        return false;
+    }
+    if (tf < tn || tf <= EPSILON) return false;
+    t0 = max(tn, 0.0);
+    t1 = tf;
+    return true;
+}
+
+// ---- the marching intersect (impl-plan-sdf-as-shape T1) ---------------------
+// The iterating twin of cylinder_intersect; rules and derivations in sphere.glsl.
+bool cylinder_sdf_intersect(Ray ray, Cylinder c, float t0, float t1, out float t) {
+    t = max(t0, EPSILON);
+    float t_stop = t1 + march_epsilon(t1);
+    float bound = 1e20;
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        if (t > t_stop) return false;
+        bound = abs(cylinder_sdf(ray.origin + t * ray.direction, c));
+        if (bound < march_epsilon(t)) return true;
+        t += bound;
+    }
+    return bound < 16.0 * march_epsilon(t) && t <= t_stop;
+}
+
+// Gradient normal of THIS field (six taps), in the shape's own frame.
+vec3 cylinder_sdf_normal(vec3 p, Cylinder c) {
+    vec2 e = vec2(NORMAL_EPSILON, 0.0);
+    return normalize(vec3(
+        cylinder_sdf(p + e.xyy, c) - cylinder_sdf(p - e.xyy, c),
+        cylinder_sdf(p + e.yxy, c) - cylinder_sdf(p - e.yxy, c),
+        cylinder_sdf(p + e.yyx, c) - cylinder_sdf(p - e.yyx, c)));
+}

@@ -33,7 +33,6 @@ import {
     type Similarity,
 } from '../../../components/geometry/similarity.js';
 
-import raymarchGLSL from '../../../components/intersection/raymarch/raymarch.glsl?raw';
 import bvhWalkGLSL from '../../../components/accel/bvh/bvh.glsl?raw';
 import cwbvhWalkGLSL from '../../../components/accel/cwbvh/cwbvh.glsl?raw';
 import { CWBVH_STACK_DEPTH } from '../../../components/accel/cwbvh/cwbvh.js';
@@ -44,6 +43,7 @@ import { generateRecordReader, sdfTailTexel } from '../records.js';
 import { DATA_TEX_WIDTH } from '../../../components/data/pack.js';
 import { BVH_STACK_DEPTH, BVH_TFAR_PAD, bvhWalkLines } from '../../../components/accel/bvh/bvh.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
+import marchGLSL from '../../../glsl/core/march.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
 
@@ -115,6 +115,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         ...plan.instanceBatches.flatMap((b) => b.prototype.backend === 'analytic' ? [b.prototype.shapeType] : []),
     ]);
     const present = Object.values(PRIMITIVES).filter((d) => presentTypes.has(d.type));
+    // Marching tolerances BEFORE the primitive files (impl-plan-sdf-as-shape T1): the
+    // shapes' own <type>_sdf_intersect calls march_epsilon(), so the vocabulary has to
+    // exist by then. Gated on the primitives PRESENT, not on the scene's backends: a
+    // marchable shape's file rides wholesale (§2.12) even into an all-analytic program,
+    // and it carries its marching half with it.
+    if (present.some((d) => d.provides.sdf)) {
+        blocks.push({ origin: 'glsl/core/march.glsl', source: marchGLSL });
+    }
     if (present.length > 0) {
         blocks.push({
             origin: 'generated:primitive-structs',
@@ -138,13 +146,20 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // every hit-fill keeps the cheap planar placeholder (no wasted chart trig).
     const chartUv = plan.program.materials.materialsReadUv;
 
-    // SDF backend: per-scene march-bound dispatch + the marcher (sdf_intersect*).
-    // Boxed-SDF leaves (impl-plan-sdf-accel T3): under table dispatch the GLOBAL
-    // marcher shrinks to the RESIDUAL subset (driven/unbounded/frame-retained —
-    // residualAnalytic's mirror); tabled objects march per leaf in the scene-table
-    // block, and their region-keyed queries (scene_object_sdf/uv — normals,
-    // containment, interior) route through the per-TYPE record-driven field helpers
-    // (prototyped here, defined with the table).
+    // The occlusion query chain is a seam decision (impl-plan-exact-linkage): the opaque
+    // shadow fast path is its only caller. The generated walkers (analytic_intersect_any,
+    // sdf_intersect_any, scene_intersect_any) are gated together.
+    const anyQuery = plan.program.intersection.anyQuery;
+
+    // Marched objects: ONE per-object arm each, the analytic arm's twin (impl-plan-
+    // sdf-as-shape T3). An SDF object is a shape whose intersect ITERATES — the ray
+    // enters the shape's own frame, its declared bound gives the interval, and the
+    // shape's static <type>_sdf_intersect finds the hit inside it. There is no scene
+    // field, no minimum over objects, and no per-step dispatch: the global marcher and
+    // its scene_march_bound / scene_object_sdf / scene_object_uv are gone, and with
+    // them the class of generated code that grew with the object count.
+    // Under table dispatch this covers the RESIDUAL subset only (driven/unbounded/
+    // frame-retained — residualAnalytic's mirror); tabled objects march per leaf.
     const residualSdf = tableMode ? plan.objects.filter((o) => o.tabled !== true) : plan.objects;
     const tabledSdf: SdfLeafArm[] = tableMode && table !== undefined && plan.sceneTable !== undefined
         ? plan.sceneTable.sdfRecords.map((s, i) => ({
@@ -153,15 +168,8 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         }))
         : [];
     if (hasSDF) {
-        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(residualSdf, tabledSdf, ids, chartUv) });
-        blocks.push({ origin: 'components/intersection/raymarch/raymarch.glsl', source: raymarchGLSL });
+        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(residualSdf, tabledSdf, ids, chartUv, anyQuery) });
     }
-
-    // The occlusion query chain is a seam decision (impl-plan-exact-linkage): the opaque
-    // shadow fast path is its only caller. The generated walkers (analytic_intersect_any,
-    // scene_intersect_any) are gated together; sdf_intersect_any rides inside raymarch.glsl
-    // regardless (whole-component inclusion — the declared cost).
-    const anyQuery = plan.program.intersection.anyQuery;
 
     // Analytic backend: per-scene analytic_intersect* dispatch over the closed forms —
     // under table dispatch, only the RESIDUAL subset (driven/unbounded) unrolls here.
@@ -391,7 +399,7 @@ function generateNamedShapes(sdf: PlannedSDFObject[], analytic: PlannedAnalyticO
  *  BAKED record base texel. Slot order = plan.sceneTable.sdfRecords order. */
 interface SdfLeafArm { region: number; type: string; rbase: number }
 
-function generateSDFDispatch(objects: PlannedSDFObject[], tabled: SdfLeafArm[], ids: Map<number, string>, chartUv: boolean): string {
+function generateSDFDispatch(objects: PlannedSDFObject[], tabled: SdfLeafArm[], ids: Map<number, string>, chartUv: boolean, anyQuery: boolean): string {
     const lines: string[] = [];
     lines.push('// Generated SDF dispatch');
 
@@ -429,81 +437,130 @@ function generateSDFDispatch(objects: PlannedSDFObject[], tabled: SdfLeafArm[], 
         lines.push('');
     }
 
-    // Per-owner UV chart helpers (fable-imagery P1) — mirror sdf_<id>: the SAME world→local
-    // placement wrapper (so the chart inherits the placement's rotation — an SDF sphere gets an
-    // oriented chart for free, unlike the constant-folded analytic path, P1b), but NO scale
-    // prefix (uv is dimensionless; the shape ctor still absorbs s so (p−center)/radius is
-    // consistent). Only charted owners emit one; the dispatch below falls back to planar.
-    for (const obj of objects) {
-        const d = primitive(obj.sdfType);
-        if (!d.uvChart || !chartUv) continue;
-        lines.push(`vec2 uv_${ids.get(obj.index)!}(vec3 p) {`);
-        if (isDrivenPlacement(obj.placement)) {
-            const g = obj.placement;
-            lines.push(`    p = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p);`);
-            lines.push(`    float s = placement_scale(${g.uniformTS});`);
-            lines.push(`    return ${d.type}_uv(p, ${uvShapeRef(obj, ids, 's')});`);
-        } else {
-            lines.push(...emitPlacementQuery(obj.placement));
-            lines.push(`    return ${d.type}_uv(p, ${uvShapeRef(obj, ids)});`);
-        }
-        lines.push(`}`);
+    // ---- the per-object arms (impl-plan-sdf-as-shape T3) --------------------
+    // Shape-for-shape the analytic dispatch's twin, and deliberately so: conjugate the
+    // ray into the object's own frame (§6.1 — the direction stays UNIT and the ray is
+    // never scaled; the shape's length-like params absorb s, so t is a WORLD value and
+    // every epsilon guard holds unchanged), restrict the search to the object's
+    // DECLARED bound, march inside it, fill the hit locally.
+    //
+    // What is gone with the global marcher: scene_march_bound (the per-step minimum
+    // over every object), scene_object_sdf / scene_object_uv (the per-owner lookups by
+    // region id) and raymarch.glsl's scene_normal / raymarch_commit. The R-SUBMERGED
+    // lesson those existed to serve — a hit's normal must come from the HIT OBJECT's
+    // own field, never the scene minimum, which a container hijacks — is now
+    // STRUCTURAL: an arm can only see its own shape.
+    lines.push('bool sdf_intersect(Ray ray, inout Hit hit) {');
+    lines.push('    bool found = false;');
+    lines.push('    float t;');
+    for (const obj of objects) lines.push(...sdfObjectArm(obj, ids, chartUv, null));
+    lines.push('    return found;');
+    lines.push('}');
+
+    if (anyQuery) {
+        // Occlusion: the same arms, unordered, first accepted hit ends the query. The
+        // interval is clamped to the light distance PER OBJECT (the Jul 13 maxDist
+        // lesson): geometry at or beyond the light must never shadow the point.
         lines.push('');
+        lines.push('bool sdf_intersect_any(Ray ray, float maxDist) {');
+        lines.push('    float t;');
+        for (const obj of objects) lines.push(...sdfObjectArm(obj, ids, chartUv, 'maxDist'));
+        lines.push('    return false;');
+        lines.push('}');
     }
-
-    // scene_march_bound — UNSIGNED nearest-surface bound min|sdf_i| + its owner (§2.3, arg-min).
-    // Unsigned (not the signed min) so marching works from object interiors and, inside a big
-    // region, steps stay bounded by nested inner surfaces (|signed min| would overshoot them).
-    lines.push('float scene_march_bound(vec3 p, out int region) {');
-    lines.push(`    float d = 1e20;`);
-    lines.push(`    float d_obj;`);
-    lines.push(`    region = -1;`);
-    for (const obj of objects) {
-        lines.push(`    d_obj = abs(sdf_${ids.get(obj.index)!}(p));`);
-        lines.push(`    if (d_obj < d) { d = d_obj; region = ${obj.index}; }`);
-    }
-    lines.push(`    return d;`);
-    lines.push(`}`);
-    lines.push('');
-
-    // Per-owner signed SDF — scene_normal takes the gradient of the HIT OBJECT's own field.
-    // The global signed min is hijacked by containers: on a nested surface (glass sphere inside
-    // a water pool) the pool's deeply-negative sdf wins the min everywhere inside, and its
-    // gradient points at the nearest POOL face — cube-quantized normals on the sphere
-    // (found by the R-SUBMERGED witness).
-    lines.push('float scene_object_sdf(vec3 p, int region) {');
-    for (const obj of objects) {
-        lines.push(`    if (region == ${obj.index}) return sdf_${ids.get(obj.index)!}(p);`);
-    }
-    // Tabled owners (T3): one-line arms through the per-type record helpers — the
-    // gradient of a conjugated field IS the world gradient (chain rule through the
-    // rigid map), so scene_normal needs no placement_normal here.
-    for (const s of tabled) {
-        lines.push(`    if (region == ${s.region}) return sdf_leaf_field_${s.type}(p, ${s.rbase}u);`);
-    }
-    lines.push('    return 1e20;');
-    lines.push('}');
-    lines.push('');
-
-    // Per-owner UV chart dispatch (fable-imagery P1) — scene_object_sdf's sibling: the marcher's
-    // hit-fill dispatches on the hit owner. Charted owners route to uv_<id>; the rest keep the
-    // planar placeholder. Always emitted alongside scene_object_sdf (the static marcher calls it
-    // unconditionally, same as scene_object_sdf).
-    lines.push('vec2 scene_object_uv(vec3 p, int region) {');
-    for (const obj of objects) {
-        if (chartUv && primitive(obj.sdfType).uvChart) {
-            lines.push(`    if (region == ${obj.index}) return uv_${ids.get(obj.index)!}(p);`);
-        }
-    }
-    for (const s of tabled) {
-        if (chartUv && primitive(s.type).uvChart) {
-            lines.push(`    if (region == ${s.region}) return uv_leaf_${s.type}(p, ${s.rbase}u);`);
-        }
-    }
-    lines.push('    return vec2(p.x * UV_PLANAR_SCALE, p.z * UV_PLANAR_SCALE);');
-    lines.push('}');
 
     return lines.join('\n');
+}
+
+/** One marched object's arm — the analytic arm's twin, differing only in the intersect
+ *  call and the bound restriction (impl-plan-sdf-as-shape §1). `bound` is null for the
+ *  nearest-hit dispatch (the running nearest, hit.t, is the far limit) or the occlusion
+ *  distance expression for the any-query, whose acceptance is strictly before it. */
+function sdfObjectArm(obj: PlannedSDFObject, ids: Map<number, string>, chartUv: boolean, bound: string | null): string[] {
+    const d = primitive(obj.sdfType);
+    const pl = emitSdfPlacement(obj.placement);
+    const far = bound ?? 'hit.t';
+    const lines: string[] = ['    {'];
+    for (const s of pl.setup) lines.push(`        ${s}`);
+    const rayRef = pl.local ? 'lray' : 'ray';
+    if (pl.local) lines.push(`        Ray lray = make_ray(${pl.ro}, ${pl.rd});`);
+    // A hoisted const carries UNSCALED params, so an object still holding a scale
+    // residual constructs inline (post-fold, that is the driven tier only).
+    let ref = pl.scale === undefined ? hoistedShapeName(obj, ids) : null;
+    if (ref === null) {
+        lines.push(`        ${structName(d)} shape = ${emitCtor(d, obj.parameters, pl.scale)};`);
+        ref = 'shape';
+    }
+    const lp = `${rayRef}.origin + t * ${rayRef}.direction`;
+
+    /** The march + hit fill, given the interval expressions. */
+    const body = (t0: string, t1: string): string[] => {
+        const call = `${d.type}_sdf_intersect(${rayRef}, ${ref}, ${t0}, ${t1}, t)`;
+        if (bound !== null) return [`if (${call} && t < ${far}) return true;`];
+        return [
+            `if (${call} && t < hit.t) {`,
+            `    hit.t = t; found = true;`,
+            `    hit.p = ambient_geodesic(ray.origin, ray.direction, t);`,
+            `    hit.frame = ambient_frame(hit.p, ${pl.nWorld(`${d.type}_sdf_normal(${lp}, ${ref})`)});`,
+            `    hit.region_owner = ${obj.index};`,
+            `    hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)`,
+            `    ${uvFill(d, lp, ref, chartUv)}`,
+            `}`,
+        ];
+    };
+
+    // The bound restriction: the ray interval of the DECLARED analytic bound, clamped
+    // by the running nearest / the light distance. An 'unbounded' shape (plane) skips
+    // the test and marches the open interval — always visited, by its own declaration.
+    const mb = d.marchBound;
+    if (mb === undefined || mb === 'unbounded') {
+        for (const l of body('0.0', far)) lines.push(`        ${l}`);
+    } else {
+        const bt = mb === 'self' ? d.type : mb.type;
+        const bref = mb === 'self' ? ref : emitCtor(primitive(mb.type), mb.values(obj.parameters), pl.scale);
+        lines.push(`        float b0, b1;`);
+        lines.push(`        if (${bt}_interval(${rayRef}, ${bref}, b0, b1)) {`);
+        for (const l of body('b0', `min(b1, ${far})`)) lines.push(`            ${l}`);
+        lines.push(`        }`);
+    }
+    lines.push('    }');
+    return lines;
+}
+
+/** World→local RAY for one marched object's placement (impl-plan-sdf-as-shape T3) —
+ *  emitPlacementQuery's tiers, for rays instead of points. The §6.1 discipline: the ray
+ *  is NEVER scaled (direction stays unit, t stays a world distance); a scale residual is
+ *  absorbed by the shape's params instead, which is what keeps the march's stepping and
+ *  every epsilon guard world-exact. `local` false = the object already sits in world
+ *  space (the folded constant case — most objects, post placement-fold). */
+function emitSdfPlacement(pl: PlannedPlacement): { setup: string[]; local: boolean; ro: string; rd: string; scale?: string; nWorld: (n: string) => string } {
+    if (isDrivenPlacement(pl)) {
+        return {
+            setup: [`float s = placement_scale(${pl.uniformTS});`],
+            local: true,
+            ro: `placement_rigid(${pl.uniformQ}, ${pl.uniformTS}, ray.origin)`,
+            rd: `placement_dir(${pl.uniformQ}, ray.direction)`,
+            scale: 's',
+            nWorld: (n) => `placement_normal(${pl.uniformQ}, ${n})`,
+        };
+    }
+    const g = pl as Similarity;
+    const kind = classifySimilarity(g);
+    if (kind === 'identity') return { setup: [], local: false, ro: 'ray.origin', rd: 'ray.direction', nWorld: (n) => n };
+    const t = g.translation;
+    if (kind === 'translation') {
+        return { setup: [], local: true, ro: `ray.origin - ${formatVec3(t)}`, rd: 'ray.direction', nWorld: (n) => n };
+    }
+    const Rt = quatToMat3(quatConjugate(g.rotation));
+    const R = quatToMat3(g.rotation);
+    const centered = isIdentityTranslation(t) ? 'ray.origin' : `(ray.origin - ${formatVec3(t)})`;
+    return {
+        setup: [], local: true,
+        ro: `${formatMat3(Rt)} * ${centered}`,
+        rd: `${formatMat3(Rt)} * ray.direction`,
+        scale: kind === 'similarity' ? formatFloat(g.scale) : undefined,
+        nWorld: isIdentityRotation(g.rotation) ? (n) => n : (n) => `${formatMat3(R)} * ${n}`,
+    };
 }
 
 /**
@@ -569,12 +626,6 @@ function placementRefs(p: PlannedPlacement): { q: string; ts: string } {
     return { q: formatVec4(inv.q), ts: formatVec4(inv.ts) };
 }
 
-/** The shape reference for a per-owner `uv_<id>` helper (SDF marcher path): the hoisted const
- *  for a named constant object, else the inline ctor (s-scaled under the driven tier — the
- *  same ctor sdf_<id> uses, so chart and distance field read one shape). */
-function uvShapeRef(obj: PlannedSDFObject, ids: Map<number, string>, scaleExpr?: string): string {
-    return hoistedShapeName(obj, ids) ?? emitCtor(primitive(obj.sdfType), obj.parameters, scaleExpr);
-}
 
 // ============================================================================
 // Analytic backend dispatch (per-scene)

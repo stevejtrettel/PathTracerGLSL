@@ -8,16 +8,17 @@ algebra); this family owns the ENGINES that traverse them.
 
 ## Occupants
 
-- `raymarch/` — the SDF backend's engine: sphere-tracing over the generated unsigned
-  nearest-surface bound (`sdf_intersect`, stall-aware exhaustion in both directions,
-  adaptive `march_epsilon`), the occlusion walker (`sdf_intersect_any`), and
-  gradient normals over the per-owner signed field (`scene_normal`). See
-  `raymarch/raymarch.md`; the acceptance threshold is COUPLED to `EPS_INTERFACE`
-  classification — retune together or not at all.
+- (`raymarch/` was RETIRED at impl-plan-sdf-as-shape T3, Aug 10 2026.) Marching is no
+  longer an engine that traverses the scene: **an SDF object is a shape whose intersect
+  ITERATES**, so the march lives in each shape's own file beside its distance function
+  (`<type>_sdf_intersect`, `<type>_sdf_normal`) and runs only inside that shape's
+  DECLARED bound. The measurement that settled it is in `docs/impl-plan-sdf-as-shape.md`
+  §0. Shared tolerances are `glsl/core/march.glsl`; the acceptance threshold is still
+  COUPLED to `EPS_INTERFACE` classification — retune together or not at all.
 
-The analytic backend needs no engine file — its "method" is the generated
-closed-form dispatch (`generateAnalyticDispatch`) over the primitives' `<type>_intersect`
-functions. The mesh backend (`mesh/` — impl-plan-meshes) is this family's second occupant:
+Neither the analytic nor the marching method needs an engine file — both are generated
+per-object dispatches over the primitives' own functions (`<type>_intersect` for the
+closed forms, `<type>_sdf_intersect` inside a declared bound for the marched ones). The mesh backend (`mesh/` — impl-plan-meshes) is this family's second occupant:
 a triangle engine over data-texture geometry, gated by `intersection.backends.mesh`.
 
 The family REGISTRY (`index.ts` — held since founding, opened by the audit batch) holds

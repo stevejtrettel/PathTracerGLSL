@@ -13,6 +13,9 @@ export const sphereDescriptor: PrimitiveDescriptor = {
     ],
     glsl: sphereGLSL,
     provides: { sdf: true, analytic: true },
+    // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it
+    // exactly, so a marched arm is confined to precisely this shape's interval.
+    marchBound: 'self',
     similarityClosed: true,   // isotropic: R fixes the canonical center — the fold is total
     uvChart: true,            // (θ,φ) chart — sphere_uv (fable-imagery P1)
     samplableAsLight: true,   // §6.2: emissive analytic spheres join the light registry

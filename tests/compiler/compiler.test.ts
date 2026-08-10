@@ -224,13 +224,16 @@ describe('Compiler', () => {
             expect(lastBlock.endLine).toBe(lineCount);
         });
 
-        it('includes expected origin blocks (minimal PINS the marcher — the sdf twin)', () => {
+        it('includes expected origin blocks (minimal PINS marching — the sdf twin)', () => {
             const sm = result.sourceMaps!.get('pathtracer-minimal-main')!;
             const origins = sm.blocks.map(b => b.origin);
             expect(origins).toContain('glsl/core/structs.glsl');
             expect(origins).toContain('generated:sdf-dispatch');
             expect(origins).toContain('generated:material-lookup');
-            expect(origins).toContain('components/intersection/raymarch/raymarch.glsl');
+            // The marching tolerances the shapes' own <type>_sdf_intersect is written
+            // against (impl-plan-sdf-as-shape T1/T3 — raymarch.glsl and its global
+            // marcher are GONE; the march lives in each shape's file now).
+            expect(origins).toContain('glsl/core/march.glsl');
         });
 
         it('an ALL-analytic scene carries NO marcher at all (B1 auto — backend-level exact linkage)', () => {
@@ -239,7 +242,6 @@ describe('Compiler', () => {
             const origins = sm.blocks.map(b => b.origin);
             expect(origins).toContain('generated:analytic-dispatch');
             expect(origins).not.toContain('generated:sdf-dispatch');
-            expect(origins).not.toContain('components/intersection/raymarch/raymarch.glsl');
         });
     });
 

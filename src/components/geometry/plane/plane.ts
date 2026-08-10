@@ -27,6 +27,10 @@ export const planeDescriptor: PrimitiveDescriptor = {
     ],
     glsl: planeGLSL,
     provides: { sdf: true, analytic: true },
+    // THE unbounded shape (impl-plan-sdf-as-shape §2.3): a plane has no finite bound to
+    // declare, so a marched plane is always visited and marches the open interval. This
+    // is the declaration the rule demands — silence would be a compile error.
+    marchBound: 'unbounded',
     similarityClosed: true,   // orientation lives in the normal row (coupled fold below)
     // Canonical form: unit normal + rescaled offset (the framework applies this ONCE
     // on every Planner path — the SDF expression is a true distance bound only then).
