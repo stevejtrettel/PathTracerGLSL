@@ -9,6 +9,9 @@
 import { describe, it, expect } from 'vitest';
 import { witnessSuite } from '../witnesses/index.js';
 import { demoSuite } from '../../demos/index.js';
+// Importing sections runs its own fail-loudly guard (exactly-once coverage, no
+// dangling ids) — the import alone gates the gallery taxonomy statically.
+import { gallerySections } from '../../pages/sections.js';
 
 describe('suite registry integrity (P5 silent-clobber guards)', () => {
     it('witness and demo scene keys do not collide (the merge would silently shadow)', () => {
@@ -16,6 +19,14 @@ describe('suite registry integrity (P5 silent-clobber guards)', () => {
         for (const key of Object.keys(demoSuite)) {
             expect(witnessKeys.has(key), `demo key '${key}' shadows a witness`).toBe(false);
         }
+    });
+
+    it('gallery sections file every scene exactly once (pages/sections.ts guard)', () => {
+        // The real enforcement is sections.ts's import-time guard (a violation makes
+        // the import above throw); this assertion just keeps the count honest.
+        const filed = gallerySections.flatMap((s) =>
+            s.entries.flatMap((e) => [e.id, ...(e.partners ?? [])]));
+        expect(filed.length).toBe(Object.keys(witnessSuite).length + Object.keys(demoSuite).length);
     });
 
     for (const [suiteName, suite] of [['witness', witnessSuite], ['demo', demoSuite]] as const) {

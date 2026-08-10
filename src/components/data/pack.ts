@@ -31,6 +31,26 @@ export function writeTexels(ch: PackedChannel, baseTexel: number, floats: Float3
     ch.data.set(floats, baseTexel * 4);
 }
 
+/** One packed UNSIGNED-INTEGER channel (RGBA32UI / usampler2D) — the cwbvh node
+ *  substrate (fable-accel-cwbvh §6). Bit-packed payloads NEVER ride float channels
+ *  (denormal flush / NaN canonicalization en route — the verified platform rule). */
+export interface PackedChannelU32 {
+    data: Uint32Array;
+    width: number;
+    height: number;
+}
+
+export function allocChannelU32(texelCount: number): PackedChannelU32 {
+    const w = DATA_TEX_WIDTH;
+    const h = Math.max(1, Math.ceil(Math.max(1, texelCount) / w));
+    return { data: new Uint32Array(w * h * 4), width: w, height: h };
+}
+
+/** Write raw texel words (length 4·n) at a base texel. */
+export function writeTexelsU32(ch: PackedChannelU32, baseTexel: number, words: Uint32Array): void {
+    ch.data.set(words, baseTexel * 4);
+}
+
 /** Write a vec3-per-item payload (length 3·count) at a base texel (w = 0). */
 export function writeVec3s(ch: PackedChannel, baseTexel: number, src: Float32Array, count: number): void {
     for (let i = 0; i < count; i++) {

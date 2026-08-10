@@ -16,6 +16,9 @@
 
 import type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues } from '../descriptors.js';
 import {
+    IDENTITY_SIMILARITY,
+    isIdentityRotation,
+    quatRotate,
     similarityApplyDirection,
     similarityApplyPoint,
     similarityApplyVector,
@@ -139,8 +142,11 @@ export function emitSignedDistance(d: PrimitiveDescriptor, values: PrimitiveValu
 
 /** The kind-derived fold (T2): each row transforms independently by its declared
  *  geometric kind. Correct exactly for SEPARABLE parameter sets — a coupled rule
- *  (plane's offset) declares a descriptor `fold` override instead. */
-function derivedFold(d: PrimitiveDescriptor, v: PrimitiveValues, g: Similarity): PrimitiveValues {
+ *  (plane's offset) declares a descriptor `fold` override instead. Exported for the
+ *  closure contract test (which must show a non-closed shape's kind-fold genuinely
+ *  drops R) and for classifyPlacement's partial-fold arm; production folds go
+ *  through foldPlacementIntoParameters, which guards closure. */
+export function derivedFold(d: PrimitiveDescriptor, v: PrimitiveValues, g: Similarity): PrimitiveValues {
     const out: PrimitiveValues = { ...v };
     for (const f of d.params) {
         const value = v[f.name];
@@ -181,23 +187,95 @@ export function canonicalizePrimitiveParameters(type: string, parameters: Primit
 }
 
 /**
- * Constant-transform lowering for the analytic backend (fable-transforms §5.1): the
- * analytic primitive set is CLOSED under similarities, so a constant placement folds
- * entirely into canonical parameters at plan time. Kind-derived unless the descriptor
- * declares a coupled override (plane). Identity placements pass through exactly
- * (IEEE: +0 adds, ×1 are exact). Takes any registered type — the `primitive()` lookup
- * is the throwing backstop (Planner/Validator diagnose unknown types upstream), so a
- * new analytic primitive never touches this signature. Values resolved and
+ * Constant-placement lowering into canonical parameters (fable-transforms §5.1/§5.2 —
+ * BACKEND-NEUTRAL since impl-plan-placement-fold: folding is a property of the
+ * placement↔params relationship, not of any intersection method). Total for
+ * `similarityClosed` primitives; for non-closed primitives it is exact ONLY when the
+ * rotation is identity (T,s always fold through the kind rows) — a rotated non-closed
+ * placement THROWS here, making derivedFold's silent rotation-drop structurally
+ * unreachable (callers route those through classifyPlacement's residual instead).
+ * Kind-derived unless the descriptor declares a coupled override (plane). Identity
+ * placements pass through exactly (IEEE: +0 adds, ×1 are exact). Values resolved and
  * CANONICALIZED before the fold (folds assume canonical input; direction kinds stay
  * unit under R, so folding preserves it).
  */
-export function foldAnalyticParameters(
+export function foldPlacementIntoParameters(
     type: string,
     parameters: PrimitiveValues,
     g: Similarity,
 ): PrimitiveValues {
     const d = primitive(type);
+    if (!d.similarityClosed && !isIdentityRotation(g.rotation)) {
+        throw new Error(`geometry: '${type}' is not similarityClosed — a rotated placement cannot fold into its parameters (route through classifyPlacement)`);
+    }
     const resolved = resolvePrimitiveValues(d, parameters);
     const canonical = d.canonicalize !== undefined ? d.canonicalize(resolved) : resolved;
     return d.fold ? d.fold(canonical, g) : derivedFold(d, canonical, g);
+}
+
+/** Params-tier record width in FLOATS (impl-plan-placement-fold stage 3, the §6.1
+ *  stride amendment), or null when the shape cannot take the params tier. A params-tier
+ *  instance record is the shape's FOLDED canonical parameters — one texel, intersected
+ *  in world space with no conjugation — so the shape must be similarityClosed (the fold
+ *  is total), analytic (the leaf calls <type>_intersect), free of derived ctor fields
+ *  (nothing to bake beyond the rows), fold-generic rows only (point/length — what the
+ *  flat per-instance pack fold implements), and ≤ 4 floats wide. Sphere (3+1) is the
+ *  selected set today; disk (7 floats) is the deferred 2-texel arm. The uv gate
+ *  (materialReadsUv — orientation genuinely rotates a chart) is scene knowledge and
+ *  lives with the batch decision in the dataTenants adapter, not here. */
+export function paramsRecordFloats(type: string): number | null {
+    const d = PRIMITIVES[type];
+    if (d === undefined || !d.similarityClosed || !d.provides.analytic) return null;
+    if (d.derivedCtorFields !== undefined || (d.derivedFields?.length ?? 0) > 0) return null;
+    if (d.params.some((p) => p.kind !== 'point' && p.kind !== 'length')) return null;
+    let n = 0;
+    for (const p of d.params) n += p.shape === 'vec3' ? 3 : 1;
+    return n <= 4 ? n : null;
+}
+
+/** A maximally-folded constant placement: canonical parameters with everything the
+ *  rows can absorb folded in, plus the residual similarity the emitted wrapper must
+ *  still apply (fable-transforms §5.2 as built — impl-plan-placement-fold stage 2). */
+export interface ClassifiedPlacement {
+    parameters: PrimitiveValues;
+    /** Identity (closed shapes / rotation-free placements — no wrapper at all) or a
+     *  PURE ROTATION about the folded center (scale 1 — the `s·d` correction is dead
+     *  for constants; the existing rigid query tier serves the residual). */
+    residual: Similarity;
+}
+
+/**
+ * The maximal constant fold, both backends (ONE truth for Planner and App):
+ * `g·Shape(v) = residual · Shape(parameters)` exactly.
+ *
+ * - closed, or rotation-free g → total fold, identity residual;
+ * - non-closed + rotation, one point row, no orientation rows → fold everything the
+ *   kinds absorb (center takes the full g·center; lengths ×s) and keep the rotation
+ *   as a residual about the folded center: derivation in the plan doc —
+ *   g·Shape(c,ℓ) = {g(c) + sR·u} = {c′ + R·v : v ∈ Shape₀(s·ℓ)}, so
+ *   residual = (1, R, c′ − R·c′), which the rigid query tier emits unchanged;
+ * - anything else (no current primitive) → untouched canonical params, residual = g —
+ *   today's behavior as the safe fallback. A non-closed shape with direction/vector
+ *   rows must NOT take the partial fold (the kind-fold would rotate those rows while
+ *   the residual rotates them again).
+ */
+export function classifyPlacement(type: string, parameters: PrimitiveValues, g: Similarity): ClassifiedPlacement {
+    const d = primitive(type);
+    if (d.similarityClosed || isIdentityRotation(g.rotation)) {
+        return { parameters: foldPlacementIntoParameters(type, parameters, g), residual: IDENTITY_SIMILARITY };
+    }
+    const resolved = resolvePrimitiveValues(d, parameters);
+    const canonical = d.canonicalize !== undefined ? d.canonicalize(resolved) : resolved;
+    const pointRows = d.params.filter((p) => p.kind === 'point');
+    const orientationRows = d.params.some((p) => p.kind === 'direction' || p.kind === 'vector');
+    if (pointRows.length !== 1 || orientationRows) {
+        return { parameters: canonical, residual: g };
+    }
+    const folded = derivedFold(d, canonical, g);
+    const c = folded[pointRows[0].name] as Vec3Tuple;
+    const rc = quatRotate(g.rotation, c);
+    return {
+        parameters: folded,
+        residual: { rotation: g.rotation, translation: [c[0] - rc[0], c[1] - rc[1], c[2] - rc[2]], scale: 1 },
+    };
 }

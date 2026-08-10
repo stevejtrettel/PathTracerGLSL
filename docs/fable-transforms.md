@@ -190,6 +190,15 @@ threshold are all world-space lengths compared against a world-space field
 Where a primitive's params are similarity-closed (sphere: fully; box:
 translation+scale but **not** rotation; plane: fully), the fold tier may absorb factors
 and shrink the wrapper — a pure lowering optimization, per-primitive, never semantic.
+*BUILT Aug 9 2026 (`impl-plan-placement-fold.md`)*: closure is the **declared descriptor
+fact `similarityClosed`** (equivariance-contract-tested both directions — not derivable
+from kind rows: sphere and cylinder share kinds, isotropy differs), and constant
+placements fold MAXIMALLY on both backends via `classifyPlacement` — closed shapes emit
+no wrapper at all; non-closed shapes fold T,s and keep a pure-rotation residual on the
+rigid tier, so the `s·d` similarity tier serves only `keepsLocalFrame` retentions. One
+semantic exception discovered post-§5.2 (the July 21 uv charts): a uv-charted shape
+whose material reads uv keeps its wrapper when rotated — the oriented chart needs the
+frame the fold would dissolve (`keepsLocalFrame`, the shared predicate).
 
 ### 5.3 Analytic, general case → local-frame conjugation
 
@@ -296,7 +305,12 @@ closure means every composed placement decomposes back to TRS (§3).
    — one helper + one rcp, added when needed, never before. The payload is
    precomposed host-side in fp64. Slot cost 2.25 vec4/object vs a mat4's 5 (cliff
    ~40 → ~90 driven objects); instance TABLES store the same 8-float record
-   (2 RGBA32F texels vs a mat4's 4). The 2-vec4 footprint does not privilege
+   (2 RGBA32F texels vs a mat4's 4). *Amended Aug 9 2026
+   (`impl-plan-placement-fold.md`): the instance record STRIDE is a per-batch plan
+   fact — frame-tier batches keep the 2-texel rigid record; params-tier batches
+   (analytic ∧ `similarityClosed` ∧ folded rows ≤ 4 floats ∧ material doesn't read
+   uv) store the folded canonical parameters instead, 1 texel, intersected in world
+   space with no conjugation at all.* The 2-vec4 footprint does not privilege
    Euclid: H³'s compact isometry representation (SL(2,ℂ)) is also 8 reals — a
    curved-space occupant swaps payload semantics + helper bodies, keeping the ABI
    footprint, plumbing, factor lists, and table format.

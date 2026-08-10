@@ -18,13 +18,19 @@ the descriptor rows). Type-first symbols; the `_light_` infix is deliberate:
   the MIS density, which MUST mirror the sampler (§6.1). The mirror is now two
   ADJACENT functions over one struct in one file — never TS strings.
 
-Conventions (§6.1): **delta kinds** (point, spot) fold 1/d² — and any angular
-falloff — into `radiance`, set `LIGHT_DELTA`, pdf 1 — never BSDF-hittable, MIS
-weight 1 (§6.4). ISOTROPIC delta kinds declare the `deltaQuery` fact (which rows are
+Conventions (§6.1): **delta-position kinds** (point, spot) fold 1/d² — and any
+angular falloff — into `radiance`, set `LIGHT_DELTA`, pdf 1 — never BSDF-hittable,
+MIS weight 1 (§6.4). **Delta-direction kinds** (directional, beam —
+impl-plan-directional-beam) are the same delta contract with NOTHING folded:
+collimation has no 1/d², so `radiance` is the authored irradiance E verbatim and
+transmittance is the shadow walker's job (directional's `distance` is the 1.0e20
+env sentinel; beam's is the axial distance to its aperture plane, and outside the
+beam's forward cylinder the sampler returns pdf 0 — the techniques' invalid-sample
+guard). ISOTROPIC delta kinds declare the `deltaQuery` fact (which rows are
 position/intensity — the equiangular placement query composes from it); anisotropic
-ones (spot) deliberately don't, and the Validator rejects them under 'equiangular'
-(the queried intensity feeds the estimate directly — an on-axis value would bias
-it). **Area kinds**
+ones (spot, directional, beam) deliberately don't, and the Validator rejects them
+under 'equiangular' (the queried intensity feeds the estimate directly — an on-axis
+value would bias it). **Area kinds**
 (quad, sphere, disk) do the area→solid-angle conversion inside the sampler. Quads
 and disks are **ONE-SIDED** (pinned deviation from the §6.2 two-sided aside): the
 emitting-side normal is ONE compile-time formula shared with the backing geometry
@@ -53,7 +59,11 @@ end to end. (Residue: a new kind's authored-input interface still extends
 `LightDescription` — the scene-side union is the authoring language's business.)
 
 Authoring note (B2): lights author **`emission`** — Le for area kinds, radiant
-intensity (W/sr) for delta — the same word materials use; scalar broadcasts.
+intensity (W/sr) for delta-position kinds, irradiance (W/m², ⊥ to the propagation
+direction) for delta-direction kinds — the same word materials use; scalar
+broadcasts. `power(values, ctx?)` may read the Planner-stamped `ctx.worldRadius`
+(directional's pbrt Φ = E·π·R² — variance-only, stamped on every light, no kind
+branch anywhere).
 
 ## How the compiler consumes it
 

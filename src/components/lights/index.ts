@@ -11,6 +11,8 @@ import { sphereLightDescriptor } from './sphere/sphere.js';
 import { diskLightDescriptor } from './disk/disk.js';
 import { spotLightDescriptor } from './spot/spot.js';
 import { meshLightDescriptor } from './mesh/mesh.js';
+import { directionalLightDescriptor } from './directional/directional.js';
+import { beamLightDescriptor } from './beam/beam.js';
 
 export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     point: pointLightDescriptor,
@@ -19,6 +21,8 @@ export const LIGHT_KINDS: Record<string, LightKindDescriptor> = {
     disk: diskLightDescriptor,
     spot: spotLightDescriptor,
     mesh: meshLightDescriptor,   // data-driven; sampleAsLight-route only (fable-mesh-lights)
+    directional: directionalLightDescriptor,   // delta-direction class (impl-plan-directional-beam)
+    beam: beamLightDescriptor,                 // delta-direction class (impl-plan-directional-beam)
 };
 
 // radiantScalar lives in power.ts (D5: family-root shared part — occupants import it

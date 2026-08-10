@@ -35,6 +35,9 @@ import {
 
 import raymarchGLSL from '../../../components/intersection/raymarch/raymarch.glsl?raw';
 import bvhWalkGLSL from '../../../components/accel/bvh/bvh.glsl?raw';
+import cwbvhWalkGLSL from '../../../components/accel/cwbvh/cwbvh.glsl?raw';
+import { CWBVH_STACK_DEPTH } from '../../../components/accel/cwbvh/cwbvh.js';
+import { NODESQ_EXTERN, NODESQ_UNIFORM } from '../../../components/data/channels.js';
 import meshGLSL from '../../../components/intersection/mesh/mesh.glsl?raw';
 import { MESH_TRAVERSALS, INSTANCE_ACCELS, ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH } from '../../../components/intersection/index.js';
 import { generateRecordReader } from '../records.js';
@@ -158,6 +161,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         defines.BVH_STACK_DEPTH = String(BVH_STACK_DEPTH);
         blocks.push({ origin: 'glsl/core/data_texture.glsl', source: dataTextureGLSL });
         blocks.push({ origin: 'components/accel/bvh/bvh.glsl', source: bvhWalkGLSL });
+    }
+    // The CWBVH occupant (fable-accel-cwbvh): scalar helpers + the integer node
+    // channel + its stack depth — exact-linkage gated on the SELECTED engine.
+    const cwbvhMode = hasInstanced && plan.program.intersection.instanceAccel === 'cwbvh';
+    if (cwbvhMode) {
+        defines.CWBVH_STACK_DEPTH = String(CWBVH_STACK_DEPTH);
+        blocks.push({ origin: 'components/accel/cwbvh/cwbvh.glsl', source: cwbvhWalkGLSL });
+        textures.push({ name: NODESQ_UNIFORM, source: `extern:${NODESQ_EXTERN}`, samplerType: 'usampler2D' });
     }
     if (needMeshLeaf) {
         blocks.push({ origin: 'components/intersection/mesh/mesh.glsl', source: meshGLSL });
@@ -727,11 +738,50 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
 // body is the driven-mesh / driven-analytic arm. mesh uses ÷s conjugation (Möller–Trumbore is
 // non-unit-safe) + unscaled BLAS; analytic uses rigid conjugation (unit rd) + s-scaled params.
 
+/** Params-tier ctor from one record texel: schema rows in order, mapped onto the
+ *  texel's components (the pack writes them in the same order — instanceAttributeRows'
+ *  one-order-truth pattern applied to the placement record). Sphere: `Sphere(rec.xyz, rec.w)`. */
+function paramsCtorFromTexel(d: ReturnType<typeof primitive>, recVar: string): string {
+    const comps = 'xyzw';
+    let off = 0;
+    const args = d.params.map((p) => {
+        const w = p.shape === 'vec3' ? 3 : 1;
+        const swizzle = comps.slice(off, off + w);
+        off += w;
+        return `${recVar}.${swizzle}`;
+    });
+    return `${structName(d)}(${args.join(', ')})`;
+}
+
 /** The per-placement leaf body for placement index `i` (reads texture → conjugate → intersect →
  *  record into hit / return-true for the any variant). Lines are at RELATIVE indent (0 = leaf
- *  scope); the accel occupant's walk() pads them to its own nesting depth. */
-function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boolean): string[] {
-    const pb = b.slot.placementsBase;
+ *  scope); the accel occupant's walk() pads them to its own nesting depth.
+ *  Params-tier analytic batches (impl-plan-placement-fold stage 3) skip conjugation
+ *  entirely: ONE texel = the folded world-space parameters, intersected with the WORLD
+ *  ray — no placement fetch, no ray transform, no normal back-rotation. */
+function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boolean, pbOverride?: number): string[] {
+    // pbOverride: the cwbvh occupant's records-TWIN base (its leaf order differs from
+    // the binary TLAS's — fable-accel-cwbvh §6); default = the binary-order region.
+    const pb = pbOverride ?? b.slot.placementsBase;
+    if (b.prototype.backend === 'analytic' && b.prototype.record === 'params') {
+        const d = primitive(b.prototype.shapeType);
+        const read = [
+            `vec4 rec = texelFetch(u_data_records, data_texel1d(uint(${pb} + i)), 0);`,
+            `${structName(d)} shape = ${paramsCtorFromTexel(d, 'rec')};`,
+            'float t;',
+        ];
+        if (forAny) return [...read,
+            `if (${b.prototype.shapeType}_intersect(ray, shape, t) && t < maxDist) return true;`];
+        return [...read,
+            `if (${b.prototype.shapeType}_intersect(ray, shape, t) && t < hit.t) {`,
+            '    hit.t = t; found = true;',
+            '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
+            '    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
+            `    hit.frame = ambient_frame(hit.p, normalize(${b.prototype.shapeType}_normal(hit.p, shape)));`,
+            `    hit.region_owner = ${b.index};`,
+            `    ${uvFill(d, 'hit.p', 'shape', chartUv)}`,
+            '}'];
+    }
     const read = [
         `vec4 q  = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i)), 0);`,
         `vec4 ts = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i + 1)), 0);`,
@@ -784,10 +834,12 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
     // baseline count-bounded scan); the per-placement leaf body is emitted here.
     const accel = INSTANCE_ACCELS[instanceAccel];
 
+    const pbOf = (b: PlannedInstanceBatch): number | undefined =>
+        instanceAccel === 'cwbvh' ? b.slot.cwbvhRecordsBase : undefined;
     for (const b of batches) {
         lines.push(`bool instance_${ids.get(b.index)!}(Ray ray, inout Hit hit) {`);
         lines.push('    bool found = false;');
-        lines.push(...accel.walk(b.slot, b.instanceCount, 'hit.t', instanceLeafItem(b, false, chartUv)));
+        lines.push(...accel.walk(b.slot, b.instanceCount, 'hit.t', instanceLeafItem(b, false, chartUv, pbOf(b))));
         lines.push('    return found;');
         lines.push('}');
         lines.push('');
@@ -806,7 +858,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
         lines.push('');
         for (const b of batches) {
             lines.push(`bool instance_any_${ids.get(b.index)!}(Ray ray, float maxDist) {`);
-            lines.push(...accel.walk(b.slot, b.instanceCount, 'maxDist', instanceLeafItem(b, true, chartUv)));
+            lines.push(...accel.walk(b.slot, b.instanceCount, 'maxDist', instanceLeafItem(b, true, chartUv, pbOf(b))));
             lines.push('    return false;');
             lines.push('}');
         }
@@ -988,12 +1040,13 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
     // The walk: standard stack DFS over the scene TLAS, pruned by the running nearest.
     lines.push('bool scene_table_intersect(Ray ray, inout Hit hit) {');
     lines.push('    bool found = false;');
+    lines.push('    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it');
     lines.push('    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;');
     lines.push('    while (ptr >= 0) {');
     lines.push('        int ni = stack[ptr]; ptr--;');
     lines.push(`        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2)), 0);`);
     lines.push(`        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2 + 1)), 0);`);
-    lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, hit.t)) continue;');
+    lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, hit.t)) continue;');
     lines.push('        if (n0.w >= 0.0) {');
     lines.push('            int off = int(n1.w), cnt = int(n0.w);');
     lines.push('            for (int j = 0; j < cnt; j++) { if (scene_table_leaf(uint(off + j), ray, hit)) found = true; }');
@@ -1032,12 +1085,13 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         lines.push('}');
         lines.push('');
         lines.push('bool scene_table_intersect_any(Ray ray, float maxDist) {');
+        lines.push('    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it');
         lines.push('    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;');
         lines.push('    while (ptr >= 0) {');
         lines.push('        int ni = stack[ptr]; ptr--;');
         lines.push(`        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2)), 0);`);
         lines.push(`        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${S.tlasBase} + ni * 2 + 1)), 0);`);
-        lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, maxDist)) continue;');
+        lines.push('        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, maxDist)) continue;');
         lines.push('        if (n0.w >= 0.0) {');
         lines.push('            int off = int(n1.w), cnt = int(n0.w);');
         lines.push('            for (int j = 0; j < cnt; j++) { if (scene_table_leaf_any(uint(off + j), ray, maxDist)) return true; }');

@@ -23,12 +23,20 @@ export interface MeshSlot {
 }
 
 export interface BatchSlot {
-    /** Records-channel base of the placement region (2 texels/instance, TLAS-leaf order). */
+    /** Records-channel base of the placement region (placementTexels per instance,
+     *  TLAS-leaf order). */
     placementsBase: number;
     /** Nodes-channel base of the batch TLAS (padded to 2(2N−1) texels). */
     tlasBase: number;
     /** Records-channel base of the attrs region (attrTexels texels), or -1 when none. */
     attrsBase: number;
+    /** nodesq-channel base of the batch's CWBVH nodes (fable-accel-cwbvh §6), or -1
+     *  when the batch is cwbvh-ineligible (mesh prototype / frame tier — the v1 pins). */
+    cwbvhNodesBase: number;
+    /** Records-channel base of the CWBVH-order placement records twin (the leaf-order
+     *  resolution: the wide tree's leaf permutation differs from the binary TLAS's),
+     *  or -1 when ineligible. */
+    cwbvhRecordsBase: number;
 }
 
 export interface MeshLightSlot {
@@ -42,9 +50,13 @@ export interface DataTenants {
     /** Standalone meshes (sceneMeshes order) THEN mesh prototypes (batch order) —
      *  one geometry slot each; PlannedMesh/prototype records carry their slot index. */
     meshes: ReadonlyArray<{ vertexCount: number; triCount: number }>;
-    /** ALL instance batches, batch-ordinal order. attrTexels = attribute rows × instances
-     *  (0 = no attrs region). */
-    batches: ReadonlyArray<{ instanceCount: number; attrTexels: number }>;
+    /** ALL instance batches, batch-ordinal order. placementTexels = the per-instance
+     *  record stride (impl-plan-placement-fold: 2 = rigid frame, 1 = folded params —
+     *  the dataTenants adapter is the ONE tier truth). attrTexels = attribute rows ×
+     *  instances (0 = no attrs region). cwbvhNodeTexels/cwbvhRecordTexels = the CWBVH
+     *  experiment's regions (fable-accel-cwbvh §6; 0 = batch ineligible — the
+     *  adapter's ONE eligibility truth). */
+    batches: ReadonlyArray<{ instanceCount: number; placementTexels: 1 | 2; attrTexels: number; cwbvhNodeTexels: number; cwbvhRecordTexels: number }>;
     /** Samplable mesh emitters, keyed by MESH ordinal (fable-mesh-lights) — the
      *  dataTenantsOf adapter is the ONE predicate that builds this list. */
     meshLights: ReadonlyArray<{ meshOrdinal: number; vertexCount: number; triCount: number }>;
@@ -66,7 +78,7 @@ export interface SceneTableSlot {
 
 export interface DataLayout {
     /** Total texels per channel (0 = channel unused by this scene). */
-    totals: { vertices: number; normals: number; uvs: number; indices: number; nodes: number; records: number };
+    totals: { vertices: number; normals: number; uvs: number; indices: number; nodes: number; records: number; nodesq: number };
     meshes: MeshSlot[];
     batches: BatchSlot[];
     /** By MESH ordinal. */
@@ -88,12 +100,15 @@ export function planDataLayout(t: DataTenants): DataLayout {
         tr += m.triCount;
         n += nodeTexelBound(m.triCount);
     }
+    let nq = 0;
     const batches: BatchSlot[] = [];
     for (const b of t.batches) {
-        const placementsBase = r; r += 2 * b.instanceCount;
+        const placementsBase = r; r += b.placementTexels * b.instanceCount;
         const attrsBase = b.attrTexels > 0 ? r : -1; r += b.attrTexels;
+        const cwbvhRecordsBase = b.cwbvhRecordTexels > 0 ? r : -1; r += b.cwbvhRecordTexels;
         const tlasBase = n; n += nodeTexelBound(b.instanceCount);
-        batches.push({ placementsBase, tlasBase, attrsBase });
+        const cwbvhNodesBase = b.cwbvhNodeTexels > 0 ? nq : -1; nq += b.cwbvhNodeTexels;
+        batches.push({ placementsBase, tlasBase, attrsBase, cwbvhNodesBase, cwbvhRecordsBase });
     }
     const meshLights = new Map<number, MeshLightSlot>();
     for (const l of t.meshLights) {
@@ -109,7 +124,7 @@ export function planDataLayout(t: DataTenants): DataLayout {
         sceneTable = { leafListBase, analyticBase, tlasBase };
     }
     return {
-        totals: { vertices: v, normals: vertexChannelTotal(t), uvs: vertexChannelTotal(t), indices: tr, nodes: n, records: r },
+        totals: { vertices: v, normals: vertexChannelTotal(t), uvs: vertexChannelTotal(t), indices: tr, nodes: n, records: r, nodesq: nq },
         meshes, batches, meshLights,
         ...(sceneTable !== undefined ? { sceneTable } : {}),
     };

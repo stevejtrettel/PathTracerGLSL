@@ -36,6 +36,7 @@ export const quadDescriptor: PrimitiveDescriptor = {
     ],
     glsl: quadGLSL,
     provides: { sdf: false, analytic: true },
+    similarityClosed: true,   // orientation lives in the edge vector rows
     uvChart: true,            // natural [0,1]² along the edges — quad_uv (fable-imagery P1)
     // Zero-thickness: never claims containment in scene_region_at — which is exactly
     // what makes it ONE-SIDED under region_to emission (and why back-face hits need

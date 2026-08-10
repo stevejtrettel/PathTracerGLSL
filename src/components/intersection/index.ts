@@ -46,15 +46,19 @@ export const MESH_TRAVERSALS: Record<string, MeshTraversalDescriptor> = {
 export interface InstanceAccelDescriptor {
     /** This engine walks the nodes channel (exact linkage: gates `data_nodes`). */
     tlasTexture: boolean;
+    /** This engine walks the INTEGER cwbvh node channel (exact linkage: gates
+     *  `data_nodesq` + the cwbvh helper include — fable-accel-cwbvh §6). */
+    nodesqTexture?: boolean;
     /** The batch walk skeleton — rail v2: fixed channel uniforms + the batch's baked
-     *  ledger slot (tlasBase into `nodes`). Visits placements (index var `i`), running
-     *  the `leaf` lines per placement, pruned by `bound` (hit.t or maxDist). `count`
-     *  is the batch's instance count — linear bakes it as the loop-bound LITERAL
-     *  (define-cleanup Aug 8: a define consumed only by generated code was pure
-     *  indirection); tlas ignores it (bounds live in the node texture). Leaf lines
-     *  arrive at RELATIVE indent (0 = leaf scope); the walk pads them to its own
-     *  nesting depth, so each occupant's dump indents like hand-written code. */
-    walk(slot: { tlasBase: number }, count: number, bound: string, leaf: string[]): string[];
+     *  ledger slot (tlasBase into `nodes`; cwbvh bases when the engine uses them).
+     *  Visits placements (index var `i`), running the `leaf` lines per placement,
+     *  pruned by `bound` (hit.t or maxDist). `count` is the batch's instance count —
+     *  linear bakes it as the loop-bound LITERAL (define-cleanup Aug 8: a define
+     *  consumed only by generated code was pure indirection); tlas ignores it (bounds
+     *  live in the node texture). Leaf lines arrive at RELATIVE indent (0 = leaf
+     *  scope); the walk pads them to its own nesting depth, so each occupant's dump
+     *  indents like hand-written code. */
+    walk(slot: { tlasBase: number; cwbvhNodesBase: number; cwbvhRecordsBase: number }, count: number, bound: string, leaf: string[]): string[];
 }
 
 export const DEFAULT_INSTANCE_ACCEL = 'tlas';
@@ -76,12 +80,13 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
     tlas: {
         tlasTexture: true,
         walk: (s, _count, bound, leaf) => [
+            '    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it',
             '    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;',
             '    while (ptr >= 0) {',
             '        int ni = stack[ptr]; ptr--;',
             `        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${s.tlasBase} + ni * 2)), 0);`,
             `        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${s.tlasBase} + ni * 2 + 1)), 0);`,
-            `        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, ray.direction, ${bound})) continue;`,
+            `        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, ${bound})) continue;`,
             '        if (n0.w >= 0.0) {',
             '            int off = int(n1.w), cnt = int(n0.w);',
             '            for (int j = 0; j < cnt; j++) {',
@@ -93,6 +98,73 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
             '            bool nf = ray.direction[axis] >= 0.0;',
             '            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }',
             '        }',
+            '    }',
+        ],
+    },
+    /** Compressed wide (8-ary) BVH walk — the scalar Alg. 1 port (fable-accel-cwbvh
+     *  §5; TS blueprint cwbvh.ts cwbvhNearestRef, bit layout pinned by the round-trip
+     *  vitest). Node = 5 RGBA32UI texels on the INTEGER channel; leaf items ride the
+     *  batch's cwbvh-order records region. Octant-ordered next-child via find-MSB;
+     *  per-node ray transform → one-FMA quantized slabs; uvec2 stack entries; bounded
+     *  data-dependent loop (the ANGLE D3D unroller rule); no structs on the hot path
+     *  (the Adreno precision rule). */
+    cwbvh: {
+        tlasTexture: false,
+        nodesqTexture: true,
+        walk: (s, _count, bound, leaf) => [
+            '    vec3 rdc = ray.direction;   // NaN guard: q·(1/0) with q=0 is NaN and silently kills pruning',
+            '    rdc.x = abs(rdc.x) < 1e-20 ? (rdc.x < 0.0 ? -1e-20 : 1e-20) : rdc.x;',
+            '    rdc.y = abs(rdc.y) < 1e-20 ? (rdc.y < 0.0 ? -1e-20 : 1e-20) : rdc.y;',
+            '    rdc.z = abs(rdc.z) < 1e-20 ? (rdc.z < 0.0 ? -1e-20 : 1e-20) : rdc.z;',
+            '    uint octinv = 7u - ((rdc.x < 0.0 ? 1u : 0u) | (rdc.y < 0.0 ? 2u : 0u) | (rdc.z < 0.0 ? 4u : 0u));',
+            '    vec3 inv = 1.0 / rdc;',
+            '    uvec2 stack[CWBVH_STACK_DEPTH]; int ptr = -1;',
+            '    // Root as a single-child pseudo-group at slot 0 (imask bit 0 → popc addressing yields 0).',
+            '    uint gBase = 0u; uint gHits = 1u << (octinv & 7u); uint gImask = 1u;',
+            '    for (int guard = 0; guard < 65536; guard++) {',
+            '        if (gHits == 0u) { if (ptr < 0) break; gBase = stack[ptr].x; gHits = stack[ptr].y & 0xFFu; gImask = stack[ptr].y >> 8; ptr--; continue; }',
+            '        int bit = cwbvh_findMSB24(gHits);',
+            '        gHits &= ~(1u << uint(bit));',
+            '        uint slot = (uint(bit) ^ octinv) & 7u;',
+            '        uint child = gBase + cwbvh_popc8(gImask & ((1u << slot) - 1u));',
+            '        if (gHits != 0u && ptr + 1 < CWBVH_STACK_DEPTH) { ptr++; stack[ptr] = uvec2(gBase, gHits | (gImask << 8)); }',
+            `        uvec4 n0 = texelFetch(u_data_nodesq, data_texel1d(${s.cwbvhNodesBase}u + child * 5u), 0);`,
+            `        uvec4 n1 = texelFetch(u_data_nodesq, data_texel1d(${s.cwbvhNodesBase}u + child * 5u + 1u), 0);`,
+            `        uvec4 n2 = texelFetch(u_data_nodesq, data_texel1d(${s.cwbvhNodesBase}u + child * 5u + 2u), 0);`,
+            `        uvec4 n3 = texelFetch(u_data_nodesq, data_texel1d(${s.cwbvhNodesBase}u + child * 5u + 3u), 0);`,
+            `        uvec4 n4 = texelFetch(u_data_nodesq, data_texel1d(${s.cwbvhNodesBase}u + child * 5u + 4u), 0);`,
+            '        vec3 p = vec3(uintBitsToFloat(n0.x), uintBitsToFloat(n0.y), uintBitsToFloat(n0.z));',
+            '        // dq = 2^e / d (the exponent bytes shifted into fp32 position — exact power-of-two scale).',
+            '        vec3 dq = vec3(uintBitsToFloat((n0.w & 0xFFu) << 23), uintBitsToFloat(((n0.w >> 8) & 0xFFu) << 23), uintBitsToFloat(((n0.w >> 16) & 0xFFu) << 23)) * inv;',
+            '        uint imask = (n0.w >> 24) & 0xFFu;',
+            '        vec3 oq = (p - ray.origin) * inv;',
+            '        uint hits = 0u; uint leafBits = 0u;',
+            '        for (uint sl = 0u; sl < 8u; sl++) {',
+            '            uint m = ((sl < 4u ? n1.z : n1.w) >> (8u * (sl & 3u))) & 0xFFu;',
+            '            if (m == 0u) continue;',
+            '            uint sh = 8u * (sl & 3u);',
+            '            float qlx = float(((sl < 4u ? n2.x : n2.y) >> sh) & 0xFFu);',
+            '            float qly = float(((sl < 4u ? n2.z : n2.w) >> sh) & 0xFFu);',
+            '            float qlz = float(((sl < 4u ? n3.x : n3.y) >> sh) & 0xFFu);',
+            '            float qhx = float(((sl < 4u ? n3.z : n3.w) >> sh) & 0xFFu);',
+            '            float qhy = float(((sl < 4u ? n4.x : n4.y) >> sh) & 0xFFu);',
+            '            float qhz = float(((sl < 4u ? n4.z : n4.w) >> sh) & 0xFFu);',
+            '            float lox = qlx * dq.x + oq.x; float hix = qhx * dq.x + oq.x;',
+            '            float loy = qly * dq.y + oq.y; float hiy = qhy * dq.y + oq.y;',
+            '            float loz = qlz * dq.z + oq.z; float hiz = qhz * dq.z + oq.z;',
+            '            float tn = max(max(min(lox, hix), min(loy, hiy)), max(min(loz, hiz), 0.0));',
+            `            float tf = min(min(max(lox, hix), max(loy, hiy)), min(max(loz, hiz), ${bound})) * 1.00000024;`,
+            '            if (tf < tn) continue;',
+            '            if ((m & 0xE0u) == 0x20u && (m & 0x1Fu) >= 24u) hits |= 1u << ((((m & 0x1Fu) - 24u) ^ octinv) & 7u);',
+            '            else leafBits |= (m >> 5) << (m & 0x1Fu);',
+            '        }',
+            '        while (leafBits != 0u) {',
+            '            int lb = cwbvh_findMSB24(leafBits);',
+            '            leafBits &= ~(1u << uint(lb));',
+            '            int i = int(n1.y) + lb;',
+            ...leaf.map((l) => '            ' + l),
+            '        }',
+            '        if (hits != 0u) { gBase = n1.x; gHits = hits; gImask = imask; } else { gHits = 0u; }',
             '    }',
         ],
     },

@@ -7,9 +7,17 @@
 // regions in existing channels (records/nodes are the generic homes); adding a channel
 // is a design event against the §5 unit budget, not a routine door.
 
-/** The six channels (fable-data-rail §3). */
+/** The six float channels (fable-data-rail §3). */
 export const DATA_CHANNELS = ['vertices', 'normals', 'uvs', 'indices', 'nodes', 'records'] as const;
 export type DataChannel = (typeof DATA_CHANNELS)[number];
+
+/** The seventh, INTEGER channel (RGBA32UI / usampler2D) — the CWBVH node substrate
+ *  (fable-accel-cwbvh §6, the design event the roster comment reserves). Kept out of
+ *  DATA_CHANNELS: different texel type, different alloc/upload path, bound only by
+ *  cwbvh-selecting programs (exact linkage). */
+export const NODESQ_CHANNEL = 'nodesq';
+export const NODESQ_EXTERN = `data_${NODESQ_CHANNEL}`;
+export const NODESQ_UNIFORM = `u_data_${NODESQ_CHANNEL}`;
 
 /** Extern name (TextureRegistry key) for a channel. */
 export function channelExtern(c: DataChannel): string {

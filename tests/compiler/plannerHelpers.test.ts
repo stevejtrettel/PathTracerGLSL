@@ -8,7 +8,7 @@ import {
 import { isDrivenPlacement, type PlannedPlacement } from '../../src/compiler/plan/types.js';
 import { keepsLocalFrame } from '../../src/compiler/plan/dataTenants.js';
 import type { SceneDescription, PrimitiveObject } from '../../src/compiler/types.js';
-import { foldAnalyticParameters } from '../../src/components/geometry/index.js';
+import { foldPlacementIntoParameters } from '../../src/components/geometry/index.js';
 import { classifySimilarity, similarityApplyPoint, type Similarity } from '../../src/components/geometry/similarity.js';
 import type { GlslExpression, ValueParam, Vec3 } from '../../src/compiler/types.js';
 type StandardSDF = { type: string; parameters: Record<string, number | number[]> };   // local test shape (the input union died with B1)
@@ -42,43 +42,54 @@ describe('placementOf', () => {
     });
 });
 
-describe('resolveSDFPlacement', () => {
-    it('folds a sphere center into the placement and zeroes center in parameters', () => {
+describe('resolveSDFPlacement (maximal fold — impl-plan-placement-fold stage 2)', () => {
+    it('untransformed sphere: center stays in parameters, NO wrapper (identity residual)', () => {
         const sdf: StandardSDF = { type: 'sphere', parameters: { center: [1, 2, 3], radius: 1 } };
         const { parameters, placement } = resolveSDFPlacement(sdf.type, sdf.parameters, undefined, 0);
-        expect(sim(placement).translation).toEqual([1, 2, 3]);
-        expect(classifySimilarity(sim(placement))).toBe('translation');
-        expect(parameters.center).toEqual([0, 0, 0]);
+        expect(classifySimilarity(sim(placement))).toBe('identity');
+        expect(parameters.center).toEqual([1, 2, 3]);
         expect(parameters.radius).toBe(1);
     });
 
-    it('sums transform.position and center into a single translation', () => {
-        const sdf: StandardSDF = { type: 'box', parameters: { center: [1, 1, 1], half: [0.5, 0.5, 0.5] } };
-        const { placement } = resolveSDFPlacement(sdf.type, sdf.parameters, { position: [10, 20, 30] }, 0);
-        expect(sim(placement).translation).toEqual([11, 21, 31]);
+    it('translated+scaled box folds T,s into center/halfSize — identity residual (s·d tier dead)', () => {
+        const sdf: StandardSDF = { type: 'box', parameters: { center: [1, 1, 1], halfSize: [0.5, 0.5, 0.5] } };
+        const { parameters, placement } = resolveSDFPlacement(sdf.type, sdf.parameters, { position: [10, 20, 30], scale: 2 }, 0);
+        expect(classifySimilarity(sim(placement))).toBe('identity');
+        expect(parameters.center).toEqual([12, 22, 32]);   // g·center = s·center + t
+        expect(parameters.halfSize).toEqual([1, 1, 1]);
     });
 
-    it('center is a PRE-translation: the object rotates about its local origin carrying center', () => {
+    it('ROTATED box: T,s fold, residual is the pure rotation about the folded center (rigid tier)', () => {
         const sdf: StandardSDF = { type: 'box', parameters: { center: [1, 0, 0], halfSize: [0.5, 0.5, 0.5] } };
-        const { placement } = resolveSDFPlacement(sdf.type, sdf.parameters, { rotation: { axis: [0, 0, 1], angle: Math.PI / 2 } }, 0);
-        // local origin maps to R·center = (0,1,0)
+        const { parameters, placement } = resolveSDFPlacement(sdf.type, sdf.parameters, { rotation: { axis: [0, 0, 1], angle: Math.PI / 2 } }, 0);
+        const g = sim(placement);
+        expect(classifySimilarity(g)).toBe('rigid');
+        expect(g.scale).toBe(1);
+        // center' = R·center = (0,1,0); residual translation = (I−R)·center'
+        expect((parameters.center as number[])[0]).toBeCloseTo(0, 12);
+        expect((parameters.center as number[])[1]).toBeCloseTo(1, 12);
+        // residual maps the folded center to itself (rotation ABOUT c′)
+        const back = similarityApplyPoint(g, parameters.center as [number, number, number]);
+        expect(back[0]).toBeCloseTo(0, 12);
+        expect(back[1]).toBeCloseTo(1, 12);
+    });
+
+    it('plane (closed, coupled fold): translation folds into the offset, no wrapper', () => {
+        const sdf: StandardSDF = { type: 'plane', parameters: { normal: [0, 2, 0], offset: 2 } };
+        const { parameters, placement } = resolveSDFPlacement(sdf.type, sdf.parameters, { position: [0, 3, 0] }, 0);
+        expect(classifySimilarity(sim(placement))).toBe('identity');
+        expect(parameters.normal).toEqual([0, 1, 0]);
+        // dot(p,n)+d=0 convention: d' = d − ⟨t, n̂⟩ = 1 − 3
+        expect(parameters.offset).toBe(-2);
+    });
+
+    it('RETAINED frame (keepsLocalFrame): the historical wrapper emission — center pre-folds into the placement', () => {
+        const sdf: StandardSDF = { type: 'sphere', parameters: { center: [1, 0, 0], radius: 1 } };
+        const { parameters, placement } = resolveSDFPlacement(sdf.type, sdf.parameters, { rotation: { axis: [0, 0, 1], angle: Math.PI / 2 } }, 0, true);
+        // local origin maps to R·center = (0,1,0); params center zeroed
+        expect(parameters.center).toEqual([0, 0, 0]);
         expect(sim(placement).translation[0]).toBeCloseTo(0, 12);
         expect(sim(placement).translation[1]).toBeCloseTo(1, 12);
-    });
-
-    it('normalizes plane normal+offset together and keeps the whole placement for the wrapper', () => {
-        const sdf: StandardSDF = { type: 'plane', parameters: { normal: [0, 2, 0], offset: 2 } };
-        const { parameters, placement } = resolveSDFPlacement(sdf.type, sdf.parameters, { position: [1, 0, 0] }, 0);
-        expect(parameters.normal).toEqual([0, 1, 0]);
-        expect(parameters.offset).toBe(1);
-        expect(sim(placement).translation).toEqual([1, 0, 0]);
-    });
-
-    it('passes parameters through when there is no center', () => {
-        const sdf: StandardSDF = { type: 'sphere', parameters: { radius: 2 } };
-        const { parameters, placement } = resolveSDFPlacement(sdf.type, sdf.parameters, { position: [1, 2, 3] }, 0);
-        expect(parameters).toBe(sdf.parameters);
-        expect(sim(placement).translation).toEqual([1, 2, 3]);
     });
 
     it('DRIVEN: keeps parameters local (no center fold) and builds the uniform record', () => {
@@ -99,20 +110,20 @@ describe('resolveSDFPlacement', () => {
     });
 });
 
-describe('foldAnalyticParameters (fable-transforms §5.1: the primitive set is similarity-closed)', () => {
+describe('foldPlacementIntoParameters (fable-transforms §5.1: the primitive set is similarity-closed)', () => {
     it('folds translation into a sphere center', () => {
-        const folded = foldAnalyticParameters('sphere', { center: [1, 2, 3], radius: 2 }, placementOf({ position: [10, 20, 30] }));
+        const folded = foldPlacementIntoParameters('sphere', { center: [1, 2, 3], radius: 2 }, placementOf({ position: [10, 20, 30] }));
         expect(folded).toEqual({ center: [11, 22, 33], radius: 2 });
     });
 
     it('scales a sphere radius by exactly s', () => {
-        const folded = foldAnalyticParameters('sphere', { center: [0, 0, 0], radius: 2 }, placementOf({ scale: 3 }));
+        const folded = foldPlacementIntoParameters('sphere', { center: [0, 0, 0], radius: 2 }, placementOf({ scale: 3 }));
         expect(folded.radius).toBe(6);
     });
 
     it('folds a full similarity into quad corner + edges (lengths scale by s)', () => {
         const g = placementOf({ position: [0, 5, 0], rotation: { axis: [0, 0, 1], angle: Math.PI / 2 }, scale: 2 });
-        const folded = foldAnalyticParameters('quad', { corner: [1, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, g);
+        const folded = foldPlacementIntoParameters('quad', { corner: [1, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, g);
         const corner = folded.corner as number[];
         const edge1 = folded.edge1 as number[];
         expect(corner[0]).toBeCloseTo(0, 12);
@@ -122,14 +133,14 @@ describe('foldAnalyticParameters (fable-transforms §5.1: the primitive set is s
     });
 
     it('normalizes and translates a plane without changing its geometric locus', () => {
-        const folded = foldAnalyticParameters('plane', { normal: [0, 2, 0], offset: 2 }, placementOf({ position: [0, 3, 0] }));
+        const folded = foldPlacementIntoParameters('plane', { normal: [0, 2, 0], offset: 2 }, placementOf({ position: [0, 3, 0] }));
         expect(folded.normal).toEqual([0, 1, 0]);
         expect(folded.offset).toBe(-2); // y=-1 translated +3 -> y=2 => y-2=0
     });
 
     it('fold agrees with direct point mapping (sphere surface stays on the folded sphere)', () => {
         const g = placementOf({ position: [1, -2, 3], rotation: { axis: [1, 2, 3], angle: 0.7 }, scale: 1.5 });
-        const folded = foldAnalyticParameters('sphere', { center: [2, 0, -1], radius: 0.5 }, g);
+        const folded = foldPlacementIntoParameters('sphere', { center: [2, 0, -1], radius: 0.5 }, g);
         const center = folded.center as number[];
         // a point on the local sphere surface, mapped through g, must lie at distance s·r from the folded center
         const world = similarityApplyPoint(g, [2.5, 0, -1]);

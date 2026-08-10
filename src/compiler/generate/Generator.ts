@@ -31,7 +31,8 @@ export function generate(
     // against future channel/texture creep, not a working constraint.
     const SAMPLER_FLOOR = 16;
     for (const [shaderId, shader] of shaders) {
-        const samplers = [...shader.fragment.matchAll(/uniform\s+sampler2D\s+(\w+)/g)].map((m) => m[1]);
+        // Counts BOTH float and integer samplers (usampler2D shares the same unit pool).
+        const samplers = [...shader.fragment.matchAll(/uniform\s+(?:highp\s+)?u?sampler2D\s+(\w+)/g)].map((m) => m[1]);
         if (samplers.length > SAMPLER_FLOOR) {
             bag.error('invalid-setting',
                 `Program '${shaderId}' binds ${samplers.length} sampler2D uniforms — over the guaranteed WebGL2 floor of ${SAMPLER_FLOOR} fragment texture units (MAX_TEXTURE_IMAGE_UNITS). Roster: ${samplers.join(', ')}. Scenes must fit the portability floor (fable-data-rail §5).`)

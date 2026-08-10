@@ -182,6 +182,11 @@ export interface InstancedObject {
      * instance_k_attrs data-rail texture.
      */
     attributes?: Record<string, number[] | [number, number, number][] | Float32Array>;
+    /** Research/coverage pin (the `backend:` pin pattern — impl-plan-placement-fold
+     *  stage 3): force the 2-texel rigid-frame placement record even when the batch
+     *  qualifies for the folded-params tier. The params≡frame witness twin rides this.
+     *  Never needed for correctness — the tiers are exactly equivalent. */
+    placementRecord?: 'frame';
     /** Provenance only (never identity) — see PrimitiveObject.name. */
     name?: string;
 }
@@ -465,8 +470,10 @@ export interface MaterialDescription {
 // ONE radiometric authoring word (B2, owner-decided Jul 17 2026): `emission`, the
 // same word materials use — a Spectrum (scalar broadcasts). Area emitters author
 // emitted RADIANCE Le (shared EXACTLY with the desugared region's material emission
-// — the pt ≡ pt-nee invariant is now visibly one field); delta lights author
-// RADIANT INTENSITY I (W/sr; a delta has no radiance — standard convention).
+// — the pt ≡ pt-nee invariant is now visibly one field); delta-POSITION lights author
+// RADIANT INTENSITY I (W/sr; a delta has no radiance — standard convention);
+// delta-DIRECTION lights (directional, beam — impl-plan-directional-beam) author
+// IRRADIANCE E (W/m², ⊥ to the propagation direction) — the ladder's fourth rung.
 // Human conveniences (power in watts, color temperature) belong to the AUTHORING
 // layer, which knows the object: power is per-OBJECT (Φ/(π·A) needs an area), so it
 // can never be a material/IR quantity. The intensity×color factoring died here.
@@ -477,12 +484,12 @@ export interface MaterialDescription {
  *  `kind` is a LIGHT_KINDS registry key; the legal fields beyond `kind`/`emission` are
  *  exactly the kind descriptor's `authoredParams` rows (Validator-enforced: unknown-key /
  *  required / shape / constraint, with row defaults framework-applied). The per-kind
- *  field documentation lives ON the descriptors, next to the math that reads it.
- *  ('directional' remains reserved vocabulary — rejected with its own message.) */
+ *  field documentation lives ON the descriptors, next to the math that reads it. */
 export interface LightDescription {
     kind: string;
-    /** ONE radiometric word (B2): Le for area kinds, radiant intensity (W/sr) for delta
-     *  kinds; scalar broadcasts. Constant Spectrum or (driven-lights Stage A) a `{param}`
+    /** ONE radiometric word (B2): Le for area kinds, radiant intensity (W/sr) for
+     *  delta-position kinds, irradiance (W/m²) for delta-direction kinds; scalar
+     *  broadcasts. Constant Spectrum or (driven-lights Stage A) a `{param}`
      *  slider — for hittable kinds the SAME uniform the desugared region's material
      *  emission reads. Geometry rows stay constant in v1. */
     emission: LightEmission;

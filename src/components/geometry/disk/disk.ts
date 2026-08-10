@@ -29,6 +29,7 @@ export const diskDescriptor: PrimitiveDescriptor = {
     ],
     glsl: diskGLSL,
     provides: { sdf: false, analytic: true },
+    similarityClosed: true,   // orientation lives in the normal row; rotation about it is a symmetry
     uvChart: true,            // polar (r/R, θ/2π) — disk_uv (fable-imagery P1)
     // Zero-thickness (the dichotomy: no sdf ⇒ thin): never claims containment, so it
     // is one-sided under region_to emission; back-face hits probe the entering side.

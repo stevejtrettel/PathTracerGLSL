@@ -219,8 +219,22 @@ export interface LightKindDescriptor {
      *  compile-time literal geometry's quad bakes; bit-exact one-sided pin). */
     derivedCtorFields?(values: Record<string, number | number[]>): (number | number[])[];
     /** Emitted power for CDF selection (pbrt PowerLightSampler formulas) over the
-     *  resolved values — a CPU selection heuristic, returns a number. */
-    power(values: Record<string, number | number[]>): number;
+     *  resolved values — a CPU selection heuristic, returns a number. `ctx` is the
+     *  Planner-stamped scene context (impl-plan-directional-beam P6): stamped on EVERY
+     *  planned light (no kind branch), read only by kinds whose pbrt formula needs a
+     *  scene fact (directional: Φ = E·π·R²_world). Selection weights are VARIANCE-ONLY
+     *  (cdf_rescale keeps every choice unbiased), so ctx-reading kinds carry their own
+     *  fallback for the optional argument. */
+    power(values: Record<string, number | number[]>, ctx?: LightPowerContext): number;
+}
+
+/** Scene-scale context for light selection power (impl-plan-directional-beam P6) —
+ *  computed once at plan time, never parameter-driven (the driven-CDF recompute
+ *  closures capture the stamped value). */
+export interface LightPowerContext {
+    /** Bounding-sphere radius of the scene's boundable geometry (pbrt worldRadius).
+     *  Heuristic by license — variance-only. */
+    worldRadius: number;
 }
 
 /** A phase model: one GLSL file declaring into MediumProperties (§3.5) — the same
@@ -310,6 +324,17 @@ export interface PrimitiveDescriptor {
      *  test checks symbols exist iff declared). sdf also serves analytic containment
      *  (scene_region_at) — the sdf slot's three clauses bind approximate SDFs too. */
     provides: { sdf: boolean; analytic: boolean };
+    /** Similarity CLOSURE (impl-plan-placement-fold, fable-transforms §5.2): a full
+     *  similarity g folds exactly into this primitive's param rows — g·Shape(v) =
+     *  Shape(fold(v, g)) for every g. A symmetry fact about the SHAPE, deliberately
+     *  not derived from kind rows (sphere and cylinder share kinds; isotropy is the
+     *  difference — cylinder's canonical axis cannot absorb R). Translation and scale
+     *  fold for EVERY primitive (point rows absorb T, length/area rows absorb s);
+     *  this flag asserts rotation folds too. Verified both directions by the
+     *  closure contract test. Gates: total constant folds on both backends
+     *  (classifyPlacement) and the instance params-tier record. Independent of
+     *  `provides` — closure is about parameter storage, never intersection method. */
+    similarityClosed: boolean;
     /** Declares a real per-primitive UV chart (fable-imagery P1): the occupant provides
      *  `vec2 <type>_uv(vec3 p, <Type>)`, and hit-fill sites call it instead of the planar
      *  placeholder WHEN some scene material reads uv (the scene-level program.materials.

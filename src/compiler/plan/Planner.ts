@@ -7,7 +7,7 @@ import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
-import { PRIMITIVES, primitive, canonicalizePrimitiveParameters, foldAnalyticParameters, resolveBackend } from '../../components/geometry/index.js';
+import { PRIMITIVES, primitive, canonicalizePrimitiveParameters, classifyPlacement, foldPlacementIntoParameters, resolveBackend } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
     isDrivenTransform,
@@ -91,7 +91,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
     // Rail v2 (fable-data-rail): THE layout truth — the same adapter+ledger call the App
     // makes, so baked bases and packed bytes can never disagree.
-    const { tenants: dataTenants, batchGeometrySlot, table: sceneTableTruth } = dataTenantsOf(scene);
+    const { tenants: dataTenants, batchGeometrySlot, batchPlacementRecord, table: sceneTableTruth } = dataTenantsOf(scene);
     const dataLayout = planDataLayout(dataTenants);
     let objectIndex = 0;
     for (const obj of scene.objects) {
@@ -161,8 +161,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     instanceCount: placementCount(obj.placements),
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
                     slot: dataLayout.batches[ordinal],
-                    // Prototype has NO transform → just canonicalize (no fold); s scales per instance in-shader.
-                    prototype: { backend: 'analytic', shapeType: proto.type, parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters) },
+                    // Prototype has NO transform → just canonicalize (no fold). record (the
+                    // adapter's ONE tier truth): 'frame' = 2-texel rigid record, s scales the
+                    // params in-shader; 'params' = 1-texel folded-parameters record, world-space
+                    // intersect (impl-plan-placement-fold stage 3).
+                    prototype: { backend: 'analytic', shapeType: proto.type, record: batchPlacementRecord[ordinal], parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters) },
                 });
             }
             continue;
@@ -182,7 +185,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             // Placement (fable-transforms §5.2/§6): constant → the point param folds into
             // the placement as a pre-translation and the wrapper owns all positioning;
             // driven → the uniform record with LOCAL parameters.
-            const { parameters, placement } = resolveSDFPlacement(obj.type, obj.parameters, obj.transform, objectIndex);
+            const { parameters, placement } = resolveSDFPlacement(obj.type, obj.parameters, obj.transform, objectIndex, keepsLocalFrame(obj, scene));
             objects.push({ index: objectIndex++, materialId: matId, sdfType: obj.type, name: obj.name, parameters, placement });
         } else if (isDrivenTransform(obj.transform)) {
             // Driven (§6): parameters stay LOCAL (plane still canonicalized); the
@@ -215,7 +218,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 name: obj.name,
                 ...(keepsLocalFrame(obj, scene)
                     ? { parameters: canonicalizePrimitiveParameters(obj.type, obj.parameters), placement: placementOf(obj.transform) }
-                    : { parameters: foldAnalyticParameters(obj.type, obj.parameters, placementOf(obj.transform)) }),
+                    : { parameters: foldPlacementIntoParameters(obj.type, obj.parameters, placementOf(obj.transform)) }),
             });
         }
     }
@@ -225,8 +228,8 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     // an authored light lowers — registry values (radiometric PRODUCTS computed once)
     // and, for hittable kinds, the backing emitter region. Le is shared EXACTLY
     // between the emission table and the sampler (any mismatch makes pt and pt-nee
-    // converge to different images). Unregistered kinds (directional) are
-    // Validator-rejected; skipped here.
+    // converge to different images). Unregistered kinds are Validator-rejected;
+    // skipped here.
     const lights: PlannedLight[] = [];
     let lightIndex = 0;
     for (const light of scene.lights) {
@@ -332,6 +335,13 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             },
         });
     }
+
+    // Selection-power context (impl-plan-directional-beam P6): pbrt's DistantLight
+    // formula Φ = E·π·R² needs the scene's bounding radius — stamped on EVERY light
+    // (no kind branch, the doors discipline; kinds read it or don't). Never
+    // parameter-driven, so the driven-CDF recompute closures capture it untouched.
+    const worldRadius = sceneWorldRadius(analyticObjects, meshes);
+    for (const l of lights) l.powerCtx = { worldRadius };
 
     // --- Ambient medium (§2.4): material_of(-1) resolves to this id; -1 = vacuum ---
     const ambientMedium = scene.ambientMedium !== undefined
@@ -724,52 +734,56 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
 }
 
 /**
- * SDF placement (fable-transforms §5.2): a local POINT parameter is a PRE-translation
- * of the placement (the object rotates/scales about its own origin, carrying the
- * offset along) — folded so the generated wrapper owns ALL positioning and the SDF
- * call stays origin-centered, preventing double-offset when both center and transform
- * are set. Which parameter folds is DERIVED from the kind rows (the object's single
- * `kind: 'point'` param — plane has none, so it falls through with no type check).
- * For pure translations this reduces exactly to the old position+center sum (byte gate).
+ * SDF placement (fable-transforms §5.2 as built — impl-plan-placement-fold stage 2):
+ * constant placements fold MAXIMALLY into the canonical parameters via
+ * `classifyPlacement` (closed shapes emit NO wrapper at all; non-closed shapes fold
+ * T,s and keep a pure-rotation residual on the rigid tier — the `s·d` similarity
+ * tier is dead for constants). `retainFrame` (keepsLocalFrame, the shared P1b
+ * predicate — its third reader) preserves the historical wrapper emission instead:
+ * the oriented uv chart mirrors the SDF wrapper, so a rotated shape whose material
+ * reads uv must keep the frame the fold would dissolve. On that path the single
+ * point row folds into the placement as a PRE-translation (the object rotates about
+ * its own origin, carrying the offset along), preventing double-offset when both
+ * center and transform are set.
  */
 export function resolveSDFPlacement(
     type: string,
     rawParameters: Record<string, number | number[]>,
     transform: Transform | undefined,
     index: number,
+    retainFrame = false,
 ): { parameters: Record<string, number | number[]>; placement: PlannedPlacement } {
-    // Descriptor canonicalization applies on BOTH paths (plane: unit normal + scaled
-    // offset — the SDF expression is a conservative bound only then; the Validator
-    // rejects the zero vector). Framework-applied, never a type-name branch.
-    const parameters = canonicalizePrimitiveParameters(type, rawParameters);
-
     // Driven (§6): parameters stay LOCAL — the rigid-frame query scales them in-shader,
-    // so there is no point fold (the wrapper handles ALL placement, live).
+    // so there is no fold (the wrapper handles ALL placement, live). Canonicalization
+    // applies exactly ONCE on every path (plane: unit normal + scaled offset — the SDF
+    // expression is a true distance bound only then); classifyPlacement canonicalizes
+    // internally, so the fold path hands it RAW values.
     if (isDrivenTransform(transform)) {
-        return { parameters, placement: buildDrivenPlacement(transform!, index) };
+        return { parameters: canonicalizePrimitiveParameters(type, rawParameters), placement: buildDrivenPlacement(transform!, index) };
     }
 
     const placement = placementOf(transform);
-    // Exactly one point param folds; zero (plane) or several (no current primitive —
-    // one translation cannot absorb two points) fall through unfolded. Only an
-    // AUTHORED value folds — an omitted param resolves to its row default at emit
-    // time, exactly as before the derivation.
-    const pointParams = primitive(type).params.filter((p) => p.kind === 'point');
-    const point = pointParams.length === 1
-        ? parameters[pointParams[0].name] as number[] | undefined
-        : undefined;
-    if (!point) {
-        return { parameters, placement };
+    if (retainFrame) {
+        const parameters = canonicalizePrimitiveParameters(type, rawParameters);
+        const pointParams = primitive(type).params.filter((p) => p.kind === 'point');
+        const point = pointParams.length === 1
+            ? parameters[pointParams[0].name] as number[] | undefined
+            : undefined;
+        if (!point) {
+            return { parameters, placement };
+        }
+        return {
+            parameters: { ...parameters, [pointParams[0].name]: [0, 0, 0] },
+            placement: similarityCompose(placement, {
+                rotation: IDENTITY_QUAT,
+                translation: point as [number, number, number],
+                scale: 1,
+            }),
+        };
     }
 
-    return {
-        parameters: { ...parameters, [pointParams[0].name]: [0, 0, 0] },
-        placement: similarityCompose(placement, {
-            rotation: IDENTITY_QUAT,
-            translation: point as [number, number, number],
-            scale: 1,
-        }),
-    };
+    const classified = classifyPlacement(type, rawParameters, placement);
+    return { parameters: classified.parameters, placement: classified.residual };
 }
 
 /** Schema-driven property resolution (materials-§7): exactly the model's declared rows,
@@ -846,4 +860,46 @@ export function resolveScalarProperty(value: MaterialProperty | undefined, fallb
     // Validator reports this before planning. Keep a hard backstop for direct helper use
     // and for untyped JavaScript callers so a malformed scalar can never compile silently.
     throw new Error('Scalar material property cannot be a vector');
+}
+
+/** Bounding-sphere radius (about the world origin) of the scene's boundable geometry —
+ *  the pbrt worldRadius for `power(values, ctx)` (impl-plan-directional-beam P6).
+ *  VARIANCE-ONLY by contract (selection weights; cdf_rescale keeps them unbiased), so
+ *  coarse by license: folded analytic objects through the bounds fact (unbounded
+ *  primitives — plane — and local-frame/driven objects skipped), closed meshes as
+ *  placed spheres around their local boxes; SDF objects and instance batches skipped.
+ *  Nothing boundable → 10, the constant the directional descriptor's ctx-fallback twins. */
+function sceneWorldRadius(analytic: PlannedAnalyticObject[], meshes: PlannedMesh[]): number {
+    let r = 0;
+    let any = false;
+    for (const o of analytic) {
+        if (o.placement !== undefined) continue;   // local-frame parameters are not world boxes
+        const b = PRIMITIVES[o.shapeType]?.bounds?.(o.parameters);
+        if (b === undefined) continue;
+        // Max corner norm of the world AABB: per-axis worst magnitude, combined.
+        r = Math.max(r, Math.hypot(
+            Math.max(Math.abs(b.min[0]), Math.abs(b.max[0])),
+            Math.max(Math.abs(b.min[1]), Math.abs(b.max[1])),
+            Math.max(Math.abs(b.min[2]), Math.abs(b.max[2])),
+        ));
+        any = true;
+    }
+    for (const m of meshes) {
+        if (m.localBox === undefined || isDrivenPlacement(m.placement)) continue;
+        const g = m.placement as Similarity;
+        const half = Math.hypot(
+            (m.localBox.max[0] - m.localBox.min[0]) / 2,
+            (m.localBox.max[1] - m.localBox.min[1]) / 2,
+            (m.localBox.max[2] - m.localBox.min[2]) / 2,
+        );
+        const center = Math.hypot(
+            (m.localBox.max[0] + m.localBox.min[0]) / 2,
+            (m.localBox.max[1] + m.localBox.min[1]) / 2,
+            (m.localBox.max[2] + m.localBox.min[2]) / 2,
+        );
+        // Rotation-free sphere bound: |t| + s·(local radius about the local origin).
+        r = Math.max(r, Math.hypot(g.translation[0], g.translation[1], g.translation[2]) + g.scale * (half + center));
+        any = true;
+    }
+    return any ? Math.max(r, 1e-3) : 10;
 }

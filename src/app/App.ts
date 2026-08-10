@@ -9,7 +9,7 @@ import { packMesh, sceneMeshes, type PackedMesh } from '../components/intersecti
 import { sceneInstanceBatches, instanceAttributeRows, placementCount, type AttributeRowSpec, type PackedInstanceBatch } from '../components/intersection/instancing/instancing.js';
 import { packInstanceBatchOffThread } from './utils/instancePack.js';
 import { similarityFromTransform, similarityApplyPoint } from '../components/geometry/similarity.js';
-import { canonicalizePrimitiveParameters, primitiveBounds, foldAnalyticParameters, primitive } from '../components/geometry/index.js';
+import { canonicalizePrimitiveParameters, primitiveBounds, foldPlacementIntoParameters, primitive } from '../components/geometry/index.js';
 import { buildBVHNodes, rootBoxOf, transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
 import { recordPack } from '../compiler/generate/records.js';
 import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH } from '../components/intersection/index.js';
@@ -17,8 +17,9 @@ import { packMeshLight } from '../components/lights/mesh/mesh.js';
 import { isMeshObject, type MeshObject } from '../compiler/types.js';
 import { dataTenantsOf } from '../compiler/plan/dataTenants.js';
 import { planDataLayout, nodeTexelBound, assertFits, type MeshSlot } from '../components/data/ledger.js';
-import { allocChannel, writeTexels, writeVec3s, writeVec2s, writeScalars, writeUvec3s, type PackedChannel } from '../components/data/pack.js';
-import { DATA_CHANNELS, channelExtern } from '../components/data/channels.js';
+import { allocChannel, allocChannelU32, writeTexels, writeTexelsU32, writeVec3s, writeVec2s, writeScalars, writeUvec3s, type PackedChannel } from '../components/data/pack.js';
+import { DATA_CHANNELS, channelExtern, NODESQ_EXTERN } from '../components/data/channels.js';
+import { CWBVH_NODE_TEXELS, CWBVH_NODE_WORDS, cwbvhNodeTexelBound } from '../components/accel/cwbvh/cwbvh.js';
 import type { RenderStrategy } from '../compiler/types.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
@@ -230,7 +231,7 @@ export class App {
      * batches — or used standalone too — builds its BVH once.
      */
     private async _uploadSceneGeometry(scene: SceneDescription): Promise<void> {
-        const { tenants, batchGeometrySlot, table } = dataTenantsOf(scene);
+        const { tenants, batchGeometrySlot, batchPlacementRecord, table } = dataTenantsOf(scene);
         if (tenants.meshes.length === 0 && tenants.batches.length === 0) return;
         const layout = planDataLayout(tenants);
         const ch: Record<(typeof DATA_CHANNELS)[number], PackedChannel> = {
@@ -241,6 +242,9 @@ export class App {
             nodes: allocChannel(layout.totals.nodes),
             records: allocChannel(layout.totals.records),
         };
+        // The integer CWBVH node channel (fable-accel-cwbvh §6) — allocated iff any
+        // batch is cwbvh-eligible (the ledger's nodesq total).
+        const chq = layout.totals.nodesq > 0 ? allocChannelU32(layout.totals.nodesq) : null;
 
         const packCache = new Map<MeshObject, PackedMesh>();
         const packCached = (m: MeshObject): PackedMesh => {
@@ -307,9 +311,15 @@ export class App {
                 ? instanceAttributeRows(scene.materials[batch.prototype.material]?.model ?? '', batch.attributes)
                     .map((r) => ({ shape: r.shape, values: batch.attributes![r.source] }))
                 : undefined;
+            // Params tier (impl-plan-placement-fold stage 3): the adapter's ONE tier truth
+            // — same array the Planner's stride/leaf-emission decisions read. The spec
+            // carries the CANONICAL prototype values (the same canon the bounds read).
+            const paramsRecord = batchPlacementRecord[ordinal] === 'params' && !isMeshObject(batch.prototype)
+                ? { type: batch.prototype.type, parameters: canonicalizePrimitiveParameters(batch.prototype.type, batch.prototype.parameters) }
+                : undefined;
             // Off the main thread (fable-instance-clouds §8 stage 2) — a 1M-instance SAH
             // build must not freeze the page; byte-identical output, sync fallback inside.
-            packs.push(packInstanceBatchOffThread(localBox, placements, attrs));
+            packs.push(packInstanceBatchOffThread(localBox, placements, attrs, paramsRecord));
         }
         (await Promise.all(packs)).forEach((packed, ordinal) => {
             const slot = layout.batches[ordinal];
@@ -317,6 +327,13 @@ export class App {
             assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placementCount(batches[ordinal].placements)));
             writeTexels(ch.nodes, slot.tlasBase, packed.nodes.subarray(0, packed.nodeCount * 8));
             if (packed.attributes !== undefined) writeTexels(ch.records, slot.attrsBase, packed.attributes);
+            // CWBVH twin payloads (fable-accel-cwbvh §6): pack eligibility mirrors the
+            // adapter's, so presence here ⇔ the ledger allocated the regions.
+            if (packed.cwbvh !== undefined && chq !== null && slot.cwbvhNodesBase >= 0) {
+                assertFits('cwbvh nodes', packed.cwbvh.nodeCount * CWBVH_NODE_TEXELS, cwbvhNodeTexelBound(placementCount(batches[ordinal].placements)));
+                writeTexelsU32(chq, slot.cwbvhNodesBase, packed.cwbvh.nodes.subarray(0, packed.cwbvh.nodeCount * CWBVH_NODE_WORDS));
+                writeTexels(ch.records, slot.cwbvhRecordsBase, packed.cwbvh.records);
+            }
             batchRoots.push(rootBoxOf(packed.nodes, packed.nodeCount));
         });
 
@@ -330,7 +347,7 @@ export class App {
             const foldedByRecord = table.analytic.map((a) => {
                 const obj = scene.objects[a.sceneIndex];
                 if (!('type' in obj)) throw new Error('scene table: analytic record points at a non-primitive');
-                return foldAnalyticParameters(obj.type, obj.parameters, similarityFromTransform(obj.transform));
+                return foldPlacementIntoParameters(obj.type, obj.parameters, similarityFromTransform(obj.transform));
             });
             table.analytic.forEach((a, slot) => {
                 const header = [table.kindCodes.get(a.type)!, a.sceneIndex, 0, 0];
@@ -366,6 +383,9 @@ export class App {
             if (layout.totals[c] > 0) {
                 this.engine.registerDataTexture(channelExtern(c), ch[c].data, ch[c].width, ch[c].height);
             }
+        }
+        if (chq !== null) {
+            this.engine.registerDataTextureU32(NODESQ_EXTERN, chq.data, chq.width, chq.height);
         }
     }
 

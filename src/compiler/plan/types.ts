@@ -341,10 +341,13 @@ export interface PlannedInstanceBatch {
      *  the TLAS base in `nodes`. */
     slot: BatchSlot;
     /** The prototype's backend + what the loop's local-intersect needs. mesh: BLAS counts (data
-     *  uploaded by the app). analytic: the canonical params, baked + scaled by s per instance. */
+     *  uploaded by the app). analytic: the canonical params + the placement-record tier
+     *  (impl-plan-placement-fold stage 3 — the dataTenants adapter's ONE truth): 'frame' =
+     *  2-texel rigid record, ray-into-local, params ×s in-shader; 'params' = 1-texel
+     *  folded-parameters record, intersected in WORLD space with no conjugation. */
     prototype:
         | { backend: 'mesh'; triCount: number; smooth: boolean; geometrySlot: MeshSlot }
-        | { backend: 'analytic'; shapeType: string; parameters: Record<string, number | number[]> };
+        | { backend: 'analytic'; shapeType: string; record: 'frame' | 'params'; parameters: Record<string, number | number[]> };
 }
 
 /** A per-instance ATTRIBUTE reference (fable-instance-attributes — the fourth storage
@@ -428,7 +431,7 @@ export interface PlannedMaterial {
  */
 export interface PlannedLight {
     id: number;
-    /** Registry key (registry-validated — A3; 'directional' is Validator-rejected input). */
+    /** Registry key (registry-validated — A3). */
     kind: string;
     /** Rows keyed by name. A RADIOMETRIC row may be a `ValueParam` (driven-lights Stage A):
      *  the emitted ctor reads the row's uniform instead of a literal, and the selection CDF
@@ -437,6 +440,10 @@ export interface PlannedLight {
     values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
     /** The emitter's region id (quad/sphere/mesh) — feeds the generated light_of table. */
     regionId?: number;
+    /** Planner-stamped scene context for `power(values, ctx)` (impl-plan-directional-beam
+     *  P6) — stamped on EVERY light after desugar (no kind branch; kinds read it or don't).
+     *  Never parameter-driven, so the driven-CDF recompute closures are untouched. */
+    powerCtx?: { worldRadius: number };
     /** DATA-DRIVEN kind (mesh — fable-mesh-lights, rail v2): the backing mesh's ordinal +
      *  the CDF walk's triangle count + the baked channel bases (tbase = the mesh's index
      *  region; wposBase = the world-position bake in `vertices`; cdfBase in `records`).

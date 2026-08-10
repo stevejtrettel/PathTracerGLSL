@@ -7,13 +7,14 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, MeshObject, PrimitiveObject } from '../types.js';
+import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject } from '../types.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
-import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
+import { PRIMITIVES, paramsRecordFloats, resolveBackend } from '../../components/geometry/index.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
+import { cwbvhNodeTexelBound } from '../../components/accel/cwbvh/cwbvh.js';
 import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH } from '../../components/intersection/index.js';
 import type { DataTenants } from '../../components/data/ledger.js';
 
@@ -68,8 +69,26 @@ export interface SceneDataTenants {
     tenants: DataTenants;
     /** Geometry-slot index per BATCH ordinal (null = analytic/SDF prototype, no slot). */
     batchGeometrySlot: Array<number | null>;
+    /** Placement-record tier per BATCH ordinal (impl-plan-placement-fold stage 3 — the
+     *  §6.1 stride amendment): 'params' = 1-texel folded-parameters record (world-space
+     *  intersect, no conjugation), 'frame' = the 2-texel rigid record. THE ONE tier
+     *  truth — Planner (prototype decision + ledger stride) and App (record packing)
+     *  both read this array, so stride and payload cannot drift. */
+    batchPlacementRecord: Array<'frame' | 'params'>;
     /** The scene table, or null when no eligible objects exist. */
     table: SceneTable | null;
+}
+
+/** The params-tier decision for one batch: shape facts (paramsRecordFloats — closed ∧
+ *  analytic ∧ one texel) ∧ the scene-side uv gate (a uv-reading material's chart is
+ *  genuinely rotated by per-instance orientations, so those batches keep the local
+ *  frame — keepsLocalFrame's instancing sibling) ∧ no authored 'frame' pin. Decided
+ *  from SHAPE and MATERIAL only, never from placement data — retune (repack) can
+ *  never change the compiled stride. */
+export function batchPlacementRecordOf(b: InstancedObject, scene: SceneDescription): 'frame' | 'params' {
+    if (isMeshObject(b.prototype) || b.placementRecord === 'frame') return 'frame';
+    if (paramsRecordFloats(b.prototype.type) === null) return 'frame';
+    return materialReadsUv(b.prototype.material, scene) ? 'frame' : 'params';
 }
 
 /** The ONE samplable-mesh-emitter predicate (fable-mesh-lights): shared by the ledger's
@@ -95,10 +114,23 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
         }
     }
 
-    const batchTenants = batches.map((b) => ({
-        instanceCount: placementCount(b.placements),
-        attrTexels: instanceAttributeRows(scene.materials[b.prototype.material]?.model ?? '', b.attributes ?? {}).length * placementCount(b.placements),
-    }));
+    const batchPlacementRecord = batches.map((b) => batchPlacementRecordOf(b, scene));
+    // CWBVH eligibility (fable-accel-cwbvh §6 v1 pins): params-tier analytic batches
+    // WITHOUT attributes. Regions allocated whenever eligible (the always-upload
+    // precedent — ONE scene layout serves every strategy; a tlas-only session simply
+    // never reads them).
+    const batchTenants = batches.map((b, i) => {
+        const n = placementCount(b.placements);
+        const attrTexels = instanceAttributeRows(scene.materials[b.prototype.material]?.model ?? '', b.attributes ?? {}).length * n;
+        const cwbvhEligible = batchPlacementRecord[i] === 'params' && attrTexels === 0;
+        return {
+            instanceCount: n,
+            placementTexels: (batchPlacementRecord[i] === 'params' ? 1 : 2) as 1 | 2,
+            attrTexels,
+            cwbvhNodeTexels: cwbvhEligible ? cwbvhNodeTexelBound(n) : 0,
+            cwbvhRecordTexels: cwbvhEligible ? n : 0,
+        };
+    });
 
     const meshLights = meshes
         .map((m, i) => ({ m, i }))
@@ -141,6 +173,7 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
                 : null,
         },
         batchGeometrySlot,
+        batchPlacementRecord,
         table,
     };
 }

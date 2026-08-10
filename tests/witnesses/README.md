@@ -79,6 +79,24 @@ The runner pins `resetSalt` (`WITNESS_SALT` in tools/witness.mjs) for EVERY rend
   nothing at any other salt. Changing `WITNESS_SALT` re-rolls every pt tripwire —
   recalibrate them if you touch it.
 
+## Perf checks (`--perf` mode)
+
+`kind: 'perf'` rows measure **ms per accumulation frame** and run ONLY under
+`npm run witness -- --perf` — a separate mode with a separate browser: the numeric
+sweep deliberately uses SwiftShader (deterministic software rasterizer, cacheable
+frames), but timing a software rasterizer misjudges bandwidth-bound work, so perf
+launches the REAL GPU (ANGLE Metal on macOS; the runner prints the GL renderer string
+first, and warns loudly on a SwiftShader fallback — rerun `--headed` for guaranteed
+hardware). Methodology: warmup frames outside the clock, then 3 timed batches via
+`extendProduction` (steady-state accumulation, no resets), each closed by an hdr
+readback as the sync barrier; the row reports the MEDIAN ms/frame plus all batches.
+
+Policy: perf rows are **report-only** (always PASS — milliseconds are machine state,
+never a sweep gate) and never cached. The numbers are read across adjacent rows:
+`perf-cloud` vs `perf-cloud-frame` is the placement-record-tier delta; future accel
+occupants (wide/compressed BVH nodes) add arms to the same fixture. Run perf alone on
+a quiet machine and compare within one run, never across machines or days.
+
 ## Adding a witness
 
 One fixture file (or a new export in an existing family file) under `scenes/` with

@@ -23,6 +23,7 @@ import {
 import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js';
 import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
+import { laserScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
 import { uvChartsScene, uvChartsNeeStrategy, uvChartsPtStrategy } from './uvChartsScene.js';
 import { exprMaterialsScene, exprMaterialsNeeStrategy, exprMaterialsPtStrategy } from './exprMaterialsScene.js';
@@ -164,6 +165,14 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             'DEMO — expression-driven materials (fable-imagery P2): albedo as a FORMULA over the surface chart `uv` (P1) and the shading point `p`, live sliders, zero recompiles. Left sphere = a cosine palette over uv (rainbow bands following the (θ,φ) chart); right sphere = a 3D sinusoid over the world point p (works chart-or-not). Same GlslExpression idiom the fog uses, pointed at material rows. Drag paint.freq. Keys 1 (pt-nee) / 2 (pt).',
         expected:
             'two spheres painted by math over a gray floor — the left one banded in rainbow stripes that wrap its surface, the right one a soft multicolor blob field; drag paint.freq to add bands/detail LIVE with no recompile; keys 1 and 2 converge',
+    },
+    laser: {
+        scene: laserScene,
+        strategies: posed([0, 1.6, 5.5], [0, 1.2, -0.5], laserNeeStrategy, laserMisStrategy),
+        exercises:
+            'DEMO — the beam kind (impl-plan-directional-beam): three colored lasers crossing a foggy room. Shafts = medium-vertex NEE inside each cylinder; wall spots = the surface evaluation; the GREEN beam terminates on a chrome MIRROR ball (occlusion IS the range) and carves a fog shadow tunnel behind it, while the ball reflects all three shafts through the fog. NO stamp on the ball (mirror = no diffuse lobe) and NO secondary green shaft (a curved mirror diverges a delta beam into a cone NEE cannot sample — the delta² argument). Drag fog.sigma_s to thicken the air. Keys 1 (pt-nee) / 2 (pt-mis) converge. v1 caveat: thin beams firefly at low spp (plan P7 — the beam-segment technique is the deferred fix)',
+        expected:
+            'three neon shafts (red/green/blue) fanning through the fog; red and blue end in hot wall/floor spots; the green one stops AT the chrome ball — no stamp, but a dark beam-shadow tunnel in the fog behind it, and the ball mirrors the shafts and the room; black sky, dim cool wash',
     },
     chrome: {
         scene: chromeScene,

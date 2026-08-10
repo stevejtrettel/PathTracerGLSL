@@ -1,0 +1,177 @@
+// pages/sections.ts — the gallery's display taxonomy: every scene in the merged
+// registry (pages/registry.ts) filed into one purpose-shaped section. This is a VIEW
+// concern only — the witness registry stays display-free; nothing here affects the
+// lab, the witness runner, or any test.
+//
+// An entry is either a plain id (one gallery row) or { id, partners } — partners are
+// fixture ref arms (a twin's other half) folded into the primary's row instead of
+// getting their own card. They stay fully renderable via lab.html?scene=<id>; the
+// gallery just stops spending a card on them.
+//
+// The guard at the bottom fails loudly (same stance as registry.ts's collision
+// check): every registry id must appear exactly once, and no section may reference
+// an id that doesn't exist — a new scene breaks the gallery until it is filed here.
+
+import { sceneSuite } from './registry.js';
+
+export interface SectionEntry {
+    id: string;
+    /** Fixture ref arms folded into this row (rendered as links, not rows). */
+    partners?: string[];
+}
+
+export interface GallerySection {
+    title: string;
+    /** One-line section subtitle. */
+    blurb: string;
+    entries: SectionEntry[];
+}
+
+const e = (id: string, ...partners: string[]): SectionEntry =>
+    partners.length ? { id, partners } : { id };
+
+export const gallerySections: GallerySection[] = [
+    {
+        title: 'Instance clouds',
+        blurb: 'external .inst datasets — hundreds of thousands of instanced spheres per scene (untracked data files, async load)',
+        entries: [e('clebsch'), e('croissant'), e('steiner'), e('crixxi'), e('octic'), e('c32')],
+    },
+    {
+        title: 'GRIN & curved light',
+        blurb: 'variable-IOR media: the Verlet geodesic walker, hard interfaces, emission & scattering on bent paths, black holes',
+        entries: [
+            e('grin'), e('maxwell'), e('blackhole'), e('accretion'), e('glassball'),
+            e('grin-vacuum', 'grin-vacuum-ref'),
+            e('grin-glass', 'grin-glass-ref'),
+            e('grin-emit', 'grin-emit-ref'),
+            e('grin-scatter', 'grin-scatter-ref'),
+            e('grin-furnace'), e('grin-furnace-hard'), e('grin-furnace-emit'), e('grin-furnace-scatter'),
+        ],
+    },
+    {
+        title: 'Meshes',
+        blurb: 'triangle meshes: BVH traversal, emissive mesh lights, closed-mesh containment (glass, fog, nesting)',
+        entries: [
+            e('meshes'), e('models'), e('cacti'),
+            e('mesh-furnace'),
+            e('mesh-quad-twin', 'mesh-quad-ref'),
+            e('mesh-light-twin', 'mesh-light-ref'),
+            e('mesh-glass-box', 'mesh-glass-box-ref'),
+            e('mesh-fog', 'mesh-fog-ref'),
+            e('mesh-submerged', 'mesh-submerged-ref'),
+        ],
+    },
+    {
+        title: 'Instancing & scene scale',
+        blurb: 'one prototype × N placements, per-instance attributes, the TLAS, and the scene object table',
+        entries: [
+            e('spheres'), e('forest'), e('grand-bazaar'), e('bazaar'),
+            e('instance-twin', 'instance-twin-ref'),
+            e('instance-params-twin', 'instance-params-frame'),
+            e('perf-cloud', 'perf-cloud-frame'),
+            e('mesh-instance-twin', 'mesh-instance-ref'),
+            e('attr-twin', 'attr-twin-ref'),
+        ],
+    },
+    {
+        title: 'Heterogeneous media & emission',
+        blurb: 'delta/ratio tracking over formula density fields, the majorant ceiling, and volume emission ε',
+        entries: [
+            e('groundfog'), e('glowblobs'),
+            e('het-const', 'het-const-ref'),
+            e('het-slab'),
+            e('clamp', 'clamp-ref'),
+            e('het-driven', 'het-driven-baked'),
+            e('het-driven-theta2', 'het-driven-baked2'),
+            e('emit'), e('emit-swap'), e('emit-sat'), e('emit-driven'), e('emit-scatter'),
+        ],
+    },
+    {
+        title: 'Homogeneous media',
+        blurb: 'constant media: Beer–Lambert, chromatic scattering, medium NEE + equiangular placement, shadow media',
+        entries: [
+            e('slab'), e('furnace-scatter'), e('haze'), e('shadow-medium'), e('fog-panel'),
+            e('fogcube'), e('fogblobs'), e('rayleigh'), e('marble'), e('mist'),
+        ],
+    },
+    {
+        title: 'Area lights & MIS',
+        blurb: 'samplable emitters — quad, disk, sphere, spot, and the delta-direction pair (sun, beam) — the power CDF, and the pt/pt-nee/pt-mis convergence gates',
+        entries: [
+            e('two-light'), e('cornell-area'), e('cornell-area-glass'), e('fog-area'),
+            e('orb'), e('cornell-disk'),
+            e('disk-bake', 'disk-bake-ref'),
+            e('spot'), e('veach-mis'),
+            e('sun'), e('beam-wall'), e('beam-slab'), e('beam-fog'), e('laser'),
+        ],
+    },
+    {
+        title: 'Environment lighting',
+        blurb: 'the env as a samplable light: CDF inversion, two-stage selection, the procedural bake, the chart axis',
+        entries: [e('sky'), e('furnace-sky'), e('sky-lamp'), e('proc-sky')],
+    },
+    {
+        title: 'Dielectrics & regions',
+        blurb: 'smooth dielectrics (the η² factor), nested regions, innermost-wins classification',
+        entries: [
+            e('eta'), e('cornell-glass'), e('analytic-glass'), e('submerged'),
+            e('regions-transformed', 'regions-transformed-ref'),
+        ],
+    },
+    {
+        title: 'Materials & texturing',
+        blurb: 'surface models and texturing: mirror + GGX showcase, blackbody emission, UV charts, expression albedos',
+        entries: [
+            e('chrome'), e('mirror'), e('hearth'), e('charts'), e('paint'),
+            e('expr-const', 'expr-const-ref'),
+        ],
+    },
+    {
+        title: 'Transforms & driven placement',
+        blurb: 'the similarity system: plan-time folds, tree flattening, conjugation, {param}-driven placement and lights',
+        entries: [
+            e('cylinders'),
+            e('transform-bake', 'transform-bake-ref'),
+            e('flatten-tree'),
+            e('conjugation', 'conjugation-base'),
+            e('driven', 'driven-baked-theta'),
+            e('driven-theta2', 'driven-baked-theta2'),
+            e('light-driven', 'light-driven-baked'),
+            e('light-driven-theta2', 'light-driven-baked2'),
+            e('light-off', 'light-off-baked'),
+        ],
+    },
+    {
+        title: 'Cameras & view',
+        blurb: 'the camera family, the fisheye sub-projections, accumulation occupants, and the tonemap roster',
+        entries: [e('cornell'), e('cornell-fisheye'), e('cornell-oneshot'), e('thinlens-zero'), e('tonemap')],
+    },
+    {
+        title: 'Core validation',
+        blurb: 'the first-principles anchors: the furnace, the minimal cross-backend twins, combined-backend shadows',
+        entries: [e('furnace'), e('minimal'), e('analytic-minimal'), e('mixed')],
+    },
+];
+
+// ---- completeness guard: exactly-once coverage, no dangling ids ----------------
+
+const filed = new Map<string, string>();
+for (const section of gallerySections) {
+    for (const entry of section.entries) {
+        for (const id of [entry.id, ...(entry.partners ?? [])]) {
+            if (!(id in sceneSuite)) {
+                throw new Error(`sections: '${id}' (section '${section.title}') is not in the scene registry`);
+            }
+            const prev = filed.get(id);
+            if (prev !== undefined) {
+                throw new Error(`sections: '${id}' is filed twice ('${prev}' and '${section.title}')`);
+            }
+            filed.set(id, section.title);
+        }
+    }
+}
+for (const id of Object.keys(sceneSuite)) {
+    if (!filed.has(id)) {
+        throw new Error(`sections: scene '${id}' is not filed in any gallery section — add it to pages/sections.ts`);
+    }
+}

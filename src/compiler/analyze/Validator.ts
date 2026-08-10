@@ -21,6 +21,7 @@ import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
 import { validateSceneProperties, constraintViolation } from './propertyValidation.js';
+import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
 const MAX_PHASE_G = 0.99;
@@ -62,18 +63,12 @@ export function validate(
         const d = LIGHT_KINDS[light.kind];
         // Unregistered kinds are REJECTED, never silently skipped (the Planner's skip is
         // the unreachable backstop) — a typo'd kind must not render the scene minus one
-        // light with no diagnostic. 'directional' is declared input vocabulary
-        // (reserved-not-removed), so it gets the honest message instead of "unknown".
+        // light with no diagnostic. ('directional' was reserved vocabulary with its own
+        // message until impl-plan-directional-beam registered the real kind.)
         if (d === undefined) {
-            if (light.kind === 'directional') {
-                bag.error('invalid-setting',
-                    `Light ${i}: directional lights not yet supported (reserved input vocabulary — no light-kind registry occupant)`)
-                    .add();
-            } else {
-                bag.error('invalid-setting',
-                    `Light ${i}: unknown light kind '${light.kind}' (registered kinds: ${Object.keys(LIGHT_KINDS).join(', ')})`)
-                    .add();
-            }
+            bag.error('invalid-setting',
+                `Light ${i}: unknown light kind '${light.kind}' (registered kinds: ${Object.keys(LIGHT_KINDS).join(', ')})`)
+                .add();
             continue;
         }
         // Authored-input schema (C7 parity with geometry): unknown keys warn (typo class),
@@ -587,6 +582,24 @@ export function validate(
         bag.warning('invalid-setting',
             `estimator.instanceAccel controls nothing here (no instanced objects) — the knob is inert`)
             .add();
+    } else if (instanceAccel === 'cwbvh') {
+        // The CWBVH experiment's v1 pins (fable-accel-cwbvh §6): params-tier analytic
+        // batches without attributes only — mesh prototypes, frame-tier batches, and
+        // attribute-carrying batches keep the binary TLAS's leaf-order semantics
+        // (Hit.element) that the cwbvh leaf permutation does not preserve.
+        for (const o of scene.objects) {
+            if (!isInstancedObject(o)) continue;
+            // ONE eligibility truth: the dataTenants adapter's tier decision + the
+            // attrs exclusion — exactly the predicate that allocates the regions.
+            const why = batchPlacementRecordOf(o, scene) !== 'params' ? 'a frame-tier placement record (mesh prototype / pin / uv-reading material / non-params shape)'
+                : o.attributes !== undefined && Object.keys(o.attributes).length > 0 ? 'per-instance attributes'
+                : null;
+            if (why !== null) {
+                bag.error('invalid-setting',
+                    `estimator.instanceAccel 'cwbvh' (v1) cannot serve batch '${o.name ?? '<unnamed>'}' — it has ${why}; the cwbvh leaf order excludes these (fable-accel-cwbvh §6). Use 'tlas' for this scene.`)
+                    .add();
+            }
+        }
     }
 
     const cameraType = strategy.measurement.camera.type;

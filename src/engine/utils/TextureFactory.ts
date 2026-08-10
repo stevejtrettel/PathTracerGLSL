@@ -130,4 +130,23 @@ export class TextureFactory {
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
         return texture;
     }
+
+    /** RGBA32UI integer data texture (usampler2D / texelFetch → raw uvec4 — bit-exact
+     *  by spec; the cwbvh node channel). NEAREST/CLAMP like every data texture —
+     *  integer textures are unfilterable anyway. */
+    createRGBA32UI(data: Uint32Array, width: number, height: number): WebGLTexture {
+        if (data.length !== width * height * 4) {
+            throw new Error(`Data size mismatch: expected ${width * height * 4}, got ${data.length}`);
+        }
+        const texture = this.gl.createTexture();
+        if (!texture) throw new Error('Failed to create texture');
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA32UI, width, height, 0, this.gl.RGBA_INTEGER, this.gl.UNSIGNED_INT, data);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+        return texture;
+    }
 }

@@ -27,6 +27,7 @@ export const planeDescriptor: PrimitiveDescriptor = {
     ],
     glsl: planeGLSL,
     provides: { sdf: true, analytic: true },
+    similarityClosed: true,   // orientation lives in the normal row (coupled fold below)
     // Canonical form: unit normal + rescaled offset (the framework applies this ONCE
     // on every Planner path — the SDF expression is a true distance bound only then).
     canonicalize: (v) => ({ ...v, ...canonicalPlane(v.normal as number[], v.offset as number | undefined) }),

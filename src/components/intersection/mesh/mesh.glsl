@@ -129,6 +129,7 @@ bool mesh_nearest_bvh(
     inout float tmax, out vec3 nLocal, out vec2 uvOut
 ) {
     bool found = false; vec3 nl = vec3(0.0); vec2 uo = vec2(0.0);
+    vec3 inv = 1.0 / rd;                           // hoisted — the slab test takes it
     int stack[BVH_STACK_DEPTH];
     int ptr = 0;
     stack[0] = 0;                                  // root
@@ -136,7 +137,7 @@ bool mesh_nearest_bvh(
         int ni = stack[ptr]; ptr--;
         vec4 n0 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2)), 0);
         vec4 n1 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2 + 1)), 0);
-        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, rd, tmax)) continue;   // prune by running nearest
+        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, inv, tmax)) continue;   // prune by running nearest
         if (n0.w >= 0.0) {
             mesh_test_range(posTex, idxTex, nrmTex, uvTex, vbase, tbase, uint(n1.w), uint(n0.w), useSmooth, ro, rd, tmax, nl, uo, found);
         } else {
@@ -165,6 +166,7 @@ const vec3 MESH_INSIDE_DIR = vec3(0.5320544, 0.7396997, 0.4114743);
 bool mesh_inside_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uint vbase, uint tbase, uint nbase, vec3 p) {
     float tmax = 1.0e20;
     float sideDot = 0.0;   // dot(dir, gnorm) at the running-nearest hit; 0 = no hit yet
+    vec3 inv = 1.0 / MESH_INSIDE_DIR;
     int stack[BVH_STACK_DEPTH];
     int ptr = 0;
     stack[0] = 0;
@@ -172,7 +174,7 @@ bool mesh_inside_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uint 
         int ni = stack[ptr]; ptr--;
         vec4 n0 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2)), 0);
         vec4 n1 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2 + 1)), 0);
-        if (!bvh_aabb_hit(n0.xyz, n1.xyz, p, MESH_INSIDE_DIR, tmax)) continue;
+        if (!bvh_aabb_hit(n0.xyz, n1.xyz, p, inv, tmax)) continue;
         if (n0.w >= 0.0) {
             uint off = uint(n1.w), cnt = uint(n0.w);
             for (uint i = off; i < off + cnt; i++) {
@@ -273,6 +275,7 @@ float mesh_closest_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uin
 }
 
 bool mesh_any_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uint vbase, uint tbase, uint nbase, vec3 ro, vec3 rd, float maxDist) {
+    vec3 inv = 1.0 / rd;
     int stack[BVH_STACK_DEPTH];
     int ptr = 0;
     stack[0] = 0;
@@ -280,7 +283,7 @@ bool mesh_any_bvh(sampler2D posTex, sampler2D idxTex, sampler2D bvhTex, uint vba
         int ni = stack[ptr]; ptr--;
         vec4 n0 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2)), 0);
         vec4 n1 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2 + 1)), 0);
-        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, rd, maxDist)) continue;
+        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, inv, maxDist)) continue;
         if (n0.w >= 0.0) {
             if (mesh_any_range(posTex, idxTex, vbase, tbase, uint(n1.w), uint(n0.w), ro, rd, maxDist)) return true;
         } else if (ptr + 2 < BVH_STACK_DEPTH) {

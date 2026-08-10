@@ -127,12 +127,14 @@ describe('Compiler', () => {
             expect(frag).toContain('u_data_indices');
         });
 
-        it('rejects directional lights', () => {
-            const badScene: SceneDescription = {
+        it('compiles directional lights (the reserved word became the registered kind — impl-plan-directional-beam)', () => {
+            const sunScene: SceneDescription = {
                 ...minimalScene,
                 lights: [{ kind: 'directional', direction: [0, -1, 0], emission: 1.0 }],
             };
-            expect(() => compiler.compile(badScene, minimalStrategy)).toThrow('directional lights not yet supported');
+            const result = compiler.compile(sunScene, minimalStrategy);
+            const frag = result.shaders.get('pathtracer-minimal-main')!.fragment;
+            expect(frag).toContain('directional_light_sample');
         });
 
         it('rejects unknown material references', () => {

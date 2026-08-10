@@ -25,6 +25,16 @@
 //   A <  0  → INTERNAL: splitAxis = -A - 1 (0|1|2),  rightChild = B,  leftChild = nodeIdx + 1
 
 export const BVH_LEAF_SIZE = 2;   // stop splitting at ≤ this many triangles
+/** Leaf size for the instance-cloud TLAS — MEASURED, not assumed (the accel research
+ *  batch, Aug 9 2026). The collapsing argument (Meister 2021 §4.6: cheap primitives →
+ *  bigger leaves) predicted 4–8 should win; the perf-cloud sweep REFUTED it:
+ *  200k spheres @512², params tier, M1 Pro — leaf 2: 31.3, leaf 4: 32.9, leaf 8:
+ *  38.1 ms/frame. With t-pruned ordered traversal a sphere test (1 texel + quadratic)
+ *  costs about as much as a node step, so the tree's extra culling beats the saved
+ *  fetches — the implicit c_node ≈ c_prim of the plain area·count SAH matches this
+ *  hardware. Kept separate from BVH_LEAF_SIZE so the next accel occupant can re-run
+ *  the sweep without touching mesh BLAS trees. */
+export const TLAS_LEAF_SIZE = 2;
 export const BVH_BINS = 12;       // SAH candidate planes per axis
 /** GLSL traversal stack depth (bvh.glsl). A well-balanced SAH tree needs ~2·log₂(N)+slack,
  *  so 64 covers millions of items; buildBVHNodesFlat warns if a (degenerate) tree would
@@ -56,7 +66,7 @@ function growPoint(b: AABB, p: [number, number, number]): void {
  *  the byte gate. Returns the flat node array (2 texels/node) + the item ORDER permutation
  *  (leaves are contiguous ranges of it) + max depth. The caller re-emits its own per-item
  *  payload (triangle indices / placement rows) in `order`. */
-export function buildBVHNodesFlat(boxes: Float64Array, n: number): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
+export function buildBVHNodesFlat(boxes: Float64Array, n: number, leafSize: number = BVH_LEAF_SIZE): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
     // Centroids: f32 stores (matching the old core's Float32Array centroids exactly).
     const cx = new Float32Array(n), cy = new Float32Array(n), cz = new Float32Array(n);
     for (let t = 0; t < n; t++) {
@@ -134,7 +144,7 @@ export function buildBVHNodesFlat(boxes: Float64Array, n: number): { nodes: Floa
             nodes[nodeIdx * 8 + 7] = start;         // B = offset
         };
 
-        if (count <= BVH_LEAF_SIZE) { makeLeaf(); return nodeIdx; }
+        if (count <= leafSize) { makeLeaf(); return nodeIdx; }
 
         // Binned SAH, best of all three axes. ALL THREE axes bin in ONE pass over the
         // range (the old core re-walked the range per axis — 3 passes). Per-axis bin

@@ -71,6 +71,31 @@ export type WitnessCheck =
           region?: WitnessRegion;
           assertFirstLowest?: boolean;
           label?: string;
+      }
+    | {
+          /**
+           * Wall-clock ms per accumulation frame (impl-plan-placement-fold's perf arm —
+           * the speed sibling of the numeric gates: every accel/bandwidth change ships
+           * with a number). Runs ONLY under `npm run witness -- --perf`, which launches
+           * the REAL GPU (never SwiftShader — timing a software rasterizer would
+           * misjudge bandwidth work; the runner prints the GL renderer string so a
+           * silent fallback can't masquerade). Methodology: `warmup` frames (compile +
+           * upload + pipeline warm), then 3 batches of `frames` frames each timed with
+           * a readback sync barrier; reports median ms/frame + spread. REPORT-ONLY
+           * (always passes): milliseconds are machine state, never a sweep gate; the
+           * numbers are read across adjacent rows (e.g. params vs frame tier).
+           * `size` overrides the spec size (perf wants GPU-bound framebuffers, not the
+           * SwiftShader budget).
+           */
+          kind: 'perf';
+          /** Strategy index into `strategies` (default 0). */
+          strategy?: number;
+          size?: [number, number];
+          /** Timed frames per batch (default 24). */
+          frames?: number;
+          /** Untimed warmup frames (default 8). */
+          warmup?: number;
+          label?: string;
       };
 
 export interface WitnessSpec {

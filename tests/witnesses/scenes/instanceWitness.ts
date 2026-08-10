@@ -113,6 +113,58 @@ export const meshInstanceRef: SceneDescription = {
 export const meshInstanceStrategy: RenderStrategy = withPose(base, [0, 2.2, 4.8], [0, 0.4, 0]);
 
 // ---------------------------------------------------------------------------
+// instance-params-twin ⇄ instance-params-frame — the placement-record TIER gate
+// (impl-plan-placement-fold stage 3). The SAME rotated, scale-varied sphere batch
+// authored twice: default (the 1-texel folded-params record — world-space intersect,
+// no conjugation) vs the `placementRecord: 'frame'` pin (the 2-texel §6.1 rigid
+// record). Same placements → same TLAS → same traversal order → same RNG stream, so
+// the two tiers must agree near-bit-exactly; any gap is a fold/record/ctor bug.
+// Rotations are DELIBERATE: the params fold absorbs them exactly (R fixes a sphere),
+// while the frame arm applies them — orientation-absorption is what's being proven.
+// ---------------------------------------------------------------------------
+
+const PARAMS_PLACEMENTS: Transform[] = [
+    { position: [-1.2, 0.5, 0.0], rotation: { axis: [0, 1, 0], angle: 0.7 }, scale: 1.0 },
+    { position: [0.0, 0.7, 0.0], rotation: { axis: [1, 0, 2], angle: -1.1 }, scale: 1.4 },
+    { position: [1.3, 0.5, -0.3], rotation: { axis: [1, 1, 1], angle: 0.4 }, scale: 0.9 },
+];
+const sphereProto = { type: 'sphere', parameters: { center: [0, 0.1, 0], radius: 0.5 }, material: 'ball' };
+
+export const instanceParamsTwin: SceneDescription = {
+    id: 'instance-params-twin',
+    name: 'Params-Tier Twin (1-texel folded records)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        { ...floor },
+        instance(sphereProto, PARAMS_PLACEMENTS, 'balls'),
+    ],
+    materials, lights, environment,
+};
+
+export const instanceParamsFrame: SceneDescription = {
+    id: 'instance-params-frame',
+    name: 'Params-Tier Frame Arm (2-texel rigid records, pinned)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        { ...floor },
+        { ...instance(sphereProto, PARAMS_PLACEMENTS, 'balls'), placementRecord: 'frame' as const },
+    ],
+    materials, lights, environment,
+};
+
+export const instanceParamsStrategy: RenderStrategy = instanceTwinStrategy;
+
+// The CWBVH estimator arm (fable-accel-cwbvh §7): the compressed wide walk visits the
+// SAME spheres with the same RNG stream — near-bit-exact agreement with the binary
+// TLAS; quantization inflates boxes conservatively (extra TESTS, never different
+// hits), so any gap is a pack/decode/traversal bug.
+export const instanceParamsCwbvhStrategy: RenderStrategy = {
+    ...instanceParamsStrategy,
+    id: 'pathtracer-cwbvh',
+    estimator: { ...instanceParamsStrategy.estimator, instanceAccel: 'cwbvh' },
+};
+
+// ---------------------------------------------------------------------------
 // attr-twin ⇄ attr-twin-ref — per-instance material attributes (fable-instance-attributes).
 //
 // One batch, one lambert material, three DIFFERENT per-instance albedos via the attribute

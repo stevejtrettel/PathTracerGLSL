@@ -14,4 +14,5 @@ export const boxDescriptor: PrimitiveDescriptor = {
     ],
     glsl: boxGLSL,
     provides: { sdf: true, analytic: false },
+    similarityClosed: false,   // axis-aligned canonical form: no row can absorb R (T,s still fold)
 };

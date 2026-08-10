@@ -433,6 +433,13 @@ export class Engine {
         this.textureRegistry.register(name, factory.createRGBA32F(data, width, height));
     }
 
+    /** Integer sibling of registerDataTexture (RGBA32UI / usampler2D) — bit-packed
+     *  payloads never ride float textures (fable-accel-cwbvh §6). */
+    registerDataTextureU32(name: string, data: Uint32Array, width: number, height: number): void {
+        const factory = new TextureFactory(this.gl);
+        this.textureRegistry.register(name, factory.createRGBA32UI(data, width, height));
+    }
+
     registerEnvironmentTable(
         rgb: Float32Array,
         width: number,

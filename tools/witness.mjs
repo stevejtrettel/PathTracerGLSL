@@ -15,11 +15,21 @@
 //   npm run witness -- furnace eta      # only these scenes
 //   npm run witness -- --list           # list checks without rendering
 //   npm run witness -- --spp-scale 3 het-const   # run these at 3× each spec's spp
+//   npm run witness -- --perf           # PERF checks only, on the REAL GPU (see below)
+//   npm run witness -- --perf --headed  # perf with a visible window (guaranteed real GPU)
 //
 // --spp-scale <x> multiplies every witness's spp (a one-time convergence probe: a twin
 // whose means agree but whose display-space RMSE just misses at the spec spp will fall as
 // ~1/√spp — this is the bias-vs-variance classifier; the cache keys on spp so a scaled run
 // is a fresh render, and the spec spp on disk is untouched). Exit code = failed check count.
+//
+// --perf runs ONLY the `kind: 'perf'` checks (ms/frame report rows, always PASS) and the
+// default sweep runs everything EXCEPT them — the two modes need different browsers:
+// numeric checks want SwiftShader (deterministic software rasterizer), perf wants the
+// real GPU (timing SwiftShader would misjudge bandwidth-bound work). The runner prints
+// the GL renderer string first — if it says SwiftShader, the numbers are meaningless;
+// rerun with --headed. Perf frames are never cached (milliseconds are machine state,
+// not pure functions of the inputs). Run perf alone on a quiet machine.
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -41,6 +51,8 @@ const WITNESS_SALT = 1234;
 const argv = process.argv.slice(2);
 const listOnly = argv.includes('--list');
 const noCache = argv.includes('--no-cache');
+const perfMode = argv.includes('--perf');
+const headed = argv.includes('--headed');
 // --spp-scale <x>: multiply every witness's spp (convergence probe). Its numeric value is
 // consumed here so it never lands in sceneFilter.
 const sppScaleIdx = argv.indexOf('--spp-scale');
@@ -538,6 +550,52 @@ async function runCheck(browser, registry, sceneId, spec, check) {
         return { sceneId, label, pass, detail: `σ/µ @ ${spp}spp: ${parts.join(', ')}` };
     }
 
+    if (check.kind === 'perf') {
+        // ms/frame on the REAL GPU (--perf mode only — main() filters). Warmup frames
+        // absorb compile/upload/pipeline warm; then 3 timed batches, each closed by an
+        // hdr readback as the sync barrier (its cost amortizes 1/frames). REPORT-ONLY:
+        // the row always passes; the numbers are read across adjacent rows.
+        const entry = registry[sceneId];
+        const strategyId = entry.strategyIds[check.strategy ?? 0];
+        const [W, H] = check.size ?? [512, 512];
+        const frames = check.frames ?? 24;
+        const warmup = check.warmup ?? 8;
+        const page = await browser.newPage();
+        try {
+            await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}`, { waitUntil: 'domcontentloaded' });
+            await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
+            const known = await page.evaluate(sid => sid in (window.sceneSuite ?? {}), sceneId);
+            if (!known) throw new Error(`scene '${sceneId}' not in the page's registry (stale dev server? restart it)`);
+            const batches = await page.evaluate(async ([sid, w, h, wu, fr, salt]) => {
+                const app = window.app;
+                app.stop();
+                app.pinResetSalt(salt);
+                app.selectRendererByStrategy(sid);
+                app.resize(w, h);
+                // One production SESSION: renderProduction settles (not idles), so the
+                // timed batches ride extendProduction — continues the SAME accumulation
+                // with no reset, which is exactly the steady-state frame we want timed.
+                await app.renderProduction(wu);
+                app.readExport('hdr');   // sync barrier — warmup stays outside the clock
+                const out = [];
+                for (let b = 0; b < 3; b++) {
+                    const t0 = performance.now();
+                    await app.extendProduction(fr);
+                    app.readExport('hdr');   // barrier inside the clock, ÷frames amortized
+                    out.push((performance.now() - t0) / fr);
+                }
+                return out;
+            }, [strategyId, W, H, warmup, frames, WITNESS_SALT]);
+            const sorted = [...batches].sort((a, b) => a - b);
+            return {
+                sceneId, label, pass: true,
+                detail: `${sorted[1].toFixed(2)} ms/frame @ ${W}×${H} (batches ${batches.map(b => b.toFixed(2)).join(' / ')}; ${frames}f ×3 after ${warmup} warmup)`,
+            };
+        } finally {
+            await page.close();
+        }
+    }
+
     return { sceneId, label, pass: false, detail: `unknown check kind '${check.kind}'` };
 }
 
@@ -547,12 +605,20 @@ const GREEN = s => `\x1b[32m${s}\x1b[0m`;
 const RED = s => `\x1b[31m${s}\x1b[0m`;
 const DIM = s => `\x1b[2m${s}\x1b[0m`;
 
+/** Only the checks the active mode owns: perf rows under --perf, everything else in
+ *  the numeric sweep. The two modes run different browsers (SwiftShader determinism
+ *  vs real-GPU timing), so a check never runs in the wrong one. */
+const modeChecks = spec => spec.checks.filter(c => perfMode ? c.kind === 'perf' : c.kind !== 'perf');
+
 async function main() {
     await ensureServer();
 
-    const browser = await chromium.launch({
-        args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-    });
+    // Numeric sweep: SwiftShader (deterministic software rasterizer — the frame cache
+    // depends on it). Perf: the real GPU (ANGLE Metal on macOS); --headed as the
+    // fallback that guarantees hardware if headless still lands on SwiftShader.
+    const browser = await chromium.launch(perfMode
+        ? { headless: !headed, args: process.platform === 'darwin' ? ['--use-angle=metal'] : [] }
+        : { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 
     try {
         // Pull the WITNESS registry (src/witnesses/ — the durable GPU test system,
@@ -572,10 +638,26 @@ async function main() {
             }
             return out;
         });
+        // Perf mode: report the GL renderer FIRST — a SwiftShader fallback makes every
+        // millisecond below meaningless, and must never masquerade as a GPU number.
+        if (perfMode) {
+            const glInfo = await bootstrap.evaluate(() => {
+                const gl = document.createElement('canvas').getContext('webgl2');
+                if (!gl) return 'NO WebGL2 context';
+                const ext = gl.getExtension('WEBGL_debug_renderer_info');
+                return String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+            });
+            console.log(`perf: GL renderer = ${glInfo}`);
+            if (/swiftshader/i.test(glInfo)) {
+                console.log(RED('perf: SOFTWARE renderer detected — these timings do not reflect the GPU. Rerun with --headed.'));
+            }
+        }
+
         // Render-cache digests: per-pair sha256 over compiled shaders + scene/strategy/
         // params JSON (computed in-page — the page has the compiler; compiles are ms).
-        // Failure degrades gracefully to cacheless rendering.
-        if (!listOnly) {
+        // Failure degrades gracefully to cacheless rendering. Perf mode skips the cache
+        // entirely (timings are machine state, never cacheable).
+        if (!listOnly && !perfMode) {
             try {
                 const t0 = Date.now();
                 const digests = await bootstrap.evaluate(() => window.__witnessDigest());
@@ -598,11 +680,11 @@ async function main() {
         await bootstrap.close();
 
         const scenes = Object.keys(registry)
-            .filter(id => registry[id].witness)
+            .filter(id => registry[id].witness && modeChecks(registry[id].witness).length > 0)
             .filter(id => sceneFilter.length === 0 || sceneFilter.includes(id));
 
         if (scenes.length === 0) {
-            console.error(sceneFilter.length ? `no witness scenes match: ${sceneFilter.join(', ')}` : 'no witness specs found');
+            console.error(sceneFilter.length ? `no ${perfMode ? 'perf ' : ''}witness scenes match: ${sceneFilter.join(', ')}` : `no ${perfMode ? 'perf ' : ''}witness specs found`);
             process.exitCode = 1;
             return;
         }
@@ -611,16 +693,16 @@ async function main() {
             for (const id of scenes) {
                 const spec = registry[id].witness;
                 console.log(`${id}  ${DIM(`[${(spec.size ?? DEFAULT_SIZE).join('×')} ×${spec.spp ?? DEFAULT_SPP}spp]`)}`);
-                for (const c of spec.checks) console.log(`  - ${c.label ?? c.kind}`);
+                for (const c of modeChecks(spec)) console.log(`  - ${c.label ?? c.kind}`);
             }
             return;
         }
 
-        console.log(`witness: ${scenes.length} scene(s)\n`);
+        console.log(`witness${perfMode ? ' (perf)' : ''}: ${scenes.length} scene(s)\n`);
         const results = [];
         for (const id of scenes) {
             const spec = registry[id].witness;
-            for (const check of spec.checks) {
+            for (const check of modeChecks(spec)) {
                 try {
                     results.push(await runCheck(browser, registry, id, spec, check));
                 } catch (err) {

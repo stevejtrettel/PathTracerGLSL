@@ -16,15 +16,22 @@
 //   A >= 0 → LEAF (count=A, offset=B);  A < 0 → INTERNAL (axis=-A-1, rightChild=B, left=i+1).
 
 // Slab test (tavianator); returns whether the box interval meets [0, tmax].
+// Takes the PRECOMPUTED inverse direction — callers hoist `1.0 / rd` once per walk
+// (it was recomputed per node visit: three divides × every node, pure waste; the
+// accel research batch, Aug 9 2026). The far plane is padded by ~2 ulps (Ize 2013,
+// "Robust BVH Ray Traversal" §3): fp32 slab arithmetic can shrink the interval so
+// that tf < tn by an ulp on a true hit (grazing the box edge / finely tessellated
+// geometry) — the multiply guarantees the interval survives rounding. Conservative
+// only: a spurious accept costs one extra leaf test; a spurious REJECT loses
+// geometry.
 // (No entry-distance out param until a walk consumes one — front-to-back leaf
 // ordering would reintroduce it; every current walk orders by axis sign alone.)
-bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 rd, float tmax) {
-    vec3 inv = 1.0 / rd;
+bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
     vec3 t0 = (bmin - ro) * inv;
     vec3 t1 = (bmax - ro) * inv;
     vec3 tsm = min(t0, t1), tbg = max(t0, t1);
     float tn = max(max(tsm.x, tsm.y), tsm.z);
-    float tf = min(min(tbg.x, tbg.y), tbg.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z) * 1.00000024;
     float tenter = max(tn, 0.0);
     return tf >= tenter && tenter < tmax;
 }

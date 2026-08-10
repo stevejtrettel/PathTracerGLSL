@@ -15,4 +15,5 @@ export const cylinderDescriptor: PrimitiveDescriptor = {
     ],
     glsl: cylinderGLSL,
     provides: { sdf: true, analytic: false },
+    similarityClosed: false,   // canonical y-axis, no axis row (orientation-is-placement): R cannot fold
 };

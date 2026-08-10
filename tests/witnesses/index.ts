@@ -23,7 +23,8 @@ import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/mini
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
 import { bazaarScene, bazaarTableStrategy, bazaarUnrolledStrategy } from './scenes/tableWitness.js';
 import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies } from './scenes/meshWitness.js';
-import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy } from './scenes/instanceWitness.js';
+import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy, instanceParamsTwin, instanceParamsFrame, instanceParamsStrategy, instanceParamsCwbvhStrategy } from './scenes/instanceWitness.js';
+import { perfCloud, perfCloudFrame, perfCloudStrategy, perfCloudCwbvhStrategy, PERF_CLOUD_COUNT } from './scenes/perfCloud.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
@@ -53,6 +54,11 @@ import {
     diskBake, diskBakeRef, diskBakeStrategy,
 } from './scenes/diskWitness.js';
 import { spotScene, spotNeeStrategy } from './scenes/spotWitness.js';
+import {
+    sunScene, sunNeeStrategy,
+    beamWallScene, beamSlabScene, beamNeeStrategy,
+    beamFogScene, beamFogNeeStrategy, beamFogMisStrategy,
+} from './scenes/directionalBeamWitness.js';
 import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
 import {
     transformBake, transformBakeRef, transformNeeStrategy, flattenTree,
@@ -340,6 +346,53 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // linear scan with the same stream — near-bit-exact (see mesh-quad-twin).
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'tlas ≡ linear (identical stream)' },
             ],
+        },
+    },
+    // The placement-record tier (impl-plan-placement-fold stage 3): the 1-texel
+    // folded-params record ≡ the pinned 2-texel rigid-frame record on the SAME rotated,
+    // scale-varied, off-center sphere batch — identical stream, identical TLAS.
+    'instance-params-frame': {
+        scene: instanceParamsFrame,
+        strategies: [instanceParamsStrategy],
+        exercises: 'frame arm of the params-tier twin — the same batch pinned to the 2-texel §6.1 rigid record (`placementRecord: \'frame\'`)',
+    },
+    'instance-params-twin': {
+        scene: instanceParamsTwin,
+        strategies: [instanceParamsStrategy, instanceParamsCwbvhStrategy],
+        exercises: 'the params-tier placement record (impl-plan-placement-fold): a rotated, scale-varied, OFF-CENTER sphere batch as 1-texel folded-parameter records — world-space intersect, no conjugation; rotations absorbed exactly by the fold. Key 2 = the CWBVH arm (fable-accel-cwbvh): compressed 8-wide quantized nodes, octant-ordered scalar walk',
+        expected: 'near-bit-identical to instance-params-frame (same placements, same TLAS, same stream — only the record layout differs); cwbvh ≡ tlas near-exactly (conservative quantization adds tests, never changes hits)',
+        witness: {
+            spp: 96,
+            checks: [
+                { kind: 'twin', other: { scene: 'instance-params-frame' }, meanTol: 0.002, rmse: 0.01, label: 'params ≡ frame records (identical stream)' },
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'cwbvh ≡ tlas (identical stream)' },
+            ],
+        },
+    },
+    // The acceleration-structure perf bench (report-only; `npm run witness -- --perf`,
+    // real GPU): ms/frame on a 200k-sphere procedural cloud, params vs frame record
+    // tiers. Future accel occupants (wide/compressed nodes) add arms here.
+    'perf-cloud': {
+        scene: perfCloud,
+        strategies: [perfCloudStrategy, perfCloudCwbvhStrategy],
+        exercises: `the perf bench (impl-plan-placement-fold): ${PERF_CLOUD_COUNT / 1000}k procedural spheres as ONE params-tier batch (1-texel folded records) — TLAS traversal + nee any-hit dominate; ms/frame is the number every accel change ships against. Key 2 = the CWBVH arm (fable-accel-cwbvh — the experiment's verdict row)`,
+        expected: 'report-only ms/frame under --perf (real GPU); compare against perf-cloud-frame for the record-tier delta and across rows for the cwbvh verdict (go at ≥1.15×)',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'params tier ms/frame @512² (binary tlas)' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'CWBVH ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-cloud-frame': {
+        scene: perfCloudFrame,
+        strategies: [perfCloudStrategy],
+        exercises: 'frame arm of the perf bench — the identical cloud pinned to 2-texel rigid records (`placementRecord: \'frame\'`)',
+        expected: 'report-only ms/frame under --perf; the delta vs perf-cloud is the params tier\'s win',
+        witness: {
+            spp: 8,
+            checks: [{ kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'frame tier ms/frame @512²' }],
         },
     },
     // The scene table (fable-object-tables): 'table' ≡ 'unrolled' on a many-unique-object
@@ -939,6 +992,75 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                     region: { x: 0.02, y: 0.02, w: 0.08, h: 0.08 },
                     label: 'F-SPOT outside-cone = 0 exactly',
                 },
+            ],
+        },
+    },
+    sun: {
+        scene: sunScene,
+        strategies: posed([0, 3, 1.5], [0, 0, -0.5], sunNeeStrategy),
+        exercises:
+            'F-SUN: the directional kind — the delta-direction class\'s first occupant (impl-plan-directional-beam). E is authored ⊥ to the propagation direction (B2\'s irradiance rung) and the BSDF supplies the cosine; distance rides the 1e20 env sentinel through the shadow walker; the sphere\'s HARD PARALLEL shadow is the class signature',
+        expected:
+            'open floor reads L = ρ·E·cosθ/π = 0.5·0.8/π ≈ 0.1273 in linear HDR (0.1592 ⇒ the obliquity cosine went missing; ~0 ⇒ a distance-fold leaked in); the clay sphere upper-right casts a razor-edged parallel shadow toward +x — no penumbra at ANY distance (delta direction)',
+        witness: {
+            spp: 48,
+            checks: [{
+                kind: 'mean', value: 0.12732, tol: 0.003,
+                region: { x: 0.4, y: 0.55, w: 0.15, h: 0.15 },   // clean floor: center-left, below the sphere
+                label: 'F-SUN ρ·E·cosθ/π = 0.4/π',
+            }],
+        },
+    },
+    'beam-wall': {
+        scene: beamWallScene,
+        strategies: posed([0, 0, 1.2], [0, 0, 0], beamNeeStrategy),
+        exercises:
+            'F-BEAM: the beam kind (collimated finite-aperture — the honest laser; impl-plan-directional-beam). Pure-evaluation sampling: cylinder test, wi = −direction, NOTHING folded into radiance; outside the cylinder pdf = 0 (the techniques\' invalid-sample guard)',
+        expected:
+            'inside the spot (disk r = 0.5 at the wall) L = ρ·E/π = 1/π ≈ 0.3183 in linear HDR, no falloff anywhere in the disk; outside the forward cylinder the wall is EXACTLY black (delta light, no env, no chance hits)',
+        witness: {
+            spp: 48,
+            checks: [
+                {
+                    kind: 'mean', value: 0.31831, tol: 0.004,
+                    region: { x: 0.47, y: 0.47, w: 0.06, h: 0.06 },
+                    label: 'F-BEAM spot ρ·E/π',
+                },
+                {
+                    kind: 'mean', value: 0.0, tol: 0.002,
+                    region: { x: 0.02, y: 0.02, w: 0.08, h: 0.08 },
+                    label: 'F-BEAM outside-cylinder = 0 exactly',
+                },
+            ],
+        },
+    },
+    'beam-slab': {
+        scene: beamSlabScene,
+        strategies: posed([0, 0, 1.2], [0, 0, 0], beamNeeStrategy),
+        exercises:
+            'F-BEAM-T: beam transmittance is the WALKER\'s job (radiance carries E verbatim; shadow_media crosses the ink\'s null interfaces). Collimation makes every shadow path exactly the slab thickness — the F-SLAB triple with zero scattering confound',
+        expected:
+            'spot center = ρ·E·e^{−σ_a·0.2}/π per channel = (0.11711, 0.04308, 0.00583) in linear HDR; the UNSCALED (0.3183·…) triple ⇒ the shadow walker skipped the medium; the SQUARED triple ⇒ double attenuation',
+        witness: {
+            spp: 48,
+            checks: [{
+                kind: 'mean', value: [0.117109, 0.043081, 0.005831], tol: [0.0015, 0.0008, 0.0004],
+                region: { x: 0.47, y: 0.47, w: 0.06, h: 0.06 },
+                label: 'F-BEAM-T walker-supplied e^{−σ_a·D}',
+            }],
+        },
+    },
+    'beam-fog': {
+        scene: beamFogScene,
+        strategies: posed([0, 0.2, 3.5], [0, 0, 0], beamFogNeeStrategy, beamFogMisStrategy),
+        exercises:
+            'X-BEAM: THE visible-beam shot — medium-vertex NEE lights eye-ray vertices landing inside the beam cylinder (no new machinery); pt-nee (key 1) ≡ pt-mis (key 2) gates the MIS bookkeeping over the delta-direction kind (weight 1 by LIGHT_DELTA). v1 noise ceiling declared (plan P7): vertex placement ignores beam proximity — the beam-segment technique is the deferred fix',
+        expected:
+            'a horizontal shaft crossing the fog cube, brightest near the entry face (beam transmittance decays left→right), terminating in a wall spot at x = 2.2; keys 1 and 2 converge to the SAME image; black surround (delta light invisible to chance hits). Calibrated mean tripwire lands at the owner\'s sweep',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'X-BEAM nee ≡ mis over the delta-direction kind' },
             ],
         },
     },

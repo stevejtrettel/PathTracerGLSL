@@ -60,9 +60,16 @@ describe('Validator', () => {
         expect(bag.hasErrors()).toBe(false);
     });
 
-    it('rejects directional lights', () => {
+    it('accepts directional lights (the reserved word became the registered kind — impl-plan-directional-beam)', () => {
         const bag = run(s => { s.lights.push({ kind: 'directional', direction: [0, -1, 0], emission: 1 }); });
-        expect(bag.getErrors().some(e => e.code === 'invalid-setting' && /directional/i.test(e.message))).toBe(true);
+        expect(bag.hasErrors()).toBe(false);
+    });
+
+    it('accepts beam lights and rejects a non-positive beam radius (row constraint)', () => {
+        const ok = run(s => { s.lights.push({ kind: 'beam', position: [0, 2, 0], direction: [0, -1, 0], radius: 0.2, emission: 1 }); });
+        expect(ok.hasErrors()).toBe(false);
+        const bad = run(s => { s.lights.push({ kind: 'beam', position: [0, 2, 0], direction: [0, -1, 0], radius: 0, emission: 1 }); });
+        expect(bad.getErrors().some(e => e.code === 'invalid-setting' && /radius/.test(e.message))).toBe(true);
     });
 
     it('rejects unknown light kinds with the registered list (never a silent skip)', () => {

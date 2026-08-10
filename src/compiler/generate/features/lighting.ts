@@ -304,7 +304,7 @@ export function resolveLightValues(l: PlannedLight, params: Record<string, unkno
  *  for the H6 invariant tests. */
 export function lightPower(l: PlannedLight, params: Record<string, unknown> = {}): number {
     const d = LIGHT_KINDS[l.kind];
-    return d !== undefined ? d.power(resolveLightValues(l, params)) : 1e-8;   // backstop; the Validator rejects unregistered kinds
+    return d !== undefined ? d.power(resolveLightValues(l, params), l.powerCtx) : 1e-8;   // backstop; the Validator rejects unregistered kinds
 }
 
 function lightKind(l: PlannedLight): LightKindDescriptor {

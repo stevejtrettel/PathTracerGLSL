@@ -9,7 +9,7 @@
 // Inputs arrive by structured clone (copy) deliberately: transferring them would
 // detach the scene's typed arrays (the .inst table views), breaking later repacks.
 
-import { packInstanceBatch, type AttributeRowSpec } from '../../components/intersection/instancing/instancing.js';
+import { packInstanceBatch, type AttributeRowSpec, type ParamsRecordSpec } from '../../components/intersection/instancing/instancing.js';
 import type { Similarity } from '../../components/geometry/similarity.js';
 import type { PackedPlacements } from '../../compiler/types.js';
 
@@ -17,12 +17,15 @@ export interface PackRequest {
     localBox: { min: [number, number, number]; max: [number, number, number] };
     placements: Similarity[] | PackedPlacements;
     attrs?: AttributeRowSpec[];
+    /** Present iff the batch's tier is 'params' (impl-plan-placement-fold stage 3). */
+    paramsRecord?: ParamsRecordSpec;
 }
 
 self.onmessage = (e: MessageEvent<PackRequest>) => {
-    const { localBox, placements, attrs } = e.data;
-    const packed = packInstanceBatch(localBox, placements, attrs);
+    const { localBox, placements, attrs, paramsRecord } = e.data;
+    const packed = packInstanceBatch(localBox, placements, attrs, paramsRecord);
     const transfers: ArrayBuffer[] = [packed.placements.buffer as ArrayBuffer, packed.nodes.buffer as ArrayBuffer];
     if (packed.attributes !== undefined) transfers.push(packed.attributes.buffer as ArrayBuffer);
+    if (packed.cwbvh !== undefined) transfers.push(packed.cwbvh.nodes.buffer as ArrayBuffer, packed.cwbvh.records.buffer as ArrayBuffer);
     (self as unknown as Worker).postMessage(packed, transfers);
 };

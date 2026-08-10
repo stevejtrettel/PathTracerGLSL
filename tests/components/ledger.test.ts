@@ -10,8 +10,10 @@ const T: DataTenants = {
         { vertexCount: 594, triCount: 1152 }, // slot 1 (the cactus)
     ],
     batches: [
-        { instanceCount: 3, attrTexels: 3 },  // batch 0: 3 instances, 1 attr row
-        { instanceCount: 500, attrTexels: 0 },
+        // batch 0: frame tier, 1 attr row — cwbvh-INELIGIBLE (zero regions)
+        { instanceCount: 3, placementTexels: 2, attrTexels: 3, cwbvhNodeTexels: 0, cwbvhRecordTexels: 0 },
+        // batch 1: params tier — cwbvh-eligible: 5(2N−1) node texels + N record-twin texels
+        { instanceCount: 500, placementTexels: 1, attrTexels: 0, cwbvhNodeTexels: 5 * (2 * 500 - 1), cwbvhRecordTexels: 500 },
     ],
     meshLights: [{ meshOrdinal: 1, vertexCount: 594, triCount: 1152 }],
     sceneTable: { leafCount: 4, analyticTexels: 10 },   // 2 analytic × stride 5
@@ -28,15 +30,20 @@ describe('data rail ledger', () => {
         expect(L.totals.vertices).toBe(24 + 594 + 594);
         // normals/uvs span only mesh geometry (no light bakes).
         expect(L.totals.normals).toBe(24 + 594);
-        // Records: batch 0 placements (6) + attrs (3), batch 1 placements (1000), then the CDF.
-        expect(L.batches[0]).toMatchObject({ placementsBase: 0, attrsBase: 6 });
+        // Records: batch 0 placements (3 × 2 texels) + attrs (3), batch 1 placements
+        // (500 × 1 texel — the params tier stride) + its cwbvh record TWIN (500),
+        // then the CDF.
+        expect(L.batches[0]).toMatchObject({ placementsBase: 0, attrsBase: 6, cwbvhNodesBase: -1, cwbvhRecordsBase: -1 });
         expect(L.batches[1].placementsBase).toBe(9);
         expect(L.batches[1].attrsBase).toBe(-1);
-        expect(L.meshLights.get(1)!.cdfBase).toBe(9 + 1000);
+        expect(L.batches[1].cwbvhRecordsBase).toBe(9 + 500);
+        expect(L.batches[1].cwbvhNodesBase).toBe(0);
+        expect(L.totals.nodesq).toBe(5 * (2 * 500 - 1));
+        expect(L.meshLights.get(1)!.cdfBase).toBe(9 + 500 + 500);
         // Scene table: leaf list then analytic records after the CDF; TLAS after batch TLASes.
-        expect(L.sceneTable!.leafListBase).toBe(9 + 1000 + 1152);
-        expect(L.sceneTable!.analyticBase).toBe(9 + 1000 + 1152 + 4);
-        expect(L.totals.records).toBe(9 + 1000 + 1152 + 4 + 10);
+        expect(L.sceneTable!.leafListBase).toBe(9 + 500 + 500 + 1152);
+        expect(L.sceneTable!.analyticBase).toBe(9 + 500 + 500 + 1152 + 4);
+        expect(L.totals.records).toBe(9 + 500 + 500 + 1152 + 4 + 10);
         // Nodes: BLAS bounds then TLAS bounds, then the scene TLAS, disjoint.
         expect(L.batches[0].tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152));
         expect(L.sceneTable!.tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500));

@@ -5,7 +5,7 @@
 // placement lists so a forest or a lattice is one call. Constant placements only (v1).
 
 import type { InstancedObject, PrimitiveObject, MeshObject, Transform, Vec3 } from '../compiler/types.js';
-import { foldAnalyticParameters } from '../components/geometry/index.js';
+import { foldPlacementIntoParameters } from '../components/geometry/index.js';
 import type { PrimitiveValues } from '../components/descriptors.js';
 import type { InstanceTable } from './loadInstances.js';
 
@@ -103,7 +103,7 @@ export function instanceCloud(table: InstanceTable, opts: InstanceCloudOptions):
             // No per-instance size source: fold the uniform scale into the UNIT
             // prototype's parameters (the ONE kind-derived fold, under a pure-scale
             // similarity) instead of materializing an N-array of one constant.
-            parameters = foldAnalyticParameters(proto.type, parameters, {
+            parameters = foldPlacementIntoParameters(proto.type, parameters, {
                 rotation: [0, 0, 0, 1], translation: [0, 0, 0], scale: opts.sizeScale,
             });
         }
