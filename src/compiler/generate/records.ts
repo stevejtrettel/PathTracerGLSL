@@ -47,6 +47,40 @@ export function recordPack(d: PrimitiveDescriptor, values: Record<string, number
     return floats;
 }
 
+/** RECORD-relative texel index of an SDF record's rigid tail (impl-plan-sdf-accel T2):
+ *  header texel 0, params floats texel-PADDED, then the q_inv texel (ts follows at
+ *  +1). Texel-aligned so the tail is two clean vec4 fetches. ONE layout truth for the
+ *  App packer and the generated leaf-march readers. */
+export function sdfTailTexel(d: PrimitiveDescriptor): number {
+    const floats = recordFields(d).reduce((acc, f) => acc + f.width, 0);
+    return 1 + Math.ceil(floats / 4);
+}
+
+/** Pack one boxed-SDF leaf record's payload (impl-plan-sdf-accel T2): the CANONICAL
+ *  T,s-folded values (texel-padded), then the §6.1 rigid-residual tail — the q_inv
+ *  texel and the (t_rigid.xyz, s) texel — zero-padded to the shared stride. Identity
+ *  residuals write the identity tail (the leaf conjugates ONCE per visit —
+ *  negligible). */
+export function sdfRecordPack(d: PrimitiveDescriptor, values: Record<string, number | number[]>, qInv: [number, number, number, number], ts: [number, number, number, number]): number[] {
+    const floats: number[] = [];
+    for (const row of d.params) {
+        const v = values[row.name];
+        if (Array.isArray(v)) floats.push(v[0], v[1], v[2]);
+        else floats.push(v as number);
+    }
+    for (const dv of d.derivedCtorFields?.(values) ?? []) {
+        if (Array.isArray(dv)) floats.push(dv[0], dv[1], dv[2]);
+        else floats.push(dv);
+    }
+    while (floats.length % 4 !== 0) floats.push(0);   // texel-align the tail
+    floats.push(qInv[0], qInv[1], qInv[2], qInv[3], ts[0], ts[1], ts[2], ts[3]);
+    if (floats.length > PAYLOAD_FLOATS) {
+        throw new Error(`sdfRecordPack: primitive '${d.type}' needs ${floats.length} payload floats (params + aligned rigid tail) > ${PAYLOAD_FLOATS} — raise ANALYTIC_RECORD_TEXELS deliberately`);
+    }
+    while (floats.length < PAYLOAD_FLOATS) floats.push(0);
+    return floats;
+}
+
 /** Generate the GLSL reader for one primitive kind — the record pair's other half,
  *  from the SAME field walk. Emitted only in table-mode programs. */
 export function generateRecordReader(d: PrimitiveDescriptor): string {

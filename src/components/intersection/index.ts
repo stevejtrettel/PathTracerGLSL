@@ -186,3 +186,9 @@ export const ANALYTIC_RECORD_TEXELS = 5;
 export const LEAF_ANALYTIC = 0;
 export const LEAF_MESH = 1;
 export const LEAF_BATCH = 2;
+/** Boxed-SDF leaves (fable-sdf-accel / impl-plan-sdf-accel T2): the leaf's record is
+ *  folded params + the §6.1 rigid-residual tail (q_inv texel, (t_rigid, 1) texel —
+ *  positional, immediately after the params floats), riding the same 5-texel stride
+ *  and records region as the analytic entries. Leaf-size-1 scene TLAS ⇒ the march
+ *  interval IS the node box. */
+export const LEAF_SDF = 3;

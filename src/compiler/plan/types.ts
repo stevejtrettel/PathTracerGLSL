@@ -250,6 +250,11 @@ export interface PlannedSDFObject {
      *  (§6): the uniform record — parameters stay LOCAL (center NOT folded; the
      *  rigid-frame query scales params in-shader). */
     placement: PlannedPlacement;
+    /** This object has a LEAF_SDF scene-table record (impl-plan-sdf-accel T2): under
+     *  'table' dispatch it leaves the GLOBAL marcher for the interval leaf march.
+     *  Constant + bounded + frame-free, per the adapter's ONE eligibility predicate
+     *  (rotation allowed — the record's rigid tail carries it). */
+    tabled?: boolean;
 }
 
 /**
@@ -270,6 +275,14 @@ export interface PlannedSceneTable {
     kinds: Array<{ type: string; code: number }>;
     /** Mesh ordinals with table leaves (constant-placement meshes). */
     tabledMeshOrdinals: number[];
+    /** Boxed-SDF leaf records (impl-plan-sdf-accel T2) in RECORD order — slots
+     *  [analyticCount, analyticCount + length) in the same region/stride, solids first
+     *  within the block (the containment loop's second range). `region` = the object's
+     *  region id (≡ scene index, the A5 convention). */
+    sdfRecords: Array<{ region: number; type: string; solid: boolean }>;
+    /** Present SDF-arm kinds with their header codes (offset past `kinds` — globally
+     *  unique headers across both arms). */
+    sdfKinds: Array<{ type: string; code: number }>;
 }
 
 export interface PlannedAnalyticObject {

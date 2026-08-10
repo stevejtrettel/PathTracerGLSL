@@ -375,6 +375,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     if (sceneTableTruth !== null && dataLayout.sceneTable !== undefined) {
         const tabledSet = new Set(sceneTableTruth.analytic.map((a) => a.sceneIndex));
         for (const a of analyticObjects) if (tabledSet.has(a.index)) a.tabled = true;
+        // Boxed-SDF leaves (impl-plan-sdf-accel T2): tabled SDF objects leave the
+        // global marcher for the LEAF_SDF interval march — the same residual/table
+        // split, on the SDF arm.
+        const sdfTabledSet = new Set(sceneTableTruth.sdf.map((s) => s.sceneIndex));
+        for (const o of objects) if (sdfTabledSet.has(o.index)) o.tabled = true;
         sceneTable = {
             slot: dataLayout.sceneTable,
             leafCount: sceneTableTruth.leaves.length,
@@ -382,6 +387,8 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             solidCount: sceneTableTruth.solidCount,
             kinds: [...sceneTableTruth.kindCodes].map(([type, code]) => ({ type, code })),
             tabledMeshOrdinals: sceneTableTruth.leaves.filter((l) => l.kind === 1).map((l) => l.ref),
+            sdfRecords: sceneTableTruth.sdf.map((s) => ({ region: s.sceneIndex, type: s.type, solid: s.solid })),
+            sdfKinds: [...sceneTableTruth.sdfKindCodes].map(([type, code]) => ({ type, code })),
         };
     }
 

@@ -8,11 +8,11 @@ import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packMesh, sceneMeshes, type PackedMesh } from '../components/intersection/mesh/mesh.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount, type AttributeRowSpec, type PackedInstanceBatch } from '../components/intersection/instancing/instancing.js';
 import { packInstanceBatchOffThread } from './utils/instancePack.js';
-import { similarityFromTransform, similarityApplyPoint } from '../components/geometry/similarity.js';
-import { canonicalizePrimitiveParameters, primitiveBounds, foldPlacementIntoParameters, primitive } from '../components/geometry/index.js';
+import { similarityFromTransform, similarityApplyPoint, rigidInverse } from '../components/geometry/similarity.js';
+import { canonicalizePrimitiveParameters, primitiveBounds, foldPlacementIntoParameters, primitive, classifyPlacement } from '../components/geometry/index.js';
 import { buildBVHNodes, rootBoxOf, transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
-import { recordPack } from '../compiler/generate/records.js';
-import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH } from '../components/intersection/index.js';
+import { recordPack, sdfRecordPack } from '../compiler/generate/records.js';
+import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_SDF } from '../components/intersection/index.js';
 import { packMeshLight } from '../components/lights/mesh/mesh.js';
 import { isMeshObject, type MeshObject } from '../compiler/types.js';
 import { dataTenantsOf, lightRosterOf, meshIsSamplableEmitter } from '../compiler/plan/dataTenants.js';
@@ -362,6 +362,23 @@ export class App {
                 const payload = recordPack(primitive(a.type), foldedByRecord[slot]);
                 writeTexels(ch.records, S.analyticBase + slot * ANALYTIC_RECORD_TEXELS, [...header, ...payload]);
             });
+            // Boxed-SDF records (impl-plan-sdf-accel T2): classifyPlacement is the ONE
+            // fold truth — T,s-folded params + the rigid residual as the §6.1 inverse
+            // tail (the leaf march conjugates once per visit via placement_rigid/dir).
+            // Slots follow the analytic block in the same region/stride.
+            const sdfClassified = table.sdf.map((s) => {
+                const obj = scene.objects[s.sceneIndex];
+                if (!('type' in obj)) throw new Error('scene table: sdf record points at a non-primitive');
+                return classifyPlacement(obj.type, obj.parameters, similarityFromTransform(obj.transform));
+            });
+            table.sdf.forEach((s, i) => {
+                const slot = table.analytic.length + i;
+                const cl = sdfClassified[i];
+                const inv = rigidInverse(cl.residual);
+                const header = [table.sdfKindCodes.get(s.type)!, s.sceneIndex, 0, 0];
+                const payload = sdfRecordPack(primitive(s.type), cl.parameters, inv.q, inv.ts);
+                writeTexels(ch.records, S.analyticBase + slot * ANALYTIC_RECORD_TEXELS, [...header, ...payload]);
+            });
             // Leaf world boxes in the adapter's canonical leaf order.
             const leafBoxes: AABB[] = table.leaves.map((L) => {
                 if (L.kind === LEAF_ANALYTIC) {
@@ -373,9 +390,19 @@ export class App {
                     const root = packCached(mesh).rootBox;
                     return transformAABB(root, (pt) => similarityApplyPoint(similarityFromTransform(mesh.transform), pt));
                 }
+                if (L.kind === LEAF_SDF) {
+                    // bounds(folded params) through the rigid residual — 8 corners.
+                    const cl = sdfClassified[L.ref];
+                    const local = primitiveBounds(table.sdf[L.ref].type, cl.parameters)!;   // bounded by eligibility
+                    return transformAABB(local, (pt) => similarityApplyPoint(cl.residual, pt));
+                }
                 return batchRoots[L.ref];
             });
-            const tlas = buildBVHNodes(leafBoxes);
+            // Leaf size 1 (fable-sdf-accel §2.1, landed at impl-plan-sdf-accel T1):
+            // "node box = object box" is an INVARIANT — the LEAF_SDF arm's march
+            // interval is the node box, so scene-TLAS leaves hold exactly one object.
+            // Scene tables are tens of objects; the extra nodes are noise.
+            const tlas = buildBVHNodes(leafBoxes, 1);
             assertFits('scene TLAS nodes', tlas.nodeCount * 2, nodeTexelBound(table.leaves.length));
             writeTexels(ch.nodes, S.tlasBase, tlas.nodes.subarray(0, tlas.nodeCount * 8));
             // Leaf list in TLAS-leaf order (the tree's permutation over the canonical list).

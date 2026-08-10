@@ -39,8 +39,8 @@ import cwbvhWalkGLSL from '../../../components/accel/cwbvh/cwbvh.glsl?raw';
 import { CWBVH_STACK_DEPTH } from '../../../components/accel/cwbvh/cwbvh.js';
 import { NODESQ_EXTERN, NODESQ_UNIFORM } from '../../../components/data/channels.js';
 import meshGLSL from '../../../components/intersection/mesh/mesh.glsl?raw';
-import { MESH_TRAVERSALS, INSTANCE_ACCELS, ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH } from '../../../components/intersection/index.js';
-import { generateRecordReader } from '../records.js';
+import { MESH_TRAVERSALS, INSTANCE_ACCELS, ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_SDF } from '../../../components/intersection/index.js';
+import { generateRecordReader, sdfTailTexel } from '../records.js';
 import { DATA_TEX_WIDTH } from '../../../components/data/pack.js';
 import { BVH_STACK_DEPTH, BVH_TFAR_PAD, bvhWalkLines } from '../../../components/accel/bvh/bvh.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
@@ -63,6 +63,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // RESIDUAL unrolled arms beside it (plus the SDF arm, unchanged).
     const tableMode = plan.program.intersection.objectDispatch === 'table' && plan.sceneTable !== undefined;
     const table = tableMode ? plan.sceneTable : undefined;
+    // Boxed-SDF leaves present (impl-plan-sdf-accel T3): gates placement.glsl (the
+    // leaf march conjugates by the record's rigid tail) ahead of the dispatch blocks.
+    const tabledSdfPresent = tableMode && (table?.sdfRecords.length ?? 0) > 0;
     // Light-tree selection (fable-light-bvh §5): the lighting feature's generated walks
     // read nodes/records through the rail — this feature owns the addressing
     // (data_texel1d + DATA_TEX_WIDTH), so a rail-free scene under 'bvh' still gets it.
@@ -92,7 +95,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const parameters: FeatureContribution['parameters'] = {};
     // placement.glsl (the rigid-frame ABI) is needed by driven placement AND by every instance
     // batch (the loop conjugates the ray with placement_rigid/dir/normal/scale).
-    if (plan.program.intersection.drivenPlacement || hasInstanced || placedAnalytic) {
+    if (plan.program.intersection.drivenPlacement || hasInstanced || placedAnalytic || tabledSdfPresent) {
         blocks.push({ origin: 'glsl/core/placement.glsl', source: placementGLSL });
         for (const rec of drivenRecords) {
             uniforms.push(...rec.uniforms);
@@ -136,8 +139,21 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const chartUv = plan.program.materials.materialsReadUv;
 
     // SDF backend: per-scene march-bound dispatch + the marcher (sdf_intersect*).
+    // Boxed-SDF leaves (impl-plan-sdf-accel T3): under table dispatch the GLOBAL
+    // marcher shrinks to the RESIDUAL subset (driven/unbounded/frame-retained —
+    // residualAnalytic's mirror); tabled objects march per leaf in the scene-table
+    // block, and their region-keyed queries (scene_object_sdf/uv — normals,
+    // containment, interior) route through the per-TYPE record-driven field helpers
+    // (prototyped here, defined with the table).
+    const residualSdf = tableMode ? plan.objects.filter((o) => o.tabled !== true) : plan.objects;
+    const tabledSdf: SdfLeafArm[] = tableMode && table !== undefined && plan.sceneTable !== undefined
+        ? plan.sceneTable.sdfRecords.map((s, i) => ({
+            region: s.region, type: s.type,
+            rbase: plan.sceneTable!.slot.analyticBase + (plan.sceneTable!.analyticCount + i) * ANALYTIC_RECORD_TEXELS,
+        }))
+        : [];
     if (hasSDF) {
-        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(plan.objects, ids, chartUv) });
+        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(residualSdf, tabledSdf, ids, chartUv) });
         blocks.push({ origin: 'components/intersection/raymarch/raymarch.glsl', source: raymarchGLSL });
     }
 
@@ -253,7 +269,10 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         origin: 'generated:scene-intersect',
         source: generateSceneIntersect({
             analytic: hasAnalytic && residualAnalytic.length > 0,
-            sdf: hasSDF,
+            // The GLOBAL marcher arm serves the residual subset only (T3) — an
+            // all-tabled scene's sdf_intersect is never called (raymarch.glsl rides
+            // wholesale regardless: march_epsilon/raymarch_commit serve the leaves).
+            sdf: hasSDF && residualSdf.length > 0,
             mesh: hasMesh && residualMeshes.length > 0,
             instanced: hasInstanced && !tableMode,
             table: tableMode,
@@ -286,13 +305,15 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         provides.push({ name: 'data_texel1d', signature: 'ivec2 data_texel1d(uint i)' });
         requires.push('data_texel1d');
     }
-    if (plan.program.intersection.drivenPlacement || hasInstanced || placedAnalytic) {
+    if (plan.program.intersection.drivenPlacement || hasInstanced || placedAnalytic || tabledSdfPresent) {
         // Only the helpers the EMITTED code calls (dir/normal are analytic-arm
         // vocabulary; a driven-SDF-only program leaves them as unlisted wholesale
         // residue of the core file, like sdf_intersect_any inside raymarch.glsl).
-        // Instance batches always use all four (rigid/dir/normal/scale) in the loop.
+        // Instance batches always use all four (rigid/dir/normal/scale) in the loop;
+        // the SDF leaf march uses rigid + dir (normals come from the conjugated
+        // field's gradient — no placement_normal).
         const meshDriven = plan.meshes.some((m) => isDrivenPlacement(m.placement));
-        const used = ['placement_rigid', 'placement_scale', ...((placedAnalytic || meshDriven || hasInstanced) ? ['placement_dir', 'placement_normal'] : [])];
+        const used = ['placement_rigid', 'placement_scale', ...((placedAnalytic || meshDriven || hasInstanced || tabledSdfPresent) ? ['placement_dir', 'placement_normal'] : [])];
         const sigs: Record<string, string> = {
             placement_rigid: 'vec3 placement_rigid(vec4 q, vec4 ts, vec3 p)',
             placement_dir: 'vec3 placement_dir(vec4 q, vec3 d)',
@@ -366,9 +387,25 @@ function generateNamedShapes(sdf: PlannedSDFObject[], analytic: PlannedAnalyticO
 // SDF backend dispatch (per-scene)
 // ============================================================================
 
-function generateSDFDispatch(objects: PlannedSDFObject[], ids: Map<number, string>, chartUv: boolean): string {
+/** One tabled SDF object's leaf arm (impl-plan-sdf-accel T3): region id + kind + the
+ *  BAKED record base texel. Slot order = plan.sceneTable.sdfRecords order. */
+interface SdfLeafArm { region: number; type: string; rbase: number }
+
+function generateSDFDispatch(objects: PlannedSDFObject[], tabled: SdfLeafArm[], ids: Map<number, string>, chartUv: boolean): string {
     const lines: string[] = [];
     lines.push('// Generated SDF dispatch');
+
+    // Per-TYPE record-driven field helpers for TABLED objects — PROTOTYPES here
+    // (the definitions live with the scene table, after the data rail + record
+    // readers they need): the region-keyed queries below call them, so normals,
+    // containment, and interior marching for tabled owners work off the SAME record
+    // the leaf march reads.
+    const tabledTypes = [...new Set(tabled.map((s) => s.type))];
+    for (const t of tabledTypes) {
+        lines.push(`float sdf_leaf_field_${t}(vec3 p, uint rbase);`);
+        if (chartUv && primitive(t).uvChart) lines.push(`vec2 uv_leaf_${t}(vec3 p, uint rbase);`);
+    }
+    if (tabledTypes.length > 0) lines.push('');
 
     for (const obj of objects) {
         lines.push(`float sdf_${ids.get(obj.index)!}(vec3 p) {`);
@@ -438,6 +475,12 @@ function generateSDFDispatch(objects: PlannedSDFObject[], ids: Map<number, strin
     for (const obj of objects) {
         lines.push(`    if (region == ${obj.index}) return sdf_${ids.get(obj.index)!}(p);`);
     }
+    // Tabled owners (T3): one-line arms through the per-type record helpers — the
+    // gradient of a conjugated field IS the world gradient (chain rule through the
+    // rigid map), so scene_normal needs no placement_normal here.
+    for (const s of tabled) {
+        lines.push(`    if (region == ${s.region}) return sdf_leaf_field_${s.type}(p, ${s.rbase}u);`);
+    }
     lines.push('    return 1e20;');
     lines.push('}');
     lines.push('');
@@ -450,6 +493,11 @@ function generateSDFDispatch(objects: PlannedSDFObject[], ids: Map<number, strin
     for (const obj of objects) {
         if (chartUv && primitive(obj.sdfType).uvChart) {
             lines.push(`    if (region == ${obj.index}) return uv_${ids.get(obj.index)!}(p);`);
+        }
+    }
+    for (const s of tabled) {
+        if (chartUv && primitive(s.type).uvChart) {
+            lines.push(`    if (region == ${s.region}) return uv_leaf_${s.type}(p, ${s.rbase}u);`);
         }
     }
     lines.push('    return vec2(p.x * UV_PLANAR_SCALE, p.z * UV_PLANAR_SCALE);');
@@ -893,6 +941,7 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
     lines.push('    float best = -1.0e20;   // best = least-negative inside distance so far');
     lines.push('    float d;');
     for (const obj of sdf) {
+        if (table !== undefined && obj.tabled === true) continue;   // containment via the SDF record loop below
         lines.push(`    d = sdf_${ids.get(obj.index)!}(p);`);
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
@@ -925,6 +974,25 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
         for (const k of solidKinds) {
             const d = primitive(k.type);
             lines.push(`        if (int(hdr.x) == ${k.code}) { ${structName(d)} shape = ${k.type}_from_record(u_data_records, rbase); ds = ${k.type}_sdf(p, shape); }`);
+        }
+        lines.push('        if (ds < 0.0 && ds > best) { best = ds; region = int(hdr.y); }');
+        lines.push('    }');
+    }
+    // Tabled SDF SOLIDS (impl-plan-sdf-accel T4): the same record-loop shape over the
+    // SDF block's solids-first range, through the per-type record field (conjugation
+    // inside — d stays an exact WORLD signed distance; s = 1 on the rigid tail). No
+    // point-in-box early-out: for PRIMITIVE fields the signed-distance eval costs
+    // about a box test — the early-out becomes worthwhile only when expression fields
+    // arrive (fable-sdf-accel §2.2's deferred half).
+    if (table !== undefined && table.sdfRecords.some((s) => s.solid)) {
+        const sdfSolidCount = table.sdfRecords.filter((s) => s.solid).length;
+        const sdfSolidKinds = table.sdfKinds.filter((k) => primitive(k.type).thin !== true);
+        lines.push(`    for (uint ri = ${table.analyticCount}u; ri < ${table.analyticCount + sdfSolidCount}u; ri++) {`);
+        lines.push(`        uint rbase = ${table.slot.analyticBase}u + ri * ${ANALYTIC_RECORD_TEXELS}u;`);
+        lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+        lines.push('        float ds = 1.0e20;');
+        for (const k of sdfSolidKinds) {
+            lines.push(`        if (int(hdr.x) == ${k.code}) ds = sdf_leaf_field_${k.type}(p, rbase);`);
         }
         lines.push('        if (ds < 0.0 && ds > best) { best = ds; region = int(hdr.y); }');
         lines.push('    }');
@@ -996,19 +1064,124 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
     const lines: string[] = ['// Generated scene table (fable-object-tables)'];
     const S = table.slot;
     const STRIDE = ANALYTIC_RECORD_TEXELS;
+    const chartUv = plan.program.materials.materialsReadUv;
 
     // Record readers for the present tabled kinds — generated from the SAME rows as the
-    // structs/ctors (records.ts), so pack and read cannot drift.
-    for (const k of table.kinds) {
-        lines.push(generateRecordReader(primitive(k.type)));
+    // structs/ctors (records.ts), so pack and read cannot drift. ONE reader per TYPE
+    // across both arms (a box may be an analytic AND an SDF record — same param layout).
+    const readerTypes = [...new Set([...table.kinds.map((k) => k.type), ...table.sdfKinds.map((k) => k.type)])];
+    for (const t of readerTypes) {
+        lines.push(generateRecordReader(primitive(t)));
     }
     lines.push('');
+
+    // ── Boxed-SDF leaf machinery (impl-plan-sdf-accel T3), per PRESENT SDF-arm type:
+    // the record-driven signed field (the region-keyed queries' target — prototyped in
+    // the SDF dispatch), its uv sibling, and the INTERVAL leaf marchers. The rigid tail
+    // (q_inv texel, (t_rigid, s) texel) sits texel-aligned after the params (records.ts
+    // sdfTailTexel — the ONE layout truth); conjugation is once per call/visit.
+    for (const k of table.sdfKinds) {
+        const d = primitive(k.type);
+        const sn = structName(d);
+        const tail = sdfTailTexel(d);
+        lines.push(`float sdf_leaf_field_${k.type}(vec3 p, uint rbase) {`);
+        lines.push(`    ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
+        lines.push(`    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
+        lines.push(`    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
+        lines.push(`    return ${k.type}_sdf(placement_rigid(rq, rts, p), shape);`);
+        lines.push('}');
+        if (chartUv && d.uvChart) {
+            lines.push(`vec2 uv_leaf_${k.type}(vec3 p, uint rbase) {`);
+            lines.push(`    ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
+            lines.push(`    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
+            lines.push(`    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
+            lines.push(`    return ${k.type}_uv(placement_rigid(rq, rts, p), shape);`);
+            lines.push('}');
+        }
+        // The per-type SELF-CONTAINED commit (the ONE-SHOT FIX, Aug 10 2026): the
+        // first build committed through raymarch_commit → scene_normal →
+        // scene_object_sdf — an O(N)-ARM dispatch inlined at every commit site inside
+        // every marcher: ~6·N·2·3 inlined ops that stalled shader compilers past
+        // ~50 objects (the sdf-field failure; SwiftShader AND Metal — backend-
+        // agnostic). The leaf KNOWS its type and record: the normal is six taps of
+        // ITS OWN field (O(1)), rotated to world ONCE by the record's quat; uv from
+        // its own chart. One helper, called at both acceptance sites, so the two
+        // paths cannot drift (the raymarch_commit lesson, kept — locally).
+        lines.push(`void march_commit_${k.type}(Ray ray, float t, ${sn} shape, vec3 lp, vec4 rq, int region, inout Hit hit) {`);
+        lines.push('    hit.t = t;');
+        lines.push('    hit.p = ambient_geodesic(ray.origin, ray.direction, t);');
+        lines.push('    vec2 e = vec2(NORMAL_EPSILON, 0.0);');
+        lines.push('    vec3 nl = normalize(vec3(');
+        lines.push(`        ${k.type}_sdf(lp + e.xyy, shape) - ${k.type}_sdf(lp - e.xyy, shape),`);
+        lines.push(`        ${k.type}_sdf(lp + e.yxy, shape) - ${k.type}_sdf(lp - e.yxy, shape),`);
+        lines.push(`        ${k.type}_sdf(lp + e.yyx, shape) - ${k.type}_sdf(lp - e.yyx, shape)));`);
+        lines.push('    hit.frame = ambient_frame(hit.p, placement_normal(rq, nl));');
+        lines.push('    hit.region_owner = region;');
+        lines.push('    hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)');
+        if (chartUv && d.uvChart) {
+            lines.push(`    hit.uv = ${k.type}_uv(lp, shape);   // the type's own LOCAL chart`);
+        } else {
+            lines.push('    hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);   // planar placeholder (world — matches the unrolled arm)');
+        }
+        lines.push('}');
+        // The interval leaf march (fable-sdf-accel §3): conjugate ONCE, march |sdf|
+        // within [lt0, lt1] dilated by march_epsilon(lt1) (surfaces may sit ON the
+        // conservative box wall); per-leaf exhaustion inside the interval = the
+        // grazing stall-commit, outside = miss-and-resume.
+        lines.push(`bool march_leaf_${k.type}(Ray ray, float lt0, float lt1, uint rbase, int region, inout Hit hit) {`);
+        lines.push(`    ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
+        lines.push(`    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
+        lines.push(`    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
+        lines.push('    vec3 ro = placement_rigid(rq, rts, ray.origin);');
+        lines.push('    vec3 rd = placement_dir(rq, ray.direction);');
+        lines.push('    float t = max(lt0, EPSILON);');
+        lines.push('    float t_stop = min(lt1 + march_epsilon(lt1), hit.t);');
+        lines.push('    float bound = 1e20;');
+        lines.push('    for (int i = 0; i < MAX_MARCH_STEPS; i++) {');
+        lines.push('        if (t > t_stop) return false;   // left the (dilated) interval or past the running nearest');
+        lines.push(`        bound = abs(${k.type}_sdf(ro + t * rd, shape));`);
+        lines.push('        if (bound < march_epsilon(t)) {');
+        lines.push(`            march_commit_${k.type}(ray, t, shape, ro + t * rd, rq, region, hit);`);
+        lines.push('            return true;');
+        lines.push('        }');
+        lines.push('        t += bound;');
+        lines.push('    }');
+        lines.push('    // Exhaustion still inside the interval: pinned at grazing — the stall-commit');
+        lines.push('    // (never fires merely at the box wall: it requires bound < 16ε of REAL surface).');
+        lines.push('    if (bound < 16.0 * march_epsilon(t) && t <= t_stop) {');
+        lines.push(`        march_commit_${k.type}(ray, t, shape, ro + t * rd, rq, region, hit);`);
+        lines.push('        return true;');
+        lines.push('    }');
+        lines.push('    return false;');
+        lines.push('}');
+        if (anyQuery) {
+            lines.push(`bool march_leaf_any_${k.type}(Ray ray, float lt0, float lt1, uint rbase, float maxDist) {`);
+            lines.push(`    ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
+            lines.push(`    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
+            lines.push(`    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
+            lines.push('    vec3 ro = placement_rigid(rq, rts, ray.origin);');
+            lines.push('    vec3 rd = placement_dir(rq, ray.direction);');
+            lines.push('    float t = max(lt0, EPSILON);');
+            lines.push('    float t_stop = min(lt1 + march_epsilon(lt1), maxDist);');
+            lines.push('    for (int i = 0; i < MAX_MARCH_STEPS; i++) {');
+            lines.push('        if (t > t_stop) return false;   // cleared the interval/light: unoccluded here');
+            lines.push(`        float bound = abs(${k.type}_sdf(ro + t * rd, shape));`);
+            lines.push('        if (bound < march_epsilon(t)) return true;');
+            lines.push('        t += bound;');
+            lines.push('    }');
+            lines.push('    return true;   // exhausted inside the interval: grazing — conservatively occluded');
+            lines.push('}');
+        }
+    }
+    if (table.sdfKinds.length > 0) lines.push('');
 
 
     const tabledMeshes = plan.meshes.filter((m) => table.tabledMeshOrdinals.includes(m.ordinal));
 
-    // Nearest-hit leaf: kind switch → analytic record / mesh wrapper / batch walk.
-    lines.push('bool scene_table_leaf(uint li, Ray ray, inout Hit hit) {');
+    // Nearest-hit leaf: kind switch → analytic record / mesh wrapper / batch walk /
+    // SDF interval march (lt0/lt1 = the node-box ray interval — leaf-size-1 TLAS, so
+    // the node box IS the object box; the non-SDF arms ignore it).
+    lines.push('bool scene_table_leaf(uint li, Ray ray, float lt0, float lt1, inout Hit hit) {');
     lines.push(`    vec4 L = texelFetch(u_data_records, data_texel1d(${S.leafListBase}u + li), 0);`);
     lines.push('    int lk = int(L.x); int ref = int(L.y);');
     lines.push('    bool found = false;');
@@ -1034,6 +1207,14 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
     for (const m of tabledMeshes) {
         lines.push(`        if (ref == ${m.ordinal}) { if (mesh_${ids.get(m.index)!}(ray, hit)) found = true; }`);
     }
+    if (table.sdfKinds.length > 0) {
+        lines.push(`    } else if (lk == ${LEAF_SDF}) {`);
+        lines.push(`        uint rbase = ${S.analyticBase}u + (${table.analyticCount}u + uint(ref)) * ${STRIDE}u;`);
+        lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+        for (const k of table.sdfKinds) {
+            lines.push(`        if (int(hdr.x) == ${k.code}) { if (march_leaf_${k.type}(ray, lt0, lt1, rbase, int(hdr.y), hit)) found = true; }`);
+        }
+    }
     lines.push('    } else {');
     for (const b of plan.instanceBatches) {
         lines.push(`        if (ref == ${b.ordinal}) { if (instance_${ids.get(b.index)!}(ray, hit)) found = true; }`);
@@ -1048,14 +1229,14 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
     lines.push('bool scene_table_intersect(Ray ray, inout Hit hit) {');
     lines.push('    bool found = false;');
     lines.push(...bvhWalkLines(S.tlasBase, 'hit.t', [
-        'for (int j = 0; j < cnt; j++) { if (scene_table_leaf(uint(off + j), ray, hit)) found = true; }',
-    ]));
+        'for (int j = 0; j < cnt; j++) { if (scene_table_leaf(uint(off + j), ray, lt0, lt1, hit)) found = true; }',
+    ], /*range*/ true));
     lines.push('    return found;');
     lines.push('}');
 
     if (anyQuery) {
         lines.push('');
-        lines.push('bool scene_table_leaf_any(uint li, Ray ray, float maxDist) {');
+        lines.push('bool scene_table_leaf_any(uint li, Ray ray, float lt0, float lt1, float maxDist) {');
         lines.push(`    vec4 L = texelFetch(u_data_records, data_texel1d(${S.leafListBase}u + li), 0);`);
         lines.push('    int lk = int(L.x); int ref = int(L.y);');
         lines.push(`    if (lk == ${LEAF_ANALYTIC}) {`);
@@ -1070,6 +1251,14 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         for (const m of tabledMeshes) {
             lines.push(`        if (ref == ${m.ordinal}) { if (mesh_any_${ids.get(m.index)!}(ray, maxDist)) return true; }`);
         }
+        if (table.sdfKinds.length > 0) {
+            lines.push(`    } else if (lk == ${LEAF_SDF}) {`);
+            lines.push(`        uint rbase = ${S.analyticBase}u + (${table.analyticCount}u + uint(ref)) * ${STRIDE}u;`);
+            lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+            for (const k of table.sdfKinds) {
+                lines.push(`        if (int(hdr.x) == ${k.code}) { if (march_leaf_any_${k.type}(ray, lt0, lt1, rbase, maxDist)) return true; }`);
+            }
+        }
         lines.push('    } else {');
         for (const b of plan.instanceBatches) {
             lines.push(`        if (ref == ${b.ordinal}) { if (instance_any_${ids.get(b.index)!}(ray, maxDist)) return true; }`);
@@ -1080,8 +1269,8 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         lines.push('');
         lines.push('bool scene_table_intersect_any(Ray ray, float maxDist) {');
         lines.push(...bvhWalkLines(S.tlasBase, 'maxDist', [
-            'for (int j = 0; j < cnt; j++) { if (scene_table_leaf_any(uint(off + j), ray, maxDist)) return true; }',
-        ]));
+            'for (int j = 0; j < cnt; j++) { if (scene_table_leaf_any(uint(off + j), ray, lt0, lt1, maxDist)) return true; }',
+        ], /*range*/ true));
         lines.push('    return false;');
         lines.push('}');
     }

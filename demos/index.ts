@@ -22,6 +22,7 @@ import {
 } from './demoScenes.js';
 import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js';
 import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
+import { sdfFieldScene, sdfFieldTableStrategy } from './sdfFieldScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
@@ -225,6 +226,19 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
         strategies: posed([0, 1, 4], [0, 1, 0], cornellOneshotStrategy),
         exercises: 'non-accumulating (oneshot) accumulation occupant — writes the current sample each frame, no history blend; reuses the average pipeline (never reads u_previous)',
         expected: 'a live, noisy image that does NOT converge (grain animates every frame); contrast the accumulating cornell card which cleans up over time',
+    },
+    'sdf-field': {
+        scene: sdfFieldScene,
+        strategies: posed([13, 7, 13], [0, 1.2, 0], sdfFieldTableStrategy),
+        exercises:
+            'the boxed-SDF architecture on its HOME TURF (fable-sdf-accel): 150 small well-separated rotated '
+            + 'SDF objects as LEAF_SDF leaves of the scene TLAS — a ray marches only the few fields whose boxes '
+            + 'it enters; empty space costs zero evaluations. TABLE-ONLY like grand-bazaar (an unrolled arm at '
+            + 'this count stalls compile at load — exactly the pain the table retires); the A/B vs the global '
+            + 'marcher lives on the 30-object sdf-table-twin witness.',
+        expected:
+            'a colorful spiral field of 150 boxes/cylinders/spheres over a gray floor, loading as fast as a '
+            + 'small scene and tracing interactively. If THIS card is slow, the leaf machinery itself is at fault.',
     },
     cylinders: {
         scene: cylinderScene,

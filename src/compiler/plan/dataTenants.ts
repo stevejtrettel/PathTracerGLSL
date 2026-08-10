@@ -19,7 +19,7 @@ import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { cwbvhNodeTexelBound } from '../../components/accel/cwbvh/cwbvh.js';
-import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH } from '../../components/intersection/index.js';
+import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH, LEAF_SDF } from '../../components/intersection/index.js';
 import type { DataTenants } from '../../components/data/ledger.js';
 
 /** Does material `name` read Hit.uv? — i.e. is it a PROCEDURAL material: the checker model
@@ -49,9 +49,10 @@ export function keepsLocalFrame(obj: PrimitiveObject, scene: SceneDescription): 
 
 /** One scene-TLAS leaf (canonical pre-TLAS order; the App reorders by the tree). */
 export interface SceneTableLeaf {
-    /** LEAF_ANALYTIC | LEAF_MESH | LEAF_BATCH. */
+    /** LEAF_ANALYTIC | LEAF_MESH | LEAF_BATCH | LEAF_SDF. */
     kind: number;
-    /** analytic → record slot; mesh → mesh ordinal; batch → batch ordinal. */
+    /** analytic → record slot; mesh → mesh ordinal; batch → batch ordinal;
+     *  sdf → index into table.sdf (record slot = analytic.length + ref). */
     ref: number;
 }
 
@@ -67,6 +68,14 @@ export interface SceneTable {
     solidCount: number;
     /** Primitive kind → the record header's kind code (registry order over present kinds). */
     kindCodes: Map<string, number>;
+    /** Boxed-SDF table objects (fable-sdf-accel T2), record slots AFTER the analytic
+     *  block in the same region (slot = analytic.length + i). Rotation is ALLOWED here
+     *  (the record's rigid tail carries it — unlike the analytic arm, whose folded
+     *  record cannot). */
+    sdf: Array<{ sceneIndex: number; type: string; solid: boolean }>;
+    /** Kind → header code for the SDF ARM, offset past the analytic codes (globally
+     *  unique headers; a box may be BOTH an analytic and an SDF record in one scene). */
+    sdfKindCodes: Map<string, number>;
 }
 
 export interface SceneDataTenants {
@@ -273,13 +282,39 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
     for (const t of Object.keys(PRIMITIVES)) {
         if (analytic.some((a) => a.type === t)) kindCodes.set(t, kindCodes.size);
     }
+    // ── Boxed-SDF leaves (fable-sdf-accel / impl-plan-sdf-accel T2): eligible =
+    // bounded, CONSTANT-placement, frame-free SDF-backend objects — ROTATION allowed
+    // (the record's §6.1 rigid tail carries it; the interval march conjugates once
+    // per leaf). Driven/unbounded/frame-retained stay in the residual global marcher
+    // (the analytic rule verbatim). Solids first, mirroring the analytic block.
+    const sdfEligible: Array<{ sceneIndex: number; type: string; solid: boolean }> = [];
+    scene.objects.forEach((o, i) => {
+        if (!isPrimitiveObject(o)) return;
+        if (isDrivenTransform(o.transform) || keepsLocalFrame(o, scene)) return;
+        if (resolveBackend(o.type, o.backend) !== 'sdf') return;
+        const d = PRIMITIVES[o.type];
+        if (d?.bounds === undefined) return;   // unbounded (plane) → residual
+        // The record budget: texel-padded params + derived + the 2-texel rigid tail
+        // must fit the shared stride (sdfRecordPack throws past it; degrade-to-residual
+        // here so an exotic pinned type renders through the global marcher instead of
+        // erroring). Mirrors sdfTailTexel's alignment.
+        const rowFloats = [...d.params, ...(d.derivedFields ?? [])].reduce((acc, r) => acc + (r.shape === 'vec3' ? 3 : 1), 0);
+        if (1 + Math.ceil(rowFloats / 4) + 2 > ANALYTIC_RECORD_TEXELS) return;
+        sdfEligible.push({ sceneIndex: i, type: o.type, solid: d.thin !== true });
+    });
+    const sdf = [...sdfEligible.filter((s) => s.solid), ...sdfEligible.filter((s) => !s.solid)];
+    const sdfKindCodes = new Map<string, number>();
+    for (const t of Object.keys(PRIMITIVES)) {
+        if (sdf.some((s) => s.type === t)) sdfKindCodes.set(t, kindCodes.size + sdfKindCodes.size);
+    }
     const leaves: SceneTableLeaf[] = [
         ...analytic.map((_, slot) => ({ kind: LEAF_ANALYTIC, ref: slot })),
         ...meshes.map((m, i) => ({ m, i })).filter(({ m }) => !isDrivenTransform(m.transform)).map(({ i }) => ({ kind: LEAF_MESH, ref: i })),
         ...batches.map((_, i) => ({ kind: LEAF_BATCH, ref: i })),
+        ...sdf.map((_, i) => ({ kind: LEAF_SDF, ref: i })),
     ];
     const table: SceneTable | null = leaves.length > 0
-        ? { leaves, analytic, solidCount: analytic.filter((a) => a.solid).length, kindCodes }
+        ? { leaves, analytic, solidCount: analytic.filter((a) => a.solid).length, kindCodes, sdf, sdfKindCodes }
         : null;
 
     // The light tree (fable-light-bvh §5/§7): leaves = the registry roster PLUS every
@@ -302,7 +337,9 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
         tenants: {
             meshes: geo, batches: batchTenants, meshLights,
             sceneTable: table !== null
-                ? { leafCount: table.leaves.length, analyticTexels: table.analytic.length * ANALYTIC_RECORD_TEXELS }
+                // analyticTexels covers BOTH record families since T2 — analytic AND
+                // boxed-SDF entries share the region and the 5-texel stride.
+                ? { leafCount: table.leaves.length, analyticTexels: (table.analytic.length + table.sdf.length) * ANALYTIC_RECORD_TEXELS }
                 : null,
             lightTree,
         },

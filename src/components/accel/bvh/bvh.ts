@@ -53,8 +53,10 @@ export const BVH_TFAR_PAD = 1.00000024;
  *  byte-identical copies, and one static sibling had already drifted). Lines are emitted at
  *  4-space function-body indent. `nodesBase` is the walk's baked node region base; `bound`
  *  is the pruning distance expression (`hit.t` nearest / `maxDist` any); `leafRange` lines
- *  land inside the leaf branch (relative indent 0) with `off`/`cnt` in scope. */
-export function bvhWalkLines(nodesBase: number, bound: string, leafRange: string[]): string[] {
+ *  land inside the leaf branch (relative indent 0) with `off`/`cnt` in scope. `range`
+ *  swaps the slab test for its entry/exit form, putting `lt0`/`lt1` (the node-box ray
+ *  interval) in leaf scope — the LEAF_SDF march consumes it (impl-plan-sdf-accel T3). */
+export function bvhWalkLines(nodesBase: number, bound: string, leafRange: string[], range = false): string[] {
     return [
         '    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it',
         '    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;',
@@ -62,7 +64,10 @@ export function bvhWalkLines(nodesBase: number, bound: string, leafRange: string
         '        int ni = stack[ptr]; ptr--;',
         `        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${nodesBase} + ni * 2)), 0);`,
         `        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${nodesBase} + ni * 2 + 1)), 0);`,
-        `        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, ${bound})) continue;`,
+        ...(range
+            ? ['        float lt0, lt1;',
+               `        if (!bvh_aabb_hit_range(n0.xyz, n1.xyz, ray.origin, inv, ${bound}, lt0, lt1)) continue;`]
+            : [`        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, ${bound})) continue;`]),
         '        if (n0.w >= 0.0) {',
         '            int off = int(n1.w), cnt = int(n0.w);',
         ...leafRange.map((l) => '            ' + l),
@@ -382,14 +387,14 @@ export { buildBVHCore };
 export type { BVHCoreOpts };
 
 /** Object-input adapter for callers holding AABB[] (App-side world boxes etc.). */
-export function buildBVHNodes(boxes: AABB[]): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
+export function buildBVHNodes(boxes: AABB[], leafSize: number = BVH_LEAF_SIZE): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
     const n = boxes.length;
     const flat = new Float64Array(6 * n);
     for (let t = 0; t < n; t++) {
         flat[6 * t] = boxes[t].min[0]; flat[6 * t + 1] = boxes[t].min[1]; flat[6 * t + 2] = boxes[t].min[2];
         flat[6 * t + 3] = boxes[t].max[0]; flat[6 * t + 4] = boxes[t].max[1]; flat[6 * t + 5] = boxes[t].max[2];
     }
-    return buildBVHNodesFlat(flat, n);
+    return buildBVHNodesFlat(flat, n, leafSize);
 }
 
 /** BLAS: a BVH over a triangle mesh. Computes per-triangle boxes (flat — no per-triangle

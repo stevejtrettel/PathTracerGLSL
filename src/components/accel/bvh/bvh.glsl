@@ -25,8 +25,6 @@
 // only: a spurious accept costs one extra leaf test; a spurious REJECT loses
 // geometry. BVH_TFAR_PAD is emitted from bvh.ts's const (one source — the cwbvh
 // walk's quantized slab test and the TS reference walk read the same number).
-// (No entry-distance out param until a walk consumes one — front-to-back leaf
-// ordering would reintroduce it; every current walk orders by axis sign alone.)
 bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
     vec3 t0 = (bmin - ro) * inv;
     vec3 t1 = (bmax - ro) * inv;
@@ -37,3 +35,19 @@ bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
     return tf >= tenter && tenter < tmax;
 }
 
+// The RANGE form — the entry/exit-distance consumer the bool form's old comment
+// reserved (impl-plan-sdf-accel T1): same slab arithmetic, same pad, plus the box
+// interval clamped to [0, ∞) at entry. The `LEAF_SDF` arm marches WITHIN
+// [enter, exit] (leaf-size-1 scene TLAS ⇒ the node box IS the object box —
+// fable-sdf-accel §2.1); `exit` carries the pad so the interval survives fp32
+// rounding exactly like the bool test's far plane.
+bool bvh_aabb_hit_range(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax, out float t_enter, out float t_exit) {
+    vec3 t0 = (bmin - ro) * inv;
+    vec3 t1 = (bmax - ro) * inv;
+    vec3 tsm = min(t0, t1), tbg = max(t0, t1);
+    float tn = max(max(tsm.x, tsm.y), tsm.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z) * BVH_TFAR_PAD;
+    t_enter = max(tn, 0.0);
+    t_exit = tf;
+    return tf >= t_enter && t_enter < tmax;
+}

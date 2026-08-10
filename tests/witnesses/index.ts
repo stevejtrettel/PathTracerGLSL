@@ -32,6 +32,7 @@ import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinear
 import { perfCloud, perfCloudFrame, perfCloudStrategy, perfCloudCwbvhStrategy, PERF_CLOUD_COUNT } from './scenes/perfCloud.js';
 import { accelTriple, accelTripleNeeStrategy, accelTripleMisStrategy, accelTriplePtStrategy } from './scenes/accelTriple.js';
 import { solidsAnalytic, solidsSdf, solidsStrategy, cubeCloud, cubeCloudRef, cubeCloudStrategy } from './scenes/solidsWitness.js';
+import { sdfTableTwin, sdfUnrolledStrategy, sdfTableStrategy, perfSdf0, perfSdf8, perfSdf32, perfSdf128, perfSdfCluster8, perfSdfCluster32, perfSdfCluster128, perfSdfBlob } from './scenes/sdfTableWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
@@ -619,6 +620,133 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         scene: minimalScene,
         strategies: posed([0, 1, 5], [0, 0, 0], minimalStrategy, directOnlyStrategy),
         exercises: 'constant environment; pathtracer vs direct-only strategy from one scene; twin partner of analytic-minimal',
+    },
+    'sdf-table-twin': {
+        scene: sdfTableTwin,
+        strategies: posed([-7.5, 1.1, -7.5], [0, 0.4, 0], sdfUnrolledStrategy, sdfTableStrategy),
+        exercises:
+            'boxed-SDF leaves (fable-sdf-accel): 30 rotated pinned-SDF objects + the grazing ground slab — '
+            + 'global min-march (key 1) vs per-leaf INTERVAL marching through the scene TLAS (key 2: LEAF_SDF '
+            + 'records with the rigid tail, node-box intervals, the §3 epsilon rule); containment via the SDF '
+            + 'record loop on the table arm',
+        expected:
+            'keys 1 and 2 identical (bias-free estimator swap; the low camera grazes the slab, so any '
+            + 'interval-end epsilon mistake shows as silhouette divergence)',
+        witness: {
+            spp: 96,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'table ≡ unrolled (identical stream, grazing stress)' },
+            ],
+        },
+    },
+    'perf-sdf-8': {
+        scene: perfSdf8,
+        strategies: posed([8, 5.5, 8], [0, 1.8, 0], sdfUnrolledStrategy, sdfTableStrategy),
+        exercises: 'the SDF crossover referee at N=8 (fable-sdf-accel §5): unrolled global march vs LEAF_SDF table — the design predicts unrolled WINS here',
+        expected: 'report-only ms/frame under --perf; compare rows across N for the crossover',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'N=8 unrolled ms/frame @512²' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'N=8 table ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-sdf-32': {
+        scene: perfSdf32,
+        strategies: posed([8, 5.5, 8], [0, 1.8, 0], sdfUnrolledStrategy, sdfTableStrategy),
+        exercises: 'the SDF crossover referee at N=32 — the design\'s predicted crossover zone',
+        expected: 'report-only ms/frame under --perf',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'N=32 unrolled ms/frame @512²' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'N=32 table ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-sdf-128': {
+        scene: perfSdf128,
+        strategies: posed([8, 5.5, 8], [0, 1.8, 0], sdfUnrolledStrategy, sdfTableStrategy),
+        exercises: 'the SDF crossover referee at N=128 — the table regime\'s home turf (empty space skipped analytically, per-step cost 1 field)',
+        expected: 'report-only ms/frame under --perf; table should win decisively',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'N=128 unrolled ms/frame @512²' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'N=128 table ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-sdf-0': {
+        scene: perfSdf0,
+        strategies: posed([8, 5.5, 8], [0, 1.8, 0], sdfTableStrategy),
+        exercises: 'the FLOOR row for the SDF ladders: identical film/camera/floor/light, zero SDF objects — subtract it from every other row to read SDF-attributable cost',
+        expected: 'report-only ms/frame under --perf',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'N=0 floor ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-sdf-cluster-8': {
+        scene: perfSdfCluster8,
+        strategies: posed([3.0, 2.4, 3.0], [0, 1.8, 0], sdfUnrolledStrategy, sdfTableStrategy),
+        exercises: 'the OVERLAP referee at N=8: the same shapes packed into one fixed ball, framed identically at every N — box overlap is the only variable across the cluster ladder',
+        expected: 'report-only ms/frame under --perf; read against perf-sdf-8 (same N, spread apart) to separate re-walking cost from empty-space savings',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'cluster N=8 unrolled ms/frame @512²' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'cluster N=8 table ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-sdf-cluster-32': {
+        scene: perfSdfCluster32,
+        strategies: posed([3.0, 2.4, 3.0], [0, 1.8, 0], sdfUnrolledStrategy, sdfTableStrategy),
+        exercises: 'the OVERLAP referee at N=32 — same ball, same framing, 4× the box-overlap depth',
+        expected: 'report-only ms/frame under --perf',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'cluster N=32 unrolled ms/frame @512²' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'cluster N=32 table ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-sdf-cluster-128': {
+        scene: perfSdfCluster128,
+        strategies: posed([3.0, 2.4, 3.0], [0, 1.8, 0], sdfUnrolledStrategy, sdfTableStrategy),
+        exercises: 'the OVERLAP referee at N=128 — the densest packing on the ladder (deep box overlap AND a heavy per-step ×N for the shared loop)',
+        expected: 'report-only ms/frame under --perf',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'cluster N=128 unrolled ms/frame @512²' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'cluster N=128 table ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-sdf-blob': {
+        scene: perfSdfBlob,
+        strategies: posed([1.55, 1.05, 1.55], [0, 1.0, 0], sdfUnrolledStrategy, sdfTableStrategy),
+        exercises:
+            'THE adversarial case for per-object marching (fable-sdf-accel, the Aug 10 architecture question): 6 mutually '
+            + 'interpenetrating shapes in one lump, camera close and level so the lump fills the frame at grazing incidence — '
+            + 'little empty space to skip, every ray re-walks the same stretch once per overlapping box, and N is small enough '
+            + 'that the global march\'s per-step ×6 is nearly free',
+        expected:
+            'report-only ms/frame under --perf. If the shared global marcher (key 1) wins anywhere it wins HERE; if the table arm '
+            + '(key 2) ties or wins, "an SDF is a shape with a slow intersect" carries no measurable penalty at its worst case',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'blob N=6 unrolled ms/frame @512²' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'blob N=6 table ms/frame @512²' },
+            ],
+        },
     },
     'solids-analytic': {
         scene: solidsAnalytic,

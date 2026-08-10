@@ -61616,8 +61616,6 @@ ivec2 data_texel1d(uint i) {
 // only: a spurious accept costs one extra leaf test; a spurious REJECT loses
 // geometry. BVH_TFAR_PAD is emitted from bvh.ts's const (one source — the cwbvh
 // walk's quantized slab test and the TS reference walk read the same number).
-// (No entry-distance out param until a walk consumes one — front-to-back leaf
-// ordering would reintroduce it; every current walk orders by axis sign alone.)
 bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
     vec3 t0 = (bmin - ro) * inv;
     vec3 t1 = (bmax - ro) * inv;
@@ -61628,6 +61626,22 @@ bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
     return tf >= tenter && tenter < tmax;
 }
 
+// The RANGE form — the entry/exit-distance consumer the bool form's old comment
+// reserved (impl-plan-sdf-accel T1): same slab arithmetic, same pad, plus the box
+// interval clamped to [0, ∞) at entry. The \`LEAF_SDF\` arm marches WITHIN
+// [enter, exit] (leaf-size-1 scene TLAS ⇒ the node box IS the object box —
+// fable-sdf-accel §2.1); \`exit\` carries the pad so the interval survives fp32
+// rounding exactly like the bool test's far plane.
+bool bvh_aabb_hit_range(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax, out float t_enter, out float t_exit) {
+    vec3 t0 = (bmin - ro) * inv;
+    vec3 t1 = (bmax - ro) * inv;
+    vec3 tsm = min(t0, t1), tbg = max(t0, t1);
+    float tn = max(max(tsm.x, tsm.y), tsm.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z) * BVH_TFAR_PAD;
+    t_enter = max(tn, 0.0);
+    t_exit = tf;
+    return tf >= t_enter && t_enter < tmax;
+}
 
 // Generated region -> material table (§2.3), across both backends
 int material_of(int region) {
@@ -62232,144 +62246,144 @@ void main() {
         "startLine": 443,
       },
       {
-        "endLine": 492,
+        "endLine": 506,
         "origin": "components/accel/bvh/bvh.glsl",
         "startLine": 453,
       },
       {
-        "endLine": 500,
+        "endLine": 514,
         "origin": "generated:material-of",
-        "startLine": 493,
+        "startLine": 507,
       },
       {
-        "endLine": 515,
+        "endLine": 529,
         "origin": "generated:scene-region-at",
-        "startLine": 501,
+        "startLine": 515,
       },
       {
-        "endLine": 539,
+        "endLine": 553,
         "origin": "generated:scene-intersect",
-        "startLine": 516,
+        "startLine": 530,
       },
       {
-        "endLine": 555,
+        "endLine": 569,
         "origin": "generated:material-lookup",
-        "startLine": 540,
-      },
-      {
-        "endLine": 593,
-        "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 556,
-      },
-      {
-        "endLine": 603,
-        "origin": "generated:interaction-dispatch",
-        "startLine": 594,
+        "startLine": 554,
       },
       {
         "endLine": 607,
-        "origin": "generated:nondelta-guard",
-        "startLine": 604,
+        "origin": "components/materials/lambert/lambert.glsl",
+        "startLine": 570,
       },
       {
-        "endLine": 611,
-        "origin": "generated:emissive-table",
+        "endLine": 617,
+        "origin": "generated:interaction-dispatch",
         "startLine": 608,
       },
       {
-        "endLine": 628,
+        "endLine": 621,
+        "origin": "generated:nondelta-guard",
+        "startLine": 618,
+      },
+      {
+        "endLine": 625,
+        "origin": "generated:emissive-table",
+        "startLine": 622,
+      },
+      {
+        "endLine": 642,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 612,
+        "startLine": 626,
       },
       {
-        "endLine": 633,
+        "endLine": 647,
         "origin": "generated:light-structs",
-        "startLine": 629,
+        "startLine": 643,
       },
       {
-        "endLine": 657,
+        "endLine": 671,
         "origin": "components/lights/point/point.glsl",
-        "startLine": 634,
+        "startLine": 648,
       },
       {
-        "endLine": 717,
+        "endLine": 731,
         "origin": "components/accel/light_tree/light_tree.glsl",
-        "startLine": 658,
+        "startLine": 672,
       },
       {
-        "endLine": 724,
+        "endLine": 738,
         "origin": "generated:light-table-loaders",
-        "startLine": 718,
+        "startLine": 732,
       },
       {
-        "endLine": 780,
+        "endLine": 794,
         "origin": "generated:light-tree-walks",
-        "startLine": 725,
+        "startLine": 739,
       },
       {
-        "endLine": 799,
+        "endLine": 813,
         "origin": "generated:light-sampling",
-        "startLine": 781,
+        "startLine": 795,
       },
       {
-        "endLine": 807,
+        "endLine": 821,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 800,
+        "startLine": 814,
       },
       {
-        "endLine": 826,
+        "endLine": 840,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 808,
+        "startLine": 822,
       },
       {
-        "endLine": 830,
+        "endLine": 844,
         "origin": "generated:environment",
-        "startLine": 827,
+        "startLine": 841,
       },
       {
-        "endLine": 837,
+        "endLine": 851,
         "origin": "generated:transport/light-query",
-        "startLine": 831,
+        "startLine": 845,
       },
       {
-        "endLine": 853,
+        "endLine": 867,
         "origin": "generated:transport/state",
-        "startLine": 838,
+        "startLine": 852,
       },
       {
-        "endLine": 863,
+        "endLine": 877,
         "origin": "generated:transport/combiner",
-        "startLine": 854,
+        "startLine": 868,
       },
       {
-        "endLine": 869,
+        "endLine": 883,
         "origin": "generated:transport/kernel-record",
-        "startLine": 864,
+        "startLine": 878,
       },
       {
-        "endLine": 904,
+        "endLine": 918,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 870,
+        "startLine": 884,
       },
       {
-        "endLine": 927,
+        "endLine": 941,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 905,
+        "startLine": 919,
       },
       {
-        "endLine": 945,
+        "endLine": 959,
         "origin": "generated:transport/walk",
-        "startLine": 928,
+        "startLine": 942,
       },
       {
-        "endLine": 946,
+        "endLine": 960,
         "origin": "generated:accumulation-inputs",
-        "startLine": 946,
+        "startLine": 960,
       },
       {
-        "endLine": 973,
+        "endLine": 987,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 947,
+        "startLine": 961,
       },
     ],
   },
