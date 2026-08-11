@@ -80,7 +80,8 @@ Each fact is genuinely underivable from an opaque field; each has a gate.
 | `params` rows + kinds | the moduli; kinds (`length`/`scalar`/…) drive scaling + folds | — (existing) | contract tests (existing) |
 | `marchBound` | a bounding PRIMITIVE as a function of the rows (`'self'` / `{type, values}` / `'unbounded'`) | required for marched shapes (existing) | **containment sampling**: the field twin's negative points must lie inside the declared bound; the synthetic must-fail arm stays |
 | `bounds()` AABB | world box for TLAS/instancing | **DERIVED from `marchBound`** for cross-type bounds — the bound primitive's own `bounds()` at the mapped values. Hand-written only in the self-bounded base case. Menger/apollonian restating their `marchBound` numbers verbatim, and bottle sharing them by hand, is exactly the drift hazard bottle.ts already names | derived-equals-current test at migration |
-| `lipschitz` | NEW. Default 1 (a true SDF). `> 1` declares a distance ESTIMATE; the generated loop steps `d / lipschitz` | 1 | sampled finite-difference gradient magnitude ≤ declared, on the twin |
+| `lipschitz` | ~~a global step divisor~~ **DELETED (Aug 11 hygiene, owner-ordered)**: zero occupants ever declared it — real fields bake their safety factor IN-FIELD, where it can depend on the parameters (the gyroid's `2.5k`), and the value/gradient authoring form needs no global divisor at all. `refine` (§4) is the estimate-quality fact that earned its place | — | — |
+| `refine` | hit-refinement conservatism factor (§4): worst-case ratio of true surface distance to the estimate near the surface. Declared ⇒ accepted hits are sign-bracketed to the true crossing; absent ⇒ no polish, no cost | none | the ring-banding class it exists for is eye-checked (the field-glass witness gates its estimator consequences) |
 | `thickness` | a ROW, applied IN the field (amended at build — see the header): the ε-shell of a measure-zero set is part of the shape's definition, and `<type>_sdf` is pinned to be the exact field of the object AS DECLARED, so the subtraction is shape math, not boilerplate. Apollonian is the standing instance | none | covered by the bound gate (the shell must stay inside the bound) |
 | `stepBudget` | NEW. Per-shape max march steps — a fractal wants 512, a torus wants 64. `MAX_MARCH_STEPS` becomes the default, not the law | global | perf witness rows |
 | `uvChart` | opt-in chart (existing) | off | existing |
@@ -103,8 +104,8 @@ resolves first, so it structurally cannot catch this).
 - Struct + ctor from rows (existing).
 - **`<type>_sdf_intersect` — generated** per present type: interval clamp, the
   interval-end epsilon dilation, the grazing stall-commit, `abs()` so one loop
-  marches interiors, `÷ lipschitz`, the shape's `stepBudget`. One emitter = the
-  single truth for every marching rule.
+  marches interiors, the shape's `stepBudget`. One emitter = the single truth for
+  every marching rule.
 - **`<type>_sdf_refine` — generated, NEED-DECLARED via the `refine` fact**
   (owner-ordered Aug 11 after the glass tangle's ring banding; scoped to a
   declaration the same day after an always-on version taxed the fractals for

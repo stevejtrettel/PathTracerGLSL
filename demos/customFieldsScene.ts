@@ -19,6 +19,7 @@
 
 import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 import { defineSDF } from '../src/components/geometry/custom.js';
+import { tangle } from '../tests/witnesses/scenes/customFieldWitness.js';
 
 const gyroid = defineSDF({
     name: 'gyroid',
@@ -59,48 +60,10 @@ float gyroid_sdf(vec3 p, Gyroid g) {
     stepBudget: 256,
 });
 
-const tangle = defineSDF({
-    name: 'tangle',
-    params: [
-        { name: 'size', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
-        // The quartic's constant c — the morph dial. 11.8 is the classic tangle cube.
-        { name: 'shape', kind: 'scalar', shape: 'number', required: false, default: 11.8 },
-    ],
-    // f = x⁴+y⁴+z⁴ − 5|q|² + shape, in q = p/size units — a SOLID: f < 0 is the
-    // tangle's arms, a genuine interior (this is what makes the glass real).
-    // Distance is the VALUE/GRADIENT estimate (the variety-system form — the old
-    // tracer's DE, gradient hand-derived here, autodiff's job when the port lands):
-    // d ≈ ½·f/|∇f| is first-order accurate near the surface, so the marching is
-    // fast and the accepted residual is only a few acceptance radii (`refine: 4`
-    // covers it — contrast the global-bound /130 divide this replaced, whose ~130×
-    // crushed residual caused the interior ring banding). The |∇f| floor keeps
-    // critical points (∇f → 0) from exploding the step. The Chebyshev clip
-    // (menger_cell_box's argument: it underestimates outside, which the sdf clauses
-    // allow) owns the bound, so `shape` can roam without the envelope moving.
-    glsl: `
-float tangle_sdf(vec3 p, Tangle t) {
-    vec3 q = p / t.size;
-    vec3 q2 = q * q;
-    float f = dot(q2, q2) - 5.0 * dot(q, q) + t.shape;
-    vec3 g = 4.0 * q2 * q - 10.0 * q;
-    float d = 0.5 * f / max(length(g), 4.0);
-    float clip = (max(abs(q.x), max(abs(q.y), abs(q.z))) - 2.3) * t.size;
-    return max(d * t.size, clip);
-}
-`,
-    field: (p, v) => {
-        const s = v.size as number;
-        const q = p.map((x) => x / s);
-        const f = q[0] ** 4 + q[1] ** 4 + q[2] ** 4
-            - 5 * (q[0] * q[0] + q[1] * q[1] + q[2] * q[2]) + (v.shape as number);
-        const g = Math.hypot(...q.map((x) => 4 * x * x * x - 10 * x));
-        const d = (0.5 * f) / Math.max(g, 4.0);
-        const clip = (Math.max(Math.abs(q[0]), Math.abs(q[1]), Math.abs(q[2])) - 2.3) * s;
-        return Math.max(d * s, clip);
-    },
-    marchBound: { type: 'box', values: (v) => ({ halfSize: [2.3 * (v.size as number), 2.3 * (v.size as number), 2.3 * (v.size as number)] }) },
-    refine: 4,
-});
+// The tangle — a quartic SOLID authored in the VALUE/GRADIENT form (the variety-port
+// shape) — is defined in the WITNESS fixture and imported above (demos may import
+// witness fixtures, never the reverse): one field, one truth, and its numeric gate
+// (field-glass: nee ≡ mis through the scene-local interfaces) rides the sweep.
 
 export const customFieldsScene: SceneDescription = {
     id: 'custom-fields',

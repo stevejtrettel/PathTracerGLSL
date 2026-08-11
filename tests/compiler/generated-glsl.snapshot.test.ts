@@ -15,6 +15,7 @@ import { marbleScene, marbleStrategy, marbleNoScatterStrategy, mistScene, mistSt
 import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellAreaMisStrategy, cornellAreaGlass, fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy, fogPanel, orbScene, orbNeeStrategy, orbPtStrategy } from '../witnesses/scenes/areaLightScenes.js';
 import { skyScene, skyPtStrategy, skyNeeStrategy, skyMisOctStrategy, furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, skyLampScene, skyLampMisStrategy, procSkyScene, procSkyNeeStrategy, procSkyMisCompStrategy } from '../witnesses/scenes/envScenes.js';
 import { cylinderScene, cylinderStrategy } from '../../demos/cylinderScene.js';
+import { sdfTableTwin, sdfTableStrategy } from '../witnesses/scenes/sdfTableWitness.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -71,6 +72,11 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     // Analytic backend: all-analytic (cross-method twin of minimal) + mixed SDF/analytic dispatch.
     ['analytic-minimal', analyticMinimal, analyticStrategy],
     ['mixed backends', mixedScene, analyticStrategy],
+    // TABLE dispatch (fable-object-tables + impl-plan-sdf-accel + impl-plan-region-
+    // materials): the scene-TLAS walk, LEAF_SDF interval marching + generated refine,
+    // AND the DATA-form material_of/ior_of (the rail fetch) — previously zero
+    // byte-level coverage of the table regime (hygiene batch, Aug 11).
+    ['sdf-table + table', sdfTableTwin, sdfTableStrategy],
     // Dielectric (impl-plan-dielectric): ior_of + dielectric dispatch + NEE guard + etaScale,
     // across the witnesses (η², innermost-wins) and both geometry backends.
     ['eta witness', etaScene, etaStrategy],

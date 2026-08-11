@@ -105,8 +105,8 @@ hand-writes marching code:
    marched type (`emitSdfIntersect`/`emitSdfNormal` in `index.ts` carry the rules —
    interval-end dilation, the grazing stall-commit, the `abs()` interior discipline);
    the contract test fails an occupant that hand-writes either. Per-shape declared
-   knobs: `stepBudget` (loop bound; default `MAX_MARCH_STEPS`) and `lipschitz`
-   (step divisor for estimate-valued fields; default 1).
+   knobs: `stepBudget` (loop bound; default `MAX_MARCH_STEPS`) and `refine` (hit
+   refinement for conservative estimates — fable-sdf-contract §4; absent = no cost).
 5. `marchBound` — `'self'`, `'unbounded'`, or a DIFFERENT primitive with its parameters
    derived from this shape's moduli. Never inferred: a marchable shape that declares
    nothing fails the contract test naming itself. A bound that is too loose only costs

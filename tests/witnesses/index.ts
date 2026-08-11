@@ -33,6 +33,7 @@ import { perfCloud, perfCloudFrame, perfCloudStrategy, perfCloudCwbvhStrategy, P
 import { accelTriple, accelTripleNeeStrategy, accelTripleMisStrategy, accelTriplePtStrategy } from './scenes/accelTriple.js';
 import { solidsAnalytic, solidsSdf, solidsStrategy, cubeCloud, cubeCloudRef, cubeCloudStrategy } from './scenes/solidsWitness.js';
 import { sdfTableTwin, sdfInstanceTwin, sdfInstanceTwinRef, sdfInstanceStrategy, sdfUnrolledStrategy, sdfTableStrategy, perfSdf0, perfSdf8, perfSdf32, perfSdf128, perfSdfCluster8, perfSdfCluster32, perfSdfCluster128, perfSdfBlob } from './scenes/sdfTableWitness.js';
+import { fieldGlass, fieldGlassNeeStrategy, fieldGlassMisStrategy, fieldGlassPtStrategy } from './scenes/customFieldWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
@@ -620,6 +621,26 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         scene: minimalScene,
         strategies: posed([0, 1, 5], [0, 0, 0], minimalStrategy, directOnlyStrategy),
         exercises: 'constant environment; pathtracer vs direct-only strategy from one scene; twin partner of analytic-minimal',
+    },
+    'field-glass': {
+        scene: fieldGlass,
+        strategies: posed([1.4, 1.5, 1.9], [0, 0.8, 0], fieldGlassNeeStrategy, fieldGlassMisStrategy, fieldGlassPtStrategy),
+        exercises:
+            'the scene-local field door (fable-sdf-contract §5.2) under the X-GLASS pattern: a defineSDF '
+            + 'quartic SOLID (value/gradient estimate + `refine: 4`) in real dielectric glass under a samplable '
+            + 'panel — delta bookkeeping through a scene-local field\'s interfaces, containment via its twin-'
+            + 'checked signed field, hit refinement\'s placement of the entry/exit interfaces',
+        expected:
+            'keys 1 (nee) and 2 (mis) converge to the same image; key 3 (pt) too, noisier — arm divergence '
+            + 'implicates interface placement/classification on the marched field (the ring-banding class)',
+        witness: {
+            spp: 256,
+            checks: [
+                // Pre-calibration estimates (X-GLASS values) — the first owner sweep calibrates.
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.03, label: 'field-glass nee ≡ mis' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.4, label: 'field-glass pt tripwire' },
+            ],
+        },
     },
     'sdf-table-twin': {
         scene: sdfTableTwin,

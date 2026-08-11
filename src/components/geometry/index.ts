@@ -182,8 +182,10 @@ export function emitSignedDistance(d: PrimitiveDescriptor, values: PrimitiveValu
  *
  * The rules (transcribed from the verified leaf marcher, fable-sdf-accel §3 —
  * formerly documented in sphere.glsl, now stated at their ONE author):
- *   · step by |sdf| (unsigned) so a ray INSIDE the shape marches to its exit;
- *   · a declared `lipschitz` L divides the step (the field may overestimate ×L);
+ *   · step by |sdf| (unsigned) so a ray INSIDE the shape marches to its exit —
+ *     the field must never OVERESTIMATE true distance (the sdf clauses; a field
+ *     built from a value/gradient estimate applies its own safety factor
+ *     in-field, where it can depend on the parameters);
  *   · accept when the field falls under march_epsilon(t), then REFINE (below);
  *   · the far end is dilated by march_epsilon(t1) — a surface may sit exactly ON
  *     the bound's wall, and a tight bound would otherwise clip silhouettes;
@@ -213,7 +215,6 @@ export function emitSignedDistance(d: PrimitiveDescriptor, values: PrimitiveValu
  */
 export function emitSdfIntersect(d: PrimitiveDescriptor): string {
     const steps = d.stepBudget !== undefined ? String(d.stepBudget) : 'MAX_MARCH_STEPS';
-    const div = d.lipschitz !== undefined && d.lipschitz !== 1 ? ` / ${formatFloat(d.lipschitz)}` : '';
     const f = (at: string) => `${d.type}_sdf(ray.origin + ${at} * ray.direction, s)`;
     const accept = d.refine !== undefined ? `{ t = ${d.type}_sdf_refine(ray, s, t); return true; }` : 'return true;';
     const stall = d.refine !== undefined
@@ -247,7 +248,7 @@ export function emitSdfIntersect(d: PrimitiveDescriptor): string {
         `    float bound = 1e20;`,
         `    for (int i = 0; i < ${steps}; i++) {`,
         `        if (t > t_stop) return false;`,
-        `        bound = abs(${f('t')})${div};`,
+        `        bound = abs(${f('t')});`,
         `        if (bound < march_epsilon(t)) ${accept}`,
         `        t += bound;`,
         `    }`,

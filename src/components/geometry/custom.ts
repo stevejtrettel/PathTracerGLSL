@@ -34,16 +34,20 @@ export interface SceneSDFSpec {
      *  plus optional file-private prefixed helpers. Marching/normal are GENERATED —
      *  defining them here is rejected. */
     glsl: string;
-    /** The CPU twin of the field — same math, same constants, same operator order. */
-    field(p: number[], values: PrimitiveValues): number;
+    /** The CPU twin of the field — same math, same constants, same operator order.
+     *  OPTIONAL (owner-decided Aug 11): WITH a twin, the Validator samples the
+     *  declared bound against it at compile time, per object, at the authored values
+     *  — a clipping bound is a compile error. WITHOUT one, the declared bound is
+     *  TRUSTED: a too-small bound silently chops geometry with no error anywhere,
+     *  which is exactly the failure the twin exists to catch. Omit for quick
+     *  experiments; add the twin when the shape starts to matter. */
+    field?(p: number[], values: PrimitiveValues): number;
     /** The declared bound (never inferred): a registry analytic primitive whose
      *  parameters derive from this field's values, or an explicit 'unbounded'.
      *  ('self' is meaningless here — a scene-local field has no analytic form.) */
     marchBound: 'unbounded' | { type: string; values(v: PrimitiveValues): PrimitiveValues };
     /** Per-shape march step budget (default: the global MAX_MARCH_STEPS). */
     stepBudget?: number;
-    /** Lipschitz factor for estimate-valued fields (default 1 — conservative). */
-    lipschitz?: number;
     /** Hit-refinement conservatism factor (fable-sdf-contract §4): declare the
      *  worst-case ratio of true surface distance to the field's estimate near the
      *  surface, and accepted hits get sign-bracketed to the true crossing. ABSENT =
@@ -126,10 +130,6 @@ export function defineSDF(spec: SceneSDFSpec): string {
             throw new Error(`defineSDF('${name}'): marchBound type '${mb.type}' must be a registry analytic bounding primitive (${Object.keys(BOUND_FIELDS).join(', ')})`);
         }
     }
-    if (typeof spec.field !== 'function') {
-        throw new Error(`defineSDF('${name}'): the TS field twin is required — it is what makes the declared bound CHECKED (the Validator samples it per authored object)`);
-    }
-
     registerLocal(spec, structName);
     return name;
 }
@@ -143,11 +143,10 @@ function registerLocal(spec: SceneSDFSpec, _structName: string): void {
         similarityClosed: false,
         marchBound: spec.marchBound,
         ...(spec.stepBudget !== undefined ? { stepBudget: spec.stepBudget } : {}),
-        ...(spec.lipschitz !== undefined ? { lipschitz: spec.lipschitz } : {}),
         ...(spec.refine !== undefined ? { refine: spec.refine } : {}),
         ...(spec.uvChart === true ? { uvChart: true } : {}),
         local: true,
-        fieldTwin: spec.field,
+        ...(spec.field !== undefined ? { fieldTwin: spec.field } : {}),
     };
     PRIMITIVES[spec.name] = d;
 }

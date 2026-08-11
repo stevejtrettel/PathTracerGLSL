@@ -526,12 +526,11 @@ function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, cha
         if (bound !== null) return [`if (${call} && t < ${far}) return true;`];
         return [
             `if (${call} && t < hit.t) {`,
-            `    hit.t = t; found = true;`,
-            `    hit.p = ambient_geodesic(ray.origin, ray.direction, t);`,
-            `    hit.frame = ambient_frame(hit.p, ${pl.nWorld(`${d.type}_sdf_normal(${lp}, ${ref})`)});`,
-            `    hit.region_owner = ${obj.index};`,
-            `    hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)`,
-            `    ${uvFill(d, lp, ref, chartUv)}`,
+            ...primitiveHitFill('    ', {
+                nWorld: pl.nWorld(`${d.type}_sdf_normal(${lp}, ${ref})`),
+                region: obj.index,
+                uv: uvFill(d, lp, ref, chartUv),
+            }),
             `}`,
         ];
     };
@@ -642,6 +641,34 @@ function uvFill(d: ReturnType<typeof primitive>, chartPoint: string, shapeRef: s
         : `hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);`;
 }
 
+/** THE primitive-object hit-fill (hygiene batch, audit D4: SEVEN independently-written
+ *  copies of this block, already drifted on `normalize` and on field order). One shape,
+ *  one order — t/found, p, frame, region_owner, element, uv — for every arm whose hit
+ *  is a primitive: unrolled (marched + analytic, folded + placed), instanced
+ *  (params + frame tiers), and both table leaves. Mesh arms stay their own (their
+ *  normal is barycentric-interpolated and their uv comes from the leaf walk).
+ *
+ *  The normalize rule, settled HERE once: `<type>_normal` and the generated
+ *  `<type>_sdf_normal` return UNIT vectors by contract, and every world map applied
+ *  to them is a rotation (a folded constant mat3 R, `placement_normal`'s quat
+ *  rotate) — length-preserving — so hit-fill NEVER re-normalizes. (The mesh arms DO:
+ *  interpolated normals are genuinely non-unit.) */
+function primitiveHitFill(indent: string, o: {
+    nWorld: string;
+    region: string | number;
+    element?: string;   // default '0' — instanced arms pass the leaf-order index
+    uv: string;
+}): string[] {
+    return [
+        'hit.t = t; found = true;',
+        'hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
+        `hit.frame = ambient_frame(hit.p, ${o.nWorld});`,
+        `hit.region_owner = ${o.region};`,
+        `hit.element = ${o.element ?? '0'};`,
+        o.uv,
+    ].map((l) => indent + l);
+}
+
 /** The rigid-frame ABI (§6.1) references for a placed analytic object — driven OR constant.
  *  Driven objects forward their two uniform names; a CONSTANT placement retained for a
  *  patterned shape (fable-imagery P1b) bakes the SAME `rigidInverse` payloads as compile-time
@@ -687,12 +714,11 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
         }
         lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters, 's')};`);
         lines.push(`        if (${d.type}_intersect(lray, shape, t) && t < hit.t) {`);
-        lines.push(`            hit.t = t; found = true;`);
-        lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
-        lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${q}, ${d.type}_normal(lray.origin + t * lray.direction, shape)));`);
-        lines.push(`            hit.region_owner = ${obj.index};`);
-        lines.push(`            hit.element = 0;`);
-        lines.push(`            ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`);
+        lines.push(...primitiveHitFill('            ', {
+            nWorld: `placement_normal(${q}, ${d.type}_normal(lray.origin + t * lray.direction, shape))`,
+            region: obj.index,
+            uv: uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv),
+        }));
         lines.push(`        }`);
         lines.push(`    }`);
         return lines;
@@ -708,12 +734,11 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
         lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters)};`);
     }
     lines.push(`        if (${d.type}_intersect(ray, ${shapeRef}, t) && t < hit.t) {`);
-    lines.push(`            hit.t = t; found = true;`);
-    lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
-    lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, ${shapeRef}));`);
-    lines.push(`            hit.region_owner = ${obj.index};`);
-    lines.push(`            hit.element = 0;`);
-    lines.push(`            ${uvFill(d, 'hit.p', shapeRef, chartUv)}`);
+    lines.push(...primitiveHitFill('            ', {
+        nWorld: `${d.type}_normal(hit.p, ${shapeRef})`,
+        region: obj.index,
+        uv: uvFill(d, 'hit.p', shapeRef, chartUv),
+    }));
     lines.push(`        }`);
     lines.push(`    }`);
     return lines;
@@ -919,12 +944,12 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
             `if (${b.prototype.shapeType}_intersect(ray, shape, t) && t < maxDist) return true;`];
         return [...read,
             `if (${b.prototype.shapeType}_intersect(ray, shape, t) && t < hit.t) {`,
-            '    hit.t = t; found = true;',
-            '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
-            '    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
-            `    hit.frame = ambient_frame(hit.p, normalize(${b.prototype.shapeType}_normal(hit.p, shape)));`,
-            `    hit.region_owner = ${b.index};`,
-            `    ${uvFill(d, 'hit.p', 'shape', chartUv)}`,
+            ...primitiveHitFill('    ', {
+                nWorld: `${b.prototype.shapeType}_normal(hit.p, shape)`,
+                region: b.index,
+                element: 'i',   // the leaf-order placement index (attribute rows read it)
+                uv: uvFill(d, 'hit.p', 'shape', chartUv),
+            }),
             '}'];
     }
     const read = [
@@ -978,12 +1003,12 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
         `if (${test('maxDist')} && t < maxDist) return true;`];
     return [...read, ...conj, ...boundOpen,
         `if (${test('hit.t')} && t < hit.t) {`,
-        '    hit.t = t; found = true;',
-        '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
-        '    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
-        `    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${normal})));`,
-        `    hit.region_owner = ${b.index};`,
-        `    ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`,
+        ...primitiveHitFill('    ', {
+            nWorld: `placement_normal(q, ${normal})`,
+            region: b.index,
+            element: 'i',   // the leaf-order placement index (attribute rows read it)
+            uv: uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv),
+        }),
         '}'];
 }
 
@@ -1195,12 +1220,11 @@ function sdfLeafArm(k: { type: string; code: number }, chartUv: boolean, bound: 
         lines.push(`            if (${call} && t < ${far}) return true;`);
     } else {
         lines.push(`            if (${call} && t < hit.t) {`);
-        lines.push('                hit.t = t; found = true;');
-        lines.push('                hit.p = ambient_geodesic(ray.origin, ray.direction, t);');
-        lines.push(`                hit.frame = ambient_frame(hit.p, placement_normal(rq, ${k.type}_sdf_normal(${lp}, shape)));`);
-        lines.push('                hit.region_owner = int(hdr.y);');
-        lines.push('                hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)');
-        lines.push(`                ${uvFill(d, lp, 'shape', chartUv)}`);
+        lines.push(...primitiveHitFill('                ', {
+            nWorld: `placement_normal(rq, ${k.type}_sdf_normal(${lp}, shape))`,
+            region: 'int(hdr.y)',
+            uv: uvFill(d, lp, 'shape', chartUv),
+        }));
         lines.push('            }');
     }
     lines.push('        }');
@@ -1265,12 +1289,11 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         lines.push(`        if (int(hdr.x) == ${k.code}) {`);
         lines.push(`            ${structName(d)} shape = ${k.type}_from_record(u_data_records, rbase);`);
         lines.push(`            if (${k.type}_intersect(ray, shape, t) && t < hit.t) {`);
-        lines.push('                hit.t = t; found = true;');
-        lines.push('                hit.p = ambient_geodesic(ray.origin, ray.direction, t);');
-        lines.push(`                hit.frame = ambient_frame(hit.p, ${k.type}_normal(hit.p, shape));`);
-        lines.push('                hit.region_owner = int(hdr.y);');
-        lines.push('                hit.element = 0;');
-        lines.push(`                ${uvFill(d, 'hit.p', 'shape', plan.program.materials.materialsReadUv)}`);
+        lines.push(...primitiveHitFill('                ', {
+            nWorld: `${k.type}_normal(hit.p, shape)`,
+            region: 'int(hdr.y)',
+            uv: uvFill(d, 'hit.p', 'shape', plan.program.materials.materialsReadUv),
+        }));
         lines.push('            }');
         lines.push('        }');
     }

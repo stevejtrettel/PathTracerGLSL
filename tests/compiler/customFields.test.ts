@@ -98,6 +98,16 @@ describe('defineSDF — definition-time gates', () => {
     });
 });
 
+describe('defineSDF — the twin is optional (owner-decided: omit = bound TRUSTED)', () => {
+    it('a twin-less definition registers and compiles; the bound gate is skipped', () => {
+        const spec = ballSpec('trusting', 0.9);   // a bound that WOULD clip — but no twin, no check
+        delete (spec as { field?: unknown }).field;
+        defineSDF(spec as never);
+        expect(PRIMITIVES.trusting?.fieldTwin).toBeUndefined();
+        expect(() => compiler.compile(sceneWith('trusting'), strategy)).not.toThrow();
+    });
+});
+
 describe('defineSDF — compile-time gates (the Validator samples the twin)', () => {
     it('an honest bound compiles clean, end to end', () => {
         defineSDF(ballSpec('honest'));

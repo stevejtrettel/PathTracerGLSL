@@ -405,13 +405,6 @@ export interface PrimitiveDescriptor {
      *  silently clips geometry — which is why the field-containment vitest samples each
      *  shape's field against its declared bound. */
     marchBound?: 'self' | 'unbounded' | { type: string; values(v: PrimitiveValues): PrimitiveValues };
-    /** Lipschitz factor of the field (fable-sdf-contract §3). ABSENT = 1: a true or
-     *  conservative signed distance (never overestimates), which every current
-     *  occupant is by construction. A field that can OVERESTIMATE true distance by up
-     *  to a factor L declares it here and the GENERATED march steps d/L — a
-     *  declaration, never a fork of the loop. The sampling gate for a first L>1
-     *  occupant lands with that occupant. */
-    lipschitz?: number;
     /** Per-shape march step budget (fable-sdf-contract §3): the loop bound of the
      *  GENERATED `<type>_sdf_intersect`. ABSENT = the global MAX_MARCH_STEPS
      *  (glsl/core/march.glsl). A fractal that needs more, or a cheap smooth shape

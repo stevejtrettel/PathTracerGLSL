@@ -41956,7 +41956,7 @@ bool primitive_intersect(Ray ray, inout Hit hit) {
             hit.p = ambient_geodesic(ray.origin, ray.direction, t);
             hit.frame = ambient_frame(hit.p, plane_sdf_normal(ray.origin + t * ray.direction, shape));
             hit.region_owner = 0;
-            hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)
+            hit.element = 0;
             hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);
         }
     }
@@ -41969,7 +41969,7 @@ bool primitive_intersect(Ray ray, inout Hit hit) {
                 hit.p = ambient_geodesic(ray.origin, ray.direction, t);
                 hit.frame = ambient_frame(hit.p, sphere_sdf_normal(ray.origin + t * ray.direction, shape));
                 hit.region_owner = 1;
-                hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)
+                hit.element = 0;
                 hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);
             }
         }
@@ -43357,7 +43357,7 @@ bool primitive_intersect(Ray ray, inout Hit hit) {
             hit.p = ambient_geodesic(ray.origin, ray.direction, t);
             hit.frame = ambient_frame(hit.p, plane_sdf_normal(ray.origin + t * ray.direction, shape));
             hit.region_owner = 0;
-            hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)
+            hit.element = 0;
             hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);
         }
     }
@@ -43370,7 +43370,7 @@ bool primitive_intersect(Ray ray, inout Hit hit) {
                 hit.p = ambient_geodesic(ray.origin, ray.direction, t);
                 hit.frame = ambient_frame(hit.p, sphere_sdf_normal(ray.origin + t * ray.direction, shape));
                 hit.region_owner = 1;
-                hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)
+                hit.element = 0;
                 hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);
             }
         }
@@ -53384,6 +53384,1864 @@ void main() {
 }
 `;
 
+exports[`generated GLSL snapshot (§2.10 refactor safety net) > sdf-table + table 1`] = `
+{
+  "exportTargets": {
+    "hdr": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
+    },
+    "ldr": {
+      "bufferId": "ldr",
+      "format": "byte",
+    },
+  },
+  "id": "table-sdf-table-twin",
+  "parameters": {
+    "camera.fov": {
+      "default": 0.95,
+      "group": "Camera",
+      "name": "FOV",
+      "triggersReset": true,
+      "type": "float",
+    },
+    "camera.position": {
+      "default": [
+        0,
+        0,
+        8,
+      ],
+      "group": "Camera",
+      "name": "Position",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "camera.target": {
+      "default": [
+        0,
+        0,
+        0,
+      ],
+      "group": "Camera",
+      "name": "Target",
+      "triggersReset": true,
+      "type": "vec3",
+    },
+    "env.intensity": {
+      "default": 1,
+      "group": "Environment",
+      "name": "Sky intensity",
+      "range": [
+        0,
+        5,
+      ],
+      "triggersReset": true,
+      "type": "float",
+    },
+  },
+  "pipeline": {
+    "framebuffers": [
+      {
+        "format": "rgba32f",
+        "id": "accumulation",
+        "type": "double_buffer",
+      },
+      {
+        "format": undefined,
+        "id": "screen",
+        "type": "screen",
+      },
+      {
+        "format": "rgba8",
+        "id": "ldr",
+        "type": "texture",
+      },
+    ],
+    "passes": [
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "pathtracer-pass",
+        "inputs": {
+          "textures": {
+            "u_data_nodes": "extern:data_nodes",
+            "u_data_records": "extern:data_records",
+            "u_previous": "accumulation_previous",
+          },
+        },
+        "output": "accumulation_current",
+        "shader": "table-sdf-table-twin-main",
+      },
+      {
+        "execution": {
+          "type": "once",
+        },
+        "id": "display-pass",
+        "inputs": {
+          "textures": {
+            "u_blueNoise": "extern:blue_noise",
+            "u_radiance": "accumulation_current",
+          },
+        },
+        "output": "screen",
+        "shader": "table-sdf-table-twin-display",
+      },
+    ],
+    "postFrame": {
+      "swaps": [
+        {
+          "buffers": [
+            "accumulation",
+          ],
+          "type": "swap",
+        },
+      ],
+    },
+  },
+  "shaders": {
+    "table-sdf-table-twin-display": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+uniform vec2 u_resolution;
+uniform sampler2D u_radiance;
+uniform sampler2D u_blueNoise;
+#define DISPLAY_EXPOSURE 1.0000000
+// display.glsl — shared display-pass math (compiler-owned, non-swappable).
+// safe_color (NaN/Inf + negative sanitize) and the sRGB OETF are FIXED math shared by
+// every tonemap occupant, so they live here, not re-pasted per occupant. A tonemap
+// occupant supplies ONLY its \`vec3 <id>_curve(vec3)\`; exposure, this math, and the
+// display main() are shared/generated glue (impl-plan-display Stage 2).
+
+vec3 safe_color(vec3 c) {
+    c = max(c, vec3(0.0));
+    bvec3 ok = lessThanEqual(abs(c), vec3(1e19));
+    if (!(ok.x && ok.y && ok.z)) return vec3(0.0);
+    return c;
+}
+
+vec3 linear_to_srgb(vec3 c) {
+    vec3 lo = 12.92 * c;
+    vec3 hi = 1.055 * pow(max(c, 0.0), vec3(1.0 / 2.4)) - 0.055;
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    return mix(hi, lo, vec3(cutoff));
+}
+
+// noise.glsl — shared noise primitive (compiler-owned, non-swappable).
+// Accessor for the global blue-noise tile bound as \`u_blueNoise\` (a 64x64 RGB8, REPEAT-
+// wrapped void-and-cluster tile — see tools/gen-bluenoise.mjs). Returns three INDEPENDENT
+// blue-noise values (one per color channel), each spectrally blue (energy at high
+// frequencies, a hole near DC) and mutually decorrelated, so RGB dither doesn't correlate
+// the channels' quantization error. Consumed by the display dither (view).
+
+vec3 blue_noise(vec2 fragCoord) {
+    return texture(u_blueNoise, fragCoord * (1.0 / 64.0)).rgb;   // 64 = BLUE_NOISE_SIZE (gen-bluenoise.mjs)
+}
+
+// tonemap 'reinhard' — the Reinhard operator x/(1+x), per channel.
+// HDR-linear → display-linear [0,1]. safe_color, the sRGB OETF (linear_to_srgb),
+// exposure, and the display main() are shared/generated glue — this occupant is the
+// tone curve only (impl-plan-display Stage 2).
+
+vec3 reinhard_curve(vec3 x) {
+    return x / (1.0 + x);
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    color = reinhard_curve(color);
+    color = clamp(linear_to_srgb(color), 0.0, 1.0);
+    color += (blue_noise(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);
+    fragColor = vec4(color, 1.0);
+}",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+    "table-sdf-table-twin-main": {
+      "fragment": "#version 300 es
+precision highp float;
+precision highp int;
+
+out vec4 fragColor;
+
+#define DATA_TEX_WIDTH 4096
+#define BVH_STACK_DEPTH 64
+#define BVH_TFAR_PAD 1.00000024
+// Uniforms
+uniform int u_resetSalt;
+uniform vec3 u_cameraPosition;
+uniform vec3 u_cameraForward;
+uniform vec3 u_cameraRight;
+uniform vec3 u_cameraUp;
+uniform vec2 u_imageSize;
+uniform float u_aspect;
+uniform float u_tanFov;
+uniform float u_envIntensity;
+uniform int u_sampleCount;
+uniform vec2 u_pixelOffset;
+uniform sampler2D u_data_nodes;
+uniform sampler2D u_data_records;
+// Core struct definitions
+// Provides: Ray, Hit, Frame, LightSample, MaterialProperties
+
+#define Point vec3
+#define Direction vec3
+#define Spectrum vec3
+#define Radiance vec3
+
+// A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
+// interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
+// occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
+//
+// The seed is where Category-B camera dimensions land when they arrive (camera/README.md):
+// shutter time (motion blur) and wavelength (spectral sensor) are seeded once at the sensor
+// and read by the whole path — they belong here as carried fields, NOT as generateRay args.
+// A time coordinate here also serves relativistic geodesics (Point may become vec4). Both
+// are prepared-for, not built.
+struct Ray {
+    Point origin;
+    Direction direction;
+};
+
+struct Frame {
+    Point p;
+    Direction t;
+    Direction b;
+    Direction n;
+};
+
+struct Hit {
+    float t;
+    Point p;
+    Frame frame;        // shading frame; n oriented toward region_from (§4.1)
+    int region_from;    // medium behind the boundary (-1 = ambient) — §4.2 classification
+    int region_to;      // medium ahead of the boundary — emission keys on this (§6.2)
+    int region_owner;   // whose surface this IS (§4.3) — material_of(region_owner) shades (§4.1)
+    vec2 uv;            // surface parameterization — PLACEHOLDER planar xz chart today (all
+                        // writers use UV_PLANAR_SCALE); no reader yet — the first consumer
+                        // will be a procedural material, which owns making this chart real.
+    int element;        // sub-element of the OWNING region that produced this hit (owner-
+                        // approved contract edit, fable-instance-attributes): the region says
+                        // WHOSE surface, element says WHICH PIECE of it. Instanced batch →
+                        // placement index; every other backend → 0 today. Future tenants:
+                        // per-triangle index (multi-material meshes), Stage B object refs.
+                        // Reader: scene_material_properties' attribute rows. Every arm that
+                        // fills a Hit fills this too (the fill-the-whole-Hit protocol).
+};
+
+// Placeholder planar-uv chart scale — the ONE truth for every Hit.uv writer (the SDF
+// marcher and the generated analytic arms) until a real per-primitive chart exists.
+#define UV_PLANAR_SCALE 0.1
+
+// Light flags (§6.1). LIGHT_DELTA: point/directional — not BSDF-hittable, excluded from BSDF-side MIS.
+const uint LIGHT_DELTA = 1u;
+
+// Light-selection query context (fable-light-bvh §3.2 v1.5 — pbrt's LightSampleContext
+// transcribed as DESIGN): everything selection may know about the query point. Pinned
+// fields; static technique files NEVER construct it directly — the generated
+// constructors (light_query_surface/light_query_medium) are the policy site, and the
+// MIS pmf replays the STORED query (PathState.prev_query), so sampler and pmf see
+// byte-identical context by construction. n = 0 means "no orientation information"
+// (medium events; future rough-transmissive receivers): selection falls back to the
+// normal-free importance. Future context (spectral, curved frames) extends THIS
+// struct + the constructors — the seams and techniques never churn again.
+struct LightQuery {
+    Point p;
+    Direction n;
+};
+
+struct LightSample {
+    Direction wi;         // toward the light, unit
+    float distance;       // to the sampled point (1e20 for directional/environment)
+    Spectrum radiance;    // incident radiance, WITHOUT visibility (delta lights fold 1/d² in)
+    float pdf;            // total: selection × per-light, in solid-angle measure
+    uint flags;
+    int light_id;
+};
+
+// MaterialProperties is GENERATED per scene (§3.4): the union of fields declared by
+// the models present (see generate/schema.ts) — emitted as the next block.
+
+// Generated MaterialProperties — the union of fields the models PRESENT read (§3.4)
+struct MaterialProperties {
+    Spectrum albedo;
+    Spectrum emission;
+};
+// interaction.glsl — the unified scattering-event contract (§3.1/§3.2).
+// One InteractionSample serves surface BSDFs and (later) medium phase functions.
+// Depends on: structs.glsl (Direction, Spectrum typedefs).
+
+// Lobe / event flags. A flag earns its place only if transport branches on it.
+const uint LOBE_REFLECTION   = 1u;   // wi on the same side of the surface as wo
+const uint LOBE_TRANSMISSION = 2u;   // wi on the far side (drives medium update + offset sign)
+const uint LOBE_DELTA        = 4u;   // pdf is a Dirac delta; the pdf field is 0
+const uint LOBE_MEDIUM       = 8u;   // phase-function event, no surface (transport skips the cosine)
+// dropped LOBE_NULL      -> compile-time is_null_interface(hit) predicate (arrives with media, §3.6)
+// deferred LOBE_GLOSSY/DIFFUSE -> add when path regularization/guiding has a reader
+
+struct InteractionSample {
+    Direction wi;       // sampled next direction, world space
+    Spectrum  weight;   // throughput factor: f·|cosθi|/pdf (surface); phase/pdf (medium)
+    float     pdf;      // solid-angle pdf of the non-delta part; 0.0 for delta lobes
+    uint      flags;
+};
+
+// RNG — counter-based pcg hash, dimension-indexed (contracts §2.11)
+// Provides: rng_init(), random(), random2()
+//
+// Counter-based (not stateful) so the sample stream is an addressable field,
+// keeping the §2.9 stratification/QMC door a drop-in: rng_dim is the dimension
+// index; a later QMC swap replaces pcg4d(base, dim) with sobol(sampleIndex, dim).
+
+uint rng_base;   // per (pixel, sample, reset) seed
+uint rng_dim;    // dimension / draw index
+
+// Jarzynski–Olano "Hash Functions for GPU Rendering" — pcg4d
+uvec4 pcg4d(uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    v ^= v >> 16u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    return v;
+}
+
+// Seed on two independent axes: sampleCount (within a converging render) and
+// resetSalt (bumped per accumulation reset — kills replay + frozen-motion noise).
+void rng_init(uvec2 pixel, uint sampleCount, uint resetSalt) {
+    rng_base = pcg4d(uvec4(pixel, sampleCount, resetSalt)).x;
+    rng_dim = 0u;
+}
+
+uint rng_u32() {
+    return pcg4d(uvec4(rng_base, rng_dim++, 0u, 0u)).x;
+}
+
+// Top 24 bits scaled by 2^-24: exactly representable, guaranteed in [0, 1).
+// (Dividing the full u32 by 2^32-1 rounds values near the top UP to >= 1.0,
+// which NaN-poisons sqrt(1-xi) in cosine sampling and overruns CDF selection.)
+float random() {
+    return float(rng_u32() >> 8) * (1.0 / 16777216.0);
+}
+
+vec2 random2() {
+    return vec2(random(), random());
+}
+
+// Math utilities
+// Provides: PI, TWO_PI, EPSILON, build_basis(), concentric_disk(), schlick_fresnel(),
+//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black(),
+//           spectrum_exp() (math_media.glsl when media exist)
+
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
+#define EPSILON 0.001
+#define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
+#define EPS_INTERFACE 0.001   // §4.2 classification probe depth — 10× MARCH_EPSILON so a probe
+                              // along the normal clears the marcher's stop-short residual
+
+// Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
+// literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
+// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
+// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
+// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
+const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
+const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
+float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
+float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
+bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
+// Declared-EUCLIDEAN sampler helper (light samplers, phase ONBs — sites carrying the
+// METRIC EXEMPTION). Deliberately distinct from ambient_frame(), the METRIC SEAM that
+// builds shading frames and gets swapped per space: any construction/pivot works here
+// because a sampler only needs SOME orthonormal completion, while ambient_frame's output
+// is contract surface (Frame) that curved-space occupants replace wholesale.
+void build_basis(vec3 n, out vec3 t, out vec3 b) {
+    vec3 up = abs(n.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    t = normalize(cross(up, n));
+    b = cross(n, t);
+}
+
+// Concentric (Shirley) map [0,1)² → unit disk — equal-area, low distortion (pbrt's
+// SampleUniformDiskConcentric). Shared by the thin-lens aperture and the disk light.
+vec2 concentric_disk(vec2 u) {
+    vec2 o = 2.0 * u - 1.0;                 // to [-1,1]²
+    if (o.x == 0.0 && o.y == 0.0) return vec2(0.0);
+    float r, theta;
+    if (abs(o.x) > abs(o.y)) { r = o.x; theta = (PI / 4.0) * (o.y / o.x); }
+    else                     { r = o.y; theta = PI / 2.0 - (PI / 4.0) * (o.x / o.y); }
+    return r * vec2(cos(theta), sin(theta));
+}
+
+// Schlick's Fresnel from normal-incidence reflectance — the house conductor vocabulary
+// (f0 row shared by ggx + mirror). cos_theta is the caller's |cos| against its own
+// half-vector/normal convention; must be in [0,1].
+Spectrum schlick_fresnel(Spectrum f0, float cos_theta) {
+    return f0 + (SPECTRUM_ONE - f0) * pow(1.0 - cos_theta, 5.0);
+}
+
+// sensor 'ideal' — the measurement functional's importance We ≡ 1.
+// We is the ADJOINT of a light's Le: it weights the measured radiance by the sensor's
+// response, so a pixel integrates ∫ h_j · We · L. v1 is the identity sensor (unit
+// response — no exposure, no vignetting, no spectral weighting), which is exactly what
+// makes this carve INERT: \`We·L == L\` bit-for-bit (×1.0 is exact), so witness numbers are
+// unchanged. Real sensors (physical exposure, cosⁿ / optical vignetting, CIE spectral
+// response once wavelengths are a seed field) are future occupants — and \`film\`/\`ray_dir\`
+// are already the arguments they need.
+// Provides: sensor_response(vec2 film, Direction ray_dir).
+
+Spectrum sensor_response(vec2 film, Direction ray_dir) {
+    return SPECTRUM_ONE;
+}
+
+// Euclidean Ambient Geometry
+// Flat-space geometric operations
+// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport()
+
+Point ambient_geodesic(Point origin, Direction dir, float t) {
+    return origin + dir * t;
+}
+
+// The METRIC-SEAM frame builder: curved-space occupants replace this wholesale, so its
+// construction is free to differ from core math's build_basis (the declared-Euclidean
+// sampler helper) — the two serve different contracts and need not agree.
+Frame ambient_frame(Point p, Direction n) {
+    Direction nn = normalize(n);
+    Direction t = abs(nn.x) < 0.9 ? Direction(1.0, 0.0, 0.0) : Direction(0.0, 1.0, 0.0);
+    t = normalize(t - dot(t, nn) * nn);
+    Direction b = cross(nn, t);
+    return Frame(p, t, b, nn);
+}
+
+float ambient_dot(Direction v1, Direction v2, Point p) {
+    return dot(v1, v2);
+}
+
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
+    return v;
+}
+
+// Ray construction — see docs/trace-loop-contract.md.
+// A Ray is a pure geodesic seed: origin + unit direction, no search interval. Self-intersection
+// escape is an ORIGIN OFFSET along the geodesic (ray_spawn), so a Ray's origin is already off the
+// surface. Search bounds live elsewhere: nearest-hit uses hit.t; occlusion passes a maxDist argument.
+// Provides: make_ray(), ray_spawn(). Depends on: Ray/Hit (structs), ambient_geodesic/ambient_dot.
+
+Ray make_ray(Point origin, Direction dir) {
+    Ray r;
+    r.origin    = origin;
+    r.direction = dir;
+    return r;
+}
+
+// Spawn a scattered/shadow ray from a hit: origin escaped to wi's SIDE of the surface along the
+// geodesic (robust at grazing, curved-correct). Transmission gets the far side for free.
+Ray ray_spawn(Hit hit, Direction wi) {
+    float side = ambient_dot(wi, hit.frame.n, hit.p) >= 0.0 ? 1.0 : -1.0;
+    return make_ray(ambient_geodesic(hit.p, hit.frame.n * side, EPSILON), wi);
+}
+
+// ── Interface header (generated): the seams this program links ──
+// intersection:
+bool scene_intersect(Ray ray, out Hit hit);
+int scene_region_at(vec3 p);
+int material_of(int region);
+bool scene_intersect_any(Ray ray, float maxDist);
+ivec2 data_texel1d(uint i);
+vec3 placement_rigid(vec4 q, vec4 ts, vec3 p);
+float placement_scale(vec4 ts);
+vec3 placement_dir(vec4 q, vec3 d);
+vec3 placement_normal(vec4 q, vec3 n);
+// materials:
+MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element);
+InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u);
+Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp);
+bool material_is_emissive(int mat);
+Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp);
+bool material_has_nondelta_lobes(int mat);
+// lighting:
+LightSample lighting_sample(LightQuery q, vec2 xi);
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);
+// pixel:
+vec2 pixel_sample(vec2 coord, vec2 xi);
+// camera:
+Ray camera_generateRay(vec2 film, vec2 xiLens);
+// environment:
+vec3 environment_radiance(vec3 dir);
+// transport:
+Radiance transport_trace(Ray ray);
+LightQuery light_query_surface(int mat, Hit hit);
+LightQuery light_query_medium(Point p);
+// core/placement.glsl — the driven-placement contract (fable-transforms §6.1).
+//
+// A live (uniform-driven) placement arrives as TWO vec4s, host-precomposed in fp64:
+//   q  = the INVERSE rotation quaternion (world→local)
+//   ts = (t_rigid.xyz, s) where t_rigid = −Rᵀ·t and s is the FORWARD scale
+//
+// The contract is four operations, never a matrix. The load-bearing subtlety: queries
+// run in the RIGID frame (rotation+translation only — an isometry of world space), and
+// the similarity-closed primitive PARAMETERS absorb s in-shader (s·center, s·radius,
+// s·halfSize, s·offset). Consequences, all exact:
+//   - distances and ray-t are WORLD values (no rescaling, no reciprocal anywhere);
+//   - every EPSILON guard inside the primitives stays world-correct under driven scale;
+//   - SDF marching sees an exact world-distance field.
+// Directions stay unit through placement_dir, so intersector assumptions hold; normals
+// return via the free forward rotation (quaternion conjugation is a sign flip).
+// Included only when the program has driven placements (exact linkage).
+
+// Rotate v by unit quaternion q: v + 2·q.xyz × (q.xyz × v + q.w·v).
+vec3 placement_qrot(vec4 q, vec3 v) {
+    return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+}
+
+// World → the placement's RIGID frame (isometric to world; scale stays on params).
+vec3 placement_rigid(vec4 q, vec4 ts, vec3 p) {
+    return placement_qrot(q, p) + ts.xyz;
+}
+
+// World → rigid-frame direction. Pure rotation: unit in, unit out.
+vec3 placement_dir(vec4 q, vec3 d) {
+    return placement_qrot(q, d);
+}
+
+// Rigid-frame normal → world (the forward rotation; conjugation is free).
+vec3 placement_normal(vec4 q, vec3 n) {
+    return placement_qrot(vec4(-q.xyz, q.w), n);
+}
+
+// The forward scale s — multiplies similarity-closed primitive parameters in-shader.
+float placement_scale(vec4 ts) {
+    return ts.w;
+}
+
+// Marching tolerances — the shared vocabulary of the GENERATED marching boilerplate
+// (fable-sdf-contract §4: \`<type>_sdf_intersect\`/\`<type>_sdf_normal\` are emitted per
+// marched type by geometry/index.ts, and are the only consumers). Included exactly
+// when a program marches something. These are numeric knobs, not structural gates:
+// the compiler never overrides them; MAX_MARCH_STEPS is the DEFAULT step budget a
+// descriptor \`stepBudget\` overrides per shape.
+//
+// Lives in core/ beside EPSILON/EPS_INTERFACE because it is the same family of fact:
+// EPS_INTERFACE's "10× MARCH_EPSILON" comment in math.glsl has always referred to this
+// number, and the two must be read together.
+
+#define MAX_MARCH_STEPS 512
+#define MARCH_EPSILON 0.0001
+#define NORMAL_EPSILON 0.001
+
+// Acceptance threshold grows with travel distance (pixel-footprint scaling: a fixed 1e-4 at
+// t = 40 resolves geometry far below one pixel and just burns steps) but stays CAPPED at half
+// of EPS_INTERFACE, so the §4.2 classification probes always clear the accepted residual.
+#define MARCH_EPSILON_MAX 0.0005
+float march_epsilon(float t) { return min(MARCH_EPSILON_MAX, MARCH_EPSILON * (1.0 + t)); }
+
+// Generated primitive structs (rows are the single source — A1)
+struct Sphere {
+    Point center;
+    float radius;
+};
+struct Box {
+    Point center;
+    vec3 halfSize;
+};
+struct Cylinder {
+    Point center;
+    float radius;
+    float halfHeight;
+};
+// Sphere — one primitive, both backends' math (included wholesale when present, §2.12).
+// The struct is the shape's record (house convention — MaterialProperties/MediumProperties
+// pattern); call sites construct it from compile-time literals (constant placement) or
+// s-scaled expressions (driven rigid frame, fable-transforms §6.1).
+// Provides (struct GENERATED from descriptor rows — A1): sphere_sdf() (signed distance — also the analytic backend's
+// containment query), sphere_intersect() (closed-form intersection), sphere_normal().
+
+float sphere_sdf(vec3 p, Sphere sp) {
+    return length(p - sp.center) - sp.radius;
+}
+
+// Nearest intersection ahead of the ray (t > EPSILON). direction is unit → a = 1.
+// The FAR bound is the caller's job (t < hit.t for nearest-hit, t < maxDist for occlusion).
+bool sphere_intersect(Ray ray, Sphere sp, out float t) {
+    vec3 oc = ray.origin - sp.center;
+    float b = dot(oc, ray.direction);
+    float c = dot(oc, oc) - sp.radius * sp.radius;
+    float disc = b * b - c;
+    if (disc < 0.0) return false;
+    float s = sqrt(disc);
+    // Root selection by the INSIDE test (c < 0), never by a t-threshold: an outside origin
+    // within EPSILON of the surface must NOT fall through to the far root — that skips the
+    // entry interface and fakes an exit from a region the ray never entered (review finding).
+    // Outside origins whose near root is ≤ EPSILON now miss (hairline, energy-bounded).
+    t = (c < 0.0) ? (-b + s) : (-b - s);
+    return (t > EPSILON);
+}
+
+// Outward surface normal at p (a point on/near the surface).
+vec3 sphere_normal(vec3 p, Sphere sp) {
+    return normalize(p - sp.center);
+}
+
+// The INTERVAL form (impl-plan-sdf-as-shape T2) — entry and exit, not the nearest
+// root: this is what a shape declaring \`marchBound\` hands its marched intersect, and
+// what a shape bounded BY a sphere gets. Entry is clamped to 0 (an origin inside the
+// sphere enters at once); false = the ray misses entirely. Deliberately a sibling of
+// sphere_intersect rather than a rewrite of it — the closed-form arm's root-selection
+// discipline must not move.
+bool sphere_interval(Ray ray, Sphere sp, out float t0, out float t1) {
+    vec3 oc = ray.origin - sp.center;
+    float b = dot(oc, ray.direction);
+    float c = dot(oc, oc) - sp.radius * sp.radius;
+    float disc = b * b - c;
+    if (disc < 0.0) return false;
+    float s = sqrt(disc);
+    t1 = -b + s;
+    if (t1 <= EPSILON) return false;   // the whole sphere is behind the ray
+    t0 = max(-b - s, 0.0);
+    return true;
+}
+
+// Marching (\`sphere_sdf_intersect\`) and the gradient normal (\`sphere_sdf_normal\`)
+// are GENERATED from sphere_sdf when a program marches this shape — fable-sdf-contract
+// §4 (emitSdfIntersect/emitSdfNormal in geometry/index.ts carry the rules).
+
+// Surface parameterization — the (θ,φ) equirectangular chart from the outward direction.
+// u = longitude ∈ [0,1), v = latitude (v=0 at the +y pole). AXIS-ALIGNED (fable-imagery P1
+// §7.2 v1): the analytic fold dissolves a sphere's rotation (a sphere IS rotation-invariant),
+// so this chart has no authored orientation to inherit — a chart-frame carry is the deferred fix.
+vec2 sphere_uv(vec3 p, Sphere sp) {
+    vec3 d = normalize(p - sp.center);
+    float u = atan(d.z, d.x) / TWO_PI + 0.5;
+    float v = acos(clamp(d.y, -1.0, 1.0)) / PI;
+    return vec2(u, v);
+}
+
+// Box (axis-aligned canonical form — rotation comes from placement: the rigid-residual
+// arm for constant rotations, the frame tier for instanced placements). Both backends'
+// math in one wholesale file (§2.12); placement-fold stage 4 added the analytic pair.
+// Provides (struct GENERATED from descriptor rows — A1): box_sdf() (also the analytic
+// backend's containment query), box_intersect(), box_normal().
+
+float box_sdf(vec3 p, Box b) {
+    vec3 d = abs(p - b.center) - b.halfSize;
+    return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+// Nearest intersection ahead of the ray (t > EPSILON) — the slab method. direction is
+// unit; a zero component gives ±inf slab times that min/max resolve (the bvh_aabb_hit
+// convention). The FAR bound is the caller's job (t < hit.t / t < maxDist).
+// Root selection by the INSIDE test (tn < 0 ⇔ origin inside the box), never by a
+// t-threshold: an outside origin within EPSILON of a face must NOT fall through to the
+// exit face — that skips the entry interface and fakes an exit from a region the ray
+// never entered (the sphere_intersect review finding, transcribed).
+bool box_intersect(Ray ray, Box b, out float t) {
+    vec3 inv = 1.0 / ray.direction;
+    vec3 t0 = (b.center - b.halfSize - ray.origin) * inv;
+    vec3 t1 = (b.center + b.halfSize - ray.origin) * inv;
+    vec3 tsm = min(t0, t1), tbg = max(t0, t1);
+    float tn = max(max(tsm.x, tsm.y), tsm.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z);
+    if (tf < tn) return false;
+    t = (tn < 0.0) ? tf : tn;
+    return t > EPSILON;
+}
+
+// Outward surface normal at p (a point on/near the surface): the dominant axis of the
+// unit-cube map — exact on faces, the nearer face at edges/corners.
+vec3 box_normal(vec3 p, Box b) {
+    vec3 q = (p - b.center) / b.halfSize;
+    vec3 a = abs(q);
+    if (a.x >= a.y && a.x >= a.z) return vec3(sign(q.x), 0.0, 0.0);
+    if (a.y >= a.z) return vec3(0.0, sign(q.y), 0.0);
+    return vec3(0.0, 0.0, sign(q.z));
+}
+
+// The INTERVAL form (impl-plan-sdf-as-shape T2) — entry/exit of the slab intersection,
+// the shape a marched arm consumes. Entry clamped to 0; sibling of box_intersect, which
+// stays untouched.
+bool box_interval(Ray ray, Box b, out float t0, out float t1) {
+    vec3 inv = 1.0 / ray.direction;
+    vec3 ta = (b.center - b.halfSize - ray.origin) * inv;
+    vec3 tb = (b.center + b.halfSize - ray.origin) * inv;
+    vec3 tsm = min(ta, tb), tbg = max(ta, tb);
+    float tn = max(max(tsm.x, tsm.y), tsm.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z);
+    if (tf < tn || tf <= EPSILON) return false;
+    t0 = max(tn, 0.0);
+    t1 = tf;
+    return true;
+}
+
+// Marching (\`box_sdf_intersect\`) and the gradient normal (\`box_sdf_normal\`) are
+// GENERATED from box_sdf when a program marches this shape — fable-sdf-contract §4.
+
+// Cylinder (finite, capped, canonical Y-axis — orientation is PLACEMENT, not shape:
+// a tilted cylinder is transform.rotation through the rigid-residual/frame arms,
+// exactly like box). Both backends' math in one wholesale file (§2.12);
+// placement-fold stage 4 added the analytic pair.
+// Provides (struct GENERATED from descriptor rows — A1): cylinder_sdf() (also the
+// analytic backend's containment query), cylinder_intersect(), cylinder_normal().
+
+// Exact signed distance to the capped cylinder (not a bound): correct sign, never
+// overestimates, exact near the surface — full quality for marching, containment,
+// and gradient normals alike.
+float cylinder_sdf(vec3 p, Cylinder c) {
+    vec3 q = p - c.center;
+    vec2 d = vec2(length(q.xz) - c.radius, abs(q.y) - c.halfHeight);
+    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+
+// Nearest intersection ahead of the ray (t > EPSILON): the capped cylinder as the
+// INTERVAL intersection of the axis slab and the infinite tube — caps and side fall
+// out of one [tn, tf] pair, no per-face candidate juggling. Root selection by the
+// INSIDE test (tn < 0 ⇔ origin inside), the sphere_intersect discipline.
+bool cylinder_intersect(Ray ray, Cylinder c, out float t) {
+    vec3 q = ray.origin - c.center;
+    vec3 d = ray.direction;
+    float tn, tf;
+    if (abs(d.y) > 1e-12) {
+        float ta = (-c.halfHeight - q.y) / d.y;
+        float tb = ( c.halfHeight - q.y) / d.y;
+        tn = min(ta, tb); tf = max(ta, tb);
+    } else {
+        if (abs(q.y) > c.halfHeight) return false;   // axis-normal ray outside the slab
+        tn = -1.0e30; tf = 1.0e30;
+    }
+    float a  = d.x * d.x + d.z * d.z;
+    float bq = q.x * d.x + q.z * d.z;
+    float cc = q.x * q.x + q.z * q.z - c.radius * c.radius;
+    if (a > 1e-12) {
+        float disc = bq * bq - a * cc;
+        if (disc < 0.0) return false;
+        float s = sqrt(disc);
+        tn = max(tn, (-bq - s) / a);
+        tf = min(tf, (-bq + s) / a);
+        if (tf < tn) return false;
+    } else if (cc > 0.0) {
+        return false;   // axis-parallel ray outside the tube
+    }
+    t = (tn < 0.0) ? tf : tn;
+    return t > EPSILON;
+}
+
+// Outward surface normal at p (a point on/near the surface): the smaller surface
+// residual picks the face — exact on caps and side, the nearer face at the rim.
+vec3 cylinder_normal(vec3 p, Cylinder c) {
+    vec3 q = p - c.center;
+    float dy = c.halfHeight - abs(q.y);
+    float dr = c.radius - length(q.xz);
+    if (dy < dr) return vec3(0.0, sign(q.y), 0.0);
+    return normalize(vec3(q.x, 0.0, q.z));
+}
+
+// The INTERVAL form (impl-plan-sdf-as-shape T2) — the slab ∩ tube interval that
+// cylinder_intersect already computes internally, exposed as entry/exit for a marched
+// arm. Entry clamped to 0; cylinder_intersect stays untouched.
+bool cylinder_interval(Ray ray, Cylinder c, out float t0, out float t1) {
+    vec3 q = ray.origin - c.center;
+    vec3 d = ray.direction;
+    float tn, tf;
+    if (abs(d.y) > 1e-12) {
+        float ta = (-c.halfHeight - q.y) / d.y;
+        float tb = ( c.halfHeight - q.y) / d.y;
+        tn = min(ta, tb); tf = max(ta, tb);
+    } else {
+        if (abs(q.y) > c.halfHeight) return false;
+        tn = -1.0e30; tf = 1.0e30;
+    }
+    float a  = d.x * d.x + d.z * d.z;
+    float bq = q.x * d.x + q.z * d.z;
+    float cc = q.x * q.x + q.z * q.z - c.radius * c.radius;
+    if (a > 1e-12) {
+        float disc = bq * bq - a * cc;
+        if (disc < 0.0) return false;
+        float s = sqrt(disc);
+        tn = max(tn, (-bq - s) / a);
+        tf = min(tf, (-bq + s) / a);
+    } else if (cc > 0.0) {
+        return false;
+    }
+    if (tf < tn || tf <= EPSILON) return false;
+    t0 = max(tn, 0.0);
+    t1 = tf;
+    return true;
+}
+
+// Marching (\`cylinder_sdf_intersect\`) and the gradient normal (\`cylinder_sdf_normal\`)
+// are GENERATED from cylinder_sdf when a program marches this shape — fable-sdf-contract §4.
+
+// Generated marching intersects + gradient normals (fable-sdf-contract §4)
+bool sphere_sdf_intersect(Ray ray, Sphere s, float t0, float t1, out float t) {
+    t = max(t0, EPSILON);
+    float t_stop = t1 + march_epsilon(t1);
+    float bound = 1e20;
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        if (t > t_stop) return false;
+        bound = abs(sphere_sdf(ray.origin + t * ray.direction, s));
+        if (bound < march_epsilon(t)) return true;
+        t += bound;
+    }
+    return bound < 16.0 * march_epsilon(t) && t <= t_stop;
+}
+vec3 sphere_sdf_normal(vec3 p, Sphere s) {
+    vec2 k = vec2(0.5773, -0.5773);
+    return normalize(k.xyy * sphere_sdf(p + k.xyy * NORMAL_EPSILON, s)
+                   + k.yyx * sphere_sdf(p + k.yyx * NORMAL_EPSILON, s)
+                   + k.yxy * sphere_sdf(p + k.yxy * NORMAL_EPSILON, s)
+                   + k.xxx * sphere_sdf(p + k.xxx * NORMAL_EPSILON, s));
+}
+bool box_sdf_intersect(Ray ray, Box s, float t0, float t1, out float t) {
+    t = max(t0, EPSILON);
+    float t_stop = t1 + march_epsilon(t1);
+    float bound = 1e20;
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        if (t > t_stop) return false;
+        bound = abs(box_sdf(ray.origin + t * ray.direction, s));
+        if (bound < march_epsilon(t)) return true;
+        t += bound;
+    }
+    return bound < 16.0 * march_epsilon(t) && t <= t_stop;
+}
+vec3 box_sdf_normal(vec3 p, Box s) {
+    vec2 k = vec2(0.5773, -0.5773);
+    return normalize(k.xyy * box_sdf(p + k.xyy * NORMAL_EPSILON, s)
+                   + k.yyx * box_sdf(p + k.yyx * NORMAL_EPSILON, s)
+                   + k.yxy * box_sdf(p + k.yxy * NORMAL_EPSILON, s)
+                   + k.xxx * box_sdf(p + k.xxx * NORMAL_EPSILON, s));
+}
+bool cylinder_sdf_intersect(Ray ray, Cylinder s, float t0, float t1, out float t) {
+    t = max(t0, EPSILON);
+    float t_stop = t1 + march_epsilon(t1);
+    float bound = 1e20;
+    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
+        if (t > t_stop) return false;
+        bound = abs(cylinder_sdf(ray.origin + t * ray.direction, s));
+        if (bound < march_epsilon(t)) return true;
+        t += bound;
+    }
+    return bound < 16.0 * march_epsilon(t) && t <= t_stop;
+}
+vec3 cylinder_sdf_normal(vec3 p, Cylinder s) {
+    vec2 k = vec2(0.5773, -0.5773);
+    return normalize(k.xyy * cylinder_sdf(p + k.xyy * NORMAL_EPSILON, s)
+                   + k.yyx * cylinder_sdf(p + k.yyx * NORMAL_EPSILON, s)
+                   + k.yxy * cylinder_sdf(p + k.yxy * NORMAL_EPSILON, s)
+                   + k.xxx * cylinder_sdf(p + k.xxx * NORMAL_EPSILON, s));
+}
+// Generated named shapes (authored names, constant placement — compile-time data)
+const Box shape_ground_slab = Box(vec3(0.0, -0.15, 0.0), vec3(9.0, 0.15, 9.0));
+// Generated per-object signed fields (containment targets — impl-plan-sdf-as-shape T5)
+float sdf_leaf_field_box(vec3 p, uint rbase);
+float sdf_leaf_field_cylinder(vec3 p, uint rbase);
+float sdf_leaf_field_sphere(vec3 p, uint rbase);
+
+// glsl/core/data_texture.glsl — data-texture addressing (the rail's GLSL half).
+// Included whenever a program reads data textures (mesh geometry, instance placements,
+// BVH nodes). DATA_TEX_WIDTH is emitted by the compiler from components/data_textures.ts
+// — the ONE width both the app's packers and this addressing share.
+
+// Linear texel index → 2D coordinate (data textures are row-major at the fixed width).
+ivec2 data_texel1d(uint i) {
+    return ivec2(int(i % uint(DATA_TEX_WIDTH)), int(i / uint(DATA_TEX_WIDTH)));
+}
+
+// accel/bvh/bvh.glsl — ray-walk support for BVH traversal (impl-plan-tlas; audit batch 3).
+// The generic pieces every ray-query BVH walk needs, independent of leaf type — used by the
+// mesh BLAS walk (intersection/mesh/mesh.glsl) AND the generated instance TLAS walk. Non-ray
+// queries (a future light-BVH importance walk, majorant grids) write their own query GLSL next
+// to their domain — build is shared, query is local. Provides: bvh_aabb_hit, BVH_STACK_DEPTH.
+// Depends on: data_texel1d (glsl/core/data_texture.glsl, included before this file).
+
+// GLSL traversal stack depth: BVH_STACK_DEPTH is ALWAYS emitted by the intersection
+// feature (from bvh.ts's const, same needDataRail gate that includes this file) — no
+// fallback here: we are writing a compiler, it emits the correct define or this file is
+// absent (define-cleanup Aug 8; the old #ifndef was dead defensive code). The builder
+// warns if a tree would exceed the depth.
+
+// Node layout (a BVH node texture, 2 RGBA32F texels/node — impl-plan-mesh-bvh §3):
+//   texel 2i = (min.xyz, A)   texel 2i+1 = (max.xyz, B)
+//   A >= 0 → LEAF (count=A, offset=B);  A < 0 → INTERNAL (axis=-A-1, rightChild=B, left=i+1).
+
+// Slab test (tavianator); returns whether the box interval meets [0, tmax].
+// Takes the PRECOMPUTED inverse direction — callers hoist \`1.0 / rd\` once per walk
+// (it was recomputed per node visit: three divides × every node, pure waste; the
+// accel research batch, Aug 9 2026). The far plane is padded by ~2 ulps (Ize 2013,
+// "Robust BVH Ray Traversal" §3): fp32 slab arithmetic can shrink the interval so
+// that tf < tn by an ulp on a true hit (grazing the box edge / finely tessellated
+// geometry) — the multiply guarantees the interval survives rounding. Conservative
+// only: a spurious accept costs one extra leaf test; a spurious REJECT loses
+// geometry. BVH_TFAR_PAD is emitted from bvh.ts's const (one source — the cwbvh
+// walk's quantized slab test and the TS reference walk read the same number).
+bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
+    vec3 t0 = (bmin - ro) * inv;
+    vec3 t1 = (bmax - ro) * inv;
+    vec3 tsm = min(t0, t1), tbg = max(t0, t1);
+    float tn = max(max(tsm.x, tsm.y), tsm.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z) * BVH_TFAR_PAD;
+    float tenter = max(tn, 0.0);
+    return tf >= tenter && tenter < tmax;
+}
+
+// The RANGE form — the entry/exit-distance consumer the bool form's old comment
+// reserved (impl-plan-sdf-accel T1): same slab arithmetic, same pad, plus the box
+// interval clamped to [0, ∞) at entry. The \`LEAF_SDF\` arm marches WITHIN
+// [enter, exit] (leaf-size-1 scene TLAS ⇒ the node box IS the object box —
+// fable-sdf-accel §2.1); \`exit\` carries the pad so the interval survives fp32
+// rounding exactly like the bool test's far plane.
+bool bvh_aabb_hit_range(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax, out float t_enter, out float t_exit) {
+    vec3 t0 = (bmin - ro) * inv;
+    vec3 t1 = (bmax - ro) * inv;
+    vec3 tsm = min(t0, t1), tbg = max(t0, t1);
+    float tn = max(max(tsm.x, tsm.y), tsm.z);
+    float tf = min(min(tbg.x, tbg.y), tbg.z) * BVH_TFAR_PAD;
+    t_enter = max(tn, 0.0);
+    t_exit = tf;
+    return tf >= t_enter && t_enter < tmax;
+}
+
+// Point-in-box (impl-plan-sdf-as-shape T6) — the POINT-QUERY counterpart of the slab
+// test, for walks that classify a point rather than trace a ray (scene_region_at's
+// containment descent). No pad: a point exactly on a box wall may be claimed by either
+// side, and the object's own signed distance decides afterwards.
+bool bvh_aabb_contains(vec3 bmin, vec3 bmax, vec3 p) {
+    return all(greaterThanEqual(p, bmin)) && all(lessThanEqual(p, bmax));
+}
+
+// Generated scene table (fable-object-tables)
+Sphere sphere_from_record(sampler2D rec, uint base) {
+    vec4 t0 = texelFetch(rec, data_texel1d(base + 1u), 0);
+    return Sphere(vec3(t0.x, t0.y, t0.z), t0.w);
+}
+Box box_from_record(sampler2D rec, uint base) {
+    vec4 t0 = texelFetch(rec, data_texel1d(base + 1u), 0);
+    vec4 t1 = texelFetch(rec, data_texel1d(base + 2u), 0);
+    return Box(vec3(t0.x, t0.y, t0.z), vec3(t0.w, t1.x, t1.y));
+}
+Cylinder cylinder_from_record(sampler2D rec, uint base) {
+    vec4 t0 = texelFetch(rec, data_texel1d(base + 1u), 0);
+    vec4 t1 = texelFetch(rec, data_texel1d(base + 2u), 0);
+    return Cylinder(vec3(t0.x, t0.y, t0.z), t0.w, t1.x);
+}
+
+float sdf_leaf_field_sphere(vec3 p, uint rbase) {
+    Sphere shape = sphere_from_record(u_data_records, rbase);
+    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 2u), 0);
+    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+    return sphere_sdf(placement_rigid(rq, rts, p), shape);
+}
+float sdf_leaf_field_box(vec3 p, uint rbase) {
+    Box shape = box_from_record(u_data_records, rbase);
+    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 4u), 0);
+    return box_sdf(placement_rigid(rq, rts, p), shape);
+}
+float sdf_leaf_field_cylinder(vec3 p, uint rbase) {
+    Cylinder shape = cylinder_from_record(u_data_records, rbase);
+    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 4u), 0);
+    return cylinder_sdf(placement_rigid(rq, rts, p), shape);
+}
+
+bool scene_table_leaf(uint li, Ray ray, float lt0, float lt1, inout Hit hit) {
+    vec4 L = texelFetch(u_data_records, data_texel1d(0u + li), 0);
+    int lk = int(L.x); int ref = int(L.y);
+    bool found = false;
+    if (lk == 0) {
+        uint rbase = 31u + uint(ref) * 5u;
+        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);
+        float t;
+    } else if (lk == 1) {
+    } else if (lk == 3) {
+        uint rbase = 31u + (0u + uint(ref)) * 5u;
+        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);
+        float t;
+        if (int(hdr.x) == 0) {
+            Sphere shape = sphere_from_record(u_data_records, rbase);
+            vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 2u), 0);
+            vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction));
+            if (sphere_sdf_intersect(lray, shape, lt0, min(lt1, hit.t), t) && t < hit.t) {
+                hit.t = t; found = true;
+                hit.p = ambient_geodesic(ray.origin, ray.direction, t);
+                hit.frame = ambient_frame(hit.p, placement_normal(rq, sphere_sdf_normal(lray.origin + t * lray.direction, shape)));
+                hit.region_owner = int(hdr.y);
+                hit.element = 0;
+                hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);
+            }
+        }
+        if (int(hdr.x) == 1) {
+            Box shape = box_from_record(u_data_records, rbase);
+            vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+            vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 4u), 0);
+            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction));
+            if (box_sdf_intersect(lray, shape, lt0, min(lt1, hit.t), t) && t < hit.t) {
+                hit.t = t; found = true;
+                hit.p = ambient_geodesic(ray.origin, ray.direction, t);
+                hit.frame = ambient_frame(hit.p, placement_normal(rq, box_sdf_normal(lray.origin + t * lray.direction, shape)));
+                hit.region_owner = int(hdr.y);
+                hit.element = 0;
+                hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);
+            }
+        }
+        if (int(hdr.x) == 2) {
+            Cylinder shape = cylinder_from_record(u_data_records, rbase);
+            vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+            vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 4u), 0);
+            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction));
+            if (cylinder_sdf_intersect(lray, shape, lt0, min(lt1, hit.t), t) && t < hit.t) {
+                hit.t = t; found = true;
+                hit.p = ambient_geodesic(ray.origin, ray.direction, t);
+                hit.frame = ambient_frame(hit.p, placement_normal(rq, cylinder_sdf_normal(lray.origin + t * lray.direction, shape)));
+                hit.region_owner = int(hdr.y);
+                hit.element = 0;
+                hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);
+            }
+        }
+    } else {
+    }
+    return found;
+}
+
+bool scene_table_intersect(Ray ray, inout Hit hit) {
+    bool found = false;
+    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it
+    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;
+    while (ptr >= 0) {
+        int ni = stack[ptr]; ptr--;
+        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(0 + ni * 2)), 0);
+        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + ni * 2 + 1)), 0);
+        float lt0, lt1;
+        if (!bvh_aabb_hit_range(n0.xyz, n1.xyz, ray.origin, inv, hit.t, lt0, lt1)) continue;
+        if (n0.w >= 0.0) {
+            int off = int(n1.w), cnt = int(n0.w);
+            for (int j = 0; j < cnt; j++) { if (scene_table_leaf(uint(off + j), ray, lt0, lt1, hit)) found = true; }
+        } else {
+            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);
+            bool nf = ray.direction[axis] >= 0.0;
+            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }
+        }
+    }
+    return found;
+}
+
+bool scene_table_leaf_any(uint li, Ray ray, float lt0, float lt1, float maxDist) {
+    vec4 L = texelFetch(u_data_records, data_texel1d(0u + li), 0);
+    int lk = int(L.x); int ref = int(L.y);
+    if (lk == 0) {
+        uint rbase = 31u + uint(ref) * 5u;
+        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);
+        float t;
+    } else if (lk == 1) {
+    } else if (lk == 3) {
+        uint rbase = 31u + (0u + uint(ref)) * 5u;
+        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);
+        float t;
+        if (int(hdr.x) == 0) {
+            Sphere shape = sphere_from_record(u_data_records, rbase);
+            vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 2u), 0);
+            vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction));
+            if (sphere_sdf_intersect(lray, shape, lt0, min(lt1, maxDist), t) && t < maxDist) return true;
+        }
+        if (int(hdr.x) == 1) {
+            Box shape = box_from_record(u_data_records, rbase);
+            vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+            vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 4u), 0);
+            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction));
+            if (box_sdf_intersect(lray, shape, lt0, min(lt1, maxDist), t) && t < maxDist) return true;
+        }
+        if (int(hdr.x) == 2) {
+            Cylinder shape = cylinder_from_record(u_data_records, rbase);
+            vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + 3u), 0);
+            vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + 4u), 0);
+            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction));
+            if (cylinder_sdf_intersect(lray, shape, lt0, min(lt1, maxDist), t) && t < maxDist) return true;
+        }
+    } else {
+    }
+    return false;
+}
+
+bool scene_table_intersect_any(Ray ray, float maxDist) {
+    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it
+    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;
+    while (ptr >= 0) {
+        int ni = stack[ptr]; ptr--;
+        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(0 + ni * 2)), 0);
+        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + ni * 2 + 1)), 0);
+        float lt0, lt1;
+        if (!bvh_aabb_hit_range(n0.xyz, n1.xyz, ray.origin, inv, maxDist, lt0, lt1)) continue;
+        if (n0.w >= 0.0) {
+            int off = int(n1.w), cnt = int(n0.w);
+            for (int j = 0; j < cnt; j++) { if (scene_table_leaf_any(uint(off + j), ray, lt0, lt1, maxDist)) return true; }
+        } else {
+            int axis = int(-n0.w - 1.0); int L = ni + 1; int R = int(n1.w);
+            bool nf = ray.direction[axis] >= 0.0;
+            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = nf ? R : L; stack[++ptr] = nf ? L : R; }
+        }
+    }
+    return false;
+}
+// Generated region -> material lookup (impl-plan-region-materials): DATA form —
+// ids packed 4/texel in the records channel at the ledger-baked base.
+int material_of(int region) {
+    if (region < 0) return -1;
+    vec4 ids = texelFetch(u_data_records, data_texel1d(uint(190 + (region >> 2))), 0);
+    int c = region & 3;
+    float id = c == 0 ? ids.x : c == 1 ? ids.y : c == 2 ? ids.z : ids.w;
+    return int(id + 0.5);
+}
+// Generated point classification (§2.7 innermost-wins)
+int scene_region_at(vec3 p) {
+    int region = -1;
+    float best = -1.0e20;   // best = least-negative inside distance so far
+    float d;
+    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;
+    while (ptr >= 0) {
+        int ni = stack[ptr]; ptr--;
+        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(0 + ni * 2)), 0);
+        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + ni * 2 + 1)), 0);
+        if (!bvh_aabb_contains(n0.xyz, n1.xyz, p)) continue;
+        if (n0.w >= 0.0) {
+            int off = int(n1.w), cnt = int(n0.w);
+            for (int j = 0; j < cnt; j++) {
+                vec4 L = texelFetch(u_data_records, data_texel1d(0u + uint(off + j)), 0);
+                int lk = int(L.x); int lref = int(L.y);
+                uint rbase; bool solid = false;
+                if (lk == 0) { rbase = 31u + uint(lref) * 5u; solid = lref < 0; }
+                else if (lk == 3) { rbase = 31u + (0u + uint(lref)) * 5u; solid = lref < 31; }
+                else continue;   // mesh / batch leaves: containment handled outside the descent
+                if (!solid) continue;
+                vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);
+                float ds = 1.0e20;
+                if (int(hdr.x) == 0) ds = sdf_leaf_field_sphere(p, rbase);
+                if (int(hdr.x) == 1) ds = sdf_leaf_field_box(p, rbase);
+                if (int(hdr.x) == 2) ds = sdf_leaf_field_cylinder(p, rbase);
+                if (ds < 0.0 && ds > best) { best = ds; region = int(hdr.y); }
+            }
+        } else {
+            int l = int(n1.w), r = l + 1;
+            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = l; stack[++ptr] = r; }
+        }
+    }
+    return region;
+}
+// Generated scene_intersect dispatcher
+bool scene_intersect(Ray ray, out Hit hit) {
+    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it
+    bool found = false;
+    if (scene_table_intersect(ray, hit)) found = true;
+    if (found) {
+        // §4.2/§4.3: one outside-probe along the outward normal; owner covers its own side.
+        int outside = scene_region_at(ambient_geodesic(hit.p, hit.frame.n, EPS_INTERFACE));
+        if (ambient_dot(ray.direction, hit.frame.n, hit.p) < 0.0) {
+            hit.region_from = outside;              // entering the owner
+            hit.region_to   = hit.region_owner;
+        } else {
+            hit.region_from = hit.region_owner;     // exiting the owner
+            hit.region_to   = outside;
+            hit.frame = ambient_frame(hit.p, -hit.frame.n);   // §4.1: n faces region_from
+        }
+    }
+    return found;
+}
+
+bool scene_intersect_any(Ray ray, float maxDist) {
+    if (scene_table_intersect_any(ray, maxDist)) return true;
+    return false;
+}
+// Generated material properties lookup — assignments follow the models' schemas (§3.4):
+// a material sets exactly the fields its model reads, nothing else. \`p\` (shading point)
+// and \`uv\` (surface chart, fable-imagery P2) are the coordinates an expression row may
+// reference; \`element\` = Hit.element (the owner's sub-element) — read only by ATTRIBUTE rows.
+MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element) {
+    MaterialProperties props;
+    props.albedo = Spectrum(0.8);
+    props.emission = SPECTRUM_ZERO;
+    if (id == 0) {
+        props.albedo = vec3(0.45, 0.45, 0.45);
+    }
+    else if (id == 1) {
+        props.albedo = vec3(0.65, 0.25, 0.2);
+    }
+    else if (id == 2) {
+        props.albedo = vec3(0.2, 0.35, 0.65);
+    }
+    else if (id == 3) {
+        props.albedo = vec3(0.6, 0.5, 0.35);
+    }
+    return props;
+}
+// Lambert diffuse BRDF — conforms to §3.2 (transcribed from reference-implementations §1).
+// Fields read: mp.albedo, mp.emission. Reflection-only, non-delta.
+// Provides: lambert_eval(), lambert_sample(), lambert_pdf(), lambert_emission().
+// Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
+//             PI, TWO_PI, SPECTRUM_ZERO.
+
+Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
+    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
+    return mp.albedo * (1.0 / PI);
+}
+
+InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    // Cosine-weighted hemisphere on the side we arrived from. Lambert has one lobe: uc unused.
+    Frame f = hit.frame;
+    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
+    float cos_theta = sqrt(u.y);
+    float sin_theta = sqrt(max(0.0, 1.0 - u.y));
+    float phi = TWO_PI * u.x;
+
+    InteractionSample s;
+    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.weight = mp.albedo;                       // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
+    s.pdf    = cos_theta * (1.0 / PI);
+    s.flags  = LOBE_REFLECTION;
+    return s;
+}
+
+float lambert_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
+    return max(0.0, c) * (1.0 / PI);
+}
+
+Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
+    return mp.emission;
+}
+
+// Generated surface-interaction dispatch (§3.3)
+InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
+    return lambert_sample(wo, hit, mp, uc, u);
+}
+Spectrum interaction_surface_eval(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_eval(wi, wo, hit, mp);
+}
+Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp) {
+    return lambert_emission(wo, hit, mp);
+}
+// Generated NEE guard: pure-delta materials skip the shadow ray (eval ≡ 0)
+bool material_has_nondelta_lobes(int mat) {
+    return true;
+}
+// Generated emission gate: fetch/dispatch emission only where it can exist
+bool material_is_emissive(int mat) {
+    return false;
+}
+// Shadow transmittance — opaque specialization (§6.3, revised per docs/trace-loop-contract.md).
+// Provides: shadow_transmittance(). Depends on: scene_intersect_any() (intersection),
+//           Ray/Spectrum (structs), SPECTRUM_ZERO/ONE (math).
+//
+// The contract returns a Spectrum: the per-channel fraction of light surviving the shadow ray.
+// This is the OPAQUE specialization the compiler emits when the scene has no media —
+// transmittance is exactly 0 (blocked) or 1 (clear), the boolean occlusion test behind the
+// spectral contract. When media exist the compiler emits the segment-walking form instead
+// (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
+// Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
+// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
+
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
+    return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
+}
+
+// Generated light structs (rows are the single source — A1)
+struct PointLight {
+    Point position;
+    Spectrum intensity;
+};
+// Point light — delta light sampler (§6.1 / reference §6.3). Struct-shaped (the house
+// pattern): the struct is the light's record; the generated dispatcher constructs it
+// from compile-time literals (hoisted const) and calls the uniform surface over it.
+// Delta light: 1/d² falloff is folded into radiance; per-light pdf = 1; no pdf function
+// (never hittable, never MIS-queried).
+// METRIC EXEMPTION (trace-loop contract): raw dot() on world-space physical directions is
+// deliberate — light samplers are Euclidean closed forms; curved spaces get new bodies (§5.3).
+// Provides (struct GENERATED from descriptor rows — A1): point_light_sample().
+// Depends on: LightSample, LIGHT_DELTA, Point, Spectrum.
+
+LightSample point_light_sample(PointLight l, Point p, vec2 xi) {
+    vec3 d = l.position - p;
+    float d2 = dot(d, d);
+
+    LightSample ls;
+    ls.wi       = d * inversesqrt(d2);
+    ls.distance = sqrt(d2);
+    ls.radiance = l.intensity / d2;    // falloff folded in (delta light, §6.1)
+    ls.pdf      = 1.0;                 // per-light pdf; selection pdf applied by the dispatcher
+    ls.flags    = LIGHT_DELTA;
+    ls.light_id = -1;                  // dispatcher sets the real id
+    return ls;
+}
+
+// Generated light accessors (§6.1) — constants baked inline, driven read u_
+PointLight light_get_0() { return PointLight(vec3(4.0, 7.0, 4.0), vec3(140.0, 140.0, 140.0)); }
+// Generated light selection dispatcher (§6.1)
+LightSample lighting_sample(LightQuery q, vec2 xi) {
+    LightSample ls;
+    ls = point_light_sample(light_get_0(), q.p, xi);
+    ls.light_id = 0;
+    return ls;
+}
+// Box pixel filter — the reconstruction kernel h(u) is the indicator of the pixel square,
+// so a sample is placed uniformly over the footprint (plain sub-pixel jitter).
+// Provides: pixel_sample(coord, xi) → continuous film point (pixel units).
+
+vec2 pixel_sample(vec2 coord, vec2 xi) {
+    return coord + (xi - 0.5);   // uniform over the unit footprint
+}
+
+// Pinhole camera
+// Requires: u_tanFov (= tan(fov/2)), u_imageSize, u_cameraPosition, u_cameraForward/Right/Up
+
+Ray camera_generateRay(vec2 film, vec2 xiLens) {
+    // film = continuous sub-pixel point (pixel/ owns the footprint); xiLens unused (no aperture).
+    vec2 ndc = (2.0 * film / u_imageSize) - 1.0;
+    ndc.x *= u_aspect;   // aspect precomputed on the CPU (u_aspect), not per-ray
+
+    // Look-at frame precomputed on the CPU (components/camera/basis.ts) and shipped as
+    // uniforms — no per-ray normalize/cross (the degenerate up-reference guard lives there).
+    vec3 forward = u_cameraForward;
+    vec3 right = u_cameraRight;
+    vec3 up = u_cameraUp;
+
+    vec3 dir = normalize(forward + ndc.x * u_tanFov * right + ndc.y * u_tanFov * up);
+
+    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
+}
+
+// Environment radiance
+vec3 environment_radiance(vec3 dir) {
+    return vec3(0.09, 0.09, 0.11) * u_envIntensity;
+}
+// ── Light-query constructors (generated policy — fable-light-bvh §3.2) ──
+LightQuery light_query_surface(int mat, Hit hit) {
+    return LightQuery(hit.p, hit.frame.n);
+}
+LightQuery light_query_medium(Point p) {
+    return LightQuery(p, vec3(0.0));   // no orientation at a medium event
+}
+// ── Path state (generated §3.4-style: the union of fields the included parts declare) ──
+struct PathState {
+    Ray ray;
+    Spectrum throughput;
+    Radiance radiance;
+    bool prev_was_delta;     // kernel's record: camera "bounce" counts as delta (§6.2)
+};
+
+PathState path_state_init(Ray ray) {
+    PathState s;
+    s.ray = ray;
+    s.throughput = SPECTRUM_ONE;
+    s.radiance = SPECTRUM_ZERO;
+    s.prev_was_delta = true;
+    return s;
+}
+// ── Combiner (generated): pt-nee — T2 at weight 1; T1's shared-term weight is the binary rule ──
+float combiner_w_emitter(PathState s, Hit hit) {
+    return 1.0;   // T1 owns the emitter term outright in this program
+}
+float combiner_w_env(PathState s) {
+    return 1.0;   // environment not samplable in this program — T1 owns the sky term
+}
+float combiner_w_light(int mat, LightSample ls, Direction wo, Hit hit, MaterialProperties props) {
+    return 1.0;   // plain NEE: the light sample carries full weight
+}
+// ── Kernel record (generated): the ONE writer of T1's carried state ──
+// The query arrives from the SAME generated constructor the NEE call used at
+// this vertex — stored-context replay (fable-light-bvh §3.2 v1.5).
+void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
+    s.prev_was_delta = is_delta;
+}
+// T1 — KERNEL SAMPLING (fable-components §7; emitted shape per fable-transport-glsl-target §3).
+// One draw serves two estimator terms: the recursion's next segment AND a direct-
+// lighting sample scored where it LANDS (the deferred sites below), with the record
+// kernel_record carried forward. Weights are the combiner's; this file is the math.
+// Provides: kernel_score_miss(), kernel_score_emitter_hit(), kernel_sample_continuation().
+// Depends on: PathState core (ray/throughput/radiance ONLY — the static-file rule),
+//             combiner_w_env/combiner_w_emitter, kernel_record (generated),
+//             interaction_surface_sample/_emission, material_is_emissive,
+//             environment_radiance, scene_material_properties, material_of.
+
+void kernel_score_miss(inout PathState s) {
+    // Deferred scoring, boundary case: the sample escaped to the environment.
+    s.radiance += s.throughput * combiner_w_env(s) * environment_radiance(s.ray.direction);
+}
+
+void kernel_score_emitter_hit(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props) {
+    // Deferred scoring: emission keys on region_to (§6.2 — you receive emission from
+    // the region ahead, NOT the owner; they differ at exits).
+    int mat_emit = material_of(hit.region_to);
+    if (!material_is_emissive(mat_emit)) return;
+    // No ternary: ANGLE rejects '?:' on struct operands (ESSL restriction).
+    MaterialProperties eprops = props;
+    if (mat_emit != mat) eprops = scene_material_properties(mat_emit, hit.p, hit.uv, hit.element);
+    s.radiance += s.throughput * combiner_w_emitter(s, hit) * interaction_surface_emission(mat_emit, wo, hit, eprops);
+}
+
+bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props, out InteractionSample bs) {
+    // Sample-returns-weight collapses scatter+shade+pdf into one line (§2.1).
+    bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
+    if (spectrum_is_black(bs.weight)) return false;
+    s.throughput *= bs.weight;
+    kernel_record(s, bs.pdf, light_query_surface(mat, hit), (bs.flags & LOBE_DELTA) != 0u);
+    return true;
+}
+
+// T2 — LIGHT SAMPLING / NEE, surface site (included when NEE is on).
+// Both edge endpoints known immediately: sample, shadow-test, score — all local.
+// Provides: light_sample_direct().
+// Depends on: PathState core, combiner_w_light (generated), lighting_sample,
+//             shadow_transmittance, material_has_nondelta_lobes,
+//             interaction_surface_eval, ray_spawn, ambient_dot.
+
+void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props) {
+    // Pure-delta materials skip NEE: their eval is zero, the march would be wasted.
+    if (!material_has_nondelta_lobes(mat)) return;
+    LightSample ls = lighting_sample(light_query_surface(mat, hit), random2());
+    if (ls.pdf <= 0.0) return;
+    // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
+    // back-off is measured against the fixed target — drift-free across null-interface crossings.
+    Ray shadow_ray = ray_spawn(hit, ls.wi);
+    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
+    if (spectrum_is_black(vis)) return;
+    Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
+    float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
+    s.radiance += s.throughput * ls.radiance * f * cos_i * vis * combiner_w_light(mat, ls, wo, hit, props) / ls.pdf;
+}
+
+// ── The walk (generated): pt — the estimator's table of contents ──
+Radiance transport_trace(Ray ray) {
+    PathState s = path_state_init(ray);
+    for (int bounce = 0; bounce < 4; bounce++) {
+        Hit hit;
+        if (!scene_intersect(s.ray, hit)) { kernel_score_miss(s); break; }
+        int mat = material_of(hit.region_owner);   // §4.1: the boundary OWNER's BSDF shades
+        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element);
+        Direction wo = -s.ray.direction;
+
+        kernel_score_emitter_hit(s, hit, mat, wo, props);   // settle last bounce's deferred estimate
+        light_sample_direct(s, hit, mat, wo, props);        // NEE: sample + score locally
+        InteractionSample bs;
+        if (!kernel_sample_continuation(s, hit, mat, wo, props, bs)) break;
+        s.ray = ray_spawn(hit, bs.wi);   // escape wi's side along the geodesic
+    }
+    return s.radiance;
+}
+uniform sampler2D u_previous;
+// Main function with progressive accumulation
+// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+
+void main() {
+    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
+    // Seed with the GLOBAL pixel (tile offset included) — seeding with the local
+    // gl_FragCoord replays the identical RNG stream in every tile of a tiled render.
+    // sampleCount decorrelates samples within a render; resetSalt (bumped per
+    // accumulation reset) decorrelates across resets (§2.11).
+    rng_init(uvec2(pixel), uint(u_sampleCount), uint(u_resetSalt));
+
+    vec2 film = pixel_sample(pixel, random2());   // sub-pixel placement (pixel/ footprint)
+    vec2 xiLens = random2();                       // lens-disk sample — cameras without aperture ignore it
+    Ray ray = camera_generateRay(film, xiLens);
+    vec3 color = sensor_response(film, ray.direction) * transport_trace(ray);   // We · L (measurement)
+
+    if (u_sampleCount == 0) {
+        fragColor = vec4(color, 1.0);
+    } else {
+        ivec2 coord = ivec2(gl_FragCoord.xy);
+        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
+        float n = float(u_sampleCount);
+        float new_weight = 1.0 / (n + 1.0);
+        fragColor = vec4(mix(previous, color, new_weight), 1.0);
+    }
+}
+",
+      "vertex": "#version 300 es
+// Fullscreen triangle vertex shader
+// Uses gl_VertexID trick — no VAO needed, draw 3 vertices
+
+void main() {
+    float x = float((gl_VertexID & 1) << 2) - 1.0;
+    float y = float((gl_VertexID & 2) << 1) - 1.0;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+}
+",
+    },
+  },
+  "sourceMaps": {
+    "table-sdf-table-twin-display": [
+      {
+        "endLine": 9,
+        "origin": "generated:display-header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 29,
+        "origin": "glsl/shared/display.glsl",
+        "startLine": 10,
+      },
+      {
+        "endLine": 40,
+        "origin": "glsl/shared/noise.glsl",
+        "startLine": 30,
+      },
+      {
+        "endLine": 49,
+        "origin": "components/tonemap/reinhard/reinhard.glsl",
+        "startLine": 41,
+      },
+      {
+        "endLine": 57,
+        "origin": "generated:display-main",
+        "startLine": 50,
+      },
+    ],
+    "table-sdf-table-twin-main": [
+      {
+        "endLine": 9,
+        "origin": "generated:header",
+        "startLine": 1,
+      },
+      {
+        "endLine": 23,
+        "origin": "generated:uniforms",
+        "startLine": 10,
+      },
+      {
+        "endLine": 104,
+        "origin": "glsl/core/structs.glsl",
+        "startLine": 24,
+      },
+      {
+        "endLine": 109,
+        "origin": "generated:material-properties",
+        "startLine": 105,
+      },
+      {
+        "endLine": 128,
+        "origin": "glsl/core/interaction.glsl",
+        "startLine": 110,
+      },
+      {
+        "endLine": 169,
+        "origin": "components/sampler/pcg4d/pcg4d.glsl",
+        "startLine": 129,
+      },
+      {
+        "endLine": 220,
+        "origin": "glsl/core/math.glsl",
+        "startLine": 170,
+      },
+      {
+        "endLine": 234,
+        "origin": "components/sensor/ideal/ideal.glsl",
+        "startLine": 221,
+      },
+      {
+        "endLine": 261,
+        "origin": "components/ambient/euclidean/euclidean.glsl",
+        "startLine": 235,
+      },
+      {
+        "endLine": 281,
+        "origin": "glsl/core/ray.glsl",
+        "startLine": 262,
+      },
+      {
+        "endLine": 312,
+        "origin": "generated:interfaces",
+        "startLine": 282,
+      },
+      {
+        "endLine": 354,
+        "origin": "glsl/core/placement.glsl",
+        "startLine": 313,
+      },
+      {
+        "endLine": 375,
+        "origin": "glsl/core/march.glsl",
+        "startLine": 355,
+      },
+      {
+        "endLine": 389,
+        "origin": "generated:primitive-structs",
+        "startLine": 376,
+      },
+      {
+        "endLine": 456,
+        "origin": "components/geometry/sphere/sphere.glsl",
+        "startLine": 390,
+      },
+      {
+        "endLine": 515,
+        "origin": "components/geometry/box/box.glsl",
+        "startLine": 457,
+      },
+      {
+        "endLine": 610,
+        "origin": "components/geometry/cylinder/cylinder.glsl",
+        "startLine": 516,
+      },
+      {
+        "endLine": 668,
+        "origin": "generated:sdf-march",
+        "startLine": 611,
+      },
+      {
+        "endLine": 670,
+        "origin": "generated:named-shapes",
+        "startLine": 669,
+      },
+      {
+        "endLine": 675,
+        "origin": "generated:sdf-fields",
+        "startLine": 671,
+      },
+      {
+        "endLine": 685,
+        "origin": "glsl/core/data_texture.glsl",
+        "startLine": 676,
+      },
+      {
+        "endLine": 747,
+        "origin": "components/accel/bvh/bvh.glsl",
+        "startLine": 686,
+      },
+      {
+        "endLine": 922,
+        "origin": "generated:scene-table",
+        "startLine": 748,
+      },
+      {
+        "endLine": 931,
+        "origin": "generated:material-of",
+        "startLine": 923,
+      },
+      {
+        "endLine": 966,
+        "origin": "generated:scene-region-at",
+        "startLine": 932,
+      },
+      {
+        "endLine": 990,
+        "origin": "generated:scene-intersect",
+        "startLine": 967,
+      },
+      {
+        "endLine": 1012,
+        "origin": "generated:material-lookup",
+        "startLine": 991,
+      },
+      {
+        "endLine": 1050,
+        "origin": "components/materials/lambert/lambert.glsl",
+        "startLine": 1013,
+      },
+      {
+        "endLine": 1060,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 1051,
+      },
+      {
+        "endLine": 1064,
+        "origin": "generated:nondelta-guard",
+        "startLine": 1061,
+      },
+      {
+        "endLine": 1068,
+        "origin": "generated:emissive-table",
+        "startLine": 1065,
+      },
+      {
+        "endLine": 1085,
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
+        "startLine": 1069,
+      },
+      {
+        "endLine": 1090,
+        "origin": "generated:light-structs",
+        "startLine": 1086,
+      },
+      {
+        "endLine": 1114,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 1091,
+      },
+      {
+        "endLine": 1116,
+        "origin": "generated:light-accessors",
+        "startLine": 1115,
+      },
+      {
+        "endLine": 1123,
+        "origin": "generated:light-sampling",
+        "startLine": 1117,
+      },
+      {
+        "endLine": 1131,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 1124,
+      },
+      {
+        "endLine": 1150,
+        "origin": "components/camera/pinhole/pinhole.glsl",
+        "startLine": 1132,
+      },
+      {
+        "endLine": 1154,
+        "origin": "generated:environment",
+        "startLine": 1151,
+      },
+      {
+        "endLine": 1161,
+        "origin": "generated:transport/light-query",
+        "startLine": 1155,
+      },
+      {
+        "endLine": 1177,
+        "origin": "generated:transport/state",
+        "startLine": 1162,
+      },
+      {
+        "endLine": 1187,
+        "origin": "generated:transport/combiner",
+        "startLine": 1178,
+      },
+      {
+        "endLine": 1193,
+        "origin": "generated:transport/kernel-record",
+        "startLine": 1188,
+      },
+      {
+        "endLine": 1228,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 1194,
+      },
+      {
+        "endLine": 1251,
+        "origin": "components/transport/techniques/light/light.glsl",
+        "startLine": 1229,
+      },
+      {
+        "endLine": 1269,
+        "origin": "generated:transport/walk",
+        "startLine": 1252,
+      },
+      {
+        "endLine": 1270,
+        "origin": "generated:accumulation-inputs",
+        "startLine": 1270,
+      },
+      {
+        "endLine": 1297,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1271,
+      },
+    ],
+  },
+  "uniforms": [
+    {
+      "parameters": [
+        "engine.resetSalt",
+      ],
+      "type": "int",
+      "uniform": "u_resetSalt",
+    },
+    {
+      "parameters": [
+        "camera.position",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraPosition",
+    },
+    {
+      "parameters": [
+        "camera.position",
+        "camera.target",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraForward",
+    },
+    {
+      "parameters": [
+        "camera.position",
+        "camera.target",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraRight",
+    },
+    {
+      "parameters": [
+        "camera.position",
+        "camera.target",
+      ],
+      "type": "vec3",
+      "uniform": "u_cameraUp",
+    },
+    {
+      "parameters": [
+        "engine.imageSize",
+      ],
+      "type": "vec2",
+      "uniform": "u_imageSize",
+    },
+    {
+      "parameters": [
+        "engine.imageSize",
+      ],
+      "type": "float",
+      "uniform": "u_aspect",
+    },
+    {
+      "parameters": [
+        "camera.fov",
+      ],
+      "type": "float",
+      "uniform": "u_tanFov",
+    },
+    {
+      "parameters": [
+        "env.intensity",
+      ],
+      "type": "float",
+      "uniform": "u_envIntensity",
+    },
+    {
+      "parameters": [
+        "engine.sampleCount",
+      ],
+      "type": "int",
+      "uniform": "u_sampleCount",
+    },
+    {
+      "parameters": [
+        "engine.pixelOffset",
+      ],
+      "type": "vec2",
+      "uniform": "u_pixelOffset",
+    },
+    {
+      "parameters": [
+        "engine.resolution",
+      ],
+      "type": "vec2",
+      "uniform": "u_resolution",
+    },
+  ],
+}
+`;
+
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky + pt 1`] = `
 {
   "exportTargets": {
@@ -61654,7 +63512,7 @@ bool primitive_intersect(Ray ray, inout Hit hit) {
                 hit.p = ambient_geodesic(ray.origin, ray.direction, t);
                 hit.frame = ambient_frame(hit.p, sphere_sdf_normal(ray.origin + t * ray.direction, shape));
                 hit.region_owner = 1;
-                hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)
+                hit.element = 0;
                 hit.uv = sphere_uv(ray.origin + t * ray.direction, shape);
             }
         }
@@ -61666,7 +63524,7 @@ bool primitive_intersect(Ray ray, inout Hit hit) {
             hit.p = ambient_geodesic(ray.origin, ray.direction, t);
             hit.frame = ambient_frame(hit.p, plane_sdf_normal(ray.origin + t * ray.direction, shape));
             hit.region_owner = 2;
-            hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)
+            hit.element = 0;
             hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);
         }
     }
