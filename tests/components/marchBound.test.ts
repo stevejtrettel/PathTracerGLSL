@@ -23,6 +23,7 @@ import {
     resolvePrimitiveValues,
     type PrimitiveValues,
 } from '../../src/components/geometry/index.js';
+import { checkConservativeness } from '../../src/components/geometry/boundCheck.js';
 import { FIELDS } from './fieldTwins.js';
 
 
@@ -146,6 +147,33 @@ describe('march bounds contain their shapes', () => {
     it('an unbounded shape says so explicitly (plane is the standing instance)', () => {
         expect(PRIMITIVES.plane.marchBound).toBe('unbounded');
     });
+});
+
+// The CONSERVATIVENESS gate, registry side (fable-sdf-contract §4's law): a marched
+// field must never claim MORE distance than is true — the marching architecture's one
+// load-bearing axiom, and the one whose violation renders as terraced rings instead
+// of failing loudly (the glass-lab night: a ½·f/|∇f_local| "safety factor" overshot
+// where the gradient steepened ahead of the ray). Directional finite differences
+// never exceed the true Lipschitz constant, so worst > 1 + FD-grace is PROOF.
+describe('marched fields never overestimate distance (the conservativeness law)', () => {
+    // DECLARED exceptions — a raised ceiling with a reason, never a silent blanket:
+    //   knob: the VENDORED sdf-explorer math overestimates mildly (measured 1.036 —
+    //   its smooth ops are the corpus's, not ours to fix). Opaque in every scene,
+    //   and the sign-tracked march commits any crossing it steps over, so the
+    //   violation degrades to correct geometry. The gate found it on its FIRST run.
+    const DECLARED_SLOPE: Record<string, number> = { knob: 1.05 };
+    for (const [key, d] of Object.entries(PRIMITIVES)) {
+        if (d.local === true || !d.provides.sdf) continue;
+        if (FIELDS[key] === undefined) continue;
+        it(`${key}: sampled directional slope ≤ ${DECLARED_SLOPE[key] ?? 1.02}`, () => {
+            const values = resolvePrimitiveValues(d, SAMPLES[key]);
+            const box = primitiveBounds(key, values);
+            if (box === null) return;   // unbounded (plane): exact field, nothing to fit a grid to
+            const { worst, at } = checkConservativeness(FIELDS[key], values, box);
+            expect(worst, `${key}: slope ${worst.toFixed(3)} at [${at.map((x) => x.toFixed(3)).join(', ')}] — the field overestimates; the marcher can step through walls`)
+                .toBeLessThanOrEqual(DECLARED_SLOPE[key] ?? 1.02);
+        });
+    }
 });
 
 // The checker must be able to FAIL. The real cross-type bounds above (torus/bottle/

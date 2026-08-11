@@ -816,7 +816,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             'the cube-clouds door (fable-instance-clouds §8, closed by stage 4): 48 rotated scale-varied boxes as ONE '
             + 'instanced batch — FRAME-tier records (box is not similarityClosed) conjugating the world ray into the '
             + 'prototype frame per instance, box_intersect with s-scaled params, TLAS over the world boxes',
-        expected: 'converges to cube-cloud-ref\'s image (batch ≡ 48 individual boxes)',
+        expected: 'converges to cube-cloud-ref\'s image (batch ≡ 24 individual boxes)',
         witness: {
             spp: 96,
             checks: [{ kind: 'twin', other: { scene: 'cube-cloud-ref' }, meanTol: 0.01, rmse: 0.03, label: 'instanced cubes ≡ individual boxes' }],

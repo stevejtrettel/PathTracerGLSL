@@ -41901,12 +41901,27 @@ vec3 plane_normal(vec3 p, Plane pl) {
 bool sphere_sdf_intersect(Ray ray, Sphere s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = sphere_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(sphere_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = sphere_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((sphere_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -41920,12 +41935,27 @@ vec3 sphere_sdf_normal(vec3 p, Sphere s) {
 bool plane_sdf_intersect(Ray ray, Plane s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = plane_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(plane_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = plane_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((plane_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -42451,144 +42481,144 @@ void main() {
         "startLine": 400,
       },
       {
-        "endLine": 468,
+        "endLine": 498,
         "origin": "generated:sdf-march",
         "startLine": 430,
       },
       {
-        "endLine": 477,
+        "endLine": 507,
         "origin": "generated:sdf-fields",
-        "startLine": 469,
+        "startLine": 499,
       },
       {
-        "endLine": 524,
+        "endLine": 554,
         "origin": "generated:primitive-dispatch",
-        "startLine": 478,
+        "startLine": 508,
       },
       {
-        "endLine": 530,
+        "endLine": 560,
         "origin": "generated:material-of",
-        "startLine": 525,
+        "startLine": 555,
       },
       {
-        "endLine": 541,
+        "endLine": 571,
         "origin": "generated:scene-region-at",
-        "startLine": 531,
+        "startLine": 561,
       },
       {
-        "endLine": 565,
+        "endLine": 595,
         "origin": "generated:scene-intersect",
-        "startLine": 542,
+        "startLine": 572,
       },
       {
-        "endLine": 581,
+        "endLine": 611,
         "origin": "generated:material-lookup",
-        "startLine": 566,
+        "startLine": 596,
       },
       {
-        "endLine": 619,
+        "endLine": 649,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 582,
-      },
-      {
-        "endLine": 629,
-        "origin": "generated:interaction-dispatch",
-        "startLine": 620,
-      },
-      {
-        "endLine": 633,
-        "origin": "generated:nondelta-guard",
-        "startLine": 630,
-      },
-      {
-        "endLine": 637,
-        "origin": "generated:emissive-table",
-        "startLine": 634,
-      },
-      {
-        "endLine": 654,
-        "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 638,
+        "startLine": 612,
       },
       {
         "endLine": 659,
-        "origin": "generated:light-structs",
-        "startLine": 655,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 650,
       },
       {
-        "endLine": 683,
-        "origin": "components/lights/point/point.glsl",
+        "endLine": 663,
+        "origin": "generated:nondelta-guard",
         "startLine": 660,
       },
       {
-        "endLine": 685,
+        "endLine": 667,
+        "origin": "generated:emissive-table",
+        "startLine": 664,
+      },
+      {
+        "endLine": 684,
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
+        "startLine": 668,
+      },
+      {
+        "endLine": 689,
+        "origin": "generated:light-structs",
+        "startLine": 685,
+      },
+      {
+        "endLine": 713,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 690,
+      },
+      {
+        "endLine": 715,
         "origin": "generated:light-accessors",
-        "startLine": 684,
+        "startLine": 714,
       },
       {
-        "endLine": 692,
+        "endLine": 722,
         "origin": "generated:light-sampling",
-        "startLine": 686,
-      },
-      {
-        "endLine": 700,
-        "origin": "components/pixel/box/box.glsl",
-        "startLine": 693,
-      },
-      {
-        "endLine": 719,
-        "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 701,
-      },
-      {
-        "endLine": 723,
-        "origin": "generated:environment",
-        "startLine": 720,
+        "startLine": 716,
       },
       {
         "endLine": 730,
-        "origin": "generated:transport/light-query",
-        "startLine": 724,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 723,
       },
       {
-        "endLine": 746,
-        "origin": "generated:transport/state",
+        "endLine": 749,
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 731,
       },
       {
-        "endLine": 756,
+        "endLine": 753,
+        "origin": "generated:environment",
+        "startLine": 750,
+      },
+      {
+        "endLine": 760,
+        "origin": "generated:transport/light-query",
+        "startLine": 754,
+      },
+      {
+        "endLine": 776,
+        "origin": "generated:transport/state",
+        "startLine": 761,
+      },
+      {
+        "endLine": 786,
         "origin": "generated:transport/combiner",
-        "startLine": 747,
+        "startLine": 777,
       },
       {
-        "endLine": 762,
+        "endLine": 792,
         "origin": "generated:transport/kernel-record",
-        "startLine": 757,
+        "startLine": 787,
       },
       {
-        "endLine": 797,
+        "endLine": 827,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 763,
+        "startLine": 793,
       },
       {
-        "endLine": 820,
+        "endLine": 850,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 798,
+        "startLine": 828,
       },
       {
-        "endLine": 838,
+        "endLine": 868,
         "origin": "generated:transport/walk",
-        "startLine": 821,
+        "startLine": 851,
       },
       {
-        "endLine": 839,
+        "endLine": 869,
         "origin": "generated:accumulation-inputs",
-        "startLine": 839,
+        "startLine": 869,
       },
       {
-        "endLine": 866,
+        "endLine": 896,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 840,
+        "startLine": 870,
       },
     ],
   },
@@ -43302,12 +43332,27 @@ vec3 plane_normal(vec3 p, Plane pl) {
 bool sphere_sdf_intersect(Ray ray, Sphere s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = sphere_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(sphere_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = sphere_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((sphere_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -43321,12 +43366,27 @@ vec3 sphere_sdf_normal(vec3 p, Sphere s) {
 bool plane_sdf_intersect(Ray ray, Plane s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = plane_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(plane_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = plane_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((plane_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -43861,149 +43921,149 @@ void main() {
         "startLine": 401,
       },
       {
-        "endLine": 469,
+        "endLine": 499,
         "origin": "generated:sdf-march",
         "startLine": 431,
       },
       {
-        "endLine": 478,
+        "endLine": 508,
         "origin": "generated:sdf-fields",
-        "startLine": 470,
+        "startLine": 500,
       },
       {
-        "endLine": 525,
+        "endLine": 555,
         "origin": "generated:primitive-dispatch",
-        "startLine": 479,
+        "startLine": 509,
       },
       {
-        "endLine": 531,
+        "endLine": 561,
         "origin": "generated:material-of",
-        "startLine": 526,
+        "startLine": 556,
       },
       {
-        "endLine": 542,
+        "endLine": 572,
         "origin": "generated:scene-region-at",
-        "startLine": 532,
+        "startLine": 562,
       },
       {
-        "endLine": 566,
+        "endLine": 596,
         "origin": "generated:scene-intersect",
-        "startLine": 543,
+        "startLine": 573,
       },
       {
-        "endLine": 582,
+        "endLine": 612,
         "origin": "generated:material-lookup",
-        "startLine": 567,
+        "startLine": 597,
       },
       {
-        "endLine": 620,
+        "endLine": 650,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 583,
-      },
-      {
-        "endLine": 630,
-        "origin": "generated:interaction-dispatch",
-        "startLine": 621,
-      },
-      {
-        "endLine": 634,
-        "origin": "generated:nondelta-guard",
-        "startLine": 631,
-      },
-      {
-        "endLine": 638,
-        "origin": "generated:emissive-table",
-        "startLine": 635,
-      },
-      {
-        "endLine": 655,
-        "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 639,
+        "startLine": 613,
       },
       {
         "endLine": 660,
-        "origin": "generated:light-structs",
-        "startLine": 656,
+        "origin": "generated:interaction-dispatch",
+        "startLine": 651,
       },
       {
-        "endLine": 684,
-        "origin": "components/lights/point/point.glsl",
+        "endLine": 664,
+        "origin": "generated:nondelta-guard",
         "startLine": 661,
       },
       {
-        "endLine": 686,
+        "endLine": 668,
+        "origin": "generated:emissive-table",
+        "startLine": 665,
+      },
+      {
+        "endLine": 685,
+        "origin": "components/transport/shadow/opaque/opaque.glsl",
+        "startLine": 669,
+      },
+      {
+        "endLine": 690,
+        "origin": "generated:light-structs",
+        "startLine": 686,
+      },
+      {
+        "endLine": 714,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 691,
+      },
+      {
+        "endLine": 716,
         "origin": "generated:light-accessors",
-        "startLine": 685,
+        "startLine": 715,
       },
       {
-        "endLine": 693,
+        "endLine": 723,
         "origin": "generated:light-sampling",
-        "startLine": 687,
-      },
-      {
-        "endLine": 701,
-        "origin": "components/pixel/box/box.glsl",
-        "startLine": 694,
-      },
-      {
-        "endLine": 720,
-        "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 702,
-      },
-      {
-        "endLine": 724,
-        "origin": "generated:environment",
-        "startLine": 721,
+        "startLine": 717,
       },
       {
         "endLine": 731,
-        "origin": "generated:transport/light-query",
-        "startLine": 725,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 724,
       },
       {
-        "endLine": 747,
-        "origin": "generated:transport/state",
+        "endLine": 750,
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 732,
       },
       {
-        "endLine": 757,
+        "endLine": 754,
+        "origin": "generated:environment",
+        "startLine": 751,
+      },
+      {
+        "endLine": 761,
+        "origin": "generated:transport/light-query",
+        "startLine": 755,
+      },
+      {
+        "endLine": 777,
+        "origin": "generated:transport/state",
+        "startLine": 762,
+      },
+      {
+        "endLine": 787,
         "origin": "generated:transport/combiner",
-        "startLine": 748,
+        "startLine": 778,
       },
       {
-        "endLine": 763,
+        "endLine": 793,
         "origin": "generated:transport/kernel-record",
-        "startLine": 758,
+        "startLine": 788,
       },
       {
-        "endLine": 771,
+        "endLine": 801,
         "origin": "generated:transport/roulette",
-        "startLine": 764,
+        "startLine": 794,
       },
       {
-        "endLine": 806,
+        "endLine": 836,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 772,
+        "startLine": 802,
       },
       {
-        "endLine": 829,
+        "endLine": 859,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 807,
+        "startLine": 837,
       },
       {
-        "endLine": 848,
+        "endLine": 878,
         "origin": "generated:transport/walk",
-        "startLine": 830,
+        "startLine": 860,
       },
       {
-        "endLine": 849,
+        "endLine": 879,
         "origin": "generated:accumulation-inputs",
-        "startLine": 849,
+        "startLine": 879,
       },
       {
-        "endLine": 876,
+        "endLine": 906,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 850,
+        "startLine": 880,
       },
     ],
   },
@@ -54184,12 +54244,27 @@ bool cylinder_interval(Ray ray, Cylinder c, out float t0, out float t1) {
 bool sphere_sdf_intersect(Ray ray, Sphere s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = sphere_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(sphere_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = sphere_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((sphere_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -54203,12 +54278,27 @@ vec3 sphere_sdf_normal(vec3 p, Sphere s) {
 bool box_sdf_intersect(Ray ray, Box s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = box_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(box_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = box_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((box_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -54222,12 +54312,27 @@ vec3 box_sdf_normal(vec3 p, Box s) {
 bool cylinder_sdf_intersect(Ray ray, Cylinder s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = cylinder_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(cylinder_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = cylinder_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((cylinder_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -54994,159 +55099,159 @@ void main() {
         "startLine": 516,
       },
       {
-        "endLine": 668,
+        "endLine": 713,
         "origin": "generated:sdf-march",
         "startLine": 611,
       },
       {
-        "endLine": 670,
+        "endLine": 715,
         "origin": "generated:named-shapes",
-        "startLine": 669,
+        "startLine": 714,
       },
       {
-        "endLine": 675,
+        "endLine": 720,
         "origin": "generated:sdf-fields",
-        "startLine": 671,
+        "startLine": 716,
       },
       {
-        "endLine": 685,
+        "endLine": 730,
         "origin": "glsl/core/data_texture.glsl",
-        "startLine": 676,
+        "startLine": 721,
       },
       {
-        "endLine": 747,
+        "endLine": 792,
         "origin": "components/accel/bvh/bvh.glsl",
-        "startLine": 686,
+        "startLine": 731,
       },
       {
-        "endLine": 922,
+        "endLine": 967,
         "origin": "generated:scene-table",
-        "startLine": 748,
+        "startLine": 793,
       },
       {
-        "endLine": 931,
+        "endLine": 976,
         "origin": "generated:material-of",
-        "startLine": 923,
+        "startLine": 968,
       },
       {
-        "endLine": 966,
+        "endLine": 1011,
         "origin": "generated:scene-region-at",
-        "startLine": 932,
+        "startLine": 977,
       },
       {
-        "endLine": 990,
+        "endLine": 1035,
         "origin": "generated:scene-intersect",
-        "startLine": 967,
+        "startLine": 1012,
       },
       {
-        "endLine": 1012,
+        "endLine": 1057,
         "origin": "generated:material-lookup",
-        "startLine": 991,
+        "startLine": 1036,
       },
       {
-        "endLine": 1050,
+        "endLine": 1095,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 1013,
+        "startLine": 1058,
       },
       {
-        "endLine": 1060,
+        "endLine": 1105,
         "origin": "generated:interaction-dispatch",
-        "startLine": 1051,
+        "startLine": 1096,
       },
       {
-        "endLine": 1064,
+        "endLine": 1109,
         "origin": "generated:nondelta-guard",
-        "startLine": 1061,
+        "startLine": 1106,
       },
       {
-        "endLine": 1068,
+        "endLine": 1113,
         "origin": "generated:emissive-table",
-        "startLine": 1065,
+        "startLine": 1110,
       },
       {
-        "endLine": 1085,
+        "endLine": 1130,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 1069,
+        "startLine": 1114,
       },
       {
-        "endLine": 1090,
+        "endLine": 1135,
         "origin": "generated:light-structs",
-        "startLine": 1086,
+        "startLine": 1131,
       },
       {
-        "endLine": 1114,
+        "endLine": 1159,
         "origin": "components/lights/point/point.glsl",
-        "startLine": 1091,
-      },
-      {
-        "endLine": 1116,
-        "origin": "generated:light-accessors",
-        "startLine": 1115,
-      },
-      {
-        "endLine": 1123,
-        "origin": "generated:light-sampling",
-        "startLine": 1117,
-      },
-      {
-        "endLine": 1131,
-        "origin": "components/pixel/box/box.glsl",
-        "startLine": 1124,
-      },
-      {
-        "endLine": 1150,
-        "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1132,
-      },
-      {
-        "endLine": 1154,
-        "origin": "generated:environment",
-        "startLine": 1151,
+        "startLine": 1136,
       },
       {
         "endLine": 1161,
-        "origin": "generated:transport/light-query",
-        "startLine": 1155,
+        "origin": "generated:light-accessors",
+        "startLine": 1160,
       },
       {
-        "endLine": 1177,
-        "origin": "generated:transport/state",
+        "endLine": 1168,
+        "origin": "generated:light-sampling",
         "startLine": 1162,
       },
       {
-        "endLine": 1187,
+        "endLine": 1176,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 1169,
+      },
+      {
+        "endLine": 1195,
+        "origin": "components/camera/pinhole/pinhole.glsl",
+        "startLine": 1177,
+      },
+      {
+        "endLine": 1199,
+        "origin": "generated:environment",
+        "startLine": 1196,
+      },
+      {
+        "endLine": 1206,
+        "origin": "generated:transport/light-query",
+        "startLine": 1200,
+      },
+      {
+        "endLine": 1222,
+        "origin": "generated:transport/state",
+        "startLine": 1207,
+      },
+      {
+        "endLine": 1232,
         "origin": "generated:transport/combiner",
-        "startLine": 1178,
+        "startLine": 1223,
       },
       {
-        "endLine": 1193,
+        "endLine": 1238,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1188,
+        "startLine": 1233,
       },
       {
-        "endLine": 1228,
+        "endLine": 1273,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1194,
+        "startLine": 1239,
       },
       {
-        "endLine": 1251,
+        "endLine": 1296,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1229,
+        "startLine": 1274,
       },
       {
-        "endLine": 1269,
+        "endLine": 1314,
         "origin": "generated:transport/walk",
-        "startLine": 1252,
+        "startLine": 1297,
       },
       {
-        "endLine": 1270,
+        "endLine": 1315,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1270,
+        "startLine": 1315,
       },
       {
-        "endLine": 1297,
+        "endLine": 1342,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1271,
+        "startLine": 1316,
       },
     ],
   },
@@ -63444,12 +63549,27 @@ bool box_interval(Ray ray, Box b, out float t0, out float t1) {
 bool sphere_sdf_intersect(Ray ray, Sphere s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = sphere_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(sphere_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = sphere_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((sphere_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -63463,12 +63583,27 @@ vec3 sphere_sdf_normal(vec3 p, Sphere s) {
 bool plane_sdf_intersect(Ray ray, Plane s, float t0, float t1, out float t) {
     t = max(t0, EPSILON);
     float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
+    float t_prev = t;
+    float dv = plane_sdf(ray.origin + t * ray.direction, s);
+    float bound = abs(dv);
     for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(plane_sdf(ray.origin + t * ray.direction, s));
         if (bound < march_epsilon(t)) return true;
+        t_prev = t;
         t += bound;
+        if (t > t_stop) return false;
+        float dn = plane_sdf(ray.origin + t * ray.direction, s);
+        if ((dn < 0.0) != (dv < 0.0)) {
+            float a = t_prev, b = t;
+            bool negA = dv < 0.0;
+            for (int j = 0; j < 12; j++) {
+                float m = 0.5 * (a + b);
+                if ((plane_sdf(ray.origin + m * ray.direction, s) < 0.0) == negA) a = m; else b = m;
+            }
+            t = a;
+            return true;
+        }
+        dv = dn;
+        bound = abs(dv);
     }
     return bound < 16.0 * march_epsilon(t) && t <= t_stop;
 }
@@ -63985,119 +64120,119 @@ void main() {
         "startLine": 429,
       },
       {
-        "endLine": 526,
+        "endLine": 556,
         "origin": "generated:sdf-march",
         "startLine": 488,
       },
       {
-        "endLine": 535,
+        "endLine": 565,
         "origin": "generated:sdf-fields",
-        "startLine": 527,
+        "startLine": 557,
       },
       {
-        "endLine": 577,
+        "endLine": 607,
         "origin": "generated:primitive-dispatch",
-        "startLine": 536,
+        "startLine": 566,
       },
       {
-        "endLine": 584,
+        "endLine": 614,
         "origin": "generated:material-of",
-        "startLine": 578,
+        "startLine": 608,
       },
       {
-        "endLine": 590,
+        "endLine": 620,
         "origin": "generated:ior-of",
-        "startLine": 585,
+        "startLine": 615,
       },
       {
-        "endLine": 603,
+        "endLine": 633,
         "origin": "generated:scene-region-at",
-        "startLine": 591,
+        "startLine": 621,
       },
       {
-        "endLine": 623,
+        "endLine": 653,
         "origin": "generated:scene-intersect",
-        "startLine": 604,
+        "startLine": 634,
       },
       {
-        "endLine": 644,
+        "endLine": 674,
         "origin": "generated:material-lookup",
-        "startLine": 624,
+        "startLine": 654,
       },
       {
-        "endLine": 682,
+        "endLine": 712,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 645,
+        "startLine": 675,
       },
       {
-        "endLine": 743,
+        "endLine": 773,
         "origin": "components/materials/dielectric/dielectric.glsl",
-        "startLine": 683,
+        "startLine": 713,
       },
       {
-        "endLine": 752,
+        "endLine": 782,
         "origin": "generated:interaction-dispatch",
-        "startLine": 744,
+        "startLine": 774,
       },
       {
-        "endLine": 756,
+        "endLine": 786,
         "origin": "generated:emissive-table",
-        "startLine": 753,
-      },
-      {
-        "endLine": 764,
-        "origin": "components/pixel/box/box.glsl",
-        "startLine": 757,
-      },
-      {
-        "endLine": 783,
-        "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 765,
-      },
-      {
-        "endLine": 787,
-        "origin": "generated:environment",
-        "startLine": 784,
+        "startLine": 783,
       },
       {
         "endLine": 794,
-        "origin": "generated:transport/light-query",
-        "startLine": 788,
+        "origin": "components/pixel/box/box.glsl",
+        "startLine": 787,
       },
       {
-        "endLine": 812,
-        "origin": "generated:transport/state",
+        "endLine": 813,
+        "origin": "components/camera/pinhole/pinhole.glsl",
         "startLine": 795,
       },
       {
-        "endLine": 819,
+        "endLine": 817,
+        "origin": "generated:environment",
+        "startLine": 814,
+      },
+      {
+        "endLine": 824,
+        "origin": "generated:transport/light-query",
+        "startLine": 818,
+      },
+      {
+        "endLine": 842,
+        "origin": "generated:transport/state",
+        "startLine": 825,
+      },
+      {
+        "endLine": 849,
         "origin": "generated:transport/combiner",
-        "startLine": 813,
+        "startLine": 843,
       },
       {
-        "endLine": 825,
+        "endLine": 855,
         "origin": "generated:transport/kernel-record",
-        "startLine": 820,
+        "startLine": 850,
       },
       {
-        "endLine": 860,
+        "endLine": 890,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 826,
+        "startLine": 856,
       },
       {
-        "endLine": 882,
+        "endLine": 912,
         "origin": "generated:transport/walk",
-        "startLine": 861,
+        "startLine": 891,
       },
       {
-        "endLine": 883,
+        "endLine": 913,
         "origin": "generated:accumulation-inputs",
-        "startLine": 883,
+        "startLine": 913,
       },
       {
-        "endLine": 910,
+        "endLine": 940,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 884,
+        "startLine": 914,
       },
     ],
   },

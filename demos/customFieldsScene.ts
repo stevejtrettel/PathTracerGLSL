@@ -21,7 +21,7 @@ import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js'
 import { defineSDF } from '../src/components/geometry/custom.js';
 import { tangle } from '../tests/witnesses/scenes/customFieldWitness.js';
 
-const gyroid = defineSDF({
+export const gyroid = defineSDF({
     name: 'gyroid',
     params: [
         { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },

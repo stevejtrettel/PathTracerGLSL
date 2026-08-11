@@ -27,6 +27,7 @@ import { sdfKnotScene, sdfKnotStrategy } from './sdfKnotScene.js';
 import { sdfShapesScene, sdfShapesStrategy, sdfShapesPtStrategy } from './sdfShapesScene.js';
 import { fractalsScene, fractalsStrategy } from './fractalsScene.js';
 import { customFieldsScene, customFieldsStrategy } from './customFieldsScene.js';
+import { glassLabScene, glassLabStrategies } from './glassLabScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
@@ -245,6 +246,22 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             'an ivory Menger sponge tipped onto a corner and a gold Apollonian gasket, both lit by an overhead '
             + 'panel with a dim rim behind: the recursion should read through CONTACT SHADOWS and occlusion, '
             + 'not just silhouette. Drop apollonian thickness to 0.002 in the source for finer filigree.',
+    },
+    'glass-lab': {
+        scene: glassLabScene,
+        strategies: posed([0, 1.7, 3.4], [0, 0.7, 0], ...glassLabStrategies),
+        exercises:
+            'THE GLASS EXPERIMENT BENCH \u2014 the instrument that cornered the conservativeness bug '
+            + '(fable-sdf-contract \u00a74). Keys 1-4 = maxBounces 4/8/16/32 (dark patches that brighten = PATH '
+            + 'TRUNCATION \u2014 many-interface solids want 16+). Left = the quartic tangle SOLID (the (f, \u2207f, H) '
+            + 'envelope estimate \u2014 the variety-port form); right = the gyroid lattice SHELL in glass (global '
+            + 'gradient-bound estimate, thin double walls); front = the EXACT closed-form sphere (no field '
+            + 'anywhere \u2014 the control that separates transport from field/marching). glass.ior slider '
+            + '(1.05-2.0) drives TIR strength live.',
+        expected:
+            'key 3+ (16/32 bounces): all three bright, clean glass \u2014 the tangle\u2019s arms refract solidly, the '
+            + 'gyroid reads as a filigree glass lattice, the sphere\u2019s caustic is sharp. Key 1 shows honest '
+            + 'truncation darkening. No terraced rings anywhere \u2014 that class is gated now.',
     },
     'custom-fields': {
         scene: customFieldsScene,

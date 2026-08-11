@@ -120,6 +120,16 @@ describe('defineSDF — compile-time gates (the Validator samples the twin)', ()
         expect(() => compiler.compile(sceneWith('clipped'), strategy)).toThrow(/CLIPS the field/);
     });
 
+    it('an OVERESTIMATING field is a COMPILE ERROR (the conservativeness law)', () => {
+        // 2× the true distance — exactly the class that marched through the tangle's
+        // walls (fable-sdf-contract §4). The bound is honest; only the SLOPE lies.
+        const spec = ballSpec('liar', 1.0);
+        spec.glsl = `float liar_sdf(vec3 p, Liar s) { return 2.0 * (length(p) - s.size); }`;
+        spec.field = (p, v) => 2.0 * (Math.hypot(p[0], p[1], p[2]) - (v.size as number));
+        expect(() => defineSDF(spec)).not.toThrow();   // definition-time can't know — the gate is per-values
+        expect(() => compiler.compile(sceneWith('liar'), strategy)).toThrow(/OVERESTIMATES distance/);
+    });
+
     it('the demo scene compiles (gyroid + tangle through the whole pipeline)', () => {
         const result = compiler.compile(customFieldsScene, customFieldsStrategy);
         expect(result.shaders.size).toBeGreaterThan(0);

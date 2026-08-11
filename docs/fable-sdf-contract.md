@@ -119,14 +119,36 @@ resolves first, so it structurally cannot catch this).
   landing-offset lesson). No bracket = graze = the stall behavior. Undeclared =
   no polish, no cost: a true distance OR a value/gradient estimate lands within
   ~2 acceptance radii already.
-- **The authoring guidance that falls out** (and the variety-port shape): prefer
-  VALUE/GRADIENT estimates (`d ≈ ½·f/max(|∇f|, floor)` — the old tracer's DE;
-  gradient hand-derived for simple polynomials, autodiff's job when the
-  expression machinery lands). First-order accurate near the surface ⇒ fast
-  marching AND a small honest `refine` (~4). A global-gradient-bound divide
-  (÷L for large L) is the crude fallback for gradient-less fields — it marches
-  slowly and needs `refine: L`. The demo tangle is the worked example of the
-  good form.
+- **THE CONSERVATIVENESS LAW** (Aug 11, written in the ashes of the tangle-ring
+  night): the ENTIRE marching architecture is a corollary of one premise — *the
+  field never claims more distance than is true*. A field that violates it does
+  not fail loudly; it renders SYSTEMATICALLY DISPLACED geometry (terraced walls,
+  concentric rings along gradient contours, worse under TIR chains) that no
+  epsilon, normal, refinement, or bounce budget can touch — a five-hypothesis
+  goose chase, receipts in memory. Therefore:
+  1. A value/gradient estimate is INCOMPLETE — `½·f/|∇f_local|` with a "safety
+     factor" OVERESTIMATES wherever the gradient steepens ahead of the ray.
+     **Numeric safety factors are prohibited.** The safe authoring triple is
+     **(f, ∇f, H)** with H a bound on the Hessian norm over the bound cell: the
+     second-order envelope `d = (√(|∇f|² + 2H·|f|) − |∇f|)/H` NEVER
+     overestimates, behaves like f/|∇f| near the surface (fast) and √(2|f|/H)
+     far from it. For polynomials H is a one-line bound; for the variety port,
+     autodiff supplies f and ∇f, and H derives per variety. The tangle
+     (customFieldWitness.ts) is the worked example.
+  2. The generated march is SIGN-TRACKED (built same day): a sign flip between
+     consecutive samples proves an overestimating step crossed a wall — the loop
+     bisects that bracket and commits the crossing instead of the displaced
+     point. Honest fields never take the branch; violating fields degrade to
+     correct geometry (thin features jumped over in one step stay the gate's
+     job). Defense in depth, not a license to lie.
+  3. The conservativeness GATE (BUILT, owner-ordered): directional finite
+     differences of the twin over the bound grid — a directional slope can never
+     exceed the true Lipschitz constant, so worst > 1.02 is PROOF of a lie.
+     Registry side in marchBound.test.ts (with a DECLARED-exception table — the
+     gate's FIRST run caught the vendored knob at 1.036, the corpus's own math);
+     scene-local side in the Validator per authored object (compile error naming
+     the shape and the sample point). Twin-less fields skip it — trusted, the
+     optional-twin trade.
 - **`<type>_sdf_normal` — generated 4-tap tetrahedral gradient** (replaces the
   hand-written 6-tap: four field evaluations, same order of accuracy, and the tap
   pattern becomes a one-site choice). Numbers move at epsilon scale → the witness

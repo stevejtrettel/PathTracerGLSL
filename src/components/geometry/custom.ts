@@ -115,9 +115,12 @@ export function defineSDF(spec: SceneSDFSpec): string {
     if (!new RegExp(`float\\s+${name}_sdf\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${structName}\\b`).test(spec.glsl)) {
         throw new Error(`defineSDF('${name}'): glsl must define float ${name}_sdf(vec3 p, ${structName} s)`);
     }
-    if (new RegExp(`${name}_sdf_(intersect|normal|refine)\\s*\\(`).test(spec.glsl)) {
-        throw new Error(`defineSDF('${name}'): ${name}_sdf_intersect / ${name}_sdf_normal / ${name}_sdf_refine are GENERATED (fable-sdf-contract §4) — delete the hand copies`);
+    if (new RegExp(`${name}_sdf_(intersect|refine)\\s*\\(`).test(spec.glsl)) {
+        throw new Error(`defineSDF('${name}'): ${name}_sdf_intersect / ${name}_sdf_refine are GENERATED (fable-sdf-contract §4) — delete the hand copies`);
     }
+    // `<name>_sdf_normal` MAY be authored (experimental, scene-local only): a
+    // value/gradient field knows its exact ∇f, and the generated 4-tap is a worse
+    // estimate of it. Defining it here suppresses the generated one.
     if (spec.uvChart === true && !new RegExp(`vec2\\s+${name}_uv\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${structName}\\b`).test(spec.glsl)) {
         throw new Error(`defineSDF('${name}'): uvChart declared but glsl does not define vec2 ${name}_uv(vec3 p, ${structName} s)`);
     }

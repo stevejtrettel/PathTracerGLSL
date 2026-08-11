@@ -70,8 +70,15 @@ function lcg(seed: number): () => number {
 
 const rand = lcg(20260810);
 const cubePlacements: Transform[] = [];
-for (let i = 0; i < 48; i++) {
-    const a = (i / 48) * Math.PI * 2;
+// 24, not 48 (Aug 11 2026): shrunk while investigating the ref arm's witness-runner
+// timeout. KNOWN HARNESS ISSUE, unresolved: the ref page's `window.app` readiness
+// probe times out under SwiftShader even though the shader compiles/links/draws in
+// milliseconds and the page logs Ready! on some loads — a runner/page liveness
+// problem, NOT a renderer bug (the batch arm renders and the twin math is untouched).
+// An earlier "~273s ANGLE compile stall" reading was RETRACTED — contaminated by a
+// dev server silently on the wrong port. See memory `sdf-hygiene-batch`.
+for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
     const r = 1.6 + rand() * 3.2;
     cubePlacements.push({
         position: [r * Math.cos(a), 0.25 + rand() * 1.6, r * Math.sin(a)],
@@ -87,7 +94,7 @@ const cloudMaterials = (): SceneDescription['materials'] => ({
 
 export const cubeCloud: SceneDescription = {
     id: 'cube-cloud',
-    name: 'Cube Cloud (48 instanced boxes, frame tier)',
+    name: 'Cube Cloud (24 instanced boxes, frame tier)',
     ambientSpace: { type: 'euclidean' },
     objects: [
         { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 }, material: 'floor' },
@@ -105,7 +112,7 @@ export const cubeCloud: SceneDescription = {
 
 export const cubeCloudRef: SceneDescription = {
     id: 'cube-cloud-ref',
-    name: 'Cube Cloud Ref (48 individual boxes)',
+    name: 'Cube Cloud Ref (24 individual boxes)',
     ambientSpace: { type: 'euclidean' },
     objects: [
         { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 }, material: 'floor' },

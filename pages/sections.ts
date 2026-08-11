@@ -131,7 +131,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'The SDF shape library',
         blurb: 'distance fields as ordinary shapes: a constructed bottle, a vendored model, the torus — and scene-local fields defined where they are used',
-        entries: [e('sdf-shapes'), e('fractals'), e('custom-fields'), e('field-glass')],
+        entries: [e('sdf-shapes'), e('fractals'), e('custom-fields'), e('field-glass'), e('glass-lab')],
     },
     {
         title: 'Transforms & driven placement',

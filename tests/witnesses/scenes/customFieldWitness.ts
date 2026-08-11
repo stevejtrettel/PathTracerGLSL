@@ -32,8 +32,15 @@ float tangle_sdf(vec3 p, Tangle t) {
     vec3 q = p / t.size;
     vec3 q2 = q * q;
     float f = dot(q2, q2) - 5.0 * dot(q, q) + t.shape;
-    vec3 g = 4.0 * q2 * q - 10.0 * q;
-    float d = 0.5 * f / max(length(g), 4.0);
+    float g = length(4.0 * q2 * q - 10.0 * q);
+    // Curvature-safe step (2nd-order envelope): the Hessian is diag(12q_i^2 - 10),
+    // norm <= 54 on the clip cell (H = 60 with margin), so
+    // d = (sqrt(g^2 + 2H|f|) - g)/H NEVER overestimates the distance to {f = 0} --
+    // ~f/g near the surface (fast), ~sqrt(2|f|/H) far from it (safe). Replaces the
+    // WRONG 0.5*f/|grad f|_local step, whose overshoot where the gradient steepens
+    // ahead of the ray was the concentric-ring artifact (glass-lab, Aug 11).
+    float H = 60.0;
+    float d = (sqrt(g * g + 2.0 * H * abs(f)) - g) / H * sign(f);
     float clip = (max(abs(q.x), max(abs(q.y), abs(q.z))) - 2.3) * t.size;
     return max(d * t.size, clip);
 }
@@ -44,7 +51,8 @@ float tangle_sdf(vec3 p, Tangle t) {
         const f = q[0] ** 4 + q[1] ** 4 + q[2] ** 4
             - 5 * (q[0] * q[0] + q[1] * q[1] + q[2] * q[2]) + (v.shape as number);
         const g = Math.hypot(...q.map((x) => 4 * x * x * x - 10 * x));
-        const d = (0.5 * f) / Math.max(g, 4.0);
+        const H = 60.0;
+        const d = ((Math.sqrt(g * g + 2 * H * Math.abs(f)) - g) / H) * Math.sign(f);
         const clip = (Math.max(Math.abs(q[0]), Math.abs(q[1]), Math.abs(q[2])) - 2.3) * s;
         return Math.max(d * s, clip);
     },

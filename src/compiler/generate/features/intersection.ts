@@ -167,12 +167,18 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Generated marching boilerplate (fable-sdf-contract §4): the loop + the 4-tap
     // gradient, emitted per MARCHED type from its one authored field. AFTER the
     // occupant files (they define `<type>_sdf`), in registry order.
+    // EXPERIMENTAL (glass-lab banding, Aug 11): a SCENE-LOCAL field that authors its
+    // own `<type>_sdf_normal` (a value/gradient field knows ∇f exactly — the 4-tap
+    // off-surface picks up ∇|∇f| contamination) keeps it; generation is the fallback.
+    // Registry occupants stay generated-only (the contract test pins it).
+    const authoredNormal = (d: ReturnType<typeof primitive>): boolean =>
+        d.local === true && new RegExp(`vec3\\s+${d.type}_sdf_normal\\b`).test(d.glsl);
     if (marchedTypes.size > 0) {
         blocks.push({
             origin: 'generated:sdf-march',
             source: ['// Generated marching intersects + gradient normals (fable-sdf-contract §4)',
                 ...present.filter((d) => marchedTypes.has(d.type))
-                    .flatMap((d) => [emitSdfIntersect(d), emitSdfNormal(d)])].join('\n'),
+                    .flatMap((d) => authoredNormal(d) ? [emitSdfIntersect(d)] : [emitSdfIntersect(d), emitSdfNormal(d)])].join('\n'),
         });
     }
 

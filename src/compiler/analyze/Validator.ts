@@ -13,7 +13,7 @@ import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
 import { PRIMITIVES, primitiveBounds, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
-import { BOUND_FIELDS, checkBoundContainment } from '../../components/geometry/boundCheck.js';
+import { BOUND_FIELDS, checkBoundContainment, checkConservativeness } from '../../components/geometry/boundCheck.js';
 import { MARCHED_TABLE_THRESHOLD, MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
@@ -1324,6 +1324,18 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
                 } else if (r.interior === 0) {
                     bag.warning('invalid-setting',
                         `${label} (${type}): the field has NO interior samples over its bound at these values — the shape may be empty, or the twin may not match the GLSL`)
+                        .withOriginal('scene', path)
+                        .add();
+                }
+                // The CONSERVATIVENESS gate (fable-sdf-contract §4's law): a field
+                // claiming MORE distance than is true lets the marcher step through
+                // walls — rendered as terraced rings that no epsilon can fix (the
+                // glass-lab night). Directional slopes never exceed the true
+                // Lipschitz constant, so worst > 1 (+FD grace) is proof of a lie.
+                const cons = checkConservativeness((p, v) => twin(p, v), resolved, box);
+                if (cons.worst > 1.02) {
+                    bag.error('invalid-setting',
+                        `${label} (${type}): the field OVERESTIMATES distance (sampled slope ${cons.worst.toPrecision(3)} at [${cons.at.map((x) => x.toPrecision(3)).join(', ')}]) — the marcher can step through walls (terraced-ring artifacts). Use a conservative estimate (the (f, ∇f, H) envelope — fable-sdf-contract §4)`)
                         .withOriginal('scene', path)
                         .add();
                 }

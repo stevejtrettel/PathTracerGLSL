@@ -49,6 +49,53 @@ export interface BoundContainment {
     worst: number;
 }
 
+export interface Conservativeness {
+    /** Worst sampled directional slope |f(x+hv) − f(x−hv)| / 2h. A field that never
+     *  overestimates true distance has slope ≤ 1 EVERYWHERE (the sdf clauses);
+     *  directional differences can never spuriously exceed the true Lipschitz
+     *  constant, so worst > ~1 is PROOF of an overestimating field — the class
+     *  whose renders show terraced walls/concentric rings (the marcher steps
+     *  through geometry; fable-sdf-contract §4's conservativeness law). */
+    worst: number;
+    at: number[];
+}
+
+/** Sample directional slopes of `field` over `box` × `margin` — the CONSERVATIVENESS
+ *  gate's core (fable-sdf-contract §4.3). Deterministic pseudo-random directions
+ *  (LCG) so the gate is reproducible; h scales with the box diagonal. */
+export function checkConservativeness(
+    field: FieldFn,
+    values: PrimitiveValues,
+    box: AABB,
+    grid = 17,
+    margin = 1.2,
+): Conservativeness {
+    const c = [0, 1, 2].map((i) => (box.min[i] + box.max[i]) / 2);
+    const half = [0, 1, 2].map((i) => ((box.max[i] - box.min[i]) / 2) * margin);
+    const diag = Math.hypot(...[0, 1, 2].map((i) => box.max[i] - box.min[i]));
+    const h = Math.max(diag * 1e-4, 1e-7);
+    let seed = 0x9e3779b9 >>> 0;
+    const rnd = (): number => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
+    let worst = 0;
+    let at: number[] = [];
+    for (let ix = 0; ix < grid; ix++) {
+        for (let iy = 0; iy < grid; iy++) {
+            for (let iz = 0; iz < grid; iz++) {
+                const p = [ix, iy, iz].map((n, i) => c[i] + half[i] * (2 * (n / (grid - 1)) - 1));
+                const v = [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5];
+                const n = Math.hypot(...v) || 1;
+                const d = v.map((x) => (x / n) * h);
+                const slope = Math.abs(
+                    field([p[0] + d[0], p[1] + d[1], p[2] + d[2]], values)
+                    - field([p[0] - d[0], p[1] - d[1], p[2] - d[2]], values),
+                ) / (2 * h);
+                if (slope > worst) { worst = slope; at = p; }
+            }
+        }
+    }
+    return { worst, at };
+}
+
 /** Sample `field` over `box` × `margin` on a grid³ lattice; every interior point must
  *  lie inside the bound (boundField ≤ 0). Exact up to fp noise — a one-grid-step
  *  tolerance would hide exactly the clipping this check exists for. */

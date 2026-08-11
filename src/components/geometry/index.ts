@@ -216,12 +216,27 @@ export function emitSignedDistance(d: PrimitiveDescriptor, values: PrimitiveValu
 export function emitSdfIntersect(d: PrimitiveDescriptor): string {
     const steps = d.stepBudget !== undefined ? String(d.stepBudget) : 'MAX_MARCH_STEPS';
     const f = (at: string) => `${d.type}_sdf(ray.origin + ${at} * ray.direction, s)`;
-    const accept = d.refine !== undefined ? `{ t = ${d.type}_sdf_refine(ray, s, t); return true; }` : 'return true;';
+    // With `refine`: acceptance must be CONFIRMED BY A SIGN CROSSING (the glass-lab
+    // ring finding, Aug 11 round 3 — exact normals + refinement both exonerated the
+    // artifact): a near-tangent ray can dip inside the acceptance shell and MISS,
+    // and committing that point manufactures a phantom surface along the near-miss
+    // locus — on a curved lobe at the critical angle, a thin concentric ring. An
+    // exact intersector only reports true crossings; a confirmed marcher matches its
+    // topology. A failed confirmation advances ONE acceptance radius and resumes
+    // (never the searched span — the doubling samples don't exclude a thin feature
+    // between them). Exhaustion keeps the unconditional stall-commit (the silhouette
+    // pin: a pinned PRIMARY ray must report the surface, not the background).
+    // Refined shapes: a failed crossing-confirmation NUDGES one acceptance radius and
+    // falls through to the normal step+resample (never `continue` — the loop head
+    // would re-test a stale bound and spin).
+    const accept = d.refine !== undefined
+        ? `{ if (${d.type}_sdf_refine(ray, s, t, t)) return true; bound = march_epsilon(t); }`
+        : 'return true;';
     const stall = d.refine !== undefined
-        ? `    if (bound < 16.0 * march_epsilon(t) && t <= t_stop) { t = ${d.type}_sdf_refine(ray, s, t); return true; }\n    return false;`
+        ? `    if (bound < 16.0 * march_epsilon(t) && t <= t_stop) { ${d.type}_sdf_refine(ray, s, t, t); return true; }\n    return false;`
         : `    return bound < 16.0 * march_epsilon(t) && t <= t_stop;`;
     const refine = d.refine === undefined ? [] : [
-        `float ${d.type}_sdf_refine(Ray ray, ${structName(d)} s, float t) {`,
+        `bool ${d.type}_sdf_refine(Ray ray, ${structName(d)} s, float t, out float tc) {`,
         `    bool neg0 = ${f('t')} < 0.0;`,
         `    float a = t, b = t, w = march_epsilon(t);`,
         `    bool crossed = false;`,
@@ -232,25 +247,54 @@ export function emitSdfIntersect(d: PrimitiveDescriptor): string {
         `        if ((${f('b')} < 0.0) != neg0) crossed = true;`,
         `        else { a = b; w *= 2.0; }`,
         `    }`,
-        `    if (!crossed) return t;`,
-        `    for (int i = 0; i < 8; i++) {`,
+        `    if (!crossed) { tc = t; return false; }`,
+        //   14 bisections, not 8: the bracket width is octave-quantized (the doubling
+        //   search), so the residual bracket/2^k JUMPS by powers of two across a
+        //   surface — at k = 8 those octave boundaries render as nested contour rings
+        //   seen through refraction (the glass-lab bullseye, Aug 11 round 3). At
+        //   k = 14 the worst residual is ~eps/128: octaves fall below visibility.
+        `    for (int i = 0; i < 14; i++) {`,
         `        float m = 0.5 * (a + b);`,
         `        if ((${f('m')} < 0.0) == neg0) a = m; else b = m;`,
         `    }`,
-        `    return a;`,
+        `    tc = a;`,
+        `    return true;`,
         `}`,
     ];
+    // SIGN-TRACKED marching (the overestimation tripwire — glass-lab, Aug 11): a
+    // sign flip between consecutive samples PROVES the field overestimated and the
+    // ray stepped across a wall (a conservative field can never cross zero by its
+    // own step). The two samples bracket the crossing — 12 bisections snap the hit
+    // back onto the wall, committed on the STARTING side. Honest fields never take
+    // this branch and pay only the un-abs'd compare; lying fields get correct
+    // geometry instead of silently displaced walls (thin features jumped clean
+    // over in one step remain the conservativeness gate's job).
     return [
         ...refine,
         `bool ${d.type}_sdf_intersect(Ray ray, ${structName(d)} s, float t0, float t1, out float t) {`,
         `    t = max(t0, EPSILON);`,
         `    float t_stop = t1 + march_epsilon(t1);`,
-        `    float bound = 1e20;`,
+        `    float t_prev = t;`,
+        `    float dv = ${f('t')};`,
+        `    float bound = abs(dv);`,
         `    for (int i = 0; i < ${steps}; i++) {`,
-        `        if (t > t_stop) return false;`,
-        `        bound = abs(${f('t')});`,
         `        if (bound < march_epsilon(t)) ${accept}`,
+        `        t_prev = t;`,
         `        t += bound;`,
+        `        if (t > t_stop) return false;`,
+        `        float dn = ${f('t')};`,
+        `        if ((dn < 0.0) != (dv < 0.0)) {`,
+        `            float a = t_prev, b = t;`,
+        `            bool negA = dv < 0.0;`,
+        `            for (int j = 0; j < 12; j++) {`,
+        `                float m = 0.5 * (a + b);`,
+        `                if ((${f('m')} < 0.0) == negA) a = m; else b = m;`,
+        `            }`,
+        `            t = a;`,
+        `            return true;`,
+        `        }`,
+        `        dv = dn;`,
+        `        bound = abs(dv);`,
         `    }`,
         stall,
         `}`,
