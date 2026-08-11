@@ -386,6 +386,32 @@ export function bvhNodeBound(n: number): number {
 export { buildBVHCore };
 export type { BVHCoreOpts };
 
+/** THE point-query walk (impl-plan-sdf-as-shape T6) — `bvhWalkLines`' sibling for
+ *  classification rather than tracing: descend nodes whose box CONTAINS p, and run
+ *  `leafRange` on the leaves that survive. Correct by containment: a point outside a
+ *  leaf's box cannot be inside the object that box bounds, so a skipped leaf can never
+ *  have claimed the point. Turns scene_region_at from a scan over every solid — one
+ *  record fetch + field evaluation each, ONCE PER HIT — into a descent, which is what
+ *  thousands of objects need. `off`/`cnt` are in scope inside the leaf branch. */
+export function bvhPointWalkLines(nodesBase: number, leafRange: string[]): string[] {
+    return [
+        '    int stack[BVH_STACK_DEPTH]; int ptr = 0; stack[0] = 0;',
+        '    while (ptr >= 0) {',
+        '        int ni = stack[ptr]; ptr--;',
+        `        vec4 n0 = texelFetch(u_data_nodes, data_texel1d(uint(${nodesBase} + ni * 2)), 0);`,
+        `        vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(${nodesBase} + ni * 2 + 1)), 0);`,
+        '        if (!bvh_aabb_contains(n0.xyz, n1.xyz, p)) continue;',
+        '        if (n0.w >= 0.0) {',
+        '            int off = int(n1.w), cnt = int(n0.w);',
+        ...leafRange.map((l) => '            ' + l),
+        '        } else {',
+        '            int l = int(n1.w), r = l + 1;',
+        '            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = l; stack[++ptr] = r; }',
+        '        }',
+        '    }',
+    ];
+}
+
 /** Object-input adapter for callers holding AABB[] (App-side world boxes etc.). */
 export function buildBVHNodes(boxes: AABB[], leafSize: number = BVH_LEAF_SIZE): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
     const n = boxes.length;

@@ -23,6 +23,10 @@ import {
 import { skyScene as tonemapScene, tonemapStrategies } from './tonemapScenes.js';
 import { cylinderScene, cylinderStrategy } from './cylinderScene.js';
 import { sdfFieldScene, sdfFieldTableStrategy } from './sdfFieldScene.js';
+import { sdfKnotScene, sdfKnotStrategy } from './sdfKnotScene.js';
+import { sdfShapesScene, sdfShapesStrategy, sdfShapesPtStrategy } from './sdfShapesScene.js';
+import { fractalsScene, fractalsStrategy } from './fractalsScene.js';
+import { customFieldsScene, customFieldsStrategy } from './customFieldsScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
@@ -226,6 +230,69 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
         strategies: posed([0, 1, 4], [0, 1, 0], cornellOneshotStrategy),
         exercises: 'non-accumulating (oneshot) accumulation occupant — writes the current sample each frame, no history blend; reuses the average pipeline (never reads u_previous)',
         expected: 'a live, noisy image that does NOT converge (grain animates every frame); contrast the accumulating cornell card which cleans up over time',
+    },
+    fractals: {
+        scene: fractalsScene,
+        strategies: posed([0.35, 1.75, 4.2], [0, 0.95, 0], fractalsStrategy),
+        exercises:
+            'TWO CLASSICAL FRACTALS as ordinary occupants. menger: the construction is subtractive, so its '
+            + 'march bound is the enclosing cube EXACTLY — a fractal costs no more envelope than a box, and '
+            + '`iterations` is a row (1…8). apollonian: an IFS with no closed-form envelope, so its bound is a '
+            + 'MEASURED fit; and since the limit set has EMPTY INTERIOR, the object is the declared '
+            + 'ε-neighbourhood (`thickness`) rather than whatever MARCH_EPSILON happened to resolve. A plain '
+            + 'sphere sits between them as the control — same dispatch, same materials, slower intersect only.',
+        expected:
+            'an ivory Menger sponge tipped onto a corner and a gold Apollonian gasket, both lit by an overhead '
+            + 'panel with a dim rim behind: the recursion should read through CONTACT SHADOWS and occlusion, '
+            + 'not just silhouette. Drop apollonian thickness to 0.002 in the source for finer filigree.',
+    },
+    'custom-fields': {
+        scene: customFieldsScene,
+        strategies: posed([1.8, 1.9, 3.6], [0, 0.85, 0], customFieldsStrategy),
+        exercises:
+            'SCENE-LOCAL SDF FIELDS (fable-sdf-contract §5.2, the zero-ceremony door): two fields invented FOR '
+            + 'this scene and defined in its own file with `defineSDF` — no folder, no registry line. Each is one '
+            + 'call: the GLSL field, its TS twin, and the declaration sheet; the compiler generates struct, march '
+            + 'loop, 4-tap normal, containment and the derived AABB, and the VALIDATOR samples the twin against '
+            + 'the declared bound at the authored values — a clipping bound is a compile error. gyroid: a '
+            + 'sin/cos lattice made conservative by dividing its gradient bound, clipped to a ball (bound exact '
+            + 'by construction). tangle: a quartic SOLID in real glass (f < 0 is a genuine interior — '
+            + 'containment through the same twin-checked field); its `shape` dial roams freely because the '
+            + 'clip cell, not the surface, owns the bound.',
+        expected:
+            'a bronze gyroid lattice ball and a glass quartic tangle on stone plinths, copper ring on the floor '
+            + 'behind; the tangle should refract like solid glass (its interior is genuine), and the lattice '
+            + 'should read through its holes under the overhead panel.',
+    },
+    'sdf-shapes': {
+        scene: sdfShapesScene,
+        strategies: posed([1.9, 1.75, 3.5], [0, 0.8, 0], sdfShapesStrategy, sdfShapesPtStrategy),
+        exercises:
+            'THE SDF SHAPE LIBRARY, now that a distance field is just a shape with a slow intersect: a '
+            + 'CONSTRUCTED bottle (two rounded cylinders smooth-unioned, onion-hollowed, chopped, punted) filled '
+            + 'with a real dielectric — its operators file-private, since a shape\'s internal maths is its own; a '
+            + 'VENDORED model (NVIDIA sdf-explorer knob, MIT — helpers prefixed, bound MEASURED with its TS twin); '
+            + 'and a torus, whose march bound is a DIFFERENT primitive (cylinder R+r × r). The plinths, ball and '
+            + 'block are ANALYTIC — both intersect kinds in one dispatch, indistinguishable at the authoring '
+            + 'layer. Key 2 = the pt arm (no NEE).',
+        expected:
+            'a still life: glass flask and brass knob on two stone plinths, a copper ring behind, a ball and a '
+            + 'block on the floor under a soft overhead key. The glass should refract what is behind it, and the '
+            + 'knob should show its cutout, inner eye and etched groove. Key 2 converges to the same picture, '
+            + 'slower and noisier.',
+    },
+    'sdf-knot': {
+        scene: sdfKnotScene,
+        strategies: posed([7.5, 5.2, 7.5], [0, 0, 0], sdfKnotStrategy),
+        exercises:
+            'SDF INSTANCING (impl-plan-sdf-as-shape T7): 3000 marched links on a trefoil knot as THREE batches — '
+            + 'cylinder, box and sphere prototypes, each placed at ~1000 individually rotated and scaled transforms. '
+            + 'A marched prototype rides the same instance leaf item as a closed-form one, differing only in its '
+            + 'bound test + <type>_sdf_intersect. Three regions, three materials: nothing in the compiler grows '
+            + 'with the link count.',
+        expected:
+            'a trefoil chain of brass/jade/coral links tracing interactively. Distinct (non-instanced) marched '
+            + 'objects stay the small-N regime — see sdf-table-twin.',
     },
     'sdf-field': {
         scene: sdfFieldScene,

@@ -54,29 +54,5 @@ bool box_interval(Ray ray, Box b, out float t0, out float t1) {
     return true;
 }
 
-// ---- the marching intersect (impl-plan-sdf-as-shape T1) ---------------------
-// The iterating twin of box_intersect: march |box_sdf| within the [t0, t1] interval
-// the shape's bound produced. Rules and their derivations: see sphere.glsl's copy
-// (one transcription, four shapes — the same accepted repetition as each shape's
-// closed form).
-bool box_sdf_intersect(Ray ray, Box b, float t0, float t1, out float t) {
-    t = max(t0, EPSILON);
-    float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
-    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(box_sdf(ray.origin + t * ray.direction, b));
-        if (bound < march_epsilon(t)) return true;
-        t += bound;
-    }
-    return bound < 16.0 * march_epsilon(t) && t <= t_stop;
-}
-
-// Gradient normal of THIS field (six taps), in the shape's own frame.
-vec3 box_sdf_normal(vec3 p, Box b) {
-    vec2 e = vec2(NORMAL_EPSILON, 0.0);
-    return normalize(vec3(
-        box_sdf(p + e.xyy, b) - box_sdf(p - e.xyy, b),
-        box_sdf(p + e.yxy, b) - box_sdf(p - e.yxy, b),
-        box_sdf(p + e.yyx, b) - box_sdf(p - e.yyx, b)));
-}
+// Marching (`box_sdf_intersect`) and the gradient normal (`box_sdf_normal`) are
+// GENERATED from box_sdf when a program marches this shape — fable-sdf-contract §4.

@@ -104,6 +104,9 @@ export interface SceneDataTenants {
  *  never change the compiled stride. */
 export function batchPlacementRecordOf(b: InstancedObject, scene: SceneDescription): 'frame' | 'params' {
     if (isMeshObject(b.prototype) || b.placementRecord === 'frame') return 'frame';
+    // A MARCHED prototype (impl-plan-sdf-as-shape T7) conjugates the ray into its own
+    // frame — the bound test and the march both live there — so it takes the frame tier.
+    if (resolveBackend(b.prototype.type, b.prototype.backend) === 'sdf') return 'frame';
     if (paramsRecordFloats(b.prototype.type) === null) return 'frame';
     return materialReadsUv(b.prototype.material, scene) ? 'frame' : 'params';
 }
@@ -216,6 +219,32 @@ export function batchLightEligible(b: InstancedObject, scene: SceneDescription):
     }
     const em = isBlackbody(mat.emission) ? foldBlackbody(mat.emission) : mat.emission;
     return hasConstantNonzeroEmission(em);
+}
+
+/**
+ * Region id → material id, SCENE-SIDE (impl-plan-region-materials — the census
+ * pattern: the ONE mirror of the Planner's region/material assignment, packed by the
+ * App and Planner-ASSERTED kind-for-kind like the light roster, so drift is loud).
+ *
+ * Region ids are scene.objects positions (every entry — primitive, mesh, instanced —
+ * takes exactly one), followed by the desugared HITTABLE-light regions in authored
+ * light order. Material ids are scene.materials insertion order (the pinned id rule),
+ * followed by the minted `__light_*` materials — one per hittable light, in the same
+ * order, so the j-th hittable light's region maps to id authoredCount + j.
+ */
+export function regionMaterialsOf(scene: SceneDescription): number[] {
+    const matIds = new Map(Object.keys(scene.materials).map((name, i) => [name, i]));
+    const ids = scene.objects.map((o) => {
+        const name = isPrimitiveObject(o) || isMeshObject(o) ? o.material : (o as InstancedObject).prototype.material;
+        return matIds.get(name) ?? -1;   // unknown names are Validator-rejected; -1 keeps the mirror total
+    });
+    let minted = matIds.size;
+    for (const light of scene.lights) {
+        const d = LIGHT_KINDS[light.kind];
+        if (d === undefined || d.region === undefined) continue;   // delta kinds: no region, no material
+        ids.push(minted++);
+    }
+    return ids;
 }
 
 export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
@@ -342,6 +371,9 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
                 ? { leafCount: table.leaves.length, analyticTexels: (table.analytic.length + table.sdf.length) * ANALYTIC_RECORD_TEXELS }
                 : null,
             lightTree,
+            // Allocated with the table (only 'table' programs read the data form of
+            // material_of); count covers EVERY region incl. desugared light regions.
+            regionMaterials: table !== null ? { count: regionMaterialsOf(scene).length } : null,
         },
         batchGeometrySlot,
         batchPlacementRecord,

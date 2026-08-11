@@ -83,7 +83,13 @@ const view = { tonemap: { type: 'reinhard' as const } };
 export const sdfUnrolledStrategy: RenderStrategy = {
     id: 'unrolled',
     measurement,
-    estimator: { directLighting: 'nee', russianRoulette: null, accumulation: { type: 'average' } },
+    // EXPLICIT (impl-plan-sdf-as-shape T6): the dispatch default is scene-dependent now
+    // — a scene with >= MARCHED_TABLE_THRESHOLD marched objects defaults to 'table'.
+    // These fixtures carry 30-128 marched objects, so an implicit strategy would make
+    // this arm silently become the table and the twin would compare table against
+    // itself (it did, for one run). dispatchArmsPinned in tests/compiler/sdfTable.test.ts
+    // guards both arms.
+    estimator: { directLighting: 'nee', objectDispatch: 'unrolled', russianRoulette: null, accumulation: { type: 'average' } },
     view,
 };
 
@@ -248,4 +254,57 @@ export const perfSdfBlob: SceneDescription = {
     materials: twinMaterials(),
     lights: [{ kind: 'point', position: [3, 5, 3], emission: 90 }],
     environment: { type: 'constant', color: [0.09, 0.09, 0.11] },
+};
+
+// ---- sdf-instance-twin (impl-plan-sdf-as-shape T7) ---------------------------
+//
+// The door gate for MARCHED PROTOTYPES: 12 marched boxes as ONE instanced batch vs the
+// same 12 as individual objects. Identical stream, so the arms must agree to noise —
+// the batch arm reads its placements from the rail and marches the prototype inside its
+// bound, the reference arm bakes each object's constants and marches its own. Anything
+// the instance path gets wrong about the rigid frame (conjugation, the s-scaled params,
+// the normal's rotation back to world) shows here and nowhere else.
+
+const twinBoxPlacements = (): Array<{ position: [number, number, number]; rotation: { axis: [number, number, number]; angle: number }; scale: number }> => {
+    const rand = lcg(4242);
+    return Array.from({ length: 12 }, (_, i) => {
+        const a = (i / 12) * Math.PI * 2;
+        return {
+            position: [1.9 * Math.cos(a), 0.5 + 0.6 * rand(), 1.9 * Math.sin(a)] as [number, number, number],
+            rotation: { axis: [rand() - 0.5, 1, rand() - 0.5] as [number, number, number], angle: rand() * Math.PI },
+            scale: 0.6 + 0.5 * rand(),
+        };
+    });
+};
+
+const twinBoxProto = { type: 'box' as const, parameters: { halfSize: [0.28, 0.42, 0.28] }, material: 'red', backend: 'sdf' as const };
+
+const instanceTwinBase = (objects: SceneDescription['objects'], id: string, name: string): SceneDescription => ({
+    id, name,
+    ambientSpace: { type: 'euclidean' },
+    objects: [{ type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.0 }, material: 'floor' }, ...objects],
+    materials: twinMaterials(),
+    lights: [{ kind: 'point', position: [3, 6, 3], emission: 120 }],
+    environment: { type: 'constant', color: [0.09, 0.09, 0.11] },
+});
+
+export const sdfInstanceTwin = instanceTwinBase(
+    [{ kind: 'instanced', prototype: twinBoxProto, placements: twinBoxPlacements(), name: 'marched_batch' }],
+    'sdf-instance-twin', 'SDF Instance Twin (marched prototype × 12)');
+
+export const sdfInstanceTwinRef = instanceTwinBase(
+    twinBoxPlacements().map((t) => ({ ...twinBoxProto, transform: t })),
+    'sdf-instance-twin-ref', 'SDF Instance Twin ref (12 individual marched boxes)');
+
+// TABLE on both arms, deliberately. The twin asks "does the instance path reproduce the
+// per-object path" — either regime answers that, and the table regime compiles in
+// constant time. The unrolled regime emits one INLINED march loop per object, which
+// SwiftShader (the numeric gate's renderer) takes minutes to compile even at a dozen
+// objects — measured Aug 10 2026: this same 12-box reference timed out at 90s under
+// SwiftShader and was instant under Metal. Unrolled arms belong on tiny scenes only.
+export const sdfInstanceStrategy: RenderStrategy = {
+    id: 'inst',
+    measurement,
+    estimator: { directLighting: 'nee', objectDispatch: 'table', russianRoulette: null, accumulation: { type: 'average' } },
+    view,
 };

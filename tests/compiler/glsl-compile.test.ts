@@ -138,8 +138,26 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
         // and identical vec3s would make a quad's edges parallel (Validator-rejected).
         const rowValue = (shape: 'number' | 'vec3', i: number) => (shape === 'vec3' ? [0.4 + i, 0.2 * i, 0.3] : 0.5 + 0.1 * i);
         const surfaceMat = () => `mat_${surfaceModels[n % surfaceModels.length]}`;
+        // Index-varied values are enough for a shape whose rows are independent, but not
+        // for one with COUPLED rules (a torus needs tubeRadius < ringRadius; a bottle
+        // needs the neck to be the narrow end). Those declare a sample here — and a shape
+        // whose generic values violate its own validateValues fails loudly below rather
+        // than dropping out of compile coverage.
+        const sampleParameters: Record<string, Record<string, number | number[]>> = {
+            torus: { ringRadius: 0.8, tubeRadius: 0.25 },
+            bottle: { baseRadius: 0.6, baseHeight: 0.8, neckRadius: 0.2, neckHeight: 0.4 },
+            menger: { size: 0.6, iterations: 3 },
+            apollonian: { size: 0.5, morph: 1.2, iterations: 6 },
+        };
         for (const d of Object.values(PRIMITIVES)) {
-            const parameters = Object.fromEntries(d.params.map((p, i) => [p.name, p.default ?? rowValue(p.shape, i)]));
+            const parameters = Object.fromEntries(d.params.map((p, i) =>
+                [p.name, sampleParameters[d.type]?.[p.name] ?? p.default ?? rowValue(p.shape, i)]));
+            const coupled = d.validateValues?.(
+                Object.fromEntries(d.params.map((p) => [p.name, parameters[p.name] ?? p.default!])),
+            ) ?? [];
+            if (coupled.length > 0) {
+                throw new Error(`kitchen sink: synthesized parameters for '${d.type}' violate its own rules (${coupled.join('; ')}) — add an entry to sampleParameters so this occupant stays compile-covered`);
+            }
             const constant = { transform: { position: [n * 3, 0.5, 0] as [number, number, number] } };
             const driven = {
                 transform: {

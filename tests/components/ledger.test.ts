@@ -17,8 +17,10 @@ const T: DataTenants = {
     ],
     meshLights: [{ meshOrdinal: 1, vertexCount: 594, triCount: 1152 }],
     sceneTable: { leafCount: 4, analyticTexels: 10 },   // 2 analytic × stride 5
-    // 5 lights at row stride 3 (fable-light-bvh §5) — appended LAST by contract.
+    // 5 lights at row stride 3 (fable-light-bvh §5) — appended after everything above.
     lightTree: { count: 5, tableTexels: 15 },
+    // 6 regions → 2 texels (4 ids/texel) — appended LAST (impl-plan-region-materials).
+    regionMaterials: { count: 6 },
 };
 
 describe('data rail ledger', () => {
@@ -49,7 +51,10 @@ describe('data rail ledger', () => {
         // byte-stable): table rows, then trails, then its nodes region.
         expect(L.lightTree!.tableBase).toBe(9 + 500 + 500 + 1152 + 4 + 10);
         expect(L.lightTree!.trailsBase).toBe(9 + 500 + 500 + 1152 + 4 + 10 + 15);
-        expect(L.totals.records).toBe(9 + 500 + 500 + 1152 + 4 + 10 + 15 + 5);
+        // The region→material table appends LAST (impl-plan-region-materials):
+        // ceil(6/4) = 2 texels after the light tree's records.
+        expect(L.regionMaterials!.base).toBe(9 + 500 + 500 + 1152 + 4 + 10 + 15 + 5);
+        expect(L.totals.records).toBe(9 + 500 + 500 + 1152 + 4 + 10 + 15 + 5 + 2);
         // Nodes: BLAS bounds then TLAS bounds, then the scene TLAS, disjoint.
         expect(L.batches[0].tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152));
         expect(L.sceneTable!.tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500));

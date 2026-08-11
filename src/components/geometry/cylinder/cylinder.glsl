@@ -90,26 +90,5 @@ bool cylinder_interval(Ray ray, Cylinder c, out float t0, out float t1) {
     return true;
 }
 
-// ---- the marching intersect (impl-plan-sdf-as-shape T1) ---------------------
-// The iterating twin of cylinder_intersect; rules and derivations in sphere.glsl.
-bool cylinder_sdf_intersect(Ray ray, Cylinder c, float t0, float t1, out float t) {
-    t = max(t0, EPSILON);
-    float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
-    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(cylinder_sdf(ray.origin + t * ray.direction, c));
-        if (bound < march_epsilon(t)) return true;
-        t += bound;
-    }
-    return bound < 16.0 * march_epsilon(t) && t <= t_stop;
-}
-
-// Gradient normal of THIS field (six taps), in the shape's own frame.
-vec3 cylinder_sdf_normal(vec3 p, Cylinder c) {
-    vec2 e = vec2(NORMAL_EPSILON, 0.0);
-    return normalize(vec3(
-        cylinder_sdf(p + e.xyy, c) - cylinder_sdf(p - e.xyy, c),
-        cylinder_sdf(p + e.yxy, c) - cylinder_sdf(p - e.yxy, c),
-        cylinder_sdf(p + e.yyx, c) - cylinder_sdf(p - e.yyx, c)));
-}
+// Marching (`cylinder_sdf_intersect`) and the gradient normal (`cylinder_sdf_normal`)
+// are GENERATED from cylinder_sdf when a program marches this shape — fable-sdf-contract §4.

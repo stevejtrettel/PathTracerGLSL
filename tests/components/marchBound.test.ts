@@ -16,33 +16,15 @@
 // field arrives with a hand-written bound, this is what proves the pair honest.
 
 import { describe, it, expect } from 'vitest';
-import { PRIMITIVES, resolvePrimitiveValues, type PrimitiveValues } from '../../src/components/geometry/index.js';
+import {
+    PRIMITIVES,
+    canonicalizePrimitiveParameters,
+    primitiveBounds,
+    resolvePrimitiveValues,
+    type PrimitiveValues,
+} from '../../src/components/geometry/index.js';
+import { FIELDS } from './fieldTwins.js';
 
-/** Signed distance TS twins — one per marchable primitive, transcribed from the GLSL
- *  (the .glsl is the shipping truth; these mirror it for the CPU-side gate). */
-const FIELDS: Record<string, (p: number[], v: PrimitiveValues) => number> = {
-    sphere: (p, v) => {
-        const c = v.center as number[];
-        return Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]) - (v.radius as number);
-    },
-    plane: (p, v) => {
-        const n = v.normal as number[];
-        return p[0] * n[0] + p[1] * n[1] + p[2] * n[2] + (v.offset as number);
-    },
-    box: (p, v) => {
-        const c = v.center as number[], h = v.halfSize as number[];
-        const d = [0, 1, 2].map((i) => Math.abs(p[i] - c[i]) - h[i]);
-        const outside = Math.hypot(...d.map((x) => Math.max(x, 0)));
-        return outside + Math.min(Math.max(d[0], Math.max(d[1], d[2])), 0);
-    },
-    cylinder: (p, v) => {
-        const c = v.center as number[];
-        const q = [p[0] - c[0], p[1] - c[1], p[2] - c[2]];
-        const dx = Math.hypot(q[0], q[2]) - (v.radius as number);
-        const dy = Math.abs(q[1]) - (v.halfHeight as number);
-        return Math.min(Math.max(dx, dy), 0) + Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
-    },
-};
 
 /** Is p inside the bounding primitive? (The bound is an analytic object, so "inside"
  *  is just its own field being negative — the same dichotomy the renderer uses.) */
@@ -52,12 +34,27 @@ function insideBound(boundType: string, boundValues: PrimitiveValues, p: number[
     return f(p, resolvePrimitiveValues(PRIMITIVES[boundType], boundValues));
 }
 
-/** Sample values per primitive — deliberately off-centre and non-cubic so a bound that
- *  ignores `center`, or swaps an axis, cannot pass. */
+/** Sample values per primitive. The self-bounded analytic shapes are deliberately
+ *  off-centre (a bound that ignores `center` cannot pass); the marched shapes are
+ *  CANONICAL (fable-sdf-contract §2 — no center row), so their asymmetry lives in the
+ *  bound's own y-offset (bottle/knob) and non-cubic extents. */
 const SAMPLES: Record<string, PrimitiveValues> = {
     sphere: { center: [0.4, -0.2, 0.7], radius: 0.9 },
     box: { center: [-0.3, 0.5, 0.2], halfSize: [0.8, 0.35, 1.1] },
     cylinder: { center: [0.25, -0.4, -0.6], radius: 0.55, halfHeight: 0.9 },
+    // The cross-type bounds (impl-plan-sdf-as-shape §2.2) — the cases this gate was
+    // written for.
+    torus: { ringRadius: 0.8, tubeRadius: 0.25 },
+    bottle: {
+        baseRadius: 0.5, baseHeight: 0.7, neckRadius: 0.18,
+        neckHeight: 0.35, thickness: 0.04, rounded: 0.06, smoothJoin: 0.25, punt: 0.2,
+    },
+    knob: { radius: 0.8 },
+    // The fractals: a subtractive construction whose cube bounds it exactly, and an IFS
+    // whose bound is a MEASURED fit (apollonian.ts) — the case §2.4 was written for,
+    // since nothing about an iterated inversion yields a closed-form envelope.
+    menger: { size: 0.9, iterations: 4 },
+    apollonian: { size: 0.5, morph: 1.2, thickness: 0.02, iterations: 8 },
 };
 
 const GRID = 26;      // 26³ ≈ 17.5k probes per shape — cheap, and dense enough that a
@@ -66,7 +63,7 @@ const MARGIN = 1.6;   // clipped face shows up. Grid spans the bound × MARGIN.
 /** Interior probes of `shape` that fall outside `bound`, over the shape's AABB × MARGIN.
  *  Zero = the bound contains the shape. */
 function escapedProbes(shapeType: string, values: PrimitiveValues, boundType: string, boundValues: PrimitiveValues): { interior: number; escaped: number; worst: number } {
-    const box = PRIMITIVES[shapeType].bounds!(values);
+    const box = primitiveBounds(shapeType, values)!;
     const c = [0, 1, 2].map((i) => (box.min[i] + box.max[i]) / 2);
     const half = [0, 1, 2].map((i) => ((box.max[i] - box.min[i]) / 2) * MARGIN);
     let interior = 0, escaped = 0, worst = 0;
@@ -86,6 +83,7 @@ function escapedProbes(shapeType: string, values: PrimitiveValues, boundType: st
 
 describe('march bounds contain their shapes', () => {
     for (const [key, d] of Object.entries(PRIMITIVES)) {
+        if (d.local === true) continue;   // scene-local fields: the Validator runs this gate per authored object
         if (d.marchBound === undefined || d.marchBound === 'unbounded') continue;
 
         it(`${key}: every interior point lies inside the declared bound`, () => {
@@ -95,7 +93,7 @@ describe('march bounds contain their shapes', () => {
                 ? values
                 : (d.marchBound as { values(v: PrimitiveValues): PrimitiveValues }).values(values);
 
-            const box = d.bounds!(values);
+            const box = primitiveBounds(key, values)!;
             const c = [0, 1, 2].map((i) => (box.min[i] + box.max[i]) / 2);
             const half = [0, 1, 2].map((i) => ((box.max[i] - box.min[i]) / 2) * MARGIN);
 
@@ -124,7 +122,7 @@ describe('march bounds contain their shapes', () => {
             // for a DIFFERENT shape usually leaves the surface unreached. Require the
             // shape's surface to come within a tenth of the bound's own extent.
             const values = resolvePrimitiveValues(d, SAMPLES[key]);
-            const box = d.bounds!(values);
+            const box = primitiveBounds(key, values)!;
             const diag = Math.hypot(...[0, 1, 2].map((i) => box.max[i] - box.min[i]));
             const boundType = d.marchBound === 'self' ? d.type : (d.marchBound as { type: string }).type;
             const boundValues = d.marchBound === 'self'
@@ -150,11 +148,10 @@ describe('march bounds contain their shapes', () => {
     });
 });
 
-// The checker must be able to FAIL. Every shape today declares `marchBound: 'self'`
-// (bound ≡ shape, so containment holds trivially), which would leave the gate above
-// vacuous and silently useless the day a real cross-type bound arrives. These two
-// cases exercise it on the shape a future occupant will actually have: a cylinder
-// bounded by a sphere — once honestly, once deliberately too small.
+// The checker must be able to FAIL. The real cross-type bounds above (torus/bottle/
+// knob/menger/apollonian) exercise it for keeps; these two synthetic cases prove the
+// checker itself can reject — a cylinder bounded by a sphere, once honestly, once
+// deliberately too small — so a passing suite is never mistaken for a vacuous one.
 describe('the containment check itself catches a clipping bound', () => {
     const cyl: PrimitiveValues = { center: [0.25, -0.4, -0.6], radius: 0.55, halfHeight: 0.9 };
     const r = cyl.radius as number, h = cyl.halfHeight as number;
@@ -170,4 +167,41 @@ describe('the containment check itself catches a clipping bound', () => {
         expect(interior).toBeGreaterThan(100);
         expect(escaped, 'a 10%-small bound must leave interior points outside it').toBeGreaterThan(0);
     });
+});
+
+// The resolve pin (fable-sdf-contract §3): every descriptor function receives values
+// that went through `canonicalizePrimitiveParameters` — THE resolve site. Before the
+// pin, the Planner's driven and retained-frame paths shipped RAW authored values, so a
+// driven bottle with defaulted optional rows fed NaN through bottleExtent and the
+// object silently disappeared. This feeds each bound function EXACTLY what the Planner
+// now hands it — the authored form with every optional row OMITTED — and requires
+// finite numbers everywhere. (The old form of this test resolved values itself first,
+// which is why it could never catch the violation.)
+describe('bound functions receive resolved values (the fable-sdf-contract §3 pin)', () => {
+    const flat = (v: PrimitiveValues): number[] =>
+        Object.values(v).flatMap((x) => (Array.isArray(x) ? x : [x])) as number[];
+
+    for (const [key, d] of Object.entries(PRIMITIVES)) {
+        if (d.local === true) continue;
+        const requiredOnly = Object.fromEntries(
+            d.params.filter((p) => p.required).map((p) => [p.name, SAMPLES[key]?.[p.name]
+                ?? (p.shape === 'vec3' ? [0.3, -0.2, 0.5] : 0.7)]),
+        );
+
+        it(`${key}: marchBound.values / bounds are finite on minimally-authored input`, () => {
+            const v = canonicalizePrimitiveParameters(key, requiredOnly);
+            const mb = d.marchBound;
+            if (mb !== undefined && mb !== 'self' && mb !== 'unbounded') {
+                for (const x of flat(mb.values(v))) {
+                    expect(Number.isFinite(x), `${key}: marchBound.values produced a non-finite number — an optional row leaked through unresolved`).toBe(true);
+                }
+            }
+            const box = primitiveBounds(key, requiredOnly);
+            if (box !== null) {
+                for (const x of [...box.min, ...box.max]) {
+                    expect(Number.isFinite(x), `${key}: derived AABB is non-finite on minimal input`).toBe(true);
+                }
+            }
+        });
+    }
 });

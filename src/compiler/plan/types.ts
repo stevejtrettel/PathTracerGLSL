@@ -149,17 +149,20 @@ export interface EmittersDesc {
 }
 
 export interface IntersectionDesc {
-    /** Which geometry backends this program's scene_intersect combines — the intersection
-     *  family's registry occupants (raymarch = the SDF marcher, mesh = the triangle engine)
-     *  plus the engine-less analytic closed-form dispatch. A LINK-MAP decision (decision-hoist):
-     *  "does this program contain the X backend" is answered ONCE here, symmetrically for all
-     *  three, not re-derived per feature (it replaced the fake `method: 'raymarch'` singleton).
-     *  scene_intersect / scene_intersect_any / the region tables emit exactly the arms flagged. */
-    backends: { sdf: boolean; analytic: boolean; mesh: boolean; instanced: boolean };
+    /** Which geometry CLASSES this program's scene_intersect combines. A LINK-MAP
+     *  decision (decision-hoist): "does this program contain X" is answered ONCE here,
+     *  never re-derived per feature; scene_intersect / scene_intersect_any / the region
+     *  tables emit exactly the arms flagged.
+     *
+     *  `primitive` covers every primitive object regardless of how it is intersected:
+     *  since impl-plan-sdf-as-shape T5 there is no SDF *backend* to flag — marching is
+     *  one object's choice of intersect routine, recorded per object on
+     *  PlannedPrimitiveObject.intersect, and both kinds share one generated dispatch. */
+    classes: { primitive: boolean; mesh: boolean; instanced: boolean };
     /** Mesh traversal engine (impl-plan-mesh-bvh): a MESH_TRAVERSALS registry id
      *  (components/intersection — 'bvh' walks the SAH tree, 'brute' scans all triangles;
      *  Validator-gatekept). Gates which per-mesh wrapper (and whether the mesh_N_bvh
-     *  extern) is emitted. Only meaningful when backends.mesh. */
+     *  extern) is emitted. Only meaningful when classes.mesh. */
     meshTraversal: string;
     /** Instance traversal engine (impl-plan-tlas): an INSTANCE_ACCELS registry id ('tlas'
      *  walks the per-batch BVH, 'linear' scans every placement). Gates the instance
@@ -181,6 +184,13 @@ export interface IntersectionDesc {
 
 export interface MaterialsDesc {
     models: MaterialModel[];
+    /** Region→material lookup form (impl-plan-region-materials): 'baked' emits the
+     *  per-region constant arms (small scenes — the constants fold); 'data' emits ONE
+     *  rail fetch against the regionMaterials tenant, and `ior_of` decomposes to
+     *  ior_of_material(material_of(region), p) — generated size follows the MATERIAL
+     *  count, never the object count. Decided with objectDispatch ('table' ⇒ 'data'),
+     *  never re-derived by a generator. */
+    regionLookup: 'baked' | 'data';
     /** The interaction_surface_eval dispatch (+ material_has_nondelta_lobes guard)
      *  exists — their only caller is the light technique (NEE). */
     surfaceEval: boolean;
@@ -232,41 +242,14 @@ export interface PlannedPipeline {
     swaps: Array<{ buffers: string[] }>;
 }
 
-/**
- * Resolved SDF object for code generation.
- * All parameters are concrete numbers ready to bake into GLSL.
- */
-export interface PlannedSDFObject {
-    index: number;
-    materialId: number;
-    sdfType: string;   // registry-validated upstream (A2)
-    /** Authored provenance name (naming batch N5): flows into emitted symbols
-     *  (`sdf_<name>`, hoisted shape consts) after sanitization + dedup. Optional,
-     *  collision-legal (fable-transforms §7.6) — unnamed objects emit `object_<i>`. */
-    name?: string;
-    parameters: Record<string, number | number[]>;
-    /** Constant: composed local→world similarity (fable-transforms §5.2; any local
-     *  'center' folded in as a pre-translation) lowered to wrapper tiers. Driven
-     *  (§6): the uniform record — parameters stay LOCAL (center NOT folded; the
-     *  rigid-frame query scales params in-shader). */
-    placement: PlannedPlacement;
-    /** This object has a LEAF_SDF scene-table record (impl-plan-sdf-accel T2): under
-     *  'table' dispatch it leaves the GLOBAL marcher for the interval leaf march.
-     *  Constant + bounded + frame-free, per the adapter's ONE eligibility predicate
-     *  (rotation allowed — the record's rigid tail carries it). */
-    tabled?: boolean;
-}
-
-/**
- * Resolved analytic object for code generation — intersected in closed form (a second
- * geometry backend behind scene_intersect). `index` shares the region-id space with SDF
- * objects (regions are globally unique — §2.3), so material_of() spans both.
- */
 /** The planned SCENE TABLE (fable-object-tables): everything the table-mode codegen
  *  bakes — ledger bases + counts + the present-kind header codes. Built from the
  *  dataTenantsOf adapter's table (the one truth the App packs from too). */
 export interface PlannedSceneTable {
     slot: SceneTableSlot;
+    /** Records-channel base of the region→material id table (impl-plan-region-
+     *  materials; four ids per texel, region-id order) — allocated with the table. */
+    regionMaterialsBase: number;
     leafCount: number;
     analyticCount: number;
     /** Records [0, solidCount) are SOLID (the containment loop's range). */
@@ -285,18 +268,38 @@ export interface PlannedSceneTable {
     sdfKinds: Array<{ type: string; code: number }>;
 }
 
-export interface PlannedAnalyticObject {
+/**
+ * Resolved primitive object for code generation — ONE type for both intersection
+ * methods (impl-plan-sdf-as-shape T5, owner-decided Aug 10 2026: "an SDF is a shape
+ * with a slow intersect"). There is no SDF *backend*: `intersect` names the routine
+ * this object's generated arm calls — the shape's closed form, or its marching form
+ * restricted to its declared bound. Everything else about an object is the same
+ * either way, which is the whole point of the merge.
+ *
+ * `index` is the region id (globally unique — §2.3), shared with meshes and batches,
+ * so material_of() spans every geometry class.
+ */
+export interface PlannedPrimitiveObject {
     index: number;
     materialId: number;
-    shapeType: string;   // registry-validated upstream (A2)
-    /** Authored provenance name (naming batch N5) — see PlannedSDFObject.name. */
+    /** The primitive type — registry-validated upstream (A2). */
+    type: string;
+    /** Authored provenance name (naming batch N5): flows into emitted symbols (hoisted
+     *  `shape_<name>` consts, `sdf_<name>` containment helpers) after sanitization +
+     *  dedup. Optional and collision-legal (fable-transforms §7.6) — unnamed objects
+     *  emit `object_<i>`. */
     name?: string;
     parameters: Record<string, number | number[]>;
+    /** Which intersect routine the arm calls: 'closed-form' → `<type>_intersect`,
+     *  'march' → `<type>_sdf_intersect` inside the shape's declared bound. Resolved by
+     *  the Planner from the primitive's `provides` + any authored `backend:` pin. */
+    intersect: 'closed-form' | 'march';
     /** Present when the object keeps a LOCAL frame (parameters are then canonical/unfolded
      *  and the generated arm conjugates the ray into the rigid frame): a DrivenPlacement for
      *  {param} transforms (§6), OR a constant Similarity retained for a PATTERNED + rotated
-     *  shape (fable-imagery P1b — the chart needs the frame the fold would dissolve). Plain
-     *  constant placements fold entirely into `parameters` and this stays undefined. */
+     *  shape (fable-imagery P1b — the chart needs the frame the fold would dissolve), OR a
+     *  rotation residual a non-closed shape cannot absorb. Plain constant placements fold
+     *  entirely into `parameters` and this stays undefined. */
     placement?: PlannedPlacement;
     /** This object has a scene-table record (fable-object-tables): under 'table' dispatch
      *  it leaves the unrolled arms (intersect via the TLAS leaf, containment via the
@@ -369,7 +372,18 @@ export interface PlannedInstanceBatch {
      *  folded-parameters record, intersected in WORLD space with no conjugation. */
     prototype:
         | { backend: 'mesh'; triCount: number; smooth: boolean; geometrySlot: MeshSlot }
-        | { backend: 'analytic'; shapeType: string; record: 'frame' | 'params'; parameters: Record<string, number | number[]> };
+        | {
+            backend: 'primitive';
+            shapeType: string;
+            record: 'frame' | 'params';
+            parameters: Record<string, number | number[]>;
+            /** Which intersect routine the leaf item calls — the same per-object fact
+             *  PlannedPrimitiveObject carries (impl-plan-sdf-as-shape T7). 'march' runs
+             *  the prototype's <type>_sdf_intersect inside its declared bound; the
+             *  placement record is FRAME tier for marched prototypes (the bound test and
+             *  the march both run in the prototype's own frame). */
+            intersect: 'closed-form' | 'march';
+        };
 }
 
 /** A per-instance ATTRIBUTE reference (fable-instance-attributes — the fourth storage
@@ -531,8 +545,8 @@ export function isDrivenPlacement(p: PlannedPlacement): p is DrivenPlacement {
  */
 export interface RenderPlan {
     /** Resolved scene data for code generators */
-    objects: PlannedSDFObject[];
-    analyticObjects: PlannedAnalyticObject[];
+    /** Every primitive object, both intersection methods, in scene order (T5). */
+    objects: PlannedPrimitiveObject[];
     meshes: PlannedMesh[];
     instanceBatches: PlannedInstanceBatch[];
     /** Present when the scene has table-eligible objects (fable-object-tables) —

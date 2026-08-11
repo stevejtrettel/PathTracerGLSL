@@ -65,7 +65,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Instancing & scene scale',
         blurb: 'one prototype × N placements, per-instance attributes, the TLAS, and the scene object table',
         entries: [
-            e('spheres'), e('forest'), e('grand-bazaar'), e('bazaar'), e('sdf-field'),
+            e('spheres'), e('forest'), e('grand-bazaar'), e('bazaar'), e('sdf-field'), e('sdf-knot'),
             e('instance-twin', 'instance-twin-ref'),
             e('cube-cloud', 'cube-cloud-ref'),
             e('instance-params-twin', 'instance-params-frame'),
@@ -129,6 +129,11 @@ export const gallerySections: GallerySection[] = [
         ],
     },
     {
+        title: 'The SDF shape library',
+        blurb: 'distance fields as ordinary shapes: a constructed bottle, a vendored model, the torus — and scene-local fields defined where they are used',
+        entries: [e('sdf-shapes'), e('fractals'), e('custom-fields')],
+    },
+    {
         title: 'Transforms & driven placement',
         blurb: 'the similarity system: plan-time folds, tree flattening, conjugation, {param}-driven placement and lights',
         entries: [
@@ -153,7 +158,7 @@ export const gallerySections: GallerySection[] = [
         blurb: 'the first-principles anchors: the furnace, the minimal cross-backend twins, combined-backend shadows',
         entries: [
             e('furnace'), e('minimal'), e('analytic-minimal'), e('solids-analytic', 'solids-sdf'),
-            e('sdf-table-twin'),
+            e('sdf-table-twin'), e('sdf-instance-twin', 'sdf-instance-twin-ref'),
             // The SDF perf ladders ride as PARTNER links, not cards (the perf-cloud
             // convention): a card compiles every strategy arm at load, and the N=128
             // rows carry a global-marcher arm at 529 ms/frame — grand-bazaar's rule.

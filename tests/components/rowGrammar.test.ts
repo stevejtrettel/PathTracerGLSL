@@ -15,10 +15,10 @@ import { SENSORS } from '../../src/components/sensor/index.js';
 import type { RowConstraint, ParamKind } from '../../src/components/descriptors.js';
 
 /** Kinds-imply-shapes — ONE table (the geometry rule, applied everywhere a kind appears):
- *  point/vector/direction are vec3; angle/area are scalars; length is either (halfSize). */
+ *  point/vector/direction are vec3; angle/area/scalar are scalars; length is either (halfSize). */
 function checkKindShape(label: string, kind: ParamKind | undefined, shape: 'number' | 'vec3'): void {
     if (kind === undefined || kind === 'length') return;
-    if (kind === 'angle' || kind === 'area') {
+    if (kind === 'angle' || kind === 'area' || kind === 'scalar') {
         expect(shape, `${label} (kind '${kind}')`).toBe('number');
     } else {
         expect(shape, `${label} (kind '${kind}')`).toBe('vec3');
@@ -51,6 +51,7 @@ describe('row grammar (D1) — one vocabulary across families', () => {
 
     describe('geometry rows', () => {
         for (const [type, d] of Object.entries(PRIMITIVES)) {
+            if (d.local === true) continue;   // scene-local defineSDF fields: row rules enforced at definition time
             it(`${type}: required XOR default; constraints sane`, () => {
                 for (const p of d.params) {
                     if (p.required) expect(p.default, `${type}.${p.name}`).toBeUndefined();

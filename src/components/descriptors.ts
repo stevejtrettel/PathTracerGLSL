@@ -281,9 +281,14 @@ export type PrimitiveValues = Record<string, number | number[]>;
  *    angle → θ (INVARIANT — cone half-angles/cosines; a similarity changes no angle)
  *    area → s²·A (a derived surface measure — the quad/disk lights' A; kinding it
  *           'length' would silently under-scale it the day light params take Value<T>)
+ *    scalar → x (INVARIANT and DIMENSIONLESS — ratios, gains, counts, noise seeds:
+ *           the shape's *recipe* rather than its size. Distinct from 'angle', which is
+ *           also invariant but carries radians; a carved shape's erosion fraction is
+ *           neither a length nor an angle, and kinding it 'length' would scale the
+ *           carve pattern's DEPTH RATIO with the object — silently a different shape.)
  *  Driven ×s scaling derives from the same table: every kind scales except
- *  direction and angle (the invariant kinds); area scales ×s². */
-export type ParamKind = 'point' | 'vector' | 'direction' | 'length' | 'angle' | 'area';
+ *  direction, angle and scalar (the invariant kinds); area scales ×s². */
+export type ParamKind = 'point' | 'vector' | 'direction' | 'length' | 'angle' | 'area' | 'scalar';
 
 /** One row of a primitive's parameter schema. ROW ORDER = GLSL SIGNATURE ORDER
  *  (the derived call emitters splice arguments positionally — checked by the
@@ -336,7 +341,11 @@ export interface PrimitiveDescriptor {
     /** ONE schema row for both backends (order = struct field order = constructor
      *  order — see PrimitiveParamSpec). */
     params: PrimitiveParamSpec[];
-    /** ?raw source with this primitive's math. */
+    /** ?raw source with this primitive's math. SELF-CONTAINED: an occupant's helpers
+     *  are its own, prefixed and file-private (bottle's combinators, knob's vendored
+     *  operators, menger's cell box). Files are included WHOLESALE, so a helper defined
+     *  in two of them is a link error — shared vocabulary would need a shared file, and
+     *  there is deliberately none until scene-level composition is designed. */
     glsl: string;
     /** Declared occupant surface — declare-and-verify, both directions (the contract
      *  test checks symbols exist iff declared). sdf also serves analytic containment
@@ -396,6 +405,29 @@ export interface PrimitiveDescriptor {
      *  silently clips geometry — which is why the field-containment vitest samples each
      *  shape's field against its declared bound. */
     marchBound?: 'self' | 'unbounded' | { type: string; values(v: PrimitiveValues): PrimitiveValues };
+    /** Lipschitz factor of the field (fable-sdf-contract §3). ABSENT = 1: a true or
+     *  conservative signed distance (never overestimates), which every current
+     *  occupant is by construction. A field that can OVERESTIMATE true distance by up
+     *  to a factor L declares it here and the GENERATED march steps d/L — a
+     *  declaration, never a fork of the loop. The sampling gate for a first L>1
+     *  occupant lands with that occupant. */
+    lipschitz?: number;
+    /** Per-shape march step budget (fable-sdf-contract §3): the loop bound of the
+     *  GENERATED `<type>_sdf_intersect`. ABSENT = the global MAX_MARCH_STEPS
+     *  (glsl/core/march.glsl). A fractal that needs more, or a cheap smooth shape
+     *  that wants fewer, declares a number — one line, one shape's loop. */
+    stepBudget?: number;
+    /** HIT REFINEMENT conservatism factor (fable-sdf-contract §4, owner-ordered after
+     *  the tangle's ring banding): the worst-case ratio of TRUE surface distance to
+     *  the field's estimate near the surface (a field dividing by a gradient bound
+     *  declares that divisor's order). Declaring it emits `<type>_sdf_refine` — a
+     *  sign-only doubling bracket sized to cover ~2× this factor in acceptance radii,
+     *  then 8 bisections — so accepted hits land within the §4.2 classification band
+     *  no matter how crushed the estimate is. ABSENT = no refinement (a true distance
+     *  field's accepted residual is already ≤ march_epsilon — the fast path, and the
+     *  reason fractals pay nothing for the tangle's fix). ~(log2(2·refine) + 8) field
+     *  evals per HIT when declared. */
+    refine?: number;
     /** Computed compile-time struct fields appended after the row's fields
      *  (quad: the precompiled one-sided normal — MUST stay a compile-time
      *  value so hit side and the quad light's sampler agree bit-exactly).
@@ -415,6 +447,19 @@ export interface PrimitiveDescriptor {
      *  (`constraint`); this is for multi-row facts only (quad's parallel-edges — the
      *  area couples edge1 AND edge2). Runs after the C7 shape loop passes. */
     validateValues?(values: PrimitiveValues): string[];
+    /** SCENE-LOCAL marker (fable-sdf-contract §5.2): this descriptor was minted by
+     *  `defineSDF` in a scene module, not authored as a components/geometry folder.
+     *  The folder/structure/registry contract tests cover folder occupants only —
+     *  local fields are gated at DEFINITION time (defineSDF's checks) and at COMPILE
+     *  time (the Validator's twin-sampled bound containment, run over each authored
+     *  object's resolved values). Never set by hand. */
+    local?: boolean;
+    /** The CPU field twin (scene-local fields only — REQUIRED by defineSDF): the same
+     *  math as the GLSL, evaluated host-side. It is the measuring instrument that
+     *  makes the declared bound CHECKED rather than trusted. Registry occupants keep
+     *  their twins test-side (tests/components/fieldTwins.ts) — this slot exists
+     *  because a scene-local definition has no test file to keep one in. */
+    fieldTwin?(p: number[], values: PrimitiveValues): number;
     /** Similarity-closure fold OVERRIDE (fable-transforms §5.1). ABSENT = derived
      *  from kinds (point → g·p, vector → sR·v, direction → R·d, length → s·ℓ).
      *  Declare only when a parameter's rule couples several pieces (plane: the new

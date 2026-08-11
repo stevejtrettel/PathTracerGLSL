@@ -60,10 +60,10 @@ describe('explicit-light desugar (§6.2)', () => {
         const light = p.lights[0];
         expect(light.values.radiance).toEqual([5, 2.5, 1.25]);
         // the synthesized region exists and points at the emitter material
-        const region = p.analyticObjects.find((o) => o.index === light.regionId);
+        const region = p.objects.find((o) => o.index === light.regionId);
         expect(region).toBeDefined();
         expect(region!.materialId).toBe(emitter!.id);
-        expect(region!.shapeType).toBe('quad');
+        expect(region!.type).toBe('quad');
     });
 
     it('assigns desugared region ids after user objects, in scene order (globally unique)', () => {
@@ -74,7 +74,7 @@ describe('explicit-light desugar (§6.2)', () => {
             { kind: 'sphere', position: [0, 8, 0], radius: 0.2, emission: 1 },
         ];
         const p = runPlan(scene);
-        const allIndices = [...p.objects.map((o) => o.index), ...p.analyticObjects.map((o) => o.index)].sort((a, b) => a - b);
+        const allIndices = p.objects.map((o) => o.index).sort((a, b) => a - b);
         expect(allIndices).toEqual([0, 1, 2, 3]);   // dense, no collisions
         expect(p.lights[0].regionId).toBe(2);
         expect(p.lights[1].regionId).toBe(3);
@@ -116,7 +116,7 @@ describe('sampleAsLight route (§6.2)', () => {
         quad.transform = { position: [2, 3, 4] };
 
         const p = runPlan(scene);
-        const region = p.analyticObjects.find((o) => o.index === p.lights[0].regionId)!;
+        const region = p.objects.find((o) => o.index === p.lights[0].regionId)!;
         expect(region.parameters.corner).toEqual([2, 7, 4]);
         expect(p.lights[0].values.corner).toEqual([2, 7, 4]);
     });

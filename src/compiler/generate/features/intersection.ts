@@ -1,12 +1,12 @@
 // compiler/generate/features/intersection.ts
-// Geometry backends + the generated scene_intersect dispatcher.
+// Geometry classes + the generated scene_intersect dispatcher.
 //
 // A scene may use the SDF backend (marching), the analytic backend (closed-form), or both.
-// scene_intersect / scene_intersect_any are GENERATED to combine only the backends present —
+// scene_intersect / scene_intersect_any are GENERATED to combine only the classes present —
 // so "swapping the details of intersect" is exactly what the codegen does. Region ids are
 // globally unique across both backends (§2.3), so material_of() spans them.
 
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedSceneTable, DrivenPlacement, PlannedPlacement } from '../../plan/types.js';
+import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedSceneTable, DrivenPlacement, PlannedPlacement } from '../../plan/types.js';
 import { isDrivenPlacement } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -21,6 +21,8 @@ import {
     emitSdfCall,
     emitAnalyticTest,
     emitSignedDistance,
+    emitSdfIntersect,
+    emitSdfNormal,
 } from '../../../components/geometry/index.js';
 import {
     classifySimilarity,
@@ -41,17 +43,17 @@ import meshGLSL from '../../../components/intersection/mesh/mesh.glsl?raw';
 import { MESH_TRAVERSALS, INSTANCE_ACCELS, ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_SDF } from '../../../components/intersection/index.js';
 import { generateRecordReader, sdfTailTexel } from '../records.js';
 import { DATA_TEX_WIDTH } from '../../../components/data/pack.js';
-import { BVH_STACK_DEPTH, BVH_TFAR_PAD, bvhWalkLines } from '../../../components/accel/bvh/bvh.js';
+import { BVH_STACK_DEPTH, BVH_TFAR_PAD, bvhWalkLines, bvhPointWalkLines } from '../../../components/accel/bvh/bvh.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 import marchGLSL from '../../../glsl/core/march.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
-    // Backend presence is a link-map decision (ProgramDescription.intersection.backends) —
+    // Class presence is a link-map decision (ProgramDescription.intersection.classes) —
     // no scene with geometry is empty, but a fully-empty scene contributes nothing.
-    const { sdf: hasSDF, analytic: hasAnalytic, mesh: hasMesh, instanced: hasInstanced } = plan.program.intersection.backends;
-    if (!hasSDF && !hasAnalytic && !hasMesh && !hasInstanced) {
+    const { primitive: hasPrimitives, mesh: hasMesh, instanced: hasInstanced } = plan.program.intersection.classes;
+    if (!hasPrimitives && !hasMesh && !hasInstanced) {
         return emptyContribution('intersection');
     }
     // The data rail (data_texel1d) + the accel walk support (bvh_aabb_hit/BVH_STACK_DEPTH)
@@ -73,7 +75,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         && plan.lights.length > 0 && plan.lightTree !== undefined;
     const needDataRail = hasMesh || hasInstanced || tableMode || bvhLighting;
     const needMeshLeaf = hasMesh || plan.instanceBatches.some((b) => b.prototype.backend === 'mesh');
-    const ids = objectGlslIds(plan.objects, plan.analyticObjects, plan.meshes, plan.instanceBatches);
+    const ids = objectGlslIds(plan.objects, plan.meshes, plan.instanceBatches);
     const blocks: ShaderBlock[] = [];
     const defines: FeatureContribution['defines'] = {};
     const textures: PlannedTexture[] = [];
@@ -82,15 +84,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // per-object uniform pairs + slider metadata. Gated on the Planner's decision —
     // constant-only scenes carry ZERO placement machinery (exact linkage).
     const drivenRecords: DrivenPlacement[] = [
-        ...plan.objects.map((o) => o.placement).filter(isDrivenPlacement),
-        ...plan.analyticObjects.map((o) => o.placement).filter((p): p is DrivenPlacement => p !== undefined && isDrivenPlacement(p)),
+        ...plan.objects.map((o) => o.placement).filter((p): p is DrivenPlacement => p !== undefined && isDrivenPlacement(p)),
         ...plan.meshes.map((m) => m.placement).filter(isDrivenPlacement),
     ];
     // A patterned + rotated constant analytic shape keeps a similarity placement (P1b) and
     // calls the SAME placement_* helpers as a driven object — but bakes constant vec4s, so it
     // needs the ABI block WITHOUT being authored-driven (no uniforms). Broaden the placement
     // gate to any PLACED analytic object; the driven-uniform machinery above stays uniform-only.
-    const placedAnalytic = plan.analyticObjects.some((o) => o.placement !== undefined);
+    const placedAnalytic = plan.objects.some((o) => o.intersect === 'closed-form' && o.placement !== undefined);
     const uniforms: FeatureContribution['uniforms'] = [];
     const parameters: FeatureContribution['parameters'] = {};
     // placement.glsl (the rigid-frame ABI) is needed by driven placement AND by every instance
@@ -109,18 +110,48 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // The STRUCTS are generated from the descriptor rows first (A1: one declaration —
     // the row is the single source for struct, ctor, resolution, and validation).
     const presentTypes = new Set<string>([
-        ...plan.objects.map((o) => o.sdfType as string),
-        ...plan.analyticObjects.map((o) => o.shapeType as string),
+        ...plan.objects.map((o) => o.type),
         // Instanced analytic prototypes contribute their primitive's struct + glsl too.
-        ...plan.instanceBatches.flatMap((b) => b.prototype.backend === 'analytic' ? [b.prototype.shapeType] : []),
+        ...plan.instanceBatches.flatMap((b) => b.prototype.backend === 'primitive' ? [b.prototype.shapeType] : []),
     ]);
+    // The MARCHED set (fable-sdf-contract §4): the types whose generated
+    // `<type>_sdf_intersect` + `<type>_sdf_normal` this program actually calls —
+    // marched objects (residual AND tabled: the leaf arm calls the same functions)
+    // plus marched instance prototypes. Exactly linked: an analytic-only program
+    // carries no march code at all.
+    const marchedTypes = new Set<string>([
+        ...plan.objects.filter((o) => o.intersect === 'march').map((o) => o.type),
+        ...plan.instanceBatches.flatMap((b) =>
+            b.prototype.backend === 'primitive' && b.prototype.intersect === 'march' ? [b.prototype.shapeType] : []),
+    ]);
+    // A MARCH BOUND is an analytic object of a possibly DIFFERENT primitive (a torus
+    // bounds with a cylinder — impl-plan-sdf-as-shape §2.2), and the marched arm calls
+    // that primitive's `<type>_interval` over its struct. So the present set is closed
+    // under the bound relation for the types whose arms CALL the interval — the
+    // residual (unrolled) and instanced arms. A TABLED marched type's interval is the
+    // TLAS node box (impl-plan-sdf-accel T4), so its bound type is NOT dragged in
+    // (fable-sdf-contract B5 trimmed the previous everyone-closure). The fixpoint
+    // stands: a two-step bound chain must not be a link error discovered on the GPU.
+    const intervalSeeds = new Set<string>([
+        ...plan.objects.filter((o) => o.intersect === 'march' && !(tableMode && o.tabled === true)).map((o) => o.type),
+        ...plan.instanceBatches.flatMap((b) =>
+            b.prototype.backend === 'primitive' && b.prototype.intersect === 'march' ? [b.prototype.shapeType] : []),
+    ]);
+    for (let grew = true; grew;) {
+        grew = false;
+        for (const type of [...intervalSeeds]) {
+            const mb = PRIMITIVES[type]?.marchBound;
+            if (mb === undefined || mb === 'self' || mb === 'unbounded') continue;
+            if (!presentTypes.has(mb.type)) { presentTypes.add(mb.type); grew = true; }
+            if (!intervalSeeds.has(mb.type)) { intervalSeeds.add(mb.type); grew = true; }
+        }
+    }
     const present = Object.values(PRIMITIVES).filter((d) => presentTypes.has(d.type));
-    // Marching tolerances BEFORE the primitive files (impl-plan-sdf-as-shape T1): the
-    // shapes' own <type>_sdf_intersect calls march_epsilon(), so the vocabulary has to
-    // exist by then. Gated on the primitives PRESENT, not on the scene's backends: a
-    // marchable shape's file rides wholesale (§2.12) even into an all-analytic program,
-    // and it carries its marching half with it.
-    if (present.some((d) => d.provides.sdf)) {
+    // Marching tolerances BEFORE the generated march block: march_epsilon()/
+    // NORMAL_EPSILON are consumed ONLY by the generated intersects/normals now, so
+    // the file rides exactly when something marches (exact linkage — an occupant
+    // file no longer carries a marching half of its own).
+    if (marchedTypes.size > 0) {
         blocks.push({ origin: 'glsl/core/march.glsl', source: marchGLSL });
     }
     if (present.length > 0) {
@@ -133,11 +164,22 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     for (const d of present) {
         blocks.push({ origin: `components/geometry/${d.type}/${d.type}.glsl`, source: d.glsl });
     }
+    // Generated marching boilerplate (fable-sdf-contract §4): the loop + the 4-tap
+    // gradient, emitted per MARCHED type from its one authored field. AFTER the
+    // occupant files (they define `<type>_sdf`), in registry order.
+    if (marchedTypes.size > 0) {
+        blocks.push({
+            origin: 'generated:sdf-march',
+            source: ['// Generated marching intersects + gradient normals (fable-sdf-contract §4)',
+                ...present.filter((d) => marchedTypes.has(d.type))
+                    .flatMap((d) => [emitSdfIntersect(d), emitSdfNormal(d)])].join('\n'),
+        });
+    }
 
     // Named shapes (naming batch N5): each NAMED, CONSTANT-placed object's struct is
     // hoisted to one named const — emitted source reads like the scene, machine code
     // identical (the driver folds either form). Unnamed objects keep inline ctors.
-    const namedShapes = generateNamedShapes(plan.objects, plan.analyticObjects, ids);
+    const namedShapes = generateNamedShapes(plan.objects, ids);
     if (namedShapes !== null) {
         blocks.push({ origin: 'generated:named-shapes', source: namedShapes });
     }
@@ -151,31 +193,28 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // sdf_intersect_any, scene_intersect_any) are gated together.
     const anyQuery = plan.program.intersection.anyQuery;
 
-    // Marched objects: ONE per-object arm each, the analytic arm's twin (impl-plan-
-    // sdf-as-shape T3). An SDF object is a shape whose intersect ITERATES — the ray
-    // enters the shape's own frame, its declared bound gives the interval, and the
-    // shape's static <type>_sdf_intersect finds the hit inside it. There is no scene
-    // field, no minimum over objects, and no per-step dispatch: the global marcher and
-    // its scene_march_bound / scene_object_sdf / scene_object_uv are gone, and with
-    // them the class of generated code that grew with the object count.
-    // Under table dispatch this covers the RESIDUAL subset only (driven/unbounded/
-    // frame-retained — residualAnalytic's mirror); tabled objects march per leaf.
-    const residualSdf = tableMode ? plan.objects.filter((o) => o.tabled !== true) : plan.objects;
+    // ONE dispatch over ONE list (impl-plan-sdf-as-shape T5). Each object's arm calls
+    // either its shape's closed form or its shape's bounded march — a per-object fact,
+    // not a scene-wide backend. Under table dispatch this covers the RESIDUAL subset
+    // only (driven / unbounded / frame-retained); tabled objects are reached through
+    // the scene-TLAS leaf switch instead.
+    const residual = tableMode ? plan.objects.filter((o) => o.tabled !== true) : plan.objects;
     const tabledSdf: SdfLeafArm[] = tableMode && table !== undefined && plan.sceneTable !== undefined
         ? plan.sceneTable.sdfRecords.map((s, i) => ({
             region: s.region, type: s.type,
             rbase: plan.sceneTable!.slot.analyticBase + (plan.sceneTable!.analyticCount + i) * ANALYTIC_RECORD_TEXELS,
         }))
         : [];
-    if (hasSDF) {
-        blocks.push({ origin: 'generated:sdf-dispatch', source: generateSDFDispatch(residualSdf, tabledSdf, ids, chartUv, anyQuery) });
+    // Per-object signed fields for MARCHED objects — the containment query's targets
+    // (scene_region_at), not an intersect path: point-in-object for a marched shape has
+    // no closed form to fall back on. Tabled owners read theirs from the record (the
+    // prototypes here, definitions with the table).
+    const marchedResidual = residual.filter((o) => o.intersect === 'march');
+    if (marchedResidual.length > 0 || tabledSdf.length > 0) {
+        blocks.push({ origin: 'generated:sdf-fields', source: generateSdfFields(marchedResidual, tabledSdf, ids) });
     }
-
-    // Analytic backend: per-scene analytic_intersect* dispatch over the closed forms —
-    // under table dispatch, only the RESIDUAL subset (driven/unbounded) unrolls here.
-    const residualAnalytic = tableMode ? plan.analyticObjects.filter((o) => o.tabled !== true) : plan.analyticObjects;
-    if (hasAnalytic && residualAnalytic.length > 0) {
-        blocks.push({ origin: 'generated:analytic-dispatch', source: generateAnalyticDispatch(residualAnalytic, anyQuery, ids, chartUv) });
+    if (residual.length > 0) {
+        blocks.push({ origin: 'generated:primitive-dispatch', source: generatePrimitiveDispatch(residual, anyQuery, ids, chartUv) });
     }
 
     // The rail's addressing (glsl/core/data_texture.glsl: data_texel1d at DATA_TEX_WIDTH)
@@ -247,26 +286,43 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'generated:scene-table', source: generateSceneTable(table!, plan, ids, anyQuery) });
     }
 
-    // region → material table spans ALL backends (regions are globally unique).
-    blocks.push({ origin: 'generated:material-of', source: generateMaterialOf(plan.objects, plan.analyticObjects, plan.meshes, plan.instanceBatches, plan.ambientMedium) });
+    // region → material table spans EVERY geometry class (regions are globally unique).
+    // The lookup FORM is a link-map decision (impl-plan-region-materials): 'data' =
+    // one rail fetch against the regionMaterials tenant (table regime — generated size
+    // stops scaling with objects); 'baked' = the folded per-region constants. The
+    // presence guard mirrors tableMode's (a 'data' decision without a table falls back
+    // to baked, exactly as 'table' dispatch itself does).
+    const regionData = plan.program.materials.regionLookup === 'data' && tableMode
+        && plan.sceneTable !== undefined && plan.sceneTable.regionMaterialsBase >= 0;
+    blocks.push({
+        origin: 'generated:material-of',
+        source: regionData
+            ? generateMaterialOfData(plan.sceneTable!.regionMaterialsBase, plan.ambientMedium)
+            : generateMaterialOf(plan.objects, plan.meshes, plan.instanceBatches, plan.ambientMedium),
+    });
 
     // region → IOR table (§2.3 generated-tables family) — only when a transmissive model
     // reads it (capability-driven, R1a; both readers — dielectric_sample and the walk's
     // eta_scale site — pass the hit point since the GRIN-interface unification).
     if (plan.materials.some((m) => modelTransmission(m.model))) {
-        blocks.push({ origin: 'generated:ior-of', source: generateIorOf(plan.objects, plan.analyticObjects, plan.meshes, plan.materials) });
+        blocks.push({
+            origin: 'generated:ior-of',
+            source: regionData
+                ? generateIorOfData(plan.meshes, plan.materials)
+                : generateIorOf(plan.objects, plan.meshes, plan.materials),
+        });
     }
 
     // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
-    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.analyticObjects, plan.meshes, ids, table) });
+    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.meshes, ids, table) });
 
-    // The top-level dispatcher, combining only the backends present (declared after all).
+    // The top-level dispatcher, combining only the classes present (declared after all).
     // Zero-thickness regions (descriptor `thin` fact): they never claim containment, so
     // the dispatcher's owner-covers-own-side shortcut is invalid for them (audit H2). Meshes
     // are thin-like in v0 (surface-only, excluded from scene_region_at — impl-plan-meshes §3),
     // so their regions join the thin set: a back-face mesh hit probes the entering side.
     const thinRegions = [
-        ...plan.analyticObjects.filter((o) => primitive(o.shapeType).thin).map((o) => o.index),
+        ...plan.objects.filter((o) => primitive(o.type).thin).map((o) => o.index),
         // Open meshes are thin; CLOSED meshes have a proven interior (fable-mesh-containment)
         // and claim containment in scene_region_at instead.
         ...plan.meshes.filter((m) => !m.closed).map((m) => m.index),
@@ -276,11 +332,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     blocks.push({
         origin: 'generated:scene-intersect',
         source: generateSceneIntersect({
-            analytic: hasAnalytic && residualAnalytic.length > 0,
-            // The GLOBAL marcher arm serves the residual subset only (T3) — an
-            // all-tabled scene's sdf_intersect is never called (raymarch.glsl rides
-            // wholesale regardless: march_epsilon/raymarch_commit serve the leaves).
-            sdf: hasSDF && residualSdf.length > 0,
+            // ONE arm for every primitive object (T5) — the residual subset under
+            // table dispatch, everything otherwise.
+            primitive: residual.length > 0,
             mesh: hasMesh && residualMeshes.length > 0,
             instanced: hasInstanced && !tableMode,
             table: tableMode,
@@ -340,13 +394,13 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
 // Authored names flow into emitted symbols: `sdf_<name>`/`mesh_<name>`/`instance_<name>`
 // wrappers and hoisted `shape_<name>` consts. Names are provenance and collision-LEGAL
 // (fable-transforms §7.6), so identifiers are sanitized then deduped; unnamed objects
-// keep the `object_<i>` scheme. The map spans ALL backends (one identifier space,
+// keep the `object_<i>` scheme. The map spans EVERY geometry class (one identifier space,
 // keyed by the shared region index).
 
-function objectGlslIds(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[]): Map<number, string> {
+function objectGlslIds(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[]): Map<number, string> {
     const used = new Set<string>();
     const map = new Map<number, string>();
-    for (const o of [...sdf, ...analytic, ...meshes, ...batches].sort((a, b) => a.index - b.index)) {
+    for (const o of [...objects, ...meshes, ...batches].sort((a, b) => a.index - b.index)) {
         const base = o.name !== undefined ? sanitizeIdent(o.name) : `object_${o.index}`;
         let id = base;
         let n = 2;
@@ -372,19 +426,23 @@ function sanitizeIdent(name: string): string {
  *  (the `shape_` prefix keeps authored names clear of locals/params in the generated
  *  functions). Driven objects construct in-function (uniforms cannot initialize a
  *  global); unnamed objects keep inline ctors — zero churn where nothing is named. */
-function hoistedShapeName(obj: PlannedSDFObject | PlannedAnalyticObject, ids: Map<number, string>): string | null {
+function hoistedShapeName(obj: PlannedPrimitiveObject, ids: Map<number, string>): string | null {
     if (obj.name === undefined) return null;
-    const driven = 'sdfType' in obj ? isDrivenPlacement(obj.placement) : obj.placement !== undefined;
-    if (driven) return null;
+    // A retained placement means the ctor is built in-function (scaled params for the
+    // closed-form arm; the march arm hoists whenever it needs no scale expression).
+    const retained = obj.intersect === 'march'
+        ? obj.placement !== undefined && isDrivenPlacement(obj.placement)
+        : obj.placement !== undefined;
+    if (retained) return null;
     return `shape_${ids.get(obj.index)!}`;
 }
 
-function generateNamedShapes(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], ids: Map<number, string>): string | null {
+function generateNamedShapes(objects: PlannedPrimitiveObject[], ids: Map<number, string>): string | null {
     const lines: string[] = [];
-    for (const obj of [...sdf, ...analytic].sort((a, b) => a.index - b.index)) {
+    for (const obj of objects) {
         const constName = hoistedShapeName(obj, ids);
         if (constName === null) continue;
-        const d = primitive('sdfType' in obj ? obj.sdfType : obj.shapeType);
+        const d = primitive(obj.type);
         lines.push(`const ${structName(d)} ${constName} = ${emitCtor(d, obj.parameters)};`);
     }
     if (lines.length === 0) return null;
@@ -399,9 +457,9 @@ function generateNamedShapes(sdf: PlannedSDFObject[], analytic: PlannedAnalyticO
  *  BAKED record base texel. Slot order = plan.sceneTable.sdfRecords order. */
 interface SdfLeafArm { region: number; type: string; rbase: number }
 
-function generateSDFDispatch(objects: PlannedSDFObject[], tabled: SdfLeafArm[], ids: Map<number, string>, chartUv: boolean, anyQuery: boolean): string {
+function generateSdfFields(objects: PlannedPrimitiveObject[], tabled: SdfLeafArm[], ids: Map<number, string>): string {
     const lines: string[] = [];
-    lines.push('// Generated SDF dispatch');
+    lines.push('// Generated per-object signed fields (containment targets — impl-plan-sdf-as-shape T5)');
 
     // Per-TYPE record-driven field helpers for TABLED objects — PROTOTYPES here
     // (the definitions live with the scene table, after the data rail + record
@@ -411,13 +469,12 @@ function generateSDFDispatch(objects: PlannedSDFObject[], tabled: SdfLeafArm[], 
     const tabledTypes = [...new Set(tabled.map((s) => s.type))];
     for (const t of tabledTypes) {
         lines.push(`float sdf_leaf_field_${t}(vec3 p, uint rbase);`);
-        if (chartUv && primitive(t).uvChart) lines.push(`vec2 uv_leaf_${t}(vec3 p, uint rbase);`);
     }
     if (tabledTypes.length > 0) lines.push('');
 
     for (const obj of objects) {
         lines.push(`float sdf_${ids.get(obj.index)!}(vec3 p) {`);
-        if (isDrivenPlacement(obj.placement)) {
+        if (obj.placement !== undefined && isDrivenPlacement(obj.placement)) {
             // Driven (§6.1): query in the RIGID frame; the similarity-closed primitive
             // params absorb s in-shader — distances stay exact WORLD values, so the
             // marcher's stepping and every epsilon guard hold under live scale.
@@ -426,47 +483,17 @@ function generateSDFDispatch(objects: PlannedSDFObject[], tabled: SdfLeafArm[], 
             lines.push(`    float s = placement_scale(${g.uniformTS});`);
             lines.push(`    return ${generateSDFCall(obj, ids, 's')};`);
         } else {
-            lines.push(...emitPlacementQuery(obj.placement));
+            // No placement = folded into the params already (world space).
+            const g = obj.placement as Similarity | undefined;
+            if (g !== undefined) lines.push(...emitPlacementQuery(g));
             // s·d_local keeps the wrapper a WORLD-SPACE distance field — what keeps the
-            // marcher's stepping and the epsilon discipline (march_epsilon/EPS_INTERFACE/
-            // ray_spawn) valid unchanged (fable-transforms §5.2). s > 0 by Validator pin.
-            const scalePrefix = isIdentityScale(obj.placement.scale) ? '' : `${formatFloat(obj.placement.scale)} * `;
+            // epsilon discipline (march_epsilon/EPS_INTERFACE/ray_spawn) valid unchanged
+            // (fable-transforms §5.2). s > 0 by Validator pin.
+            const scalePrefix = g === undefined || isIdentityScale(g.scale) ? '' : `${formatFloat(g.scale)} * `;
             lines.push(`    return ${scalePrefix}${generateSDFCall(obj, ids)};`);
         }
         lines.push(`}`);
         lines.push('');
-    }
-
-    // ---- the per-object arms (impl-plan-sdf-as-shape T3) --------------------
-    // Shape-for-shape the analytic dispatch's twin, and deliberately so: conjugate the
-    // ray into the object's own frame (§6.1 — the direction stays UNIT and the ray is
-    // never scaled; the shape's length-like params absorb s, so t is a WORLD value and
-    // every epsilon guard holds unchanged), restrict the search to the object's
-    // DECLARED bound, march inside it, fill the hit locally.
-    //
-    // What is gone with the global marcher: scene_march_bound (the per-step minimum
-    // over every object), scene_object_sdf / scene_object_uv (the per-owner lookups by
-    // region id) and raymarch.glsl's scene_normal / raymarch_commit. The R-SUBMERGED
-    // lesson those existed to serve — a hit's normal must come from the HIT OBJECT's
-    // own field, never the scene minimum, which a container hijacks — is now
-    // STRUCTURAL: an arm can only see its own shape.
-    lines.push('bool sdf_intersect(Ray ray, inout Hit hit) {');
-    lines.push('    bool found = false;');
-    lines.push('    float t;');
-    for (const obj of objects) lines.push(...sdfObjectArm(obj, ids, chartUv, null));
-    lines.push('    return found;');
-    lines.push('}');
-
-    if (anyQuery) {
-        // Occlusion: the same arms, unordered, first accepted hit ends the query. The
-        // interval is clamped to the light distance PER OBJECT (the Jul 13 maxDist
-        // lesson): geometry at or beyond the light must never shadow the point.
-        lines.push('');
-        lines.push('bool sdf_intersect_any(Ray ray, float maxDist) {');
-        lines.push('    float t;');
-        for (const obj of objects) lines.push(...sdfObjectArm(obj, ids, chartUv, 'maxDist'));
-        lines.push('    return false;');
-        lines.push('}');
     }
 
     return lines.join('\n');
@@ -476,8 +503,8 @@ function generateSDFDispatch(objects: PlannedSDFObject[], tabled: SdfLeafArm[], 
  *  call and the bound restriction (impl-plan-sdf-as-shape §1). `bound` is null for the
  *  nearest-hit dispatch (the running nearest, hit.t, is the far limit) or the occlusion
  *  distance expression for the any-query, whose acceptance is strictly before it. */
-function sdfObjectArm(obj: PlannedSDFObject, ids: Map<number, string>, chartUv: boolean, bound: string | null): string[] {
-    const d = primitive(obj.sdfType);
+function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null): string[] {
+    const d = primitive(obj.type);
     const pl = emitSdfPlacement(obj.placement);
     const far = bound ?? 'hit.t';
     const lines: string[] = ['    {'];
@@ -533,7 +560,8 @@ function sdfObjectArm(obj: PlannedSDFObject, ids: Map<number, string>, chartUv: 
  *  absorbed by the shape's params instead, which is what keeps the march's stepping and
  *  every epsilon guard world-exact. `local` false = the object already sits in world
  *  space (the folded constant case — most objects, post placement-fold). */
-function emitSdfPlacement(pl: PlannedPlacement): { setup: string[]; local: boolean; ro: string; rd: string; scale?: string; nWorld: (n: string) => string } {
+function emitSdfPlacement(pl: PlannedPlacement | undefined): { setup: string[]; local: boolean; ro: string; rd: string; scale?: string; nWorld: (n: string) => string } {
+    if (pl === undefined) return { setup: [], local: false, ro: 'ray.origin', rd: 'ray.direction', nWorld: (n) => n };
     if (isDrivenPlacement(pl)) {
         return {
             setup: [`float s = placement_scale(${pl.uniformTS});`],
@@ -593,12 +621,12 @@ function emitPlacementQuery(g: Similarity): string[] {
  *  descriptors): row order = signature order; kind≠direction params × s under the
  *  driven tier. Named constant objects reference their hoisted shape const; everyone
  *  else gets the inline ctor (literals as folded, or s-scaled expressions). */
-function generateSDFCall(obj: PlannedSDFObject, ids: Map<number, string>, scaleExpr?: string): string {
+function generateSDFCall(obj: PlannedPrimitiveObject, ids: Map<number, string>, scaleExpr?: string): string {
     const constName = hoistedShapeName(obj, ids);
     if (constName !== null) {
-        return `${obj.sdfType}_sdf(p, ${constName})`;
+        return `${obj.type}_sdf(p, ${constName})`;
     }
-    return emitSdfCall(primitive(obj.sdfType), obj.parameters, { point: 'p', scale: scaleExpr });
+    return emitSdfCall(primitive(obj.type), obj.parameters, { point: 'p', scale: scaleExpr });
 }
 
 /** Hit.uv fill for an analytic hit-fill site (fable-imagery P1). The primitive's real chart
@@ -633,76 +661,88 @@ function placementRefs(p: PlannedPlacement): { q: string; ts: string } {
 // Nearest-hit over the analytic objects, and a first-blocker any-hit. p and the shading frame
 // come from ambient_geodesic/ambient_frame so they agree with the SDF path (cross-method match).
 
-function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: boolean, ids: Map<number, string>, chartUv: boolean): string {
-    const lines: string[] = ['// Generated analytic dispatch'];
+/** One CLOSED-FORM object's arm — unchanged in body from the pre-merge analytic
+ *  dispatch (impl-plan-sdf-as-shape T5: the merge moves arms between functions, it does
+ *  not rewrite them). `bound` is null for nearest-hit or the occlusion distance. */
+function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null): string[] {
+    const d = primitive(obj.type);
+    const sn = structName(d);
+    const lines: string[] = [];
+    if (obj.placement !== undefined) {
+        // Placed arm — DRIVEN (§6.1) or a CONSTANT placement retained for a patterned
+        // shape (fable-imagery P1b): conjugate into the RIGID frame once, so hit-finding
+        // AND the uv chart both run in the shape's own frame. The struct's length-like
+        // fields absorb s in-shader, so t is a WORLD value — comparable on hit.t unchanged,
+        // and the primitives' internal EPSILON guards stay world-correct. The chart inherits
+        // the placement's rotation for free (no rotation-dissolution — that only bites the
+        // FOLDED constant arm below).
+        const { q, ts } = placementRefs(obj.placement);
+        lines.push(`    {`);
+        lines.push(`        Ray lray = make_ray(placement_rigid(${q}, ${ts}, ray.origin), placement_dir(${q}, ray.direction));`);
+        lines.push(`        float s = placement_scale(${ts});`);
+        if (bound !== null) {
+            lines.push(`        if (${analyticTest(obj, 'lray', ids, 's')} && t < ${bound}) return true;`);
+            lines.push(`    }`);
+            return lines;
+        }
+        lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters, 's')};`);
+        lines.push(`        if (${d.type}_intersect(lray, shape, t) && t < hit.t) {`);
+        lines.push(`            hit.t = t; found = true;`);
+        lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
+        lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${q}, ${d.type}_normal(lray.origin + t * lray.direction, shape)));`);
+        lines.push(`            hit.region_owner = ${obj.index};`);
+        lines.push(`            hit.element = 0;`);
+        lines.push(`            ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`);
+        lines.push(`        }`);
+        lines.push(`    }`);
+        return lines;
+    }
+    if (bound !== null) {
+        lines.push(`    if (${analyticTest(obj, 'ray', ids)} && t < ${bound}) return true;`);
+        return lines;
+    }
+    const constName = hoistedShapeName(obj, ids);
+    const shapeRef = constName ?? 'shape';
+    lines.push(`    {`);
+    if (constName === null) {
+        lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters)};`);
+    }
+    lines.push(`        if (${d.type}_intersect(ray, ${shapeRef}, t) && t < hit.t) {`);
+    lines.push(`            hit.t = t; found = true;`);
+    lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
+    lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, ${shapeRef}));`);
+    lines.push(`            hit.region_owner = ${obj.index};`);
+    lines.push(`            hit.element = 0;`);
+    lines.push(`            ${uvFill(d, 'hit.p', shapeRef, chartUv)}`);
+    lines.push(`        }`);
+    lines.push(`    }`);
+    return lines;
+}
 
-    // Nearest-hit bounded by the incoming hit.t (the running nearest — set by the caller / a prior
-    // backend). Fills the hit's GEOMETRY + owner and shrinks hit.t on a closer object; leaves hit
-    // untouched otherwise. region_from/to are classified once by the dispatcher (§4.2).
-    lines.push('bool analytic_intersect(Ray ray, inout Hit hit) {');
+/** THE primitive dispatch (impl-plan-sdf-as-shape T5) — ONE generated function over ONE
+ *  list of objects. Which routine an object's arm calls is a per-object fact
+ *  (`intersect`), not a scene-wide backend: a closed form and a bounded march sit side
+ *  by side in the same loop, both bounded by the running nearest, both filling the same
+ *  Hit. This is the merge the measurement bought — before it there were two dispatches,
+ *  two aggregators, and an "SDF backend" concept threaded through the whole compiler.
+ *  region_from/to are classified once by the dispatcher (§4.2). */
+function generatePrimitiveDispatch(objects: PlannedPrimitiveObject[], anyQuery: boolean, ids: Map<number, string>, chartUv: boolean): string {
+    const lines: string[] = ['// Generated primitive dispatch (closed forms + bounded marches, one list)'];
+    lines.push('bool primitive_intersect(Ray ray, inout Hit hit) {');
     lines.push('    bool found = false;');
     lines.push('    float t;');
     for (const obj of objects) {
-        const d = primitive(obj.shapeType);
-        const sn = structName(d);
-        if (obj.placement !== undefined) {
-            // Placed arm — DRIVEN (§6.1) or a CONSTANT placement retained for a patterned
-            // shape (fable-imagery P1b): conjugate into the RIGID frame once, so hit-finding
-            // AND the uv chart both run in the shape's own frame. The struct's length-like
-            // fields absorb s in-shader, so t is a WORLD value — comparable on hit.t unchanged,
-            // and the primitives' internal EPSILON guards stay world-correct. The chart inherits
-            // the placement's rotation for free (no rotation-dissolution — that only bites the
-            // FOLDED constant arm below).
-            const { q, ts } = placementRefs(obj.placement);
-            lines.push(`    {`);
-            lines.push(`        Ray lray = make_ray(placement_rigid(${q}, ${ts}, ray.origin), placement_dir(${q}, ray.direction));`);
-            lines.push(`        float s = placement_scale(${ts});`);
-            lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters, 's')};`);
-            lines.push(`        if (${d.type}_intersect(lray, shape, t) && t < hit.t) {`);
-            lines.push(`            hit.t = t; found = true;`);
-            lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
-            lines.push(`            hit.frame = ambient_frame(hit.p, placement_normal(${q}, ${d.type}_normal(lray.origin + t * lray.direction, shape)));`);
-            lines.push(`            hit.region_owner = ${obj.index};`);
-            lines.push(`            hit.element = 0;`);
-            lines.push(`            ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`);
-            lines.push(`        }`);
-            lines.push(`    }`);
-            continue;
-        }
-        const constName = hoistedShapeName(obj, ids);
-        const shapeRef = constName ?? 'shape';
-        lines.push(`    {`);
-        if (constName === null) {
-            lines.push(`        ${sn} shape = ${emitCtor(d, obj.parameters)};`);
-        }
-        lines.push(`        if (${d.type}_intersect(ray, ${shapeRef}, t) && t < hit.t) {`);
-        lines.push(`            hit.t = t; found = true;`);
-        lines.push(`            hit.p = ambient_geodesic(ray.origin, ray.direction, t);`);
-        lines.push(`            hit.frame = ambient_frame(hit.p, ${d.type}_normal(hit.p, ${shapeRef}));`);
-        lines.push(`            hit.region_owner = ${obj.index};`);
-        lines.push(`            hit.element = 0;`);
-        lines.push(`            ${uvFill(d, 'hit.p', shapeRef, chartUv)}`);
-        lines.push(`        }`);
-        lines.push(`    }`);
+        lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, null) : analyticObjectArm(obj, ids, chartUv, null)));
     }
     lines.push('    return found;');
     lines.push('}');
-    lines.push('');
 
     if (anyQuery) {
-        lines.push('bool analytic_intersect_any(Ray ray, float maxDist) {');
+        lines.push('');
+        lines.push('bool primitive_intersect_any(Ray ray, float maxDist) {');
         lines.push('    float t;');
         for (const obj of objects) {
-            if (obj.placement !== undefined) {
-                const { q, ts } = placementRefs(obj.placement);
-                lines.push(`    {`);
-                lines.push(`        Ray lray = make_ray(placement_rigid(${q}, ${ts}, ray.origin), placement_dir(${q}, ray.direction));`);
-                lines.push(`        float s = placement_scale(${ts});`);
-                lines.push(`        if (${analyticTest(obj, 'lray', ids, 's')} && t < maxDist) return true;`);
-                lines.push(`    }`);
-                continue;
-            }
-            lines.push(`    if (${analyticTest(obj, 'ray', ids)} && t < maxDist) return true;`);
+            lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, 'maxDist') : analyticObjectArm(obj, ids, chartUv, 'maxDist')));
         }
         lines.push('    return false;');
         lines.push('}');
@@ -715,24 +755,24 @@ function generateAnalyticDispatch(objects: PlannedAnalyticObject[], anyQuery: bo
  *  precomputed one-sided normal is a derived struct field). Named constant objects
  *  reference their hoisted const; with `scaleExpr` (driven §6.1), the length-like
  *  constructor args are multiplied by s in-shader. */
-function analyticTest(obj: PlannedAnalyticObject, rayVar: string, ids: Map<number, string>, scaleExpr?: string): string {
+function analyticTest(obj: PlannedPrimitiveObject, rayVar: string, ids: Map<number, string>, scaleExpr?: string): string {
     const constName = hoistedShapeName(obj, ids);
     if (constName !== null) {
-        return `${obj.shapeType}_intersect(${rayVar}, ${constName}, t)`;
+        return `${obj.type}_intersect(${rayVar}, ${constName}, t)`;
     }
-    return emitAnalyticTest(primitive(obj.shapeType), obj.parameters, rayVar, scaleExpr);
+    return emitAnalyticTest(primitive(obj.type), obj.parameters, rayVar, scaleExpr);
 }
 
 /** GLSL expr for the SIGNED distance to `obj` at point `p` (analytic backend) —
  *  derived: thin primitives never claim containment; everyone else reuses their own
  *  <type>_sdf body, so both backends share ONE distance truth per primitive. Named
  *  constant objects reference their hoisted const. */
-function analyticSignedDistance(obj: PlannedAnalyticObject, ids: Map<number, string>): string {
-    const d = primitive(obj.shapeType);
+function analyticSignedDistance(obj: PlannedPrimitiveObject, ids: Map<number, string>): string {
+    const d = primitive(obj.type);
     if (d.thin) return '1.0e20';
     const constName = hoistedShapeName(obj, ids);
     if (constName !== null) {
-        return `${obj.shapeType}_sdf(p, ${constName})`;
+        return `${obj.type}_sdf(p, ${constName})`;
     }
     return emitSignedDistance(d, obj.parameters, { point: 'p' });
 }
@@ -868,7 +908,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
     // pbOverride: the cwbvh occupant's records-TWIN base (its leaf order differs from
     // the binary TLAS's — fable-accel-cwbvh §6); default = the binary-order region.
     const pb = pbOverride ?? b.slot.placementsBase;
-    if (b.prototype.backend === 'analytic' && b.prototype.record === 'params') {
+    if (b.prototype.backend === 'primitive' && b.prototype.record === 'params') {
         const d = primitive(b.prototype.shapeType);
         const read = [
             `vec4 rec = texelFetch(u_data_records, data_texel1d(uint(${pb} + i)), 0);`,
@@ -912,6 +952,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
             '}'];
     }
     const d = primitive(b.prototype.shapeType);
+    const marched = b.prototype.intersect === 'march';
     const conj = [
         'vec3 ro = placement_rigid(q, ts, ray.origin);',
         'vec3 rd = placement_dir(q, ray.direction);   // unit — <type>_intersect assumes it',
@@ -919,14 +960,28 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
         `${structName(d)} shape = ${emitCtor(d, b.prototype.parameters, 's')};`,
         'float t;',
     ];
-    if (forAny) return [...read, ...conj,
-        `if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < maxDist) return true;`];
-    return [...read, ...conj,
-        `if (${b.prototype.shapeType}_intersect(lray, shape, t) && t < hit.t) {`,
+    // The MARCHED prototype (impl-plan-sdf-as-shape T7): the identical leaf item, with
+    // the shape's bounded march in place of its closed form. The ray is already in the
+    // prototype's own frame and the params already absorbed s, so the bound test and the
+    // march need nothing further — this is the whole dividend of the T5 merge.
+    const mb = d.marchBound;
+    const boundOpen = marched && mb !== undefined && mb !== 'unbounded'
+        ? [`float b0, b1;`, `if (!${mb === 'self' ? d.type : mb.type}_interval(lray, ${mb === 'self' ? 'shape' : emitCtor(primitive(mb.type), mb.values(b.prototype.parameters), 's')}, b0, b1)) continue;`]
+        : marched ? ['float b0 = 0.0, b1 = 1.0e20;'] : [];
+    const test = (far: string): string => marched
+        ? `${d.type}_sdf_intersect(lray, shape, b0, min(b1, ${far}), t)`
+        : `${d.type}_intersect(lray, shape, t)`;
+    const normal = marched
+        ? `${d.type}_sdf_normal(lray.origin + t * lray.direction, shape)`
+        : `${d.type}_normal(lray.origin + t * lray.direction, shape)`;
+    if (forAny) return [...read, ...conj, ...boundOpen,
+        `if (${test('maxDist')} && t < maxDist) return true;`];
+    return [...read, ...conj, ...boundOpen,
+        `if (${test('hit.t')} && t < hit.t) {`,
         '    hit.t = t; found = true;',
         '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
         '    hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
-        `    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${b.prototype.shapeType}_normal(lray.origin + t * lray.direction, shape))));`,
+        `    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, ${normal})));`,
         `    hit.region_owner = ${b.index};`,
         `    ${uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv)}`,
         '}'];
@@ -985,20 +1040,24 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
 // flipped inequality away: `d > best` among negatives — deepest-wins made a submerged sphere
 // invisible (verification T2 / R-SUBMERGED). Spans both backends.
 
-function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], ids: Map<number, string>, table?: PlannedSceneTable): string {
+function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], ids: Map<number, string>, table?: PlannedSceneTable): string {
     const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
     lines.push('int scene_region_at(vec3 p) {');
     lines.push('    int region = -1;');
     lines.push('    float best = -1.0e20;   // best = least-negative inside distance so far');
     lines.push('    float d;');
-    for (const obj of sdf) {
-        if (table !== undefined && obj.tabled === true) continue;   // containment via the SDF record loop below
-        lines.push(`    d = sdf_${ids.get(obj.index)!}(p);`);
-        lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
-    }
-    for (const obj of analytic) {
-        if (table !== undefined && obj.tabled === true) continue;   // containment via the record loop below
-        if (obj.placement !== undefined && !primitive(obj.shapeType).thin) {
+    // ONE loop over ONE list (T5): a marched object answers through its generated
+    // signed-field wrapper, a closed-form one through its shape's own field — the same
+    // innermost-wins comparison either way, because containment was never a property of
+    // the intersection method.
+    for (const obj of objects) {
+        if (table !== undefined && obj.tabled === true) continue;   // containment via the record loops below
+        if (obj.intersect === 'march') {
+            lines.push(`    d = sdf_${ids.get(obj.index)!}(p);`);
+            lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
+            continue;
+        }
+        if (obj.placement !== undefined && !primitive(obj.type).thin) {
             // Placed (§6.1) — driven OR a patterned-shape's retained constant placement (P1b):
             // classify in the rigid frame with s-scaled params — d stays an exact WORLD signed
             // distance, so innermost-wins compares correctly across constant and placed objects.
@@ -1006,47 +1065,51 @@ function generateSceneRegionAt(sdf: PlannedSDFObject[], analytic: PlannedAnalyti
             // irrelevant.)
             const { q, ts } = placementRefs(obj.placement);
             lines.push(`    { vec3 lp = placement_rigid(${q}, ${ts}, p); float s = placement_scale(${ts});`);
-            lines.push(`      d = ${emitSignedDistance(primitive(obj.shapeType), obj.parameters, { point: 'lp', scale: 's' })}; }`);
+            lines.push(`      d = ${emitSignedDistance(primitive(obj.type), obj.parameters, { point: 'lp', scale: 's' })}; }`);
         } else {
             lines.push(`    d = ${analyticSignedDistance(obj, ids)};`);
         }
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
     }
-    // Tabled SOLIDS (fable-object-tables §4 — ONE param truth): a generated loop over
-    // the record range [0, solidCount), reading each solid's struct from its record and
-    // ranking its signed distance in the SAME innermost-wins comparison. O(1) code size
-    // regardless of object count; the region id rides the record header.
-    if (table !== undefined && table.solidCount > 0) {
+    // Tabled SOLIDS — ONE DESCENT of the scene TLAS (impl-plan-sdf-as-shape T6),
+    // replacing the two record SCANS this used to run (analytic block, then SDF block).
+    // Containment was O(objects) per call and scene_region_at runs once per hit, so at
+    // thousands of objects the scan — not the tracing — became the ceiling. The descent
+    // visits only leaves whose box contains p, which is exactly the candidate set: a
+    // point outside a leaf's box cannot be inside the object that box bounds.
+    //
+    // Record solidity is POSITIONAL (solids first in each block), so the leaf's `ref`
+    // decides it with a compile-time constant — no extra fetch. THIN leaves, mesh leaves
+    // and instance batches fall through: their containment is handled below/elsewhere.
+    if (table !== undefined && (table.solidCount > 0 || table.sdfRecords.some((r) => r.solid))) {
         const solidKinds = table.kinds.filter((k) => primitive(k.type).thin !== true);
-        lines.push(`    for (uint ri = 0u; ri < ${table.solidCount}u; ri++) {`);
-        lines.push(`        uint rbase = ${table.slot.analyticBase}u + ri * ${ANALYTIC_RECORD_TEXELS}u;`);
-        lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
-        lines.push('        float ds = 1.0e20;');
+        const sdfSolidKinds = table.sdfKinds.filter((k) => primitive(k.type).thin !== true);
+        const sdfSolidCount = table.sdfRecords.filter((r) => r.solid).length;
+        const leaf: string[] = [
+            'for (int j = 0; j < cnt; j++) {',
+            `    vec4 L = texelFetch(u_data_records, data_texel1d(${table.slot.leafListBase}u + uint(off + j)), 0);`,
+            '    int lk = int(L.x); int lref = int(L.y);',
+            '    uint rbase; bool solid = false;',
+            `    if (lk == ${LEAF_ANALYTIC}) { rbase = ${table.slot.analyticBase}u + uint(lref) * ${ANALYTIC_RECORD_TEXELS}u; solid = lref < ${table.solidCount}; }`,
+        ];
+        if (table.sdfKinds.length > 0) {
+            leaf.push(`    else if (lk == ${LEAF_SDF}) { rbase = ${table.slot.analyticBase}u + (${table.analyticCount}u + uint(lref)) * ${ANALYTIC_RECORD_TEXELS}u; solid = lref < ${sdfSolidCount}; }`);
+        }
+        leaf.push('    else continue;   // mesh / batch leaves: containment handled outside the descent');
+        leaf.push('    if (!solid) continue;');
+        leaf.push('    vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+        leaf.push('    float ds = 1.0e20;');
         for (const k of solidKinds) {
             const d = primitive(k.type);
-            lines.push(`        if (int(hdr.x) == ${k.code}) { ${structName(d)} shape = ${k.type}_from_record(u_data_records, rbase); ds = ${k.type}_sdf(p, shape); }`);
+            leaf.push(`    if (int(hdr.x) == ${k.code}) { ${structName(d)} shape = ${k.type}_from_record(u_data_records, rbase); ds = ${k.type}_sdf(p, shape); }`);
         }
-        lines.push('        if (ds < 0.0 && ds > best) { best = ds; region = int(hdr.y); }');
-        lines.push('    }');
-    }
-    // Tabled SDF SOLIDS (impl-plan-sdf-accel T4): the same record-loop shape over the
-    // SDF block's solids-first range, through the per-type record field (conjugation
-    // inside — d stays an exact WORLD signed distance; s = 1 on the rigid tail). No
-    // point-in-box early-out: for PRIMITIVE fields the signed-distance eval costs
-    // about a box test — the early-out becomes worthwhile only when expression fields
-    // arrive (fable-sdf-accel §2.2's deferred half).
-    if (table !== undefined && table.sdfRecords.some((s) => s.solid)) {
-        const sdfSolidCount = table.sdfRecords.filter((s) => s.solid).length;
-        const sdfSolidKinds = table.sdfKinds.filter((k) => primitive(k.type).thin !== true);
-        lines.push(`    for (uint ri = ${table.analyticCount}u; ri < ${table.analyticCount + sdfSolidCount}u; ri++) {`);
-        lines.push(`        uint rbase = ${table.slot.analyticBase}u + ri * ${ANALYTIC_RECORD_TEXELS}u;`);
-        lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
-        lines.push('        float ds = 1.0e20;');
         for (const k of sdfSolidKinds) {
-            lines.push(`        if (int(hdr.x) == ${k.code}) ds = sdf_leaf_field_${k.type}(p, rbase);`);
+            // The marched block's field reads the record AND conjugates by its rigid tail.
+            leaf.push(`    if (int(hdr.x) == ${k.code}) ds = sdf_leaf_field_${k.type}(p, rbase);`);
         }
-        lines.push('        if (ds < 0.0 && ds > best) { best = ds; region = int(hdr.y); }');
-        lines.push('    }');
+        leaf.push('    if (ds < 0.0 && ds > best) { best = ds; region = int(hdr.y); }');
+        leaf.push('}');
+        lines.push(...bvhPointWalkLines(table.slot.tlasBase, leaf));
     }
     // CLOSED meshes (fable-mesh-containment §1, amended): the lazy three-tier query —
     // (1) outside the baked local box → outside, free; (2) first-hit-facing nearest walk
@@ -1111,6 +1174,39 @@ function emitMeshPointQuery(pl: PlannedPlacement): string[] {
 // analytic leaf reads its struct from the record and runs the SAME <type>_intersect
 // the unrolled arm calls — one math, two addressings.
 
+/** One marched scene-table leaf arm (impl-plan-sdf-as-shape T4) — the unrolled arm's
+ *  body, reading its shape from a record instead of compile-time literals. `bound` is
+ *  null for the nearest-hit walk or the occlusion distance for the any-walk. The
+ *  interval is the node box the walk already fetched: leaf size 1 makes the node box
+ *  this object's own bound, so there is no second bound test to pay for. */
+function sdfLeafArm(k: { type: string; code: number }, chartUv: boolean, bound: string | null): string[] {
+    const d = primitive(k.type);
+    const sn = structName(d);
+    const tail = sdfTailTexel(d);
+    const far = bound ?? 'hit.t';
+    const lp = 'lray.origin + t * lray.direction';
+    const lines = [`        if (int(hdr.x) == ${k.code}) {`];
+    lines.push(`            ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
+    lines.push(`            vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
+    lines.push(`            vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
+    lines.push('            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction));');
+    const call = `${k.type}_sdf_intersect(lray, shape, lt0, min(lt1, ${far}), t)`;
+    if (bound !== null) {
+        lines.push(`            if (${call} && t < ${far}) return true;`);
+    } else {
+        lines.push(`            if (${call} && t < hit.t) {`);
+        lines.push('                hit.t = t; found = true;');
+        lines.push('                hit.p = ambient_geodesic(ray.origin, ray.direction, t);');
+        lines.push(`                hit.frame = ambient_frame(hit.p, placement_normal(rq, ${k.type}_sdf_normal(${lp}, shape)));`);
+        lines.push('                hit.region_owner = int(hdr.y);');
+        lines.push('                hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)');
+        lines.push(`                ${uvFill(d, lp, 'shape', chartUv)}`);
+        lines.push('            }');
+    }
+    lines.push('        }');
+    return lines;
+}
+
 function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map<number, string>, anyQuery: boolean): string {
     const lines: string[] = ['// Generated scene table (fable-object-tables)'];
     const S = table.slot;
@@ -1126,11 +1222,17 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
     }
     lines.push('');
 
-    // ── Boxed-SDF leaf machinery (impl-plan-sdf-accel T3), per PRESENT SDF-arm type:
-    // the record-driven signed field (the region-keyed queries' target — prototyped in
-    // the SDF dispatch), its uv sibling, and the INTERVAL leaf marchers. The rigid tail
-    // (q_inv texel, (t_rigid, s) texel) sits texel-aligned after the params (records.ts
-    // sdfTailTexel — the ONE layout truth); conjugation is once per call/visit.
+    // ── Boxed-SDF leaves (impl-plan-sdf-as-shape T4): the ONE generated helper left
+    // per present SDF-arm type — the record-driven signed field. It is PLUMBING (read
+    // the record, conjugate by the rigid tail) around the shape's own static math, and
+    // it exists because the region-keyed containment query needs a point-in-object test
+    // for objects whose parameters live in a texture (scene_region_at's record loop —
+    // prototyped in the SDF dispatch, defined here with the readers it needs).
+    //
+    // GONE at T4: march_leaf_<type>, march_leaf_any_<type>, march_commit_<type> and
+    // uv_leaf_<type>. The leaf arms below call the shapes' OWN <type>_sdf_intersect /
+    // <type>_sdf_normal / <type>_uv, exactly as the unrolled arms do — one march
+    // implementation in the codebase, living beside the field it marches.
     for (const k of table.sdfKinds) {
         const d = primitive(k.type);
         const sn = structName(d);
@@ -1141,88 +1243,6 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         lines.push(`    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
         lines.push(`    return ${k.type}_sdf(placement_rigid(rq, rts, p), shape);`);
         lines.push('}');
-        if (chartUv && d.uvChart) {
-            lines.push(`vec2 uv_leaf_${k.type}(vec3 p, uint rbase) {`);
-            lines.push(`    ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
-            lines.push(`    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
-            lines.push(`    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
-            lines.push(`    return ${k.type}_uv(placement_rigid(rq, rts, p), shape);`);
-            lines.push('}');
-        }
-        // The per-type SELF-CONTAINED commit (the ONE-SHOT FIX, Aug 10 2026): the
-        // first build committed through raymarch_commit → scene_normal →
-        // scene_object_sdf — an O(N)-ARM dispatch inlined at every commit site inside
-        // every marcher: ~6·N·2·3 inlined ops that stalled shader compilers past
-        // ~50 objects (the sdf-field failure; SwiftShader AND Metal — backend-
-        // agnostic). The leaf KNOWS its type and record: the normal is six taps of
-        // ITS OWN field (O(1)), rotated to world ONCE by the record's quat; uv from
-        // its own chart. One helper, called at both acceptance sites, so the two
-        // paths cannot drift (the raymarch_commit lesson, kept — locally).
-        lines.push(`void march_commit_${k.type}(Ray ray, float t, ${sn} shape, vec3 lp, vec4 rq, int region, inout Hit hit) {`);
-        lines.push('    hit.t = t;');
-        lines.push('    hit.p = ambient_geodesic(ray.origin, ray.direction, t);');
-        lines.push('    vec2 e = vec2(NORMAL_EPSILON, 0.0);');
-        lines.push('    vec3 nl = normalize(vec3(');
-        lines.push(`        ${k.type}_sdf(lp + e.xyy, shape) - ${k.type}_sdf(lp - e.xyy, shape),`);
-        lines.push(`        ${k.type}_sdf(lp + e.yxy, shape) - ${k.type}_sdf(lp - e.yxy, shape),`);
-        lines.push(`        ${k.type}_sdf(lp + e.yyx, shape) - ${k.type}_sdf(lp - e.yyx, shape)));`);
-        lines.push('    hit.frame = ambient_frame(hit.p, placement_normal(rq, nl));');
-        lines.push('    hit.region_owner = region;');
-        lines.push('    hit.element = 0;   // SDF objects have no sub-elements (Hit.element contract)');
-        if (chartUv && d.uvChart) {
-            lines.push(`    hit.uv = ${k.type}_uv(lp, shape);   // the type's own LOCAL chart`);
-        } else {
-            lines.push('    hit.uv = vec2(hit.p.x * UV_PLANAR_SCALE, hit.p.z * UV_PLANAR_SCALE);   // planar placeholder (world — matches the unrolled arm)');
-        }
-        lines.push('}');
-        // The interval leaf march (fable-sdf-accel §3): conjugate ONCE, march |sdf|
-        // within [lt0, lt1] dilated by march_epsilon(lt1) (surfaces may sit ON the
-        // conservative box wall); per-leaf exhaustion inside the interval = the
-        // grazing stall-commit, outside = miss-and-resume.
-        lines.push(`bool march_leaf_${k.type}(Ray ray, float lt0, float lt1, uint rbase, int region, inout Hit hit) {`);
-        lines.push(`    ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
-        lines.push(`    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
-        lines.push(`    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
-        lines.push('    vec3 ro = placement_rigid(rq, rts, ray.origin);');
-        lines.push('    vec3 rd = placement_dir(rq, ray.direction);');
-        lines.push('    float t = max(lt0, EPSILON);');
-        lines.push('    float t_stop = min(lt1 + march_epsilon(lt1), hit.t);');
-        lines.push('    float bound = 1e20;');
-        lines.push('    for (int i = 0; i < MAX_MARCH_STEPS; i++) {');
-        lines.push('        if (t > t_stop) return false;   // left the (dilated) interval or past the running nearest');
-        lines.push(`        bound = abs(${k.type}_sdf(ro + t * rd, shape));`);
-        lines.push('        if (bound < march_epsilon(t)) {');
-        lines.push(`            march_commit_${k.type}(ray, t, shape, ro + t * rd, rq, region, hit);`);
-        lines.push('            return true;');
-        lines.push('        }');
-        lines.push('        t += bound;');
-        lines.push('    }');
-        lines.push('    // Exhaustion still inside the interval: pinned at grazing — the stall-commit');
-        lines.push('    // (never fires merely at the box wall: it requires bound < 16ε of REAL surface).');
-        lines.push('    if (bound < 16.0 * march_epsilon(t) && t <= t_stop) {');
-        lines.push(`        march_commit_${k.type}(ray, t, shape, ro + t * rd, rq, region, hit);`);
-        lines.push('        return true;');
-        lines.push('    }');
-        lines.push('    return false;');
-        lines.push('}');
-        if (anyQuery) {
-            lines.push(`bool march_leaf_any_${k.type}(Ray ray, float lt0, float lt1, uint rbase, float maxDist) {`);
-            lines.push(`    ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
-            lines.push(`    vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
-            lines.push(`    vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
-            lines.push('    vec3 ro = placement_rigid(rq, rts, ray.origin);');
-            lines.push('    vec3 rd = placement_dir(rq, ray.direction);');
-            lines.push('    float t = max(lt0, EPSILON);');
-            lines.push('    float t_stop = min(lt1 + march_epsilon(lt1), maxDist);');
-            lines.push('    for (int i = 0; i < MAX_MARCH_STEPS; i++) {');
-            lines.push('        if (t > t_stop) return false;   // cleared the interval/light: unoccluded here');
-            lines.push(`        float bound = abs(${k.type}_sdf(ro + t * rd, shape));`);
-            lines.push('        if (bound < march_epsilon(t)) return true;');
-            lines.push('        t += bound;');
-            lines.push('    }');
-            lines.push('    return true;   // exhausted inside the interval: grazing — conservatively occluded');
-            lines.push('}');
-        }
     }
     if (table.sdfKinds.length > 0) lines.push('');
 
@@ -1259,11 +1279,17 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
         lines.push(`        if (ref == ${m.ordinal}) { if (mesh_${ids.get(m.index)!}(ray, hit)) found = true; }`);
     }
     if (table.sdfKinds.length > 0) {
+        // The marched leaf (impl-plan-sdf-as-shape T4): read the record, conjugate by
+        // its rigid tail, and march the shape's OWN intersect over the node-box
+        // interval — leaf size 1, so the node box IS this object's bound and no
+        // separate bound test is needed (fable-sdf-accel §2.1). Body-for-body the
+        // unrolled arm; only where the shape's numbers come from differs.
         lines.push(`    } else if (lk == ${LEAF_SDF}) {`);
         lines.push(`        uint rbase = ${S.analyticBase}u + (${table.analyticCount}u + uint(ref)) * ${STRIDE}u;`);
         lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+        lines.push('        float t;');
         for (const k of table.sdfKinds) {
-            lines.push(`        if (int(hdr.x) == ${k.code}) { if (march_leaf_${k.type}(ray, lt0, lt1, rbase, int(hdr.y), hit)) found = true; }`);
+            lines.push(...sdfLeafArm(k, chartUv, null));
         }
     }
     lines.push('    } else {');
@@ -1306,8 +1332,9 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
             lines.push(`    } else if (lk == ${LEAF_SDF}) {`);
             lines.push(`        uint rbase = ${S.analyticBase}u + (${table.analyticCount}u + uint(ref)) * ${STRIDE}u;`);
             lines.push('        vec4 hdr = texelFetch(u_data_records, data_texel1d(rbase), 0);');
+            lines.push('        float t;');
             for (const k of table.sdfKinds) {
-                lines.push(`        if (int(hdr.x) == ${k.code}) { if (march_leaf_any_${k.type}(ray, lt0, lt1, rbase, maxDist)) return true; }`);
+                lines.push(...sdfLeafArm(k, chartUv, 'maxDist'));
             }
         }
         lines.push('    } else {');
@@ -1333,15 +1360,77 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
 // region → material table (both backends)
 // ============================================================================
 
-function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], instances: PlannedInstanceBatch[], ambientMedium: number): string {
-    const lines: string[] = ['// Generated region -> material table (§2.3), across both backends'];
+function generateMaterialOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], instances: PlannedInstanceBatch[], ambientMedium: number): string {
+    const lines: string[] = ['// Generated region -> material table (§2.3), across every geometry class'];
     lines.push('int material_of(int region) {');
-    const all: Array<{ index: number; materialId: number }> = [...sdf, ...analytic, ...meshes, ...instances];
+    const all: Array<{ index: number; materialId: number }> = [...objects, ...meshes, ...instances];
     for (const obj of all.sort((a, b) => a.index - b.index)) {
         lines.push(`    if (region == ${obj.index}) return ${obj.materialId};`);
     }
     // Default arm covers region -1: the ambientMedium's material id, or -1 = vacuum (§2.4).
     lines.push(`    return ${ambientMedium};`);
+    lines.push('}');
+    return lines.join('\n');
+}
+
+/** The DATA form (impl-plan-region-materials): region → material id is per-object
+ *  DATA — one rail fetch replaces the per-region constant arms, so the generated size
+ *  stops scaling with the object count (the knot scene's material_of was 3002 of its
+ *  4515 lines). Ids ride the records channel four to a texel (f32 is exact far past
+ *  any material count); the in-texel pick is a COMPONENT SELECT, never a dynamic
+ *  vector index (the standing ANGLE dialect rule). region < 0 keeps the ambient
+ *  default arm byte-for-byte. */
+function generateMaterialOfData(base: number, ambientMedium: number): string {
+    return [
+        '// Generated region -> material lookup (impl-plan-region-materials): DATA form —',
+        '// ids packed 4/texel in the records channel at the ledger-baked base.',
+        'int material_of(int region) {',
+        `    if (region < 0) return ${ambientMedium};`,
+        `    vec4 ids = texelFetch(u_data_records, data_texel1d(uint(${base} + (region >> 2))), 0);`,
+        '    int c = region & 3;',
+        '    float id = c == 0 ? ids.x : c == 1 ? ids.y : c == 2 ? ids.z : ids.w;',
+        '    return int(id + 0.5);',
+        '}',
+    ].join('\n');
+}
+
+/** The DATA form of the IOR table: the decomposition ior_of(region, p) =
+ *  ior_of_material(material_of(region), p). The material half STAYS generated —
+ *  an index may be a FORMULA (GRIN) or a driven uniform, which is exactly why fusing
+ *  it to regions was the O(N) mistake — and is sized by the MATERIAL count. The two
+ *  semantic pins of the baked form carry over exactly: region −1 answers 1.0 before
+ *  any fetch, and OPEN meshes (thin — excluded from the baked table) keep explicit
+ *  1.0 arms, sized by the open-transmissive-mesh count (a warned configuration). */
+function generateIorOfData(meshes: PlannedMesh[], materials: PlannedMaterial[]): string {
+    const lines: string[] = ['// Generated material -> IOR (impl-plan-region-materials: the region half is data)'];
+    lines.push('float ior_of_material(int mat, vec3 p) {');
+    for (const mat of materials) {
+        if (mat.medium?.ior !== undefined) {
+            lines.push(`    if (mat == ${mat.id}) return ${emitValue(mat.medium.ior as ParamValue, formatFloat)};   // '${mat.name}' — deflecting: the medium's n(p)`);
+            continue;
+        }
+        if (!modelTransmission(mat.model)) continue;
+        const row = MATERIAL_MODELS[mat.model]?.properties.find((r) => r.storage === 'region-table');
+        const ior = row !== undefined ? mat.values[row.source] : undefined;
+        if (ior === undefined) continue;
+        const expr = emitValue(ior as ParamValue, formatFloat as (x: never) => string, () => {
+            throw new Error(`intersection: material '${mat.name}': the surface ior row cannot be a GLSL expression — a spatial index is a medium: author it as medium: { ior: <formula> } (fable-variable-ior)`);
+        });
+        lines.push(`    if (mat == ${mat.id}) return ${expr};`);
+    }
+    lines.push('    return 1.0;'); // non-transmissive / ambient
+    lines.push('}');
+    lines.push('');
+    lines.push('float ior_of(int region, vec3 p) {');
+    lines.push('    if (region < 0) return 1.0;');
+    const byId = new Map(materials.map((m) => [m.id, m]));
+    for (const m of meshes) {
+        const mat = byId.get(m.materialId);
+        if (!m.closed && mat !== undefined && (mat.medium?.ior !== undefined || modelTransmission(mat.model))) {
+            lines.push(`    if (region == ${m.index}) return 1.0;   // open mesh (thin): the baked table excluded it`);
+        }
+    }
+    lines.push('    return ior_of_material(material_of(region), p);');
     lines.push('}');
     return lines.join('\n');
 }
@@ -1354,13 +1443,13 @@ function generateMaterialOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticOb
 // p (fold away). Non-dielectric materials are 1.0 (vacuum-like — pinned in the Planner),
 // ior_of(-1, p) = 1.0 (ambient; ambientMedium is a media-era concern, §2.4). Value<T>-driven ior
 // reads its uniform (declared via the materials {param} scan — same for formula params).
-function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[], meshes: PlannedMesh[], materials: PlannedMaterial[]): string {
+function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], materials: PlannedMaterial[]): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
     const lines: string[] = ['// Generated region -> IOR table (§2.3 family; p = the GRIN-interface point argument)'];
     lines.push('float ior_of(int region, vec3 p) {');
     // CLOSED meshes have a real interior (fable-mesh-containment) and earn rows like any
     // solid; open meshes stay off the table (thin — the Validator's warning covers them).
-    for (const obj of [...sdf, ...analytic, ...meshes.filter((m) => m.closed)].sort((a, b) => a.index - b.index)) {
+    for (const obj of [...objects, ...meshes.filter((m) => m.closed)].sort((a, b) => a.index - b.index)) {
         const mat = byId.get(obj.materialId);
         if (!mat) continue;
         // ONE ior truth (impl-plan-grin-interface): a deflecting medium's formula IS the
@@ -1408,7 +1497,7 @@ function generateIorOf(sdf: PlannedSDFObject[], analytic: PlannedAnalyticObject[
 // residual (EPS_INTERFACE = 10× MARCH_EPSILON). Entering ⇒ region_to = owner; exiting ⇒
 // region_from = owner and the frame flips so n faces region_from (§4.1).
 
-function generateSceneIntersect(arms: { analytic: boolean; sdf: boolean; mesh: boolean; instanced: boolean; table: boolean }, thinRegions: number[], anyQuery: boolean): string {
+function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; instanced: boolean; table: boolean }, thinRegions: number[], anyQuery: boolean): string {
     const lines: string[] = ['// Generated scene_intersect dispatcher'];
 
     // Zero-thickness owners (quads) never claim containment in scene_region_at, so
@@ -1426,8 +1515,7 @@ function generateSceneIntersect(arms: { analytic: boolean; sdf: boolean; mesh: b
     lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
     lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
     lines.push('    bool found = false;');
-    if (arms.analytic) lines.push('    if (analytic_intersect(ray, hit)) found = true;');
-    if (arms.sdf) lines.push('    if (sdf_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
+    if (arms.primitive) lines.push('    if (primitive_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
     if (arms.mesh) lines.push('    if (mesh_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
     if (arms.instanced) lines.push('    if (instanced_intersect(ray, hit)) found = true;');
     if (arms.table) lines.push('    if (scene_table_intersect(ray, hit)) found = true;');   // the scene TLAS (fable-object-tables)
@@ -1458,8 +1546,7 @@ function generateSceneIntersect(arms: { analytic: boolean; sdf: boolean; mesh: b
     // fast path links it; the media shadow walker re-spawns scene_intersect instead).
     if (anyQuery) {
         lines.push('bool scene_intersect_any(Ray ray, float maxDist) {');
-        if (arms.analytic) lines.push('    if (analytic_intersect_any(ray, maxDist)) return true;');
-        if (arms.sdf) lines.push('    if (sdf_intersect_any(ray, maxDist)) return true;');
+        if (arms.primitive) lines.push('    if (primitive_intersect_any(ray, maxDist)) return true;');
         if (arms.mesh) lines.push('    if (mesh_intersect_any(ray, maxDist)) return true;');
         if (arms.instanced) lines.push('    if (instanced_intersect_any(ray, maxDist)) return true;');
         if (arms.table) lines.push('    if (scene_table_intersect_any(ray, maxDist)) return true;');

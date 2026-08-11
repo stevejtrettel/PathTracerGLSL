@@ -28,6 +28,8 @@ const ALLOWED_ROOT_FILES = new Set([
     'channels.ts', 'ledger.ts', 'pack.ts', // data substrate parts (fable-data-rail — roster/layout truth/assembly)
     'importance.ts',                       // env shared part (importance-table math — E6: mirrors the charts' Jacobians)
     'similarity.ts',                       // geometry shared part (placement algebra — fable-transforms §2)
+    'custom.ts',                           // geometry shared part (defineSDF — scene-local fields, fable-sdf-contract §5.2)
+    'boundCheck.ts',                       // geometry shared part (twin-sampled bound containment — the §3 gate's core)
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)
     'blackbody.ts',                        // lights shared part (kelvin → RGB parameterization — impl-plan-blackbody-uv)

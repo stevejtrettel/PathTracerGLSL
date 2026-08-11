@@ -14,10 +14,11 @@
 // zero-thickness, and silent-thin is impossible.
 
 import { describe, it, expect } from 'vitest';
-import { PRIMITIVES, structName } from '../../src/components/geometry/index.js';
+import { PRIMITIVES, structName, emitSdfIntersect, emitSdfNormal } from '../../src/components/geometry/index.js';
 
 describe('geometry primitive descriptors (struct + symbol contract)', () => {
     for (const [key, d] of Object.entries(PRIMITIVES)) {
+        if (d.local === true) continue;   // scene-local defineSDF fields: gated at definition + compile time, not folder occupants
         const sn = structName(d);
         describe(key, () => {
             it('registry key matches descriptor type', () => {
@@ -36,9 +37,9 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                 if (d.thin === true) expect(d.provides.analytic).toBe(true);
             });
 
-            it('kinds imply shapes: point/vector/direction are vec3; angle/area are scalars', () => {
+            it('kinds imply shapes: point/vector/direction are vec3; angle/area/scalar are scalars', () => {
                 for (const p of d.params) {
-                    if (p.kind === 'angle' || p.kind === 'area') {
+                    if (p.kind === 'angle' || p.kind === 'area' || p.kind === 'scalar') {
                         expect(p.shape, `${key}.${p.name} (kind '${p.kind}')`).toBe('number');
                     } else if (p.kind !== 'length') {
                         expect(p.shape, `${key}.${p.name} (kind '${p.kind}')`).toBe('vec3');
@@ -78,14 +79,24 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                     .toBe(d.provides.sdf);
             });
 
-            it(`defines ${key}_sdf_intersect(Ray, ${sn}, float, float, out float) iff provides.sdf`, () => {
-                expect(new RegExp(`bool\\s+${key}_sdf_intersect\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${sn}\\b[^)]*out\\s+float`).test(d.glsl))
-                    .toBe(d.provides.sdf);
+            // The marching intersect and the gradient normal are GENERATED from the
+            // field (fable-sdf-contract §4) — an occupant hand-writing either would
+            // shadow the one emitter and silently fork the epsilon/stall rules.
+            it(`does NOT hand-write ${key}_sdf_intersect / ${key}_sdf_normal (generated — fable-sdf-contract §4)`, () => {
+                expect(new RegExp(`bool\\s+${key}_sdf_intersect\\b`).test(d.glsl),
+                    `${key}: the marching intersect is generated — delete the hand copy`).toBe(false);
+                expect(new RegExp(`vec3\\s+${key}_sdf_normal\\b`).test(d.glsl),
+                    `${key}: the gradient normal is generated — delete the hand copy`).toBe(false);
+                expect(new RegExp(`float\\s+${key}_sdf_refine\\b`).test(d.glsl),
+                    `${key}: hit refinement is generated (declare the \`refine\` fact instead)`).toBe(false);
             });
 
-            it(`defines ${key}_sdf_normal(vec3, ${sn}) iff provides.sdf`, () => {
-                expect(new RegExp(`vec3\\s+${key}_sdf_normal\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${sn}\\b`).test(d.glsl))
-                    .toBe(d.provides.sdf);
+            it(`the GENERATED march pair carries the contract signatures (provides.sdf)`, () => {
+                if (!d.provides.sdf) return;
+                expect(new RegExp(`bool\\s+${key}_sdf_intersect\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${sn}\\b[^)]*out\\s+float`).test(emitSdfIntersect(d)))
+                    .toBe(true);
+                expect(new RegExp(`vec3\\s+${key}_sdf_normal\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${sn}\\b`).test(emitSdfNormal(d)))
+                    .toBe(true);
             });
 
             it(`the march bound resolves to an analytic primitive with an interval form`, () => {

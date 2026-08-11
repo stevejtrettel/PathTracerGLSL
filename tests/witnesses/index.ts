@@ -32,7 +32,7 @@ import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinear
 import { perfCloud, perfCloudFrame, perfCloudStrategy, perfCloudCwbvhStrategy, PERF_CLOUD_COUNT } from './scenes/perfCloud.js';
 import { accelTriple, accelTripleNeeStrategy, accelTripleMisStrategy, accelTriplePtStrategy } from './scenes/accelTriple.js';
 import { solidsAnalytic, solidsSdf, solidsStrategy, cubeCloud, cubeCloudRef, cubeCloudStrategy } from './scenes/solidsWitness.js';
-import { sdfTableTwin, sdfUnrolledStrategy, sdfTableStrategy, perfSdf0, perfSdf8, perfSdf32, perfSdf128, perfSdfCluster8, perfSdfCluster32, perfSdfCluster128, perfSdfBlob } from './scenes/sdfTableWitness.js';
+import { sdfTableTwin, sdfInstanceTwin, sdfInstanceTwinRef, sdfInstanceStrategy, sdfUnrolledStrategy, sdfTableStrategy, perfSdf0, perfSdf8, perfSdf32, perfSdf128, perfSdfCluster8, perfSdfCluster32, perfSdfCluster128, perfSdfBlob } from './scenes/sdfTableWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
@@ -677,6 +677,26 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'N=128 table ms/frame @512²' },
             ],
         },
+    },
+    'sdf-instance-twin': {
+        scene: sdfInstanceTwin,
+        strategies: posed([4.6, 2.4, 4.6], [0, 0.5, 0], sdfInstanceStrategy),
+        exercises:
+            'the MARCHED PROTOTYPE door (impl-plan-sdf-as-shape T7): 12 marched boxes as one instanced batch — '
+            + 'placements from the rail, the prototype marched inside its declared bound in its own rigid frame — '
+            + 'against the same 12 as individual objects',
+        expected: 'identical to sdf-instance-twin-ref (identical stream): the instance path must reproduce the per-object path exactly',
+        witness: {
+            spp: 96,
+            checks: [
+                { kind: 'twin', other: { scene: 'sdf-instance-twin-ref' }, meanTol: 0.002, rmse: 0.01, label: 'marched batch ≡ 12 individual marched boxes' },
+            ],
+        },
+    },
+    'sdf-instance-twin-ref': {
+        scene: sdfInstanceTwinRef,
+        strategies: posed([4.6, 2.4, 4.6], [0, 0.5, 0], sdfInstanceStrategy),
+        exercises: 'twin partner: the same 12 marched boxes as individual objects (the reference arm)',
     },
     'perf-sdf-0': {
         scene: perfSdf0,

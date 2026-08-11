@@ -16,8 +16,10 @@
 
 import type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues } from '../descriptors.js';
 import {
+    IDENTITY_QUAT,
     IDENTITY_SIMILARITY,
     isIdentityRotation,
+    isIdentityTranslation,
     quatRotate,
     similarityApplyDirection,
     similarityApplyPoint,
@@ -33,6 +35,11 @@ import { boxDescriptor } from './box/box.js';
 import { quadDescriptor } from './quad/quad.js';
 import { cylinderDescriptor } from './cylinder/cylinder.js';
 import { diskDescriptor } from './disk/disk.js';
+import { torusDescriptor } from './torus/torus.js';
+import { bottleDescriptor } from './bottle/bottle.js';
+import { knobDescriptor } from './knob/knob.js';
+import { mengerDescriptor } from './menger/menger.js';
+import { apollonianDescriptor } from './apollonian/apollonian.js';
 
 export type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues, PrimitiveParamSpec } from '../descriptors.js';
 export { canonicalPlane } from './plane/plane.js';
@@ -47,7 +54,13 @@ export const PRIMITIVES: Record<string, PrimitiveDescriptor> = {
     quad: quadDescriptor,
     cylinder: cylinderDescriptor,
     disk: diskDescriptor,
+    torus: torusDescriptor,
+    bottle: bottleDescriptor,
+    knob: knobDescriptor,
+    menger: mengerDescriptor,
+    apollonian: apollonianDescriptor,
 };
+
 
 /** Lookup that throws on unregistered types — the Planner/Validator diagnose them
  *  upstream (reject-not-remove), so this is an unreachable backstop. */
@@ -63,11 +76,24 @@ export function structName(d: PrimitiveDescriptor): string {
 }
 
 /** Local-space AABB of a primitive given (canonical) values — the prototype box for instancing
- *  (impl-plan-tlas). null = unbounded (no `bounds` declared, e.g. plane) → not an instance
- *  prototype (Validator-rejected). */
+ *  (impl-plan-tlas). null = unbounded (no bound exists, e.g. plane) → not an instance
+ *  prototype (Validator-rejected).
+ *
+ *  Resolves internally (idempotent), so the resolved-values contract is self-enforcing
+ *  at the AABB door. A shape with no authored `bounds` but a CROSS-TYPE `marchBound`
+ *  gets its AABB DERIVED: the bound primitive's own box at the mapped values
+ *  (fable-sdf-contract §3 — the same numbers expressed twice is how a bound silently
+ *  starts clipping; menger/apollonian/bottle restated theirs verbatim before this). */
 export function primitiveBounds(type: string, values: PrimitiveValues): AABB | null {
     const d = PRIMITIVES[type];
-    return d?.bounds ? d.bounds(values) : null;
+    if (d === undefined) return null;
+    const v = resolvePrimitiveValues(d, values);
+    if (d.bounds) return d.bounds(v);
+    const mb = d.marchBound;
+    if (mb !== undefined && mb !== 'self' && mb !== 'unbounded') {
+        return primitiveBounds(mb.type, mb.values(v));
+    }
+    return null;
 }
 
 /** Backend resolution (B1 — shape, not backend): auto = analytic if provided, else
@@ -109,7 +135,7 @@ export function emitCtor(d: PrimitiveDescriptor, values: PrimitiveValues, scale?
     const args = d.params.map((f) => {
         const lit = formatValue(v[f.name]!);
         if (!scale) return lit;
-        if (f.kind === 'direction' || f.kind === 'angle') return lit;          // invariant kinds
+        if (f.kind === 'direction' || f.kind === 'angle' || f.kind === 'scalar') return lit;   // invariant kinds
         if (f.kind === 'area') return `${scale} * ${scale} * ${lit}`;          // surface measure: ×s²
         return `${scale} * ${lit}`;
     });
@@ -141,6 +167,113 @@ export function emitSignedDistance(d: PrimitiveDescriptor, values: PrimitiveValu
     return emitSdfCall(d, values, ctx);
 }
 
+// ============================================================================
+// Generated marching boilerplate (fable-sdf-contract §4) — an SDF occupant authors
+// its FIELD; the loop and the gradient are POLICY over it and are emitted here,
+// once, for exactly the types a program marches. Before the contract these were
+// hand-transcribed 9× byte-identical per shape file, with nothing keeping the
+// epsilon/stall rules in sync.
+// ============================================================================
+
+/**
+ * The generated marching intersect — same signature shape as `<type>_intersect`,
+ * plus the [t0, t1] interval its bound handed us. Nothing here knows about the
+ * scene — no minimum over other objects, no region ids.
+ *
+ * The rules (transcribed from the verified leaf marcher, fable-sdf-accel §3 —
+ * formerly documented in sphere.glsl, now stated at their ONE author):
+ *   · step by |sdf| (unsigned) so a ray INSIDE the shape marches to its exit;
+ *   · a declared `lipschitz` L divides the step (the field may overestimate ×L);
+ *   · accept when the field falls under march_epsilon(t), then REFINE (below);
+ *   · the far end is dilated by march_epsilon(t1) — a surface may sit exactly ON
+ *     the bound's wall, and a tight bound would otherwise clip silhouettes;
+ *   · exhaustion still inside the interval commits the graze (the stall rule: a
+ *     ray pinned at a silhouette must report the surface, not paint the background
+ *     through it); exhaustion past it is a miss and the caller resumes.
+ * The caller applies its own nearest-hit test (t < hit.t), exactly as it does for
+ * the closed-form intersects — this returns the nearest hit WITHIN the interval.
+ *
+ * THE REFINEMENT (`<type>_sdf_refine` — owner-ordered after the tangle's ring
+ * banding; NEED-DECLARED via the `refine` fact after it made the fractals pay for
+ * nothing): acceptance tests the ESTIMATE, so for a conservative field (a /L
+ * divide) the accepted point's TRUE residual can be up to ~L× march_epsilon —
+ * larger than EPS_INTERFACE, which breaks the §4.2 classification band and reads
+ * as contour-following rings and wrong-side speckle in interiors. The polish uses
+ * only the field's SIGN (exact even when the magnitude is crushed): DOUBLING steps
+ * find a bracket across the surface — the step COUNT derives from the DECLARED
+ * factor (cover ~2·refine acceptance radii, no more: an unbounded search would
+ * walk through a fine-featured field's holes and commit a FARTHER surface), then
+ * a fixed BISECTION nails the crossing to bracket/2⁸. The committed t is the
+ * STARTING-side end of the bracket — deterministically on the approach side (the
+ * old tracer's landing-offset lesson: an exact-surface landing makes
+ * inside/outside a float-noise coin flip). No bracket = a graze/tangent: the
+ * accepted point stands, which is exactly the stall behavior. A shape with NO
+ * `refine` fact gets no polish and no cost — a true distance field's accepted
+ * residual is already ≤ march_epsilon.
+ */
+export function emitSdfIntersect(d: PrimitiveDescriptor): string {
+    const steps = d.stepBudget !== undefined ? String(d.stepBudget) : 'MAX_MARCH_STEPS';
+    const div = d.lipschitz !== undefined && d.lipschitz !== 1 ? ` / ${formatFloat(d.lipschitz)}` : '';
+    const f = (at: string) => `${d.type}_sdf(ray.origin + ${at} * ray.direction, s)`;
+    const accept = d.refine !== undefined ? `{ t = ${d.type}_sdf_refine(ray, s, t); return true; }` : 'return true;';
+    const stall = d.refine !== undefined
+        ? `    if (bound < 16.0 * march_epsilon(t) && t <= t_stop) { t = ${d.type}_sdf_refine(ray, s, t); return true; }\n    return false;`
+        : `    return bound < 16.0 * march_epsilon(t) && t <= t_stop;`;
+    const refine = d.refine === undefined ? [] : [
+        `float ${d.type}_sdf_refine(Ray ray, ${structName(d)} s, float t) {`,
+        `    bool neg0 = ${f('t')} < 0.0;`,
+        `    float a = t, b = t, w = march_epsilon(t);`,
+        `    bool crossed = false;`,
+        //   Bracket span derives from the declared factor: 2^k − 1 ≥ 2·refine.
+        `    for (int i = 0; i < ${Math.min(12, Math.max(2, Math.ceil(Math.log2(2 * d.refine + 1))))}; i++) {`,
+        `        if (crossed) break;`,
+        `        b = a + w;`,
+        `        if ((${f('b')} < 0.0) != neg0) crossed = true;`,
+        `        else { a = b; w *= 2.0; }`,
+        `    }`,
+        `    if (!crossed) return t;`,
+        `    for (int i = 0; i < 8; i++) {`,
+        `        float m = 0.5 * (a + b);`,
+        `        if ((${f('m')} < 0.0) == neg0) a = m; else b = m;`,
+        `    }`,
+        `    return a;`,
+        `}`,
+    ];
+    return [
+        ...refine,
+        `bool ${d.type}_sdf_intersect(Ray ray, ${structName(d)} s, float t0, float t1, out float t) {`,
+        `    t = max(t0, EPSILON);`,
+        `    float t_stop = t1 + march_epsilon(t1);`,
+        `    float bound = 1e20;`,
+        `    for (int i = 0; i < ${steps}; i++) {`,
+        `        if (t > t_stop) return false;`,
+        `        bound = abs(${f('t')})${div};`,
+        `        if (bound < march_epsilon(t)) ${accept}`,
+        `        t += bound;`,
+        `    }`,
+        stall,
+        `}`,
+    ].join('\n');
+}
+
+/** The generated gradient normal — the 4-tap tetrahedral finite difference of THIS
+ *  field (a field-defined shape has no other normal), tap radius NORMAL_EPSILON
+ *  (0.5773 = 1/√3 normalizes the corner directions), in the shape's own frame; the
+ *  caller rotates it to world. Replaces the hand-written 6-tap: one fewer field
+ *  evaluation per axis pair, same order of accuracy. */
+export function emitSdfNormal(d: PrimitiveDescriptor): string {
+    const call = (sw: string) => `${sw} * ${d.type}_sdf(p + ${sw} * NORMAL_EPSILON, s)`;
+    return [
+        `vec3 ${d.type}_sdf_normal(vec3 p, ${structName(d)} s) {`,
+        `    vec2 k = vec2(0.5773, -0.5773);`,
+        `    return normalize(${call('k.xyy')}`,
+        `                   + ${call('k.yyx')}`,
+        `                   + ${call('k.yxy')}`,
+        `                   + ${call('k.xxx')});`,
+        `}`,
+    ].join('\n');
+}
+
 /** The kind-derived fold (T2): each row transforms independently by its declared
  *  geometric kind. Correct exactly for SEPARABLE parameter sets — a coupled rule
  *  (plane's offset) declares a descriptor `fold` override instead. Exported for the
@@ -168,7 +301,8 @@ export function derivedFold(d: PrimitiveDescriptor, v: PrimitiveValues, g: Simil
                     : g.scale * (value as number);
                 break;
             case 'angle':
-                break;   // similarity-invariant: no rotation or scale changes an angle
+            case 'scalar':
+                break;   // similarity-invariant: no rotation or scale changes an angle or a ratio
             case 'area':
                 out[f.name] = g.scale * g.scale * (value as number);   // surface measure: ×s²
                 break;
@@ -177,14 +311,30 @@ export function derivedFold(d: PrimitiveDescriptor, v: PrimitiveValues, g: Simil
     return out;
 }
 
-/** Descriptor canonicalization at a Planner entry point (the plane/disk unit-normal
- *  rule) — replaces the old per-type name branches. Identity for primitives that
- *  declare none. The framework's single-application guarantee: each parameter set
- *  passes through EXACTLY ONE of the Planner entry points (constant-analytic fold
- *  below, driven-analytic, SDF placement), each of which canonicalizes once. */
+/** Can a translation fold into this primitive's rows? Point rows absorb T directly;
+ *  a coupled `fold` override (plane: offset absorbs T through the normal) also can.
+ *  A CANONICAL shape (fable-sdf-contract §2 — the marched shapes, whose position is
+ *  placement's alone) has neither: translation rides the residual, never the params. */
+function foldsTranslation(d: PrimitiveDescriptor): boolean {
+    return d.fold !== undefined || d.params.some((p) => p.kind === 'point');
+}
+
+/** RESOLUTION + canonicalization at a Planner entry point (the plane/disk unit-normal
+ *  rule) — replaces the old per-type name branches. This is THE resolve site
+ *  (fable-sdf-contract §3's pin): every Planner path passes through it, so every
+ *  downstream descriptor function — `marchBound.values`, `bounds`, `fold`,
+ *  `validateValues` — receives COMPLETE values per its documented contract. Before
+ *  this, the driven and retained-frame paths shipped unresolved values: a driven
+ *  bottle with defaulted optional rows got NaN extents and silently disappeared.
+ *  The framework's single-application guarantee: each parameter set passes through
+ *  EXACTLY ONE of the Planner entry points (constant-analytic fold below,
+ *  driven-analytic, SDF placement), each of which resolves + canonicalizes once
+ *  (both idempotent). */
 export function canonicalizePrimitiveParameters(type: string, parameters: PrimitiveValues): PrimitiveValues {
     const d = PRIMITIVES[type];
-    return d?.canonicalize !== undefined ? d.canonicalize(parameters) : parameters;
+    if (d === undefined) return parameters;
+    const resolved = resolvePrimitiveValues(d, parameters);
+    return d.canonicalize !== undefined ? d.canonicalize(resolved) : resolved;
 }
 
 /**
@@ -208,6 +358,9 @@ export function foldPlacementIntoParameters(
     const d = primitive(type);
     if (!d.similarityClosed && !isIdentityRotation(g.rotation)) {
         throw new Error(`geometry: '${type}' is not similarityClosed — a rotated placement cannot fold into its parameters (route through classifyPlacement)`);
+    }
+    if (!foldsTranslation(d) && !isIdentityTranslation(g.translation)) {
+        throw new Error(`geometry: '${type}' is CANONICAL (no position row — fable-sdf-contract §2) — a translated placement cannot fold into its parameters (route through classifyPlacement)`);
     }
     const resolved = resolvePrimitiveValues(d, parameters);
     const canonical = d.canonicalize !== undefined ? d.canonicalize(resolved) : resolved;
@@ -262,13 +415,23 @@ export interface ClassifiedPlacement {
  */
 export function classifyPlacement(type: string, parameters: PrimitiveValues, g: Similarity): ClassifiedPlacement {
     const d = primitive(type);
-    if (d.similarityClosed || isIdentityRotation(g.rotation)) {
+    if ((d.similarityClosed || isIdentityRotation(g.rotation))
+        && (foldsTranslation(d) || isIdentityTranslation(g.translation))) {
         return { parameters: foldPlacementIntoParameters(type, parameters, g), residual: IDENTITY_SIMILARITY };
     }
     const resolved = resolvePrimitiveValues(d, parameters);
     const canonical = d.canonicalize !== undefined ? d.canonicalize(resolved) : resolved;
     const pointRows = d.params.filter((p) => p.kind === 'point');
     const orientationRows = d.params.some((p) => p.kind === 'direction' || p.kind === 'vector');
+    if (pointRows.length === 0 && !orientationRows && d.fold === undefined) {
+        // CANONICAL shapes (fable-sdf-contract §2): no row carries position, so scale
+        // folds through the length/area rows and R,T ride the residual as ONE RIGID
+        // motion — g·Shape₀(v) = {sR·u + T : u ∈ Shape₀(v)} = {R·w + T : w ∈ Shape₀(s·v)}
+        // exactly. A pure translation lands on the wrapper's cheapest tier (one
+        // subtract), which is the declared cost of losing the center row.
+        const folded = derivedFold(d, canonical, { rotation: IDENTITY_QUAT, translation: [0, 0, 0], scale: g.scale });
+        return { parameters: folded, residual: { rotation: g.rotation, translation: g.translation, scale: 1 } };
+    }
     if (pointRows.length !== 1 || orientationRows) {
         return { parameters: canonical, residual: g };
     }

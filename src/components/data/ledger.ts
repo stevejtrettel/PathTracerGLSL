@@ -73,6 +73,12 @@ export interface DataTenants {
      *  tree-eligible (every kind declares treeBounds) — strategy-independent; 'power'
      *  programs never read it. tableTexels = count × the layout truth's row stride. */
     lightTree: { count: number; tableTexels: number } | null;
+    /** The region→material id table (impl-plan-region-materials): one id per REGION
+     *  (scene objects in order, then the desugared hittable-light regions), packed
+     *  FOUR to a texel in `records`. Allocated with the scene table (only 'table'
+     *  dispatch reads it — the fused per-region `material_of` arms are what stop
+     *  scaling; 'baked' programs keep their folded constants). null = no table. */
+    regionMaterials: { count: number } | null;
 }
 
 export interface SceneTableSlot {
@@ -102,6 +108,9 @@ export interface DataLayout {
     meshLights: Map<number, MeshLightSlot>;
     sceneTable?: SceneTableSlot;
     lightTree?: LightTreeSlot;
+    /** Records-channel base of the region→material id table (ceil(count/4) texels,
+     *  four ids per texel, region-id order). */
+    regionMaterials?: { base: number };
 }
 
 /** ≤ 2T−1 nodes over T leaves, 2 texels/node — the declared BLAS/TLAS padding bound. */
@@ -150,11 +159,19 @@ export function planDataLayout(t: DataTenants): DataLayout {
         const treeBase = n; n += nodeTexelBound(t.lightTree.count);
         lightTree = { tableBase, trailsBase, treeBase };
     }
+    // The region→material table (impl-plan-region-materials) — appended after the
+    // light tree, same byte-stability discipline: existing bases never move.
+    let regionMaterials: { base: number } | undefined;
+    if (t.regionMaterials !== null && t.regionMaterials.count > 0) {
+        regionMaterials = { base: r };
+        r += Math.ceil(t.regionMaterials.count / 4);
+    }
     return {
         totals: { vertices: v, normals: vertexChannelTotal(t), uvs: vertexChannelTotal(t), indices: tr, nodes: n, records: r, nodesq: nq },
         meshes, batches, meshLights,
         ...(sceneTable !== undefined ? { sceneTable } : {}),
         ...(lightTree !== undefined ? { lightTree } : {}),
+        ...(regionMaterials !== undefined ? { regionMaterials } : {}),
     };
 }
 

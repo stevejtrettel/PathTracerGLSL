@@ -51,3 +51,11 @@ bool bvh_aabb_hit_range(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax, out
     t_exit = tf;
     return tf >= t_enter && t_enter < tmax;
 }
+
+// Point-in-box (impl-plan-sdf-as-shape T6) — the POINT-QUERY counterpart of the slab
+// test, for walks that classify a point rather than trace a ray (scene_region_at's
+// containment descent). No pad: a point exactly on a box wall may be claimed by either
+// side, and the object's own signed distance decides afterwards.
+bool bvh_aabb_contains(vec3 bmin, vec3 bmax, vec3 p) {
+    return all(greaterThanEqual(p, bmin)) && all(lessThanEqual(p, bmax));
+}

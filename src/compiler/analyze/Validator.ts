@@ -2,7 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
@@ -12,8 +12,9 @@ import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
-import { PRIMITIVES, resolveBackend, type PrimitiveParamSpec } from '../../components/geometry/index.js';
-import { MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
+import { PRIMITIVES, primitiveBounds, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
+import { BOUND_FIELDS, checkBoundContainment } from '../../components/geometry/boundCheck.js';
+import { MARCHED_TABLE_THRESHOLD, MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
 import { isDrivenTransform } from '../../components/geometry/similarity.js';
 import { placementCount } from '../../components/intersection/instancing/instancing.js';
@@ -626,6 +627,21 @@ export function validate(
             `estimator.objectDispatch '${objectDispatch}' is not a dispatch regime — registered: ${Object.keys(OBJECT_DISPATCHES).join(', ')} (default '${DEFAULT_OBJECT_DISPATCH}')`)
             .add();
     }
+    // An explicit 'unrolled' on a scene full of MARCHED objects is a compile bomb, not
+    // a slow render (impl-plan-sdf-as-shape T6): every marched object's arm carries its
+    // own march loop, which the driver inlines and specialises. Measured on an M1 Pro:
+    // 8 objects 0.9s to ready, 32 objects 7.9s, 128 objects NEVER FINISHED — the tab
+    // just stops. The default already picks 'table' past the threshold; this is for the
+    // scene that asks anyway, so the failure arrives as a sentence instead of a hang.
+    if (objectDispatch === 'unrolled') {
+        const marched = scene.objects.filter((o) => isPrimitiveObject(o)
+            && resolveBackend(o.type, o.backend) === 'sdf').length;
+        if (marched >= MARCHED_TABLE_THRESHOLD) {
+            bag.warning('invalid-setting',
+                `estimator.objectDispatch 'unrolled' with ${marched} marched objects: the shader emits one march loop PER OBJECT and compile time grows superlinearly (128 objects did not finish compiling on an M1 Pro). 'table' compiles in constant time — drop the pin unless this arm is a deliberate reference.`)
+                .add();
+        }
+    }
     const instanceAccel = strategy.estimator.instanceAccel;
     if (instanceAccel !== undefined && INSTANCE_ACCELS[instanceAccel] === undefined) {
         bag.error('invalid-setting',
@@ -931,8 +947,12 @@ export function validate(
             if (backend === undefined) {
                 bag.error('missing-geometry', `Object ${i} (instanced): prototype primitive '${proto.type}' is not implemented`)
                     .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
-            } else if (backend !== 'analytic') {
-                bag.error('invalid-setting', `Object ${i} (instanced): '${proto.type}' resolves to the SDF backend — SDF instancing is the deferred domain-repetition feature; v1 supports mesh + analytic prototypes only`)
+            } else if (backend === 'sdf' && PRIMITIVES[proto.type]?.marchBound === 'unbounded') {
+                // A marched prototype is instanceable (impl-plan-sdf-as-shape T7 — the
+                // merge made the leaf item one line different), but an UNBOUNDED shape is
+                // not: the leaf march needs a finite interval, and "always visited" has
+                // no meaning inside a batch.
+                bag.error('invalid-setting', `Object ${i} (instanced): '${proto.type}' declares marchBound 'unbounded' — a marched prototype needs a finite bound (the leaf march runs inside it)`)
                     .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
             } else if (PRIMITIVES[proto.type]?.bounds === undefined) {
                 // A1: the TLAS is a BVH over per-instance WORLD boxes, so the prototype
@@ -1228,7 +1248,10 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
             return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
         });
         if (rowsOk) {
-            for (const msg of desc.validateValues(obj.parameters)) {
+            // RESOLVED values (fable-sdf-contract §3's pin): a rule reading an
+            // optional row (menger's iterations, apollonian's morph) must see the
+            // default, not undefined — the same contract every descriptor function has.
+            for (const msg of desc.validateValues(resolvePrimitiveValues(desc, obj.parameters))) {
                 bag.error('invalid-setting', `${label} (${type}): ${msg}`)
                     .withOriginal('scene', path)
                     .add();
@@ -1267,6 +1290,44 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
                 .add();
         } else {
             validatePrimitiveConstraint(s, v, `${label} (${type}): parameter '${s.name}'`, bag);
+        }
+    }
+
+    // Scene-local fields (fable-sdf-contract §5.2): the declared bound is CHECKED
+    // against the definition's own TS twin, over THIS object's resolved values — the
+    // same gate registry occupants get in vitest (marchBound.test.ts), run where the
+    // real parameter values are, so a value-dependent bound failure cannot hide. A
+    // bound that clips is a compile error here, never silently chopped geometry on
+    // the GPU. ~26³ twin evaluations per local object per compile: milliseconds, and
+    // only for defineSDF shapes.
+    if (desc.local === true && desc.fieldTwin !== undefined) {
+        const rowsWellFormed = schema.every((s) => {
+            const v = params[s.name];
+            if (v === undefined) return !s.required;
+            return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
+        });
+        const mb = desc.marchBound;
+        if (rowsWellFormed && mb !== undefined && mb !== 'self' && mb !== 'unbounded') {
+            const resolved = resolvePrimitiveValues(desc, obj.parameters);
+            const boundDesc = PRIMITIVES[mb.type];
+            const boundField = BOUND_FIELDS[mb.type];
+            const box = primitiveBounds(desc.type, resolved);
+            if (boundDesc !== undefined && boundField !== undefined && box !== null) {
+                const boundValues = resolvePrimitiveValues(boundDesc, mb.values(resolved));
+                const twin = desc.fieldTwin;
+                const r = checkBoundContainment((p, v) => twin(p, v), resolved, boundField, boundValues, box);
+                if (r.escaped > 0) {
+                    bag.error('invalid-setting',
+                        `${label} (${type}): the declared '${mb.type}' bound CLIPS the field at these values — ${r.escaped} interior sample(s) fall outside it (worst escape ${r.worst.toPrecision(3)}); enlarge the bound (a loose bound only costs march steps)`)
+                        .withOriginal('scene', path)
+                        .add();
+                } else if (r.interior === 0) {
+                    bag.warning('invalid-setting',
+                        `${label} (${type}): the field has NO interior samples over its bound at these values — the shape may be empty, or the twin may not match the GLSL`)
+                        .withOriginal('scene', path)
+                        .add();
+                }
+            }
         }
     }
 }

@@ -20,6 +20,33 @@ decided July 16: raymarching is an intersection METHOD, not geometry).
 `similarity.ts` is the shared placement algebra (fable-transforms §2). The registry
 lives in `index.ts` (`PRIMITIVES`).
 
+**The marched-only shapes** (Aug 2026, once "an SDF is a shape with a slow intersect"
+made a distance field an ordinary occupant): `torus/` (the first shape whose march bound
+is a DIFFERENT primitive), `bottle/` (a CONSTRUCTION — two rounded cylinders,
+smooth-unioned, onion-hollowed, chopped, punted), `menger/` and `apollonian/` (the two
+fractals), `knob/` (a VENDORED model — see below). They declare
+`provides: { sdf: true, analytic: false }` and are authored exactly like a sphere; only
+which intersect line the generator emits differs.
+
+**A field with EMPTY INTERIOR declares its thickness** (`apollonian/` is the standing
+instance). An IFS limit set has measure zero: the estimate is ≥ 0 everywhere and reaches
+0 only on the fractal, so a marcher renders it only because acceptance is
+`d < march_epsilon(t)` — which makes the SHAPE a function of the marcher's TOLERANCE, and
+of viewing distance, since that epsilon grows with t. Such an occupant takes a
+`thickness` row and returns `estimate − thickness`: the object is then the declared
+ε-neighbourhood, with a genuine interior (so containment, dielectrics and media work) and
+a picture that no longer moves when a tolerance does. Subtracting a constant preserves
+the never-overestimates clause. Same discipline as the majorant clamp in
+`fable-heterogeneous-media` — the shape IS the clamped thing, and it says so.
+
+**An occupant's GLSL is SELF-CONTAINED.** Helpers are the shape's own, prefixed and
+file-private (bottle's smooth combinators, knob's vendored operators, menger's cell
+box) — files are included wholesale, so a helper defined in two of them is a link
+error. There is deliberately no shared vocabulary file: shared operators are the same
+question as scene-level shape composition, and that is open (owner, Aug 10 2026 —
+single shapes get settled first). A second consumer of some operator is the signal to
+have that discussion, not to quietly add an include.
+
 ## The occupant contract
 
 A primitive supplies:
@@ -69,12 +96,43 @@ classification, region tables ("descriptors declare facts; generators decide").
 Placement (constant folds, wrapper tiers, driven uniforms), regions, and epsilons
 come free — the wrapper machinery is placement-generic.
 
+A MARCHED shape (fable-sdf-contract) authors its FIELD and declares facts — it never
+hand-writes marching code:
+
+4. The field is CANONICAL — origin-centred, standard orientation, NO center row
+   (position/rotation/scale are placement's alone). `<type>_sdf_intersect` and
+   `<type>_sdf_normal` (4-tap tetrahedral gradient) are GENERATED from the field per
+   marched type (`emitSdfIntersect`/`emitSdfNormal` in `index.ts` carry the rules —
+   interval-end dilation, the grazing stall-commit, the `abs()` interior discipline);
+   the contract test fails an occupant that hand-writes either. Per-shape declared
+   knobs: `stepBudget` (loop bound; default `MAX_MARCH_STEPS`) and `lipschitz`
+   (step divisor for estimate-valued fields; default 1).
+5. `marchBound` — `'self'`, `'unbounded'`, or a DIFFERENT primitive with its parameters
+   derived from this shape's moduli. Never inferred: a marchable shape that declares
+   nothing fails the contract test naming itself. A bound that is too loose only costs
+   march steps; one that is too tight silently clips geometry, which is why
+   `marchBound.test.ts` samples the field against the declared bound. A cross-type
+   bound also SUPPLIES the AABB — `bounds()` is derived from it, never restated.
+6. A TS field twin in `tests/components/fieldTwins.ts` — the CPU side of both gates
+   (containment above, and the placement-fold contract, whose "surface points" for a
+   field-defined shape are found by Newton-projecting onto its zero set).
+
+**Vendoring a model** (`knob/` is the worked example): keep the licence block verbatim
+at the head of the file, PREFIX every helper with the occupant name (the sdf-explorer
+corpus was written to compile one model at a time and its helper names collide; here
+every occupant lands in one program), leave the maths — including the model's own
+smooth operators — untouched, and MEASURE the bound with the twin rather than guessing
+it. Prefer permissively-licensed models: most of that corpus is CC BY-NC-SA 3.0, which
+is a licensing decision about this repo before it is a technical one.
+
 ## Backend notes that matter downstream
 
-- The generated `scene_march_bound` takes **min |sdf_i|** — UNSIGNED, arg-min — so
-  marching works from interiors and stays bounded by nested inner surfaces;
-  `scene_object_sdf` is the **per-owner** signed field for normals (the global
-  signed min is hijacked by containers — R-SUBMERGED found it).
+- There is NO combined SDF scene (impl-plan-sdf-as-shape retired the global
+  min-march): each marched object steps `|its own field|` inside its bound's ray
+  interval — UNSIGNED, so a ray inside a shape marches to its exit — and nested
+  surfaces are found because every object is visited, not because of a global
+  minimum. The per-object `sdf_<id>` wrappers survive only as containment arms
+  (`scene_region_at`).
 - Quads are **zero-thickness** (`thin`): containment never claims a point, so they
   are one-sided under `region_to` emission and back-face hits probe the entering
   side (audit H2; the fog-panel witness guards it).

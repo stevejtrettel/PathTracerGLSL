@@ -489,8 +489,7 @@ function sceneRadiusEstimate(plan: RenderPlan): number {
         }
         r = Math.max(r, center + extent);
     };
-    for (const o of plan.analyticObjects) consider(o.parameters, PRIMITIVES[o.shapeType]?.params ?? []);
-    for (const o of plan.objects) consider(o.parameters, PRIMITIVES[o.sdfType]?.params ?? []);
+    for (const o of plan.objects) consider(o.parameters, PRIMITIVES[o.type]?.params ?? []);
     for (const l of plan.lights) consider(resolveLightValues(l), LIGHT_KINDS[l.kind]?.params ?? []);
     return r;
 }

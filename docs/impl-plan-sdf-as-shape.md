@@ -74,12 +74,12 @@ that door opens.
    bounds with a box or a sphere derived from (R, r); a box bounds with itself. The
    ray-vs-bound test is the bounding primitive's own interval routine, so bounding
    reuses the analytic library instead of a private slab path.
-   - **ONE bounding fact per shape.** The world AABB the TLAS and instancing need is
-     DERIVED from the bound (a sphere bound gives centre ± r; a box bound gives its
-     corners). Today's `bounds()` on sphere/box/cylinder returns exactly what its own
-     shape-as-bound would derive, so those hand-written AABBs are deleted, not kept
-     in parallel. Analytic-only shapes (quad, disk, plane) keep authoring `bounds()`
-     directly — they never march.
+   - **CORRECTED at T2 (the plan was wrong here).** The first draft said the world AABB
+     would be DERIVED from the bound, leaving one bounding fact per shape. It cannot be:
+     sphere/box/cylinder bound with THEMSELVES, so their AABB is the base case and has
+     nothing to derive from. `bounds()` stays as authored and `marchBound` is a second,
+     separate declaration — one added line per shape rather than three deletions. The
+     derivation only ever applies to a shape bounded by a DIFFERENT primitive.
    - **A sphere bound is rotation-invariant**, so rotated objects with a sphere bound
      need no refitting anywhere in the chain. Free tightness for blobby fields.
 3. **Unbounded is declared, never inferred** (owner, earlier). A shape either declares
@@ -88,10 +88,12 @@ that door opens.
    `[near, running nearest]` — the pinned SDF planes in `minimal` / `submerged` are
    the standing coverage.
 4. **The bound must contain the surface, and we test that.** A loose bound only costs
-   march steps; a bound that is too small silently clips geometry. Gate: a vitest that
-   samples each shape's field over a grid and asserts every negative-distance point
-   lies inside the declared bound (and, for the derived AABB, inside that too). This
-   is the gate future custom fields inherit.
+   march steps; a bound that is too small silently clips geometry. Gate: `marchBound.test.ts`
+   samples each shape's field over a grid and asserts every negative-distance point lies
+   inside the declared bound. Every bound today is `'self'`, which makes that check
+   trivially true, so the test ALSO exercises the checker on synthetic cross-type bounds
+   (a cylinder inside a sphere: once honest, once shrunk 10% and required to fail) — a
+   gate that cannot fail is worse than no gate. This is what future custom fields inherit.
 5. **`backend: 'sdf'` stays exactly as authored** (owner, decision 4). Its meaning
    shifts from "use the other engine" to "intersect this one by marching"; no rename,
    no authoring change, and the existing pins stay as research coverage.
@@ -174,6 +176,63 @@ Re-check whether the leaf-1 scene TLAS still earns its unconditional setting
 - **Compile size stops scaling with the scene**, which retires the whole class the
   Stage C incident belonged to. The standing law (no O(N)-body call reachable from
   inside a per-item loop) still holds and should be checked at review.
+
+## 6. T6 — what the scale run exposed (Aug 10 2026)
+
+Built with the 3000-object knot demo, and the findings that came with it.
+
+### 6.1 Landed
+
+- **Containment DESCENDS** (`bvhPointWalkLines` beside `bvhWalkLines`): scene_region_at
+  was a scan over every solid, run once per hit — O(objects) on the hot path. Now it
+  walks the scene TLAS and tests only leaves whose box contains p, which is exactly the
+  candidate set (a point outside a leaf's box cannot be inside the object that box
+  bounds). Gates: sdf-table-twin 0.02%/0.23%, bazaar 0.00%/0.00%.
+- **The dispatch default is scene-dependent**: >= `MARCHED_TABLE_THRESHOLD` (the
+  constant in `components/intersection/index.ts` — 9 as built) marched objects
+  defaults to 'table'. An explicit strategy always wins.
+- **The hang became a sentence**: an explicit 'unrolled' past the threshold is a
+  Validator warning quoting the measurements.
+- **The default cannot be inherited silently** (`dispatchDefaults.test.ts`): any registry
+  scene at or over the threshold must state `objectDispatch` on every strategy. This
+  fired for real — sdf-table-twin's "unrolled" arm became a second TABLE arm and the twin
+  passed at 0.00%/0.00% comparing the table with itself.
+
+### 6.2 The remaining O(N): region-keyed tables are a FUSED lookup
+
+`material_of` is 3002 of the knot program's 4515 lines — one arm per region, and the last
+construct that grows with the object count. The symptom is material_of; the cause is that
+every region-keyed table bakes *region → value* directly, when the value is a property of
+the MATERIAL, not the region. Regions are thousands; materials are four.
+
+**The fix is the decomposition, not a texture**:
+
+    region → material     per-object DATA (rail tenant under table dispatch)
+    material → value      GENERATED, sized by the material count
+
+- `material_of(region)` becomes one fetch: a `regionMaterials` tenant, ids packed four to
+  a texel, base baked as usual; a 4-way component select rather than a dynamic vector
+  index (glslang accepts what ANGLE rejects — the standing dialect rule).
+- `ior_of(region, p)` becomes `ior_of_material(material_of(region), p)`. This is why the
+  decomposition matters: a material's index may be a FORMULA (GRIN) or a driven uniform,
+  so `material → ior` must stay generated. Fusing it to regions is what made it O(N).
+- `scene_region_thin` is a disjunction over THIN regions — sized by quads, not objects.
+  Leave it; the same fix applies if a scene ever ships thousands of thin regions.
+- `light_of` is already sized by the emitter roster, not the object count. Untouched.
+- UNROLLED dispatch keeps the baked arms: small scenes, and the constants fold. Which
+  form a program uses is a link-map decision (`ProgramDescription`), never re-derived.
+
+### 6.3 We cannot see compile cost, and that is how both failures hid
+
+Two wrong readings in one day: the dev server's first-time module transform, and the
+driver's shader cache, both masquerade as compile time. Every measurement after the first
+load is cached, so the cost a user actually pays — the first open — is the one number the
+bench never reports. The 128-object compile hang survived a full perf run for exactly
+this reason.
+
+Proposal: a `compile` check kind in the witness runner — fresh browser per row,
+`--disable-gpu-shader-disk-cache`, report time-to-ready. Report-only, like `perf`. Until
+it exists, treat any compile-time claim as unmeasured.
 
 ## 5. Out of scope
 

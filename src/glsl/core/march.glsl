@@ -1,9 +1,9 @@
-// Marching tolerances — the shared vocabulary every marched shape is written against
-// (impl-plan-sdf-as-shape T1). Included only when some object is intersected by
-// marching, and BEFORE the primitive files, which call march_epsilon() inside their
-// own <type>_sdf_intersect. These are numeric knobs, not structural gates: the
-// compiler never overrides them (making one compiler-ownable later = emit it and
-// delete the line here).
+// Marching tolerances — the shared vocabulary of the GENERATED marching boilerplate
+// (fable-sdf-contract §4: `<type>_sdf_intersect`/`<type>_sdf_normal` are emitted per
+// marched type by geometry/index.ts, and are the only consumers). Included exactly
+// when a program marches something. These are numeric knobs, not structural gates:
+// the compiler never overrides them; MAX_MARCH_STEPS is the DEFAULT step budget a
+// descriptor `stepBudget` overrides per shape.
 //
 // Lives in core/ beside EPSILON/EPS_INTERFACE because it is the same family of fact:
 // EPS_INTERFACE's "10× MARCH_EPSILON" comment in math.glsl has always referred to this

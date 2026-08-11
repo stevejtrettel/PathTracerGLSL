@@ -50,44 +50,9 @@ bool sphere_interval(Ray ray, Sphere sp, out float t0, out float t1) {
     return true;
 }
 
-// ---- the marching intersect (impl-plan-sdf-as-shape T1) ---------------------
-// An SDF object is a shape whose intersect ITERATES: same signature shape as
-// sphere_intersect above, plus the [t0, t1] interval its bound handed us. Nothing
-// here knows about the scene — no minimum over other objects, no region ids.
-//
-// The rules, transcribed from the verified leaf marcher (fable-sdf-accel §3):
-//   · step by |sdf| (unsigned) so a ray INSIDE the shape marches to its exit;
-//   · accept when the field falls under march_epsilon(t);
-//   · the far end is dilated by march_epsilon(t1) — a surface may sit exactly ON the
-//     bound's wall, and a tight bound would otherwise clip silhouettes;
-//   · exhaustion still inside the interval commits the graze (the stall rule: a ray
-//     pinned at a silhouette must report the surface, not paint the background
-//     through it); exhaustion past it is a miss and the caller resumes.
-// The caller applies its own nearest-hit test (t < hit.t), exactly as it does for the
-// closed-form intersects — this returns the nearest hit WITHIN the interval.
-bool sphere_sdf_intersect(Ray ray, Sphere sp, float t0, float t1, out float t) {
-    t = max(t0, EPSILON);
-    float t_stop = t1 + march_epsilon(t1);
-    float bound = 1e20;
-    for (int i = 0; i < MAX_MARCH_STEPS; i++) {
-        if (t > t_stop) return false;
-        bound = abs(sphere_sdf(ray.origin + t * ray.direction, sp));
-        if (bound < march_epsilon(t)) return true;
-        t += bound;
-    }
-    return bound < 16.0 * march_epsilon(t) && t <= t_stop;
-}
-
-// Gradient normal of THIS field — six taps, the general form a marched hit uses (a
-// custom distance field has nothing else). In the shape's own frame; the caller
-// rotates it to world. Distinct from sphere_normal(), which the closed-form arm uses.
-vec3 sphere_sdf_normal(vec3 p, Sphere sp) {
-    vec2 e = vec2(NORMAL_EPSILON, 0.0);
-    return normalize(vec3(
-        sphere_sdf(p + e.xyy, sp) - sphere_sdf(p - e.xyy, sp),
-        sphere_sdf(p + e.yxy, sp) - sphere_sdf(p - e.yxy, sp),
-        sphere_sdf(p + e.yyx, sp) - sphere_sdf(p - e.yyx, sp)));
-}
+// Marching (`sphere_sdf_intersect`) and the gradient normal (`sphere_sdf_normal`)
+// are GENERATED from sphere_sdf when a program marches this shape — fable-sdf-contract
+// §4 (emitSdfIntersect/emitSdfNormal in geometry/index.ts carry the rules).
 
 // Surface parameterization — the (θ,φ) equirectangular chart from the outward direction.
 // u = longitude ∈ [0,1), v = latitude (v=0 at the +y pole). AXIS-ALIGNED (fable-imagery P1

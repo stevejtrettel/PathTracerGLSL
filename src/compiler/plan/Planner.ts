@@ -23,16 +23,16 @@ import {
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlannedSDFObject, PlannedAnalyticObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
+import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, regionMaterialsOf } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
-import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
+import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
 import type { BlackbodyValue } from '../types.js';
 
 /** Registered primitive types — unknowns must diagnose here, not throw downstream
@@ -81,8 +81,9 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     // pin overrides (research/coverage — Validator-checked against provides).
     // `index` is assigned in scene order across BOTH backends: it is the globally-unique
     // region id (§2.3), so material_of() spans both lists and regions never collide.
-    const objects: PlannedSDFObject[] = [];
-    const analyticObjects: PlannedAnalyticObject[] = [];
+    // ONE list, both intersection methods (impl-plan-sdf-as-shape T5) — scene order,
+    // region ids assigned as we go.
+    const objects: PlannedPrimitiveObject[] = [];
     const meshes: PlannedMesh[] = [];
     const instanceBatches: PlannedInstanceBatch[] = [];
     // THE ordinal truth (audit A5): Planner (extern declaration) and App (upload) both
@@ -153,9 +154,9 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 });
             } else {
                 const backend = resolveBackend(proto.type, proto.backend);
-                if (backend !== 'analytic') {
-                    // v1: only mesh + analytic prototypes (SDF instancing = the deferred domain-rep
-                    // generalization). The Validator diagnoses; keep region ids stable and skip.
+                if (backend === undefined) {
+                    // Unregistered type / unhonorable pin — the Validator diagnoses; keep
+                    // region ids stable and skip.
                     continue;
                 }
                 instanceBatches.push({
@@ -167,7 +168,16 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     // adapter's ONE tier truth): 'frame' = 2-texel rigid record, s scales the
                     // params in-shader; 'params' = 1-texel folded-parameters record, world-space
                     // intersect (impl-plan-placement-fold stage 3).
-                    prototype: { backend: 'analytic', shapeType: proto.type, record: batchPlacementRecord[ordinal], parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters) },
+                    // MARCHED prototypes (impl-plan-sdf-as-shape T7) ride the same record
+                    // and the same leaf item — only the intersect line differs, which is
+                    // the whole point of the merge. Frame tier: the bound test and the
+                    // march both run in the prototype's own frame.
+                    prototype: {
+                        backend: 'primitive', shapeType: proto.type,
+                        record: backend === 'sdf' ? 'frame' : batchPlacementRecord[ordinal],
+                        parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters),
+                        intersect: backend === 'sdf' ? 'march' : 'closed-form',
+                    },
                 });
             }
             continue;
@@ -188,17 +198,18 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             // the placement as a pre-translation and the wrapper owns all positioning;
             // driven → the uniform record with LOCAL parameters.
             const { parameters, placement } = resolveSDFPlacement(obj.type, obj.parameters, obj.transform, objectIndex, keepsLocalFrame(obj, scene));
-            objects.push({ index: objectIndex++, materialId: matId, sdfType: obj.type, name: obj.name, parameters, placement });
+            objects.push({ index: objectIndex++, materialId: matId, type: obj.type, intersect: 'march', name: obj.name, parameters, placement });
         } else if (isDrivenTransform(obj.transform)) {
             // Driven (§6): parameters stay LOCAL (plane still canonicalized); the
             // generated arm conjugates the ray into the rigid frame. The Validator
             // has already rejected driven SAMPLABLE emitters, so the light registry
             // never sees these.
             const regionId = objectIndex++;
-            analyticObjects.push({
+            objects.push({
                 index: regionId,
                 materialId: matId,
-                shapeType: obj.type,
+                type: obj.type,
+                intersect: 'closed-form',
                 name: obj.name,
                 parameters: canonicalizePrimitiveParameters(obj.type, obj.parameters),
                 placement: buildDrivenPlacement(obj.transform!, regionId),
@@ -224,10 +235,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                 : classifyPlacement(obj.type, obj.parameters, placementOf(obj.transform));
             const residualLive = cl !== null && !(isIdentityRotation(cl.residual.rotation) && cl.residual.scale === 1
                 && cl.residual.translation[0] === 0 && cl.residual.translation[1] === 0 && cl.residual.translation[2] === 0);
-            analyticObjects.push({
+            objects.push({
                 index: objectIndex++,
                 materialId: matId,
-                shapeType: obj.type,
+                type: obj.type,
+                intersect: 'closed-form',
                 name: obj.name,
                 ...(cl === null
                     ? { parameters: canonicalizePrimitiveParameters(obj.type, obj.parameters), placement: placementOf(obj.transform) }
@@ -283,10 +295,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
             medium: null,
         });
         const regionId = objectIndex++;
-        analyticObjects.push({
+        objects.push({
             index: regionId,
             materialId: matId,
-            shapeType: d.region.primitive,
+            type: d.region.primitive,
+            intersect: 'closed-form',
             // Framework canonicalization (the disk's unit normal): the same shared
             // formula the kind's toValues applies — hit side and sample side stay
             // bit-identical (the one-sided pin).
@@ -298,10 +311,10 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     // sampleAsLight route (§6.2): emissive analytic quad/sphere OBJECTS join the registry —
     // per REGION, so two objects sharing one emissive material become two lights. V1: constant
     // nonzero emission only (Analyzer/Validator enforce); Le read from the material constant.
-    for (const planned of analyticObjects) {
+    for (const planned of objects) {
         const mat = materials[planned.materialId];
         if (mat === undefined || mat.name.startsWith('__light_')) continue;   // synthesized: already registered
-        if (PRIMITIVES[planned.shapeType]?.samplableAsLight !== true) continue;
+        if (PRIMITIVES[planned.type]?.samplableAsLight !== true) continue;
         // Driven placement (§6): parameters are LOCAL and the geometry is live — the
         // registry bakes literals, so driven emitters are Validator-rejected upstream;
         // this skip is the backstop that keeps a stale-literal light out of the CDF.
@@ -318,7 +331,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         // but an emissive disk OBJECT is a disk light — the first-wins lookup is scoped
         // to valuesFromRegion-bearing kinds, and the contract test enforces uniqueness
         // over exactly that set).
-        const kindEntry = Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === planned.shapeType && k.valuesFromRegion !== undefined);
+        const kindEntry = Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === planned.type && k.valuesFromRegion !== undefined);
         if (kindEntry?.valuesFromRegion === undefined) continue;   // backstop; samplableAsLight already gated
         lights.push({
             id: lightIndex++, kind: kindEntry.kind, regionId: planned.index,
@@ -359,7 +372,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     // formula Φ = E·π·R² needs the scene's bounding radius — stamped on EVERY light
     // (no kind branch, the doors discipline; kinds read it or don't). Never
     // parameter-driven, so the driven-CDF recompute closures capture it untouched.
-    const worldRadius = sceneWorldRadius(analyticObjects, meshes);
+    const worldRadius = sceneWorldRadius(objects.filter((o) => o.intersect === 'closed-form'), meshes);
     for (const l of lights) l.powerCtx = { worldRadius };
 
     // --- Ambient medium (§2.4): material_of(-1) resolves to this id; -1 = vacuum ---
@@ -374,14 +387,26 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     let sceneTable: PlannedSceneTable | undefined;
     if (sceneTableTruth !== null && dataLayout.sceneTable !== undefined) {
         const tabledSet = new Set(sceneTableTruth.analytic.map((a) => a.sceneIndex));
-        for (const a of analyticObjects) if (tabledSet.has(a.index)) a.tabled = true;
+        for (const a of objects) if (a.intersect === 'closed-form' && tabledSet.has(a.index)) a.tabled = true;
         // Boxed-SDF leaves (impl-plan-sdf-accel T2): tabled SDF objects leave the
         // global marcher for the LEAF_SDF interval march — the same residual/table
         // split, on the SDF arm.
         const sdfTabledSet = new Set(sceneTableTruth.sdf.map((s) => s.sceneIndex));
         for (const o of objects) if (sdfTabledSet.has(o.index)) o.tabled = true;
+        // The region→material mirror assert (impl-plan-region-materials — the light-
+        // roster pattern): the App packs regionMaterialsOf(scene) at the ledger base;
+        // the plan's own region/material assignment must agree id-for-id, or 'data'
+        // programs shade with the wrong materials. Runs only when the tenant exists.
+        const mirror = regionMaterialsOf(scene);
+        const planIds = [...objects, ...meshes, ...instanceBatches].sort((a, b) => a.index - b.index).map((o) => o.materialId);
+        if (mirror.length !== planIds.length || mirror.some((m, i) => m !== planIds[i])) {
+            throw new Error(
+                `region-material drift: regionMaterialsOf(scene) = [${mirror.join(',')}] vs plan = [${planIds.join(',')}] `
+                + `— the census in dataTenants.ts must mirror the Planner's region/material assignment (impl-plan-region-materials)`);
+        }
         sceneTable = {
             slot: dataLayout.sceneTable,
+            regionMaterialsBase: dataLayout.regionMaterials?.base ?? -1,
             leafCount: sceneTableTruth.leaves.length,
             analyticCount: sceneTableTruth.analytic.length,
             solidCount: sceneTableTruth.solidCount,
@@ -426,12 +451,11 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         : undefined;
 
     // --- Build program description ---
-    const program = planProgram(features, scene, strategy, lights, materials, objects, analyticObjects, meshes, instanceBatches, instanceLights.reduce((a, b) => a + b.count, 0));
+    const program = planProgram(features, scene, strategy, lights, materials, objects, meshes, instanceBatches, instanceLights.reduce((a, b) => a + b.count, 0));
     const pipeline = planPipeline(program);
 
     return {
         objects,
-        analyticObjects,
         meshes,
         instanceBatches,
         ...(sceneTable !== undefined ? { sceneTable } : {}),
@@ -448,7 +472,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[], objects: PlannedSDFObject[], analyticObjects: PlannedAnalyticObject[], meshes: PlannedMesh[], instanceBatches: PlannedInstanceBatch[], batchLightTotal: number): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[], objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], instanceBatches: PlannedInstanceBatch[], batchLightTotal: number): ProgramDescription {
     // Surface models = the models of the PLANNED materials — the one list that already
     // includes the desugared area lights' synthesized emitter materials, so a new hittable
     // light kind can never leave its backing model out of the program (the lights-door
@@ -465,7 +489,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     const emissionCones = lights.flatMap((l) => {
         const fact = LIGHT_KINDS[l.kind]?.emissionCone;
         if (fact === undefined || l.regionId === undefined) return [];
-        const backing = analyticObjects.find((o) => o.index === l.regionId);
+        const backing = objects.find((o) => o.index === l.regionId);
         return backing === undefined ? [] : [{ materialId: backing.materialId, ...fact(l.values) }];
     });
 
@@ -524,6 +548,12 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // instance lights are live under the tree (their region is the batch's).
     const samplableEmitters = lights.some((l) => l.regionId !== undefined) || batchLights;
 
+    // Object dispatch (hoisted so regionLookup shares the decision — one truth):
+    // scene-dependent default (T6) past MARCHED_TABLE_THRESHOLD; an explicit
+    // strategy always wins.
+    const objectDispatch = strategy.estimator.objectDispatch
+        ?? (objects.filter((o) => o.intersect === 'march').length >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
+
     return {
         measurement: {
             // Straight-through: unregistered camera types are Validator-rejected upstream
@@ -569,9 +599,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // Backend presence — the intersection family's link map (symmetric across all
             // three; scene_intersect combines exactly these arms). Derived from the resolved
             // plan objects, so byte-identical to the prior local length checks in the feature.
-            backends: {
-                sdf: objects.length > 0,
-                analytic: analyticObjects.length > 0,
+            classes: {
+                primitive: objects.length > 0,
                 mesh: meshes.length > 0,
                 instanced: instanceBatches.length > 0,
             },
@@ -579,7 +608,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // defaults from the registry (components/intersection), Validator-gatekept.
             meshTraversal: strategy.estimator.meshTraversal ?? DEFAULT_MESH_TRAVERSAL,
             instanceAccel: strategy.estimator.instanceAccel ?? DEFAULT_INSTANCE_ACCEL,
-            objectDispatch: strategy.estimator.objectDispatch ?? DEFAULT_OBJECT_DISPATCH,
+            // Scene-dependent default (T6): a scene with many MARCHED objects gets the
+            // table, because the unrolled regime emits one march loop per object and the
+            // shader compile grows superlinearly (measurements on the constant).
+            objectDispatch,
             // The opaque shadow fast path is scene_intersect_any's only caller; the
             // media shadow walker re-spawns scene_intersect instead (§6.3).
             anyQuery: lighting !== null && !features.media.hasMedia,
@@ -590,6 +622,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         },
         materials: {
             models: brdfModels,
+            // Region→material lookup form (impl-plan-region-materials): 'data' rides
+            // table dispatch — the ONE regime whose programs must stop scaling with
+            // the object count. 'baked' keeps the folded constant arms (byte gate).
+            regionLookup: objectDispatch === 'table' ? 'data' : 'baked',
             surfaceEval: lighting !== null,
             surfacePdf: mis,
             // Directional-emission gates (softbeam v0, fable-emitter-profiles): backing
@@ -953,12 +989,12 @@ export function resolveScalarProperty(value: MaterialProperty | undefined, fallb
  *  primitives — plane — and local-frame/driven objects skipped), closed meshes as
  *  placed spheres around their local boxes; SDF objects and instance batches skipped.
  *  Nothing boundable → 10, the constant the directional descriptor's ctx-fallback twins. */
-function sceneWorldRadius(analytic: PlannedAnalyticObject[], meshes: PlannedMesh[]): number {
+function sceneWorldRadius(analytic: PlannedPrimitiveObject[], meshes: PlannedMesh[]): number {
     let r = 0;
     let any = false;
     for (const o of analytic) {
         if (o.placement !== undefined) continue;   // local-frame parameters are not world boxes
-        const b = PRIMITIVES[o.shapeType]?.bounds?.(o.parameters);
+        const b = PRIMITIVES[o.type]?.bounds?.(o.parameters);
         if (b === undefined) continue;
         // Max corner norm of the world AABB: per-axis worst magnitude, combined.
         r = Math.max(r, Math.hypot(

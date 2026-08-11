@@ -15,7 +15,7 @@ import { recordPack, sdfRecordPack } from '../compiler/generate/records.js';
 import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_SDF } from '../components/intersection/index.js';
 import { packMeshLight } from '../components/lights/mesh/mesh.js';
 import { isMeshObject, type MeshObject } from '../compiler/types.js';
-import { dataTenantsOf, lightRosterOf, meshIsSamplableEmitter } from '../compiler/plan/dataTenants.js';
+import { dataTenantsOf, lightRosterOf, meshIsSamplableEmitter, regionMaterialsOf } from '../compiler/plan/dataTenants.js';
 import { buildLightTreeOffThread } from './utils/lightTreePack.js';
 import { lightTableLayout, packLightTable } from '../components/lights/table.js';
 import { LIGHT_KINDS, radiantScalar } from '../components/lights/index.js';
@@ -239,7 +239,11 @@ export class App {
      */
     private async _uploadSceneGeometry(scene: SceneDescription): Promise<void> {
         const { tenants, batchGeometrySlot, batchPlacementRecord, table, lightBatches } = dataTenantsOf(scene);
-        if (tenants.meshes.length === 0 && tenants.batches.length === 0 && tenants.lightTree === null) return;
+        // sceneTable joined the condition with the regionMaterials tenant (impl-plan-
+        // region-materials): a tabled scene with no meshes/batches and a tree-ineligible
+        // light roster still MUST upload its records — the previous condition silently
+        // skipped that case.
+        if (tenants.meshes.length === 0 && tenants.batches.length === 0 && tenants.lightTree === null && tenants.sceneTable === null) return;
         const layout = planDataLayout(tenants);
         const ch: Record<(typeof DATA_CHANNELS)[number], PackedChannel> = {
             vertices: allocChannel(layout.totals.vertices),
@@ -485,6 +489,17 @@ export class App {
             assertFits('light tree nodes', tree.nodeCount * 2, nodeTexelBound(total));
             writeTexels(ch.nodes, layout.lightTree.treeBase, tree.nodes.subarray(0, tree.nodeCount * 8));
             writeTexels(ch.records, layout.lightTree.trailsBase, tree.trails);
+        }
+
+        // The region→material id table (impl-plan-region-materials): four ids per
+        // texel at the ledger base, from the ONE scene-side mirror the Planner asserts
+        // against its own assignment (regionMaterialsOf — the light-roster pattern).
+        if (layout.regionMaterials !== undefined) {
+            const ids = regionMaterialsOf(scene);
+            const texels = new Float32Array(Math.ceil(ids.length / 4) * 4);
+            texels.set(ids);
+            assertFits('region-material ids', Math.ceil(ids.length / 4), Math.ceil(ids.length / 4));
+            writeTexels(ch.records, layout.regionMaterials.base, texels);
         }
 
         for (const c of DATA_CHANNELS) {

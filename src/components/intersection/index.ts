@@ -166,6 +166,25 @@ export interface ObjectDispatchDescriptor { }
 
 export const DEFAULT_OBJECT_DISPATCH = 'unrolled';
 
+/** Above this many MARCHED objects, the default flips to 'table' (measured Aug 10 2026,
+ *  impl-plan-sdf-as-shape T6). Every marched object's arm carries its own march loop,
+ *  which the compiler inlines and specialises, and the cost is superlinear in the number
+ *  of copies. Time to ready:
+ *
+ *    hardware (M1 Pro / Metal)   8 obj 0.9s │ 32 obj 7.9s │ 128 obj NEVER FINISHED
+ *    software (SwiftShader)      8 obj 1.4s │ 12 obj >90s │ 32 obj >90s
+ *
+ *  The table regime is flat by comparison (code per shape TYPE, objects as data): 150
+ *  objects in 1.0s. The threshold is set from the SOFTWARE cliff, which falls between 8
+ *  and 12 — that renderer is what the numeric witness gate runs on, so a default that is
+ *  merely fine on hardware would make the gate unusable. 9 is the first count past the
+ *  measured-good 8.
+ *
+ *  Closed-form objects carry no loop and do not drive this — hence "marched", not
+ *  "objects". An EXPLICIT strategy always wins: research scenes may still ask for
+ *  'unrolled' at any size, and the Validator warns rather than refuses. */
+export const MARCHED_TABLE_THRESHOLD = 9;
+
 export const OBJECT_DISPATCHES: Record<string, ObjectDispatchDescriptor> = {
     /** The research regime: params baked into GLSL, named symbols, linear arms. */
     unrolled: {},

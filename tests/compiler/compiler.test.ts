@@ -178,8 +178,9 @@ describe('Compiler', () => {
 
         it('main shader contains all 8 objects across the RESOLVED backends (B1 auto)', () => {
             const frag = result.shaders.get('pathtracer-cornell-main')!.fragment;
-            // Auto: 6 planes + sphere → analytic; box (sdf-only) → the marcher.
-            expect(frag).toContain('analytic_intersect');
+            // Auto: 6 planes + sphere → closed form; box → its bounded march. ONE
+            // dispatch over both (impl-plan-sdf-as-shape T5).
+            expect(frag).toContain('primitive_intersect');
             expect(frag).toContain('plane_intersect');
             expect(frag).toContain('sphere_intersect');
             expect(frag).toContain('box_sdf');
@@ -228,7 +229,8 @@ describe('Compiler', () => {
             const sm = result.sourceMaps!.get('pathtracer-minimal-main')!;
             const origins = sm.blocks.map(b => b.origin);
             expect(origins).toContain('glsl/core/structs.glsl');
-            expect(origins).toContain('generated:sdf-dispatch');
+            expect(origins).toContain('generated:primitive-dispatch');
+            expect(origins).toContain('generated:sdf-fields');   // containment targets for the marched objects
             expect(origins).toContain('generated:material-lookup');
             // The marching tolerances the shapes' own <type>_sdf_intersect is written
             // against (impl-plan-sdf-as-shape T1/T3 — raymarch.glsl and its global
@@ -240,8 +242,9 @@ describe('Compiler', () => {
             const r = compiler.compile(analyticMinimal, analyticStrategy);
             const sm = r.sourceMaps!.get(`${analyticStrategy.id}-${analyticMinimal.id}-main`)!;
             const origins = sm.blocks.map(b => b.origin);
-            expect(origins).toContain('generated:analytic-dispatch');
-            expect(origins).not.toContain('generated:sdf-dispatch');
+            expect(origins).toContain('generated:primitive-dispatch');
+            // No marched object ⇒ no signed-field block at all (exact linkage).
+            expect(origins).not.toContain('generated:sdf-fields');
         });
     });
 

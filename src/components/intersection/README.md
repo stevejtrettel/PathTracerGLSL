@@ -40,8 +40,8 @@ analytic-only instanced scene pulls those without the triangle leaf, and future 
 
 ## Contract
 
-The engine consumes the generated per-scene queries (`scene_march_bound`,
-`scene_object_sdf`) and provides the backend walkers the generated
-`scene_intersect` / `scene_intersect_any` dispatchers call. Region classification
-(§4.2) is the dispatcher's job, not the engine's — the engine reports geometry +
-owner only.
+The generated `scene_intersect` / `scene_intersect_any` dispatchers emit ONE arm per
+object — closed-form or bounded-march, a per-object fact (impl-plan-sdf-as-shape:
+there is no combined SDF scene; `scene_march_bound`/`scene_object_sdf` died with the
+global min-march). Region classification (§4.2) is the dispatcher's job, not the
+engine's — the engine reports geometry + owner only.
