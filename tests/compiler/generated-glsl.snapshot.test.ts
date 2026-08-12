@@ -16,6 +16,8 @@ import { cornellArea, cornellAreaNeeStrategy, cornellAreaPtStrategy, cornellArea
 import { skyScene, skyPtStrategy, skyNeeStrategy, skyMisOctStrategy, furnaceSkyScene, furnaceSkyNeeStrategy, furnaceSkyMisStrategy, skyLampScene, skyLampMisStrategy, procSkyScene, procSkyNeeStrategy, procSkyMisCompStrategy } from '../witnesses/scenes/envScenes.js';
 import { cylinderScene, cylinderStrategy } from '../../demos/cylinderScene.js';
 import { sdfTableTwin, sdfTableStrategy } from '../witnesses/scenes/sdfTableWitness.js';
+import { veachMis, veachMisStrategy } from '../witnesses/scenes/ggxScenes.js';
+import { instanceGlass, instanceGlassStrategy } from '../witnesses/scenes/instanceGlassWitness.js';
 
 /**
  * Golden snapshot of the compiler's entire output surface — the safety net for the
@@ -77,6 +79,16 @@ const cases: Array<[string, SceneDescription, RenderStrategy]> = [
     // AND the DATA-form material_of/ior_of (the rail fetch) — previously zero
     // byte-level coverage of the table regime (hygiene batch, Aug 11).
     ['sdf-table + table', sdfTableTwin, sdfTableStrategy],
+    // MICROFACET (fable-rough-dielectric §4): the shared glsl/core/microfacet.glsl
+    // include + the ggx MODEL calling it — the corpus had ZERO byte coverage of any
+    // microfacet occupant, so the carve out of ggx.glsl had nothing to hold it. Also
+    // the pin that rough_dielectric's arrival (T2b) perturbs no conductor program.
+    ['veach + mis', veachMis, veachMisStrategy],
+    // INSTANCED CONTAINMENT (impl-plan-instanced-containment): the scene_region_at
+    // instanced arm — the TLAS point descent + the params-tier decode. The corpus had no
+    // byte coverage of a batch with an interior, and the arm's whole correctness claim is
+    // that it mirrors the ray arm's record indexing, which is a TEXT property.
+    ['instance-glass', instanceGlass, instanceGlassStrategy],
     // Dielectric (impl-plan-dielectric): ior_of + dielectric dispatch + NEE guard + etaScale,
     // across the witnesses (η², innermost-wins) and both geometry backends.
     ['eta witness', etaScene, etaStrategy],

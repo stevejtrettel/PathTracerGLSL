@@ -7,12 +7,12 @@ import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { lightRosterOf, batchLightEligible } from '../plan/dataTenants.js';
+import { lightRosterOf, batchLightEligible, batchNeedsInterior } from '../plan/dataTenants.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
-import { PRIMITIVES, primitiveBounds, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
+import { PRIMITIVES, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { BOUND_FIELDS, checkBoundContainment, checkConservativeness } from '../../components/geometry/boundCheck.js';
 import { MARCHED_TABLE_THRESHOLD, MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
@@ -435,6 +435,27 @@ export function validate(
         }
     }
 
+    // Russian roulette's survival CEILING — a probability, same class of rule as
+    // envSelectWeight. 1.0 is legal and means "never cap": survival is then the
+    // throughput alone, which for a LOSSLESS path (clear glass) is 1 forever, so the
+    // path only ends at measurement.maxBounces — i.e. termination becomes a truncation
+    // again, which is precisely what this knob exists to avoid. 0 would kill every path
+    // at startDepth. Neither is a compile error's business to guess at, so: reject the
+    // impossible, warn on the one that silently hands termination back to the bias term.
+    const rr = strategy.estimator.russianRoulette;
+    if (rr !== null && rr !== undefined && rr.maxSurvival !== undefined) {
+        const ms = rr.maxSurvival;
+        if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0 || ms > 1) {
+            bag.error('invalid-setting',
+                `estimator.russianRoulette.maxSurvival must be in (0, 1] — it is the ceiling on the per-bounce survival probability (got ${String(ms)})`)
+                .add();
+        } else if (ms === 1) {
+            bag.warning('invalid-setting',
+                'estimator.russianRoulette.maxSurvival = 1 disables the cap: a lossless path (clear glass transmits at weight exactly 1) never dims, so RR can never end it and maxBounces truncation does — the bias this knob exists to replace')
+                .add();
+        }
+    }
+
     // envSampler chart (C6: the open door — the last registry-shadow union): the
     // registry gatekeeps, exactly like every other family.
     const chart = strategy.estimator.envSampler;
@@ -678,6 +699,14 @@ export function validate(
             if (lightSelection === 'bvh' && batchLightEligible(o, scene)) {
                 bag.error('incompatible-options',
                     `estimator.instanceAccel 'cwbvh' with lightSelection 'bvh' cannot serve batch '${o.name ?? '<unnamed>'}' — its instances are tree lights, and light identity (Hit.element -> light_of) is baked in binary-TLAS record order, which the cwbvh leaf permutation does not preserve. Use 'tlas', or set sampleAsLight: false on the batch material.`)
+                    .add();
+            }
+            // Containment (impl-plan-instanced-containment): the point descent walks the
+            // BINARY TLAS's nodes and indexes placements by its leaf order. The same
+            // permutation argument as the two rules above, one query shape over.
+            if (batchNeedsInterior(o, scene)) {
+                bag.error('incompatible-options',
+                    `estimator.instanceAccel 'cwbvh' cannot serve batch '${o.name ?? '<unnamed>'}' — its prototype material needs an INTERIOR (transmissive or medium-carrying), and containment descends the binary TLAS in its record order, which the cwbvh leaf permutation does not preserve. Use 'tlas' for this scene.`)
                     .add();
             }
         }
@@ -938,10 +967,10 @@ export function validate(
         }
         const proto = obj.prototype;
         validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag);
-        if (isMeshObject(proto) && proto.closed === true) {
-            bag.error('invalid-setting', `Object ${i} (instanced): a closed (solid) mesh prototype is not supported — instanced batches are surface-only in v1 (fable-mesh-containment §6; solid instances need per-instance containment)`)
-                .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
-        }
+        // (A closed mesh PROTOTYPE was rejected here until instanced containment landed —
+        // impl-plan-instanced-containment. Solid instances now claim an interior through
+        // the same three-tier query their un-instanced siblings use, so `closed: true`
+        // is honoured on prototypes exactly as on top-level meshes.)
         if (!isMeshObject(proto)) {
             const backend = resolveBackend(proto.type, proto.backend);
             if (backend === undefined) {
@@ -954,7 +983,7 @@ export function validate(
                 // no meaning inside a batch.
                 bag.error('invalid-setting', `Object ${i} (instanced): '${proto.type}' declares marchBound 'unbounded' — a marched prototype needs a finite bound (the leaf march runs inside it)`)
                     .withOriginal('scene', [`objects[${i}]`, 'prototype']).add();
-            } else if (PRIMITIVES[proto.type]?.bounds === undefined) {
+            } else if (!primitiveIsBounded(proto.type)) {
                 // A1: the TLAS is a BVH over per-instance WORLD boxes, so the prototype
                 // must declare a finite local box (descriptors.ts `bounds` fact). Absent =
                 // unbounded (plane) — reject-not-degrade: a fabricated box would silently
@@ -1078,7 +1107,14 @@ export function validate(
             ? (obj.closed === true ? null   // solid mesh: has an interior — the rule stops firing (the fact flipped)
                 : 'an OPEN mesh (thin surface — declare `closed: true` on watertight geometry to give it an interior)')
             : isInstancedObject(obj)
-                ? 'a v1 instanced batch (surface-only; dielectric instances await containment, like glass meshes)'
+                // A batch claiming an interior has left the thin set (the mesh precedent:
+                // the fact flips and this rule stops firing with no edit). One that WANTS
+                // an interior but cannot answer containment — an open mesh prototype, or a
+                // thin primitive — still lands here, which is exactly the right diagnostic.
+                ? (batchNeedsInterior(obj, scene) ? null
+                    : isMeshObject(obj.prototype)
+                        ? 'an instanced OPEN mesh prototype (declare `closed: true` on watertight geometry to give its instances an interior)'
+                        : `an instanced batch of zero-thickness '${obj.prototype.type}' (no interior to refract into)`)
                 : PRIMITIVES[obj.type]?.thin === true
                     ? `a zero-thickness '${obj.type}'`
                     : null;

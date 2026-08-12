@@ -91,13 +91,29 @@ export interface MaterialModelDescriptor {
     properties: PropertySchema[];
     /** DERIVED fields (D4) — join the struct union like rows; never authored. */
     derived?: MaterialDerivedSpec[];
+    /** This model is written against glsl/core/microfacet.glsl (D / Smith G₁ / VNDF /
+     *  the frame maps). The INCLUDE GATE for that fixed-core library — declared, never
+     *  a model-name list in the generator (fable-rough-dielectric §4). Default false. */
+    usesMicrofacet?: boolean;
     capabilities: {
         /** Has lobes NEE can sample (false = pure delta: eval ≡ 0, shadow rays wasted).
          *  Feeds material_has_nondelta_lobes directly. (Polarity flipped vs
          *  module-anatomy §2's `deltaLobes` sketch for clarity — same fact.) */
         nonDeltaLobes: boolean;
-        /** Transmissive models: ior region-table exists, transport tracks eta_scale. */
+        /** CROSSES THE INTERFACE: ior region-table exists, transport tracks eta_scale,
+         *  current_medium switches, the thin-surface warning and the instance-batch
+         *  exclusion apply. Deliberately NOT the same fact as `support` — see below. */
         transmission: boolean;
+        /** ANGULAR SUPPORT of the BSDF about the shading normal: 'hemisphere' = the
+         *  upper side only (light from below scatters nothing); 'sphere' = both sides.
+         *  Split OUT of `transmission` when its second reader arrived
+         *  (fable-rough-dielectric §3.1 — the placement-fold lesson: dissolve a
+         *  conflated fact when a reader asks only half of it). The reader is light
+         *  SELECTION: the light tree's below-horizon cull is licensed by a
+         *  hemisphere claim, so a sphere-support receiver that runs NEE must get a
+         *  two-sided query. A future translucent model answers 'sphere' with
+         *  transmission FALSE (no index change) — which is why one flag cannot serve. */
+        support: 'hemisphere' | 'sphere';
         /** May emit — eligibility for the emission gate + light registry (§6.2);
          *  whether a given MATERIAL emits stays a per-value analysis. */
         emissive: boolean;

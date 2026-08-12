@@ -84,6 +84,19 @@ export function structName(d: PrimitiveDescriptor): string {
  *  gets its AABB DERIVED: the bound primitive's own box at the mapped values
  *  (fable-sdf-contract §3 — the same numbers expressed twice is how a bound silently
  *  starts clipping; menger/apollonian/bottle restated theirs verbatim before this). */
+/** Values-free boundedness probe — TRUE iff primitiveBounds can produce a box
+ *  (authored `bounds` OR a derivable cross-type `marchBound`). The ONE presence
+ *  predicate for eligibility checks (instance prototypes, table membership) — a
+ *  direct `d.bounds === undefined` test silently excludes every derived-bound shape
+ *  (found when the first instanced scene-local gyroid was rejected). */
+export function primitiveIsBounded(type: string): boolean {
+    const d = PRIMITIVES[type];
+    if (d === undefined) return false;
+    if (d.bounds !== undefined) return true;
+    const mb = d.marchBound;
+    return mb !== undefined && mb !== 'self' && mb !== 'unbounded';
+}
+
 export function primitiveBounds(type: string, values: PrimitiveValues): AABB | null {
     const d = PRIMITIVES[type];
     if (d === undefined) return null;

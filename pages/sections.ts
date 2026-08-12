@@ -63,13 +63,17 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Instancing & scene scale',
-        blurb: 'one prototype × N placements, per-instance attributes, the TLAS, and the scene object table',
+        blurb: 'one prototype × N placements, per-instance attributes, the TLAS, instanced interiors (glass and media), and the scene object table',
         entries: [
+            e('instance-glass', 'instance-glass-ref'),
+            e('instance-glass-mesh', 'instance-glass-mesh-ref'),
+            e('instance-fog', 'instance-fog-ref'),
             e('spheres'), e('forest'), e('grand-bazaar'), e('bazaar'), e('sdf-field'), e('sdf-knot'),
             e('instance-twin', 'instance-twin-ref'),
             e('cube-cloud', 'cube-cloud-ref'),
             e('instance-params-twin', 'instance-params-frame'),
             e('perf-cloud', 'perf-cloud-frame'),
+            e('perf-instance-glass', 'perf-instance-opaque'),
             e('mesh-instance-twin', 'mesh-instance-ref'),
             e('attr-twin', 'attr-twin-ref'),
         ],
@@ -114,10 +118,12 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Dielectrics & regions',
-        blurb: 'smooth dielectrics (the η² factor), nested regions, innermost-wins classification',
+        blurb: 'smooth and ROUGH dielectrics (the η² factor either way), nested regions, innermost-wins classification, and the two-sided NEE that rough glass forces',
         entries: [
             e('eta'), e('cornell-glass'), e('analytic-glass'), e('submerged'),
             e('regions-transformed', 'regions-transformed-ref'),
+            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'),
+            e('rough-grin', 'rough-grin-ref'),
         ],
     },
     {
@@ -131,7 +137,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'The SDF shape library',
         blurb: 'distance fields as ordinary shapes: a constructed bottle, a vendored model, the torus — and scene-local fields defined where they are used',
-        entries: [e('sdf-shapes'), e('fractals'), e('custom-fields'), e('field-glass'), e('glass-lab')],
+        entries: [e('sdf-shapes'), e('fractals'), e('custom-fields'), e('field-glass'), e('glass-lab'), e('gyroid-field')],
     },
     {
         title: 'Transforms & driven placement',

@@ -49,6 +49,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -142,6 +143,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -232,6 +234,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -331,6 +334,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accretion + pt 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -432,6 +436,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -533,6 +538,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -634,6 +640,7 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin + pat
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -735,6 +742,7 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin-ref +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -836,6 +844,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bazaar + table 
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -937,6 +946,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bazaar + unroll
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1030,6 +1040,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-fog + pt-m
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1125,6 +1136,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-fog + pt-n
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1220,6 +1232,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-slab + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1312,6 +1325,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-wall + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1411,6 +1425,7 @@ exports[`ProgramDescription structural snapshot (the link map) > blackhole + pt 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1518,6 +1533,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtra
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1620,6 +1636,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtra
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1713,6 +1730,7 @@ exports[`ProgramDescription structural snapshot (the link map) > charts + pt 1`]
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1814,6 +1832,7 @@ exports[`ProgramDescription structural snapshot (the link map) > charts + pt-nee
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -1914,6 +1933,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`]
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2017,6 +2037,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2120,6 +2141,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2215,6 +2237,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtra
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2305,6 +2328,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pat
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2406,6 +2430,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2507,6 +2532,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2602,6 +2628,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2697,6 +2724,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2791,6 +2819,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2887,6 +2916,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -2982,6 +3012,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3082,6 +3113,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3181,6 +3213,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3281,6 +3314,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3381,6 +3415,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3479,6 +3514,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3580,6 +3616,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3681,6 +3718,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3778,6 +3816,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3878,6 +3917,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -3978,6 +4018,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4078,6 +4119,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4174,6 +4216,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4270,6 +4313,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4366,6 +4410,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4463,6 +4508,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4558,6 +4604,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4657,6 +4704,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cube-cloud + pa
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4756,6 +4804,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cube-cloud-ref 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4859,6 +4908,7 @@ exports[`ProgramDescription structural snapshot (the link map) > custom-fields +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -4960,6 +5010,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cylinders + pat
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5055,6 +5106,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5155,6 +5207,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5261,6 +5314,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven + pathtr
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5362,6 +5416,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5463,6 +5518,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5564,6 +5620,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5659,6 +5716,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + mis-bv
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5754,6 +5812,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + nee-bv
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5846,6 +5905,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + pt 1`]
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -5936,6 +5996,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit + pathtrac
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6026,6 +6087,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-driven + p
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6118,6 +6180,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat + path
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6212,6 +6275,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6309,6 +6373,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6401,6 +6466,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pat
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6492,6 +6558,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6593,6 +6660,7 @@ exports[`ProgramDescription structural snapshot (the link map) > expr-const + pt
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6684,6 +6752,7 @@ exports[`ProgramDescription structural snapshot (the link map) > expr-const-ref 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6773,6 +6842,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6875,6 +6945,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -6977,6 +7048,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7078,6 +7150,7 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7170,6 +7243,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7272,6 +7346,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7374,6 +7449,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7473,6 +7549,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7575,6 +7652,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7677,6 +7755,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-n
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7769,6 +7848,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7870,6 +7950,7 @@ exports[`ProgramDescription structural snapshot (the link map) > forest + linear
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -7971,6 +8052,7 @@ exports[`ProgramDescription structural snapshot (the link map) > forest + tlas 1
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8073,6 +8155,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fractals + path
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8163,6 +8246,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8253,6 +8337,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8343,6 +8428,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8441,6 +8527,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8544,6 +8631,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8647,6 +8735,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8690,6 +8779,415 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
   "view": {
     "tonemap": {
       "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion + pt 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.02,
+      0.02,
+      0.03,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        2.2,
+        1.6,
+        2.6,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion + pt-mis-bvh 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.02,
+      0.02,
+      0.03,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "bvh",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        2.2,
+        1.6,
+        2.6,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion + pt-nee-bvh 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.02,
+      0.02,
+      0.03,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "bvh",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        2.2,
+        1.6,
+        2.6,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion + pt-nee-power 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.02,
+      0.02,
+      0.03,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        2.2,
+        1.6,
+        2.6,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
     },
   },
 }
@@ -8749,10 +9247,12 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b4 
     "models": [
       "lambert",
       "dielectric",
+      "rough_dielectric",
     ],
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": true,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8851,10 +9351,12 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b8 
     "models": [
       "lambert",
       "dielectric",
+      "rough_dielectric",
     ],
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": true,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -8953,10 +9455,12 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b16
     "models": [
       "lambert",
       "dielectric",
+      "rough_dielectric",
     ],
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": true,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9055,10 +9559,12 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b32
     "models": [
       "lambert",
       "dielectric",
+      "rough_dielectric",
     ],
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": true,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9159,6 +9665,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glassball + pt 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9257,6 +9764,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + mi
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9350,6 +9858,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + ne
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9440,6 +9949,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + pt
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9532,6 +10042,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9629,6 +10140,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9733,6 +10245,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + 
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9835,6 +10348,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + 
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -9934,6 +10448,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin + pt 1`] =
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10041,6 +10556,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin + pt-nee 1
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10142,6 +10658,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-emit + pt 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10238,6 +10755,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-emit-ref +
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10328,6 +10846,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace + 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10420,6 +10939,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-em
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10511,6 +11031,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-ha
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10601,6 +11122,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-sc
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10700,6 +11222,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-glass + pt
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10797,6 +11320,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-glass-ref 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10893,6 +11417,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-scatter + 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -10991,6 +11516,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-scatter-re
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11089,6 +11615,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-vacuum + p
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11185,6 +11712,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-vacuum-ref
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11281,6 +11809,7 @@ exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11322,6 +11851,109 @@ exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-
     "tonemap": {
       "exposure": undefined,
       "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > gyroid-field + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.14,
+      0.16,
+      0.2,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "ggx",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        6.5,
+        13.5,
+      ],
+      "target": [
+        0,
+        0.8,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
     },
   },
 }
@@ -11375,6 +12007,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11472,6 +12105,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11569,6 +12203,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11665,6 +12300,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt 1`]
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11767,6 +12403,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt-nee
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11864,6 +12501,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -11961,6 +12599,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12058,6 +12697,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12152,6 +12792,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12249,6 +12890,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12346,6 +12988,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12443,6 +13086,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12540,6 +13184,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-thet
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12632,6 +13277,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-slab + path
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12725,6 +13371,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12818,6 +13465,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -12911,6 +13559,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13004,6 +13653,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13038,6 +13688,831 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-fog + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.4,
+        1.6,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-fog-ref + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.4,
+        1.6,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-glass + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.4,
+        1.6,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-glass + pathtracer-linear 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "linear",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.4,
+        1.6,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-glass + pathtracer-lowrr 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.5,
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.4,
+        1.6,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-glass-mesh + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.4,
+        1.6,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-glass-mesh-ref + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": true,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.4,
+        1.6,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > instance-glass-ref + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.4,
+        1.6,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.7,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
   },
   "view": {
     "tonemap": {
@@ -13097,6 +14572,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13190,6 +14666,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13283,6 +14760,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13384,6 +14862,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13485,6 +14964,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13586,6 +15066,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13687,6 +15168,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13788,6 +15270,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13889,6 +15372,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin-r
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -13985,6 +15469,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser + pt-mis 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14088,6 +15573,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser + pt-nee 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14202,6 +15688,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser-soft + pt
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14316,6 +15803,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser-soft + pt
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14418,6 +15906,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14513,6 +16002,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14608,6 +16098,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14703,6 +16194,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14798,6 +16290,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-th
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14893,6 +16386,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -14988,6 +16482,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off-baked
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15087,6 +16582,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15188,6 +16684,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15287,6 +16784,7 @@ exports[`ProgramDescription structural snapshot (the link map) > maxwell + pt 1`
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15394,6 +16892,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-fog + path
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15496,6 +16995,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-fog-ref + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15586,6 +17086,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-furnace + 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15688,6 +17189,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15790,6 +17292,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15891,6 +17394,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-r
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -15992,6 +17496,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-t
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16084,6 +17589,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16179,6 +17685,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16274,6 +17781,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16369,6 +17877,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16464,6 +17973,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16556,6 +18066,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16651,6 +18162,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16746,6 +18258,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16847,6 +18360,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-ref +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -16948,6 +18462,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17049,6 +18564,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17151,6 +18667,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17253,6 +18770,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17354,6 +18872,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pathtr
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17452,6 +18971,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pt 1`]
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17551,6 +19071,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17652,6 +19173,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17748,6 +19270,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`]
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17851,6 +19374,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -17956,6 +19480,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18059,6 +19584,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18160,6 +19686,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + brute 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18261,6 +19788,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + bvh 1`
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18359,6 +19887,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + pt 1`]
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18458,6 +19987,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18560,6 +20090,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18652,6 +20183,7 @@ exports[`ProgramDescription structural snapshot (the link map) > paint + pt 1`] 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18752,6 +20284,7 @@ exports[`ProgramDescription structural snapshot (the link map) > paint + pt-nee 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18858,6 +20391,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud + pa
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -18959,6 +20493,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud + pa
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19060,6 +20595,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud-fram
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19094,6 +20630,378 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud-fram
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > perf-instance-glass + perf-b12 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 12,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > perf-instance-glass + perf-b24 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > perf-instance-glass + perf-b48 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 48,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > perf-instance-opaque + perf-b48 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.12,
+      0.15,
+      0.22,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": true,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 48,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
   },
   "view": {
     "tonemap": {
@@ -19159,6 +21067,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-0 + ta
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19258,6 +21167,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-8 + ta
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19357,6 +21267,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-8 + un
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19456,6 +21367,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-32 + t
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19555,6 +21467,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-32 + u
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19654,6 +21567,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-128 + 
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19753,6 +21667,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-128 + 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19852,6 +21767,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-blob +
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -19951,6 +21867,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-blob +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20050,6 +21967,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20149,6 +22067,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20248,6 +22167,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20347,6 +22267,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20446,6 +22367,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20545,6 +22467,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20644,6 +22567,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20751,6 +22675,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20858,6 +22783,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -20965,6 +22891,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21062,6 +22989,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21167,6 +23095,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21269,6 +23198,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21303,6 +23233,697 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rough-furnace + furnace 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        0,
+        4.2,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 24,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rough-grin + pt 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.18,
+      0.2,
+      0.28,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        3.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 14,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": true,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rough-grin-ref + pt 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.18,
+      0.2,
+      0.28,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.9,
+      "position": [
+        0,
+        1.2,
+        3.2,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 14,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.12,
+      0.15,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        1.4,
+        1.5,
+        1.9,
+      ],
+      "target": [
+        0,
+        0.8,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-mis 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.12,
+      0.15,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        1.4,
+        1.5,
+        1.9,
+      ],
+      "target": [
+        0,
+        0.8,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.12,
+      0.15,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        1.4,
+        1.5,
+        1.9,
+      ],
+      "target": [
+        0,
+        0.8,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rough-smooth-limit + pathtracer 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.6,
+      "position": [
+        0,
+        1,
+        0.05,
+      ],
+      "target": [
+        0,
+        -1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 4,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
   },
   "view": {
     "tonemap": {
@@ -21370,6 +23991,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-field + tab
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21469,6 +24091,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-instance-tw
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21568,6 +24191,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-instance-tw
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21669,6 +24293,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-knot + knot
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21772,6 +24397,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-shapes + pa
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21872,6 +24498,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-shapes + pt
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -21971,6 +24598,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin 
     "regionLookup": "data",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22070,6 +24698,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22162,6 +24791,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22257,6 +24887,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22353,6 +24984,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22457,6 +25089,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22561,6 +25194,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22665,6 +25299,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22766,6 +25401,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22870,6 +25506,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -22974,6 +25611,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23069,6 +25707,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23173,6 +25812,7 @@ exports[`ProgramDescription structural snapshot (the link map) > softbeam-wall +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23276,6 +25916,7 @@ exports[`ProgramDescription structural snapshot (the link map) > softbeam-wall +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23374,6 +26015,7 @@ exports[`ProgramDescription structural snapshot (the link map) > solids-analytic
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23473,6 +26115,7 @@ exports[`ProgramDescription structural snapshot (the link map) > solids-sdf + pa
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23574,6 +26217,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spheres + linea
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23675,6 +26319,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spheres + tlas 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23768,6 +26413,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23863,6 +26509,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -23956,6 +26603,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sun + pt-nee 1`
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24050,6 +26698,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24145,6 +26794,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24246,6 +26896,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24350,6 +27001,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24454,6 +27106,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24558,6 +27211,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24662,6 +27316,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24766,6 +27421,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24869,6 +27525,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -24975,6 +27632,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -25076,6 +27734,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -25169,6 +27828,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + bvh
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -25262,6 +27922,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -25355,6 +28016,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -25454,6 +28116,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -25556,6 +28219,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",
@@ -25658,6 +28322,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
+    "twoSidedShading": false,
   },
   "measurement": {
     "ambient": "euclidean",

@@ -567,8 +567,18 @@ export interface EstimatorDescription {
      *  Must be strictly inside (0, 1); Validator-enforced. */
     envSelectWeight?: number;
     /** null = off. Unbiased by construction (random termination WITH compensation) — the
-     *  taxonomy's canonical estimator-side termination, vs maxBounces' measurement-side one. */
-    russianRoulette: { startDepth: number } | null;
+     *  taxonomy's canonical estimator-side termination, vs maxBounces' measurement-side one.
+     *
+     *  `maxSurvival` (default 0.95) is the CEILING on the per-bounce survival probability.
+     *  Survival is normally the path's remaining throughput, so a dim path dies quickly —
+     *  but a LOSSLESS interaction (clear glass: the transmission weight is exactly 1, the
+     *  Fresnel factor having cancelled against the lobe probability) never dims, and this
+     *  ceiling is then the ONLY thing ending the path. At 0.95 that is ~20 further bounces
+     *  on average; at 0.7, ~3. Lowering it trades NOISE for TIME and stays exactly
+     *  unbiased — survivors are divided by the same probability — which is the whole point
+     *  of reaching for it instead of lowering measurement.maxBounces, whose truncation is
+     *  uncompensated bias. Must be in (0, 1]; Validator-enforced. */
+    russianRoulette: { startDepth: number; maxSurvival?: number } | null;
     /**
      * Volume distance-sampling method (§7.3 as amended by fable-volumetric-component.md §5),
      * consulted only when scattering is live (measurement.scattering 'full' + scattering

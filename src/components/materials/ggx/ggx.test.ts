@@ -1,6 +1,9 @@
 // The §11.3 pdf–histogram harness, GGX instance (fable-compiler-contracts §11.3,
 // fable-validation-scenes §6 H). This TS twin is a line-for-line transcription of
-// ggx.glsl's math in the local frame (identity Frame; ambient_dot = dot) — change one,
+// ggx.glsl's model math PLUS the shared distribution machinery it calls
+// (glsl/core/microfacet.glsl: D, Smith G₁, VNDF — carved out in
+// fable-rough-dielectric §4, so this twin now covers the stdlib every microfacet
+// occupant links) in the local frame (identity Frame; ambient_dot = dot) — change one,
 // change both. Three checks per (inclination × roughness) config from the spec grid:
 //   1. χ² histogram: sampled wi frequencies vs ∫pdf over each bin (32×16 hemispherical
 //      grid + a rejected-sample cell). Expected counts use adaptive per-bin refinement —

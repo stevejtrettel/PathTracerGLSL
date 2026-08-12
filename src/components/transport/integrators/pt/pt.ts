@@ -27,11 +27,12 @@ import {
 import { lightBlocks, lightRequires } from '../../techniques/light/light.js';
 import { equiangularBlocks, equiangularRequires } from '../../techniques/equiangular/equiangular.js';
 import mathMisGLSL from '../../math_mis.glsl?raw';
+import { formatFloat } from '../../../glsl-format.js';
 
 export function contributeTransport(program: ProgramDescription): FeatureContribution {
     const f = flags(program);
 
-    const blocks: ShaderBlock[] = [lightQueryFns(), pathState(f)];
+    const blocks: ShaderBlock[] = [lightQueryFns(f), pathState(f)];
     // MIS math (β=2 power heuristic) — transport family property: its only callers are
     // the combiner-emitted weights, so it precedes them (definition-before-use keeps it
     // out of the interface header: an internal helper, not a cross-feature seam).
@@ -44,7 +45,10 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
     // literals in the walk — MAX_SHADOW_SEGMENTS/MAX_NULL_COLLISIONS are the siblings).
     const defines: Record<string, string> = {};
     if (f.nulls) defines['MAX_NULL_CROSSINGS'] = '32';   // §3.6 null-interface budget; exhaustion terminates the path
-    if (f.rr) defines['RR_MAX_SURVIVAL'] = '0.95';       // §7.2 survival cap — bounds the 1/p_survive weight
+    // §7.2 survival cap — bounds the 1/p_survive weight, and (see the authored field's
+    // note) is the ONLY terminator for lossless paths, whose throughput never dims.
+    // Authored per strategy; 0.95 is the default, not a constant.
+    if (f.rr) defines['RR_MAX_SURVIVAL'] = formatFloat(f.rr.maxSurvival ?? 0.95);
 
     // Explicit literal (not ...emptyContribution): the purity rule — components import
     // no compiler VALUES, only contract types. tsc keeps this in sync with the type.
@@ -71,29 +75,35 @@ function walkRequires(f: Flags): string[] {
     if (f.scattering) req.push('scene_medium_properties');
     if (f.nulls) req.push('is_null_interface');
     if (f.transmission) req.push('ior_of');
+    // The generated light-query constructor's runtime arm (fable-rough-dielectric §3.3).
+    if (f.twoSided) req.push('material_two_sided');
     return req;
 }
 
 // ============================================================================
 // Light-query constructors (fable-light-bvh §3.2 v1.5) — the POLICY site for the
 // selection context: static technique files pass "everything they have" (mat, hit)
-// through these instead of constructing LightQuery themselves, so future context
-// growth (per-material normal policy, spectral, curved frames) changes ONLY these
-// bodies. `mat` is deliberately in the signature ahead of need: today every
-// transmissive model is pure-delta and never runs NEE (the lightQuery contract test
-// pins this), so the surface query always carries the shading normal.
+// through these instead of constructing LightQuery themselves, so context growth
+// (per-material support policy, spectral, curved frames) changes ONLY these bodies.
+// `mat` was in the signature ahead of need; fable-rough-dielectric §3.3 is the need —
+// the query's two-sidedness is a per-MATERIAL fact (support 'sphere' ∧ non-delta), and
+// this is where it is answered. The twoSidedShading decision folds the question away
+// entirely when the scene has no such material.
 // ============================================================================
 
-function lightQueryFns(): ShaderBlock {
+function lightQueryFns(f: Flags): ShaderBlock {
+    const sided = f.twoSided
+        ? 'material_two_sided(mat)'
+        : 'false';
     return {
         origin: 'generated:transport/light-query',
         source: [
             '// ── Light-query constructors (generated policy — fable-light-bvh §3.2) ──',
             'LightQuery light_query_surface(int mat, Hit hit) {',
-            '    return LightQuery(hit.p, hit.frame.n);',
+            `    return LightQuery(hit.p, hit.frame.n, ${sided});`,
             '}',
             'LightQuery light_query_medium(Point p) {',
-            '    return LightQuery(p, vec3(0.0));   // no orientation at a medium event',
+            '    return LightQuery(p, vec3(0.0), false);   // no orientation at a medium event',
             '}',
         ].join('\n'),
     };

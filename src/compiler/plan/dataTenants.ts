@@ -10,7 +10,7 @@
 import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue } from '../types.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression, isValueParam, isBlackbody } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
-import { PRIMITIVES, paramsRecordFloats, resolveBackend, foldPlacementIntoParameters } from '../../components/geometry/index.js';
+import { PRIMITIVES, paramsRecordFloats, primitiveIsBounded, resolveBackend, foldPlacementIntoParameters } from '../../components/geometry/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
@@ -221,6 +221,28 @@ export function batchLightEligible(b: InstancedObject, scene: SceneDescription):
     return hasConstantNonzeroEmission(em);
 }
 
+/** THE instanced-containment predicate (impl-plan-instanced-containment §2), shared by
+ *  the Planner's thin-set decision, the generator's arm emission, and the Validator —
+ *  `batchLightEligible`'s sibling, same one-spelling discipline.
+ *
+ *  Two halves, deliberately separate: WANTS an interior (the prototype material is
+ *  transmissive or carries a medium — without one of those, containment would be a
+ *  cost nothing reads, so exact linkage says don't emit it) and CAN answer containment
+ *  (a mesh prototype must be `closed: true` — the Validator-proven watertightness that
+ *  makes first-hit-facing correct; a primitive must not be thin, since zero thickness
+ *  never claims containment). A batch that wants but cannot stays in the thin set and
+ *  keeps the existing η = 1 warning, which is exactly the right diagnostic. */
+export function batchNeedsInterior(b: InstancedObject, scene: SceneDescription): boolean {
+    const mat = scene.materials[b.prototype.material];
+    if (mat === undefined) return false;
+    const wants = MATERIAL_MODELS[mat.model ?? '']?.capabilities.transmission === true
+        || mat.medium !== undefined;
+    if (!wants) return false;
+    return isMeshObject(b.prototype)
+        ? b.prototype.closed === true
+        : PRIMITIVES[b.prototype.type]?.thin !== true;
+}
+
 /**
  * Region id → material id, SCENE-SIDE (impl-plan-region-materials — the census
  * pattern: the ONE mirror of the Planner's region/material assignment, packed by the
@@ -296,7 +318,7 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
         if (isDrivenTransform(o.transform) || keepsLocalFrame(o, scene)) return;   // not folded → residual, never tabled
         if (resolveBackend(o.type, o.backend) !== 'analytic') return;
         const d = PRIMITIVES[o.type];
-        if (d?.bounds === undefined) return;   // unbounded (plane) → residual
+        if (!primitiveIsBounded(o.type)) return;   // unbounded (plane) → residual (derived bounds count — primitiveIsBounded)
         // A NON-closed analytic shape (box/cylinder — placement-fold stage 4) tables
         // only under IDENTITY rotation: the analytic record is FOLDED params, and the
         // fold cannot absorb R (foldPlacementIntoParameters throws on rotated
@@ -322,7 +344,7 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
         if (isDrivenTransform(o.transform) || keepsLocalFrame(o, scene)) return;
         if (resolveBackend(o.type, o.backend) !== 'sdf') return;
         const d = PRIMITIVES[o.type];
-        if (d?.bounds === undefined) return;   // unbounded (plane) → residual
+        if (!primitiveIsBounded(o.type)) return;   // unbounded (plane) → residual (derived bounds count — primitiveIsBounded)
         // The record budget: texel-padded params + derived + the 2-texel rigid tail
         // must fit the shared stride (sdfRecordPack throws past it; degrade-to-residual
         // here so an exotic pinned type renders through the global marcher instead of

@@ -405,8 +405,16 @@ export function bvhPointWalkLines(nodesBase: number, leafRange: string[]): strin
         '            int off = int(n1.w), cnt = int(n0.w);',
         ...leafRange.map((l) => '            ' + l),
         '        } else {',
-        '            int l = int(n1.w), r = l + 1;',
-        '            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = l; stack[++ptr] = r; }',
+        // The node layout is buildBVHCore's: LEFT is implicit at ni + 1 (never stored),
+        // B = n1.w is the RIGHT child. This walk read n1.w as the left child and assumed
+        // the sibling sat at l + 1, so it descended the right subtree twice and NEVER
+        // VISITED THE LEFT ONE — silent for opaque tabled scenes (a missed containment
+        // only matters where region identity is read: ior_of, current_medium), which is
+        // why it survived until instanced dielectrics became its first real consumer
+        // (glass instances in the left subtree reported no interior ⇒ η = 1 ⇒ invisible).
+        // No traversal order here: containment visits every node whose box holds p.
+        '            int L = ni + 1, R = int(n1.w);',
+        '            if (ptr + 2 < BVH_STACK_DEPTH) { stack[++ptr] = L; stack[++ptr] = R; }',
         '        }',
         '    }',
     ];

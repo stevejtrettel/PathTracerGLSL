@@ -14,6 +14,7 @@ import structsMediaGLSL from '../../../glsl/core/structs_media.glsl?raw';
 import interactionGLSL from '../../../glsl/core/interaction.glsl?raw';
 import mathGLSL from '../../../glsl/core/math.glsl?raw';
 import mathMediaGLSL from '../../../glsl/core/math_media.glsl?raw';
+import microfacetGLSL from '../../../glsl/core/microfacet.glsl?raw';
 import { AMBIENT_SPACES } from '../../../components/ambient/index.js';
 
 /** The ambient occupant's block, from the registry (D3) — throws on an unregistered
@@ -85,6 +86,13 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         ambientBlock(plan.program.measurement.ambient),
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
+    // Microfacet stdlib (fable-rough-dielectric §4): D / Smith G₁ / VNDF / the frame maps,
+    // shared by every microfacet MODEL. Gated on the descriptors' declared fact — a
+    // program with no microfacet occupant carries none of it, and one with several
+    // carries it once. AFTER the ambient occupant (the frame maps call ambient_dot).
+    if (plan.program.materials.models.some((m) => MATERIAL_MODELS[m]?.usesMicrofacet === true)) {
+        blocks.push({ origin: 'glsl/core/microfacet.glsl', source: microfacetGLSL });
+    }
 
     return {
         ...emptyContribution('core'),

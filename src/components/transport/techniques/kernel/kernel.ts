@@ -32,7 +32,7 @@ export function kernelStateFields(f: Flags): string[] {
 export function kernelStateInit(f: Flags): string[] {
     const lines = ['    s.prev_was_delta = true;'];
     if (f.mis) {
-        lines.push('    s.prev_bsdf_pdf = 0.0;', '    s.prev_query = LightQuery(ray.origin, vec3(0.0));');
+        lines.push('    s.prev_bsdf_pdf = 0.0;', '    s.prev_query = LightQuery(ray.origin, vec3(0.0), false);');
     }
     return lines;
 }

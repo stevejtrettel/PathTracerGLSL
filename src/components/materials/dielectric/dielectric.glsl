@@ -2,18 +2,10 @@
 // Fields read: mp.transmittance (interface tint; interior absorption is the medium's job, §4.4).
 // IORs come from the HIT's regions via ior_of() (§4.1) — media on both sides, not the material.
 // Pure delta: eval/pdf return zero (§3.1); transport skips NEE via material_has_nondelta_lobes.
-// Provides: dielectric_fresnel(), dielectric_eval/sample/pdf/emission().
-// Depends on: ior_of() (generated), MaterialProperties, Hit/Frame, InteractionSample, LOBE_*,
-//             SPECTRUM_ZERO/ONE, ambient_dot.
-
-float dielectric_fresnel(float cos_i, float eta) {    // eta = n_i / n_t
-    float sin2_t = eta * eta * (1.0 - cos_i * cos_i);
-    if (sin2_t >= 1.0) return 1.0;                    // total internal reflection
-    float cos_t = sqrt(1.0 - sin2_t);
-    float r_par  = (cos_i - eta * cos_t) / (cos_i + eta * cos_t);
-    float r_perp = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
-    return 0.5 * (r_par * r_par + r_perp * r_perp);
-}
+// Provides: dielectric_eval/sample/pdf/emission().
+// Depends on: ior_of() (generated), dielectric_fresnel() (core math — SHARED with the rough
+//             dielectric, fable-rough-dielectric §4), MaterialProperties, Hit/Frame,
+//             InteractionSample, LOBE_*, SPECTRUM_ZERO/ONE, ambient_dot.
 
 Spectrum dielectric_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) { return SPECTRUM_ZERO; } // pure delta
 float    dielectric_pdf (Direction wi, Direction wo, Hit hit, MaterialProperties mp) { return 0.0; }

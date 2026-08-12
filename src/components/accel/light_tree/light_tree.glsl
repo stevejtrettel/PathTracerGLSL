@@ -12,9 +12,12 @@
 // θu subtends the cluster's bounding sphere — the conservative "a light could sit
 // anywhere in the box" allowance (Conty–Kulla; pbrt's cosSubClamped identity, sqrt
 // only, no trig). A cluster is culled (importance 0) ONLY when its ENTIRE bounding
-// sphere lies below the tangent plane — at an opaque receiver every such light
-// contributes exactly zero, so the cull is variance-only (transmissive receivers are
-// pure-delta today and never run NEE; the lightQuery contract test pins that).
+// sphere lies below the tangent plane — at a HEMISPHERE-support receiver every such
+// light contributes exactly zero, so the cull is variance-only. THAT CLAIM IS THE
+// QUERY'S: q.two_sided (fable-rough-dielectric §3.3) says the receiver's BSDF support
+// is the whole sphere (rough glass), and then the cull is NOT licensed — it disarms
+// and the shaping goes sign-agnostic. The registry-wide contract test pins the
+// pairing, so a future sphere-support model cannot forget to say so.
 // Inside the bounding sphere the orientation claim is meaningless → normal-free
 // (pbrt's inside-the-bounds convention). The orientation-CONE term (θ_o/θ_e) stays
 // deliberately absent — provably vacuous for sphere/point emitters.
@@ -37,7 +40,18 @@ float light_tree_importance(vec3 bmin, vec3 bmax, float phi, LightQuery q) {
     // never die mid-tree while any above-horizon light exists.
     vec3 far_c = mix(bmin, bmax, step(vec3(0.0), q.n));
     float h = dot(q.n, far_c - q.p);           // EXACT max of n·(x−p) over the box
-    if (h <= 0.0) return 0.0;
+    if (q.two_sided) {
+        // Sphere support: the receiver scatters light arriving from EITHER side, so the
+        // relevant quantity is max|n·(x−p)| over the box. The opposite extreme is the
+        // same sign-selected corner for −n, which is the box's mirror partner of far_c —
+        // no second mix needed. h_two ≥ 0 always (if every corner is below, the mirror
+        // term is positive), so a two-sided query can never cull: bias-free by
+        // construction, and h_two/dmax stays a valid lower bound on best-case |cos|.
+        vec3 near_c = bmin + bmax - far_c;
+        h = max(h, -dot(q.n, near_c - q.p));
+    } else if (h <= 0.0) {
+        return 0.0;
+    }
     // Best-case-cosine shaping from the SAME corner machinery (the v1.5.1 refinement —
     // the sphere-based cos(θi−θu) was axis-anisotropic: every axis-aligned box straddles
     // a tilted horizon plane, so diagonal-facing receivers got mushy selection — the
@@ -53,6 +67,7 @@ float light_tree_importance(vec3 bmin, vec3 bmax, float phi, LightQuery q) {
     // box is at least this frontal) floors it so survivors stay reachable. Both are
     // corner/center quantities — no sphere, no axis bias.
     float cos_c = dot(q.n, d) * inversesqrt(max(d2raw, 1e-12));
+    if (q.two_sided) cos_c = abs(cos_c);       // frontal from either side (same discriminator)
     vec3 dmx = max(q.p - bmin, bmax - q.p);
     float lo = h * inversesqrt(max(dot(dmx, dmx), 1e-12));
     return base * min(1.0, max(cos_c, lo));

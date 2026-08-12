@@ -3,12 +3,12 @@
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
 import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
-import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, modelTwoSidedShading } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
-import { PRIMITIVES, primitive, canonicalizePrimitiveParameters, classifyPlacement, resolveBackend } from '../../components/geometry/index.js';
+import { PRIMITIVES, primitive, primitiveBounds, canonicalizePrimitiveParameters, classifyPlacement, resolveBackend } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
     isDrivenTransform,
@@ -29,7 +29,7 @@ import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, regionMaterialsOf } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, regionMaterialsOf, batchNeedsInterior } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
@@ -150,6 +150,7 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     instanceCount: placementCount(obj.placements),
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
                     slot: dataLayout.batches[ordinal],
+                    ...(batchNeedsInterior(obj, scene) ? { hasInterior: true } : {}),
                     prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined, geometrySlot: dataLayout.meshes[batchGeometrySlot[ordinal]!] },
                 });
             } else {
@@ -164,6 +165,9 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
                     instanceCount: placementCount(obj.placements),
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
                     slot: dataLayout.batches[ordinal],
+                    // Containment (impl-plan-instanced-containment): omitted when false so
+                    // every opaque batch's plan stays byte-identical.
+                    ...(batchNeedsInterior(obj, scene) ? { hasInterior: true } : {}),
                     // Prototype has NO transform → just canonicalize (no fold). record (the
                     // adapter's ONE tier truth): 'frame' = 2-texel rigid record, s scales the
                     // params in-shader; 'params' = 1-texel folded-parameters record, world-space
@@ -628,6 +632,11 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             regionLookup: objectDispatch === 'table' ? 'data' : 'baked',
             surfaceEval: lighting !== null,
             surfacePdf: mis,
+            // Two-sided selection queries (fable-rough-dielectric §3): a receiver whose
+            // BSDF support is the SPHERE and which runs NEE can be lit from below its
+            // shading normal, so the light tree's horizon cull must disarm there. Gated
+            // on NEE because without it there is no selection to shape at all.
+            twoSidedShading: lighting !== null && brdfModels.some(modelTwoSidedShading),
             // Directional-emission gates (softbeam v0, fable-emitter-profiles): backing
             // materials whose hit-side emission is cone-gated by the kind's emissionCone
             // fact — registry-driven, baked literals (light geometry rows are constant).
@@ -994,7 +1003,7 @@ function sceneWorldRadius(analytic: PlannedPrimitiveObject[], meshes: PlannedMes
     let any = false;
     for (const o of analytic) {
         if (o.placement !== undefined) continue;   // local-frame parameters are not world boxes
-        const b = PRIMITIVES[o.type]?.bounds?.(o.parameters);
+        const b = primitiveBounds(o.type, o.parameters) ?? undefined;
         if (b === undefined) continue;
         // Max corner norm of the world AABB: per-axis worst magnitude, combined.
         r = Math.max(r, Math.hypot(

@@ -12,7 +12,7 @@ import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/gls
 import { emitValue, emitAttributeValue, mintValueUniform, type ParamValue } from '../values.js';
 import { isAttributeValue } from '../../plan/types.js';
 
-import { MATERIAL_MODELS, materialModel, modelStructFields, EMISSION_KEY } from '../../../components/materials/index.js';
+import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, EMISSION_KEY } from '../../../components/materials/index.js';
 import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
 import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields, defaultExpr } from '../schema.js';
@@ -85,6 +85,15 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // Rides the eval decision: its only caller is the same light technique.
     if (surfaceEval) {
         blocks.push({ origin: 'generated:nondelta-guard', source: generateNondeltaGuard(plan.materials) });
+    }
+
+    // Two-sided shading predicate (fable-rough-dielectric §3.1): which materials can be
+    // lit from BELOW their shading normal. Its only caller is the generated
+    // light_query_surface constructor, and the decision folds it away entirely when no
+    // such material is present — a program with only hemisphere-support materials
+    // carries neither the predicate nor a runtime query bit.
+    if (plan.program.materials.twoSidedShading) {
+        blocks.push({ origin: 'generated:two-sided-guard', source: generateTwoSidedGuard(plan.materials) });
     }
 
     // Emission gate (§6.2 / impl-plan-media M1.2): the emission fetch+dispatch sits behind this
@@ -246,6 +255,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     }
     if (surfacePdf) {
         provides.push({ name: 'interaction_surface_pdf', signature: 'float interaction_surface_pdf(int mat, Direction wi, Direction wo, Hit hit, MaterialProperties mp)' });
+    }
+    if (plan.program.materials.twoSidedShading) {
+        provides.push({ name: 'material_two_sided', signature: 'bool material_two_sided(int mat)' });
     }
     // Self-requires: the generated medium_sample/medium_transmittance bodies call the
     // properties lookup themselves — honest linkage for the seam-unused check.
@@ -413,6 +425,31 @@ function generateNondeltaGuard(materials: PlannedMaterial[]): string {
     } else {
         lines.push(`    if (${deltaIds.map((id) => `mat == ${id}`).join(' || ')}) return false;`);
         lines.push('    return true;');
+    }
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// ============================================================================
+// Generated two-sided guard — material_two_sided (fable-rough-dielectric §3.1)
+// ============================================================================
+
+function generateTwoSidedGuard(materials: PlannedMaterial[]): string {
+    // The predicate is `modelTwoSidedShading` (components/materials/index.ts) — the ONE
+    // spelling of support-'sphere' ∧ nonDelta, fail-safe on unregistered models (an
+    // unknown model is assumed two-sided: it costs the cull's variance win, never bias).
+    const ids = materials.filter((m) => modelTwoSidedShading(m.model)).map((m) => m.id);
+    const lines: string[] = [
+        '// Generated support fact: which materials can be lit from BELOW the shading normal',
+        '// (fable-rough-dielectric §3.1) — the light tree\'s horizon cull disarms at these.',
+        'bool material_two_sided(int mat) {',
+    ];
+    if (ids.length === 0) {
+        lines.push('    return false;');
+    } else if (ids.length === materials.length) {
+        lines.push('    return true;');
+    } else {
+        lines.push(`    return ${ids.map((id) => `mat == ${id}`).join(' || ')};`);
     }
     lines.push('}');
     return lines.join('\n');

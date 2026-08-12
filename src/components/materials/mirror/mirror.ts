@@ -15,6 +15,7 @@ export const mirrorDescriptor: MaterialModelDescriptor = {
     capabilities: {
         nonDeltaLobes: false,   // pure delta: eval ≡ 0, NEE skips (the generated guard)
         transmission: false,    // conductor — no ior table entry, no etaScale
+        support: 'hemisphere',  // reflection only (delta, but the fact is about SUPPORT)
         emissive: false,        // mirror_emission ≡ 0; authored emission warns (capability ∧ value)
     },
 };

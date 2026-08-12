@@ -54,6 +54,11 @@ const BINS = 64;
 
 describe('equiangular t-sampler (TS twin of equiangular.glsl)', () => {
     for (const cfg of CONFIGS) {
+        // 30s budget, not the 5s default: each case draws 2¹⁷ samples and integrates the
+        // pdf per bin, measuring ~3.3s ALONE — marginal against 5s, and reliably over it
+        // once vitest runs several CPU-heavy twins in parallel. The documented "equiangular
+        // long-segment χ² is flaky under parallel load" was always this: a wall-clock
+        // timeout, never an unstable result (the LCG and the bins are deterministic).
         it(`${cfg.name}: histogram matches pdf (χ²), pdf normalizes`, () => {
             const rand = lcg(987654 + cfg.tC * 100 + cfg.h2);
             const counts = new Float64Array(BINS);
@@ -88,6 +93,6 @@ describe('equiangular t-sampler (TS twin of equiangular.glsl)', () => {
             expect(totalP, 'CDF must span the segment exactly').toBeCloseTo(1.0, 9);
             expect(chi2, `χ²=${chi2.toFixed(1)} over ${cells} cells (crit ${chi2Crit(cells - 1).toFixed(1)})`)
                 .toBeLessThan(chi2Crit(cells - 1));
-        });
+        }, 30000);
     }
 });

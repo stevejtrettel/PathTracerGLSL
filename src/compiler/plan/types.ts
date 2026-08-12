@@ -54,7 +54,7 @@ export interface ProgramDescription {
     estimator: {
         /** null = BSDF-only transport (no NEE machinery in the program at all). */
         lighting: LightingDesc | null;
-        russianRoulette: { startDepth: number } | null;
+        russianRoulette: { startDepth: number; maxSurvival?: number } | null;
         /** How live scattering samples distances: 'analytic' (closed-form homogeneous)
          *  or 'delta-tracking' (heterogeneous null-collision; per-medium 2×2 routing —
          *  constant media stay analytic). 'none' when no scattering arms exist. */
@@ -197,6 +197,13 @@ export interface MaterialsDesc {
     /** The interaction_surface_pdf dispatch exists — its only caller is the surface
      *  MIS weight. The surface twin of emitters.lightingPdf. */
     surfacePdf: boolean;
+    /** Some PLANNED material can be lit from below its shading normal AND runs NEE
+     *  (fable-rough-dielectric §3.1: support 'sphere' ∧ nonDeltaLobes). Gates the
+     *  generated `material_two_sided` predicate and makes light_query_surface's
+     *  two-sidedness a RUNTIME question; false folds it to the constant `false`, so
+     *  a program with no such material carries neither. The light tree's
+     *  below-horizon cull is licensed by exactly this being false at a receiver. */
+    twoSidedShading: boolean;
     /** Some present material reads Hit.uv (checker/expression — fable-imagery P1). Gates
      *  emission of the REAL per-primitive uv charts: when false (the common case — no scene
      *  material reads uv), every hit-fill keeps the cheap planar placeholder, so a scene
@@ -365,6 +372,12 @@ export interface PlannedInstanceBatch {
     /** The batch's baked ledger slot (rail v2): placements/attrs bases in `records`,
      *  the TLAS base in `nodes`. */
     slot: BatchSlot;
+    /** This batch claims an INTERIOR (impl-plan-instanced-containment): it leaves the
+     *  thin set and `scene_region_at` gains its containment arm, so `ior_of`/
+     *  `material_has_medium` answer for points inside its instances. The DECISION
+     *  (batchNeedsInterior — wants an interior ∧ can answer containment); generators
+     *  read it, never re-derive it. Absent/false = surface-only, the v1 behaviour. */
+    hasInterior?: boolean;
     /** The prototype's backend + what the loop's local-intersect needs. mesh: BLAS counts (data
      *  uploaded by the app). analytic: the canonical params + the placement-record tier
      *  (impl-plan-placement-fold stage 3 — the dataTenants adapter's ONE truth): 'frame' =

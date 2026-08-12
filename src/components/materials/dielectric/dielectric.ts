@@ -16,6 +16,11 @@ export const dielectricDescriptor: MaterialModelDescriptor = {
     capabilities: {
         nonDeltaLobes: false,   // pure delta: eval ≡ 0, NEE skips (the generated guard)
         transmission: true,
+        // Support is the SPHERE (the transmission branch scatters to the far side), but
+        // the lobes are DELTA, so NEE never runs here and the two-sided query never
+        // fires — the two facts are independent, which is the point of the split
+        // (fable-rough-dielectric §3.1). rough_dielectric is the pair that sets both.
+        support: 'sphere',
         emissive: false,        // dielectric_emission ≡ 0 — an emissive-valued dielectric material emits nothing
     },
 };

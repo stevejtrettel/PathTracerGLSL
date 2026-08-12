@@ -314,13 +314,13 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({
             origin: 'generated:ior-of',
             source: regionData
-                ? generateIorOfData(plan.meshes, plan.materials)
-                : generateIorOf(plan.objects, plan.meshes, plan.materials),
+                ? generateIorOfData(plan.meshes, plan.instanceBatches, plan.materials)
+                : generateIorOf(plan.objects, plan.meshes, plan.instanceBatches, plan.materials),
         });
     }
 
     // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
-    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.meshes, ids, table) });
+    blocks.push({ origin: 'generated:scene-region-at', source: generateSceneRegionAt(plan.objects, plan.meshes, plan.instanceBatches, plan.program.intersection.instanceAccel, ids, table) });
 
     // The top-level dispatcher, combining only the classes present (declared after all).
     // Zero-thickness regions (descriptor `thin` fact): they never claim containment, so
@@ -332,8 +332,11 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         // Open meshes are thin; CLOSED meshes have a proven interior (fable-mesh-containment)
         // and claim containment in scene_region_at instead.
         ...plan.meshes.filter((m) => !m.closed).map((m) => m.index),
-        // Instanced batches are opaque surface-only in v1 (like meshes) → thin-like.
-        ...plan.instanceBatches.map((b) => b.index),
+        // Instanced batches are surface-only UNLESS they claim an interior
+        // (impl-plan-instanced-containment): a glass/medium batch answers
+        // scene_region_at through its containment arm, exactly as a closed mesh does,
+        // and leaves the thin set by the same fact-flip.
+        ...plan.instanceBatches.filter((b) => b.hasInterior !== true).map((b) => b.index),
     ];
     blocks.push({
         origin: 'generated:scene-intersect',
@@ -1071,7 +1074,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
 // flipped inequality away: `d > best` among negatives — deepest-wins made a submerged sphere
 // invisible (verification T2 / R-SUBMERGED). Spans both backends.
 
-function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], ids: Map<number, string>, table?: PlannedSceneTable): string {
+function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], instanceAccel: string, ids: Map<number, string>, table?: PlannedSceneTable): string {
     const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
     lines.push('int scene_region_at(vec3 p) {');
     lines.push('    int region = -1;');
@@ -1162,9 +1165,87 @@ function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: Planne
         lines.push('      } }');
         lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${m.index}; }`);
     }
+    // INSTANCED batches claiming an interior (impl-plan-instanced-containment): the
+    // ray arm with the POINT walk swapped in. Records are TLAS-permuted, so `i = off + j`
+    // indexes the same instance both walks see — the containment predicate and the
+    // surface it classifies against can never disagree about which instance is which.
+    for (const b of batches) {
+        if (b.hasInterior !== true) continue;   // exact linkage: opaque batches emit nothing
+        lines.push(`    { // instanced batch ${ids.get(b.index) ?? b.index} — containment`);
+        lines.push(...instanceContainmentItem(b, instanceAccel).map((l) => `    ${l}`));
+        lines.push('    }');
+    }
     lines.push('    return region;');
     lines.push('}');
     return lines.join('\n');
+}
+
+/**
+ * The containment block for one interior-claiming batch: the TLAS point descent (or the
+ * linear scan under `instanceAccel: 'linear'`, whose walk has no TLAS texture) wrapped
+ * around a per-instance decode → prototype predicate → world-exact signed distance.
+ *
+ * Each row mirrors its own leaf item in `instanceLeafItem` — same record layout, same
+ * conjugation, same scale discipline — because the two answer the same question about
+ * the same instance and drift between them is the bug class this shape exists to kill:
+ *   params tier: the record IS the folded WORLD shape → the field is evaluated at p, no
+ *                conjugation at all (the placement-fold dividend, again).
+ *   frame tier:  rigid conjugation, params ×s, so `<type>_sdf` returns a WORLD distance.
+ *   mesh:        ÷s into the UNSCALED local frame, the lazy three-tier query
+ *                (local box → first-hit-facing → closest triangle), distance ×s back.
+ */
+function instanceContainmentItem(b: PlannedInstanceBatch, accel: string): string[] {
+    const pb = b.slot.placementsBase;
+    const item: string[] = [];
+    if (b.prototype.backend === 'primitive' && b.prototype.record === 'params') {
+        const d = primitive(b.prototype.shapeType);
+        item.push(
+            `vec4 rec = texelFetch(u_data_records, data_texel1d(uint(${pb} + i)), 0);`,
+            `${structName(d)} shape = ${paramsCtorFromTexel(d, 'rec')};`,
+            `float ds = ${b.prototype.shapeType}_sdf(p, shape);`,
+        );
+    } else if (b.prototype.backend === 'mesh') {
+        const g = b.prototype.geometrySlot;
+        item.push(
+            `vec4 q  = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i)), 0);`,
+            `vec4 ts = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i + 1)), 0);`,
+            'float s = placement_scale(ts);',
+            'vec3 lp = placement_rigid(q, ts, p) / s;   // mesh data is UNSCALED (§5.2)',
+            'float ds = 1.0e20;',
+            `if (mesh_inside_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, lp)) {`,
+            `    ds = -s * mesh_closest_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, lp);`,
+            '}',
+        );
+    } else {
+        const d = primitive(b.prototype.shapeType);
+        item.push(
+            `vec4 q  = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i)), 0);`,
+            `vec4 ts = texelFetch(u_data_records, data_texel1d(uint(${pb} + 2 * i + 1)), 0);`,
+            'float s = placement_scale(ts);',
+            'vec3 lp = placement_rigid(q, ts, p);',
+            `float ds = ${emitSignedDistance(d, b.prototype.parameters, { point: 'lp', scale: 's' })};`,
+        );
+    }
+    item.push(`if (ds < 0.0 && ds > best) { best = ds; region = ${b.index}; }`);
+
+    // The TLAS point descent visits only leaves whose box contains p — exactly the
+    // candidate set, since a point outside an instance's world box cannot be inside it.
+    // 'linear' keeps the scan (no TLAS texture); 'cwbvh' is Validator-rejected here
+    // (its leaf permutation is not the binary TLAS's, so this walk would index the
+    // wrong records — the same reason it rejects light-eligible batches).
+    if (accel === 'linear') {
+        return [
+            `for (int i = 0; i < ${b.instanceCount}; i++) {`,
+            ...item.map((l) => `    ${l}`),
+            '}',
+        ];
+    }
+    return bvhPointWalkLines(b.slot.tlasBase, [
+        'for (int j = 0; j < cnt; j++) {',
+        '    int i = off + j;',
+        ...item.map((l) => `    ${l}`),
+        '}',
+    ]).map((l) => l.replace(/^ {4}/, ''));
 }
 
 /** World→LOCAL point conjugation lines for a mesh containment query: transform `lp` in
@@ -1430,7 +1511,7 @@ function generateMaterialOfData(base: number, ambientMedium: number): string {
  *  semantic pins of the baked form carry over exactly: region −1 answers 1.0 before
  *  any fetch, and OPEN meshes (thin — excluded from the baked table) keep explicit
  *  1.0 arms, sized by the open-transmissive-mesh count (a warned configuration). */
-function generateIorOfData(meshes: PlannedMesh[], materials: PlannedMaterial[]): string {
+function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[]): string {
     const lines: string[] = ['// Generated material -> IOR (impl-plan-region-materials: the region half is data)'];
     lines.push('float ior_of_material(int mat, vec3 p) {');
     for (const mat of materials) {
@@ -1459,6 +1540,15 @@ function generateIorOfData(meshes: PlannedMesh[], materials: PlannedMaterial[]):
             lines.push(`    if (region == ${m.index}) return 1.0;   // open mesh (thin): the baked table excluded it`);
         }
     }
+    // The batch sibling of that rule: a batch that WANTS an interior but cannot answer
+    // containment (open mesh prototype / thin primitive) stays thin, so material_of would
+    // hand the data form a real ior for a region that has no inside.
+    for (const b of batches) {
+        const mat = byId.get(b.materialId);
+        if (b.hasInterior !== true && mat !== undefined && (mat.medium?.ior !== undefined || modelTransmission(mat.model))) {
+            lines.push(`    if (region == ${b.index}) return 1.0;   // batch without containment (thin): no interior`);
+        }
+    }
     lines.push('    return ior_of_material(material_of(region), p);');
     lines.push('}');
     return lines.join('\n');
@@ -1472,13 +1562,17 @@ function generateIorOfData(meshes: PlannedMesh[], materials: PlannedMaterial[]):
 // p (fold away). Non-dielectric materials are 1.0 (vacuum-like — pinned in the Planner),
 // ior_of(-1, p) = 1.0 (ambient; ambientMedium is a media-era concern, §2.4). Value<T>-driven ior
 // reads its uniform (declared via the materials {param} scan — same for formula params).
-function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], materials: PlannedMaterial[]): string {
+function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[]): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
     const lines: string[] = ['// Generated region -> IOR table (§2.3 family; p = the GRIN-interface point argument)'];
     lines.push('float ior_of(int region, vec3 p) {');
     // CLOSED meshes have a real interior (fable-mesh-containment) and earn rows like any
     // solid; open meshes stay off the table (thin — the Validator's warning covers them).
-    for (const obj of [...objects, ...meshes.filter((m) => m.closed)].sort((a, b) => a.index - b.index)) {
+    // Instanced batches CLAIMING an interior (impl-plan-instanced-containment) earn rows by
+    // the same rule — the region is real, so it needs an index. Omitting them was the
+    // η = 1 bug: containment answered correctly, the table had no row, and every glass
+    // instance rendered as perfectly clear air.
+    for (const obj of [...objects, ...meshes.filter((m) => m.closed), ...batches.filter((b) => b.hasInterior === true)].sort((a, b) => a.index - b.index)) {
         const mat = byId.get(obj.materialId);
         if (!mat) continue;
         // ONE ior truth (impl-plan-grin-interface): a deflecting medium's formula IS the

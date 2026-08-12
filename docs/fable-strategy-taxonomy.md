@@ -129,6 +129,7 @@ artifact's identity.
 | `camera.*` | measurement | frame-bound residuals; workflow unchanged |
 | `transport.maxBounces` | measurement (truncation) | first citizen of the bias ledger |
 | `transport.russianRoulette` | estimator | unbiased by construction |
+| `estimator.russianRoulette.maxSurvival` | estimator | the survival CEILING (default 0.95). The taxonomy's own line made visible: a LOSSLESS path never dims (clear glass transmits at weight exactly 1), so survival pins at this ceiling and it becomes the only thing ending the path — lower it and paths shorten with NO bias (survivors are divided by the same probability), trading noise for time. Reaching for `maxBounces` instead buys the same speed by truncating uncompensated, which is measurement-side bias. Where the two sections differ in practice. |
 | `transport.directLighting` | estimator | pt/nee/mis converge identically (X-witnesses) |
 | `transport.lightSelection` | estimator | |
 | `transport.envSampler`, `envCompensation` | estimator | chart choice cannot change the answer |

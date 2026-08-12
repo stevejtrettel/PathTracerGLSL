@@ -15,6 +15,7 @@ export const lambertDescriptor: MaterialModelDescriptor = {
     capabilities: {
         nonDeltaLobes: true,
         transmission: false,
+        support: 'hemisphere',   // opaque diffuse: nothing arrives from below the normal
         emissive: true,
     },
 };

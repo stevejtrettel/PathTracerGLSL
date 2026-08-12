@@ -74,8 +74,9 @@ export function buildLightTree(boxes: Float64Array, powers: Float64Array, n: num
 /** TS twin of the GLSL importance (fable-light-bvh §3.2 v1.5) — change light_tree.glsl,
  *  change this. n = [0,0,0] (or omitted) = no orientation → normal-free; otherwise the
  *  one-sided horizon term cos(max(0, θi − θu)) with the inside-the-bounding-sphere and
- *  θi < θu escapes. This twin powers the vitest pmf gates. */
-export function lightTreeImportance(bmin: [number, number, number], bmax: [number, number, number], phi: number, p: [number, number, number], n: [number, number, number] = [0, 0, 0]): number {
+ *  θi < θu escapes. `twoSided` mirrors LightQuery.two_sided (fable-rough-dielectric
+ *  §3.3): sphere support ⇒ no cull, |·| shaping. This twin powers the vitest pmf gates. */
+export function lightTreeImportance(bmin: [number, number, number], bmax: [number, number, number], phi: number, p: [number, number, number], n: [number, number, number] = [0, 0, 0], twoSided = false): number {
     const cx0 = (bmin[0] + bmax[0]) * 0.5, cy0 = (bmin[1] + bmax[1]) * 0.5, cz0 = (bmin[2] + bmax[2]) * 0.5;
     const ex = bmax[0] - bmin[0], ey = bmax[1] - bmin[1], ez = bmax[2] - bmin[2];
     const dx = cx0 - p[0], dy = cy0 - p[1], dz = cz0 - p[2];
@@ -88,9 +89,17 @@ export function lightTreeImportance(bmin: [number, number, number], bmax: [numbe
     const fx = n[0] >= 0 ? bmax[0] : bmin[0];
     const fy = n[1] >= 0 ? bmax[1] : bmin[1];
     const fz = n[2] >= 0 ? bmax[2] : bmin[2];
-    const h = n[0] * (fx - p[0]) + n[1] * (fy - p[1]) + n[2] * (fz - p[2]);
-    if (h <= 0) return 0;
-    const cosC = (n[0] * dx + n[1] * dy + n[2] * dz) / Math.sqrt(Math.max(d2raw, 1e-12));
+    let h = n[0] * (fx - p[0]) + n[1] * (fy - p[1]) + n[2] * (fz - p[2]);
+    if (twoSided) {
+        // max|n·(x−p)| via the mirror corner (bmin + bmax − far) — never culls.
+        h = Math.max(h, -(n[0] * (bmin[0] + bmax[0] - fx - p[0])
+            + n[1] * (bmin[1] + bmax[1] - fy - p[1])
+            + n[2] * (bmin[2] + bmax[2] - fz - p[2])));
+    } else if (h <= 0) {
+        return 0;
+    }
+    let cosC = (n[0] * dx + n[1] * dy + n[2] * dz) / Math.sqrt(Math.max(d2raw, 1e-12));
+    if (twoSided) cosC = Math.abs(cosC);
     const mx = Math.max(p[0] - bmin[0], bmax[0] - p[0]);
     const my = Math.max(p[1] - bmin[1], bmax[1] - p[1]);
     const mz = Math.max(p[2] - bmin[2], bmax[2] - p[2]);

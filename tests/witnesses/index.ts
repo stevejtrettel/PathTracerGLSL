@@ -30,6 +30,11 @@ import { bazaarScene, bazaarTableStrategy, bazaarUnrolledStrategy } from './scen
 import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies, meshLightBvhStrategies } from './scenes/meshWitness.js';
 import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy, instanceParamsTwin, instanceParamsFrame, instanceParamsStrategy, instanceParamsCwbvhStrategy } from './scenes/instanceWitness.js';
 import { perfCloud, perfCloudFrame, perfCloudStrategy, perfCloudCwbvhStrategy, PERF_CLOUD_COUNT } from './scenes/perfCloud.js';
+import {
+    instanceGlass, instanceGlassRef, instanceGlassMesh, instanceGlassMeshRef,
+    instanceFog, instanceFogRef, instanceGlassStrategy, instanceGlassLinearStrategy, instanceGlassLowRRStrategy,
+    perfInstanceGlass, perfInstanceOpaque, perfInstanceStrategy, perfInstanceLadder,
+} from './scenes/instanceGlassWitness.js';
 import { accelTriple, accelTripleNeeStrategy, accelTripleMisStrategy, accelTriplePtStrategy } from './scenes/accelTriple.js';
 import { solidsAnalytic, solidsSdf, solidsStrategy, cubeCloud, cubeCloudRef, cubeCloudStrategy } from './scenes/solidsWitness.js';
 import { sdfTableTwin, sdfInstanceTwin, sdfInstanceTwinRef, sdfInstanceStrategy, sdfUnrolledStrategy, sdfTableStrategy, perfSdf0, perfSdf8, perfSdf32, perfSdf128, perfSdfCluster8, perfSdfCluster32, perfSdfCluster128, perfSdfBlob } from './scenes/sdfTableWitness.js';
@@ -57,6 +62,13 @@ import {
     skyMisOctStrategy, procSkyMisCompStrategy,
 } from './scenes/envScenes.js';
 import { veachMis, veachMisStrategy, veachNeeStrategy, veachPtStrategy } from './scenes/ggxScenes.js';
+import {
+    roughSmoothLimit, roughSmoothLimitStrategy,
+    roughMis, roughMisNeeStrategy, roughMisMisStrategy, roughMisPtStrategy,
+    glassInclusion, inclusionNeePowerStrategy, inclusionNeeBvhStrategy, inclusionMisBvhStrategy, inclusionPtStrategy,
+    roughFurnace, roughFurnaceStrategy,
+    roughGrin, roughGrinRef, roughGrinStrategy,
+} from './scenes/roughDielectricWitness.js';
 import { mirrorScene, mirrorNeeStrategy, mirrorPtStrategy } from './scenes/mirrorWitness.js';
 import {
     cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
@@ -1630,6 +1642,254 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // The MIS claim as a number: pt-mis must measure lowest whole-frame σ
                 // at equal spp (it is visibly lowest-variance on every plate).
                 { kind: 'noise', strategies: [0, 1, 2], assertFirstLowest: true, label: 'σ at equal spp: mis lowest' },
+            ],
+        },
+    },
+    // ── Rough dielectric (fable-rough-dielectric §5) ────────────────────────────
+    // All four gates are PRE-CALIBRATION estimates until the owner's first sweep
+    // (impl-plan-rough-dielectric T4); the energy numbers are RECORDED there, since
+    // the whole point of W-ENERGY is that the curve is measured, not predicted.
+    'rough-smooth-limit': {
+        scene: roughSmoothLimit,
+        strategies: posed([0, 1, 0.05], [0, -1, 0], roughSmoothLimitStrategy),
+        exercises:
+            'the α → 0 trend gate: the rough dielectric at roughness 0.02 on the F-ETA geometry — the '
+            + 'microfacet TRANSMISSION lobe (Walter Eq. 21 + the η² factor) reaching the same number the '
+            + 'delta branch does. A twin of the `eta` witness, not an exact one: the α floor makes true '
+            + 'smoothness unreachable and single-scattering costs a G1 factor',
+        expected:
+            'center pixel ≈ 0.5540 (F-ETA) — the η² factor is the same one the smooth model carries, so '
+            + '0.98 here means it was dropped in the transmission weight; a large deficit instead '
+            + 'implicates G1/the Jacobian',
+        witness: {
+            spp: 128,
+            checks: [
+                {
+                    kind: 'mean', value: 0.554, tol: 0.02,
+                    region: { x: 0.47, y: 0.47, w: 0.06, h: 0.06 },
+                    label: 'smooth limit ≈ F-ETA 0.5540',
+                },
+                {
+                    kind: 'twin', other: { scene: 'eta' }, meanTol: 0.03, rmse: 0.15,
+                    label: 'rough(0.02) ≈ smooth dielectric (TREND gate)',
+                },
+            ],
+        },
+    },
+    'rough-mis': {
+        scene: roughMis,
+        strategies: posed([1.4, 1.5, 1.9], [0, 0.8, 0], roughMisNeeStrategy, roughMisMisStrategy, roughMisPtStrategy),
+        exercises:
+            'the X-GLASS pattern on a TWO-LOBE non-delta BSDF: NEE now runs at a glass surface (the first '
+            + 'model where material_has_nondelta_lobes is true AND transmission is true), so the F-weighted '
+            + 'lobe split in interaction_surface_pdf, the two-sided eval, and the stored-query replay all '
+            + 'have to agree for the arms to converge',
+        expected:
+            'keys 1 (nee) and 2 (mis) converge to the same image; key 3 (pt) too, noisier. Divergence '
+            + 'implicates the pdf/sample agreement (§11.3 covers it on the twin) or the MIS weights',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.03, label: 'rough-glass nee ≡ mis' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.4, label: 'rough-glass pt tripwire' },
+            ],
+        },
+    },
+    'glass-inclusion': {
+        scene: glassInclusion,
+        strategies: posed([2.2, 1.6, 2.6], [0, 1.0, 0],
+            inclusionNeePowerStrategy, inclusionNeeBvhStrategy, inclusionMisBvhStrategy, inclusionPtStrategy),
+        exercises:
+            'THE two-sided-query gate (fable-rough-dielectric §3): a glowing core INSIDE rough glass is the '
+            + 'one configuration where far-side NEE survives the opaque-dielectrics truncation — its shadow '
+            + 'ray never leaves the glass. The core lies entirely below the tangent plane of every outer '
+            + 'surface point, so a one-sided light query culls it (pmf 0) and nee-only loses its direct term '
+            + 'outright. Key 1 (power: no cull anywhere) is the reference; key 2 (bvh) must match it, and '
+            + 'key 3 (mis × bvh) must replay the same stored two-sided context in the pmf',
+        expected:
+            'keys 1, 2 and 3 converge to the same image (key 4 = pt, noisier). A DARK core under key 2 with '
+            + 'key 1 correct is the horizon cull firing at a sphere-support receiver — the exact bias the '
+            + 'capability split exists to prevent',
+        witness: {
+            spp: 256,
+            checks: [
+                // Same integrand, shared event coverage ⇒ χ² is valid on both pairs.
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'inclusion nee: power ≡ bvh (THE cull gate)' },
+                { kind: 'equality', strategies: [1, 2], meanTol: 0.02, label: 'inclusion bvh: nee ≡ mis (trail replay)' },
+                // CALIBRATED by the first sweep (Aug 11): Δmean 0.09% — the arms agree in
+                // energy to a tenth of a percent — but display-space rmse measured 136%.
+                // That is the chance-hit pt arm doing what it does in a caustic scene: a
+                // 40-emission core behind glossy glass is found by rare, huge-contribution
+                // paths, so per-pixel spread is enormous while the mean is dead on. The
+                // tripwire's job is to catch STRUCTURAL divergence, so it sits above the
+                // measured floor with headroom (cf. veach's 1.2, fog-area's 0.65).
+                { kind: 'equality', strategies: [0, 3], meanTol: 0.04, rmse: 1.8, label: 'inclusion pt tripwire' },
+            ],
+        },
+    },
+    // ── Instanced dielectrics (impl-plan-instanced-containment) ─────────────────
+    // Each is a cross-scene twin against the individually-authored geometry. The gate is
+    // unusually sharp: before containment an instanced glass object had NO interior, so
+    // ior_of fell to 1.0 and the batch refracted at η = 1 — a regression is visible on
+    // the first bounce wherever the glass is on screen, not a subtle bias.
+    'instance-glass': {
+        scene: instanceGlass,
+        strategies: posed([0.4, 1.6, 4.2], [0, 0.7, 0], instanceGlassStrategy, instanceGlassLinearStrategy, instanceGlassLowRRStrategy),
+        exercises:
+            'instanced DIELECTRICS, params tier: a batch of glass spheres claims an interior through the '
+            + 'TLAS point descent in scene_region_at (the record IS the folded world shape, so the field is '
+            + 'evaluated at p with no conjugation). Key 2 swaps instanceAccel to \'linear\', whose containment '
+            + 'is a linear scan instead of a descent — the two walks must agree. Key 3 drops the RR survival '
+            + 'CEILING to 0.5: clear glass never dims throughput, so that ceiling is the only thing ending these '
+            + 'paths (~1 further bounce instead of ~20) — the converged image must be IDENTICAL, which is what '
+            + 'makes "unbiased" checkable rather than asserted',
+        expected:
+            'identical to instance-glass-ref (the same three spheres authored individually), and key 2 '
+            + 'identical to key 1. A batch that renders as clear air with a Fresnel sheen is the η = 1 '
+            + 'regression — the interior was lost',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'twin', other: { scene: 'instance-glass-ref' }, meanTol: 0.02, rmse: 0.12, label: 'instanced glass ≡ individual glass' },
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.05, label: 'containment: TLAS descent ≡ linear scan' },
+                // Δmean is THE gate here (bias); the arms differ ~20× in path length, so
+                // their noise differs by design and χ² normalizes by measured variance.
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, label: 'RR ceiling 0.95 ≡ 0.5 (unbiased termination)' },
+                { kind: 'noise', strategies: [0, 2], label: 'σ at equal spp: the price of the shorter paths' },
+            ],
+        },
+    },
+    'instance-glass-ref': {
+        scene: instanceGlassRef,
+        strategies: posed([0.4, 1.6, 4.2], [0, 0.7, 0], instanceGlassStrategy),
+        exercises: 'the instanced-glass twin\'s reference arm: the same spheres as individual analytic objects, each with its own region',
+    },
+    'instance-glass-mesh': {
+        scene: instanceGlassMesh,
+        strategies: posed([0.4, 1.6, 4.2], [0, 0.7, 0], instanceGlassStrategy),
+        exercises:
+            'instanced dielectrics, MESH prototype (frame tier): a closed glass cube instanced under rotation '
+            + '+ scale. Containment is the lazy three-tier query — the prototype\'s baked local box, then '
+            + 'first-hit-facing along the fixed LOCAL direction, then closest-triangle only when inside — run '
+            + 'per instance in its own conjugated frame, with the ÷s / ×s discipline the unscaled BLAS needs. '
+            + 'The `closed: true` prototype was a hard Validator error until this batch',
+        expected: 'identical to instance-glass-mesh-ref (the same cubes placed individually)',
+        witness: {
+            spp: 192,
+            checks: [{ kind: 'twin', other: { scene: 'instance-glass-mesh-ref' }, meanTol: 0.02, rmse: 0.12, label: 'instanced glass mesh ≡ individual glass meshes' }],
+        },
+    },
+    'instance-glass-mesh-ref': {
+        scene: instanceGlassMeshRef,
+        strategies: posed([0.4, 1.6, 4.2], [0, 0.7, 0], instanceGlassStrategy),
+        exercises: 'the instanced-glass-mesh twin\'s reference arm: the same closed cubes as individual mesh objects',
+    },
+    'instance-fog': {
+        scene: instanceFog,
+        strategies: posed([0.4, 1.6, 4.2], [0, 0.7, 0], instanceGlassStrategy),
+        exercises:
+            'the instanced interior as a MEDIUM region: a null-interface batch holding absorbing fog. '
+            + 'Containment here feeds current_medium rather than ior_of, so it proves the batch is a region in '
+            + 'the TRANSPORT sense — paths enter and leave instanced volumes and accumulate the right optical '
+            + 'depth — not merely a refraction-time lookup',
+        expected: 'identical to instance-fog-ref; per-instance absorption depth is the discriminator',
+        witness: {
+            spp: 192,
+            checks: [{ kind: 'twin', other: { scene: 'instance-fog-ref' }, meanTol: 0.02, rmse: 0.12, label: 'instanced fog ≡ individual fog spheres' }],
+        },
+    },
+    'instance-fog-ref': {
+        scene: instanceFogRef,
+        strategies: posed([0.4, 1.6, 4.2], [0, 0.7, 0], instanceGlassStrategy),
+        exercises: 'the instanced-fog twin\'s reference arm: the same fog spheres as individual objects',
+    },
+    // The gate's justification as a number: the SAME 300-sphere batch, glass (containment
+    // arm emitted — a TLAS point descent on every classification probe) vs opaque (no arm
+    // at all). Read across the two rows; report-only, real GPU.
+    'perf-instance-glass': {
+        scene: perfInstanceGlass,
+        strategies: perfInstanceLadder,
+        exercises:
+            'THE BOUNCE LADDER on 300 instanced glass spheres (faintly absorbing, ior 1.5): keys 1/2/3 = '
+            + '12/24/48 bounces. maxBounces is the only knob that can make the picture WRONG — it truncates '
+            + 'paths uncompensated, so its error is one-directional (too dark) and never converges away, and '
+            + 'roulette does not reduce it (killed paths are paid forward into the survivors). A cluster needs '
+            + 'two interfaces per sphere CROSSED, so the budget a single solid wants is badly wrong here — which '
+            + 'is why this is a ladder to READ rather than a number to trust. Also the perf row: containment is '
+            + 'live, so every hit classification descends the batch TLAS as a point query',
+        expected:
+            'keys 2 and 3 agree ⇒ 24 bounces suffice and 48 is insurance; if key 3 is visibly brighter than key 2 '
+            + 'the budget is still truncating. FIRST READING (equal-spp linear HDR, Aug 11): 12 → 24 gains 3.87%, '
+            + '24 → 48 gains 0.76% — so 12 truncates visibly, 24 is nearly converged, and the ladder FLATTENS, which '
+            + 'is the absorption doing its job (perfectly clear glass would keep climbing instead). '
+            + 'Under --perf, ms/frame per rung + the glass-vs-opaque comparison',
+        witness: {
+            spp: 8,
+            checks: [
+                { kind: 'perf', strategy: 0, size: [512, 512], frames: 24, warmup: 8, label: 'glass cluster @12 bounces ms/frame @512²' },
+                { kind: 'perf', strategy: 1, size: [512, 512], frames: 24, warmup: 8, label: 'glass cluster @24 bounces ms/frame @512²' },
+                { kind: 'perf', strategy: 2, size: [512, 512], frames: 24, warmup: 8, label: 'glass cluster @48 bounces ms/frame @512²' },
+            ],
+        },
+    },
+    'perf-instance-opaque': {
+        scene: perfInstanceOpaque,
+        strategies: [perfInstanceStrategy],
+        exercises: 'perf baseline: the identical batch with an OPAQUE prototype material — batchNeedsInterior is false, so no containment arm exists at all',
+        expected:
+            'report-only ms/frame under --perf. Read honestly: the gap against perf-instance-glass is a GLASS batch '
+            + 'vs an opaque one — containment probes AND far longer paths — not the cost of containment alone, which '
+            + 'no pair can isolate (containment is derived from the material). What it does bound is what gating buys '
+            + 'every opaque cloud: this row emits no containment arm at all',
+        witness: {
+            spp: 8,
+            checks: [{ kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'instanced opaque (containment OFF) ms/frame @512²' }],
+        },
+    },
+    'rough-grin': {
+        scene: roughGrin,
+        strategies: posed([0, 1.2, 3.2], [0, 1, 0], roughGrinStrategy),
+        exercises:
+            'rough × GRIN: a constant-FORMULA medium ior on a ROUGH wall — entry Fresnel through '
+            + 'ior_of(region, p), the Verlet walker, the inside-exit handoff, exit Fresnel/TIR, the interior '
+            + 'L/n² factor — against the same model reading a region-table constant. The claim under test is '
+            + 'that the microfacet lobes do not care where the index came from (they read the SAME seam the '
+            + 'smooth model does); previously this combination was untested, not known-good',
+        expected: 'identical to rough-grin-ref — any lens-shaped difference implicates the handoff/guard/factor, not the BSDF',
+        witness: {
+            spp: 192,
+            checks: [{
+                kind: 'twin', other: { scene: 'rough-grin-ref' }, meanTol: 0.02, rmse: 0.35,
+                label: 'rough × GRIN ≡ rough × region-table ior',
+            }],
+        },
+    },
+    // Fixture partner: the plain-ior half of the rough-grin twin.
+    'rough-grin-ref': {
+        scene: roughGrinRef,
+        strategies: posed([0, 1.2, 3.2], [0, 1, 0], roughGrinStrategy),
+        exercises: 'the rough-grin twin\'s reference arm: the same rough dielectric reading a region-table ior constant (no ODE code emitted)',
+    },
+    'rough-furnace': {
+        scene: roughFurnace,
+        strategies: posed([0, 0, 4.2], [0, 0, 0], roughFurnaceStrategy),
+        exercises:
+            'W-ENERGY: three frosted spheres (roughness 0.05 / 0.2 / 0.5) in a uniform radiance field. An '
+            + 'energy-preserving BSDF is INVISIBLE in a furnace, so each sphere\'s deficit below 1.0 IS its '
+            + 'single-scattering energy loss — the measurement that makes §6\'s declared truncation checkable '
+            + '(and the trigger condition for Turquin-style compensation)',
+        expected:
+            'background exactly 1.0; the three spheres read progressively darker with roughness. The curve is '
+            + 'RECORDED, not predicted — the sphere tolerances here are wide pre-calibration brackets',
+        witness: {
+            spp: 256,
+            checks: [
+                // The one EXACT number: the furnace itself. If the background is not 1.0,
+                // nothing else on this card means anything.
+                { kind: 'mean', value: 1.0, tol: 0.01, region: { x: 0.02, y: 0.85, w: 0.1, h: 0.1 }, label: 'furnace background = 1.0' },
+                { kind: 'mean', value: 0.98, tol: 0.06, region: { x: 0.18, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.05 throughput' },
+                { kind: 'mean', value: 0.94, tol: 0.1, region: { x: 0.47, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.2 throughput' },
+                { kind: 'mean', value: 0.85, tol: 0.15, region: { x: 0.76, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.5 throughput' },
             ],
         },
     },

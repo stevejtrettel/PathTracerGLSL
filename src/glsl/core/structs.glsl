@@ -59,12 +59,20 @@ const uint LIGHT_DELTA = 1u;
 // constructors (light_query_surface/light_query_medium) are the policy site, and the
 // MIS pmf replays the STORED query (PathState.prev_query), so sampler and pmf see
 // byte-identical context by construction. n = 0 means "no orientation information"
-// (medium events; future rough-transmissive receivers): selection falls back to the
-// normal-free importance. Future context (spectral, curved frames) extends THIS
-// struct + the constructors — the seams and techniques never churn again.
+// (medium events): selection falls back to the normal-free importance. Future context
+// (spectral, curved frames) extends THIS struct + the constructors — the seams and
+// techniques never churn again.
+//
+// two_sided is the receiver's SUPPORT claim (fable-rough-dielectric §3.3), the same
+// sentence the material descriptor's `support` fact states: false = "my BSDF scatters
+// nothing arriving from below n", which is what LICENSES the light tree's
+// below-horizon cull; true = sphere support (rough glass), so the cull disarms and the
+// importance shapes on |n·d| instead. Orthogonal to n = 0: a medium event has neither
+// orientation nor sidedness.
 struct LightQuery {
     Point p;
     Direction n;
+    bool two_sided;
 };
 
 struct LightSample {

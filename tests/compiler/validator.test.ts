@@ -530,10 +530,23 @@ describe('Validator — mesh/instancing validation batch', () => {
         expect(glassOnThin(s => { s.objects.push({ type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, material: 'glass' }); })).toBe(true);
         // v0 mesh.
         expect(glassOnThin(s => { s.objects.push({ kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2]), material: 'glass' }); })).toBe(true);
-        // v1 instanced batch (material rides the prototype).
-        expect(glassOnThin(s => { s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'glass' }, placements }); })).toBe(true);
         // A solid (sphere object) must NOT warn — it has a real interior region.
         expect(glassOnThin(s => { s.objects.push({ type: 'sphere', parameters: { radius: 0.5 }, material: 'glass' }); })).toBe(false);
+        // ...and NEITHER does a solid-prototype BATCH any more (impl-plan-instanced-
+        // containment): a glass sphere batch claims an interior, so it left the thin set
+        // by the same fact-flip closed meshes used. The rule still fires for a batch that
+        // WANTS an interior but cannot answer containment — the two cases below.
+        expect(glassOnThin(s => { s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'glass' }, placements }); })).toBe(false);
+        // Thin PRIMITIVE prototype: zero thickness never claims containment.
+        expect(glassOnThin(s => { s.objects.push({ kind: 'instanced', prototype: { type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, material: 'glass' }, placements }); })).toBe(true);
+        // OPEN mesh prototype: no proven watertightness ⇒ no interior.
+        expect(glassOnThin(s => {
+            s.objects.push({
+                kind: 'instanced',
+                prototype: { kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2]), material: 'glass' },
+                placements,
+            });
+        })).toBe(true);
     });
 
     it('A4: rejects unknown meshTraversal/instanceAccel values (JSON-sourced strategies)', () => {
@@ -684,12 +697,15 @@ describe('Validator — mesh closedness', () => {
             .getErrors().some(e => /same-direction winding/.test(e.message))).toBe(true);
     });
 
-    it('rejects a closed mesh prototype on an instanced batch (surface-only v1)', () => {
+    it('ACCEPTS a closed mesh prototype on an instanced batch (containment landed)', () => {
+        // The inversion of the v1 pin (impl-plan-instanced-containment): solid instances
+        // now answer scene_region_at through the same three-tier query their un-instanced
+        // siblings use, so `closed: true` is honoured on prototypes too.
         const g = cube(false);
         const bag = run(s => {
             s.objects.push({ kind: 'instanced', prototype: { kind: 'mesh', ...g, material: 'm', closed: true }, placements: [{ position: [0, 1, 0] }] });
         });
-        expect(bag.getErrors().some(e => /closed \(solid\) mesh prototype is not supported/.test(e.message))).toBe(true);
+        expect(bag.getErrors().some(e => /mesh prototype/.test(e.message))).toBe(false);
     });
 
     it('transmissive warning: fires on an OPEN mesh, silent on a CLOSED one (the fact flipped)', () => {

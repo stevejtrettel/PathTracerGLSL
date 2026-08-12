@@ -18,6 +18,7 @@ export const checkerDescriptor: MaterialModelDescriptor = {
     capabilities: {
         nonDeltaLobes: true,
         transmission: false,
+        support: 'hemisphere',
         emissive: false,
         readsUv: true,   // the procedural chart reader (fable-imagery P1) → keeps its frame under rotation (P1b)
     },

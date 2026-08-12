@@ -177,20 +177,63 @@ describe('horizon term (fable-light-bvh §3.2 v1.5)', () => {
     });
 });
 
-describe('lightQuery policy contract (fable-light-bvh §3.2 v1.5)', () => {
-    it('every transmissive material model is pure-delta (NEE never runs there)', async () => {
-        // The generated light_query_surface passes the shading normal UNCONDITIONALLY,
-        // and the one-sided horizon cull is bias-safe only because no transmissive
-        // material ever runs NEE (pure delta ⇒ the technique's nondelta guard skips
-        // it, and prev_was_delta short-circuits the MIS weight). The day a
-        // ROUGH-transmissive model (GGX-T) registers, this fails: extend the
-        // constructor's policy (n = 0 or the AbsDot form for that model) FIRST.
+describe('two-sided importance (fable-rough-dielectric §3.3)', () => {
+    // The cull is licensed by the query's SUPPORT claim. Under a sphere-support
+    // receiver it disarms — these are the invariants that make that bias-free.
+    const bmin: [number, number, number] = [1, -3, -1];
+    const bmax: [number, number, number] = [2, -2, 1];
+    const p: [number, number, number] = [0, 0, 0];
+    const n: [number, number, number] = [0, 1, 0];
+
+    it('one-sided culls a fully-below cluster; two-sided never does', () => {
+        expect(lightTreeImportance(bmin, bmax, 1, p, n)).toBe(0);
+        expect(lightTreeImportance(bmin, bmax, 1, p, n, true)).toBeGreaterThan(0);
+    });
+
+    it('agrees with the one-sided form when the cluster is fully above', () => {
+        const above: [number, number, number] = [1, 2, -1];
+        const aboveMax: [number, number, number] = [2, 3, 1];
+        expect(lightTreeImportance(above, aboveMax, 1, p, n, true))
+            .toBeCloseTo(lightTreeImportance(above, aboveMax, 1, p, n), 12);
+    });
+
+    it('is symmetric under n → −n (support is the sphere: no preferred side)', () => {
+        const flip: [number, number, number] = [-n[0], -n[1], -n[2]];
+        expect(lightTreeImportance(bmin, bmax, 1, p, flip, true))
+            .toBeCloseTo(lightTreeImportance(bmin, bmax, 1, p, n, true), 12);
+    });
+
+    it('never exceeds the normal-free bound (shaping only attenuates)', () => {
+        const free = lightTreeImportance(bmin, bmax, 1, p);
+        expect(lightTreeImportance(bmin, bmax, 1, p, n, true)).toBeLessThanOrEqual(free + 1e-12);
+    });
+});
+
+describe('lightQuery policy contract (fable-light-bvh §3.2 v1.5 / fable-rough-dielectric §3.1)', () => {
+    it('every sphere-support non-delta model gets a two-sided query constructor', async () => {
+        // THE FLIP (the v1.5 pin's successor): the old rule FORBADE the combination
+        // (transmissive ⇒ pure-delta) because light_query_surface passed the shading
+        // normal unconditionally and the horizon cull assumed hemisphere support. The
+        // rule is now the HANDLING: a model whose support is 'sphere' and whose lobes
+        // are non-delta must reach the generated constructor's runtime arm — stated
+        // registry-wide, so a third such model needs no edit here.
+        const { MATERIAL_MODELS, modelTwoSidedShading } = await import('../../src/components/materials/index.js');
+        for (const [name, d] of Object.entries(MATERIAL_MODELS)) {
+            if (d === undefined) continue;
+            const twoSided = d.capabilities.support === 'sphere' && d.capabilities.nonDeltaLobes;
+            expect(modelTwoSidedShading(name),
+                `model '${name}': the ONE predicate must agree with its declared facts (support/${d.capabilities.support}, nonDelta/${d.capabilities.nonDeltaLobes})`).toBe(twoSided);
+        }
+    });
+
+    it('every registered model declares its support explicitly', async () => {
+        // Required XOR default (the geometry rows' discipline): the fact that licenses
+        // the cull may never be inferred from another capability.
         const { MATERIAL_MODELS } = await import('../../src/components/materials/index.js');
         for (const [name, d] of Object.entries(MATERIAL_MODELS)) {
-            if (d !== undefined && d.capabilities.transmission) {
-                expect(d.capabilities.nonDeltaLobes,
-                    `model '${name}' is transmissive AND has non-delta lobes — light_query_surface's normal policy must learn it (fable-light-bvh §3.2 v1.5)`).toBe(false);
-            }
+            if (d === undefined) continue;
+            expect(['hemisphere', 'sphere'], `model '${name}' must declare capabilities.support`)
+                .toContain(d.capabilities.support);
         }
     });
 });

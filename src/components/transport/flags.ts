@@ -20,6 +20,11 @@ export function flags(p: ProgramDescription) {
          *  ms.deflected outcome — spawn the bent exit ray, recompute current_medium. */
         deflecting: p.media.deflecting,
         transmission: p.materials.models.some(modelTransmission),
+        /** Some material can be lit from below its shading normal (fable-rough-dielectric
+         *  §3.1): light_query_surface asks material_two_sided at runtime instead of
+         *  folding the constant `false`. A DECISION read from the link map, never
+         *  re-derived here. */
+        twoSided: p.materials.twoSidedShading,
         envSamplable: p.environmentSamplable,
         /** The env-vs-finite selection draw is live (u_envSelectProb exists); false in
          *  env-only programs, where BOTH selection sides fold to the constant 1. */

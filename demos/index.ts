@@ -28,6 +28,7 @@ import { sdfShapesScene, sdfShapesStrategy, sdfShapesPtStrategy } from './sdfSha
 import { fractalsScene, fractalsStrategy } from './fractalsScene.js';
 import { customFieldsScene, customFieldsStrategy } from './customFieldsScene.js';
 import { glassLabScene, glassLabStrategies } from './glassLabScene.js';
+import { gyroidFieldScene, gyroidFieldStrategy } from './gyroidFieldScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
@@ -246,6 +247,18 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             'an ivory Menger sponge tipped onto a corner and a gold Apollonian gasket, both lit by an overhead '
             + 'panel with a dim rim behind: the recursion should read through CONTACT SHADOWS and occlusion, '
             + 'not just silhouette. Drop apollonian thickness to 0.002 in the source for finer filigree.',
+    },
+    'gyroid-field': {
+        scene: gyroidFieldScene,
+        strategies: posed([0, 6.5, 13.5], [0, 0.8, 0], gyroidFieldStrategy),
+        exercises:
+            '100 INSTANCED SCENE-LOCAL GYROIDS \u2014 the SDF-contract arc\u2019s payoff: a defineSDF field as an '
+            + 'INSTANCE PROTOTYPE (one prototype \u00d7 100 frame-tier placement records), batch TLAS over the '
+            + 'instance world boxes, the GENERATED gyroid_sdf_intersect as the leaf body, AABBs derived from '
+            + 'the declared sphere bound (rotation-invariant \u2014 no refit under any placement).',
+        expected:
+            'a drifting field of bronze lattice balls in three size classes under a large overhead panel \u2014 '
+            + 'interactive framerates because each ray marches only the few boxes it enters, never 100 fields.',
     },
     'glass-lab': {
         scene: glassLabScene,

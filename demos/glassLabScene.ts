@@ -22,6 +22,11 @@
 //              cornered the tangle's ring bug.)
 //   ior SLIDER — TIR STRENGTH, live (1.05-2.0): total internal reflection multiplies
 //              with the index, amplifying everything path-length-related.
+//   THE FROSTED TWIN — the rough dielectric on the same ior dial and the same ruby
+//              interior as the exact control, with its own live `glass.roughness`
+//              slider: the smooth/rough pair as a controlled comparison. Roughness is
+//              the third mechanism (with absorption and dispersion) that suppresses
+//              idealized-specular structure; the two front spheres show it isolated.
 
 import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 import { tangle } from '../tests/witnesses/scenes/customFieldWitness.js';
@@ -59,6 +64,13 @@ export const glassLabScene: SceneDescription = {
             material: 'glass',
             transform: { position: [0, 0.4, 1.1] },
         },
+        {
+            type: 'sphere',        // the ROUGH twin of the control — identical in every
+            name: 'frosted',       // other respect (same ior dial, same ruby interior)
+            parameters: { radius: 0.34 },
+            material: 'roughglass',
+            transform: { position: [0.95, 0.34, 1.25] },
+        },
     ],
     materials: {
         floor: { model: 'lambert', albedo: [0.45, 0.43, 0.4] },
@@ -71,6 +83,19 @@ export const glassLabScene: SceneDescription = {
             model: 'dielectric',
             ior: { param: 'glass.ior', default: 1.5, min: 1.05, max: 2.0 },
             albedo: [0.98, 0.98, 0.98],
+            medium: { sigma_a: [0.3, 5.0, 7.0] },
+        },
+        // The rough control's material: the SAME ior dial and the SAME ruby interior,
+        // so the only variable between the two front spheres is microroughness. The
+        // dial is live (fable-rough-dielectric §5) — turn it up and watch the mirror-
+        // sharp caustics and TIR chains soften into frost, which is the third physical
+        // mechanism (with absorption and dispersion) that keeps real glass from showing
+        // the idealized-specular structure this bench was built to hunt.
+        roughglass: {
+            model: 'rough_dielectric',
+            ior: { param: 'glass.ior', default: 1.5, min: 1.05, max: 2.0 },
+            roughness: { param: 'glass.roughness', default: 0.12, min: 0.0, max: 0.6 },
+            transmittance: [0.98, 0.98, 0.98],
             medium: { sigma_a: [0.3, 5.0, 7.0] },
         },
     },

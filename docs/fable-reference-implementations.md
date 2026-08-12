@@ -423,17 +423,24 @@ float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit) {
 
 ## 7. GGX conductor — the first glossy BSDF (VNDF sampling)
 
+> **AS BUILT (fable-rough-dielectric §4, Aug 2026):** `ggx_D`/`ggx_G1` and the VNDF
+> sampler moved to `glsl/core/microfacet.glsl` as `microfacet_D`/`microfacet_G1`/
+> `microfacet_sample_vndf` (plus the frame maps) — the FIXED stdlib every microfacet
+> model links, so a rough-dielectric-only program needs no conductor. The math below is
+> unchanged; only the home and the prefix are. `ggx.glsl` is now the conductor MODEL
+> alone.
+
 ```glsl
 // ggx.glsl — rough conductor, Smith separable masking, Schlick Fresnel.
 // Fields read: mp.f0 (normal-incidence reflectance), mp.roughness (alpha = roughness²).
 // Convention: alpha clamped ≥ 1e-3 — author true mirrors as a delta model instead (§3.1);
 // letting alpha→0 here produces fireflies, not a mirror.
 
-float ggx_D(vec3 h_local, float a) {           // local frame: n = +z
+float ggx_D(vec3 h_local, float a) {           // local frame: n = +z  [now microfacet_D]
     float t = h_local.z * h_local.z * (a * a - 1.0) + 1.0;
     return a * a / (PI * t * t);
 }
-float ggx_G1(vec3 v_local, float a) {          // Smith, separable
+float ggx_G1(vec3 v_local, float a) {          // Smith, separable     [now microfacet_G1]
     float c = abs(v_local.z);
     return 2.0 * c / (c + sqrt(a * a + (1.0 - a * a) * c * c));
 }
@@ -486,6 +493,68 @@ float ggx_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
 ```
 
 The `sample.pdf` / `ggx_pdf` agreement is the exact triple-consistency the §11.3 histogram harness exists to verify — GGX is its first real customer.
+
+---
+
+## 7b. Rough dielectric — the two-lobe microfacet BSDF (Walter 2007 / pbrt-v4 §9.7)
+
+Design authority: `docs/fable-rough-dielectric.md`. Transcribed from pbrt-v4's
+`DielectricBxDF` rough branch, which is Walter et al. 2007 Eq. 17/21 in modern form.
+**Two house conventions simplify it and must not be "fixed" back toward pbrt:**
+
+1. `hit.frame.n` is oriented toward `region_from` (§4.1), so `wo` is ALWAYS in the upper
+   hemisphere. pbrt's `if (cosTheta_o < 0) eta = 1/eta` side flip has NO analogue here.
+2. IORs come from the hit's regions (`ior_of`), never from the material. Our `eta` is
+   `n_i/n_t` (what `dielectric_fresnel` takes); pbrt's `etap` is its reciprocal, so
+   `ft /= Sqr(etap)` IS our `× eta²` — the same η² factor the smooth dielectric carries
+   (§2), and F-ETA is the witness that catches a divergence.
+
+Smith masking is SEPARABLE here (`G = G1(wo)·G1(wi)`), as everywhere in this house —
+which is what makes both weights collapse:
+
+```
+reflection:    weight = G1(wi)                         (F cancels against the lobe probability F)
+transmission:  weight = G1(wi) · eta² · transmittance  (1−F cancels against 1−F)
+```
+
+That collapse is the same VNDF elegance §7 exploits; if a transcription ever needs the
+full `f·|cos|/pdf` quotient at the sampling site, something has drifted.
+
+```glsl
+// rough_dielectric.glsl — the two-lobe microfacet dielectric.
+// wol.z > 0 by the region-orientation contract; alpha = mp.alpha (D4 derived, ≥ 1e-3).
+
+// ---- sampling ----
+vec3 m = microfacet_sample_vndf(wol, a, u);            // visible microfacet normal
+float cos_om = clamp(dot(wol, m), 1e-6, 1.0);
+float F = dielectric_fresnel(cos_om, eta);             // eta = n_i/n_t; TIR ⇒ F = 1
+if (uc < F) {                                          // REFLECTION lobe
+    wil = reflect(-wol, m);                            // dead sample if wil.z <= 0
+    weight = SPECTRUM_ONE * microfacet_G1(wil, a);
+    pdf    = F * microfacet_G1(wol, a) * microfacet_D(m, a) / (4.0 * wol.z);
+} else {                                               // TRANSMISSION lobe
+    float sin2_t = eta * eta * (1.0 - cos_om * cos_om);
+    float cos_t  = sqrt(max(0.0, 1.0 - sin2_t));       // sin2_t < 1 guaranteed (else F = 1)
+    wil = normalize(-eta * wol + (eta * cos_om - cos_t) * m);   // dead sample if wil.z >= 0
+    float denom = dot(wil, m) + dot(wol, m) * eta;     // (wi·m + (wo·m)/etap)², etap = 1/eta
+    denom *= denom;
+    weight = mp.transmittance * (microfacet_G1(wil, a) * eta * eta);
+    pdf    = (1.0 - F) * microfacet_G1(wol, a) * microfacet_D(m, a) * cos_om / wol.z
+             * abs(dot(wil, m)) / denom;               // VNDF pdf × dwm_dwi
+}
+
+// ---- eval / pdf: RECOVER the half-vector, then the same two branches ----
+float etap = reflect_case ? 1.0 : 1.0 / eta;           // pbrt's etap (n_t/n_i on transmission)
+vec3 m = wil * etap + wol;                             // generalized half-direction
+if (dot(m, m) == 0.0) return zero;
+m = normalize(m); if (m.z < 0.0) m = -m;
+if (dot(m, wil) * wil.z < 0.0 || dot(m, wol) * wol.z < 0.0) return zero;   // backfacing microfacet
+// reflection: f = D·G·F / (4|cos_i cos_o|)
+// transmission: f = D·(1−F)·G·|（wi·m)(wo·m)| / (|cos_i cos_o|·denom) · eta² · transmittance
+```
+
+`interaction_surface_pdf` returns the F-weighted density of whichever lobe could have
+produced `wi` (the side of `wi` decides) — MIS then sees the whole material.
 
 ---
 

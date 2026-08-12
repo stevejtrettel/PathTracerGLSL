@@ -1,7 +1,7 @@
 // Math utilities
 // Provides: PI, TWO_PI, EPSILON, build_basis(), concentric_disk(), schlick_fresnel(),
-//           SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(), spectrum_is_black(),
-//           spectrum_exp() (math_media.glsl when media exist)
+//           dielectric_fresnel(), SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(),
+//           spectrum_is_black(), spectrum_exp() (math_media.glsl when media exist)
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
@@ -47,4 +47,21 @@ vec2 concentric_disk(vec2 u) {
 // half-vector/normal convention; must be in [0,1].
 Spectrum schlick_fresnel(Spectrum f0, float cos_theta) {
     return f0 + (SPECTRUM_ONE - f0) * pow(1.0 - cos_theta, 5.0);
+}
+
+// EXACT (unpolarized) Fresnel reflectance at a dielectric interface — eta = n_i / n_t,
+// cos_i measured against the interface normal on the INCIDENT side. Returns 1 under
+// total internal reflection, which is why TIR is never a special case at the call site.
+// Lives here rather than in dielectric.glsl (fable-rough-dielectric §4): it is the
+// house's second Fresnel form, shared by every model that crosses an interface — smooth
+// or rough — and a rough-glass-only program must link it without pulling in the smooth
+// occupant. Named beside schlick_fresnel deliberately: the choice between them is a
+// modelling decision (conductor approximation vs exact dielectric), not an accident.
+float dielectric_fresnel(float cos_i, float eta) {
+    float sin2_t = eta * eta * (1.0 - cos_i * cos_i);
+    if (sin2_t >= 1.0) return 1.0;                    // total internal reflection
+    float cos_t = sqrt(1.0 - sin2_t);
+    float r_par  = (cos_i - eta * cos_t) / (cos_i + eta * cos_t);
+    float r_perp = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
+    return 0.5 * (r_par * r_par + r_perp * r_perp);
 }
