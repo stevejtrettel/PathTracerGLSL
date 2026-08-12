@@ -15,6 +15,7 @@
 //   instance-fog ⇄ instance-fog-ref         the interior as a MEDIUM region, not just an
 //                                           ior: proves current_medium tracking enters
 //                                           and leaves instanced volumes correctly
+//   perf-instance-glass / -opaque           the bounce ladder + the glass-vs-opaque cost row
 
 import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 import { instance } from '../../../src/authoring/instance.js';

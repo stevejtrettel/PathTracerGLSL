@@ -151,6 +151,32 @@ have caught this on the first sweep — but the compile-time suite could not, be
 "the region exists" and "the region has an index" are different facts and only the
 second one shows up in a pixel.
 
+**Closing the regime the point-walk bug lived in** (Aug 11, after the fix). Two gates,
+and building them taught the sharpest fact of the batch:
+
+> For DISJOINT solids, containment is barely load-bearing. Entering an object the
+> classifier probes only OUTSIDE it; leaving it, a solid owner covers its own side with
+> no probe at all. A stranded leaf changes NO answer. The descent decides something only
+> where a point is INSIDE a region — nesting, overlap, or a camera inside one.
+
+That is the real reason a broken descent survived months of green sweeps, and it is
+what makes a naive gate useless: a scene of separate glass balls under table dispatch
+diverges **0.08%** with the bug present — it passes. Both gates below were therefore
+CALIBRATED AGAINST THE RESTORED DEFECT, not merely observed to pass:
+
+1. `tests/components/bvh.test.ts` — a TS mirror of the descent over a real 64-box tree,
+   asserting the invariant that fails immediately: *every item whose box contains p must
+   be visited*. Verified by re-introducing the old indexing (fails, naming the stranded
+   item) and reverting (passes). No GPU, no scene.
+2. Witness **region-overlap** — twelve heavily OVERLAPPING absorbing balls in three strongly
+   different hues, unrolled vs table. Every point is inside several at once, so
+   innermost-wins decides everywhere and a stranded leaf puts a segment in the wrong
+   medium — the wrong COLOUR, not a subtle shift. Measured: **49.2% divergence with the
+   defect restored, 0.07% with it fixed.** Earlier drafts (disjoint glass, then one
+   nested tank) measured 0.08% and 0.48% — both would have shipped false confidence.
+   It lives in its own fixture (`regionOverlapWitness.ts`): the subject is the descent,
+   not instancing, and after the redesign there is no glass in it either.
+
 ### Termination policy (owner discussion, Aug 11) — and a correction
 
 The bring-up made the bounce budget matter more than anywhere else in the suite (a path

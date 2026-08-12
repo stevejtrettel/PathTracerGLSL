@@ -30,6 +30,7 @@ import { bazaarScene, bazaarTableStrategy, bazaarUnrolledStrategy } from './scen
 import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies, meshLightBvhStrategies } from './scenes/meshWitness.js';
 import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy, instanceParamsTwin, instanceParamsFrame, instanceParamsStrategy, instanceParamsCwbvhStrategy } from './scenes/instanceWitness.js';
 import { perfCloud, perfCloudFrame, perfCloudStrategy, perfCloudCwbvhStrategy, PERF_CLOUD_COUNT } from './scenes/perfCloud.js';
+import { regionOverlap, regionOverlapUnrolledStrategy, regionOverlapTableStrategy } from './scenes/regionOverlapWitness.js';
 import {
     instanceGlass, instanceGlassRef, instanceGlassMesh, instanceGlassMeshRef,
     instanceFog, instanceFogRef, instanceGlassStrategy, instanceGlassLinearStrategy, instanceGlassLowRRStrategy,
@@ -1844,6 +1845,30 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         witness: {
             spp: 8,
             checks: [{ kind: 'perf', size: [512, 512], frames: 24, warmup: 8, label: 'instanced opaque (containment OFF) ms/frame @512²' }],
+        },
+    },
+    'region-overlap': {
+        scene: regionOverlap,
+        strategies: posed([0, 1.75, 1.55], [0, 1.4, -1.2], regionOverlapUnrolledStrategy, regionOverlapTableStrategy),
+        exercises:
+            'THE CONTAINMENT DESCENT under table dispatch — the regime bvhPointWalkLines serves, which had no '
+            + 'witness at all. That skeleton read the node layout wrong (never visited left subtrees) and survived '
+            + 'for months, and the reason is sharper than "the tabled scenes were opaque": for DISJOINT solids '
+            + 'containment is barely load-bearing — entering a sphere the classifier probes only OUTSIDE it, and '
+            + 'leaving it a solid owner covers its own side with no probe, so a stranded leaf changes no answer. '
+            + 'The descent decides something only where a point is INSIDE a region. Hence twelve heavily '
+            + 'OVERLAPPING absorbing balls in three strongly different hues: every point sits inside several at '
+            + 'once, innermost-wins has a real decision everywhere, and a stranded leaf lands a segment in the '
+            + 'wrong medium — which reads as the wrong COLOUR, not a subtle shift',
+        expected:
+            'keys 1 (unrolled) and 2 (table) are the same image — a bias-free estimator swap. CALIBRATED against '
+            + 'the real defect (Aug 11): with the old child indexing restored this pair diverges 49.2% in frame '
+            + 'mean; with it fixed, 0.07%. The gate sits far below the former and far above the latter',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.08, label: 'table ≡ unrolled through overlapping regions (containment descent)' },
+            ],
         },
     },
     'rough-grin': {

@@ -36,8 +36,8 @@ const strategy: RenderStrategy = {
     view: { tonemap: { type: 'reinhard' } },
 };
 
-function fragmentOf(scene: SceneDescription): string {
-    const r = new Compiler().compile(scene, strategy);
+function fragmentOf(scene: SceneDescription, st: RenderStrategy = strategy): string {
+    const r = new Compiler().compile(scene, st);
     return [...r.shaders.entries()].find(([id]) => id.endsWith('-main'))![1].fragment;
 }
 /** The body of a generated function, by its definition line. */
@@ -123,12 +123,7 @@ describe('russian roulette: the survival ceiling is authored (the unbiased cost 
         // are divided by the same probability), which is why this is the knob to reach for
         // instead of lowering maxBounces.
         const scene = glassBatchScene();
-        expect(fragmentOf2(scene, withRR())).toContain('#define RR_MAX_SURVIVAL 0.95');
-        expect(fragmentOf2(scene, withRR(0.7))).toContain('#define RR_MAX_SURVIVAL 0.7');
+        expect(fragmentOf(scene, withRR())).toContain('#define RR_MAX_SURVIVAL 0.95');
+        expect(fragmentOf(scene, withRR(0.7))).toContain('#define RR_MAX_SURVIVAL 0.7');
     });
 });
-
-function fragmentOf2(scene: SceneDescription, st: RenderStrategy): string {
-    const r = new Compiler().compile(scene, st);
-    return [...r.shaders.entries()].find(([id]) => id.endsWith('-main'))![1].fragment;
-}

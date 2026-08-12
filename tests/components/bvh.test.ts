@@ -148,3 +148,81 @@ describe('buildBVH', () => {
         expect(Array.from(reindexedTriangles)).toEqual([0, 1, 2]);
     });
 });
+
+// ── The POINT walk's traversal semantics (regression, Aug 11) ────────────────────
+// bvhPointWalkLines emits GLSL, so nothing here executes it — but the property that
+// broke is a property of the TRAVERSAL, not of the text, and it is checkable in TS
+// against the same node array the GLSL reads. The bug: the walk took n1.w as the LEFT
+// child and reconstructed the sibling as l + 1, whereas buildBVHCore stores n1.w = the
+// RIGHT child with the LEFT implicit at ni + 1. It therefore descended the right subtree
+// twice and NEVER VISITED THE LEFT ONE.
+//
+// It hid for months because a missed containment is only observable where region
+// IDENTITY is read (ior_of, current_medium) and the walk's only consumers were opaque
+// tabled scenes — a wrong region there changes no pixel. The invariant below is the one
+// that fails immediately under the old indexing, with no GPU and no scene:
+//
+//    every item whose BOX contains p must be visited by the descent.
+//
+// (Sufficient, not merely necessary: a point outside a leaf's box cannot be inside the
+// object that box bounds, so visiting every box-containing leaf is exactly the
+// candidate set containment needs.)
+
+/** TS mirror of the GLSL point walk — the SAME node decoding bvhPointWalkLines emits. */
+function pointWalkVisits(nodes: Float32Array, p: V3): Set<number> {
+    const visited = new Set<number>();
+    const stack: number[] = [0];
+    while (stack.length > 0) {
+        const ni = stack.pop()!;
+        const mn: V3 = [nodes[ni * 8], nodes[ni * 8 + 1], nodes[ni * 8 + 2]];
+        const mx: V3 = [nodes[ni * 8 + 4], nodes[ni * 8 + 5], nodes[ni * 8 + 6]];
+        const A = nodes[ni * 8 + 3], B = nodes[ni * 8 + 7];
+        const inside = p[0] >= mn[0] && p[1] >= mn[1] && p[2] >= mn[2]
+            && p[0] <= mx[0] && p[1] <= mx[1] && p[2] <= mx[2];
+        if (!inside) continue;
+        if (A >= 0) {
+            for (let j = 0; j < A; j++) visited.add(B + j);   // leaf: [off, off + cnt)
+        } else {
+            stack.push(ni + 1, B);                            // LEFT implicit, RIGHT = B
+        }
+    }
+    return visited;
+}
+
+describe('BVH point walk visits every box that contains the point', () => {
+    it('finds the full candidate set on a tree with many internal nodes', async () => {
+        const { buildBVHNodesFlat } = await import('../../src/components/accel/bvh/bvh.js');
+        const r = rng(20260811);
+        const N = 64;   // deep enough that most items sit in LEFT subtrees — 1-2 items would hide the bug
+        const boxes = new Float64Array(6 * N);
+        for (let i = 0; i < N; i++) {
+            const cx = r() * 10 - 5, cy = r() * 10 - 5, cz = r() * 10 - 5;
+            const h = 0.3 + r() * 0.9;
+            boxes[6 * i] = cx - h; boxes[6 * i + 1] = cy - h; boxes[6 * i + 2] = cz - h;
+            boxes[6 * i + 3] = cx + h; boxes[6 * i + 4] = cy + h; boxes[6 * i + 5] = cz + h;
+        }
+        const { nodes, order } = buildBVHNodesFlat(boxes, N);
+
+        let probesWithHits = 0;
+        for (let s = 0; s < 3000; s++) {
+            const p: V3 = [r() * 12 - 6, r() * 12 - 6, r() * 12 - 6];
+            // Brute force: which ORIGINAL items contain p?
+            const expected = new Set<number>();
+            for (let i = 0; i < N; i++) {
+                if (p[0] >= boxes[6 * i] && p[1] >= boxes[6 * i + 1] && p[2] >= boxes[6 * i + 2]
+                    && p[0] <= boxes[6 * i + 3] && p[1] <= boxes[6 * i + 4] && p[2] <= boxes[6 * i + 5]) {
+                    expected.add(i);
+                }
+            }
+            if (expected.size === 0) continue;
+            probesWithHits++;
+            // The walk reports LEAF-ORDER slots; `order` maps them back to original items.
+            const got = new Set([...pointWalkVisits(nodes, p)].map((slot) => order[slot]));
+            for (const item of expected) {
+                expect(got.has(item), `point (${p.map((v) => v.toFixed(2)).join(', ')}) is inside item ${item}, but the descent never visited it`).toBe(true);
+            }
+        }
+        // The probes have to actually land inside things, or the loop proves nothing.
+        expect(probesWithHits).toBeGreaterThan(200);
+    });
+});
