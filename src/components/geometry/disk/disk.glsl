@@ -11,7 +11,7 @@ bool disk_intersect(Ray ray, Disk d, out float t) {
     float denom = dot(ray.direction, d.normal);
     if (abs(denom) < 1e-8) return false;                   // parallel to the disk's plane
     t = dot(d.center - ray.origin, d.normal) / denom;
-    if (t <= EPSILON) return false;
+    if (t <= 0.0) return false;   // floor 0: escape is ray_spawn's offset (impl-plan-epsilon-discipline)
     vec3 local = ray.origin + ray.direction * t - d.center;  // ~in-plane (O(t·ulp) residual,
     return dot(local, local) <= d.radius * d.radius;         //  same class as quad's Gram solve)
 }

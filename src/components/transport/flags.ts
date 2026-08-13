@@ -13,6 +13,11 @@ export function flags(p: ProgramDescription) {
         mis: lighting?.method === 'mis',
         media: p.media.present,
         scattering: p.media.scatteringArms,
+        /** Some scattering medium settles absorption by WEIGHT rather than by the tracking
+         *  lottery, so a per-collision survival probability is owed and the interior
+         *  termination rule exists (docs/fable-subsurface.md §6). Gates BOTH the emitted
+         *  roulette_interior body and its call site; medium_survival() is its source. */
+        weightedAbsorption: p.media.weightedAbsorptionArms,
         /** Emissive media exist (impl-plan-medium-emission): the walk adds ms.radiance. */
         mediumEmission: p.media.emission,
         nulls: p.media.nullInterfaces,

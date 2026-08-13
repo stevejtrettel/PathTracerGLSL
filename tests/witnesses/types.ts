@@ -11,16 +11,54 @@ import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.
  */
 export interface WitnessRegion { x: number; y: number; w: number; h: number }
 
+/**
+ * WHERE A `mean` CHECK'S EXPECTED VALUE CAME FROM — and therefore what a miss MEANS.
+ *
+ * Until Aug 2026 every expected value in this suite was a pen-and-paper number (`furnace = 0.4`
+ * from E/(1−ρ)), so provenance never needed saying. The subsurface work introduced the first
+ * expectations computed by a reference implementation, and those are not the same kind of claim.
+ * Recording the difference in the check — rather than smuggling a reference's error into `tol` —
+ * is what keeps a witness table honest about what it proves.
+ *
+ * The tiers are two, because there are only two kinds of statement:
+ *
+ *   'exact'       The value is exact mathematics. Whether it is evaluated in your head
+ *                 (E/(1−ρ)) or iterated to fourteen digits (Chandrasekhar's H-function) does not
+ *                 change its kind — √2 is exact whether or not a computer prints it. A miss is a
+ *                 RENDERER BUG. This is the default, and every check written before this field
+ *                 existed is one.
+ *
+ *   'cross-check' The value is a second, independent implementation of the same physics, with a
+ *                 statistical error of its own (a CPU Monte-Carlo reference for a configuration
+ *                 with no closed form). A miss means THE TWO DISAGREE — both are suspects. These
+ *                 rows must state `refTol`, and the runner reports them apart, as DISAGREE
+ *                 rather than FAIL, so a table of exact gates is never diluted by them.
+ */
+export interface WitnessSource {
+    tier: 'exact' | 'cross-check';
+    /** One line naming the derivation or the reference — printed in the report. */
+    from: string;
+    /**
+     * The REFERENCE's own uncertainty, kept apart from `tol` (the render's noise budget) so a
+     * defect can never hide inside one merged number. Required for 'cross-check'.
+     */
+    refTol?: number;
+}
+
 export type WitnessCheck =
     | {
           /** Mean over `region` (default: whole frame) equals `value` per channel. */
           kind: 'mean';
           value: number | [number, number, number];
-          /** Absolute tolerance, scalar or per-channel. */
+          /** Absolute tolerance, scalar or per-channel — the RENDER's noise budget. When
+           *  `source.tier` is 'cross-check', the reference's own error rides `source.refTol`
+           *  and the runner adds them; never fold one into the other. */
           tol: number | [number, number, number];
           region?: WitnessRegion;
           /** Strategy index into `strategies` (default 0). */
           strategy?: number;
+          /** Provenance of `value`. Absent ⇒ { tier: 'exact' } — see WitnessSource. */
+          source?: WitnessSource;
           label?: string;
       }
     | {

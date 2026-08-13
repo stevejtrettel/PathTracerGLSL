@@ -34,6 +34,22 @@ const sceneSuite = Object.fromEntries(
 
 const compiler = new Compiler();
 
+/** The Hit.eps fill invariant (impl-plan-epsilon-discipline): every arm that produces a
+ *  hit must state its positional uncertainty — exactly one `hit.eps =` per `hit.p =`
+ *  fill, plus the dispatcher's conservative seed. Without this count a missing fill
+ *  would be INVISIBLE at runtime (the seed masks it as legacy-1e-3 behavior — the same
+ *  silent-fallback species as the roulette clamp); with it, the seed is provably dead
+ *  code and exists only as out-param hygiene. */
+function checkEpsFills(fragment: string, label: string): void {
+    if (!fragment.includes('bool scene_intersect(Ray ray, out Hit hit)')) return;
+    const count = (re: RegExp) => (fragment.match(re) ?? []).length;
+    const pWrites = count(/hit\.p\s*=(?!=)/g);
+    const epsWrites = count(/hit\.eps\s*=(?!=)/g);
+    if (epsWrites !== pWrites + 1) {
+        throw new Error(`${label}: hit.eps fills (${epsWrites}) != hit.p fills (${pWrites}) + the dispatcher seed — an intersect arm is missing its positional-uncertainty fill`);
+    }
+}
+
 describe('generated GLSL compiles (glslang static check)', () => {
     for (const [key, entry] of Object.entries(sceneSuite)) {
         for (const strategy of entry.strategies) {
@@ -42,6 +58,7 @@ describe('generated GLSL compiles (glslang static check)', () => {
                 for (const [shaderId, prog] of renderer.shaders) {
                     check(prog.vertex, 'vert', `${shaderId} [vertex]`);
                     check(prog.fragment, 'frag', `${shaderId} [fragment]`);
+                    checkEpsFills(prog.fragment, shaderId);
                 }
             });
         }
@@ -77,6 +94,7 @@ describe('mesh backend compiles (glslang static check)', () => {
                 const renderer = compiler.compile(scene, strategy);
                 for (const [shaderId, prog] of renderer.shaders) {
                     check(prog.fragment, 'frag', `${shaderId} [mesh ${label} ${engine}]`);
+                    checkEpsFills(prog.fragment, `${shaderId} [mesh ${label} ${engine}]`);
                 }
             });
         }
@@ -229,6 +247,7 @@ describe('registry kitchen sink compiles (every occupant, glslang static check)'
         for (const [shaderId, prog] of renderer.shaders) {
             check(prog.vertex, 'vert', `${shaderId} [vertex]`);
             check(prog.fragment, 'frag', `${shaderId} [fragment]`);
+            checkEpsFills(prog.fragment, shaderId);
         }
     });
 

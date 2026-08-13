@@ -1,14 +1,54 @@
 // Math utilities
-// Provides: PI, TWO_PI, EPSILON, build_basis(), concentric_disk(), schlick_fresnel(),
+// Provides: PI, TWO_PI, MARCH_CLEARANCE, SHADOW_BACKOFF, fp_uncertainty(), build_basis(),
+//           concentric_disk(), schlick_fresnel(),
 //           dielectric_fresnel(), SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(),
 //           spectrum_is_black(), spectrum_exp() (math_media.glsl when media exist)
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
-#define EPSILON 0.001
 #define MAX_DIST 1000.0   // far search bound for unbounded rays (camera / bounce)
 #define EPS_INTERFACE 0.001   // §4.2 classification probe depth — 10× MARCH_EPSILON so a probe
                               // along the normal clears the marcher's stop-short residual
+
+// ── Surface-proximity clearances (impl-plan-epsilon-discipline, Aug 2026) ──────────────
+// The old single EPSILON (1e-3 — a marcher constant that J1–J5 inherited) is GONE; each
+// job now derives its clearance from the provenance of the hit it protects. Analytic
+// hits are fp-accurate and get fp_uncertainty(); marched and mesh hits keep the 1e-3
+// magnitude under the names below. Couplings pinned by tests/components/epsilonCoupling.test.ts.
+
+// MARCH_CLEARANCE — the marched tier's self-intersection clearance: 2× the marcher's
+// acceptance cap (MARCH_EPSILON_MAX, march.glsl). Read by: marched hit fills (Hit.eps),
+// the generated march's restart floor, and the dispatcher's conservative Hit.eps seed.
+// NEVER shrink it toward fp scale: a 2·march_epsilon(t) offset sits at a ZERO-margin
+// knife edge against the marcher's first acceptance test, and grazing escapes feed the
+// 16× stall-commit (the Aug 12 six-agent audit). Lives here, not march.glsl: the
+// dispatcher seed is emitted into every program, march code present or not.
+#define MARCH_CLEARANCE 0.001
+
+// SHADOW_BACKOFF — the far-end back-off of a shadow ray, keeping the LIGHT'S OWN
+// surface from reading as an occluder. Deliberately NOT fp-relative: the requirement is
+// ANGLE-AMPLIFIED (a planar emitter's root error grows as ~ε/cosθ_l — the flush-panel
+// witnesses sit at cosθ_l ≈ 0.01, the dark-tops geometry) and must also exceed the
+// origin's spawn offset (light_p is computed from the UN-offset hit). Inert for
+// delta/env kinds (the 1e20 distance sentinel absorbs it in fp32).
+#define SHADOW_BACKOFF 0.002
+
+// fp_uncertainty — positional error bound of a FLOATING-POINT-ACCURATE point (analytic
+// roots, triangle tests, refined marches): coordinate-relative with a near-origin
+// absolute floor. Constants transcribed from Wächter & Binder, "A Fast and Robust
+// Method for Avoiding Self-Intersection", Ray Tracing Gems ch. 6 (int_scale = 256 ulps
+// → 256·2⁻²³ relative; float_scale = 2⁻¹⁶ absolute; their origin() = 1/32 threshold is
+// where the two branches cross, folded here into one max). Scalar-along-the-normal
+// rather than their per-component integer offset: the escape is spelled through
+// ambient_geodesic (the metric seam), and the legal window — hit error ~2e-7…2e-6
+// below, optical significance ≳1e-4 above — leaves ≥2 orders of margin on both sides.
+// Scale-free by construction, which is what dissolves the fixed-epsilon half of the
+// Validator's transform.scale warning.
+#define FP_UNCERTAINTY_REL 3.0517578125e-5   // 256 ulps: 256 × 2⁻²³
+#define FP_UNCERTAINTY_ABS 1.52587890625e-5  // 2⁻¹⁶ — the near-origin floor
+float fp_uncertainty(Point p) {
+    return max(FP_UNCERTAINTY_ABS, FP_UNCERTAINTY_REL * max(abs(p.x), max(abs(p.y), abs(p.z))));
+}
 
 // Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
 // literals or ad-hoc luminance() for throughput decisions in library/template GLSL).

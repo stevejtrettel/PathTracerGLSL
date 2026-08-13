@@ -1482,9 +1482,12 @@ function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void 
         return;
     }
     if (Math.abs(Math.log10(scale)) > 2) {
+        // Analytic spawn offsets are fp-relative and scale-free since impl-plan-epsilon-
+        // discipline; the MARCHED tier's clearances are still world-fixed, so the warning
+        // stays for scenes that march.
         bag.warning('invalid-transform',
-            `Object ${index}: transform.scale ${scale} is extreme — world-space epsilons `
-            + `(EPSILON, MARCH_EPSILON, EPS_INTERFACE) are fixed; consider rescaling the scene`)
+            `Object ${index}: transform.scale ${scale} is extreme — the marched tier's world-space `
+            + `clearances (MARCH_EPSILON, MARCH_CLEARANCE, EPS_INTERFACE) are fixed; consider rescaling the scene`)
             .withOriginal('scene', at).add();
     }
 }

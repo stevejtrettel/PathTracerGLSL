@@ -285,8 +285,20 @@ export function emitSdfIntersect(d: PrimitiveDescriptor): string {
     return [
         ...refine,
         `bool ${d.type}_sdf_intersect(Ray ray, ${structName(d)} s, float t0, float t1, out float t) {`,
-        `    t = max(t0, EPSILON);`,
+        //  The restart floor is the marched tier's OWN clearance (impl-plan-epsilon-
+        //  discipline): it is the second half of the self-intersection escape — the spawn
+        //  offset (hit.eps = MARCH_CLEARANCE) and this floor reinforce each other, and the
+        //  first acceptance test below sits at a 5× margin only because BOTH hold. Never
+        //  re-spell either from a smaller tier.
+        `    t = max(t0, MARCH_CLEARANCE);`,
         `    float t_stop = t1 + march_epsilon(t1);`,
+        //  Guard the FIRST acceptance too: mid-loop iterations are bounded by the
+        //  step-then-check below, but the restart floor can already exceed a sliver
+        //  interval's dilated end — without this line the first acceptance could commit a
+        //  hit OUTSIDE the shape's own interval (previously papered over by the interval
+        //  producers clipping tf ≤ clearance; those clips are now the pure geometric
+        //  behind-the-ray test, and this guard is the honest home of the bound).
+        `    if (t > t_stop) return false;`,
         `    float t_prev = t;`,
         `    float dv = ${f('t')};`,
         `    float bound = abs(dv);`,

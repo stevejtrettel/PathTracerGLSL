@@ -3,7 +3,7 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
-import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumMayScatter, mediumIsDeflecting, isValueParam, isBlackbody, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, isBlackbody, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -176,6 +176,11 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             blocks.push({ origin: 'components/transport/volume/grin/grin.glsl', source: mediumGrinGLSL });
         }
         blocks.push({ origin: 'generated:medium-sample', source: generateMediumSample(plan, majorants) });
+        // The interior rule's survival source (docs/fable-subsurface.md §6) — emitted beside the
+        // seam whose per-medium routing it mirrors, and only where a weighted arm owes one.
+        if (media.weightedAbsorptionArms) {
+            blocks.push({ origin: 'generated:medium-survival', source: generateMediumSurvival(plan) });
+        }
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).
         if (wantsShadowMedia) {
             blocks.push({ origin: 'generated:medium-transmittance', source: generateMediumTransmittance(plan.materials) });
@@ -292,6 +297,11 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             }
             if (media.mediumPdf) {
                 provides.push({ name: 'interaction_medium_pdf', signature: 'float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp)' });
+            }
+            if (media.weightedAbsorptionArms) {
+                // Exists ONLY where a weighted arm leaves a survival owed — an all-tracked
+                // program links neither this nor transport's roulette_interior (§2.12).
+                provides.push({ name: 'medium_survival', signature: 'Spectrum medium_survival(int med, Point p)' });
             }
         }
     }
@@ -704,6 +714,47 @@ function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantS
         lines.push('    }');
     }
     lines.push('    return ms;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// The interior-survival accessor (docs/fable-subsurface.md §6, as amended Aug 2026) — the
+// PHYSICAL probability, per channel, that a scattering collision in `med` continues rather than
+// absorbing. Routed by `mediumWeightsAbsorption` over exactly the media generateMediumSample
+// dispatches, so the two can never disagree about which arm a medium is on.
+//
+// WHY THIS IS A SEPARATE ACCESSOR AND NOT ms.weight. The walk used to hand `ms.weight` to the
+// interior rule, but that weight is a PRODUCT: the single-scattering albedo (which is what the
+// rule is about) times the chromatic channel-selection MIS ratio (a variance-reduction artifact),
+// times — in the GRIN arm — an η² radiance compression. Only the first factor is a probability.
+// The others are individually unbounded, which is why the old rule needed a min(1) clamp, and why
+// for any medium with a chromatic σ_t the clamp bound at exactly 1 and the rule did nothing at
+// all: precisely the dense chromatic media (skin, marble) it was built for. There is no clamp
+// here, and the absence is the proof the quantity is right — σ_s/σ_t ≤ 1 by construction.
+//
+// TRACKING ARMS ANSWER 1. Kutz Alg. 4 already killed the path on absorption before the walk saw
+// it, so no survival is owed. That is why the rule's existence is `weightedAbsorptionArms` and
+// not merely `scatteringArms`: an all-delta-tracked program carries neither this function nor
+// roulette_interior.
+function generateMediumSurvival(plan: RenderPlan): string {
+    const scatteringLive = plan.program.media.scatteringArms;
+    const lines: string[] = [
+        '// Generated interior survival (docs/fable-subsurface.md §6): the physical continuation',
+        '// probability of a scattering collision — σ_s/σ_t on the WEIGHTED arms, 1 where the',
+        '// tracking lottery already settled absorption. No clamp: this is a probability by',
+        '// construction, unlike the event weight it replaced.',
+        'Spectrum medium_survival(int med, Point p) {',
+    ];
+    for (const mat of plan.materials) {
+        if (mat.medium === null) continue;
+        const scatters = scatteringLive && mediumMayScatter(mat.medium);
+        if (!mediumWeightsAbsorption(mat.medium, scatters)) continue;
+        lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — weighted absorption`);
+        lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, p);`);
+        lines.push('        return m.sigma_s / max(m.sigma_s + m.sigma_a, Spectrum(1e-9));');
+        lines.push('    }');
+    }
+    lines.push('    return SPECTRUM_ONE;   // tracking arms + non-scattering media: nothing owed');
     lines.push('}');
     return lines.join('\n');
 }

@@ -392,6 +392,28 @@ export function mediumRoutesToTracking(
 }
 
 /**
+ * The medium settles absorption by WEIGHTING the path throughput rather than by a collision
+ * LOTTERY — the analytic channel-MIS arm and the GRIN arc-length arm, as against the tracking
+ * arms. The ONE predicate behind the interior termination rule, shared by the Planner (which
+ * records it as `media.weightedAbsorptionArms`) and the Generator (which emits `medium_survival`
+ * with exactly this routing), so the two cannot drift.
+ *
+ * WHY IT IS THE DECIDING FACT (docs/fable-subsurface.md §6, as amended Aug 2026). A weighted arm
+ * multiplies the throughput by a factor and hands back a path that is still alive but dimmer, so
+ * a survival probability is genuinely owed and can be chosen to match the physical absorption
+ * rate exactly. A tracking arm has ALREADY killed the path on absorption before the walk sees it
+ * (Kutz Alg. 4's lottery), so nothing is owed and applying an absorption-shaped roulette on top
+ * would just be extra variance. `scatters` is the caller's resolved measurement side, exactly as
+ * for mediumRoutesToTracking.
+ */
+export function mediumWeightsAbsorption(
+    med: { sigma_a?: unknown; sigma_s?: unknown; emission?: unknown; ior?: unknown },
+    scatters: boolean,
+): boolean {
+    return scatters && !mediumRoutesToTracking(med, scatters);
+}
+
+/**
  * Surface material model — REGISTRY-VALIDATED, like primitive/phase/light-kind ids
  * (the B1 treatment: adding a model touches no type union; unknown models get a
  * Validator diagnostic listing the registered set). Two non-registry words carry
@@ -569,7 +591,12 @@ export interface EstimatorDescription {
     /** null = off. Unbiased by construction (random termination WITH compensation) — the
      *  taxonomy's canonical estimator-side termination, vs maxBounces' measurement-side one.
      *
-     *  `maxSurvival` (default 0.95) is the CEILING on the per-bounce survival probability.
+     *  `maxSurvival` (default 0.95) is the CEILING on the per-bounce survival probability AT
+     *  SURFACE EVENTS. It does not reach medium scattering collisions: those have a local,
+     *  exactly-known survival probability (the factor the volume arm applied) and use it
+     *  uncapped, since a scattering collision is never lossless and the ceiling would then be
+     *  the only thing ending the walk — see docs/fable-subsurface.md §6 and the
+     *  `roulette_interior` emitter. The reason below is a statement about surfaces:
      *  Survival is normally the path's remaining throughput, so a dim path dies quickly —
      *  but a LOSSLESS interaction (clear glass: the transmission weight is exactly 1, the
      *  Fresnel factor having cancelled against the lobe probability) never dims, and this

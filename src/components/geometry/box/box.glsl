@@ -9,13 +9,16 @@ float box_sdf(vec3 p, Box b) {
     return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
 }
 
-// Nearest intersection ahead of the ray (t > EPSILON) — the slab method. direction is
+// Nearest intersection strictly ahead of the ray (t > 0) — the slab method. direction is
 // unit; a zero component gives ±inf slab times that min/max resolve (the bvh_aabb_hit
 // convention). The FAR bound is the caller's job (t < hit.t / t < maxDist).
 // Root selection by the INSIDE test (tn < 0 ⇔ origin inside the box), never by a
-// t-threshold: an outside origin within EPSILON of a face must NOT fall through to the
-// exit face — that skips the entry interface and fakes an exit from a region the ray
-// never entered (the sphere_intersect review finding, transcribed).
+// t-threshold: an outside origin near a face must NOT fall through to the exit face —
+// that skips the entry interface and fakes an exit from a region the ray never entered
+// (the sphere_intersect review finding, transcribed). The floor is 0, not an epsilon:
+// self-intersection escape is OWNED by ray_spawn's provenance offset (hit.eps —
+// impl-plan-epsilon-discipline); a floor here deleted real shallow hits (the measured
+// slab-albedo J2 leak — this box IS that witness's geometry).
 bool box_intersect(Ray ray, Box b, out float t) {
     vec3 inv = 1.0 / ray.direction;
     vec3 t0 = (b.center - b.halfSize - ray.origin) * inv;
@@ -25,7 +28,7 @@ bool box_intersect(Ray ray, Box b, out float t) {
     float tf = min(min(tbg.x, tbg.y), tbg.z);
     if (tf < tn) return false;
     t = (tn < 0.0) ? tf : tn;
-    return t > EPSILON;
+    return t > 0.0;
 }
 
 // Outward surface normal at p (a point on/near the surface): the dominant axis of the
@@ -48,7 +51,7 @@ bool box_interval(Ray ray, Box b, out float t0, out float t1) {
     vec3 tsm = min(ta, tb), tbg = max(ta, tb);
     float tn = max(max(tsm.x, tsm.y), tsm.z);
     float tf = min(min(tbg.x, tbg.y), tbg.z);
-    if (tf < tn || tf <= EPSILON) return false;
+    if (tf < tn || tf <= 0.0) return false;   // behind the ray — see sphere_interval
     t0 = max(tn, 0.0);
     t1 = tf;
     return true;

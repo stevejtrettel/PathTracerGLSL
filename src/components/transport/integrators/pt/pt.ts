@@ -10,8 +10,20 @@
 // each event it calls the technique functions. A new integrator (one-shot, Whitted,
 // probe) is a new file here composing the same static functions with different rules.
 //
-// PINNED: single-emitter invariants are now single generated FUNCTIONS — roulette()
-// (both call sites), kernel_record() (both sampling sites, owned by kernel.ts).
+// PINNED: single-emitter invariants are now single generated FUNCTIONS — kernel_record()
+// (both sampling sites, owned by kernel.ts).
+//
+// roulette() USED TO BE one of those, covering the surface and medium sites together. It is
+// now TWO functions, deliberately (docs/fable-subsurface.md §6, owner-approved): a scattering
+// collision has a local, exactly-known survival probability that a surface event does not, so
+// the two sites no longer obey one rule and emitting one function would imply they do. The
+// invariant is not being weakened quietly — the two bodies share no arithmetic at all, so
+// there is no common expression left for them to drift out of.
+//
+// The interior rule's probability is supplied by the GENERATED medium_survival() accessor
+// (compiler/generate/features/materials.ts), routed per medium by whether its arm settles
+// absorption by weight or by lottery — so an all-delta-tracked program carries neither the
+// accessor nor roulette_interior, and the rule never reads a quantity that is not a probability.
 // The static-file rule (target doc §1): static files touch only PathState's pinned
 // core (ray/throughput/radiance); every program-dependent field is behind generated
 // functions. The WALK is generated, so it may touch its own fields freely.
@@ -39,6 +51,11 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
     if (f.mis) blocks.push({ origin: 'components/transport/math_mis.glsl', source: mathMisGLSL });
     blocks.push(combinerFns(f), kernelRecordFn(f));
     if (f.rr) blocks.push(roulette(f));
+    // The interior rule exists only where a collision leaves a survival OWED — a weighted
+    // absorption arm. Under tracking, the lottery already settled it (see medium_survival).
+    // The Planner folds roulette into weightedAbsorption (the accessor's only consumer is this
+    // rule), so f.rr is spelled out here for the startDepth read, not as a second gate.
+    if (f.rr && f.weightedAbsorption) blocks.push(rouletteInterior(f));
     blocks.push(...kernelBlocks(f), ...lightBlocks(f), ...equiangularBlocks(f), walk(program, f));
 
     // Numeric knobs (the house rule: budgets are NAMED pinned defines, never bare
@@ -73,6 +90,9 @@ function walkRequires(f: Flags): string[] {
     const req = ['scene_intersect', 'material_of', 'scene_material_properties'];
     if (f.media) req.push('material_has_medium', 'medium_sample', 'scene_region_at');
     if (f.scattering) req.push('scene_medium_properties');
+    // The interior rule's survival source (docs/fable-subsurface.md §6) — required exactly
+    // where the rule is emitted, so seam-unused stays honest.
+    if (f.rr && f.weightedAbsorption) req.push('medium_survival');
     if (f.nulls) req.push('is_null_interface');
     if (f.transmission) req.push('ior_of');
     // The generated light-query constructor's runtime arm (fable-rough-dielectric §3.3).
@@ -167,6 +187,67 @@ function roulette(f: Flags): ShaderBlock {
 }
 
 // ============================================================================
+// Generated INTERIOR termination — the medium site's own rule (§7.2 as amended by
+// docs/fable-subsurface.md §6). Separate from roulette() on purpose; see the note
+// at the top of this file for why the shared emitter was split.
+// ============================================================================
+
+function rouletteInterior(f: Flags): ShaderBlock {
+    return {
+        origin: 'generated:transport/roulette-interior',
+        source: [
+            '// ── Interior roulette (generated): survive in proportion to how much THIS collision',
+            '// dimmed the path — docs/fable-subsurface.md §6 ──',
+            '//',
+            '// A scattering collision has a LOCAL, exactly-known survival probability: the factor',
+            '// the volume arm just applied to the throughput. Multiplying the weight by that factor',
+            '// and then surviving with probability EQUAL to it leaves the weight exactly unchanged',
+            '// and ends the path at precisely the physical absorption rate. That is not a different',
+            '// estimator from the weighted one — it is the same estimator with the survival',
+            '// probability it should always have had, which is why this costs one function and no',
+            '// change to any volume arm.',
+            '//',
+            '// TWO DELIBERATE ABSENCES vs roulette():',
+            '//   RR_MAX_SURVIVAL — the ceiling exists for a LOSSLESS interaction (clear glass, whose',
+            '//     transmission weight is exactly 1 forever, so nothing else could ever end the',
+            '//     path). A scattering collision is never lossless, so here the ceiling would BE the',
+            '//     terminator: it would cull paths that physically continue and tax every survivor',
+            '//     by 1/p for nothing. That compounding factor over hundreds of collisions is the',
+            '//     firefly noise this rule exists to remove.',
+            '//   eta_scale — it corrects an ACCUMULATED radiance compression across interfaces, and',
+            '//     this metric is one event, so there is nothing accumulated to correct.',
+            '//',
+            '// THE SURVIVAL COMES FROM THE MEDIUM, NOT FROM THE EVENT WEIGHT. An earlier version of',
+            '// this rule passed ms.weight, which LOOKS like the dimming factor but is a product:',
+            '// the single-scattering albedo (the part this rule is about) times the chromatic',
+            '// channel-selection MIS ratio, times — in the GRIN arm — an eta^2 radiance compression.',
+            '// Only the first factor is a probability. The consequence was not academic: for any',
+            '// medium with a CHROMATIC sigma_t the MIS ratio pushes the product above 1, the clamp',
+            '// bound at exactly 1, and the rule did nothing at all — in precisely the dense chromatic',
+            '// media (skin, marble) that motivated it. medium_survival() answers sigma_s/sigma_t per',
+            '// channel, so THERE IS NO CLAMP HERE, and its absence is the proof the quantity is right.',
+            'bool roulette_interior(inout PathState s, int bounce, Spectrum survival) {',
+            `    if (bounce < ${f.rr!.startDepth}) return true;`,
+            '    // The BRIGHTEST channel, not the mean: never end a path that still carries a bright',
+            '    // channel. Averaging would kill paths whose surviving energy sits in one channel,',
+            '    // which is exactly the chromatic case that matters (a dense medium whose red travels',
+            '    // far and whose blue does not).',
+            '    float p_survive = spectrum_max(survival);',
+            '    if (p_survive <= 0.0) return false;        // a pure absorber: the path ends here',
+            '    // p == 1 (a lossless medium) is deliberately NOT short-circuited. The draw cannot',
+            '    // change the outcome and the divide is by one, so an early return would be free',
+            '    // correctness-wise — but it would stop consuming a random number, decorrelating the',
+            '    // sample stream of every lossless-medium witness (haze, fogcube, F-BOX-M, sss-furnace)',
+            '    // for no gain. Stream stability is worth more than one skipped draw.',
+            '    if (random() > p_survive) return false;',
+            '    s.throughput /= p_survive;',
+            '    return true;',
+            '}',
+        ].join('\n'),
+    };
+}
+
+// ============================================================================
 // The walk — the estimator's table of contents.
 // ============================================================================
 
@@ -243,7 +324,12 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             );
             if (f.nee && !f.equiangular) lines.push('                light_sample_direct_medium(s, med_mat, p_evt, wo_med);');
             lines.push('                kernel_sample_phase(s, med_mat, p_evt, wo_med);');
-            if (f.rr) lines.push('                if (!roulette(s, bounce)) break;');
+            // The INTERIOR rule (docs/fable-subsurface.md §6). The survival probability is asked
+            // of the MEDIUM at the event point — not read off ms.weight, which carries the
+            // channel-MIS ratio and (under GRIN) an eta^2 factor alongside the albedo.
+            if (f.rr && f.weightedAbsorption) {
+                lines.push('                if (!roulette_interior(s, bounce, medium_survival(med_mat, p_evt))) break;');
+            }
             lines.push(
                 '                continue;   // medium events COUNT toward the bounce budget (§7.2)',
                 '            }',

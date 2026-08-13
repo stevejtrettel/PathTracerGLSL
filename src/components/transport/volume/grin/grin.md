@@ -39,8 +39,10 @@ Each step: half-kick/drift/half-kick, accumulate per-step Beer–Lambert absorpt
 (σ_a colored, read by VALUE via `scene_medium_properties` — see the two-accessor note below),
 and exit the moment `scene_region_at` leaves `med`. The exit (impl-plan-grin-interface): the
 crossing drift segment is **bisected** (`GRIN_BISECT_ITERS`) to bracket the wall, then the
-returned point is **pulled back 2·EPSILON along the drift** so it sits INSIDE the region with
-the wall hit at t ≈ 2·EPSILON — robustly above the primitives' `t > EPSILON` floor in all
+returned point is **pulled back `GRIN_EXIT_PULLBACK` along the drift** so it sits strictly
+INSIDE the region — the pull-back is keyed to the WALKER'S OWN bisection residual and a
+marched wall's acceptance band, never to fp (impl-plan-epsilon-discipline; coupling pinned in
+epsilonCoupling.test.ts) — with the wall hit at t ≈ the pull-back in all
 geometries including grazing (the pull-back is along the RAY, so the hit distance is
 angle-independent to first order). The walk spawns the bent ray WITHOUT flipping
 `current_medium`; the next iteration's surface hit owns the crossing — **the walker walks, the

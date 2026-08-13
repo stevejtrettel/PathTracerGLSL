@@ -83,6 +83,18 @@ export function buildPropertiesStruct<S extends string>(structName: string, fiel
     for (const f of fields) {
         lines.push(`    ${f.glslType} ${f.name};`);
     }
+    if (baseFields.length === 0 && fields.length === 0) {
+        // GLSL forbids an empty struct, and the §3.4 union CAN legitimately be empty: a scene whose
+        // only material is `model: 'none'` (a null interface) has no model declaring any property
+        // row, so nothing contributes a field. That scene is legal — an index-matched medium with no
+        // optical surface anywhere — and it compiled to `struct MaterialProperties {};`, which
+        // glslang rejects outright. Found by the `slab-albedo` witness, the first scene in the suite
+        // with a null interface and nothing else.
+        //
+        // A placeholder keeps the type well-formed. Nothing reads it, by construction: the union is
+        // empty precisely because no model declares a field to read.
+        lines.push('    float _unused;   // §3.4 union is empty (e.g. only a null-interface material)');
+    }
     lines.push('};');
     return lines.join('\n');
 }

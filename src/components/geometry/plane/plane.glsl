@@ -9,11 +9,13 @@ float plane_sdf(vec3 p, Plane pl) {
 }
 
 // Intersection with the plane dot(p, normal) + offset = 0 (matches the SDF convention).
+// Floor 0, not an epsilon: a ray_spawn'd origin sits hit.eps off the plane, so its
+// re-root is strictly negative (impl-plan-epsilon-discipline — escape is the offset's job).
 bool plane_intersect(Ray ray, Plane pl, out float t) {
     float denom = dot(ray.direction, pl.normal);
     if (abs(denom) < 1e-8) return false;   // ray parallel to the plane
     t = -(dot(ray.origin, pl.normal) + pl.offset) / denom;
-    return (t > EPSILON);
+    return (t > 0.0);
 }
 
 // Outward surface normal — a plane's normal IS its parameter (trivial body, uniform signature).

@@ -14,7 +14,7 @@ float cylinder_sdf(vec3 p, Cylinder c) {
     return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
 }
 
-// Nearest intersection ahead of the ray (t > EPSILON): the capped cylinder as the
+// Nearest intersection strictly ahead of the ray (t > 0): the capped cylinder as the
 // INTERVAL intersection of the axis slab and the infinite tube — caps and side fall
 // out of one [tn, tf] pair, no per-face candidate juggling. Root selection by the
 // INSIDE test (tn < 0 ⇔ origin inside), the sphere_intersect discipline.
@@ -44,7 +44,7 @@ bool cylinder_intersect(Ray ray, Cylinder c, out float t) {
         return false;   // axis-parallel ray outside the tube
     }
     t = (tn < 0.0) ? tf : tn;
-    return t > EPSILON;
+    return t > 0.0;   // floor 0: escape is ray_spawn's offset (impl-plan-epsilon-discipline)
 }
 
 // Outward surface normal at p (a point on/near the surface): the smaller surface
@@ -84,7 +84,7 @@ bool cylinder_interval(Ray ray, Cylinder c, out float t0, out float t1) {
     } else if (cc > 0.0) {
         return false;
     }
-    if (tf < tn || tf <= EPSILON) return false;
+    if (tf < tn || tf <= 0.0) return false;   // behind the ray — see sphere_interval
     t0 = max(tn, 0.0);
     t1 = tf;
     return true;

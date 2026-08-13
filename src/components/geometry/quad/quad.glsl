@@ -10,7 +10,7 @@ bool quad_intersect(Ray ray, Quad q, out float t) {
     float denom = dot(ray.direction, q.normal);
     if (abs(denom) < 1e-8) return false;                   // parallel to the quad's plane
     t = dot(q.corner - ray.origin, q.normal) / denom;
-    if (t <= EPSILON) return false;
+    if (t <= 0.0) return false;   // floor 0: escape is ray_spawn's offset (impl-plan-epsilon-discipline)
     vec3 local = ray.origin + ray.direction * t - q.corner;  // Euclidean backend
     // Inside test via the plane's 2x2 Gram system (edges need not be orthogonal).
     float e11 = dot(q.edge1, q.edge1), e22 = dot(q.edge2, q.edge2), e12 = dot(q.edge1, q.edge2);

@@ -9,8 +9,12 @@ float sphere_sdf(vec3 p, Sphere sp) {
     return length(p - sp.center) - sp.radius;
 }
 
-// Nearest intersection ahead of the ray (t > EPSILON). direction is unit → a = 1.
+// Nearest intersection strictly ahead of the ray (t > 0). direction is unit → a = 1.
 // The FAR bound is the caller's job (t < hit.t for nearest-hit, t < maxDist for occlusion).
+// The floor is 0, not an epsilon: self-intersection escape is OWNED by ray_spawn's
+// provenance offset (hit.eps — impl-plan-epsilon-discipline), under which a spawned
+// origin's re-root is strictly behind the ray, so a floor here would only delete real
+// shallow hits (the measured slab-albedo J2 leak).
 bool sphere_intersect(Ray ray, Sphere sp, out float t) {
     vec3 oc = ray.origin - sp.center;
     float b = dot(oc, ray.direction);
@@ -19,11 +23,13 @@ bool sphere_intersect(Ray ray, Sphere sp, out float t) {
     if (disc < 0.0) return false;
     float s = sqrt(disc);
     // Root selection by the INSIDE test (c < 0), never by a t-threshold: an outside origin
-    // within EPSILON of the surface must NOT fall through to the far root — that skips the
-    // entry interface and fakes an exit from a region the ray never entered (review finding).
-    // Outside origins whose near root is ≤ EPSILON now miss (hairline, energy-bounded).
+    // near the surface must NOT fall through to the far root — that skips the entry
+    // interface and fakes an exit from a region the ray never entered (review finding).
+    // The sign of c is trustworthy for spawned origins: the fp-relative offset (≥256 ulps
+    // of |p|) exceeds the discriminant's rounding noise (a few ulps) by ~2 orders — the
+    // margin the six-agent audit derived; shrink FP_UNCERTAINTY_REL and re-derive.
     t = (c < 0.0) ? (-b + s) : (-b - s);
-    return (t > EPSILON);
+    return (t > 0.0);
 }
 
 // Outward surface normal at p (a point on/near the surface).
@@ -45,7 +51,8 @@ bool sphere_interval(Ray ray, Sphere sp, out float t0, out float t1) {
     if (disc < 0.0) return false;
     float s = sqrt(disc);
     t1 = -b + s;
-    if (t1 <= EPSILON) return false;   // the whole sphere is behind the ray
+    if (t1 <= 0.0) return false;   // the whole sphere is behind the ray (sliver intervals
+                                   // are the marcher's own t_stop guard's job)
     t0 = max(-b - s, 0.0);
     return true;
 }

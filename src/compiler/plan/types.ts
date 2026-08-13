@@ -110,6 +110,15 @@ export interface MediaDesc {
      *  MAX_NULL_COLLISIONS exist. Independent of scatteringArms — absorbing-only
      *  heterogeneous media need the ratio pass-through arm with no phase machinery. */
     heterogeneousArms: boolean;
+    /** Some SCATTERING medium settles absorption by WEIGHTING the throughput (the analytic
+     *  channel-MIS arm, the GRIN arc-length arm) rather than by a collision LOTTERY (the
+     *  tracking arms) — `mediumWeightsAbsorption`, the one predicate the Generator routes
+     *  `medium_survival` by. Only a weighted arm leaves a survival probability owed, so this
+     *  is the existence decision for BOTH the generated `medium_survival` accessor and the
+     *  transport family's `roulette_interior` rule (docs/fable-subsurface.md §6). A program
+     *  whose every scattering medium is delta-tracked carries neither — and neither does one
+     *  with roulette off, since the rule is the accessor's only consumer (§2.12 seam-unused). */
+    weightedAbsorptionArms: boolean;
     /** Emissive media present (impl-plan-medium-emission): the MediumProperties ε
      *  field, the generated medium_emission accessor, the arms' per-collision
      *  collection, and the walk's ms.radiance line exist. */

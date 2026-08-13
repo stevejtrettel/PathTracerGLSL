@@ -49,6 +49,14 @@ import marchGLSL from '../../../glsl/core/march.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
 
+/** The ∇n central-difference radius of the GRIN walker, and therefore the floor on
+ *  analytic spawn offsets in deflecting programs (the entry-step stencil must stay
+ *  inside the region). THE ONE OWNER of the number: it is emitted as the program-header
+ *  `#define GRIN_GRAD_EPS`, which grin.glsl's #ifndef default yields to (the numeric-knob
+ *  override seam). grin.glsl's standalone fallback must match — pinned by
+ *  tests/components/epsilonCoupling.test.ts. */
+export const GRIN_GRAD_EPS = 0.001;
+
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Class presence is a link-map decision (ProgramDescription.intersection.classes) —
     // no scene with geometry is empty, but a fully-empty scene contributes nothing.
@@ -188,6 +196,33 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const namedShapes = generateNamedShapes(plan.objects, ids);
     if (namedShapes !== null) {
         blocks.push({ origin: 'generated:named-shapes', source: namedShapes });
+    }
+
+    // The analytic tier's Hit.eps policy (impl-plan-epsilon-discipline): fp-scale, unless
+    // the program carries a DEFLECTING medium — the GRIN walker's ∇n stencil reaches
+    // GRIN_GRAD_EPS (1e-3) from a spawned entry point and authored ior formulas need not
+    // be total outside their region, so GRIN programs floor every analytic spawn at the
+    // stencil radius (byte-stable behaviour for the GRIN suite; the coupling to grin.glsl's
+    // GRIN_GRAD_EPS is pinned by tests/components/epsilonCoupling.test.ts). Emitted only
+    // when some arm produces an analytic hit (exact linkage).
+    const hasAnalyticFill = plan.objects.some((o) => o.intersect === 'closed-form')
+        || plan.instanceBatches.some((b) => b.prototype.backend === 'primitive' && b.prototype.intersect !== 'march')
+        || (table !== undefined && table.kinds.length > 0);
+    // Deflecting programs get the compiler-owned stencil radius in the header (grin.glsl's
+    // #ifndef default yields to it), so the floor below and the walker read ONE number.
+    if (plan.program.media.deflecting) {
+        defines['GRIN_GRAD_EPS'] = formatFloat(GRIN_GRAD_EPS);
+    }
+    if (hasAnalyticFill) {
+        blocks.push({
+            origin: 'generated:spawn-eps',
+            source: [
+                '// Analytic-hit spawn uncertainty (generated policy — impl-plan-epsilon-discipline)',
+                plan.program.media.deflecting
+                    ? 'float spawn_eps_analytic(Point p) { return max(fp_uncertainty(p), GRIN_GRAD_EPS); }   // floored at the ∇n stencil radius: the walker\'s entry-step stencil must stay inside the region'
+                    : 'float spawn_eps_analytic(Point p) { return fp_uncertainty(p); }',
+            ].join('\n'),
+        });
     }
 
     // Real uv charts (fable-imagery P1) emit only when some scene material reads uv — else
@@ -539,6 +574,7 @@ function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, cha
                 nWorld: pl.nWorld(`${d.type}_sdf_normal(${lp}, ${ref})`),
                 region: obj.index,
                 uv: uvFill(d, lp, ref, chartUv),
+                eps: 'MARCH_CLEARANCE',
             }),
             `}`,
         ];
@@ -667,10 +703,15 @@ function primitiveHitFill(indent: string, o: {
     region: string | number;
     element?: string;   // default '0' — instanced arms pass the leaf-order index
     uv: string;
+    /** Hit.eps — the arm's positional-uncertainty claim (impl-plan-epsilon-discipline):
+     *  `spawn_eps_analytic(hit.p)` for closed-form roots, `MARCH_CLEARANCE` for marched
+     *  commits. Required so no arm can silently fall back to a wrong tier. */
+    eps: string;
 }): string[] {
     return [
         'hit.t = t; found = true;',
         'hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
+        `hit.eps = ${o.eps};`,
         `hit.frame = ambient_frame(hit.p, ${o.nWorld});`,
         `hit.region_owner = ${o.region};`,
         `hit.element = ${o.element ?? '0'};`,
@@ -709,7 +750,7 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
         // shape (fable-imagery P1b): conjugate into the RIGID frame once, so hit-finding
         // AND the uv chart both run in the shape's own frame. The struct's length-like
         // fields absorb s in-shader, so t is a WORLD value — comparable on hit.t unchanged,
-        // and the primitives' internal EPSILON guards stay world-correct. The chart inherits
+        // and the primitives' internal proximity guards stay world-correct. The chart inherits
         // the placement's rotation for free (no rotation-dissolution — that only bites the
         // FOLDED constant arm below).
         const { q, ts } = placementRefs(obj.placement);
@@ -727,6 +768,7 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
             nWorld: `placement_normal(${q}, ${d.type}_normal(lray.origin + t * lray.direction, shape))`,
             region: obj.index,
             uv: uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv),
+            eps: 'spawn_eps_analytic(hit.p)',
         }));
         lines.push(`        }`);
         lines.push(`    }`);
@@ -747,6 +789,7 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
         nWorld: `${d.type}_normal(hit.p, ${shapeRef})`,
         region: obj.index,
         uv: uvFill(d, 'hit.p', shapeRef, chartUv),
+        eps: 'spawn_eps_analytic(hit.p)',
     }));
     lines.push(`        }`);
     lines.push(`    }`);
@@ -864,6 +907,7 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
         // hit.t was shrunk to the local (== world) t inside the leaf; the world point is the
         // world ray at that t (ray-into-local preserves the parameter, impl-plan-meshes §6).
         lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);`);
+        lines.push(`        hit.eps = MESH_T_MIN;   // shading-normal spawn — the mesh tier's clearance (mesh.glsl)`);
         lines.push(`        hit.frame = ambient_frame(hit.p, normalize(${pl.nWorld('nLocal')}));`);
         lines.push(`        hit.region_owner = ${m.index};`);
         lines.push(`        hit.element = 0;   // per-triangle refs are a future tenant`);
@@ -958,6 +1002,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
                 region: b.index,
                 element: 'i',   // the leaf-order placement index (attribute rows read it)
                 uv: uvFill(d, 'hit.p', 'shape', chartUv),
+                eps: 'spawn_eps_analytic(hit.p)',
             }),
             '}'];
     }
@@ -980,6 +1025,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
             '    found = true;',
             '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
             '    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
+            '    hit.eps = MESH_T_MIN;   // shading-normal spawn — the mesh tier\'s clearance (mesh.glsl)',
             '    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));',
             `    hit.region_owner = ${b.index};`,
             '    hit.uv = uv;',
@@ -1017,6 +1063,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
             region: b.index,
             element: 'i',   // the leaf-order placement index (attribute rows read it)
             uv: uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv),
+            eps: marched ? 'MARCH_CLEARANCE' : 'spawn_eps_analytic(hit.p)',
         }),
         '}'];
 }
@@ -1311,6 +1358,7 @@ function sdfLeafArm(k: { type: string; code: number }, chartUv: boolean, bound: 
             nWorld: `placement_normal(rq, ${k.type}_sdf_normal(${lp}, shape))`,
             region: 'int(hdr.y)',
             uv: uvFill(d, lp, 'shape', chartUv),
+            eps: 'MARCH_CLEARANCE',
         }));
         lines.push('            }');
     }
@@ -1380,6 +1428,7 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
             nWorld: `${k.type}_normal(hit.p, shape)`,
             region: 'int(hdr.y)',
             uv: uvFill(d, 'hit.p', 'shape', plan.program.materials.materialsReadUv),
+            eps: 'spawn_eps_analytic(hit.p)',
         }));
         lines.push('            }');
         lines.push('        }');
@@ -1637,6 +1686,7 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     // scene_intersect — hit.t is the running nearest (a Hit is valid only when this returns true).
     lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
     lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
+    lines.push('    hit.eps = MARCH_CLEARANCE;   // conservative seed (the largest tier) — every arm overwrites; a missed arm degrades, never garbage');
     lines.push('    bool found = false;');
     if (arms.primitive) lines.push('    if (primitive_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
     if (arms.mesh) lines.push('    if (mesh_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer

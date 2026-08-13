@@ -22,6 +22,16 @@
 
 // This file owns the TRIANGLE leaf + the mesh BLAS walk; addressing (data_texel1d) and
 // generic walk support (bvh_aabb_hit) come from the rail/accel files included before it.
+
+// MESH_T_MIN — the MESH tier's self-intersection floor AND spawn clearance (Hit.eps for
+// triangle hits; impl-plan-epsilon-discipline). The mesh tier deliberately keeps the old
+// 1e-3, unlike the analytic primitives (floor 0): meshes interpolate SHADING normals and
+// Hit carries no geometric normal, so ray_spawn's offset direction can dip below the
+// geometric horizon — this floor is what rejects the same-triangle re-hit (the standard
+// shading-normal compromise; dropping it, or shrinking the paired offset, grows
+// silhouette acne + black NEE speckle — the Aug 12 audit's counterexample). The proper
+// fix is a geometric normal in Hit; trigger: multi-material meshes bounding media.
+#define MESH_T_MIN 0.001
 //
 // RAIL v2 ADDRESSING (fable-data-rail): ALL meshes share one channel per role; every
 // query takes baked base offsets — vbase (vertex texels: vertices/normals/uvs), tbase
@@ -82,7 +92,7 @@ void mesh_test_range(
         vec3 a, b, c;
         uvec3 tri = mesh_tri_fetch(posTex, idxTex, vbase, tbase, i, a, b, c);
         vec3 bary, gnorm; float t;
-        if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > EPSILON && t < tmax) {
+        if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > MESH_T_MIN && t < tmax) {
             tmax = t;
             found = true;
             nLocal = useSmooth
@@ -104,13 +114,13 @@ bool mesh_any_range(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase, 
         vec3 a, b, c;
         mesh_tri_fetch(posTex, idxTex, vbase, tbase, i, a, b, c);
         vec3 bary, gnorm; float t;
-        if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > EPSILON && t < maxDist) return true;
+        if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > MESH_T_MIN && t < maxDist) return true;
     }
     return false;
 }
 
 // Side-of-nearest in [offset, offset+count) along the fixed containment probe ray: tracks the
-// geometric side (dot(dir, gnorm)) of the running-nearest hit. t > 0.0 (not EPSILON): the probe
+// geometric side (dot(dir, gnorm)) of the running-nearest hit. t > 0.0 (not MESH_T_MIN): the probe
 // point is already EPS_INTERFACE off any surface by the caller's discipline; skipping near hits
 // would misclassify probes standing just inside a face.
 void mesh_side_range(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase, uint offset, uint count, vec3 p, vec3 dir, inout float tmax, inout float sideDot) {

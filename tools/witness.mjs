@@ -482,8 +482,20 @@ async function runCheck(browser, registry, sceneId, spec, check) {
         const measured = regionMean(px, W, H, check.region);
         const expect = Array.isArray(check.value) ? check.value : [check.value, check.value, check.value];
         const tol = Array.isArray(check.tol) ? check.tol : [check.tol, check.tol, check.tol];
-        const pass = measured.every((m, i) => Math.abs(m - expect[i]) <= tol[i]);
-        return { sceneId, label, pass, detail: `mean ${fmt(measured)} vs ${fmt(expect)} ±${fmt(tol)}` };
+        // Provenance (witnesses/types.ts WitnessSource). Absent ⇒ exact: every check written
+        // before the field existed asserts a pen-and-paper number.
+        const source = check.source ?? { tier: 'exact' };
+        // A cross-check's budget is the RENDER's noise plus the REFERENCE's own error, added
+        // here rather than merged in the fixture — so the table can show both halves and a
+        // defect cannot hide inside one fat tolerance.
+        const refTol = source.tier === 'cross-check' ? (source.refTol ?? 0) : 0;
+        const pass = measured.every((m, i) => Math.abs(m - expect[i]) <= tol[i] + refTol);
+        const provenance = source.from ? `  ${DIM(`[${source.tier}: ${source.from}]`)}` : '';
+        const budget = refTol ? `±${fmt(tol)}+${refTol}` : `±${fmt(tol)}`;
+        return {
+            sceneId, label, pass, tier: source.tier,
+            detail: `mean ${fmt(measured)} vs ${fmt(expect)} ${budget}${provenance}`,
+        };
     }
 
     if (check.kind === 'equality' || check.kind === 'twin') {
@@ -604,6 +616,7 @@ async function runCheck(browser, registry, sceneId, spec, check) {
 const GREEN = s => `\x1b[32m${s}\x1b[0m`;
 const RED = s => `\x1b[31m${s}\x1b[0m`;
 const DIM = s => `\x1b[2m${s}\x1b[0m`;
+const YELLOW = s => `\x1b[33m${s}\x1b[0m`;
 
 /** Only the checks the active mode owns: perf rows under --perf, everything else in
  *  the numeric sweep. The two modes run different browsers (SwiftShader determinism
@@ -716,12 +729,24 @@ async function main() {
         const wScene = Math.max(...results.map(r => r.sceneId.length), 5);
         const wLabel = Math.max(...results.map(r => r.label.length), 5);
         for (const r of results) {
-            const mark = r.pass ? GREEN('PASS') : RED('FAIL');
-            console.log(`${mark}  ${r.sceneId.padEnd(wScene)}  ${r.label.padEnd(wLabel)}  ${DIM(r.detail)}`);
+            // A cross-check row compares us against ANOTHER implementation, not against
+            // mathematics — so a miss reads DISAGREE, naming what it actually establishes
+            // (the two differ; both are suspects), and the exact table stays undiluted.
+            const cross = r.tier === 'cross-check';
+            const word = r.pass ? 'PASS' : (cross ? 'DISAGREE' : 'FAIL');
+            const paint = r.pass ? GREEN : (cross ? YELLOW : RED);
+            // Pad the PLAIN word, then colour — ANSI codes make padEnd() count wrong.
+            console.log(`${paint(word.padEnd(8))}  ${r.sceneId.padEnd(wScene)}  ${r.label.padEnd(wLabel)}  ${DIM(r.detail)}`);
         }
-        const failed = results.filter(r => !r.pass).length;
-        console.log(`\n${results.length} checks, ${results.length - failed} passed, ${failed} failed`);
-        process.exitCode = failed;
+        const exact = results.filter(r => r.tier !== 'cross-check');
+        const crossRows = results.filter(r => r.tier === 'cross-check');
+        const failed = exact.filter(r => !r.pass).length;
+        const disagreed = crossRows.filter(r => !r.pass).length;
+        console.log(`\n${exact.length} exact checks, ${exact.length - failed} passed, ${failed} failed`
+            + (crossRows.length
+                ? `; ${crossRows.length} cross-check(s), ${crossRows.length - disagreed} agree, ${disagreed} disagree`
+                : ''));
+        process.exitCode = failed + disagreed;
     } finally {
         await browser.close();
         cleanup();

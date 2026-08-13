@@ -28,6 +28,10 @@ import { sdfShapesScene, sdfShapesStrategy, sdfShapesPtStrategy } from './sdfSha
 import { fractalsScene, fractalsStrategy } from './fractalsScene.js';
 import { customFieldsScene, customFieldsStrategy } from './customFieldsScene.js';
 import { glassLabScene, glassLabStrategies } from './glassLabScene.js';
+import { sssLabScene, sssStrategy, sssShortStrategy, sssNoScatterStrategy, sssPtStrategy } from './sssLabScene.js';
+import { porcelainScene, porcelainStrategy, porcelainNoScatterStrategy, porcelainPtStrategy } from './porcelainScene.js';
+import { bottleArrayScene, bottleArrayStrategy, bottleArrayNoScatterStrategy, bottleArrayDeepStrategy, bottleArrayUnrolledStrategy } from './bottleArrayScene.js';
+import { originalPresetsScene, originalPresetsStrategy, originalPresetsDeepStrategy, originalPresetsNoScatterStrategy } from './originalPresetsScene.js';
 import { gyroidFieldScene, gyroidFieldStrategy } from './gyroidFieldScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
@@ -387,6 +391,97 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             'the heterogeneous-media PLAYGROUND (fable-heterogeneous-media.md): ambient ground fog as a FORMULA of p with two declared sliders (fog.gain, fog.falloff) on the delta-tracking arms — edit the source string in demos/mediaScenes.ts and reload; the majorant ceiling (D1) saturates any spike instead of misrendering',
         expected:
             'fog hugs the floor and thins with height (drag fog.falloff); light shafts from the point light; drag fog.gain — density moves live with zero recompiles; patchy swirl from the sin-product term',
+    },
+    'sss-presets': {
+        scene: originalPresetsScene,
+        strategies: posed([-1.5, 5.4, 15.5], [1.5, 1.2, 0.0], originalPresetsStrategy, originalPresetsDeepStrategy, originalPresetsNoScatterStrategy),
+        exercises:
+            'DEMO — the subsurface presets from the ORIGINAL PathTracer (~/Code/PathTracer), ported number-for-number and '
+            + 'ADDITIVE (no model, component or other scene touched). Its model transcribed: sigma_s = 1/mfp, '
+            + 'sigma_a = -ln(tint)/depth (its absorbFor), phase = lerp-toward-random by blur^2. Five presets dense to '
+            + 'dilute — porcelain 0.02 / milk 0.03 / marble 0.06 / jade 0.10 / wax 0.12 — at the original\'s own ball radius '
+            + '1.3, so its free-path RATIOS (130 down to 22 across a ball) are preserved. Plus its nested core-in-shell pair, '
+            + 'which needed a hand-declared `nestedIn` there and resolves from geometry here (innermost-wins scene_region_at). '
+            + 'ONE declared approximation: the original\'s phase function is not HG, so this matches its MEAN COSINE '
+            + '(blur 1 -> g 0 is EXACT, so 3 of 5 presets are exact; jade and wax are approximated). Key 2 = the original\'s '
+            + 'own 1000-step budget, key 3 = scattering ignored.',
+        expected:
+            'five balls from dense barely-translucent porcelain through milk, marble, deep green jade and warm waxy orange, '
+            + 'plus a green scattering core suspended in a clear glass shell. SLOW AND NOISY BY CONSTRUCTION, and that is the '
+            + 'finding rather than a defect: porcelain sits at alpha ~ 0.997 (~400 collisions before absorption) and milk\'s '
+            + 'BLUE CHANNEL HAS sigma_a = 0 EXACTLY, so blue never absorbs and only the bounce budget can end it. Key 2 is the '
+            + 'measurement that matters — if porcelain and milk BRIGHTEN at maxBounces 1024, then key 1\'s 256 truncates this '
+            + 'look and the termination work is required, not optional. jade and wax are absorbing enough to converge quickly. '
+            + 'Key 3 collapses all five to tinted glass.',
+    },
+    'porcelain-array': {
+        scene: bottleArrayScene,
+        strategies: posed([0.15, 2.85, 4.55], [0, 0.52, -0.25], bottleArrayStrategy, bottleArrayNoScatterStrategy, bottleArrayDeepStrategy, bottleArrayUnrolledStrategy),
+        exercises:
+            'DEMO — the translucency WEDGE: 12 copies of the bottle shell, each its own lantern, over a 4x3 grid of '
+            + 'MEAN FREE PATH (columns, doubling the wall\'s optical thickness: 0.625/1.25/2.5/5.0 free paths across 0.05 of wall) '
+            + 'x SCATTERING DIRECTION (rows, HG g = +0.8 / 0 / -0.6). Every cell is authored for the SAME TARGET COLOUR '
+            + 'through subsurfaceMedium, and that inversion RAISES alpha as g turns forward, so the rows carry different '
+            + 'coefficients (alpha 0.9979 / 0.9987 / 0.9997) chosen to LOOK ALIKE. That makes the grid a test of the inversion '
+            + 'itself: it is derived for a SEMI-INFINITE slab, and these walls are 0.6 to 5 free paths thick, so the right-hand '
+            + 'columns should show the three rows nearly identical (the inversion working) while the left-hand columns should show '
+            + 'them genuinely DIFFER (too few events for the asymptotic argument, so the phase function is still visible as itself). '
+            + 'The boundary between agreeing and disagreeing rows is the answer it reports. Key 3 is the instrument\'s own validity check (twice the path budget — nothing should change, because a '
+            + 'truncated cell converges darker and would corrupt the row comparison); key 4 is the LEAF_SDF cost A/B '
+            + '(objectDispatch unrolled, pixel-identical) on 12 marched shells.',
+        expected:
+            'a grid of glowing vessels going from nearly-clear glass at the left to dense ceramic at the right. Read it by ROW '
+            + 'rather than by cell: the three rows should converge toward each other as you move right, and separate as you move '
+            + 'left. If they agree everywhere the inversion is holding further from the semi-infinite limit than expected; if they '
+            + 'disagree everywhere, something is wrong with it. Key 2 collapses all twelve to the same clear glass with the bulbs '
+            + 'snapping into view in rows — every difference in the grid was the random walk, none of it the surface. Keys 3 and 4 '
+            + 'are both the same image as key 1 — key 3 proves the sweep is not truncated, key 4 only changes ms/frame. Expect '
+            + 'firefly noise while it converges, worst on the forward (front) row, whose alpha is highest. NOT YET RENDERED at '
+            + 'these values.',
+    },
+    porcelain: {
+        scene: porcelainScene,
+        strategies: posed([1.75, 1.15, 3.0], [-0.12, 0.46, 0], porcelainStrategy, porcelainNoScatterStrategy, porcelainPtStrategy),
+        exercises:
+            'DEMO — the SSS hero shot, and the point a row of spheres cannot make: translucency is about THICKNESS. '
+            + 'The bottle SDF filled with porcelain instead of glass (a hollow shell, ~3.5 mean free paths across the wall) '
+            + 'with a warm SPHERE LIGHT inside its cavity — nothing on the vessel emits, every photon on its walls '
+            + 'random-walked through the porcelain from the bulb. The solid ball beside it is the SAME material at '
+            + '~35 mean free paths instead of ~3.4 and is flatly opaque — the comparison is in the image, not a keypress. '
+            + 'Key 2 = scattering ignored, key 3 = pt (which locates where NEE actually enters: dead inside the wall, '
+            + 'live at its inner exit — the rough glaze is load-bearing).',
+        expected:
+            'a glowing porcelain bottle on dark slate: warm light carried THROUGH the wall, strongest across the body '
+            + 'where the bulb sits and cooling as it climbs the neck, and the bulb NOT visible as a shape — only as '
+            + 'diffused light in the porcelain. Beside it the same porcelain as a solid ball reads as plain opaque white '
+            + 'ceramic (if it ever looks translucent, something is wrong), and the celadon ring picks up a deep green glow. '
+            + 'Key 2 collapses the porcelain to clear glass: the bulb snaps into view as a hard bright blob through a '
+            + 'refracting shell and the glow vanishes — that difference IS the random walk. Key 3 is far noisier. '
+            + 'Expect firefly noise while it converges; a few-free-path wall at α ≈ 0.996 is tens of events deep per path.',
+    },
+    'sss-lab': {
+        scene: sssLabScene,
+        strategies: posed([0, 1.05, 3.9], [0, 0.36, 0], sssStrategy, sssShortStrategy, sssNoScatterStrategy, sssPtStrategy),
+        exercises:
+            'DEMO — brute-force random-walk SUBSURFACE SCATTERING with no subsurface model: a refractive boundary '
+            + '(rough_dielectric) + a scattering medium in ONE material, per fable-volumetric-component §1 ("murky water '
+            + 'with brutal coefficients"). Five identical spheres differing ONLY in their medium, authored through the '
+            + 'production albedo inversion (Chiang 2016 α(A) + Christensen-Burley σ_t = 1/(d·s(A)), both CPU-side at '
+            + 'definition time) — including CHROMATIC mean free paths on `skin`. Front row: the SMOOTH-shell twin of the '
+            + 'porcelain (delta exit ⇒ NEE can never fire at it — the shadows: opaque-dielectrics consequence) and an opaque '
+            + 'lambert control. Live `sss.roughness` dial on the row. Key 2 = maxBounces 8 (the walk truncated), '
+            + 'key 3 = scattering ignored, key 4 = pt (no NEE at all).',
+        expected:
+            'a row of beads lit from INSIDE rather than on the surface: green jade, warm skin, waxy alabaster, glowing '
+            + 'porcelain, dense white milk — with pools of TRANSMITTED colour on the floor beneath each one (magenta under '
+            + 'the jade: its red channel is optically thinner, so what punches through is not the body colour). The opaque '
+            + 'lambert control reads flat and chalky beside them; that gap IS the subsurface transport. Key 2 goes duller '
+            + 'and more mottled and its specular highlights dominate — the deep multiple scattering is simply missing; it is '
+            + 'a truncation, so time never closes the gap. Key 3 collapses the whole row to frosted tinted GLASS (and runs '
+            + '~2× faster) — the difference between keys 1 and 3 is the entire effect. Key 4 is dramatically noisier '
+            + '(floor fireflies everywhere): with no NEE, every bead is in the regime the front-left smooth sphere is stuck '
+            + 'in permanently. Expect visible firefly noise even on key 1 — high-albedo walks under a throughput-capped RR '
+            + 'are genuinely noisy, which is the honest cost of brute force here.',
     },
     marble: {
         scene: marbleScene,

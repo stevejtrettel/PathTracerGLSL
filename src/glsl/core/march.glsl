@@ -5,7 +5,7 @@
 // the compiler never overrides them; MAX_MARCH_STEPS is the DEFAULT step budget a
 // descriptor `stepBudget` overrides per shape.
 //
-// Lives in core/ beside EPSILON/EPS_INTERFACE because it is the same family of fact:
+// Lives in core/ beside EPS_INTERFACE/MARCH_CLEARANCE because it is the same family of fact:
 // EPS_INTERFACE's "10× MARCH_EPSILON" comment in math.glsl has always referred to this
 // number, and the two must be read together.
 

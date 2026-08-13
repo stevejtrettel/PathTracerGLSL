@@ -27,8 +27,7 @@
 // Depends on: ior_at (generated — n(x)), scene_medium_properties (generated — σ_a/σ_s/ε fields),
 // medium_emission (generated — the zero-folding ε accessor), ambient_geodesic (core),
 // scene_region_at (generated — exit test), MediumSample (structs_media), spectrum_exp (core
-// math), EPSILON (core math — the exit pull-back is keyed to the primitives' t > EPSILON
-// floor). The step is ADAPTIVE
+// math). The step is ADAPTIVE
 // (the DS_MAX/DTOL limiters below — strong fields, e.g. black holes) with GRIN_STEP as its smooth-
 // field ceiling; analytic ∇n (autodiff the ior formula) is the remaining declared polish.
 
@@ -39,10 +38,25 @@
 #define GRIN_STEP 0.02          // Verlet parameter step ceiling (coordinate length ≈ n·h)
 #endif
 #ifndef GRIN_GRAD_EPS
-#define GRIN_GRAD_EPS 0.001     // central-difference epsilon for ∇n
+#define GRIN_GRAD_EPS 0.001     // central-difference epsilon for ∇n — STANDALONE FALLBACK ONLY:
+                                // compiled programs receive the compiler-owned header define
+                                // (intersection.ts GRIN_GRAD_EPS — it also floors analytic spawn
+                                // offsets there); this default must match it (epsilonCoupling.test)
 #endif
 #ifndef GRIN_BISECT_ITERS
 #define GRIN_BISECT_ITERS 8     // exit refinement: crossing bracketed to n·h/2^8 before the pull-back
+#endif
+// GRIN_EXIT_PULLBACK — how far INSIDE the wall the handoff point lands. Keyed to the
+// WALKER'S OWN residuals, never to fp (impl-plan-epsilon-discipline; the Aug 12 audit
+// killed an fp-relative re-key): the bisection above brackets the crossing only to
+// ds/2^GRIN_BISECT_ITERS ≤ GRIN_DS_MAX·(1+GRIN_DTOL/2)/256 ≈ 2.0e-4, and a MARCHED wall
+// additionally has its acceptance band (march_epsilon ≤ 5e-4) — the handoff must land
+// strictly inside `med`, because the walk neither flips current_medium nor re-spawns
+// there (pt.ts): an outside landing makes the next call rewind and burn bounces. Must
+// also stay BELOW the t_max micro-segment guard (min(n0·GRIN_STEP, GRIN_DS_MAX)) or the
+// handoff never terminates. Coupling pinned by tests/components/epsilonCoupling.test.ts.
+#ifndef GRIN_EXIT_PULLBACK
+#define GRIN_EXIT_PULLBACK 0.002
 #endif
 // Strong-field limiters + capture (transcribed from the reference odeMarch — PathTracer
 // docs/curved-light-blackhole.md; pulled by the Majumdar–Papapetrou demo). With |T| = n a FIXED
@@ -110,7 +124,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
     // THE t_max GUARD: the straight-line boundary (scene_intersect's hit.t) is within one step
     // — fly straight instead of relaunching the walker on a sub-resolution segment (this is
     // what terminates the near-wall handoff: the previous deflected return parked the ray
-    // ~2·EPSILON inside the wall). Deflection below one step is below the integrator's
+    // GRIN_EXIT_PULLBACK inside the wall). Deflection below one step is below the integrator's
     // resolution anyway — declared, consistent truncation. Transmitted outcome: the walk falls
     // through to the surface hit and the wall material fires there. Emission over the
     // micro-segment rides the E1.5 closed form (n change is sub-resolution — factor 1).
@@ -162,10 +176,11 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
 
         // Exit: the drift crossed out of the region (geometry-free interior ⇒ leaving `med` is
         // the only boundary). Bisect the drift segment for the crossing, then PULL BACK
-        // 2·EPSILON along the drift so the returned point sits INSIDE the wall with the exit
-        // hit at t ≈ 2·EPSILON — robustly above the primitives' t > EPSILON floor in ALL
-        // geometries including grazing (the pull-back is along the RAY, so the wall-hit
-        // distance is angle-independent to first order). The exit direction is the drift
+        // GRIN_EXIT_PULLBACK along the drift so the returned point sits strictly INSIDE the
+        // wall (above the bisection residual AND a marched wall's acceptance band — see the
+        // define) with the exit hit at t ≈ GRIN_EXIT_PULLBACK in ALL geometries including
+        // grazing (the pull-back is along the RAY, so the wall-hit distance is
+        // angle-independent to first order). The exit direction is the drift
         // tangent T_half — deliberately NOT the second half-kick, which would evaluate ∇n
         // outside the region where authored formulas need not be total. Absorption/emission
         // charge only the traveled fraction of the step.
@@ -177,7 +192,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
             }
             float n_exit  = length(T_half);
             float t_cross = hi * h * n_exit;                       // world distance from r to the crossing
-            float t_exit  = t_cross - 2.0 * EPSILON;               // may rewind past r at grazing — by design
+            float t_exit  = t_cross - GRIN_EXIT_PULLBACK;          // may rewind past r at grazing — by design
             MediumProperties me = scene_medium_properties(med, r);
             Spectrum sae = max(me.sigma_a, Spectrum(1e-6));
             Spectrum tre = spectrum_exp(-sae * max(t_exit, 0.0));
@@ -315,12 +330,12 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
         }
 
         // The wall comes first → survive-to-boundary handoff (pull-back as in the
-        // deterministic arm). Transmittance is charged to the HANDOFF point (the 2·EPSILON
+        // deterministic arm). Transmittance is charged to the HANDOFF point (the pulled-back
         // micro-segment is re-charged by the guard next iteration); the pdf is the true
         // probability of the branch taken — P(s* past the wall). The ε-order mismatch is
         // the same declared class as the straight micro-segment truncation.
         if (ds_wall <= ds) {
-            float t_exit = ds_wall - 2.0 * EPSILON;
+            float t_exit = ds_wall - GRIN_EXIT_PULLBACK;
             float er = n_half / n0;
             Spectrum tr  = spectrum_exp(-sigma_t * (s_acc + max(t_exit, 0.0)));
             float    pdf = spectrum_average(spectrum_exp(-sigma_t * (s_acc + ds_wall)));

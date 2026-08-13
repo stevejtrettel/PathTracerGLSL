@@ -49,6 +49,14 @@ import {
     hazeScene, hazeNeeStrategy, hazeEquiangularStrategy, hazePtStrategy,
 } from './scenes/mediaWitness.js';
 import {
+    sssFurnaceScene, sssFurnaceRrOffStrategy, sssFurnaceRrInteriorStrategy,
+} from './scenes/sssFurnaceWitness.js';
+import {
+    slabAlbedoScene, slabAlbedoAnisoScene, slabAlbedoRefScene, slabAlbedoSparseScene,
+    slabRrOffStrategy, slabRrInteriorStrategy, slabObliqueStrategy, slabGrazingStrategy, slabAnisoStrategy,
+    SLAB_TARGET, SLAB_PLANE_ALBEDO, SLAB_PLANE_ALBEDO_ANISO, SLAB_ANISO_REF_TOL, SLAB_VIEWS,
+} from './scenes/slabAlbedoWitness.js';
+import {
     cornellArea, cornellAreaNeeStrategy, cornellAreaMisStrategy, cornellAreaPtStrategy,
     cornellAreaGlass,
     fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy,
@@ -919,6 +927,252 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         witness: {
             spp: 96,
             checks: [{ kind: 'mean', value: 0.4, tol: 0.006, label: 'F-BOX-M 0.4/channel' }],
+        },
+    },
+    'slab-albedo': {
+        scene: slabAlbedoScene,
+        strategies: [
+            // FOUR ARMS = three exit angles plus the roulette twin at normal. The pose travels
+            // WITH the strategy, so each angle needs its own posed() call — sharing one would
+            // silently measure the same direction three times.
+            ...posed(SLAB_VIEWS.normal.position, [0, 0, 0], slabRrOffStrategy, slabRrInteriorStrategy),
+            withPose(slabObliqueStrategy, SLAB_VIEWS.oblique.position, [0, 0, 0]),
+            withPose(slabGrazingStrategy, SLAB_VIEWS.grazing.position, [0, 0, 0]),
+        ],
+        exercises:
+            'F-SLAB-A — does our transport reproduce the EXACT albedo of a semi-infinite scattering halfspace? An '
+            + '80-free-path slab of a medium built by subsurfaceMedium, under a uniform environment of radiance 1, viewed '
+            + 'through an ORTHOGRAPHIC camera so every ray shares one exit cosine. For isotropic scattering the halfspace '
+            + 'has a classical closed-form solution (Chandrasekhar: A_p(mu) = 1 - sqrt(1-omega)*H(mu)), evaluated to ~1e-14 '
+            + 'by tests/helpers/halfspace.ts — so this is an EXACT gate, not a comparison against a ~1%-accurate fit. '
+            + 'Chromatic target [0.3, 0.5, 0.7] = three independent points on the curve per frame; three viewing angles = '
+            + 'the only gate in the suite on the ANGULAR structure of a medium exit distribution (the reading rises 50% '
+            + 'from normal to mu = 0.3 in red). NULL interface on purpose (no Fresnel mixing in — that is sss-furnace\'s '
+            + 'job) and SCALAR radius on purpose (equal sigma_t keeps every per-event weight at exactly alpha_c < 1). '
+            + 'KEY 2 IS THE INTERIOR-TERMINATION GATE: this scene has NO surface events at all, so every difference '
+            + 'between keys 1 and 2 is roulette_interior and nothing else. NOTE this witness was rebuilt Aug 2026 — it '
+            + 'used to assert the AUTHORED COLOUR, which is a hemispherical albedo and cannot be read by a camera; that '
+            + 'claim now lives in tests/authoring/subsurface.test.ts.',
+        expected:
+            'per-channel mean = the exact plane albedo at each arm\'s exit cosine: [0.2488, 0.4375, 0.6466] at mu = 1 '
+            + '(keys 1-2), [0.3066, 0.5088, 0.7086] at mu = 0.6, [0.3741, 0.5824, 0.7654] at mu = 0.3. Plus keys 1 and 2 '
+            + 'must agree as estimators of the same integrand. HISTORY (Aug 12 2026): this witness was KNOWINGLY RED for '
+            + 'one sweep — low by 2.7/1.9/1.1% at mu = 1 from a REAL RENDERER BIAS at the world-space epsilon scale: J1, '
+            + 'ray_spawn\'s fixed 1e-3 normal offset (0.02 optical depths skipped on entry at sigma_t = 20), and J2, the '
+            + 'primitives\' t > EPSILON floor refusing shallow exit roots (the walk then continued in a fictitious '
+            + 'unbounded medium). Measured at roughly half each, INTERACTING (J1 masks J2), by a renderer-twin CPU walk '
+            + 'reproducing all nine numbers to ~1 sigma; fixed by the provenance-epsilon batch '
+            + '(docs/impl-plan-epsilon-discipline.md: Hit.eps + fp-relative analytic offsets + t > 0 floors), and the '
+            + 'post-fix sweep read the EXACT values. The tolerances were never loosened along the way — that discipline '
+            + 'is what kept the bias visible until it was fixed. Failure reading: all channels low at all angles ⇒ truncation (raise maxBounces) '
+            + 'or a per-collision energy loss; one channel off ⇒ a per-channel weight bug; key 2 off while key 1 holds ⇒ '
+            + 'the interior termination rule; mu = 1 fine but grazing off ⇒ the angular structure of the exit distribution, '
+            + 'which nothing else in the suite can see.',
+        witness: {
+            spp: 128,
+            checks: [
+                {
+                    kind: 'mean', value: SLAB_PLANE_ALBEDO.normal, tol: 0.006, strategy: 0,
+                    source: { tier: 'exact', from: 'A_p(1) = 1 - sqrt(1-w)H(1), Chandrasekhar via halfspace.ts' },
+                    label: 'F-SLAB-A exact plane albedo, mu = 1, roulette off',
+                },
+                {
+                    kind: 'mean', value: SLAB_PLANE_ALBEDO.normal, tol: 0.006, strategy: 1,
+                    source: { tier: 'exact', from: 'A_p(1) = 1 - sqrt(1-w)H(1), Chandrasekhar via halfspace.ts' },
+                    label: 'F-SLAB-A exact plane albedo, mu = 1, INTERIOR ROULETTE',
+                },
+                {
+                    kind: 'mean', value: SLAB_PLANE_ALBEDO.oblique, tol: 0.006, strategy: 2,
+                    source: { tier: 'exact', from: 'A_p(0.6) via halfspace.ts' },
+                    label: 'F-SLAB-A exact plane albedo, mu = 0.6 (the angular arm)',
+                },
+                {
+                    kind: 'mean', value: SLAB_PLANE_ALBEDO.grazing, tol: 0.006, strategy: 3,
+                    source: { tier: 'exact', from: 'A_p(0.3) via halfspace.ts' },
+                    label: 'F-SLAB-A exact plane albedo, mu = 0.3 (the angular arm)',
+                },
+                {
+                    // THE sharp form of the step-2 gate: two estimators of one integrand. chi-squared
+                    // is parameter-free, which is what a gate with no prior GPU run needs — both arms
+                    // sample the same events (one just stops early), so their measured variances
+                    // normalize the comparison without any hand-calibrated threshold.
+                    kind: 'equality', strategies: [0, 1], meanTol: 0.02,
+                    label: 'interior roulette is unbiased — the 1/p compensation, sharply',
+                },
+                {
+                    kind: 'noise', strategies: [1, 0],
+                    label: 'interior roulette vs none — pure here (this scene has no surface events)',
+                },
+            ],
+        },
+    },
+    'slab-albedo-sparse': {
+        scene: slabAlbedoSparseScene,
+        strategies: [
+            ...posed(SLAB_VIEWS.normal.position, [0, 0, 0], slabRrOffStrategy),
+            withPose(slabGrazingStrategy, SLAB_VIEWS.grazing.position, [0, 0, 0]),
+        ],
+        exercises:
+            'F-SLAB-A/sigma — THE SCALE-INVARIANCE ARM, and a measuring instrument as much as a gate. A_p(mu) depends on '
+            + 'alpha and mu and NOTHING ELSE: it is scale-invariant in sigma_t, because the only length in the problem is '
+            + 'the mean free path and the answer is dimensionless. So this scene is slab-albedo\'s medium at sigma_t = 2 '
+            + 'instead of 20 (and ten times BIGGER IN EVERY DIMENSION, so it is the same 80 free paths deep and the same '
+            + '~120 free paths of lateral margin) and MUST read the identical numbers. It exists because the first sweep '
+            + 'found slab-albedo low by 2.7/1.9/1.1%, traced to the two world-space epsilon mechanisms (J1 ray_spawn '
+            + 'normal offset + J2 the t > EPSILON acceptance floor, measured at roughly half each — see the slab-albedo '
+            + 'card and docs/fable-epsilon-discipline.md). Here the same 0.001 is worth 0.002 optical depths, so the '
+            + 'artifact must shrink tenfold. THE PAIR IS THE MEASUREMENT: the difference between the two scenes\' deficits '
+            + 'is the interface-epsilon bias as a function of density, and it stays that after anyone changes the epsilon. '
+            + 'RAN Aug 12 2026 and CONFIRMED the mechanism (R/G tenfold smaller on cue); the same sweep caught this '
+            + 'fixture\'s own first-version bug — depth scaled x10 but width kept at 12, so blue\'s long walks (~42 '
+            + 'scatters) leaked out the SIDES and read +0.019 HIGH. Widths scale with 1/sigma_t too now, and '
+            + 'slabAlbedo.test.ts pins the lateral margin in free paths.',
+        expected:
+            'per-channel mean = the SAME [0.2488, 0.4375, 0.6466] at mu = 1 and [0.3741, 0.5824, 0.7654] at mu = 0.3 as '
+            + 'slab-albedo — an albedo that depends on the density it was authored with is wrong, and nothing else in the '
+            + 'suite would notice. Predicted residual ~0.0007, an order below tolerance (measured Aug 12: R/G within '
+            + '0.001 at both angles). If this arm reads LOW BY THE SAME '
+            + 'AMOUNT as slab-albedo, the interface-epsilon diagnosis is wrong and the deficit is a genuine transport error.',
+        witness: {
+            spp: 128,
+            checks: [
+                {
+                    kind: 'mean', value: SLAB_PLANE_ALBEDO.normal, tol: 0.003,
+                    source: { tier: 'exact', from: 'A_p(1) via halfspace.ts — scale-invariant, so identical to slab-albedo' },
+                    label: 'F-SLAB-A/sigma same albedo at 1/10 the density, mu = 1',
+                },
+                {
+                    kind: 'mean', value: SLAB_PLANE_ALBEDO.grazing, tol: 0.003, strategy: 1,
+                    source: { tier: 'exact', from: 'A_p(0.3) via halfspace.ts — scale-invariant' },
+                    label: 'F-SLAB-A/sigma same albedo at 1/10 the density, mu = 0.3',
+                },
+            ],
+        },
+    },
+    'slab-albedo-ref': {
+        scene: slabAlbedoRefScene,
+        strategies: [
+            ...posed(SLAB_VIEWS.normal.position, [0, 0, 0], slabRrOffStrategy, slabRrInteriorStrategy),
+            withPose(slabObliqueStrategy, SLAB_VIEWS.oblique.position, [0, 0, 0]),
+            withPose(slabGrazingStrategy, SLAB_VIEWS.grazing.position, [0, 0, 0]),
+        ],
+        exercises:
+            'THE CONTROL for slab-albedo: identical geometry, cameras and environment, but an ordinary LAMBERTIAN surface '
+            + 'whose albedo IS the target colour. A Lambertian surface under uniform radiance 1 returns exactly its albedo '
+            + 'in every direction, with no approximation — so this scene has a known answer that touches no medium code at '
+            + 'all, and it is ALSO the control for the angular arms: it must read the SAME number at every viewing angle '
+            + 'where the medium must not. It splits any slab-albedo failure in one step: if this reads the target, the '
+            + 'instrument (camera, environment, region, accumulation) is sound and the medium scene\'s deviation is real '
+            + 'transport error.',
+        expected:
+            'per-channel mean = [0.3, 0.5, 0.7] EXACTLY on all four arms, to noise, INCLUDING both grazing arms — view '
+            + 'independence is the whole point of the control. Any deviation invalidates slab-albedo entirely, since the '
+            + 'two scenes differ only in the material.',
+        witness: {
+            spp: 128,
+            checks: [
+                {
+                    kind: 'mean', value: SLAB_TARGET, tol: 0.004, strategy: 0,
+                    source: { tier: 'exact', from: 'a Lambertian surface returns its albedo, exactly, in every direction' },
+                    label: 'CONTROL: lambert albedo reads exactly, mu = 1',
+                },
+                {
+                    kind: 'mean', value: SLAB_TARGET, tol: 0.004, strategy: 1,
+                    source: { tier: 'exact', from: 'a Lambertian surface returns its albedo, exactly, in every direction' },
+                    label: 'CONTROL: lambert albedo reads exactly, roulette on',
+                },
+                {
+                    kind: 'mean', value: SLAB_TARGET, tol: 0.004, strategy: 2,
+                    source: { tier: 'exact', from: 'Lambertian reflectance is view-INDEPENDENT' },
+                    label: 'CONTROL: lambert is view-independent, mu = 0.6',
+                },
+                {
+                    kind: 'mean', value: SLAB_TARGET, tol: 0.004, strategy: 3,
+                    source: { tier: 'exact', from: 'Lambertian reflectance is view-INDEPENDENT' },
+                    label: 'CONTROL: lambert is view-independent, mu = 0.3',
+                },
+            ],
+        },
+    },
+    'slab-albedo-aniso': {
+        scene: slabAlbedoAnisoScene,
+        strategies: posed(SLAB_VIEWS.normal.position, [0, 0, 0], slabAnisoStrategy),
+        exercises:
+            'F-SLAB-A/g — the HENYEY-GREENSTEIN PHASE FUNCTION under real multiple scattering, at g = 0.6 and alpha up to '
+            + '0.990 (~103 collisions per path, hence the 1024-bounce budget). Anisotropic scattering has NO closed-form '
+            + 'halfspace solution, so the expected value comes from an independent CPU random walk (tests/helpers/'
+            + 'halfspace.ts, 2M samples) that shares no code with the GLSL — a CROSS-CHECK, reported as such. NOTE what '
+            + 'this does NOT gate: the inversion\'s g term (that turning anisotropy holds the colour fixed) is a statement '
+            + 'about the HEMISPHERICAL albedo and is false of a directional reading — this slab reads 0.2176 head-on where '
+            + 'its isotropic twin reads 0.2488, which is real physics, not an error. That claim is gated on the CPU in '
+            + 'tests/authoring/subsurface.test.ts.',
+        expected:
+            'per-channel mean = [0.2176, 0.4155, 0.6367], the independent walk\'s answer +/- its own 0.0011. A DISAGREE '
+            + 'here implicates both implementations, not just the renderer — check the walk against its own gates in '
+            + 'halfspace.test.ts before suspecting the GLSL.',
+        witness: {
+            spp: 128,
+            checks: [
+                {
+                    kind: 'mean', value: SLAB_PLANE_ALBEDO_ANISO, tol: 0.006,
+                    source: {
+                        tier: 'cross-check',
+                        from: 'independent CPU HG random walk, 2M samples (halfspace.ts)',
+                        refTol: SLAB_ANISO_REF_TOL,
+                    },
+                    label: 'F-SLAB-A/g HG transport vs an independent walk',
+                },
+            ],
+        },
+    },
+    'sss-furnace': {
+        scene: sssFurnaceScene,
+        strategies: posed([0, 0, 0.9], [0, 0, 0], sssFurnaceRrOffStrategy, sssFurnaceRrInteriorStrategy),
+        exercises:
+            'F-SSS — the SUBSURFACE furnace (docs/fable-subsurface.md §9): a LOSSLESS translucent sphere '
+            + '(smooth dielectric boundary, sigma_a = 0, mildly chromatic sigma_s = 4/5/6, HG g = 0.4) inside the 0.4 furnace. '
+            + 'Scattering conserves energy and Fresnel conserves energy, so the object cannot change the equilibrium and '
+            + 'must be INVISIBLE — the exact statement, not a comparison. Tests Fresnel energy conservation incl. TIR, the '
+            + 'eta^2 radiance compression on BOTH sides of the boundary, and the chromatic channel-MIS medium weights. '
+            + 'TWO ARMS: key 1 runs roulette OFF (the usual witness protocol), key 2 runs it ON, and each must hit 0.4 '
+            + 'independently — enabling roulette must not disturb the equilibrium. NOTE the arms do NOT gate the interior '
+            + 'termination rule, which was this fixture\'s original claim and is provably false: with sigma_a = 0 the event '
+            + 'weight is W_c/mean(W), and max >= mean always, so the survival probability clamps to exactly 1 and the rule is '
+            + 'a no-op for ANY lossless medium. Exercising it needs absorption, which the furnace construction cannot have — '
+            + 'that gate is the slab-albedo test (fable-subsurface §8 Step 3).',
+        expected:
+            'per-channel mean = EXACTLY 0.4 on BOTH arms, frame-wide AND over the sphere alone (the region check — a frame '
+            + 'average can hide a visible object by compensating against the walls). Failure reading: both arms low together '
+            + '⇒ bounce starvation, since sigma_a = 0 means a path leaves only by escaping the geometry and TIR can hold it '
+            + 'a long time (raise maxBounces before suspecting physics, as grin-furnace-hard documents); channels splitting '
+            + '⇒ chromatic weight bug in the medium arm; key 2 off while key 1 holds ⇒ the interior termination rule, most '
+            + 'likely the surface roulette, since the interior rule is inert here. The reported sigma/mu comparing the arms '
+            + 'is SURFACE roulette on the walls, not this work — do not read it as a verdict on interior termination. '
+            + 'Deliberately no equality check between the arms: two independent absolute gates say more, and the arms have '
+            + 'different path-length distributions so a chi-squared structure gate would not be justified. VERIFIED Aug 12: '
+            + 'both arms 0.4 frame-wide to within 0.0008 after the sigma spread was narrowed to 4/5/6 (see the fixture header '
+            + 'for what the wider spread taught us about the chromatic sampler).',
+        witness: {
+            spp: 128,
+            checks: [
+                { kind: 'mean', value: 0.4, tol: 0.006, strategy: 0, label: 'F-SSS 0.4/channel, roulette off' },
+                { kind: 'mean', value: 0.4, tol: 0.006, strategy: 1, label: 'F-SSS 0.4/channel, interior roulette' },
+                {
+                    kind: 'mean', value: 0.4, tol: 0.008, strategy: 0,
+                    region: { x: 0.4, y: 0.4, w: 0.2, h: 0.2 },
+                    label: 'F-SSS sphere is invisible, roulette off',
+                },
+                {
+                    kind: 'mean', value: 0.4, tol: 0.008, strategy: 1,
+                    region: { x: 0.4, y: 0.4, w: 0.2, h: 0.2 },
+                    label: 'F-SSS sphere is invisible, interior roulette',
+                },
+                {
+                    kind: 'noise', strategies: [1, 0],
+                    region: { x: 0.4, y: 0.4, w: 0.2, h: 0.2 },
+                    label: 'interior roulette vs none, report-only (lossless: the rule barely fires)',
+                },
+            ],
         },
     },
     haze: {

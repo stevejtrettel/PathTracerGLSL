@@ -1,7 +1,7 @@
 // compiler/plan/Planner.ts
 
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
-import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject } from '../types.js';
+import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY, modelTwoSidedShading } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
@@ -546,6 +546,18 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     const heterogeneousArms = materials.some((m) =>
         m.medium !== null && mediumRoutesToTracking(
             m.medium, scattering === 'full' && mediumMayScatter(m.medium)));
+    // The interior termination rule's precondition (docs/fable-subsurface.md §6): some
+    // scattering medium settles absorption by WEIGHT rather than by the tracking lottery, so a
+    // per-collision survival probability is genuinely owed. Same `scatters` resolution as the
+    // routing above and as generateMediumSample's — one predicate, three readers.
+    //
+    // ROULETTE IS PART OF THE DECISION, not a separate gate downstream. The rule is the accessor's
+    // ONLY consumer, so without roulette the accessor would link with nothing calling it — the
+    // seam-unused case §2.12 exists to forbid. One decision, both emissions.
+    const weightedAbsorptionArms = strategy.estimator.russianRoulette != null
+        && materials.some((m) =>
+            m.medium !== null && mediumWeightsAbsorption(
+                m.medium, scatteringArms && mediumMayScatter(m.medium)));
 
     // §6.2: samplable-emitter machinery exists iff some light entered the registry with a
     // region (delta-only scenes compile to the pre-area-light program) — or batch
@@ -654,6 +666,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             present: features.media.hasMedia,
             scatteringArms,
             heterogeneousArms,
+            weightedAbsorptionArms,
             // Emissive media (impl-plan-medium-emission): the MediumProperties ε field,
             // the arms' collection lines, and the walk's radiance line exist. NOT gated
             // on scattering — emission is a source term, not scattering (the 'ignored'

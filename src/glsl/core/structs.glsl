@@ -44,6 +44,13 @@ struct Hit {
                         // per-triangle index (multi-material meshes), Stage B object refs.
                         // Reader: scene_material_properties' attribute rows. Every arm that
                         // fills a Hit fills this too (the fill-the-whole-Hit protocol).
+    float eps;          // positional uncertainty of p, world units (owner-approved contract
+                        // edit, impl-plan-epsilon-discipline): the arm that made the hit
+                        // states how well it knows p — spawn_eps_analytic(p) for analytic
+                        // roots (fp-scale, coordinate-relative), MARCH_CLEARANCE for marched
+                        // commits, MESH_T_MIN for triangle hits (shading-normal compromise).
+                        // ray_spawn's escape offset is the ONE reader. The dispatcher seeds
+                        // the conservative default so a missed arm degrades, never garbage.
 };
 
 // Placeholder planar-uv chart scale — the ONE truth for every Hit.uv writer (the SDF

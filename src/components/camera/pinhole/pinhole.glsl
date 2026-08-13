@@ -14,5 +14,5 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
 
     vec3 dir = normalize(forward + ndc.x * u_tanFov * right + ndc.y * u_tanFov * up);
 
-    return make_ray(u_cameraPosition, dir);   // tmin = EPSILON, tmax = MAX_DIST
+    return make_ray(u_cameraPosition, dir);   // unbounded ahead; the far clip (MAX_DIST) is the query's concern
 }

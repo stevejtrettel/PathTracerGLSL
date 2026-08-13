@@ -9,7 +9,7 @@
 // the similarity-closed primitive PARAMETERS absorb s in-shader (s·center, s·radius,
 // s·halfSize, s·offset). Consequences, all exact:
 //   - distances and ray-t are WORLD values (no rescaling, no reciprocal anywhere);
-//   - every EPSILON guard inside the primitives stays world-correct under driven scale;
+//   - every proximity guard inside the primitives stays world-correct under driven scale;
 //   - SDF marching sees an exact world-distance field.
 // Directions stay unit through placement_dir, so intersector assumptions hold; normals
 // return via the free forward rotation (quaternion conjugation is a sign flip).

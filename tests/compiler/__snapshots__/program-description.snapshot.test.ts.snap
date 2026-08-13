@@ -84,6 +84,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -178,6 +179,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -269,6 +271,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -374,6 +377,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accretion + pt 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -471,6 +475,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -573,6 +578,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -675,6 +681,7 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin + pat
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -777,6 +784,7 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin-ref +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -879,6 +887,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bazaar + table 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -981,6 +990,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bazaar + unroll
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1077,6 +1087,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-fog + pt-m
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1173,6 +1184,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-fog + pt-n
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1267,6 +1279,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-slab + pt-
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1360,6 +1373,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-wall + pt-
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1465,6 +1479,7 @@ exports[`ProgramDescription structural snapshot (the link map) > blackhole + pt 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1568,6 +1583,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtra
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1671,6 +1687,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtra
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1770,6 +1787,7 @@ exports[`ProgramDescription structural snapshot (the link map) > charts + pt 1`]
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1872,6 +1890,7 @@ exports[`ProgramDescription structural snapshot (the link map) > charts + pt-nee
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -1973,6 +1992,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`]
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2077,6 +2097,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2181,6 +2202,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2272,6 +2294,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtra
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2363,6 +2386,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pat
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2465,6 +2489,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2567,6 +2592,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2663,6 +2689,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2758,6 +2785,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2855,6 +2883,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -2951,6 +2980,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3052,6 +3082,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3155,6 +3186,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3253,6 +3285,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3354,6 +3387,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3455,6 +3489,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3554,6 +3589,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3656,6 +3692,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3758,6 +3795,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3856,6 +3894,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -3957,6 +3996,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4058,6 +4098,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4155,6 +4196,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4252,6 +4294,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4349,6 +4392,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4446,6 +4490,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4543,6 +4588,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4639,6 +4685,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4739,6 +4786,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cube-cloud + pa
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4839,6 +4887,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cube-cloud-ref 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -4943,6 +4992,7 @@ exports[`ProgramDescription structural snapshot (the link map) > custom-fields +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5045,6 +5095,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cylinders + pat
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5146,6 +5197,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5247,6 +5299,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5349,6 +5402,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven + pathtr
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5451,6 +5505,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5553,6 +5608,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5655,6 +5711,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5751,6 +5808,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + mis-bv
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5847,6 +5905,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + nee-bv
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -5940,6 +5999,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + pt 1`]
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6031,6 +6091,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit + pathtrac
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6124,6 +6185,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-driven + p
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6217,6 +6279,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat + path
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6312,6 +6375,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6410,6 +6474,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6501,6 +6566,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pat
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6593,6 +6659,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6685,6 +6752,7 @@ exports[`ProgramDescription structural snapshot (the link map) > expr-const + pt
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6777,6 +6845,7 @@ exports[`ProgramDescription structural snapshot (the link map) > expr-const-ref 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6877,6 +6946,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -6980,6 +7050,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -7083,6 +7154,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -7185,6 +7257,7 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -7285,6 +7358,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -7388,6 +7462,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -7491,6 +7566,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -7591,6 +7667,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -7694,6 +7771,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -7792,6 +7870,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-n
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -7883,6 +7962,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -7985,6 +8065,7 @@ exports[`ProgramDescription structural snapshot (the link map) > forest + linear
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8087,6 +8168,7 @@ exports[`ProgramDescription structural snapshot (the link map) > forest + tlas 1
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8190,6 +8272,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fractals + path
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8281,6 +8364,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8372,6 +8456,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8465,6 +8550,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8567,6 +8653,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8671,6 +8758,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8775,6 +8863,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8874,6 +8963,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -8977,6 +9067,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9080,6 +9171,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9183,6 +9275,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9287,6 +9380,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b4 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9391,6 +9485,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b8 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9495,6 +9590,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b16
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9599,6 +9695,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b32
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9705,6 +9802,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glassball + pt 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9799,6 +9897,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + mi
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9893,6 +9992,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + ne
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -9984,6 +10084,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + pt
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10079,6 +10180,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10177,6 +10279,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10280,6 +10383,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10383,6 +10487,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10488,6 +10593,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin + pt 1`] =
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10596,6 +10702,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin + pt-nee 1
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10693,6 +10800,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-emit + pt 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10790,6 +10898,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-emit-ref +
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10883,6 +10992,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace + 
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -10974,6 +11084,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-em
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11066,6 +11177,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-ha
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11159,6 +11271,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-sc
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11257,6 +11370,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-glass + pt
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11355,6 +11469,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-glass-ref 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11454,6 +11569,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-scatter + 
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11553,6 +11669,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-scatter-re
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11650,6 +11767,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-vacuum + p
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11747,6 +11865,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-vacuum-ref
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11846,6 +11965,7 @@ exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -11949,6 +12069,7 @@ exports[`ProgramDescription structural snapshot (the link map) > gyroid-field + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -12044,6 +12165,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -12142,6 +12264,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -12240,6 +12363,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -12340,6 +12464,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt 1`]
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -12443,6 +12568,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt-nee
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -12538,6 +12664,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -12636,6 +12763,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -12734,6 +12862,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -12829,6 +12958,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -12927,6 +13057,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13025,6 +13156,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -13123,6 +13255,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -13221,6 +13354,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-thet
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13312,6 +13446,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-slab + path
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13406,6 +13541,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13500,6 +13636,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13594,6 +13731,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13688,6 +13826,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13791,6 +13930,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-fog + 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13894,6 +14034,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-fog-re
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -13997,6 +14138,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14100,6 +14242,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14204,6 +14347,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14307,6 +14451,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass-
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14410,6 +14555,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass-
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14513,6 +14659,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass-
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14607,6 +14754,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14701,6 +14849,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14795,6 +14944,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14897,6 +15047,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -14999,6 +15150,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -15101,6 +15253,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -15203,6 +15356,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -15305,6 +15459,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -15407,6 +15562,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin-r
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -15511,6 +15667,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser + pt-mis 
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -15615,6 +15772,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser + pt-nee 
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -15730,6 +15888,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser-soft + pt
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -15845,6 +16004,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser-soft + pt
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -15941,6 +16101,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16037,6 +16198,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16133,6 +16295,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16229,6 +16392,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16325,6 +16489,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-th
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16421,6 +16586,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off + pt-
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16517,6 +16683,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off-baked
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16619,6 +16786,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -16719,6 +16887,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16824,6 +16993,7 @@ exports[`ProgramDescription structural snapshot (the link map) > maxwell + pt 1`
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -16927,6 +17097,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-fog + path
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17030,6 +17201,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-fog-ref + 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17121,6 +17293,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-furnace + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17224,6 +17397,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17327,6 +17501,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box-
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17429,6 +17604,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-r
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17531,6 +17707,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-t
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17624,6 +17801,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17720,6 +17898,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17816,6 +17995,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -17912,6 +18092,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18008,6 +18189,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18101,6 +18283,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18197,6 +18380,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18293,6 +18477,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18395,6 +18580,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-ref +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18497,6 +18683,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18599,6 +18786,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18702,6 +18890,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18805,6 +18994,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged-
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -18907,6 +19097,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pathtr
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19006,6 +19197,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pt 1`]
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19106,6 +19298,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19208,6 +19401,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19310,6 +19504,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`]
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19414,6 +19609,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19517,6 +19713,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
     "present": true,
     "scatteringArms": true,
     "shadowWalker": true,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -19619,6 +19816,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19721,6 +19919,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + brute 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19823,6 +20022,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + bvh 1`
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -19922,6 +20122,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + pt 1`]
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20022,6 +20223,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20125,6 +20327,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20223,6 +20426,7 @@ exports[`ProgramDescription structural snapshot (the link map) > paint + pt 1`] 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20324,6 +20528,7 @@ exports[`ProgramDescription structural snapshot (the link map) > paint + pt-nee 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20426,6 +20631,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud + pa
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20528,6 +20734,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud + pa
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20630,6 +20837,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud-fram
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20723,6 +20931,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-instance-g
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20816,6 +21025,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-instance-g
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -20909,6 +21119,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-instance-g
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21002,6 +21213,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-instance-o
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21102,6 +21314,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-0 + ta
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21202,6 +21415,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-8 + ta
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21302,6 +21516,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-8 + un
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21402,6 +21617,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-32 + t
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21502,6 +21718,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-32 + u
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21602,6 +21819,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-128 + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21702,6 +21920,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-128 + 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21802,6 +22021,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-blob +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -21902,6 +22122,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-blob +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22002,6 +22223,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22102,6 +22324,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22202,6 +22425,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22302,6 +22526,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22402,6 +22627,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22502,11 +22728,754 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
       "exposure": undefined,
       "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > porcelain + lanterns 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.01,
+      0.012,
+      0.018,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 10,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.72,
+      "position": [
+        1.75,
+        1.15,
+        3,
+      ],
+      "target": [
+        -0.12,
+        0.46,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 64,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": true,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > porcelain + lanterns-pt 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.01,
+      0.012,
+      0.018,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 10,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.72,
+      "position": [
+        1.75,
+        1.15,
+        3,
+      ],
+      "target": [
+        -0.12,
+        0.46,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 64,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > porcelain + noscatter 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.01,
+      0.012,
+      0.018,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 10,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.72,
+      "position": [
+        1.75,
+        1.15,
+        3,
+      ],
+      "target": [
+        -0.12,
+        0.46,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 64,
+    "response": "radiance",
+    "scattering": "ignored",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > porcelain-array + noscatter 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.012,
+      0.014,
+      0.02,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 10,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "table",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "data",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.82,
+      "position": [
+        0.15,
+        2.85,
+        4.55,
+      ],
+      "target": [
+        0,
+        0.52,
+        -0.25,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 64,
+    "response": "radiance",
+    "scattering": "ignored",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > porcelain-array + unrolled 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.012,
+      0.014,
+      0.02,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 10,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.82,
+      "position": [
+        0.15,
+        2.85,
+        4.55,
+      ],
+      "target": [
+        0,
+        0.52,
+        -0.25,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 64,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": true,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > porcelain-array + wedge 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.012,
+      0.014,
+      0.02,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 10,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "table",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "data",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.82,
+      "position": [
+        0.15,
+        2.85,
+        4.55,
+      ],
+      "target": [
+        0,
+        0.52,
+        -0.25,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 64,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": true,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > porcelain-array + wedge-128 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.012,
+      0.014,
+      0.02,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 10,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "table",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "data",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.82,
+      "position": [
+        0.15,
+        2.85,
+        4.55,
+      ],
+      "target": [
+        0,
+        0.52,
+        -0.25,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 128,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": true,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
     },
   },
 }
@@ -22607,6 +23576,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22715,6 +23685,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22823,6 +23794,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -22931,6 +23903,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23027,6 +24000,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "present": true,
     "scatteringArms": true,
     "shadowWalker": false,
+    "weightedAbsorptionArms": true,
   },
   "view": {
     "tonemap": {
@@ -23129,6 +24103,7 @@ exports[`ProgramDescription structural snapshot (the link map) > region-overlap 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23231,6 +24206,7 @@ exports[`ProgramDescription structural snapshot (the link map) > region-overlap 
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23334,6 +24310,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23437,6 +24414,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23534,6 +24512,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-furnace +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23632,6 +24611,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-grin + pt
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23730,6 +24710,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-grin-ref 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23830,6 +24811,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -23933,6 +24915,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24036,6 +25019,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24128,6 +25112,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-smooth-li
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24230,6 +25215,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-field + tab
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24330,6 +25316,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-instance-tw
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24430,6 +25417,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-instance-tw
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24532,6 +25520,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-knot + knot
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24636,6 +25625,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-shapes + pa
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24737,6 +25727,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-shapes + pt
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24837,6 +25828,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -24937,6 +25929,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25030,6 +26023,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25126,6 +26120,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
     "present": true,
     "scatteringArms": false,
     "shadowWalker": true,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25228,6 +26223,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25333,6 +26329,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25438,6 +26435,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25543,6 +26541,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25645,6 +26644,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25750,6 +26750,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25855,6 +26856,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -25946,6 +26948,1089 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
     "present": true,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + grazing 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0.9,
+        2.8618,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + oblique 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        1.8,
+        2.4,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + rr-interior 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 2,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        3,
+        0,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + rr-off 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        3,
+        0,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-aniso + rr-off 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        3,
+        0,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 1024,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref + grazing 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0.9,
+        2.8618,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref + oblique 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        1.8,
+        2.4,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref + rr-interior 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 2,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        3,
+        0,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref + rr-off 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        3,
+        0,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-sparse + grazing 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0.9,
+        2.8618,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-sparse + rr-off 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        3,
+        0,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 384,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26051,6 +28136,7 @@ exports[`ProgramDescription structural snapshot (the link map) > softbeam-wall +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26155,6 +28241,7 @@ exports[`ProgramDescription structural snapshot (the link map) > softbeam-wall +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26254,6 +28341,7 @@ exports[`ProgramDescription structural snapshot (the link map) > solids-analytic
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26354,6 +28442,7 @@ exports[`ProgramDescription structural snapshot (the link map) > solids-sdf + pa
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26456,6 +28545,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spheres + linea
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26558,6 +28648,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spheres + tlas 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26657,10 +28748,952 @@ exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
       "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-furnace + rr-interior 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 2,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 1,
+      "position": [
+        0,
+        0,
+        0.9,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 128,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-furnace + rr-off 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 1,
+      "position": [
+        0,
+        0,
+        0.9,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 128,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-lab + noscatter 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.035,
+      0.04,
+      0.055,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 8,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.85,
+      "position": [
+        0,
+        1.05,
+        3.9,
+      ],
+      "target": [
+        0,
+        0.36,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 128,
+    "response": "radiance",
+    "scattering": "ignored",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.035,
+      0.04,
+      0.055,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 8,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.85,
+      "position": [
+        0,
+        1.05,
+        3.9,
+      ],
+      "target": [
+        0,
+        0.36,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 128,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": true,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss-8 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.035,
+      0.04,
+      0.055,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 8,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.85,
+      "position": [
+        0,
+        1.05,
+        3.9,
+      ],
+      "target": [
+        0,
+        0.36,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 8,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": true,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss-pt 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.035,
+      0.04,
+      0.055,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.98,
+      "startDepth": 8,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.85,
+      "position": [
+        0,
+        1.05,
+        3.9,
+      ],
+      "target": [
+        0,
+        0.36,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 128,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-presets + noscatter 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.05,
+      0.055,
+      0.07,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.999,
+      "startDepth": 12,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.75,
+      "position": [
+        -1.5,
+        5.4,
+        15.5,
+      ],
+      "target": [
+        1.5,
+        1.2,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 256,
+    "response": "radiance",
+    "scattering": "ignored",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-presets + presets 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.05,
+      0.055,
+      0.07,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.999,
+      "startDepth": 12,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.75,
+      "position": [
+        -1.5,
+        5.4,
+        15.5,
+      ],
+      "target": [
+        1.5,
+        1.2,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 256,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": true,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > sss-presets + presets-1024 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.05,
+      0.055,
+      0.07,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "maxSurvival": 0.999,
+      "startDepth": 12,
+    },
+    "volumeSampling": "analytic",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.75,
+      "position": [
+        -1.5,
+        5.4,
+        15.5,
+      ],
+      "target": [
+        1.5,
+        1.2,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 1024,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": true,
+    "mediumPdf": true,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": false,
+    "present": true,
+    "scatteringArms": true,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": true,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
     },
   },
 }
@@ -26748,6 +29781,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26842,6 +29876,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sun + pt-nee 1`
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -26937,6 +29972,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27035,6 +30071,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27140,6 +30177,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27245,6 +30283,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27350,6 +30389,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27455,6 +30495,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27560,6 +30601,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27665,6 +30707,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27769,6 +30812,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27871,6 +30915,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -27973,6 +31018,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -28067,6 +31113,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + bvh
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -28161,6 +31208,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -28255,6 +31303,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -28355,6 +31404,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -28458,6 +31508,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {
@@ -28561,6 +31612,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
     "present": false,
     "scatteringArms": false,
     "shadowWalker": false,
+    "weightedAbsorptionArms": false,
   },
   "view": {
     "tonemap": {

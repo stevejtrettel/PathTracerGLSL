@@ -13,7 +13,12 @@ Ray make_ray(Point origin, Direction dir) {
 
 // Spawn a scattered/shadow ray from a hit: origin escaped to wi's SIDE of the surface along the
 // geodesic (robust at grazing, curved-correct). Transmission gets the far side for free.
+// The escape distance is the HIT'S OWN positional uncertainty (hit.eps, provenance-filled —
+// impl-plan-epsilon-discipline): fp-scale for analytic roots, the marcher's clearance for
+// marched commits. This offset is the ONE self-intersection mechanism for the analytic tier
+// (their floors are t > 0), so the fill must exceed the hit's true error with margin — the
+// null-crossing loops' progress and the media shadow walker both ride on it.
 Ray ray_spawn(Hit hit, Direction wi) {
     float side = ambient_dot(wi, hit.frame.n, hit.p) >= 0.0 ? 1.0 : -1.0;
-    return make_ray(ambient_geodesic(hit.p, hit.frame.n * side, EPSILON), wi);
+    return make_ray(ambient_geodesic(hit.p, hit.frame.n * side, hit.eps), wi);
 }

@@ -25,9 +25,15 @@ Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  �
    SDF marching, analytic intersection, and (future) mesh/BVH as geometry **capabilities**
    (`sdf?` / `ray?` / `instances?`), taking the nearest hit and coordinating via `tmax`.
 3. **`Hit`** — the landing record: where you arrived, the shading frame, the regions flanking
-   the boundary, and the owner's sub-element index (`element` — which PIECE of the owning
+   the boundary, the owner's sub-element index (`element` — which PIECE of the owning
    region's surface; owner-approved July 2026, fable-instance-attributes: placement index for
-   instanced batches, 0 elsewhere; future per-triangle/Stage-B refs ride the same channel).
+   instanced batches, 0 elsewhere; future per-triangle/Stage-B refs ride the same channel),
+   and the point's **positional uncertainty** (`eps` — owner-approved Aug 2026,
+   impl-plan-epsilon-discipline: the arm that made the hit states how well it knows `p` —
+   fp-scale for analytic roots via `spawn_eps_analytic`, `MARCH_CLEARANCE` for marched commits,
+   `MESH_T_MIN` for triangle hits. `ray_spawn`'s escape offset is the one reader; the
+   dispatcher seeds the conservative default so a missed fill degrades instead of reading
+   garbage).
 4. **Interaction** — the scattering event (surface BSDF and medium phase unified): `sample` returns
    the next direction + weight; `eval`/`emission` for NEE/MIS.
 5. **`make_ray`** — spawn the continuation ray from the hit; iterate.
@@ -44,8 +50,10 @@ struct Ray { Point origin; Direction direction; };   // PURE geodesic seed — n
 - **No `tmin`/`tmax` on the Ray.** Search bounds are the *query's* concern, not the ray's identity.
   We tried the interval on the Ray and it conflated three roles (ray identity / query far-bound /
   running-nearest) — the by-value-vs-`inout` confusion was the symptom. The bounds' real homes:
-  - **near bound** (`tmin`): a marcher constant `EPSILON` — self-intersection is handled by the
-    origin offset, so it never varies.
+  - **near bound** (`tmin`): the analytic primitives search strictly ahead (`t > 0`) —
+    self-intersection is handled entirely by the origin offset (impl-plan-epsilon-discipline);
+    the marched and mesh tiers keep their own named clearances (`MARCH_CLEARANCE`,
+    `MESH_T_MIN`), derived where they are defined.
   - **running nearest** (the old `tmax` shrinking): lives on **`hit.t`**. For a nearest-hit search
     "the bound" and "the nearest distance found" are the *same quantity*, so `hit.t` holds both —
     initialized to `MAX_DIST`, shrunk by each backend. (A Hit's fields other than `t` are valid only
@@ -53,7 +61,9 @@ struct Ray { Point origin; Direction direction; };   // PURE geodesic seed — n
   - **occlusion far-bound**: an explicit `maxDist` **argument** to `scene_intersect_any` (the light
     distance) — an input, not ray state.
 - **Self-intersection escape is an origin offset**, done via the geodesic:
-  `origin = ambient_geodesic(hit.p, n, EPSILON)`. Robust at grazing angles (offset along the normal)
+  `origin = ambient_geodesic(hit.p, n, hit.eps)` — the offset is the hit's OWN positional
+  uncertainty (provenance-filled; impl-plan-epsilon-discipline replaced the old global
+  `EPSILON` here). Robust at grazing angles (offset along the normal)
   and curved-space-correct (the exp-map step). The true geometric point lives on `Hit.p`; the ray's
   `origin` is legitimately the escaped point.
   - Offset direction is `+n` for reflection; dielectric transmission will offset toward `wi`'s side
@@ -102,14 +112,15 @@ never mutated by intersection — it is a pure seed.
 - **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray, Point light_p)`.
   **A shadow ray is defined by its DESTINATION, not a distance.** The scalar `maxDist` form (an
   earlier revision) was non-robust for the media segment-walk: the walker decremented `remaining`
-  and re-spawned the ray (+EPSILON) at each null-interface crossing without subtracting that
-  offset, so the light back-off drifted by ~EPSILON per crossing. After ≥2 crossings (entering +
-  exiting one bounded medium) the drift exceeded the fixed 2·EPSILON light margin and the AREA
+  and re-spawned the ray (offset) at each null-interface crossing without subtracting that
+  offset, so the light back-off drifted by one spawn offset per crossing. After ≥2 crossings
+  (entering + exiting one bounded medium) the drift exceeded the fixed light margin and the AREA
   LIGHT'S OWN surface blocked the shadow ray → NEE went dark through any bounded medium (pt, which
   reaches the light via the emitter-hit, stayed correct). Passing the light POINT lets each segment
   re-derive the back-off against the fixed target (pbrt's `SpawnRayTo` discipline), so no drift can
   accumulate. The opaque fast path derives its `maxDist` from the point; the media walk measures
-  `length(light_p − seg_ray.origin) − 2·EPSILON` per segment. (length() is Euclidean; a geodesic
+  `length(light_p − seg_ray.origin) − SHADOW_BACKOFF` per segment (the back-off's derivation —
+  angle-amplified, never fp-relative — lives on the constant in core math). (length() is Euclidean; a geodesic
   ambient-distance helper is the curved-space follow-up, like the straight-ray march itself.)
 
 ## Deferred (not this contract)

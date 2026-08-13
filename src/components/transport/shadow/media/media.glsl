@@ -10,10 +10,10 @@
 // MAX_SHADOW_SEGMENTS (define, pin: 8).
 //
 // The stop bound is the LIGHT POINT, not a scalar distance (trace-loop-contract: a shadow ray
-// is defined by its destination). Each segment re-derives the 2·EPSILON back-off against the
+// is defined by its destination). Each segment re-derives the SHADOW_BACKOFF against the
 // FIXED light_p — pbrt's SpawnRayTo discipline — so the back-off can never be eroded by the
 // ray_spawn offsets that accumulate across null-interface crossings. A decremented `remaining`
-// (the earlier form) drifted by one EPSILON per crossing, and after ≥2 crossings the drift
+// (the earlier form) drifted by one spawn offset per crossing, and after ≥2 crossings the drift
 // exceeded the back-off, letting the AREA LIGHT'S OWN surface block the shadow ray → NEE went
 // dark through any bounded medium. (length() is Euclidean; a geodesic-distance ambient helper
 // is the curved-space follow-up, like the straight-ray march itself.)
@@ -27,7 +27,11 @@ Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
 
     for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
         // Distance to the light re-derived from the fixed target — drift-free by construction.
-        float remaining = length(light_p - seg_ray.origin) - 2.0 * EPSILON;
+        float remaining = length(light_p - seg_ray.origin) - SHADOW_BACKOFF;
+        // ARRIVED, never a negative segment (rider, impl-plan-epsilon-discipline): a medium
+        // EVENT origin is unfloored and can sit within the back-off of the light; a negative
+        // remaining fed medium_transmittance an exp(+σ·|len|) — energy amplified, a firefly.
+        if (remaining <= 0.0) return T;
         Hit h;
         bool hit_boundary = scene_intersect(seg_ray, h) && h.t < remaining;
         float seg_len = hit_boundary ? h.t : remaining;

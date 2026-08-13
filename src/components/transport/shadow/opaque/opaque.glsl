@@ -8,9 +8,10 @@
 // spectral contract. When media exist the compiler emits the segment-walking form instead
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
 // Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
-// its distance minus a 2·EPSILON back-off so the light's own surface is not seen as an occluder.
+// its distance minus SHADOW_BACKOFF (core math — angle-amplified requirement, see its comment)
+// so the light's own surface is not seen as an occluder.
 
 Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
-    float maxDist = length(light_p - shadow_ray.origin) - 2.0 * EPSILON;
+    float maxDist = length(light_p - shadow_ray.origin) - SHADOW_BACKOFF;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }

@@ -21,6 +21,109 @@ lab), but nothing here imports from `compiler/scenes/`.
 - `scenes/` — the fixtures: scene + strategy definitions, with their derivations in
   comments (why 0.4, why RR is off, what a failure implicates).
 
+## Known failing witnesses — the Aug 12 2026 sweep
+
+**Read this before diagnosing a red row.** The suite is not expected to be all-green: ten checks
+fail, in four unrelated groups, and every one is a standing marker for real work rather than an
+oversight. If your change did not touch these areas and these are the only reds, you have not
+broken anything.
+
+Sweep result: **153 exact checks — 143 passed, 10 failed; 1 cross-check, agreed.**
+
+### A. The four GRIN furnaces — a ~25% energy loss, cause NOT established
+
+| witness | measured | expected |
+|---|---|---|
+| `grin-furnace` | 0.3004 / 0.3065 / 0.3179 | 0.4 |
+| `grin-furnace-emit` | 0.2960 | 0.4 |
+| `grin-furnace-scatter` | 0.2949 / 0.2951 / 0.2953 | 0.4 |
+| `grin-furnace-hard` | 0.3067 | 0.4 |
+
+All four are furnace-conservation gates on the variable-IOR walker (design + derivations:
+`docs/fable-variable-ior.md` §6). All four are low by 23–26% with the same signature, which
+suggests **one** defect in the walker rather than four, and 25% is far too large to be an epsilon
+or a truncation. `grin-furnace` in particular is documented as catching
+"weight/absorption/bounce-starvation/coexistence breaks", so it is doing its job.
+
+These were already failing on the Aug 10 sweep. Three of the four (`-emit`, `-scatter`, `-hard`)
+had never been run before that; `docs/fable-variable-ior.md:11` still records them as awaiting
+their first sweep. **Nobody has investigated the deficit.** That is the honest state — treat the
+attributions in older session notes as unverified.
+
+### B. `softbeam-wall` core — +3.34%, a normalization, not an estimator
+
+`F-SOFTBEAM core ρ·Le·sin²δ` reads 1.0326 against 0.9992. The excess is shared by the `nee` and
+`mis` arms (their equality check passes at χ² 0.01), so it is a bias in the emitted `Le`
+normalization for the finite-divergence softbeam kind, not an estimator defect. From the Aug 9
+beam batch; unchanged since. The other two `softbeam-wall` checks pass.
+
+### C. `slab-albedo` — RESOLVED (Aug 12 2026): the epsilon batch closed it, GREEN at the exact values
+
+Kept as the worked example of the red-and-documented discipline paying off. The four exact
+plane-albedo checks were low by 2.7 / 1.9 / 1.1% at µ = 1, rising toward grazing — a **real
+renderer bias** in the world-space surface-proximity constants. The resolution arc, in order:
+
+- Diagnosis: **`docs/fable-epsilon-discipline.md`** (the graded investigation), then settled by
+  measurement — a CPU walk mirroring the renderer's exact algorithm reproduced **all nine** dense
+  measurements to ~1σ and split the bias roughly half/half between J1 (the `ray_spawn` normal
+  offset) and J2 (the primitives' `t > EPSILON` acceptance floor + the walk's unrepaired
+  fictitious-medium continuation), **interacting** (J1 masks J2 ⇒ one fix, never half).
+- The falsifier: `slab-albedo-sparse` confirmed tenfold density scaling on cue (and caught its own
+  first-version width bug — blue leaked out the sides; lateral margins now pinned by
+  `slabAlbedo.test.ts`).
+- The fix: **`docs/impl-plan-epsilon-discipline.md`** (rewritten by a six-agent adversarial audit
+  before build) — provenance-based offsets (`Hit.eps`), fp-relative analytic tier, `t > 0` floors;
+  mesh/marched/GRIN/shadow kept their magnitudes as named derived constants; `EPSILON` deleted.
+- Post-fix filtered sweep (owner, Aug 12): **all rows green at the exact Chandrasekhar values** —
+  including the interior-roulette arm (step 2's gate) and the aniso cross-check.
+
+The expected values were never loosened along the way — hiding a measured bias behind a tolerance
+is how the next real defect gets missed. Full-suite re-gate after the batch is the remaining step
+(every program's frames changed: pt tripwires recalibrate).
+
+### D. `cube-cloud` — a hang, not a slow render
+
+`ERROR: page.waitForFunction: Timeout 120000ms exceeded`. Investigated Aug 12, headless
+SwiftShader, not resolved:
+
+- the page loads in ~1 s, then **`window.app` never appears** — 400 s budget, still nothing;
+- `page.evaluate` afterwards never returns, so the **main thread is hard-blocked**, which rules
+  out "slow but progressing";
+- the **compiler is not the problem**: `Compiler.compile` produces the 1361-line program in 45 ms;
+- the emitted GLSL contains **no unbounded loops** — only the bounce loop (its twin `cube-cloud`
+  renders fine in 3.6 s and does have the TLAS `while` walks);
+- `cube-cloud-ref` is the half that hangs — 24 individually transformed rotated boxes as separate
+  analytic objects, from the Aug 10 stage-4 batch. It had never been swept before this run.
+
+Remaining suspect is SwiftShader's synchronous shader JIT on a 25-object unrolled program, which
+would make it environment-specific rather than a renderer defect — **unverified**.
+
+## Tiers: where a `mean` check's expected value came from
+
+Until Aug 2026 every expected value here was a pen-and-paper number, so provenance never
+needed saying. The subsurface work introduced expectations produced by a reference
+implementation, and those are not the same kind of claim — so `kind: 'mean'` now carries an
+optional `source`, and the runner reports the two tiers apart.
+
+- **`exact`** (the default; every check written before the field existed) — the value is exact
+  mathematics. Evaluating it in your head (`furnace = E/(1−ρ) = 0.4`) or iterating it to
+  fourteen digits (Chandrasekhar's `H`, `tests/helpers/halfspace.ts`) does not change its kind.
+  **A miss is a renderer bug.** Reported `FAIL`.
+- **`cross-check`** — the value comes from a second, independent implementation of the same
+  physics, with a statistical error of its own: a CPU Monte-Carlo reference for a configuration
+  that has no closed form (anisotropic scattering, say). **A miss means the two disagree and
+  both are suspects.** Reported `DISAGREE`, counted separately, and still non-zero exit.
+
+Rules:
+
+- A `cross-check` row **must** state `source.refTol` — the reference's own uncertainty. The
+  runner adds it to `tol` (the render's noise budget) rather than letting a fixture merge them,
+  so the table shows both halves and no defect can hide inside one fat number.
+- `source.from` is one line naming the derivation or the reference; it prints in the row.
+- **A reference must itself be gated.** `halfspace.ts` is pinned by `halfspace.test.ts` against
+  single-scattering limits derived on paper, Chandrasekhar's moment identity, and the
+  conservative constants — a reference nobody checks is a second opinion, not a reference.
+
 ## The gate policy (read before adding an `equality` check)
 
 Every equality/twin check asserts a **bias gate** — pairwise |Δ frame-mean|/mean in
