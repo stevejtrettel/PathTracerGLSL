@@ -36,6 +36,7 @@ passthrough (identity curve, no encode, exposure forced to 1.0 — the §11 prob
 `ShaderBuilder.buildDisplayBlocks` looks the occupant up in `TONEMAP_MODELS` by
 `view.tonemap.type`, then assembles: generated display header → shared `display.glsl`
 (safe_color + OETF) → the occupant's `curve()` → a generated `main()`
-(`exposure → curve → (encode iff encodesToDisplay) → fragColor`). The `TonemapDesc` union
-in `src/compiler/plan/types.ts` enumerates the legal types; `Validator.ts` rejects any
-type without a live occupant (keep that allowlist in sync when adding one).
+(`exposure → curve → (encode iff encodesToDisplay) → fragColor`). The registry is the gate:
+`view.tonemap.type` is an open string, and the Validator rejects any type without an
+occupant in `TONEMAP_MODELS` (`isTonemapSupported`), so adding one needs no other edit.
+`exposure` must be finite and > 0.

@@ -83,13 +83,13 @@ geometry.
 TABLE-resident (`table.ts` is the row-layout truth; rows + bit trails ride the
 records channel, the tree rides nodes — `accel/light_tree` builds) and replaces the
 CDF with the generated pick/trail-pmf walk pair. Kinds opt into the tree via the
-`treeBounds` descriptor fact; kinds without it (mesh, directional, beam) are
-Validator-rejected under 'bvh'.
+`treeBounds` descriptor fact (mesh lights use its `'data'` form: the App supplies the box
+from the BLAS root); kinds without it (directional, beam) are Validator-rejected under 'bvh'.
 
 ## Invariants & witnesses
 
-pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2); shadow-ray
-back-off is 2·EPSILON coupled to `ray_spawn`'s offset (the dark-tops bug — documented
-at the call sites). Deferred: spherical-rectangle quads (Ureña), two-sided quads,
+pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2); the shadow-ray
+back-off is `SHADOW_BACKOFF` (math.glsl), which must exceed `ray_spawn`'s offset (the
+dark-tops bug — documented at the call sites). Deferred: spherical-rectangle quads (Ureña), two-sided quads,
 inside-sphere fallback, p-independent area arms (equiangular's area exit),
 `Value<T>` light params (the generated struct + hoisted const are the ready ABI).

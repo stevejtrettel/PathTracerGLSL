@@ -5,6 +5,7 @@
 | Document | Description |
 |----------|-------------|
 | [architecture.md](architecture.md) | Full system reference — three-layer architecture, all components |
+| [claude-improvements-2026-09.md](claude-improvements-2026-09.md) | Suggested next work after the Sep 2026 review and audit: open correctness items (mesh-light MIS normal, estimator-dependent budgets), rendering features with plans (thin dielectric questions, solid-angle quad/triangle sampling, energy compensation, conductors), throughput, and structural fixes. Nothing built |
 | [compiler-engine-contract.md](compiler-engine-contract.md) | Locked compiler-engine boundary contract and types |
 | [fable-compiler-contracts.md](fable-compiler-contracts.md) | GLSL contracts inside the compiler — interaction, regions/media, lights, transport (geodesic stepper superseded by trace-loop-contract.md) |
 | [fable-transport-verification.md](fable-transport-verification.md) | Adversarial walkthrough of the medium/transport contracts — traces, findings, resulting amendments |

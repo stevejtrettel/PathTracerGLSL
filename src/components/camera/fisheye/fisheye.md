@@ -22,9 +22,15 @@ the radial map `θ(ρ)`, normalized so `ρ = 1` at the inscribed-circle rim (whe
 Everything else — the look-at frame (with the pinhole degenerate-axis guard), ρ, the
 azimuth, the direction assembly — is shared. All four `θ(ρ)` forms live as static functions
 in `fisheye.glsl` (readable math), and the compiler aliases `FISHEYE_THETA` to the one the
-`projection` sub-parameter selects — a **value #define, the same mechanism as `TAN_FOV`**
-(not the structural preprocessor gating the codebase avoids). `fov` is a live uniform
-(`u_fisheyeFov`, full angular field in radians; default π = 180°).
+`projection` sub-parameter selects — a **value #define** (not the structural preprocessor
+gating the codebase avoids). `fov` (the full angular field in radians, required) is a live
+slider, `camera.fisheyeFov`; the shader never reads it directly. The CPU folds it into the
+projection's radial constant `u_fisheyeK` (θ_max for equidistant, sin(θ_max/2) equisolid,
+tan(θ_max/2) stereographic, sin θ_max orthographic), so the map costs no transcendental per
+ray. Each projection has a widest field it can represent — orthographic ≤ π (sin θ peaks at
+θ = π/2), stereographic < 2π (tan(θ/2) diverges), the others ≤ 2π — and the Validator and
+the slider range both enforce it (past it K stops growing or blows up and the image folds
+back or collapses to the axis).
 
 The `sin`-based maps (equisolid, orthographic) clamp their `asin` argument, so corners
 outside the inscribed circle (`ρ > 1`) pin at the rim instead of NaN-ing; equidistant and

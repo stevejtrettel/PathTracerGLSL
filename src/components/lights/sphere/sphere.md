@@ -6,18 +6,25 @@ sampling the cone uniformly gives a pdf directly in solid angle, no area→angle
 conversion and no wasted back-hemisphere samples (pitfall 3: uniform-surface sampling
 throws away half its budget).
 
-`sphere_light_sample(center, radius, Le, p, xi)`:
+`sphere_light_sample(SphereLight l, Point p, vec2 xi)` and its pdf mirror
+`sphere_light_pdf(l, p, light_p, wi)`:
 
-- Cone half-angle from `sin²θ_max = r²/|c−p|²`; `cos_t = 1 − xi.x·(1 − cos_max)` is
-  uniform over the cone's solid angle, so `pdf = 1 / (2π(1 − cos_max))` — constant.
-- The direction is assembled in a `build_basis` frame around `w = normalize(c − p)`;
-  `distance` is the near root of the ray-sphere quadratic (guaranteed real by the
-  cone construction).
+- Cone half-angle from `sin²θ_max = r²/|c−p|²`. The cone's size enters only through
+  `1 − cos θ_max`, computed as `sin²θ_max / (1 + cos θ_max)` (one shared function): the
+  direct `1 − sqrt(1 − sin²θ_max)` keeps almost no bits for a small or distant sphere, and
+  since that number IS the pdf, the light was biased (exactly 2× at r/d ≲ 1.5e-4; the
+  `tiny-sphere-light` witness). `pdf = 1 / (2π(1 − cos θ_max))`, constant over the cone.
+- The polar angle is sampled as `w = 1 − cos θ = xi.x·(1 − cos θ_max)` with
+  `sin²θ = w(2 − w)` (no cancellation for small cones); the direction is assembled in a
+  `build_basis` frame around `c − p`.
+- `distance` is the near root of the ray-sphere quadratic in the robust form (c/q with the
+  perpendicular-offset discriminant — `sphere_intersect`'s form); real by the cone
+  construction up to rounding.
 - `radiance = Le`, no falloff — as with the quad, distance is the pdf's business:
   as p recedes, `1 − cos_max` shrinks like r²/d² and the constant pdf grows.
 - **p inside the sphere: `pdf = 0` punt** (OPEN — pbrt falls back to uniform-area
-  sampling there; on the deferred list). The descriptor's `emitPdfArm` punts
-  identically, keeping sampler and pdf-query consistent.
+  sampling there; on the deferred list). `sphere_light_pdf` punts identically, keeping
+  sampler and pdf query consistent.
 
 Descriptor facts (`sphere.ts`): `power = π·4πr²·mean(Le)`; the pdf arm depends only
 on p and the precompiled center/radius — the same cone formula as the sampler (§6.1

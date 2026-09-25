@@ -7,7 +7,7 @@ spread into a circle of confusion — depth of field. This is a **measurement** 
 different integral), not an estimator one: pinhole and thin-lens do not converge to the
 same image, by design.
 
-The construction reuses the pinhole look-at frame and `TAN_FOV`:
+The construction reuses the pinhole look-at frame (CPU-computed uniforms) and `u_tanFov`:
 
 - Build the pinhole primary direction `dir` through the `film` point (identical to
   `pinhole.glsl`; the `pixel/` family already placed the sub-pixel sample).
@@ -24,10 +24,9 @@ The construction reuses the pinhole look-at frame and `TAN_FOV`:
 `normalize(focus_point − position) = dir`, i.e. the exact pinhole ray. That exact limit
 is the correctness witness (a thin-lens render at aperture 0 must match pinhole).
 
-`concentric_disk` is inlined rather than shared: thin-lens is its only user today: it
-graduates to a shared sampler helper when a second occupant (e.g. a disk area light) needs
-it. `aperture` and `focusDistance` are live sliders that trigger accumulation reset — they
-change what the render converges to.
+`concentric_disk` is the shared core-math helper (`glsl/core/math.glsl`), also used by the
+disk and soft-beam lights. `aperture` and `focusDistance` are live sliders that trigger
+accumulation reset — they change what the render converges to.
 
 Randomness note (the camera A/B split, see `../README.md`): thin-lens consumes exactly the
 Category-A dimensions — the `film` footprint (pixel/) + `xiLens`. Motion blur (shutter time) and spectral

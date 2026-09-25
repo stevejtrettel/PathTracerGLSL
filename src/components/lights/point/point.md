@@ -4,12 +4,13 @@ An idealized emitter with all its power at one position — the source term is a
 delta, so sampling is deterministic: one direction matters, and the shadow ray either
 reaches it or doesn't.
 
-`point_light_sample(Point pos, Spectrum Le, Point p)` fills the `LightSample`:
+`point_light_sample(PointLight l, Point p, vec2 xi)` fills the `LightSample` (the
+`PointLight` struct is generated from the descriptor rows; `xi` is unused):
 
 - `wi = normalize(pos − p)`, `distance = |pos − p|` — the only possible sample.
-- `radiance = Le / d²` — **the 1/d² folds into radiance here**, not into the pdf:
-  a delta light has no solid angle to integrate over (§6.1). `Le` arrives precompiled
-  as color·intensity by the descriptor's `emitSampleCall`.
+- `radiance = I / d²` — **the 1/d² folds into radiance here**, not into the pdf:
+  a delta light has no solid angle to integrate over (§6.1). `I` is the authored
+  `emission` of a delta-position light: its radiant intensity (W/sr).
 - `pdf = 1.0` (per-light; the dispatcher multiplies selection in), `flags = LIGHT_DELTA`.
 
 Consequences of `LIGHT_DELTA` elsewhere:
@@ -19,7 +20,7 @@ Consequences of `LIGHT_DELTA` elsewhere:
   is why the haze card's key 3 is darker than keys 1/2 by exactly this light's term
   (a witness, not a bug).
 
-Descriptor facts (`point.ts`): `delta: true`; `power(l) = 4π · mean(color·intensity)`
+Descriptor facts (`point.ts`): `delta: true`; `power = 4π · mean(I)`
 (pbrt's PowerLightSampler — so the compile-time selection CDF weighs it fairly against
 area lights, whose power scales with area). Position and Le are compile-time constants
 baked into the generated `lighting_sample` dispatcher — and into `lighting_query_delta`
