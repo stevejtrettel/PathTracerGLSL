@@ -1,6 +1,6 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata } from '../types.js';
+import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue } from '../types.js';
 import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY, modelTwoSidedShading } from '../../components/materials/index.js';
@@ -29,7 +29,7 @@ import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, regionMaterialsOf, batchNeedsInterior } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, regionMaterialsOf, batchNeedsInterior, regionLightKind } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
@@ -43,7 +43,14 @@ const implementedTypes = () => Object.keys(PRIMITIVES);
  *  so Generate reads values, never re-derives defaults. */
 function resolveEnvironment(env: SceneDescription['environment']): ResolvedEnvironment {
     if (env === undefined || env.type === 'none') return { type: 'none' };
-    if (env.type === 'constant') return { type: 'constant', color: env.color, intensity: env.intensity ?? 1.0 };
+    if (env.type === 'constant') {
+        // The color goes through the SAME spectrum normalization as material spectra: a
+        // scalar broadcasts to a vec3, a constant blackbody folds, a scalar {param} default
+        // broadcasts. (Passed through raw, a scalar color crashed the GLSL formatter.)
+        // (The cast drops GlslExpression from the return type: an env color cannot be one.)
+        const color = resolveColorProperty(env.color, [0, 0, 0]) as SpectrumValue;
+        return { type: 'constant', color, intensity: env.intensity ?? 1.0 };
+    }
     if (env.type === 'image') return { type: 'image', url: env.url, intensity: env.intensity ?? 1.0, rotation: env.rotation ?? 0.0 };
     return { type: 'procedural', glsl: env.glsl, intensity: env.intensity ?? 1.0, rotation: env.rotation ?? 0.0 };
 }
@@ -330,16 +337,13 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
         const Le = emission as Vec3;
         // Registry-driven (A3): the kind whose backing region primitive matches this
         // object's shape converts the FOLDED parameters back to registry values —
-        // both authoring routes share one kind definition.
-        // Only kinds DECLARING the inverse participate (softbeam backs onto 'disk' too,
-        // but an emissive disk OBJECT is a disk light — the first-wins lookup is scoped
-        // to valuesFromRegion-bearing kinds, and the contract test enforces uniqueness
-        // over exactly that set).
-        const kindEntry = Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === planned.type && k.valuesFromRegion !== undefined);
-        if (kindEntry?.valuesFromRegion === undefined) continue;   // backstop; samplableAsLight already gated
+        // both authoring routes share one kind definition (regionLightKind, the lookup
+        // the census uses too; the contract test enforces its uniqueness).
+        const kind = regionLightKind(planned.type);
+        if (kind === undefined) continue;   // backstop; samplableAsLight already gated
         lights.push({
-            id: lightIndex++, kind: kindEntry.kind, regionId: planned.index,
-            values: kindEntry.valuesFromRegion(planned.parameters, Le),
+            id: lightIndex++, kind, regionId: planned.index,
+            values: LIGHT_KINDS[kind].valuesFromRegion!(planned.parameters, Le),
         });
     }
 

@@ -251,12 +251,25 @@ function rouletteInterior(f: Flags): ShaderBlock {
 // The walk — the estimator's table of contents.
 // ============================================================================
 
+// THE BOUNCE BUDGET. measurement.maxBounces = N means the measurement is the partial sum
+// Σ_{n≤N} TⁿE: paths with at most N scattering events (surface or medium; null crossings
+// are not events). Iteration `bounce` traces the segment leaving scattering vertex number
+// `bounce`, so emission found at its end (surface, sky, or medium emission along it) closes
+// a path with `bounce` events — allowed for bounce ≤ N. Next-event estimation and the
+// continuation both ADD an event, so they run only while bounce < N. Hence the loop does
+// N + 1 intersections and the last one only scores emission (pbrt-v4's structure). Every
+// estimator (pt / pt-nee / pt-mis) then counts exactly the same set of paths; stopping NEE
+// one iteration later than the BSDF continuation would make the truncation depend on the
+// estimator, which the taxonomy forbids.
 function walk(p: ProgramDescription, f: Flags): ShaderBlock {
+    const N = p.measurement.maxBounces;
     const lines = [
         `// ── The walk (generated): pt${f.media ? ' over media' : ''} — the estimator's table of contents ──`,
+        `// Budget: paths with at most ${N} scattering events. The final iteration (bounce == ${N})`,
+        '// only scores emission; NEE and the continuation would add an event beyond the budget.',
         'Radiance transport_trace(Ray ray) {',
         '    PathState s = path_state_init(ray);',
-        `    for (int bounce = 0; bounce < ${p.measurement.maxBounces}; bounce++) {`,
+        `    for (int bounce = 0; bounce <= ${N}; bounce++) {`,
         '        Hit hit;',
     ];
 
@@ -273,7 +286,8 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             lines.push(
                 '            // Per-SEGMENT direct light (equiangular placement, segment-start throughput) —',
                 '            // independent of the transmittance sample below; replaces the at-vertex site.',
-                '            equiangular_sample_direct(s, med_mat, boundary ? hit.t : MAX_DIST);',
+                '            // It places a scattering event on this segment, so it is part of the budget.',
+                `            if (bounce < ${N}) equiangular_sample_direct(s, med_mat, boundary ? hit.t : MAX_DIST);`,
             );
         }
         lines.push(
@@ -302,6 +316,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
                 '                // CONSUMES a bounce deliberately: the budget bounds trapped closed orbits',
                 '                // (e.g. a Maxwell fisheye) across exhaustion returns AND whispering-gallery',
                 '                // TIR loops.',
+                `                if (bounce == ${N}) break;   // the bend is an event: over budget`,
                 '                kernel_record(s, 1.0, light_query_medium(ms.exit_p), true);',
             );
             if (f.transmission) {
@@ -319,6 +334,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
                 '                // ---- MEDIUM EVENT ---- The event ray comes FROM THE ARM (impl-plan-grin-media:',
                 '                // a bent event is not recomputable from (origin, dir, t), so every scattering',
                 '                // arm reports position + incident direction on exit_p/exit_dir).',
+                `                if (bounce == ${N}) break;   // a scattering event: over budget`,
                 '                Point p_evt = ms.exit_p;',
                 '                Direction wo_med = -ms.exit_dir;',
             );
@@ -365,6 +381,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         '        Direction wo = -s.ray.direction;',
         '',
         '        kernel_score_emitter_hit(s, hit, mat, wo, props);   // settle last bounce\'s deferred estimate',
+        `        if (bounce == ${N}) break;   // budget reached: emission is the last term counted`,
     );
     if (f.nee) lines.push('        light_sample_direct(s, hit, mat, wo, props);        // NEE: sample + score locally');
     lines.push(

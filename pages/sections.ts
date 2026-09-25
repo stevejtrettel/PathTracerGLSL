@@ -114,7 +114,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'Environment lighting',
         blurb: 'the env as a samplable light: CDF inversion, two-stage selection, the procedural bake, the chart axis',
-        entries: [e('sky'), e('furnace-sky'), e('sky-lamp'), e('proc-sky')],
+        entries: [e('sky'), e('furnace-sky'), e('sky-lamp'), e('proc-sky'), e('proc-sky-rotated'), e('fog-sky')],
     },
     {
         title: 'Dielectrics & regions',
@@ -124,6 +124,7 @@ export const gallerySections: GallerySection[] = [
             e('regions-transformed', 'regions-transformed-ref'),
             e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('region-overlap'),
             e('rough-grin', 'rough-grin-ref'),
+            e('rough-sheet'),
         ],
     },
     {
@@ -163,7 +164,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Core validation',
         blurb: 'the first-principles anchors: the furnace, the minimal cross-backend twins, combined-backend shadows',
         entries: [
-            e('furnace'), e('minimal'), e('analytic-minimal'), e('solids-analytic', 'solids-sdf'),
+            e('furnace'), e('bounce-budget'), e('minimal'), e('analytic-minimal'), e('solids-analytic', 'solids-sdf'),
             e('sdf-table-twin'), e('sdf-instance-twin', 'sdf-instance-twin-ref'),
             // The SDF perf ladders ride as PARTNER links, not cards (the perf-cloud
             // convention): a card compiles every strategy arm at load, and the N=128

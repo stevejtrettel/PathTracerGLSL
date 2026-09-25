@@ -342,23 +342,38 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[],
  *  (the `similarityFromTransform` bake≡ship precedent). No-op for constant lights. */
 export function resolveLightValues(l: Pick<PlannedLight, 'values'>, params: Record<string, unknown> = {}): Record<string, number | number[]> {
     const out: Record<string, number | number[]> = {};
-    for (const [k, v] of Object.entries(l.values)) {
-        if (isValueParam(v)) {
-            const raw = params[v.param] ?? v.default;
-            out[k] = typeof raw === 'number' ? [raw, raw, raw] : raw as number[];
-        } else if (isBlackbody(v)) {
-            // Blackbody dials resolve LIVE (impl-plan-blackbody-uv): the kelvin slider
-            // reshuffles the power CDF through the same bake ≡ ship body.
-            const { kelvin, scale } = v.blackbody;
-            out[k] = blackbodyRGB(
-                isValueParam(kelvin) ? ((params[kelvin.param] as number) ?? kelvin.default ?? 6500) : kelvin,
-                scale === undefined ? 1 : isValueParam(scale) ? ((params[scale.param] as number) ?? scale.default ?? 1) : scale,
-            );
-        } else {
-            out[k] = v as number | number[];
-        }
-    }
+    for (const [k, v] of Object.entries(l.values)) out[k] = resolveRadiometricValue(v, params);
     return out;
+}
+
+/** A radiometric value at the given parameter values — the ONE evaluator for driven
+ *  radiometric values (light rows and the constant sky color): a `{param}` reads its
+ *  value (a scalar broadcasts to a spectrum), a blackbody evaluates chroma × scale with
+ *  its dials read live (the kelvin slider reshuffles the power CDF through the same
+ *  body the bake used), and anything else is already a constant and passes through. */
+function resolveRadiometricValue(v: unknown, params: Record<string, unknown>): number | number[] {
+    if (isValueParam(v)) {
+        const raw = params[v.param] ?? v.default;
+        return typeof raw === 'number' ? [raw, raw, raw] : raw as number[];
+    }
+    if (isBlackbody(v)) {
+        const { kelvin, scale } = v.blackbody;
+        return blackbodyRGB(
+            isValueParam(kelvin) ? ((params[kelvin.param] as number) ?? kelvin.default ?? 6500) : kelvin,
+            scale === undefined ? 1 : isValueParam(scale) ? ((params[scale.param] as number) ?? scale.default ?? 1) : scale,
+        );
+    }
+    return v as number | number[];
+}
+
+/** The parameter paths a radiometric value reads (a {param}, or a blackbody's driven dials). */
+function radiometricValueDeps(v: unknown): string[] {
+    if (isValueParam(v)) return [v.param];
+    if (isBlackbody(v)) {
+        const { kelvin, scale } = v.blackbody;
+        return [...(isValueParam(kelvin) ? [kelvin.param] : []), ...(scale !== undefined && isValueParam(scale) ? [scale.param] : [])];
+    }
+    return [];
 }
 
 /** Emitted power for CDF selection — the kind descriptors carry the pbrt formulas
@@ -513,9 +528,8 @@ export function envSelectionProbability(plan: RenderPlan, params: Record<string,
         ?? (env.type !== 'none' ? env.intensity : 1.0);   // C2: plan-resolved
     let meanL = 1.0;
     if (env.type === 'constant') {
-        const c = env.color;
-        const raw = isValueParam(c) ? (params[c.param] ?? c.default) : c;
-        const arr = typeof raw === 'number' ? [raw, raw, raw] : (raw as number[]) ?? [1, 1, 1];
+        const raw = resolveRadiometricValue(env.color, params);
+        const arr = typeof raw === 'number' ? [raw, raw, raw] : raw;
         meanL = (arr[0] + arr[1] + arr[2]) / 3;
     } else if (env.type === 'image' || env.type === 'procedural') {
         const chart = plan.program.estimator.envSampler.chart;
@@ -540,7 +554,7 @@ function envSelectionDeps(plan: RenderPlan): string[] {
     const env = plan.program.environment;
     const deps = new Set<string>(['env.intensity']);
     if (env.type === 'constant') {
-        if (isValueParam(env.color)) deps.add(env.color.param);
+        for (const p of radiometricValueDeps(env.color)) deps.add(p);
     } else if (env.type === 'image' || env.type === 'procedural') {
         deps.add('env.totalWeight');
         deps.add(plan.program.estimator.envSampler.chart === 'octahedral' ? 'env.sizeOct' : 'env.size');

@@ -1,10 +1,9 @@
 // compiler/analyze/Analyzer.ts
 
 import type { SceneDescription } from '../types.js';
-import { isEmissiveMedium, isValueParam, isBlackbody, isMeshObject, mediumMayScatter, hasConstantNonzeroEmission } from '../types.js';
-import { isDrivenTransform } from '../../components/geometry/similarity.js';
+import { isEmissiveMedium, isValueParam, isBlackbody, mediumMayScatter } from '../types.js';
 import type { SceneFeatures } from './types.js';
-import { PRIMITIVES, resolveBackend } from '../../components/geometry/index.js';
+import { samplableEmitterObjects } from '../plan/dataTenants.js';
 
 
 export function analyze(scene: SceneDescription): SceneFeatures {
@@ -30,26 +29,10 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     }
 
     // --- Lighting: every AUTHORED light counts (registered or not — authoring INTENT,
-    // so the no-lights check never stacks on a per-light kind rejection) + emissive
-    // analytic samplable OBJECTS entering the registry via sampleAsLight (§6.2; V1:
-    // CONSTANT nonzero emission only — the C3 shared predicate).
-    let totalLightCount = scene.lights.length;
-    for (const obj of scene.objects) {
-        if ('kind' in obj) continue;
-        if (resolveBackend(obj.type, obj.backend) !== 'analytic') continue;
-        if (PRIMITIVES[obj.type]?.samplableAsLight !== true) continue;
-        const mat = scene.materials[obj.material];
-        if (mat === undefined || mat.sampleAsLight === false) continue;
-        if (hasConstantNonzeroEmission(mat.emission)) totalLightCount++;   // C3: the ONE predicate
-    }
-    // Mesh emitters (fable-mesh-lights): the same material route — constant-placement
-    // emissive meshes join the registry (driven placement = the §6 pin's exclusion).
-    for (const obj of scene.objects) {
-        if (!isMeshObject(obj) || isDrivenTransform(obj.transform)) continue;
-        const mat = scene.materials[obj.material];
-        if (mat === undefined || mat.sampleAsLight === false) continue;
-        if (hasConstantNonzeroEmission(mat.emission)) totalLightCount++;
-    }
+    // so the no-lights check never stacks on a per-light kind rejection) + every scene
+    // object that becomes a samplable light (the one census, shared with the Validator
+    // and the light roster).
+    const totalLightCount = scene.lights.length + samplableEmitterObjects(scene).length;
 
     // --- Environment as a light (T3/T4, D6): tabulated kinds default TRUE, constant opt-in, none never.
     const env = scene.environment;

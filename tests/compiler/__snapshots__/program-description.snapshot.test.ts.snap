@@ -1490,6 +1490,630 @@ exports[`ProgramDescription structural snapshot (the link map) > blackhole + pt 
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-0 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 0,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-1 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 1,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-mis-0 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": true,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 0,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-mis-1 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": true,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 1,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-nee-0 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 0,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-nee-1 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 1,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtracer 1`] = `
 {
   "emitters": {
@@ -7777,6 +8401,318 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
     "tonemap": {
       "exposure": undefined,
       "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt-mis 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": true,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      1,
+      1,
+      1,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        0,
+        3.5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
     },
   },
 }
@@ -23914,6 +24850,224 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > proc-sky-rotated + pt-mis 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "glsl": {
+      "kind": "glsl",
+      "source": "vec3(0.02) + vec3(40.0) * smoothstep(0.985, 0.99, dot(dir, normalize(vec3(0.4, 0.35, 0.2))))",
+    },
+    "intensity": 1,
+    "rotation": -3,
+    "type": "procedural",
+  },
+  "environmentPdf": true,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > proc-sky-rotated + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "glsl": {
+      "kind": "glsl",
+      "source": "vec3(0.02) + vec3(40.0) * smoothstep(0.985, 0.99, dot(dir, normalize(vec3(0.4, 0.35, 0.2))))",
+    },
+    "intensity": 1,
+    "rotation": -3,
+    "type": "procedural",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": true,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.9,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1.4,
+        5,
+      ],
+      "target": [
+        0,
+        0.9,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > rayleigh + pathtracer 1`] = `
 {
   "emitters": {
@@ -25025,6 +26179,109 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-
     "tonemap": {
       "exposure": undefined,
       "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > rough-sheet + pt-mis 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "rough_dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": true,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": {
+        "default": 0.8,
+        "max": 1.5,
+        "min": 0.3,
+        "param": "camera.fov",
+      },
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 10,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
     },
   },
 }

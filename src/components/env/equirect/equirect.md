@@ -13,7 +13,11 @@ Two conventions that are load-bearing:
   SUBTRACTS it — the pair must be exact inverses or sample↔pdf and sample↔radiance
   silently disagree whenever rotation ≠ 0 (an earlier reference implementation had
   them BOTH adding — env-plan pitfall 1; the asymmetry is the fix, don't "repair" it).
-- The φ seam at ±π wraps via the texture's REPEAT mode — no seam handling in code.
+- **u is wrapped into [0, 1)** (`fract`). Radiance lookups would survive an unwrapped u
+  (the map texture uses REPEAT), but `environment_pdf` turns u into a CDF column index.
+  Before the wrap, a rotation shifted u outside [0, 1), the index was clamped to the edge
+  column, and the MIS pdf was read from the wrong column across a band of longitudes as
+  wide as the rotation — pt-mis was biased under any nonzero rotation (fixed Sep 2026).
 
 METRIC EXEMPTION (§5.3): raw trig on world directions is deliberate — the environment
 lives on direction-space S², not in scene space.

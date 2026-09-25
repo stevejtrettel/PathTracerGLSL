@@ -119,6 +119,54 @@ export function meshIsSamplableEmitter(scene: SceneDescription, mesh: MeshObject
         && hasConstantNonzeroEmission(mat.emission) && !isDrivenTransform(mesh.transform);
 }
 
+/** The light kind an emissive OBJECT of primitive `type` becomes, or undefined if none.
+ *  Only kinds that declare the inverse map `valuesFromRegion` qualify: softbeam also backs
+ *  onto a 'disk' region, but an emissive disk object is a disk light. */
+export function regionLightKind(type: string): string | undefined {
+    return Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === type && k.valuesFromRegion !== undefined)?.kind;
+}
+
+/** A scene object that enters the light registry as a samplable emitter. */
+export interface EmitterObject {
+    /** Index into scene.objects (≡ the object's region id). */
+    index: number;
+    /** The registry light kind it becomes. */
+    kind: string;
+}
+
+/**
+ * THE answer to "which scene OBJECTS are lights" — the object half of the light roster,
+ * identity only (no values), in roster order: emissive analytic objects in scene order,
+ * then emissive meshes in scene order. An object qualifies when its shape can be sampled
+ * as a light (analytic, samplableAsLight, constant placement, no retained local frame)
+ * and its material has CONSTANT nonzero emission and has not opted out (sampleAsLight:
+ * false). Authored `lights` are the other half of the roster.
+ *
+ * Everything that needs this fact reads it here — the Analyzer's light count, the
+ * Validator's light rules, and lightRosterOf (hence the data layout and the App). Before
+ * this, four modules each re-derived it from the raw scene and disagreed at the edges
+ * (a blackbody emission, an omitted sampleAsLight flag). Safe on unvalidated scenes: it
+ * computes no values, and the cheap material guards run before any placement math.
+ */
+export function samplableEmitterObjects(scene: SceneDescription): EmitterObject[] {
+    const out: EmitterObject[] = [];
+    scene.objects.forEach((o, index) => {
+        if (!isPrimitiveObject(o)) return;
+        if (PRIMITIVES[o.type]?.samplableAsLight !== true) return;
+        const mat = scene.materials[o.material];
+        if (mat === undefined || mat.sampleAsLight === false) return;
+        if (!hasConstantNonzeroEmission(mat.emission)) return;
+        if (resolveBackend(o.type, o.backend) !== 'analytic') return;
+        if (isDrivenTransform(o.transform) || keepsLocalFrame(o, scene)) return;
+        const kind = regionLightKind(o.type);
+        if (kind !== undefined) out.push({ index, kind });
+    });
+    scene.objects.forEach((o, index) => {
+        if (isMeshObject(o) && meshIsSamplableEmitter(scene, o)) out.push({ index, kind: 'mesh' });
+    });
+    return out;
+}
+
 /** One light-roster entry: the kind + its UNRESOLVED registry values (driven rows stay
  *  ValueParam/Blackbody; consumers resolve). Mesh entries carry empty values — their
  *  geometry lives in the rail; radiance/area are real row values (mesh treeBounds). */
@@ -148,46 +196,29 @@ export function lightRosterOf(scene: SceneDescription): LightRosterEntry[] {
         roster.push({ kind: light.kind, values: d.toValues(authored, product as number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue) });
     }
 
-    // Route 2 — sampleAsLight analytic objects (scene order; every Planner skip
-    // mirrored: SDF backend, driven transform, retained local frame, non-samplable
-    // primitive, sampleAsLight: false, non-constant emission, no kind inverse).
-    for (const o of scene.objects) {
-        if (!isPrimitiveObject(o)) continue;
-        if (resolveBackend(o.type, o.backend) !== 'analytic') continue;
-        if (isDrivenTransform(o.transform) || keepsLocalFrame(o, scene)) continue;
-        if (PRIMITIVES[o.type]?.samplableAsLight !== true) continue;
-        const mat = scene.materials[o.material];
-        if (mat === undefined || mat.sampleAsLight === false) continue;
-        // The Planner reads the RESOLVED material emission (constant blackbody dials
-        // fold to a Vec3 there) — fold here too before the C3 predicate.
-        const raw = mat.emission;
+    // Routes 2 and 3 — emissive OBJECTS, from the one census (samplableEmitterObjects),
+    // in its order: analytic objects, then meshes. The material emission is constant by
+    // the census predicate; a blackbody spelling folds to its constant spectrum here,
+    // exactly as the Planner's resolved material value does.
+    for (const { index, kind } of samplableEmitterObjects(scene)) {
+        const o = scene.objects[index] as PrimitiveObject | MeshObject;
+        const raw = scene.materials[o.material]!.emission;
         const em = isBlackbody(raw) ? foldBlackbody(raw) : raw;
-        if (!hasConstantNonzeroEmission(em)) continue;
         const Le = (typeof em === 'number' ? [em, em, em] : em) as number[];
-        const kindEntry = Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === o.type);
-        if (kindEntry?.valuesFromRegion === undefined) continue;
-        roster.push({
-            kind: kindEntry.kind,
-            values: kindEntry.valuesFromRegion(
-                foldPlacementIntoParameters(o.type, o.parameters, similarityFromTransform(o.transform)), Le),
-        });
-    }
-
-    // Route 3 — mesh emitters (the shared adapter predicate). Values mirror the
-    // Planner's mesh route exactly (radiance = the constant material emission,
-    // scalar-broadcast; area = the s²-folded WORLD total) — real values, because the
-    // mesh kind is tree-eligible (treeBounds: 'data') and its table row/power read
-    // them; only the BOX is pack-side (the App's 'data' route).
-    for (const m of sceneMeshes(scene.objects)) {
-        if (!meshIsSamplableEmitter(scene, m)) continue;
-        const e = scene.materials[m.material]!.emission as number | number[];
-        roster.push({
-            kind: 'mesh',
-            values: {
-                radiance: typeof e === 'number' ? [e, e, e] : e,
-                area: meshWorldArea(m.positions, m.indices, similarityFromTransform(m.transform).scale),
-            },
-        });
+        if (isMeshObject(o)) {
+            // Real values (the mesh kind is tree-eligible — its table row and power read
+            // them): radiance, and the s²-folded WORLD area. Only the BOX is pack-side.
+            roster.push({
+                kind,
+                values: { radiance: Le, area: meshWorldArea(o.positions, o.indices, similarityFromTransform(o.transform).scale) },
+            });
+        } else {
+            roster.push({
+                kind,
+                values: LIGHT_KINDS[kind].valuesFromRegion!(
+                    foldPlacementIntoParameters(o.type, o.parameters, similarityFromTransform(o.transform)), Le),
+            });
+        }
     }
 
     return roster;

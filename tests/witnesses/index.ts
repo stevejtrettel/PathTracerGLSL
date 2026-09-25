@@ -70,6 +70,7 @@ import {
     procSkyScene, procSkyNeeStrategy, procSkyMisStrategy, procSkyPtStrategy,
     skyMisOctStrategy, procSkyMisCompStrategy,
 } from './scenes/envScenes.js';
+import { bounceBudgetScene, bounceBudgetStrategies, procSkyRotatedScene, fogSkyScene, FOG_SKY_SIGMA, roughSheetScene } from './scenes/estimatorAgreementWitness.js';
 import { veachMis, veachMisStrategy, veachNeeStrategy, veachPtStrategy } from './scenes/ggxScenes.js';
 import {
     roughSmoothLimit, roughSmoothLimitStrategy,
@@ -1330,6 +1331,64 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'proc-sky nee ≡ mis' },
                 { kind: 'equality', strategies: [1, 3], meanTol: 0.02, label: 'W9 plain ≡ compensated table' },
             ],
+        },
+    },
+    // ── Estimator agreement (Sep 2026): each entry pins a place where two techniques must
+    // count exactly the same paths — see scenes/estimatorAgreementWitness.ts. All exact.
+    'bounce-budget': {
+        scene: bounceBudgetScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], ...bounceBudgetStrategies),
+        exercises:
+            'maxBounces means the SAME partial sum Σ_{n≤N} TⁿE under pt, pt-nee and pt-mis: the walk does N + 1 intersections, the last one scoring emission only (NEE and continuation stop at the budget). Keys 1-3: N = 0 (nee, mis, pt); keys 4-6: N = 1',
+        expected:
+            'N = 1: sphere = ρ·L = 0.4 exactly and sky = 1 on all three keys (a convex body\'s single bounce IS its whole answer). N = 0: sky = 1, sphere = 0 (only directly visible emission)',
+        witness: {
+            spp: 96,
+            checks: [0, 1, 2].flatMap((k) => [
+                { kind: 'mean' as const, value: 0, tol: 0.001, strategy: k, region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, label: `N=0 sphere = 0 (key ${k + 1})` },
+                { kind: 'mean' as const, value: 1.0, tol: 0.005, strategy: k, region: { x: 0.02, y: 0.88, w: 0.1, h: 0.1 }, label: `N=0 sky = L (key ${k + 1})` },
+                { kind: 'mean' as const, value: 0.4, tol: 0.008, strategy: k + 3, region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, label: `N=1 sphere = ρ·L = 0.4 (key ${k + 4})` },
+                { kind: 'mean' as const, value: 1.0, tol: 0.005, strategy: k + 3, region: { x: 0.02, y: 0.88, w: 0.1, h: 0.1 }, label: `N=1 sky = L (key ${k + 4})` },
+            ]),
+        },
+    },
+    'proc-sky-rotated': {
+        scene: procSkyRotatedScene,
+        strategies: posed([0, 1.4, 5], [0, 0.9, 0], procSkyNeeStrategy, procSkyMisStrategy),
+        exercises:
+            'the environment pdf under ROTATION: the equirect chart wraps u into [0, 1) so environment_pdf reads the column the sampler used (the sun sits in the band a −3-rad rotation pushes below u = 0)',
+        expected: 'keys 1 (pt-nee) and 2 (pt-mis) converge to the same image — mis brighter around the sun means the MIS pdf is read from the wrong table column',
+        witness: {
+            spp: 192,
+            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'rotated env: nee ≡ mis' }],
+        },
+    },
+    'fog-sky': {
+        scene: fogSkyScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy),
+        exercises:
+            'the far clip is one convention: environment NEE places the sky at MAX_DIST, where a missed BSDF ray finds it, so an ambient medium attenuates both by the same e^{−σ·MAX_DIST}',
+        expected: `sky = e^{−1} = 0.3679 and sphere centre = 0.4·e^{−1}·e^{−0.0025} = 0.1468 (σ_a = ${FOG_SKY_SIGMA}) on all three keys`,
+        witness: {
+            // 384, not furnace-sky's 96: the pt-nee arm (uniform-sphere sky sampling, half the
+            // samples below the horizon) has ~1% relative noise over the check region at 96 spp,
+            // so the 2% tolerance would be only ~2σ. Measured: +2.2% at 96 spp, +0.5% at 384.
+            spp: 384,
+            checks: [0, 1, 2].flatMap((k) => [
+                { kind: 'mean' as const, value: 0.4 * Math.exp(-1) * Math.exp(-2.5 * FOG_SKY_SIGMA), tol: 0.003, strategy: k, region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, label: `sphere = ρ·L·e^{−σ(1000+2.5)} (key ${k + 1})` },
+                { kind: 'mean' as const, value: Math.exp(-1), tol: 0.002, strategy: k, region: { x: 0.02, y: 0.88, w: 0.1, h: 0.1 }, label: `sky = L·e^{−σ·1000} (key ${k + 1})` },
+            ]),
+        },
+    },
+    'rough-sheet': {
+        scene: roughSheetScene,
+        strategies: posed([0, 1, 4], [0, 1, 0], cornellAreaMisStrategy),
+        exercises:
+            'an index-matched (η = 1) rough dielectric is the DELTA pass-through: a thin rough sheet in front of cornell-area, seen from its BACK (where both sides are air), must be invisible, never NaN (the microfacet branch\'s pdf is infinite at η = 1). From its front a thin dielectric currently refracts into its own index — an open defect, see the fixture',
+        expected: 'identical to cornell-area under pt-mis',
+        witness: {
+            spp: 192,
+            checks: [{ kind: 'twin', other: { scene: 'cornell-area', strategy: 1 }, meanTol: 0.02, label: 'η = 1 rough sheet ≡ no sheet (pt-mis)' }],
         },
     },
     orb: {

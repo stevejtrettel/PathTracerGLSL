@@ -75,7 +75,7 @@ LightSample environment_sample(Point p, vec2 xi) {
     float r = sqrt(max(0.0, 1.0 - z * z));
     float phi = TWO_PI * xi.y;
     ls.wi = vec3(r * cos(phi), z, r * sin(phi));
-    ls.distance = 1.0e20;                                          // §6.1 environment convention
+    ls.distance = MAX_DIST;                                        // the far clip — where a missed BSDF ray finds the sky
     ls.radiance = ${colorExpr} * u_envIntensity;         // without visibility
     ls.pdf = 1.0 / (4.0 * PI);                                     // per-light; selection applied by lighting_sample
     ls.flags = 0u;                                                 // not delta — BSDF paths see the env on miss

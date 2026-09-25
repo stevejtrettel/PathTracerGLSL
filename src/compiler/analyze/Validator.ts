@@ -7,7 +7,7 @@ import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { lightRosterOf, batchLightEligible, batchNeedsInterior } from '../plan/dataTenants.js';
+import { samplableEmitterObjects, batchLightEligible, batchNeedsInterior } from '../plan/dataTenants.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
@@ -270,12 +270,13 @@ export function validate(
                 .add();
         }
         const e = mat.emission;
-        const nonzeroEmission = typeof e === 'number' ? e > 0 : Array.isArray(e) ? e.some((c) => c > 0) : false;
         const negativeEmission = typeof e === 'number' ? e < 0 : Array.isArray(e) ? e.some((c) => c < 0) : false;
         if (negativeEmission) {
             bag.error('invalid-setting', `Material '${name}': emission components must be >= 0`).add();
         }
-        if (nonzeroEmission && !EMITTING_MODELS.has(mat.model)) {
+        // A CONSTANT emission (incl. a constant blackbody) on a non-emitting model: the
+        // light registry would admit it, so this is where the phantom light is caught.
+        if (hasConstantNonzeroEmission(e) && !EMITTING_MODELS.has(mat.model)) {
             const wouldRegister = mat.sampleAsLight !== false && samplableObjectUses(scene, name);
             if (wouldRegister) {
                 bag.error('invalid-setting',
@@ -435,6 +436,15 @@ export function validate(
         }
     }
 
+    // The bounce budget is spliced into the walk as an integer loop bound; anything but a
+    // non-negative integer would emit GLSL that fails to compile (or silently never loops).
+    const maxBounces = strategy.measurement.maxBounces;
+    if (typeof maxBounces !== 'number' || !Number.isInteger(maxBounces) || maxBounces < 0) {
+        bag.error('invalid-setting',
+            `measurement.maxBounces must be a non-negative integer — the number of scattering events a path may have (got ${String(maxBounces)})`)
+            .add();
+    }
+
     // Russian roulette's survival CEILING — a probability, same class of rule as
     // envSelectWeight. 1.0 is legal and means "never cap": survival is then the
     // throughput alone, which for a LOSSLESS path (clear glass) is 1 forever, so the
@@ -496,13 +506,25 @@ export function validate(
         // area arms land (reject-not-degrade). Registry-derived (the lights-door rule);
         // the explicit `!== undefined` guard matters — `!LIGHT_KINDS[k]?.delta` would
         // count UNREGISTERED kinds as area lights (they already get their own rejection).
+        // Emissive OBJECTS come from the one census: they are samplable lights whether or
+        // not the material says sampleAsLight: true (omitting it is the default), which
+        // the earlier material-flag test missed — the generator then crashed on them.
         const hasAreaLight = scene.lights.some((l) => {
             const kind = LIGHT_KINDS[l.kind];
             return kind !== undefined && !kind.delta;
-        }) || Object.values(scene.materials).some((m) => m.sampleAsLight === true);
+        }) || samplableEmitterObjects(scene).length > 0;
         if (hasAreaLight) {
             bag.error('incompatible-options',
-                `mediumLightSampling 'equiangular' supports DELTA lights only in v1 — this scene has samplable area emitters (deferred: p-independent area arms, impl-plan-equiangular §7)`)
+                `mediumLightSampling 'equiangular' supports DELTA lights only in v1 — this scene has samplable area emitters (an area light, or an emissive object sampled as a light; set sampleAsLight: false on its material to keep it path-traced only)`)
+                .add();
+        }
+        // Pin 1, environment half: the equiangular vertex samples delta lights only, but the
+        // NEE combiner gives the sky weight 0 after every scattering event ("NEE already
+        // counted it") — so a SAMPLED environment's single-scattered light would be counted
+        // by nothing and silently vanish from the medium.
+        if (features.environment.samplable) {
+            bag.error('incompatible-options',
+                `mediumLightSampling 'equiangular' samples delta lights only, so a samplable environment's light scattered in the medium would be lost — set the environment's sampleAsLight: false (it is then path-traced), or use 'vertex'`)
                 .add();
         }
         // Isotropy pin (the spot lesson): the generated delta query returns an
@@ -594,7 +616,13 @@ export function validate(
             `estimator.lightSelection '${lightSelection}' is not a light-selection occupant — registered: ${Object.keys(LIGHT_SELECTIONS).join(', ')} (default '${DEFAULT_LIGHT_SELECTION}')`)
             .add();
     } else if (lightSelection === 'bvh') {
-        const roster = lightRosterOf(scene);
+        // The roster's KINDS only — authored registered lights, then emissive objects (the
+        // census). No values are computed, so a malformed light that failed its own checks
+        // above cannot throw here.
+        const roster = [
+            ...scene.lights.filter((l) => LIGHT_KINDS[l.kind] !== undefined).map((l) => ({ kind: l.kind })),
+            ...samplableEmitterObjects(scene),
+        ];
         if (roster.length === 0 && !scene.objects.some((o) => isInstancedObject(o) && batchLightEligible(o, scene))) {
             // The C5 silent-inert rule (selection needs finite lights to select among).
             // Light-eligible batches count: a batch-lights-only scene (lights: [], one
@@ -863,10 +891,7 @@ export function validate(
             }
             // An emission VALUE on a model that cannot emit (its emission function ≡ 0).
             const emissiveCapable = MATERIAL_MODELS[mat.model]?.capabilities.emissive ?? false;
-            const hasEmission = mat.emission !== undefined && !isValueParam(mat.emission) && !isGlslExpression(mat.emission)
-                ? (typeof mat.emission === 'number' ? mat.emission > 0 : (mat.emission as Vec3).some((c) => c > 0))
-                : mat.emission !== undefined;
-            if (!emissiveCapable && hasEmission) {
+            if (!emissiveCapable && emissionMayBeNonzero(mat.emission)) {
                 bag.warning('invalid-setting',
                     `Material '${name}': emission is set but model '${mat.model}' cannot emit (its emission is identically zero) — the value is ignored`)
                     .add();
@@ -1508,6 +1533,20 @@ function validatePrimitiveConstraint(
 // Helpers (audit-hardening H1)
 // ============================================================================
 
+
+/** May this authored emission be nonzero at runtime? Constants by value (some channel
+ *  > 0), a blackbody by its scale (constant 0 → no, driven → maybe), and any {param} or
+ *  GLSL expression → maybe. Covers every value spelling of SpectrumProperty. */
+function emissionMayBeNonzero(e: unknown): boolean {
+    if (e === undefined) return false;
+    if (typeof e === 'number') return e > 0;
+    if (Array.isArray(e)) return e.some((c) => typeof c === 'number' && c > 0);
+    if (isBlackbody(e)) {
+        const s = e.blackbody.scale;
+        return s === undefined || isValueParam(s) || s !== 0;
+    }
+    return true;   // {param} or GLSL expression
+}
 
 function isVec3(v: unknown): v is Vec3 {
     return Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number');

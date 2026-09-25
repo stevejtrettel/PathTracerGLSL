@@ -367,11 +367,20 @@ export function mediumIsDeflecting(med: { ior?: unknown }): boolean {
  *  and the Planner's registry route — these jointly guard pt ≡ pt-nee, so agreeing by
  *  convention was the audit's M6). Absent, `{param}`-driven, and expression emissions are
  *  all FALSE: a v1 samplable emitter's power must bake into the compile-time CDF.
+ *  A BLACKBODY spelling counts when both dials are constant — it folds to a constant
+ *  spectrum at plan time — and is nonzero iff its scale is (the chroma is max-normalized,
+ *  so never zero). Callers may pass the raw authored value or the folded one and get the
+ *  same answer; before this, raw callers (Analyzer, Validator) said "not a light" while
+ *  folded callers (Planner) said "light", and the Validator crashed on the spelling.
  *  (Deliberately `!== 0`, matching the registry route; materials.ts's emission GATE uses
  *  `> 0` — a documented, separate fact.) */
 export function hasConstantNonzeroEmission(emission: unknown): boolean {
     if (typeof emission === 'number') return emission !== 0;
     if (Array.isArray(emission)) return emission.some((c) => typeof c === 'number' && c !== 0);
+    if (isBlackbody(emission)) {
+        const { kelvin, scale } = emission.blackbody;
+        return !isValueParam(kelvin) && (scale === undefined || (!isValueParam(scale) && scale !== 0));
+    }
     return false;
 }
 
@@ -552,7 +561,11 @@ export interface MeasurementDescription {
     /** Which functional each pixel reports. 'radiance' is the sole occupant; debug
      *  measurements (§11.3 pdf-histogram, §11.4 repair counter, AO) arrive as new values. */
     response?: 'radiance';
-    /** Truncation — limit: ∞ (Neumann partial sum; §7.2 counts surface + medium events). */
+    /** Truncation — limit: ∞. The measurement is the partial sum Σ_{n≤maxBounces} TⁿE:
+     *  paths with at most this many scattering events (surface and medium events count;
+     *  null-interface crossings do not). 0 = directly visible emission only; 1 = one-shot
+     *  direct lighting E + TE. Every estimator counts exactly this set of paths.
+     *  A non-negative integer. */
     maxBounces: number;
     /** Truncation — limit: 'full'. 'ignored' renders scattering media absorbing-only
      *  (the research A/B formerly expressed as volumeIntegrator 'none' on a scattering scene). */

@@ -48,6 +48,7 @@ Spectrum rough_dielectric_eval(Direction wi, Direction wo, Hit hit, MaterialProp
     vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
     if (wol.z <= 0.0 || wil.z == 0.0) return SPECTRUM_ZERO;   // grazing/degenerate
     float eta = ior_of(hit.region_from, hit.p) / ior_of(hit.region_to, hit.p);
+    if (eta == 1.0) return SPECTRUM_ZERO;   // index-matched: pure delta pass-through (see sample)
     vec3 m;
     if (!rough_dielectric_half(wil, wol, eta, m)) return SPECTRUM_ZERO;
 
@@ -79,6 +80,22 @@ InteractionSample rough_dielectric_sample(Direction wo, Hit hit, MaterialPropert
     float n_i = ior_of(hit.region_from, hit.p);
     float n_t = ior_of(hit.region_to, hit.p);
     float eta = n_i / n_t;
+
+    // Index-matched interface (η = 1, e.g. both sides of a thin sheet, or glass inside
+    // glass of the same index): F = 0 and every microfacet refracts wo straight through,
+    // so the BSDF collapses to the DELTA pass-through wi = −wo. The microfacet branch below
+    // would produce that direction with an infinite pdf — the Jacobian's denominator
+    // (wi·m + η wo·m)² is exactly 0 — which becomes NaN in the MIS weight. eval and pdf
+    // return 0 at η = 1 (mathematically they are 0 anyway: F = 0 kills reflection and the
+    // half-vector test rejects every transmitted pair; the explicit early return removes
+    // the fp residue of F), so the delta sample is the whole BSDF. pbrt-v4 does the same.
+    if (eta == 1.0) {
+        s.wi = -wo;
+        s.weight = mp.transmittance;                  // T = 1 − F = 1, and η² = 1
+        s.pdf = 0.0;                                  // delta convention (interaction.glsl)
+        s.flags = LOBE_TRANSMISSION | LOBE_DELTA;
+        return s;
+    }
 
     vec3 m = microfacet_sample_vndf(wol, a, u);       // visible microfacet normal (Heitz 2018)
     float cos_om = clamp(dot(wol, m), 1e-6, 1.0);
@@ -116,6 +133,7 @@ float rough_dielectric_pdf(Direction wi, Direction wo, Hit hit, MaterialProperti
     vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
     if (wol.z <= 0.0 || wil.z == 0.0) return 0.0;
     float eta = ior_of(hit.region_from, hit.p) / ior_of(hit.region_to, hit.p);
+    if (eta == 1.0) return 0.0;             // index-matched: pure delta pass-through (see sample)
     vec3 m;
     if (!rough_dielectric_half(wil, wol, eta, m)) return 0.0;
 

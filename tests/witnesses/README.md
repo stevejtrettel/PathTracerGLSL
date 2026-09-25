@@ -21,7 +21,31 @@ lab), but nothing here imports from `compiler/scenes/`.
 - `scenes/` — the fixtures: scene + strategy definitions, with their derivations in
   comments (why 0.4, why RR is off, what a failure implicates).
 
-## Known failing witnesses — the Aug 12 2026 sweep
+## Known failing witnesses — current (Sep 24 2026 sweep)
+
+**Read this before diagnosing a red row.** Full sweep after the Sep 24 fixes (CHANGELOG.md):
+**175 exact checks + 1 cross-check; every check passes except these six**, all standing
+markers for open work:
+
+- the four GRIN furnaces (`grin-furnace`, `-emit`, `-scatter`, `-hard`) — ~25% low, section A below;
+- `softbeam-wall` core — +3.3%, section B below;
+- `cube-cloud` — the hang, section D below.
+
+(`slab-albedo`, section C, is resolved.)
+
+**Runner flake.** A check can report `ERROR: page.evaluate: TypeError: Cannot read properties
+of undefined (reading 'readExport')` — the page's `app` was not ready when the runner read
+back. It hit a different check on each of the two Sep 24 sweeps and never on a re-run of the
+same scene. Re-run that scene before treating the row as red.
+
+**Thin dielectrics are one-sided (open defect, no witness yet).** On a FRONT-face hit of a
+zero-thickness surface the dispatcher reports `region_to` = the surface's own region, which
+carries the material's index, so a thin glass sheet refracts as if entering glass and never
+exits (bent, darkened by η²); from its back both sides are air (η = 1). The same asymmetry is
+what makes quad lights one-sided. The Validator's thin-surface warning ("will refract as
+η = 1") is only true from the back. `rough-sheet` deliberately views its sheet from the back.
+
+## The Aug 12 2026 sweep (historical record)
 
 **Read this before diagnosing a red row.** The suite is not expected to be all-green: ten checks
 fail, in four unrelated groups, and every one is a standing marker for real work rather than an

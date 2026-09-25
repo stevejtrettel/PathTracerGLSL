@@ -63,6 +63,7 @@ function half(wil: V3, wol: V3, eta: number): V3 | null {
 
 function evalBsdf(wi: V3, wo: V3, roughness: number, eta: number, tint = 1): number {
     if (wo[2] <= 0.0 || wi[2] === 0.0) return 0.0;
+    if (eta === 1.0) return 0.0;
     const m = half(wi, wo, eta);
     if (m === null) return 0.0;
     const a = alphaOf(roughness);
@@ -78,6 +79,7 @@ function evalBsdf(wi: V3, wo: V3, roughness: number, eta: number, tint = 1): num
 
 function pdfBsdf(wi: V3, wo: V3, roughness: number, eta: number): number {
     if (wo[2] <= 0.0 || wi[2] === 0.0) return 0.0;
+    if (eta === 1.0) return 0.0;
     const m = half(wi, wo, eta);
     if (m === null) return 0.0;
     const a = alphaOf(roughness);
@@ -110,11 +112,13 @@ function sampleVndf(wo: V3, a: number, u1: number, u2: number): V3 {
     return norm([a * nh[0], a * nh[1], Math.max(1e-6, nh[2])]);
 }
 
-interface TwinSample { wi: V3; weight: number; pdf: number; rejected: boolean }
+interface TwinSample { wi: V3; weight: number; pdf: number; rejected: boolean; delta?: boolean }
 
 function sampleBsdf(wo: V3, roughness: number, eta: number, uc: number, u1: number, u2: number, tint = 1): TwinSample {
     const dead: TwinSample = { wi: wo, weight: 0, pdf: 0, rejected: true };
     if (wo[2] <= 0.0) return dead;
+    // Index-matched interface: the delta pass-through (pdf 0 = the delta convention).
+    if (eta === 1.0) return { wi: neg(wo), weight: tint, pdf: 0, rejected: false, delta: true };
     const a = alphaOf(roughness);
     const m = sampleVndf(wo, a, u1, u2);
     const cosOm = Math.min(1.0, Math.max(1e-6, dot(wo, m)));
@@ -298,6 +302,29 @@ describe('rough dielectric §11.3 pdf–histogram consistency (TS twin of rough_
             checked++;
         }
         expect(checked).toBeGreaterThan(1000);
+    });
+
+    it('index-matched interface (η = 1): the BSDF is exactly the delta pass-through', () => {
+        // At η = 1 the refracted direction is −wo for every microfacet and F = 0, so all the
+        // mass sits on one direction. The microfacet sampling branch reaches that direction
+        // with an infinite pdf: the Jacobian's denominator (wi·m + η wo·m)² vanishes. Under
+        // MIS that became ∞/∞ = NaN and poisoned pixels (thin rough-glass sheets, glass in
+        // index-matched glass). The fix treats it as a delta sample; this pins BOTH halves
+        // of that: every sample is the pass-through, and eval/pdf are zero everywhere, so
+        // the delta sample is the complete BSDF (nothing is lost or double-counted).
+        const rand = lcg(2718);
+        for (let i = 0; i < 2000; i++) {
+            const wo = dirOf(0.02 + 0.97 * rand(), 2 * Math.PI * rand());
+            const r = 0.05 + 0.9 * rand();
+            const s = sampleBsdf(wo, r, 1.0, rand(), rand(), rand(), 0.8);
+            expect(s.delta).toBe(true);
+            expect(s.wi).toEqual(neg(wo));
+            expect(s.weight).toBe(0.8);
+            expect(s.pdf).toBe(0);
+            const wi = dirOf(-1 + 2 * rand(), 2 * Math.PI * rand());
+            expect(evalBsdf(wi, wo, r, 1.0)).toBe(0);
+            expect(pdfBsdf(wi, wo, r, 1.0)).toBe(0);
+        }
     });
 
     it('reflection lobe is plainly reciprocal (no η factor on that side)', () => {

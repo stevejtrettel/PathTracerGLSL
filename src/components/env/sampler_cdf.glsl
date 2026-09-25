@@ -65,7 +65,12 @@ LightSample environment_sample(Point p, vec2 xi) {
 
     LightSample ls;
     ls.wi = env_chart_dir(uv);
-    ls.distance = 1.0e20;                                     // §6.1 environment convention
+    // The sky sits at the FAR CLIP, exactly where a BSDF ray that misses finds it: its shadow
+    // ray tests occluders out to MAX_DIST and its media walk attenuates over MAX_DIST — the
+    // same world a missed BSDF ray sees, so NEE and BSDF sampling estimate the same term.
+    // (A 1e20 sentinel here saw planes beyond the clip, and extinguished the sky entirely
+    // in any ambient medium, while missed BSDF rays were attenuated over only MAX_DIST.)
+    ls.distance = MAX_DIST;
     // DEFINITIONAL consistency (T4): the sampler returns exactly the radiance the miss
     // branch would see for this direction — image envs re-fetch through the chart (an exact
     // round-trip), procedural envs direct-eval the formula. This is the MIS requirement
