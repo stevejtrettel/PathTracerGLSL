@@ -34,11 +34,17 @@ bool cylinder_intersect(Ray ray, Cylinder c, out float t) {
     float bq = q.x * d.x + q.z * d.z;
     float cc = q.x * q.x + q.z * q.z - c.radius * c.radius;
     if (a > 1e-12) {
-        float disc = bq * bq - a * cc;
+        // The sphere_intersect robust form in 2D: bq² − a·cc = a·r² − (q × d)² (Lagrange's
+        // identity), which avoids subtracting two numbers of size |q|² for thin, distant
+        // tubes; the near root as cc/Q.
+        float cross_qd = q.x * d.z - q.z * d.x;
+        float disc = a * c.radius * c.radius - cross_qd * cross_qd;
         if (disc < 0.0) return false;
-        float s = sqrt(disc);
-        tn = max(tn, (-bq - s) / a);
-        tf = min(tf, (-bq + s) / a);
+        float Q = (bq >= 0.0) ? -bq - sqrt(disc) : -bq + sqrt(disc);
+        if (Q == 0.0) return false;   // tangent through the origin
+        float ra = Q / a, rb = cc / Q;
+        tn = max(tn, min(ra, rb));
+        tf = min(tf, max(ra, rb));
         if (tf < tn) return false;
     } else if (cc > 0.0) {
         return false;   // axis-parallel ray outside the tube
@@ -76,11 +82,17 @@ bool cylinder_interval(Ray ray, Cylinder c, out float t0, out float t1) {
     float bq = q.x * d.x + q.z * d.z;
     float cc = q.x * q.x + q.z * q.z - c.radius * c.radius;
     if (a > 1e-12) {
-        float disc = bq * bq - a * cc;
+        // The sphere_intersect robust form in 2D: bq² − a·cc = a·r² − (q × d)² (Lagrange's
+        // identity), which avoids subtracting two numbers of size |q|² for thin, distant
+        // tubes; the near root as cc/Q.
+        float cross_qd = q.x * d.z - q.z * d.x;
+        float disc = a * c.radius * c.radius - cross_qd * cross_qd;
         if (disc < 0.0) return false;
-        float s = sqrt(disc);
-        tn = max(tn, (-bq - s) / a);
-        tf = min(tf, (-bq + s) / a);
+        float Q = (bq >= 0.0) ? -bq - sqrt(disc) : -bq + sqrt(disc);
+        if (Q == 0.0) return false;   // tangent through the origin
+        float ra = Q / a, rb = cc / Q;
+        tn = max(tn, min(ra, rb));
+        tf = min(tf, max(ra, rb));
     } else if (cc > 0.0) {
         return false;
     }

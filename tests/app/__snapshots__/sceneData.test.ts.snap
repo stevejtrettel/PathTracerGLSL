@@ -676,6 +676,10 @@ exports[`scene-data textures (byte fingerprints) > sun 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > thinlens-zero 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > tiny-sphere 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > tiny-sphere-light 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > tonemap 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > transform-bake 1`] = `null`;

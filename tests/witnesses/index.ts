@@ -42,6 +42,7 @@ import { sdfTableTwin, sdfInstanceTwin, sdfInstanceTwinRef, sdfInstanceStrategy,
 import { fieldGlass, fieldGlassNeeStrategy, fieldGlassMisStrategy, fieldGlassPtStrategy } from './scenes/customFieldWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
+import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN } from './scenes/precisionWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
 import {
     slabScene, slabStrategy,
@@ -1709,6 +1710,32 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                     label: 'F-SOFTBEAM outside-cone = 0 exactly',
                 },
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'F-SOFTBEAM nee ≡ mis (hittable + cone gate)' },
+            ],
+        },
+    },
+    'tiny-sphere': {
+        scene: tinySphereScene,
+        strategies: posed([0, 0, 0], [0, 0, -1], tinySphereStrategy),
+        exercises: 'sphere_intersect precision: an emissive sphere of radius 0.01 at distance 40 (r/D = 2.5e-4, an instance-cloud sphere seen from across the cloud) through a narrow pinhole — the perpendicular-offset discriminant (Ray Tracing Gems ch. 7) vs the old b² − c, which subtracted two numbers of size 1600 to find one of size 1e-4',
+        expected: 'a clean 10-px disk; frame mean = disk area / frame area',
+        witness: {
+            spp: 256,
+            size: TINY_SIZE,
+            checks: [
+                { kind: 'mean', value: TINY_SPHERE_MEAN, tol: 0.0015, label: 'tiny sphere covers π·ρ² pixels' },
+            ],
+        },
+    },
+    'tiny-sphere-light': {
+        scene: tinySphereLightScene,
+        strategies: posed(TINY_LIGHT_CAMERA.position, TINY_LIGHT_CAMERA.target, tinySphereLightStrategy),
+        exercises: 'sphere-light sampling precision: r/d = 1e-4, where the old f32 1 − sqrt(1 − sin²α) rounded to 0, the 1e-8 floor took over and the light read exactly twice its value; now sin²α/(1 + cosα), the w(2 − w) polar-angle sample, and the robust near-root distance',
+        expected: 'wall radiance ρ·Le·r²/d²·(1 + x²/d²)^(−3/2) ≈ 0.5 in the crop',
+        witness: {
+            spp: 64,
+            size: TINY_SIZE,
+            checks: [
+                { kind: 'mean', value: TINY_LIGHT_MEAN, tol: 0.005, region: TINY_LIGHT_REGION, label: 'tiny sphere light ρ·Le·sin²α' },
             ],
         },
     },

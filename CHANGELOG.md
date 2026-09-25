@@ -4,6 +4,30 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — precision: small, distant spheres (intersection and sphere lights)
+
+Found by the Sep 25 audit (f32 emulation), confirmed on the GPU with two new exact witnesses.
+
+- **Sphere and cylinder intersection** computed the discriminant as b² − c, subtracting two
+  numbers of size |oc|² to find one of size r². For a sphere small against its distance (an
+  instance-cloud sphere seen from across the cloud, r/D ~ 1e-3) hit/miss near the silhouette
+  was decided largely by rounding and hit points moved by a large fraction of r. Both now use
+  the perpendicular-offset form of Haines et al. (Ray Tracing Gems ch. 7), r² − |oc − b·d|²,
+  with the near root as c/q; the cylinder's tube uses the 2D version (Lagrange's identity).
+- **Sphere lights** computed 1 − cosθmax as 1 − sqrt(1 − sin²θmax), which keeps almost no
+  bits for small or distant spheres, and that number is the pdf: at r/d ≲ 1.5e-4 it rounded to
+  0 and the 1e-8 floor made the light exactly twice as bright; at r/d = 1e-3 (the embers
+  demo) the error is up to ±12% per shading point. Now sin²θmax/(1 + cosθmax); the polar angle
+  is sampled as w = u·(1 − cosθmax), sin²θ = w(2 − w) (the old form quantized small cones onto a
+  few rings); the distance to the sampled point uses the robust near root. The pdf mirror uses
+  the same function, so the sampler/pdf byte match holds.
+- New witnesses (tests/witnesses/scenes/precisionWitness.ts): `tiny-sphere` (an emissive
+  sphere at r/D = 2.5e-4; frame mean = disk area / frame area) read 0.2195 on the old code
+  against 0.0767 and reads 0.0768 now; `tiny-sphere-light` (a wall under a sphere light at
+  r/d = 1e-4; L = ρ·Le·r²/d²·(1 + x²/d²)^(−3/2)) read 0.9998 against 0.4997 and reads 0.4997.
+
+Generated-GLSL snapshots changed by exactly these three formulas (plus source-map offsets).
+
 ## 2026-09-25 — the GRIN "energy loss" was black lenses; the softbeam "bias" was noise
 
 **GRIN regions rendered black whenever their region id differed from their material id.**
