@@ -686,10 +686,12 @@ function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSam
         // The kind's density lives in its GLSL file, ADJACENT to its sampler (the §6.1
         // byte-match invariant is now two functions over one struct) — the arm here is
         // pure composition: selection pdf × the kind's solid-angle pdf. The mesh kind's
-        // emitting normal varies per hit (unlike the quad's struct field), so its arm
-        // passes the emitter hit's frame normal (a front hit: n IS the outward normal).
+        // emitting normal varies per hit (unlike the quad's struct field), so its arm passes
+        // the emitter hit's GEOMETRIC normal: the sampler converts area to solid angle with
+        // the triangle's plane normal, and the two pdfs must agree (the shading normal of a
+        // smooth mesh would not).
         if (l.mesh !== undefined) {
-            lines.push(`    if (light_id == ${l.id}) return ${select} * mesh_light_pdf(${lightRef(l)}, q.p, light_hit.p, light_hit.frame.n, wi);`);
+            lines.push(`    if (light_id == ${l.id}) return ${select} * mesh_light_pdf(${lightRef(l)}, q.p, light_hit.p, light_hit.ng, wi);`);
             continue;
         }
         lines.push(`    if (light_id == ${l.id}) return ${select} * ${d.kind}_light_pdf(${lightRef(l)}, q.p, light_hit.p, wi);`);
@@ -933,8 +935,8 @@ function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBak
             if (kind === 'mesh') {
                 // The mesh pdf is IDENTITY-FREE (area measure over the row's world total)
                 // — no rail bases needed; the emitting normal varies per hit, so the arm
-                // passes the emitter hit's frame normal (the CDF-regime shape).
-                lines.push(`        if (kind == ${code}) return light_tree_pmf(q, light_id)${stage0} * mesh_light_pdf(mesh_light_row(light_id), q.p, light_hit.p, light_hit.frame.n, wi);`);
+                // passes the emitter hit's geometric normal (as in the CDF regime).
+                lines.push(`        if (kind == ${code}) return light_tree_pmf(q, light_id)${stage0} * mesh_light_pdf(mesh_light_row(light_id), q.p, light_hit.p, light_hit.ng, wi);`);
                 return;
             }
             lines.push(`        if (kind == ${code}) return light_tree_pmf(q, light_id)${stage0} * ${kind}_light_pdf(${kind}_light_row(light_id), q.p, light_hit.p, wi);`);

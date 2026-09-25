@@ -713,6 +713,7 @@ function primitiveHitFill(indent: string, o: {
         'hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
         `hit.eps = ${o.eps};`,
         `hit.frame = ambient_frame(hit.p, ${o.nWorld});`,
+        'hit.ng = hit.frame.n;   // a primitive\'s normal is its true surface normal',
         `hit.region_owner = ${o.region};`,
         `hit.element = ${o.element ?? '0'};`,
         o.uv,
@@ -902,13 +903,14 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
         const nearest = engine.nearestCall(m.slot, { smooth: m.smooth, triCount: m.triCount, ro: pl.ro, rd: pl.rd });
         lines.push(`bool mesh_${ids.get(m.index)!}(Ray ray, inout Hit hit) {`);
         lines.push(...pl.setup.map((s) => `    ${s}`));
-        lines.push(`    vec3 nLocal; vec2 uv;`);
+        lines.push(`    vec3 nLocal, gLocal; vec2 uv;`);
         lines.push(`    if (${nearest}) {`);
         // hit.t was shrunk to the local (== world) t inside the leaf; the world point is the
         // world ray at that t (ray-into-local preserves the parameter, impl-plan-meshes §6).
         lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);`);
-        lines.push(`        hit.eps = MESH_T_MIN;   // shading-normal spawn — the mesh tier's clearance (mesh.glsl)`);
+        lines.push(`        hit.eps = MESH_T_MIN;   // the mesh tier's clearance (mesh.glsl)`);
         lines.push(`        hit.frame = ambient_frame(hit.p, normalize(${pl.nWorld('nLocal')}));`);
+        lines.push(`        hit.ng = normalize(${pl.nWorld('gLocal')});   // the triangle's plane normal`);
         lines.push(`        hit.region_owner = ${m.index};`);
         lines.push(`        hit.element = 0;   // per-triangle refs are a future tenant`);
         lines.push(`        hit.uv = uv;`);
@@ -1020,13 +1022,14 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
         if (forAny) return [...read, ...conj,
             `if (mesh_any_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ro, rd, maxDist)) return true;`];
         return [...read, ...conj,
-            'vec3 nLocal; vec2 uv;',
-            `if (mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, uv)) {`,
+            'vec3 nLocal, gLocal; vec2 uv;',
+            `if (mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${g.vbase}u, ${g.tbase}u, ${g.nbase}u, ${b.prototype.smooth}, ro, rd, hit.t, nLocal, gLocal, uv)) {`,
             '    found = true;',
             '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
             '    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
-            '    hit.eps = MESH_T_MIN;   // shading-normal spawn — the mesh tier\'s clearance (mesh.glsl)',
+            '    hit.eps = MESH_T_MIN;   // the mesh tier\'s clearance (mesh.glsl)',
             '    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));',
+            '    hit.ng = normalize(placement_normal(q, gLocal));   // the triangle\'s plane normal',
             `    hit.region_owner = ${b.index};`,
             '    hit.uv = uv;',
             '}'];
@@ -1709,6 +1712,7 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     }
     lines.push('            hit.region_to   = outside;');
     lines.push('            hit.frame = ambient_frame(hit.p, -hit.frame.n);   // §4.1: n faces region_from');
+    lines.push('            hit.ng = -hit.ng;                                  // and so does the geometric normal');
     lines.push('        }');
     lines.push('    }');
     lines.push('    return found;');

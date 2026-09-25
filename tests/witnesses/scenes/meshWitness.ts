@@ -269,6 +269,45 @@ export const meshLightRef: SceneDescription = {
     environment: { type: 'none' },
 };
 
+// ---------------------------------------------------------------------------
+// mesh-light-smooth — a SMOOTH-SHADED emissive mesh: the MIS pdf must use the geometric normal.
+//
+// A regular octahedron lamp (6 shared vertices, 8 faces) with RADIAL vertex normals. Face
+// normals point along the diagonals (±1, ±1, ±1)/√3 and vertex normals along the axes, so the
+// interpolated shading normal leaves the plane normal by up to 54.7° toward the vertices (they
+// agree at face centers). The NEE sampler converts area to solid angle with the plane normal;
+// the MIS pdf query at a BSDF-found lamp hit must use the same one (Hit.ng). With the shading
+// normal there, the two pdfs differ, the MIS weights stop summing to 1, and pt-mis drifts from
+// pt-nee in a pattern that follows the facets.
+// ---------------------------------------------------------------------------
+
+function octahedronMesh(center: number[], r: number): { positions: Float32Array; indices: Uint32Array; normals: Float32Array } {
+    const axes = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    const positions = new Float32Array(axes.flatMap((a) => a.map((x, k) => center[k] + r * x)));
+    const normals = new Float32Array(axes.flat());   // radial: each vertex normal is its axis
+    const idx: number[] = [];
+    for (const sx of [1, -1]) for (const sy of [1, -1]) for (const sz of [1, -1]) {
+        const X = sx > 0 ? 0 : 1, Y = sy > 0 ? 2 : 3, Z = sz > 0 ? 4 : 5;
+        // (X, Y, Z) winds outward exactly when sx·sy·sz > 0; otherwise swap two.
+        if (sx * sy * sz > 0) idx.push(X, Y, Z); else idx.push(X, Z, Y);
+    }
+    return { positions, indices: new Uint32Array(idx), normals };
+}
+const smoothLamp = octahedronMesh([0, 1.9, 0], 0.5);
+
+export const meshLightSmooth: SceneDescription = {
+    id: 'mesh-light-smooth',
+    name: 'Mesh Light, smooth-shaded (octahedron lamp)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        ...lampObjects,
+        { kind: 'mesh', positions: smoothLamp.positions, indices: smoothLamp.indices, normals: smoothLamp.normals, material: 'lamp', name: 'octa' },
+    ],
+    materials: lampMaterials,
+    lights: [],
+    environment: { type: 'none' },
+};
+
 const lampBase = (id: string, direct: 'nee' | 'mis' | 'none'): RenderStrategy => withPose({
     id,
     measurement: { camera: { type: 'pinhole', fov: 0.9 }, maxBounces: 5 },
@@ -299,3 +338,4 @@ export const meshTwinBruteStrategy: RenderStrategy = {
     id: 'pathtracer-brute',
     estimator: { ...meshTwinStrategy.estimator, meshTraversal: 'brute' },
 };
+

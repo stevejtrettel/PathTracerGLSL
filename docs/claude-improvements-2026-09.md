@@ -3,8 +3,8 @@
 Written after the Sep 24–25 review, bug-fix and audit sessions. What was already fixed is in
 `CHANGELOG.md` (Sep 24 and Sep 25 entries). This document is what remains: things we could
 do next, most valuable first, with a worked-out plan wherever I could research one fully.
-Nothing here is built. Items marked **Your call** need a decision from you before any code
-(1.1 has since been decided).
+Nothing here is built except where marked. Items marked **Your call** need a decision from
+you before any code (1.1 has since been decided and built).
 
 Each item says: what it is, why it matters (with the evidence), and the plan.
 
@@ -15,7 +15,7 @@ Each item says: what it is, why it matters (with the evidence), and the plan.
 These are real defects or estimator-dependent truncations. I left them unfixed because each
 one changes an interface or a declared semantic, which you prefer to decide yourself.
 
-### 1.1 Mesh lights under MIS use the wrong normal for smooth meshes — **Decided: add `Hit.ng`**
+### 1.1 Mesh lights under MIS use the wrong normal for smooth meshes — **Built (Sep 25): `Hit.ng`**
 
 **What.** For a mesh light with interpolated (smooth) normals, the NEE sampler converts
 area to solid angle with the triangle's *geometric* normal, but the MIS pdf query at a
@@ -48,6 +48,13 @@ surface. `ng` lets the latter two go too. Considered and not chosen: recovering 
 from a triangle index in `Hit.element` (fixes only the pdf, costs vertex fetches per emitter
 hit), and a Validator rule against smooth normals on sampled mesh lights (smallest, but the
 limitation returns with normal mapping).
+
+**Built (Sep 25).** `Hit.ng` exists; `mesh_light_pdf` and `ray_spawn` read it (CHANGELOG). The
+witness showed the spawn rule mattered more than the pdf: with the shading-normal offset, a
+reflected ray sampled below a smooth lamp's true plane re-hit its own triangle and counted the
+emission under MIS only (mis 5% bright). Remaining: test whether `MESH_T_MIN` can shrink, and
+whether the dispatcher can classify front/back by `ng` so `mesh_test_range` no longer has to
+re-orient the shading normal.
 
 ### 1.2 Three budgets that make the image depend on the estimator — **Your call** (semantics)
 

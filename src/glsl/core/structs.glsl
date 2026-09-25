@@ -31,12 +31,21 @@ struct Hit {
     float t;
     Point p;
     Frame frame;        // shading frame; n oriented toward region_from (§4.1)
+    Direction ng;       // GEOMETRIC normal of the surface actually hit, oriented like frame.n
+                        // (toward region_from). Equal to frame.n wherever the shading normal is
+                        // the true surface normal (analytic and marched surfaces, flat meshes);
+                        // it differs where shading is interpolated or perturbed (smooth meshes,
+                        // later normal/bump maps). Read it for anything that depends on the
+                        // surface's real orientation: which side of the surface a spawned ray
+                        // starts on (ray_spawn), and an emitter's area → solid-angle conversion,
+                        // which must match its sampler (mesh_light_pdf).
     int region_from;    // medium behind the boundary (-1 = ambient) — §4.2 classification
     int region_to;      // medium ahead of the boundary — emission keys on this (§6.2)
     int region_owner;   // whose surface this IS (§4.3) — material_of(region_owner) shades (§4.1)
-    vec2 uv;            // surface parameterization — PLACEHOLDER planar xz chart today (all
-                        // writers use UV_PLANAR_SCALE); no reader yet — the first consumer
-                        // will be a procedural material, which owns making this chart real.
+    vec2 uv;            // surface coordinates: the shape's own chart (<type>_uv) when it declares
+                        // one, interpolated vertex uvs on meshes, else the planar placeholder
+                        // (x, z)·UV_PLANAR_SCALE. Read by scene_material_properties (checker and
+                        // expression materials).
     int element;        // sub-element of the OWNING region that produced this hit (owner-
                         // approved contract edit, fable-instance-attributes): the region says
                         // WHOSE surface, element says WHICH PIECE of it. Instanced batch →
@@ -48,7 +57,7 @@ struct Hit {
                         // edit, impl-plan-epsilon-discipline): the arm that made the hit
                         // states how well it knows p — spawn_eps_analytic(p) for analytic
                         // roots (fp-scale, coordinate-relative), MARCH_CLEARANCE for marched
-                        // commits, MESH_T_MIN for triangle hits (shading-normal compromise).
+                        // commits, MESH_T_MIN for triangle hits.
                         // ray_spawn's escape offset is the ONE reader. The dispatcher seeds
                         // the conservative default so a missed arm degrades, never garbage.
 };

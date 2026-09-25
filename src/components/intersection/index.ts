@@ -33,12 +33,12 @@ export const DEFAULT_MESH_TRAVERSAL = 'bvh';
 export const MESH_TRAVERSALS: Record<string, MeshTraversalDescriptor> = {
     brute: {
         nodeTexture: false,
-        nearestCall: (s, o) => `mesh_nearest_local(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, ${s.vbase}u, ${s.tbase}u, ${o.triCount}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, uv)`,
+        nearestCall: (s, o) => `mesh_nearest_local(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, ${s.vbase}u, ${s.tbase}u, ${o.triCount}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, gLocal, uv)`,
         anyCall: (s, o) => `mesh_any_local(u_data_vertices, u_data_indices, ${s.vbase}u, ${s.tbase}u, ${o.triCount}u, ${o.ro}, ${o.rd}, maxDist)`,
     },
     bvh: {
         nodeTexture: true,
-        nearestCall: (s, o) => `mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${s.vbase}u, ${s.tbase}u, ${s.nbase}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, uv)`,
+        nearestCall: (s, o) => `mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${s.vbase}u, ${s.tbase}u, ${s.nbase}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, gLocal, uv)`,
         anyCall: (s, o) => `mesh_any_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${s.vbase}u, ${s.tbase}u, ${s.nbase}u, ${o.ro}, ${o.rd}, maxDist)`,
     },
 };

@@ -24,8 +24,13 @@ Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  �
 2. **`scene_intersect(Ray) → Hit`** — advance to the next intersection. One contract; it subsumes
    SDF marching, analytic intersection, and (future) mesh/BVH as geometry **capabilities**
    (`sdf?` / `ray?` / `instances?`), taking the nearest hit and coordinating via `tmax`.
-3. **`Hit`** — the landing record: where you arrived, the shading frame, the regions flanking
-   the boundary, the owner's sub-element index (`element` — which PIECE of the owning
+3. **`Hit`** — the landing record: where you arrived, the shading frame, the **geometric
+   normal** (`ng` — the true normal of the surface hit, oriented like the shading normal;
+   equal to it except where shading is interpolated or perturbed: smooth meshes now, normal
+   and bump maps later. Anything that depends on the surface's real orientation reads it:
+   `ray_spawn` offsets along it, so a spawned ray starts on the side of the true surface it
+   travels into, and a mesh emitter's area → solid-angle conversion uses it), the regions
+   flanking the boundary, the owner's sub-element index (`element` — which PIECE of the owning
    region's surface; owner-approved July 2026, fable-instance-attributes: placement index for
    instanced batches, 0 elsewhere; future per-triangle/Stage-B refs ride the same channel),
    and the point's **positional uncertainty** (`eps` — owner-approved Aug 2026,

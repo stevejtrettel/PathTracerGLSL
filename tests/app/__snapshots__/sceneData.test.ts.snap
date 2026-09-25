@@ -420,6 +420,17 @@ exports[`scene-data textures (byte fingerprints) > mesh-instance-twin 1`] = `
 
 exports[`scene-data textures (byte fingerprints) > mesh-light-ref 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > mesh-light-smooth 1`] = `
+{
+  "indices": "4096x1 1b3b6631cd370e5c",
+  "nodes": "4096x1 c431a1352734ccf8",
+  "normals": "4096x1 6c258a99edd08c6e",
+  "records": "4096x1 ecfd83a2d540b452",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 c54e485f739d49a3",
+}
+`;
+
 exports[`scene-data textures (byte fingerprints) > mesh-light-twin 1`] = `
 {
   "indices": "4096x1 06d40912ce8f268d",

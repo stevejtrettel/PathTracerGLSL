@@ -31,8 +31,8 @@ lab), but nothing here imports from `compiler/scenes/`.
 Resolved Sep 25: the four GRIN furnaces (section A — lenses rendered black, a region/material
 id mix-up in the walker's exit test) and `softbeam-wall` (section B — an under-sampled check,
 not a bias). `slab-albedo` (section C) was resolved in August. New since Sep 24: `tiny-sphere`,
-`tiny-sphere-light`, `sun-haze`, `fog-area-ignored`, `instance-lights-sky` (each fails on the
-code before its fix).
+`tiny-sphere-light`, `sun-haze`, `fog-area-ignored`, `instance-lights-sky`, `mesh-light-smooth`
+(each fails on the code before its fix).
 
 **`cube-cloud` (updated Sep 25).** Since the lab page stopped starting its own render loop
 under the runner, the runner takes control immediately; the failure is now the RENDER not

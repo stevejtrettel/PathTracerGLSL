@@ -62,8 +62,9 @@ LightSample mesh_light_sample(MeshLight l, sampler2D idxTex, sampler2D wposTex, 
 
 // The MIS density with which mesh_light_sample(l, p, ·) would have produced wi toward the
 // hit point — uniform-area makes it triangle-identity-FREE: only the hit geometry + the
-// baked total area. The emitter-hit's shading frame n IS the face's outward normal (flat
-// or smooth-consistent), so the caller passes the geometric cosine via the Hit.
+// baked total area. light_n must be the hit triangle's GEOMETRIC normal (Hit.ng), the
+// normal the sampler uses; a smooth mesh's interpolated shading normal would give a
+// different cosine, and the MIS weights would no longer sum to 1.
 float mesh_light_pdf(MeshLight l, Point p, Point light_p, Direction light_n, Direction wi) {
     float cos_l = dot(light_n, -wi);
     if (cos_l <= 0.0) return 0.0;

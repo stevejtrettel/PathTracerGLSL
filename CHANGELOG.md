@@ -4,6 +4,33 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — `Hit` carries the geometric normal (`ng`)
+
+`Hit` gained `Direction ng`: the true normal of the surface hit, oriented like `frame.n`. It
+equals `frame.n` everywhere the shading normal is the true normal (analytic and marched
+surfaces, flat meshes) and differs on smooth meshes (and, later, under normal and bump maps,
+which is why it is a field and not a special case). Filled by the shared primitive hit fill,
+by both mesh arms (from the triangle's winding normal, which `mesh_test_range` now returns as
+`gLocal`), and flipped with the frame on exit in the dispatcher. Two readers:
+
+- **`mesh_light_pdf`** now takes `light_hit.ng`, matching the sampler's area → solid-angle
+  conversion. With the interpolated shading normal the two pdfs disagreed and the MIS weights
+  of a smooth-shaded mesh light did not sum to 1.
+- **`ray_spawn`** offsets along `ng`, on the side of the true surface the new direction goes
+  into. With the shading normal, a direction sampled below a smooth mesh's true plane started
+  on the outside and crossed back through its own triangle; on an emitter that spurious hit
+  counted the emission under MIS (weight ≈ 1, since the light pdf at a hit millimetres away is
+  ≈ 0) but not under NEE. For every non-mesh surface and every flat mesh, `ng = frame.n`, so
+  those renders are unchanged.
+
+New witness `mesh-light-smooth`: an octahedron lamp with radial vertex normals (up to 54.7°
+from the face normals) over the mesh-light floor, nee ≡ mis. Before: nee 0.14572 vs mis
+0.15312 over four seeds (mis 5% bright); the pdf fix alone moved it only to 4.95%; with the
+spawn fix too, nee 0.14573 vs mis 0.14574. The same octahedron with flat normals agreed before
+the change. Still open (docs/claude-improvements-2026-09.md §1.1): whether the mesh tier's
+1e-3 self-intersection floor (`MESH_T_MIN`) can now shrink, and the shading-normal
+re-orientation in `mesh_test_range` that keeps the dispatcher's front/back test consistent.
+
 ## 2026-09-25 — accel and data: CWBVH on coincident centroids, mesh-light NaN, workers
 
 - **CWBVH threw on coincident centroids** (duplicate rows in a `.inst` file, concentric

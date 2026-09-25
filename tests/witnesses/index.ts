@@ -27,7 +27,7 @@ import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/f
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
 import { bazaarScene, bazaarTableStrategy, bazaarUnrolledStrategy } from './scenes/tableWitness.js';
-import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightRef, meshLightStrategies, meshLightBvhStrategies } from './scenes/meshWitness.js';
+import { meshFurnace, meshFurnaceStrategy, meshQuadTwin, meshQuadRef, meshTwinStrategy, meshTwinBruteStrategy, meshGlassPair, meshFogPair, meshSubmergedPair, containStrategy, meshLightTwin, meshLightSmooth, meshLightRef, meshLightStrategies, meshLightBvhStrategies } from './scenes/meshWitness.js';
 import { instanceTwin, instanceTwinRef, instanceTwinStrategy, instanceTwinLinearStrategy, meshInstanceTwin, meshInstanceRef, meshInstanceStrategy, attrTwin, attrTwinRef, attrTwinStrategy, instanceParamsTwin, instanceParamsFrame, instanceParamsStrategy, instanceParamsCwbvhStrategy } from './scenes/instanceWitness.js';
 import { perfCloud, perfCloudFrame, perfCloudStrategy, perfCloudCwbvhStrategy, PERF_CLOUD_COUNT } from './scenes/perfCloud.js';
 import { regionOverlap, regionOverlapUnrolledStrategy, regionOverlapTableStrategy } from './scenes/regionOverlapWitness.js';
@@ -545,6 +545,18 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         scene: meshLightRef,
         strategies: meshLightStrategies,
         exercises: 'reference arm of the mesh-light twin — the same panel as the analytic quad emitter (material route)',
+    },
+    'mesh-light-smooth': {
+        scene: meshLightSmooth,
+        strategies: meshLightStrategies.slice(0, 2),
+        exercises: 'a SMOOTH-SHADED emissive mesh (an octahedron lamp with radial vertex normals, up to 54.7° off the face normals): the MIS pdf query at a BSDF-found lamp hit must use the geometric normal (Hit.ng), as the sampler does',
+        expected: 'keys 1 (pt-nee) and 2 (pt-mis) converge to the same image; a facet-shaped difference means the pdf query is reading the shading normal',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'smooth mesh light nee ≡ mis' },
+            ],
+        },
     },
     'mesh-light-twin': {
         scene: meshLightTwin,

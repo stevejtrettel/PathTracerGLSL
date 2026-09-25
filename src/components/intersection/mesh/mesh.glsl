@@ -25,12 +25,11 @@
 
 // MESH_T_MIN — the MESH tier's self-intersection floor AND spawn clearance (Hit.eps for
 // triangle hits; impl-plan-epsilon-discipline). The mesh tier deliberately keeps the old
-// 1e-3, unlike the analytic primitives (floor 0): meshes interpolate SHADING normals and
-// Hit carries no geometric normal, so ray_spawn's offset direction can dip below the
-// geometric horizon — this floor is what rejects the same-triangle re-hit (the standard
-// shading-normal compromise; dropping it, or shrinking the paired offset, grows
-// silhouette acne + black NEE speckle — the Aug 12 audit's counterexample). The proper
-// fix is a geometric normal in Hit; trigger: multi-material meshes bounding media.
+// 1e-3, unlike the analytic primitives (floor 0). Triangle hits are less precise than analytic
+// roots, and when ray_spawn offset along the interpolated shading normal this floor was what
+// rejected same-triangle re-hits. ray_spawn now offsets along the geometric normal (Hit.ng),
+// so a spawned ray starts on the side it travels into; whether the floor can now shrink toward
+// fp scale is untested (shrinking it without that test risks silhouette acne and NEE speckle).
 #define MESH_T_MIN 0.001
 //
 // RAIL v2 ADDRESSING (fable-data-rail): ALL meshes share one channel per role; every
@@ -81,12 +80,13 @@ uvec3 mesh_tri_fetch(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase,
 // index texture — ONE triangle test, so the two engines can never drift (impl-plan-mesh-bvh §4).
 
 // Nearest triangle in [offset, offset+count), bounded by tmax. On a closer hit: updates tmax +
-// the LOCAL shading normal (smooth when useSmooth, else flat geometric) + interpolated uv + found.
+// the LOCAL shading normal nLocal (smooth when useSmooth, else flat geometric) + the LOCAL
+// geometric normal gLocal (the triangle's winding normal, unnormalized) + interpolated uv + found.
 void mesh_test_range(
     sampler2D posTex, sampler2D idxTex, sampler2D nrmTex, sampler2D uvTex,
     uint vbase, uint tbase,
     uint offset, uint count, bool useSmooth, vec3 ro, vec3 rd,
-    inout float tmax, inout vec3 nLocal, inout vec2 uvOut, inout bool found
+    inout float tmax, inout vec3 nLocal, inout vec3 gLocal, inout vec2 uvOut, inout bool found
 ) {
     for (uint i = offset; i < offset + count; i++) {
         vec3 a, b, c;
@@ -103,6 +103,7 @@ void mesh_test_range(
             // the dispatcher's front/back test misclassify → black facets. Orient the shading
             // normal to the geometric normal's ray-side. No-op for flat (nLocal == gnorm).
             if (dot(rd, nLocal) * dot(rd, gnorm) < 0.0) nLocal = -nLocal;
+            gLocal = gnorm;
             uvOut = bary.x * mesh_uv(uvTex, vbase + tri.x) + bary.y * mesh_uv(uvTex, vbase + tri.y) + bary.z * mesh_uv(uvTex, vbase + tri.z);
         }
     }
@@ -140,11 +141,11 @@ bool mesh_nearest_local(
     sampler2D posTex, sampler2D idxTex, sampler2D nrmTex, sampler2D uvTex,
     uint vbase, uint tbase,
     uint triCount, bool useSmooth, vec3 ro, vec3 rd,
-    inout float tmax, out vec3 nLocal, out vec2 uvOut
+    inout float tmax, out vec3 nLocal, out vec3 gLocal, out vec2 uvOut
 ) {
-    bool found = false; vec3 nl = vec3(0.0); vec2 uo = vec2(0.0);
-    mesh_test_range(posTex, idxTex, nrmTex, uvTex, vbase, tbase, 0u, triCount, useSmooth, ro, rd, tmax, nl, uo, found);
-    nLocal = nl; uvOut = uo; return found;
+    bool found = false; vec3 nl = vec3(0.0); vec3 gl = vec3(0.0); vec2 uo = vec2(0.0);
+    mesh_test_range(posTex, idxTex, nrmTex, uvTex, vbase, tbase, 0u, triCount, useSmooth, ro, rd, tmax, nl, gl, uo, found);
+    nLocal = nl; gLocal = gl; uvOut = uo; return found;
 }
 
 bool mesh_any_local(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase, uint triCount, vec3 ro, vec3 rd, float maxDist) {
@@ -159,9 +160,9 @@ bool mesh_nearest_bvh(
     sampler2D posTex, sampler2D idxTex, sampler2D nrmTex, sampler2D uvTex, sampler2D bvhTex,
     uint vbase, uint tbase, uint nbase,
     bool useSmooth, vec3 ro, vec3 rd,
-    inout float tmax, out vec3 nLocal, out vec2 uvOut
+    inout float tmax, out vec3 nLocal, out vec3 gLocal, out vec2 uvOut
 ) {
-    bool found = false; vec3 nl = vec3(0.0); vec2 uo = vec2(0.0);
+    bool found = false; vec3 nl = vec3(0.0); vec3 gl = vec3(0.0); vec2 uo = vec2(0.0);
     vec3 inv = 1.0 / rd;                           // hoisted — the slab test takes it
     int stack[BVH_STACK_DEPTH];
     int ptr = 0;
@@ -172,7 +173,7 @@ bool mesh_nearest_bvh(
         vec4 n1 = texelFetch(bvhTex, data_texel1d(nbase + uint(ni * 2 + 1)), 0);
         if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, inv, tmax)) continue;   // prune by running nearest
         if (n0.w >= 0.0) {
-            mesh_test_range(posTex, idxTex, nrmTex, uvTex, vbase, tbase, uint(n1.w), uint(n0.w), useSmooth, ro, rd, tmax, nl, uo, found);
+            mesh_test_range(posTex, idxTex, nrmTex, uvTex, vbase, tbase, uint(n1.w), uint(n0.w), useSmooth, ro, rd, tmax, nl, gl, uo, found);
         } else {
             int axis = int(-n0.w - 1.0);
             int L = ni + 1, R = int(n1.w);
@@ -183,7 +184,7 @@ bool mesh_nearest_bvh(
             }
         }
     }
-    nLocal = nl; uvOut = uo; return found;
+    nLocal = nl; gLocal = gl; uvOut = uo; return found;
 }
 
 // ── Containment point queries (fable-mesh-containment) — LOCAL space, closed meshes only. ──

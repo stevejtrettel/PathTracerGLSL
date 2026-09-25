@@ -198,7 +198,7 @@ meshes.
 
 **Known open defects**: cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
 README.md). Correctness items found by the Sep 25 audit and deliberately left for a decision
-(the mesh-light MIS normal on smooth meshes; three estimator-dependent budgets) are in
+(three estimator-dependent budgets) are in
 docs/claude-improvements-2026-09.md, Part 1. Fixed Sep 25: the GRIN furnaces (lenses rendered
 black: a region/material id mix-up) and softbeam-wall (an under-sampled check). The Sep 25
 sweep passed 180 of 181 exact checks (only cube-cloud).
