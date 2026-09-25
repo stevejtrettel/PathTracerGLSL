@@ -20,7 +20,11 @@ const binByPlatform: Record<string, string> = {
     win32: 'glslangValidator.exe',
 };
 const pkgDir = dirname(require_.resolve('glslang-validator-prebuilt-predownloaded/package.json'));
-const bin = join(pkgDir, 'bin', binByPlatform[process.platform] ?? 'glslangValidator.linux');
+// GLSLANG_VALIDATOR overrides the packaged binary. The package ships only an x86_64 macOS
+// build, which an Apple-silicon Mac runs only under Rosetta; without it, point this at a
+// native build (e.g. `brew install glslang`, then GLSLANG_VALIDATOR=$(which glslangValidator)).
+const bin = process.env.GLSLANG_VALIDATOR
+    ?? join(pkgDir, 'bin', binByPlatform[process.platform] ?? 'glslangValidator.linux');
 
 let dir: string | null = null;
 /** Identical sources validate once (display shaders repeat across pairs). */
@@ -57,7 +61,13 @@ export function glslangCheck(source: string, stageExt: 'vert' | 'frag', label: s
         execFileSync(bin, [file], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
         validated.set(source, null);
     } catch (e) {
-        const out = (e as { stdout?: string }).stdout ?? String(e);
+        const err = e as { stdout?: string; status?: number | null; code?: string };
+        // The binary never ran (no exit status): report the machine, not the shader.
+        if (err.status === null || err.status === undefined || typeof err.code === 'string') {
+            throw new Error(`${label}: glslangValidator could not be run (${String(e).split('\n')[0]}). On Apple silicon the packaged `
+                + 'binary needs Rosetta (`softwareupdate --install-rosetta`), or set GLSLANG_VALIDATOR to a native glslangValidator.');
+        }
+        const out = err.stdout ?? String(e);
         validated.set(source, out);
         throw new Error(`${label}: glslangValidator rejected the generated shader\n${out}`);
     }
