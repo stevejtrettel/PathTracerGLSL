@@ -3,7 +3,8 @@
 Written after the Sep 24–25 review, bug-fix and audit sessions. What was already fixed is in
 `CHANGELOG.md` (Sep 24 and Sep 25 entries). This document is what remains: things we could
 do next, most valuable first, with a worked-out plan wherever I could research one fully.
-Nothing here is built. Items marked **Your call** need a decision from you before any code.
+Nothing here is built. Items marked **Your call** need a decision from you before any code
+(1.1 has since been decided).
 
 Each item says: what it is, why it matters (with the evidence), and the plan.
 
@@ -14,7 +15,7 @@ Each item says: what it is, why it matters (with the evidence), and the plan.
 These are real defects or estimator-dependent truncations. I left them unfixed because each
 one changes an interface or a declared semantic, which you prefer to decide yourself.
 
-### 1.1 Mesh lights under MIS use the wrong normal for smooth meshes — **Your call** (contract edit)
+### 1.1 Mesh lights under MIS use the wrong normal for smooth meshes — **Decided: add `Hit.ng`**
 
 **What.** For a mesh light with interpolated (smooth) normals, the NEE sampler converts
 area to solid angle with the triangle's *geometric* normal, but the MIS pdf query at a
@@ -37,9 +38,16 @@ image than pt-nee: a bias patterned by facet, largest on big nearby emitters.
 4. Witness: an emissive smooth-normal mesh near a diffuse floor, nee ≡ mis equality (the
    cactus scene reduced to one lamp). It should fail today.
 
-The `MESH_T_MIN` comment (`intersection/mesh/mesh.glsl`) already names "a geometric normal in
-Hit" as the proper fix for its shading-normal compromise in `ray_spawn`, so `ng` would have
-two readers.
+**Decision (Sep 25).** Add `ng`. Today the two normals would differ only on smooth meshes,
+but normal and bump mapping are planned, and those make the shading normal differ from the
+geometric one on every surface. Smooth meshes already work around the missing field in three
+places: this pdf; `mesh_test_range` flipping the interpolated normal onto the triangle's side
+of the ray so the dispatcher's front/back test holds; and the fixed `MESH_T_MIN` spawn
+clearance, needed because `ray_spawn` pushes along the shading normal, which can dip under the
+surface. `ng` lets the latter two go too. Considered and not chosen: recovering the normal
+from a triangle index in `Hit.element` (fixes only the pdf, costs vertex fetches per emitter
+hit), and a Validator rule against smooth normals on sampled mesh lights (smallest, but the
+limitation returns with normal mapping).
 
 ### 1.2 Three budgets that make the image depend on the estimator — **Your call** (semantics)
 
