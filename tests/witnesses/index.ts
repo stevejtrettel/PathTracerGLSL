@@ -1689,11 +1689,18 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         expected:
             'spot CORE (r < 0.4) = ρ·Le·sin²δ = 0.9992 in linear HDR — the near-field plateau, independent of r and d; a PENUMBRA annulus 0.4 → 0.6 (the soft edge the delta beam cannot make); EXACTLY black outside 0.6; keys 1 (pt-nee) and 2 (pt-mis) converge to the same image',
         witness: {
-            spp: 96,
+            // The core check is NOISE-bound: NEE samples the whole aperture (r = 0.5) but only
+            // the sub-disk inside the cone (radius d·tanδ ≈ 0.1) contributes — 4% of samples, a
+            // per-sample relative sd of ≈ 4.9. The original 80-pixel crop at 96 spp had a 7%
+            // standard error against a 1.2% tolerance, and its pinned-salt draw read +3.3%
+            // (Sep 25: six salts gave 0.9985 ± 0.030, i.e. no bias). The crop is now a square of
+            // half-side 0.25 on the wall (corner radius 0.354 < the core's 0.3999), 3600 px, at
+            // 384 spp: 0.9989 ± 0.0028 over three salts, so the tolerance is ~4σ.
+            spp: 384,
             checks: [
                 {
                     kind: 'mean', value: 0.99917, tol: 0.012,
-                    region: { x: 0.47, y: 0.47, w: 0.06, h: 0.06 },
+                    region: { x: 0.315, y: 0.2535, w: 0.37, h: 0.493 },
                     label: 'F-SOFTBEAM core ρ·Le·sin²δ',
                 },
                 {

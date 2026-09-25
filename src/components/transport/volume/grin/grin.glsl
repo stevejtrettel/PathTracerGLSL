@@ -13,7 +13,7 @@
 //
 // n(x) is read through `ior_at` (NOT MediumProperties — ior is consumed by its GRADIENT, sampled
 // at many nearby points; the value-bundle struct is for σ_a/σ_s/ε). ∇n is central finite
-// differences of ior_at (the SDF-normal trick). Marches until scene_region_at leaves the region,
+// differences of ior_at (the SDF-normal trick). Marches until the ray leaves the medium,
 // then returns the bent ray from just INSIDE the wall — the wall's MATERIAL owns the interface
 // (impl-plan-grin-interface): 'none' = continuous-n pass-through, dielectric = Snell/Fresnel/TIR
 // with the local n(exit_p) via ior_of(region, p). Per-step Beer–Lambert absorption (σ_a, colored,
@@ -26,7 +26,7 @@
 //
 // Depends on: ior_at (generated — n(x)), scene_medium_properties (generated — σ_a/σ_s/ε fields),
 // medium_emission (generated — the zero-folding ε accessor), ambient_geodesic (core),
-// scene_region_at (generated — exit test), MediumSample (structs_media), spectrum_exp (core
+// scene_region_at + material_of (generated — the exit test, grin_inside), MediumSample (structs_media), spectrum_exp (core
 // math). The step is ADAPTIVE
 // (the DS_MAX/DTOL limiters below — strong fields, e.g. black holes) with GRIN_STEP as its smooth-
 // field ceiling; analytic ∇n (autodiff the ior formula) is the remaining declared polish.
@@ -90,6 +90,20 @@ vec3 grin_grad_n(int med, vec3 p) {
     ) / (2.0 * GRIN_GRAD_EPS);
 }
 
+// Is p still inside this walker's medium? `med` is a MATERIAL id — the dispatcher passes the
+// material, and ior_at / scene_medium_properties take the same id — so the exit test asks
+// the material at p, via material_of. (Until Sep 25 2026 it compared scene_region_at's REGION
+// id with `med` directly, which is right only when the two numberings coincide: in every GRIN
+// demo the lens was region 1 AND material 1, but in the six-plane furnaces it is region 6 and
+// material 1 or 2, so the walker "left" at its first step, rewound outside, re-entered, and
+// burned the bounce budget — those lenses rendered black.) Leaving the MEDIUM rather than the
+// region is also the physically right exit: a wall between two regions of the same material
+// has the same n(p) on both sides, so walking through it changes nothing; and an ambient GRIN
+// medium (region −1) is handled by the same test.
+bool grin_inside(int med, vec3 p) {
+    return material_of(scene_region_at(p)) == med;
+}
+
 // The conservative force F(r) = n·∇n = ∇(n²/2) — position-only (the Verlet enabler).
 vec3 grin_force(int med, vec3 r) {
     return grin_n(med, r) * grin_grad_n(med, r);
@@ -98,7 +112,11 @@ vec3 grin_force(int med, vec3 r) {
 // Interior basic-radiance factor (impl-plan-grin-interface): along a curved ray in varying n,
 // L/n² is invariant, so camera-path throughput over the interior carries (n_in/n_out)² — the
 // continuous twin of the dielectric's η² line. |T| = n is carried by the integrator, so the
-// factor is free. Mirrored into ms.eta_scale so the §7.2 RR metric divides the compression
+// factor is free — and |T|, not a fresh ior_at(p), is the RIGHT n here: Verlet exactly
+// conserves a nearby "shadow" Hamiltonian, whose index along the computed trajectory is |T|,
+// so ratios of |T| are consistent with the ray actually traced. (Sep 25 2026, measured:
+// evaluating n exactly at the exit/event points instead biased grin-furnace-scatter +0.25%,
+// 0.40101 ± 0.00002 over salts; the |T| form reads 0.4000.) Mirrored into ms.eta_scale so the §7.2 RR metric divides the compression
 // back out (exactly the surface transmission site's bookkeeping). Books close: enter (1/n_A)²
 // · interior (n_A/n_B)² · exit (n_B/1)² = 1 for a lossless region — and under the continuous
 // n→1 wall contract the factor is 1, so 'none'-wall scenes are unchanged.
@@ -184,11 +202,11 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         // tangent T_half — deliberately NOT the second half-kick, which would evaluate ∇n
         // outside the region where authored formulas need not be total. Absorption/emission
         // charge only the traveled fraction of the step.
-        if (scene_region_at(r_next) != med) {
+        if (!grin_inside(med, r_next)) {
             float lo = 0.0, hi = 1.0;
             for (int j = 0; j < GRIN_BISECT_ITERS; j++) {
                 float mid = 0.5 * (lo + hi);
-                if (scene_region_at(r + (mid * h) * T_half) == med) lo = mid; else hi = mid;
+                if (grin_inside(med, r + (mid * h) * T_half)) lo = mid; else hi = mid;
             }
             float n_exit  = length(T_half);
             float t_cross = hi * h * n_exit;                       // world distance from r to the crossing
@@ -304,11 +322,11 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
         // Does the wall cross this drift? (Needed to order event-vs-wall along the step.)
         float ds_wall = ds + 1.0;                      // sentinel: no crossing in this step
         float hi = 1.0;
-        if (scene_region_at(r_next) != med) {
+        if (!grin_inside(med, r_next)) {
             float lo = 0.0;
             for (int j = 0; j < GRIN_BISECT_ITERS; j++) {
                 float mid = 0.5 * (lo + hi);
-                if (scene_region_at(r + (mid * h) * T_half) == med) lo = mid; else hi = mid;
+                if (grin_inside(med, r + (mid * h) * T_half)) lo = mid; else hi = mid;
             }
             ds_wall = hi * ds;
         }

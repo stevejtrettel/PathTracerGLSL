@@ -1,5 +1,10 @@
 # fable-variable-ior.md — variable-IOR (gradient-index) media
 
+> **Sep 25 2026 fix:** the walker's exit test compared a region id with the material id the
+> dispatcher passes, so a GRIN region whose region and material ids differ rendered black
+> (the four furnaces read ~0.30). It now tests the material at the point (`grin_inside`).
+> All GRIN witnesses pass, including the furnaces; see tests/witnesses/README.md §A.
+
 **STATUS: BUILT & GPU-verified Jul 21 2026** — the tracer's first curved-space feature.
 **HARD-INTERFACE BATCH BUILT Jul 22 2026 — GPU-UNSWEPT** (`docs/impl-plan-grin-interface.md`):
 the §7 "hard refractive interface" item is now built — `ior_of(int region, Point p)` (one ior

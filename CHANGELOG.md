@@ -4,6 +4,38 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — the GRIN "energy loss" was black lenses; the softbeam "bias" was noise
+
+**GRIN regions rendered black whenever their region id differed from their material id.**
+The four GRIN furnaces read ~0.30 against 0.4 (open since August, listed as "a ~25% energy
+loss, cause not established"). Rendering `grin-furnace-hard` showed the lens itself nearly
+black (mean 0.07) with the rest of the frame near 0.4, and the lens covers about a quarter of
+the view. The walker's exit test compared `scene_region_at(p)`, a region id, with `med`, which
+the dispatcher passes as a material id. In the furnaces the lens is region 6 (after six wall
+planes) but material 1 or 2, so the walker "left" on its first step, rewound to just outside,
+re-entered, and repeated until the bounce budget ran out. Every GRIN demo and every GRIN twin
+had the lens as region 1 and material 1, so only the furnaces saw it. The walker now asks
+whether the MATERIAL at the point has changed (`grin_inside`, grin.glsl), which is also the
+right exit physically: a wall between two regions of the same material has the same n on
+both sides. After: `grin-furnace` (0.3989, 0.3994, 0.3996), `-emit` 0.3997, `-scatter`
+(0.3997, 0.4001, 0.4002), `-hard` 0.4000; the GRIN twins are unchanged.
+
+Tried and rejected: evaluating n exactly at the walker's exit/event points (plus an (n/n_wall)²
+factor on the final straight micro-segment), which telescopes on paper, biased
+`grin-furnace-scatter` to 0.40101 ± 0.00002 over salts. Velocity Verlet conserves a nearby
+"shadow" Hamiltonian whose index along the computed ray is |T|, so the walker's |T|-ratio
+factor is the consistent one; the reasoning is now in the `grin_finish` comment.
+
+**`softbeam-wall` +3.3% was noise, not a normalization bias.** NEE samples the whole aperture
+but only the 4% of it inside the emission cone contributes, so each sample has a relative sd of
+≈4.9; the check averaged 80 pixels at 96 spp (a 7% standard error, against a 1.2% tolerance),
+and the runner's pinned salt reproduced the same draw every sweep. Six salts on the old crop:
+0.9985 ± 0.030 (expected 0.99917). The check now averages a 3600-pixel crop inside the core
+at 384 spp (0.9963 on the runner's salt; 0.9989 ± 0.0028 over three salts).
+
+Verified: `npm run witness` on all nine GRIN witnesses and `softbeam-wall` — all pass.
+tests/witnesses/README.md sections A and B record the analysis.
+
 ## 2026-09-25 — large images: tiled rendering saves one stitched file
 
 The old `TiledRenderer` was never reachable from the app, and would have failed on its second

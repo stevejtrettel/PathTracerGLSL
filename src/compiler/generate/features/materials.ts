@@ -275,10 +275,10 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             { name: 'medium_sample', signature: 'MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi)' },
         );
         if (media.deflecting) {
-            // The GRIN arm (grin.glsl) calls ior_at (self-provided) + scene_region_at (its own
-            // exit test) — honest linkage (fable-variable-ior).
+            // The GRIN arm (grin.glsl) calls ior_at (self-provided) + scene_region_at and
+            // material_of (its exit test: has the MEDIUM changed?) — honest linkage.
             provides.push({ name: 'ior_at', signature: 'float ior_at(int med, vec3 p)' });
-            requires.push('ior_at', 'scene_region_at');
+            requires.push('ior_at', 'scene_region_at', 'material_of');
         }
         if (wantsNullTable) {
             provides.push({ name: 'is_null_interface', signature: 'bool is_null_interface(int mat)' });

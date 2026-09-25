@@ -21,17 +21,17 @@ lab), but nothing here imports from `compiler/scenes/`.
 - `scenes/` — the fixtures: scene + strategy definitions, with their derivations in
   comments (why 0.4, why RR is off, what a failure implicates).
 
-## Known failing witnesses — current (Sep 24 2026 sweep)
+## Known failing witnesses — current (Sep 24 2026 sweep, updated Sep 25)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 24 fixes (CHANGELOG.md):
-**175 exact checks + 1 cross-check; every check passes except these six**, all standing
-markers for open work:
+**175 exact checks + 1 cross-check; every check passes except these**, all standing markers
+for open work:
 
-- the four GRIN furnaces (`grin-furnace`, `-emit`, `-scatter`, `-hard`) — ~25% low, section A below;
-- `softbeam-wall` core — +3.3%, section B below;
 - `cube-cloud` — the hang, section D below.
 
-(`slab-albedo`, section C, is resolved.)
+(`slab-albedo`, section C, is resolved. Resolved Sep 25: the four GRIN furnaces, section A — a
+region-id/material-id mix-up in the walker's exit test; and `softbeam-wall`, section B — an
+under-sampled check, not a bias.)
 
 **`cube-cloud` (updated Sep 25).** Since the lab page stopped starting its own render loop
 under the runner, the runner takes control immediately; the failure is now the RENDER not
@@ -59,32 +59,47 @@ broken anything.
 
 Sweep result: **153 exact checks — 143 passed, 10 failed; 1 cross-check, agreed.**
 
-### A. The four GRIN furnaces — a ~25% energy loss, cause NOT established
+### A. The four GRIN furnaces — RESOLVED (Sep 25 2026): GRIN regions rendered black
 
-| witness | measured | expected |
-|---|---|---|
-| `grin-furnace` | 0.3004 / 0.3065 / 0.3179 | 0.4 |
-| `grin-furnace-emit` | 0.2960 | 0.4 |
-| `grin-furnace-scatter` | 0.2949 / 0.2951 / 0.2953 | 0.4 |
-| `grin-furnace-hard` | 0.3067 | 0.4 |
+| witness | before | after the fix | expected |
+|---|---|---|---|
+| `grin-furnace` | 0.3004 / 0.3065 / 0.3179 | 0.3989 / 0.3994 / 0.3996 | 0.4 |
+| `grin-furnace-emit` | 0.2960 | 0.3997 | 0.4 |
+| `grin-furnace-scatter` | 0.2949 / 0.2951 / 0.2953 | 0.3997 / 0.4001 / 0.4002 | 0.4 |
+| `grin-furnace-hard` | 0.3067 | 0.4000 | 0.4 |
 
-All four are furnace-conservation gates on the variable-IOR walker (design + derivations:
-`docs/fable-variable-ior.md` §6). All four are low by 23–26% with the same signature, which
-suggests **one** defect in the walker rather than four, and 25% is far too large to be an epsilon
-or a truncation. `grin-furnace` in particular is documented as catching
-"weight/absorption/bounce-starvation/coexistence breaks", so it is doing its job.
+Not an energy loss: rendering `grin-furnace-hard` showed the lens itself nearly black (pixel
+mean 0.07) with the rest of the frame at ~0.38, and the lens covers about a quarter of the
+view. Cause: the walker's exit test compared `scene_region_at(p)`, a REGION id, with `med`,
+which the dispatcher passes as a MATERIAL id. In these furnaces the lens is region 6 (after
+the six wall planes) but material 1 or 2, so the walker "left" the lens on its first step,
+rewound to just outside, re-entered, and repeated until the bounce budget ran out. Every GRIN
+demo and the GRIN twins happened to have the lens as region 1 AND material 1, so nothing else
+saw it. The walker now asks whether the MATERIAL at the point changed (`grin_inside` in
+grin.glsl). These four furnaces are the only witnesses whose GRIN region and material ids
+differ, so they are the regression gate for this class.
 
-These were already failing on the Aug 10 sweep. Three of the four (`-emit`, `-scatter`, `-hard`)
-had never been run before that; `docs/fable-variable-ior.md:11` still records them as awaiting
-their first sweep. **Nobody has investigated the deficit.** That is the honest state — treat the
-attributions in older session notes as unverified.
+The remaining −0.1…−0.3% on `grin-furnace` is within tolerance (its per-salt sd is 0.15%).
+Tempting "fix", measured and rejected (Sep 25): evaluating n exactly at the walker's exit and
+event points (and adding the (n/n_wall)² factor on the straight micro-segment to the wall)
+looks exact on paper but biased `grin-furnace-scatter` to 0.40101 ± 0.00002 over salts,
+against 0.4000 for the shipped form. Velocity Verlet exactly conserves a nearby "shadow"
+Hamiltonian whose index along the computed ray is |T|, so the walker's |T|-ratio factor is
+the one consistent with the trajectory actually traced (grin.glsl, the grin_finish comment).
 
-### B. `softbeam-wall` core — +3.34%, a normalization, not an estimator
+### B. `softbeam-wall` core — RESOLVED (Sep 25 2026): noise, not a bias
 
-`F-SOFTBEAM core ρ·Le·sin²δ` reads 1.0326 against 0.9992. The excess is shared by the `nee` and
-`mis` arms (their equality check passes at χ² 0.01), so it is a bias in the emitted `Le`
-normalization for the finite-divergence softbeam kind, not an estimator defect. From the Aug 9
-beam batch; unchanged since. The other two `softbeam-wall` checks pass.
+The core read 1.0326 against 0.99917 (+3.3%) with the nee and mis arms agreeing, which was
+taken as a normalization bias in the softbeam Le. It was an under-sampled check. NEE samples
+the whole aperture (r = 0.5) but only the sub-disk inside the cone (radius d·tanδ ≈ 0.1)
+contributes, so 4% of samples carry all the signal (per-sample relative sd ≈ 4.9); the check
+averaged an 80-pixel crop at 96 spp, a 7% standard error against a 1.2% tolerance, and the
+runner's pinned salt reproduced the same unlucky draw every sweep. Six salts on the old crop:
+0.9985 ± 0.030. A 3600-pixel crop inside the core at 384 spp: 0.9989 ± 0.0028. The check now
+uses that crop and spp (fixture comment in index.ts).
+
+Lesson for new `mean` checks on crops: estimate the standard error first (sample the check
+with a few salts), and keep the tolerance at 3σ or more.
 
 ### C. `slab-albedo` — RESOLVED (Aug 12 2026): the epsilon batch closed it, GREEN at the exact values
 

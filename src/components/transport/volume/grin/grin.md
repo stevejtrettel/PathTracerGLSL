@@ -37,7 +37,9 @@ the further, exact refinement.
 
 Each step: half-kick/drift/half-kick, accumulate per-step Beer–Lambert absorption `exp(−σ_a·ds)`
 (σ_a colored, read by VALUE via `scene_medium_properties` — see the two-accessor note below),
-and exit the moment `scene_region_at` leaves `med`. The exit (impl-plan-grin-interface): the
+and exit the moment the ray leaves the MEDIUM — `material_of(scene_region_at(p)) != med`, since
+`med` is a material id (`grin_inside`; a wall between two regions of the same material has the
+same n on both sides, so it is walked through). The exit (impl-plan-grin-interface): the
 crossing drift segment is **bisected** (`GRIN_BISECT_ITERS`) to bracket the wall, then the
 returned point is **pulled back `GRIN_EXIT_PULLBACK` along the drift** so it sits strictly
 INSIDE the region — the pull-back is keyed to the WALKER'S OWN bisection residual and a
