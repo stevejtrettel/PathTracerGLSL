@@ -45,7 +45,8 @@ export const CWBVH_MAX_PRIMS_PER_NODE = 24;
 export const CWBVH_C_NODE = 1.0;
 export const CWBVH_C_PRIM_DEFAULT = 0.3;
 /** Wide-walk stack depth: tree depth is ~log₈ N (+ leaf groups), so 24 covers any
- *  realistic tree with a wide margin (the binary walk needs 64). */
+ *  realistic tree with a wide margin (the binary walk needs 64). buildCWBVH warns when a
+ *  tree is deep enough to reach it. */
 export const CWBVH_STACK_DEPTH = 24;
 
 /** Ledger padding bound (fable-data-rail §4 style): wide internal nodes branch ≥ 2
@@ -360,6 +361,13 @@ export function buildCWBVH(boxes: Float64Array, n: number, cPrim: number = CWBVH
     emit(0, 0, 1);
     if (nodeCursor !== wideCount) throw new Error(`cwbvh: emitted ${nodeCursor} nodes, counted ${wideCount}`);
     if (itemCursor !== n) throw new Error(`cwbvh: emitted ${itemCursor} items of ${n}`);
+    // The GLSL walk pushes at most one pending group per level it descends, into a fixed
+    // stack of CWBVH_STACK_DEPTH entries; past that it drops the group (a guarded bound, so
+    // no crash, but missing geometry). A step limit may never decide the picture, so say so
+    // whenever a tree is deep enough to reach it.
+    if (maxDepth >= CWBVH_STACK_DEPTH) {
+        console.warn(`CWBVH depth ${maxDepth} >= CWBVH_STACK_DEPTH ${CWBVH_STACK_DEPTH} for ${n} items — the GLSL walk may drop deep subtrees; raise CWBVH_STACK_DEPTH or check for degenerate input.`);
+    }
     return { nodes, nodeCount: wideCount, order, maxDepth };
 }
 

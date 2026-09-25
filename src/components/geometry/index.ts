@@ -204,7 +204,10 @@ export function emitSignedDistance(d: PrimitiveDescriptor, values: PrimitiveValu
  *     the bound's wall, and a tight bound would otherwise clip silhouettes;
  *   · exhaustion still inside the interval commits the graze (the stall rule: a
  *     ray pinned at a silhouette must report the surface, not paint the background
- *     through it); exhaustion past it is a miss and the caller resumes.
+ *     through it); exhaustion past it is a miss and the caller resumes. The stall
+ *     rule is a numerical tolerance (taxonomy §4 ledger). Exhaustion FARTHER than
+ *     its 16× band from a surface is a step limit that can decide the picture: it
+ *     reports a miss with the rest of [t, t1] unexplored (taxonomy §4.1).
  * The caller applies its own nearest-hit test (t < hit.t), exactly as it does for
  * the closed-form intersects — this returns the nearest hit WITHIN the interval.
  *

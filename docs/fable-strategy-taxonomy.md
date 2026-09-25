@@ -88,6 +88,7 @@ place listing every way the image differs from ground truth, each with its named
 | `color: 'rgb'` (future field; RGB transport is a biased surrogate of spectral — projection does not commute with multiplication) | `'spectral'` (§8) |
 | path-class restrictions (future: one-shot, Whitted-style delta-only continuation) | the unrestricted path space |
 | firefly/radiance clamping (future) | clamp → ∞ |
+| numerical tolerances — fixed constants, not fields: the marcher's acceptance (`march_epsilon`, including its grazing rule: a ray still within 16× the acceptance of a surface when its steps run out counts as a hit), GRIN's ODE step and exit bisection, SDF refinement counts, spawn margins | tolerances → 0 |
 
 ### 4.1 Budgets describe paths; step limits describe computation — PINNED
 
@@ -111,6 +112,13 @@ A program has two kinds of limit, and they belong to different sections.
 Test for a proposed limit: *would the set of counted paths change if the integrator's step
 size, the majorant, or the sampler changed?* If yes, it is a step limit, and declaring it as
 a measurement field does not make it one.
+
+Known step limits that can still decide the picture: the SDF marcher's step budget
+(`MAX_MARCH_STEPS` or a shape's `stepBudget`) when a ray runs out of steps FARTHER than the
+grazing rule's band from a surface — it reports a miss and leaves the rest of the shape's
+interval unexplored (a ray skimming just outside a surface for a long way, or crawling through
+a fractal); the tracking collision cap where the Planner warns; GRIN's `MAX_ODE_STEPS`, which is
+charged against `maxBounces` until the unbiased give-up rule for long traversals is designed.
 
 ## 5. The camera lives in measurement
 

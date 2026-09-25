@@ -4,7 +4,7 @@
 // is proven against BRUTE FORCE here; GLSL correctness then reduces to the bit-layout
 // round-trip (decode mirrors pack) + the GPU equality witness.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
     buildCWBVH,
     decodeCWBVHNode,
@@ -12,6 +12,7 @@ import {
     CWBVH_NODE_WORDS,
     CWBVH_MAX_PRIMS_PER_LEAF,
     CWBVH_MAX_PRIMS_PER_NODE,
+    CWBVH_STACK_DEPTH,
 } from '../../src/components/accel/cwbvh/cwbvh.js';
 
 /** Seeded LCG (the perf-cloud pattern). */
@@ -263,5 +264,16 @@ describe('cwbvh: coincident centroids', () => {
         for (let i = 1; i <= 5; i++) boxes.set(boxes.subarray(0, 6), 6 * i);   // items 1..5 = item 0
         const w = buildCWBVH(boxes, 1000);
         expect([...w.order].sort((a, b) => a - b)).toEqual([...Array(1000).keys()]);
+    });
+});
+
+describe('CWBVH stack depth', () => {
+    it('a 50k-item cloud sits far below the walk\'s stack, and builds without the depth warning', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const { boxes } = sphereCloud(50_000, 7);
+        const t = buildCWBVH(boxes, 50_000);
+        expect(t.maxDepth).toBeLessThan(CWBVH_STACK_DEPTH / 2);
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
     });
 });

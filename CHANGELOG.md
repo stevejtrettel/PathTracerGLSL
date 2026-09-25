@@ -4,6 +4,26 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — budgets vs step limits (taxonomy §4.1), and a survey of the step limits
+
+The taxonomy now separates **budgets** (truncations: predicates on paths, counted the same way
+by every technique) from **step limits** (loop bounds inside the machinery: estimator side,
+must be shown unreachable, never charged against a budget). A survey of every loop bound:
+
+- checked and unreachable: the light tree's 48 levels (the builder caps depth), the binary BVH
+  stack (the builder warns), and now the wide BVH stack: `buildCWBVH` warns when its depth
+  reaches `CWBVH_STACK_DEPTH` (24); a 50k-item cloud measures under half of it.
+- diagnosed: the tracking collision cap (the Planner warning).
+- still able to decide the picture: GRIN's `MAX_ODE_STEPS` (charged against `maxBounces`
+  until an unbiased give-up rule is designed), and the SDF marcher's step budget when a ray
+  runs out of steps farther than 16× the acceptance tolerance from a surface (reported as a
+  miss, rest of the interval unexplored).
+- not limits: fixed-count loops that set accuracy or define a shape (GRIN exit bisection, SDF
+  refinement, fractal iterations).
+
+The bias ledger gains a row for numerical tolerances (the marcher's acceptance and its grazing
+rule, the ODE step, refinement counts, spawn margins), with the limit tolerances → 0.
+
 ## 2026-09-25 — declared budgets in media: `maxNullCrossings`, the collision cap
 
 Three fixed budgets could make the image depend on the estimator or drop energy silently
