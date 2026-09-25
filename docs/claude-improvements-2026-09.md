@@ -375,3 +375,69 @@ region with emitting walls at albedo ρ, which must read Le/(1 − ρ) exactly a
 space). Light sampling in curved space (the exponential map, and the Jacobian of the
 geodesic flow for the solid-angle measure) is the hard part and deserves its own design
 document before any code.
+
+---
+
+## Part 7 — Audit reports I did not verify
+
+The Sep 25 audit ran five read-only reviews in parallel. Everything marked fixed in the
+CHANGELOG was confirmed (usually with a test that fails on the old code). The reports below
+were plausible but unconfirmed, or confirmed but too small to act on yet. Listed so nothing is
+lost; each says what would settle it.
+
+**Transport and media**
+- The per-path null-crossing counter is never reset (see 1.2). Settle: count paths the cap
+  kills in `grin-furnace` with Russian roulette off and a large `maxBounces`.
+- Tracking exhaustion on long segments (see 1.2). Settle: instrument the exhaustion rate in
+  `groundfog` under an environment or sun light.
+
+**Lights, environment, cameras**
+- Mesh-light CDF in f32: for meshes with 10⁵–10⁶+ triangles the realized per-triangle
+  probability drifts from area/A (≈ 6e-8·T relative), and very small triangles get a zero
+  CDF span. No current scene reaches it. Fix when needed: a higher-precision CDF, and a fresh
+  random number for the in-triangle coordinate.
+- The octahedral environment table is point-resampled (one bilinear sample per texel). A
+  bright feature smaller than a texel can get pdf 0, so NEE alone would miss it. Today
+  octahedral is used only with MIS (variance only). Fix: supersample or max-filter per texel.
+- The equirect chart's pdf uses the row-center sin θ (a bias factor ≈ 1 + Δθ²/24 ≈ 1 + 6e-6
+  at 256 rows). Negligible.
+- The nee ≡ mis χ² checks share NEE random streams, so their denominators overstate the
+  variance of the difference and the checks have less power than they appear to. Consider
+  decorrelated streams for equality checks.
+
+**Acceleration and data**
+- `BVH_TFAR_PAD` is 1 + 4u; the three-rounding bound is 1 + 2γ(3) ≈ 1 + 6u (pbrt's choice).
+  Settle: an f32-emulated search over rays through box edges, or just adopt 1 + 2γ(3).
+- Slab tests compute 0·∞ = NaN when a ray with an exactly zero direction component starts on
+  a slab plane; GLSL leaves min/max with NaN undefined. The CWBVH walk already clamps
+  direction components; the binary walks and `box_intersect` do not. Settle: an axis-aligned
+  orthographic view with no jitter over integer-coordinate boxes, on hardware that propagates NaN.
+- The mesh triangle test rejects |det| < 1e-12 in local space; for finely tessellated meshes
+  scaled up by 10³ or more, valid grazing hits may be rejected.
+- No guard ties the CWBVH's maximum depth to `CWBVH_STACK_DEPTH` (24). Harmless for today's
+  sphere-only batches.
+- Data textures: no check of a channel's total height against `MAX_TEXTURE_SIZE`, and BVH
+  child/leaf indices stored in f32 are exact only below 2²⁴ (meshes above ~8.4M triangles).
+  A plan-time channel budget (like the sampler budget) would make both compile errors.
+- Light-tree build: collinear lights (a row of point lights) have zero-area boxes, so SAH
+  degenerates into chains (depth 32 at n = 100). Regularize the split measure.
+
+**Compiler and authoring**
+- `defineSDF` kind codes follow `PRIMITIVES` iteration order, which depends on module import
+  order, so generated source might differ between sessions. Settle: compile one scene after
+  importing the scene modules in two orders and diff.
+- `flattenGroups` does not validate group transforms (a nonuniform or reflecting group scale
+  is reported against the leaves, or not at all for instanced leaves).
+- A scene parameter named like a camera slider (`camera.aperture`, `camera.focusDistance`)
+  probably binds to that slider silently; only `camera.position/target/frame` are reserved.
+- The same parameter path authored with different defaults at different sites: the first
+  minted default probably wins silently. (The parameter table in Part 4.3 would settle both.)
+
+**Runtime**
+- Two overlapping `App.recompile` calls, or a recompile during a context restore: the last
+  scene-data upload to finish wins, so new programs could read old data. No UI caller today.
+- `App.recompile(newScene)` does not re-bake or reload the environment, or update the
+  stored config used by context restore.
+- The witness runner's variance path calls `App.initialize` a second time, which replaces
+  the scene-data textures with a single-strategy layout while the original renderers stay
+  loaded.
