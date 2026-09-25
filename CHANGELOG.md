@@ -4,6 +4,17 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — OBJ loader: relative indices and mixed normals
+
+- Face corners were cached by their raw token, so a relative index (`f -3 -2 -1`) meant the
+  same vertex every time it appeared: a second vertex block's faces reused the first block's
+  vertices. The cache now keys on the resolved indices.
+- In a file mixing `v//vn` and bare `v` faces, the bare corners got a (0,0,0) normal, NaN once
+  interpolated and normalized. They now get the area-weighted vertex normal.
+
+Tests in tests/authoring/loadOBJ.test.ts (both fail on the old loader); every suite scene's
+packed data is byte-identical.
+
 ## 2026-09-25 — validation: inputs that used to pass and then break or mislead
 
 From the Sep 25 compiler audit (its compile fuzzer and probes). Each case below passed

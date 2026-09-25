@@ -54,6 +54,7 @@ export function parseOBJ(text: string, opts: MeshAuthoring): MeshObject {
     const outUv: number[] = [];
     const indices: number[] = [];
     const cornerMap = new Map<string, number>();
+    const cornerHasNormal: boolean[] = [];
     let usedNormals = false;
     let usedUvs = false;
 
@@ -61,28 +62,33 @@ export function parseOBJ(text: string, opts: MeshAuthoring): MeshObject {
     const resolve = (raw: number, count: number): number => (raw < 0 ? count + raw : raw - 1);
 
     // Turn one face corner token ("v", "v/vt", "v//vn", "v/vt/vn") into a unified output index.
+    // The cache keys on the RESOLVED indices: a relative token such as "-1" names a different
+    // vertex each time it appears (the last one read so far), so keying on the raw token made
+    // a second vertex block's faces reuse the first block's vertices.
     const corner = (token: string): number => {
-        const existing = cornerMap.get(token);
-        if (existing !== undefined) return existing;
         const [vs, vts, vns] = token.split('/');
         const vi = resolve(parseInt(vs, 10), v.length / 3);
+        const ti = vts !== undefined && vts !== '' ? resolve(parseInt(vts, 10), vt.length / 2) : -1;
+        const ni = vns !== undefined && vns !== '' ? resolve(parseInt(vns, 10), vn.length / 3) : -1;
+        const key = `${vi}/${ti}/${ni}`;
+        const existing = cornerMap.get(key);
+        if (existing !== undefined) return existing;
         const out = outPos.length / 3;
         outPos.push(v[vi * 3], v[vi * 3 + 1], v[vi * 3 + 2]);
-        if (vts !== undefined && vts !== '') {
-            const ti = resolve(parseInt(vts, 10), vt.length / 2);
+        if (ti >= 0) {
             outUv.push(vt[ti * 2], vt[ti * 2 + 1]);
             usedUvs = true;
         } else {
             outUv.push(0, 0);
         }
-        if (vns !== undefined && vns !== '') {
-            const ni = resolve(parseInt(vns, 10), vn.length / 3);
+        if (ni >= 0) {
             outNrm.push(vn[ni * 3], vn[ni * 3 + 1], vn[ni * 3 + 2]);
             usedNormals = true;
         } else {
             outNrm.push(0, 0, 0);
         }
-        cornerMap.set(token, out);
+        cornerHasNormal.push(ni >= 0);
+        cornerMap.set(key, out);
         return out;
     };
 
@@ -117,8 +123,19 @@ export function parseOBJ(text: string, opts: MeshAuthoring): MeshObject {
         indices: new Uint32Array(indices),
         material: opts.material,
     };
-    if (usedNormals) mesh.normals = new Float32Array(outNrm);
-    else if (opts.smoothNormals) mesh.normals = computeVertexNormals(mesh.positions, mesh.indices);
+    if (usedNormals) {
+        mesh.normals = new Float32Array(outNrm);
+        // Corners the file gave no normal (a file mixing `v//vn` and bare `v` faces) would
+        // interpolate a zero normal — NaN once normalized. Give them the area-weighted normal.
+        if (cornerHasNormal.includes(false)) {
+            const synthesized = computeVertexNormals(mesh.positions, mesh.indices);
+            cornerHasNormal.forEach((has, i) => {
+                if (!has) mesh.normals!.set(synthesized.subarray(3 * i, 3 * i + 3), 3 * i);
+            });
+        }
+    } else if (opts.smoothNormals) {
+        mesh.normals = computeVertexNormals(mesh.positions, mesh.indices);
+    }
     if (usedUvs) mesh.uvs = new Float32Array(outUv);
     if (opts.transform !== undefined) mesh.transform = opts.transform;
     if (opts.name !== undefined) mesh.name = opts.name;

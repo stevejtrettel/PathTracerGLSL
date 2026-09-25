@@ -52,3 +52,29 @@ describe('parseOBJ', () => {
         expect(() => parseOBJ('v 0 0 0\n', { material: 'm' })).toThrow(/no faces/);
     });
 });
+
+describe('parseOBJ — Sep 25 audit', () => {
+    it('resolves relative indices per occurrence (two blocks each using -3 -2 -1)', () => {
+        const text = [
+            'v 0 0 0', 'v 1 0 0', 'v 0 1 0', 'f -3 -2 -1',
+            'v 5 0 0', 'v 6 0 0', 'v 5 1 0', 'f -3 -2 -1',
+        ].join('\n');
+        const m = parseOBJ(text, { material: 'm' });
+        const tri = (t: number) => [0, 1, 2].map((k) => Array.from(m.positions.subarray(3 * m.indices[3 * t + k], 3 * m.indices[3 * t + k] + 3)));
+        expect(tri(0)).toEqual([[0, 0, 0], [1, 0, 0], [0, 1, 0]]);
+        expect(tri(1)).toEqual([[5, 0, 0], [6, 0, 0], [5, 1, 0]]);
+    });
+
+    it('gives corners without a file normal a real normal when others have one', () => {
+        const text = [
+            'v 0 0 0', 'v 1 0 0', 'v 0 1 0', 'v 1 1 0', 'vn 0 0 1',
+            'f 1//1 2//1 3//1',   // with normals
+            'f 2 4 3',            // bare corners (vertex 4 appears only here)
+        ].join('\n');
+        const m = parseOBJ(text, { material: 'm' });
+        for (let i = 0; i < m.normals!.length; i += 3) {
+            const len = Math.hypot(m.normals![i], m.normals![i + 1], m.normals![i + 2]);
+            expect(len).toBeCloseTo(1, 5);
+        }
+    });
+});
