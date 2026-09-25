@@ -7,6 +7,7 @@ import { dataTenantsOf, READS_EVERYTHING } from '../../src/compiler/plan/dataTen
 import { LEAF_SDF, ANALYTIC_RECORD_TEXELS } from '../../src/components/intersection/index.js';
 import { sdfRecordPack, sdfTailTexel } from '../../src/compiler/generate/records.js';
 import { primitive } from '../../src/components/geometry/index.js';
+import { defineSDF } from '../../src/components/geometry/custom.js';
 import type { SceneDescription } from '../../src/compiler/types.js';
 import { plan as planScene } from '../../src/compiler/plan/Planner.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
@@ -91,5 +92,29 @@ describe('the sdf-table-twin arms stay two regimes', () => {
 
     it('the table arm plans table', () => {
         expect(dispatchOf(sdfTableStrategy)).toBe('table');
+    });
+});
+
+describe('a scaled scene-local SDF stays off the table (Sep 25 audit, C1)', () => {
+    // classifyPlacement keeps the whole similarity as the residual for a scene-local field
+    // with an orientation row; the record's tail is rigid, so tabling it dropped the scale.
+    const slab = defineSDF({
+        name: 'auditSlab',
+        params: [
+            { name: 'size', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
+            { name: 'axis', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0] },
+        ],
+        glsl: 'float auditSlab_sdf(vec3 p, AuditSlab s) { return max(abs(dot(p, s.axis)) - s.size, length(p) - 3.0 * s.size); }',
+        marchBound: { type: 'sphere', values: (v) => ({ radius: 3 * (v.size as number) }) },
+    });
+
+    it('scale ≠ 1 → residual (global marcher, which applies the scale); scale 1 → tabled', () => {
+        const s = base();
+        s.objects.push(
+            { type: slab, parameters: { size: 1 }, material: 'm', transform: { position: [2, 0, 0], scale: 3 } },
+            { type: slab, parameters: { size: 1 }, material: 'm', transform: { position: [-2, 0, 0] } },
+        );
+        const { table } = dataTenantsOf(s, READS_EVERYTHING);
+        expect(table!.sdf.map((e) => e.sceneIndex)).toEqual([2]);
     });
 });

@@ -11,7 +11,7 @@ import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject, Va
 import type { ProgramDescription } from './types.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression, isValueParam, isBlackbody } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
-import { PRIMITIVES, paramsRecordFloats, primitiveIsBounded, resolveBackend, foldPlacementIntoParameters } from '../../components/geometry/index.js';
+import { PRIMITIVES, paramsRecordFloats, primitiveIsBounded, resolveBackend, foldPlacementIntoParameters, classifyPlacement } from '../../components/geometry/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
@@ -396,6 +396,11 @@ export function dataTenantsOf(scene: SceneDescription, reads: DataReads): SceneD
         // erroring). Mirrors sdfTailTexel's alignment.
         const rowFloats = [...d.params, ...(d.derivedFields ?? [])].reduce((acc, r) => acc + (r.shape === 'vec3' ? 3 : 1), 0);
         if (1 + Math.ceil(rowFloats / 4) + 2 > ANALYTIC_RECORD_TEXELS) return;
+        // The record's tail is RIGID (rotation + translation): a placement whose fold leaves
+        // a SCALED residual (classifyPlacement's fallback — scene-local shapes with
+        // direction/vector rows) cannot be expressed, so it stays on the global marcher,
+        // whose wrapper applies the scale. (Tabling it drew the object at 1/s size — Sep 25.)
+        if (classifyPlacement(o.type, o.parameters, similarityFromTransform(o.transform)).residual.scale !== 1) return;
         sdfEligible.push({ sceneIndex: i, type: o.type, solid: d.thin !== true });
     });
     const sdf = [...sdfEligible.filter((s) => s.solid), ...sdfEligible.filter((s) => !s.solid)];

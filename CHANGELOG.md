@@ -4,6 +4,16 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — table dispatch: a scaled scene-local SDF drew at the wrong size
+
+`classifyPlacement` keeps the whole similarity (scale included) as the residual for a
+`defineSDF` field with a direction or vector row, and the unrolled marcher applies it; the
+scene table's SDF record carries only a rigid tail, so a tabled copy of such an object was
+drawn at 1/s of its size (its TLAS box was still scaled). Table dispatch is the default from 9
+marched objects, so this changed the image without the author asking for it. Such objects now
+stay on the global marcher. Test: tests/compiler/sdfTable.test.ts (fails without the fix). No
+registry scene was affected (snapshots unchanged). Found by the Sep 25 audit.
+
 ## 2026-09-25 — `scattering: 'ignored'`: shadow rays see the same medium as camera paths
 
 Under `measurement.scattering: 'ignored'` a scattering medium is absorbing-only (σ_t = σ_a),
