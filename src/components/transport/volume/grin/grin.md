@@ -107,8 +107,10 @@ two generated projections, consumed differently:
   every `GRIN_ROUND_STEPS` (512) steps the ray survives with probability
   `GRIN_ROUND_SURVIVAL` (0.9) and survivors are divided by it — unbiased, noisier only for
   those rays. Radiance collected before a kill stays (it belongs to the prefix). The loop's
-  hard stop, `GRIN_MAX_ROUNDS` (200) rounds, is reached with probability 0.9¹⁹⁹ ≈ 8·10⁻¹⁰ per
-  traversal. Witness `grin-long` (30- and 60-unit `ior: 1` regions at a unit sky read 1).
+  hard stop, `GRIN_MAX_ROUNDS` (200) rounds, is reached with probability 0.9¹⁹⁹ ≈ 8·10⁻¹⁰, but a
+  survivor carries weight 0.9⁻¹⁹⁹, so the stop drops exactly the contribution of traversals
+  longer than 102,400 steps: a fixed step limit that can decide the picture (taxonomy §4.1).
+  Witness `grin-long` (30- and 60-unit `ior: 1` regions at a unit sky read 1).
 - Knobs: `GRIN_STEP` (the smooth-field step ceiling), `GRIN_DS_MAX`/`GRIN_DTOL` (the
   strong-field limiters), `GRIN_CAPTURE`, `GRIN_BISECT_ITERS` (exit refinement depth), and the
   three roulette constants above. All `#ifndef`-guarded; per-region scale-DERIVED defaults are

@@ -104,10 +104,12 @@ A program has two kinds of limit, and they belong to different sections.
 - **Step limits** bound loops inside the machinery: ODE integrator steps, null-collision
   tracking steps, SDF march steps, traversal stack depths. They are properties of the
   computation, so they belong to the estimator side, which is bias-free by contract. A step
-  limit may never decide the picture: it must be shown unreachable, by a bound derived from
-  the quantities the computation already has (the tracking loops: a Poisson quantile of σ̄ ×
-  the segment's length, delta_tracking.glsl `tracking_cap`), and where no bound exists it is a
-  known defect listed below. Never a fixed number chosen to be "big enough": such a number
+  limit may never decide the picture: the bias it can introduce must be bounded, by a bound
+  derived from the quantities the computation already has (the tracking loops: a Poisson
+  quantile of σ̄ × the segment's length, delta_tracking.glsl `tracking_cap`, reached with
+  probability below 1e-10 per segment). A small probability bounds the bias only when the
+  weight a stopped walk would have carried is bounded; after roulette it is not (below). Where
+  no such bound exists, the limit is a known defect listed below. Never a fixed number chosen to be "big enough": such a number
   decides the picture for the scene that exceeds it. A step limit is never charged against a
   budget: refining a step size must not change which paths are in the measurement.
 
@@ -115,15 +117,19 @@ Test for a proposed limit: *would the set of counted paths change if the integra
 size, the majorant, or the sampler changed?* If yes, it is a step limit, and declaring it as
 a measurement field does not make it one.
 
-Known step limits that can still decide the picture: the SDF marcher's step budget
-(`MAX_MARCH_STEPS` or a shape's `stepBudget`) when a ray runs out of steps FARTHER than the
-grazing rule's band from a surface — it reports a miss and leaves the rest of the shape's
-interval unexplored (a ray skimming just outside a surface for a long way, or crawling through
-a fractal). Two patterns for step limits that do not decide the picture: derive the bound from
-the computation's own quantities (the tracking loops, < 1e-10 per segment), or give up by
-roulette — GRIN: a traversal is one event however long, long traversals end by Russian roulette
-every 512 steps (unbiased; it may depend on step counts because it only changes noise), and the
-loop's hard stop is reached with a stated probability (≈ 8·10⁻¹⁰ per traversal).
+Known step limits that can still decide the picture:
+- the SDF marcher's step budget (`MAX_MARCH_STEPS` or a shape's `stepBudget`) when a ray runs
+  out of steps FARTHER than the grazing rule's band from a surface — it reports a miss and
+  leaves the rest of the shape's interval unexplored (a ray skimming just outside a surface for
+  a long way, or crawling through a fractal);
+- GRIN's hard stop (`GRIN_MAX_ROUNDS` = 200 rounds of 512 steps). The walker's roulette ends
+  long traversals without bias, but a traversal that survives 199 draws carries weight 0.9⁻¹⁹⁹,
+  so probability × weight means the stop drops exactly the contribution of traversals longer
+  than 102,400 steps: roulette changes the cost of long walks, not what a fixed stop cuts off;
+- the BVH traversal stacks (binary 64, wide 24): fixed sizes past which a walk drops subtrees;
+  the builders warn when a tree is deep enough to reach them;
+- the wide-BVH walk's fixed 65,536-iteration guard (`components/intersection/index.ts`),
+  unchecked, where a bound derived from the node count exists.
 
 ## 5. The camera lives in measurement
 

@@ -116,7 +116,9 @@ declared. Three safety budgets break that quietly. None is reached by a registry
   formula along the ray), to be designed.
 - GRIN: a traversal is now one event however long (charging a bounce per 512 steps made the
   measurement depend on the step size). Long and trapped traversals end by the walker's own
-  roulette every 512 steps (survival 0.9), with a hard stop at 200 rounds (probability ≈ 8·10⁻¹⁰).
+  roulette every 512 steps (survival 0.9). The hard stop at 200 rounds is NOT harmless: a
+  survivor carries weight 0.9⁻¹⁹⁹, so the stop drops the contribution of traversals longer than
+  102,400 steps (review 2026-09-25, item 1.1); giving up without a fixed stop is open.
   Witness `grin-long`: 30- and 60-unit `ior: 1` regions at a unit sky read 1; the per-step
   charge read 0.
 - Export stamps now carry the resolved measurement, defaults included.

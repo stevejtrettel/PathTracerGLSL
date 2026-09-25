@@ -41,8 +41,12 @@
 // unbiased — E[weight] is unchanged — and it may depend on step counts because it only changes
 // the noise. Radiance already collected stays on a kill: it belongs to the traversal's prefix,
 // which is counted with probability 1. Smooth lenses leave within ~100 steps and never draw.
-// GRIN_MAX_ROUNDS is the loop's hard stop, a step limit that must be unreachable: a traversal
-// reaches it with probability GRIN_ROUND_SURVIVAL^(GRIN_MAX_ROUNDS − 1) = 0.9^199 ≈ 8e-10.
+// GRIN_MAX_ROUNDS is the loop's hard stop, and it is a step limit that CAN decide the picture:
+// a traversal reaches it with probability 0.9^199 ≈ 8e-10, but a survivor then carries weight
+// 0.9^-199, so the stop drops exactly the contribution of traversals longer than
+// GRIN_MAX_ROUNDS·GRIN_ROUND_STEPS steps — the roulette changes the cost of long traversals, not
+// what a fixed stop cuts off (taxonomy §4.1, known step limits). How large that contribution is
+// for a given lens is not measured.
 #ifndef GRIN_ROUND_STEPS
 #define GRIN_ROUND_STEPS 512
 #endif
@@ -277,7 +281,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         F = F_next;
     }
 
-    // The hard stop (probability ≈ 8e-10 per traversal — header).
+    // The hard stop: drops traversals longer than GRIN_MAX_ROUNDS rounds (header).
     return grin_no_return(ms, t_max);
 }
 
@@ -400,6 +404,6 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
         F = F_next;
     }
 
-    // The hard stop (probability ≈ 8e-10 per traversal — header).
+    // The hard stop: drops traversals longer than GRIN_MAX_ROUNDS rounds (header).
     return grin_no_return(ms, t_max);
 }

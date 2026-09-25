@@ -492,7 +492,7 @@ const uint LIGHT_DELTA = 1u;   // point/directional: not hittable by BSDF rays, 
 
 struct LightSample {
     Direction wi;         // toward the light, world space (unit)
-    float     distance;   // to the sampled point (1e20 for environment/directional)
+    float     distance;   // to the sampled point (MAX_DIST, the far clip, for environment and directional)
     Spectrum  radiance;   // incident radiance from the sample, *without* visibility
     float     pdf;        // total pdf: selection × per-light, in SOLID ANGLE measure
     uint      flags;
@@ -594,18 +594,20 @@ The generated loop owns this state and this shape:
 ```glsl
 // state: Spectrum throughput; Spectrum radiance; int current_medium; Ray ray;  (pure seed, §5)
 //        (spectral mode adds: vec4 lambda, float lambda_pdf — §8)
-for (bounce = 0; bounce < MAX_BOUNCES; bounce++) {
+for (bounce = 0; bounce <= N; bounce++) {          // N = measurement.maxBounces: N + 1 intersections
     // 1. advance through current_medium: either a MEDIUM EVENT (volume integrator:
     //    distance sampling vs sigma_t) or a BOUNDARY EVENT (scene_intersect via stepper).
     //    Non-scattering media (sigma_s = 0, e.g. tinted glass): no distance sampling —
     //    deterministic transmittance *= exp(-sigma_a * t_hit) on the segment (compiler specializes).
     // 2. medium event  → throughput *= sigma_s/sigma_t (single-scatter albedo);
+    //                    if bounce == N: break (an event past the budget);
     //                    NEE from the medium point (§6.3); phase sample (Contract 1 medium); continue
     // 3. miss          → environment radiance (MIS-weighted), break
     // 4. boundary, null interface (§3.6) → current_medium = region_to; continue
     //                    (no bounce consumed; counts against measurement.maxNullCrossings)
     // 5. boundary, surface → verify/heal current_medium against region_from (§4.4);
-    //                    emission (registry logic §6.2); NEE (non-delta materials);
+    //                    emission (registry logic §6.2); if bounce == N: break;
+    //                    NEE (non-delta materials);
     //                    surface sample (Contract 1); if TRANSMISSION: current_medium = region_to;
     //                    throughput *= sample.weight; RR; continue
 }
@@ -613,11 +615,11 @@ for (bounce = 0; bounce < MAX_BOUNCES; bounce++) {
 
 **Accounting pins (added by verification — two integrators must not be free to disagree on these):**
 
-- **Bounce budget:** surface scattering events and medium scattering events both count toward `maxBounces`; null crossings do not (own safety counter). Rationale: medium events do the same work and carry the same variance as surface bounces; null crossings are bookkeeping.
-  **What N counts (fixed Sep 2026):** `maxBounces: N` is the partial sum Σ_{n≤N} TⁿE — paths with at most N events — for EVERY estimator. The walk therefore does N + 1 intersections: emission found at the end of segment N is scored, but NEE and the continuation (each of which adds an event) run only while `bounce < N`. The earlier loop did N intersections with NEE at all of them, so pt counted n ≤ N−1, pt-nee counted n ≤ N for samplable lights, and pt-mis counted only the NEE share of the n = N term — the truncation depended on the estimator.
-- **Russian roulette:** applied once per loop iteration, *after* `throughput *= sample.weight`, using `spectrum_max(throughput)` (**revised from `spectrum_average` by §10.1 item 6, owner-approved** — PBRT's MaxComponentValue). The survival metric is one generated expression; it can become a strategy knob later if a reader appears — `spectrum_max` is the pinned default. Starts after `russianRoulette.startDepth` *counted* events (nulls excluded). *Dielectric-era note:* raw-throughput RR over-kills inside dense media because transmission compresses radiance by η² (restored on exit) — carry PBRT's `etaScale` correction in the RR metric when the dielectric lands.
+- **Bounce budget:** surface scattering events and medium scattering events both count toward `maxBounces`; null crossings do not — they count against `measurement.maxNullCrossings`, a separate declared budget shared by the path and its shadow rays. Rationale: medium events do the same work and carry the same variance as surface bounces; null crossings are bookkeeping.
+  **What N counts:** `maxBounces: N` is the partial sum Σ_{n≤N} TⁿE — paths with at most N events — for EVERY estimator. The walk therefore does N + 1 intersections: emission found at the end of segment N is scored, but NEE and the continuation (each of which adds an event) run only while `bounce < N`. With N intersections and NEE at each, pt would count n ≤ N−1, pt-nee n ≤ N for samplable lights, and pt-mis only the NEE share of the n = N term: the truncation would depend on the estimator.
+- **Russian roulette:** applied once per loop iteration, *after* `throughput *= sample.weight`, using `spectrum_max(throughput)` (**revised from `spectrum_average` by §10.1 item 6, owner-approved** — PBRT's MaxComponentValue). The survival metric is one generated expression; it can become a strategy knob later if a reader appears — `spectrum_max` is the pinned default. The survival probability is capped at `estimator.russianRoulette.maxSurvival` (default 0.95; the only terminator for a lossless path). Starts after `russianRoulette.startDepth` *counted* events (nulls excluded). When transmissive materials exist the metric carries PBRT's `etaScale` correction (transmission compresses radiance by η², restored on exit, so raw-throughput RR would over-kill inside dense media). Medium collisions in weighted-absorption arms use a separate interior rule (`roulette_interior`, docs/fable-subsurface.md §6).
 
-Steps 1–2 exist only when the scene has media (Planner knows); their implementation is the `volumeIntegrator` axis. The loop is *generated* — a scene with no volumes, no NEE, and one Lambert material compiles to something as small as today's template.
+Steps 1–2 exist only when the scene has media (Planner knows); how they sample is the estimator's `volumeSampling` axis, and whether scattering is computed at all is the measurement's `scattering` field (the former `volumeIntegrator` split, fable-strategy-taxonomy.md §8). The loop is *generated* — a scene with no volumes, no NEE, and one Lambert material compiles to something as small as today's template.
 
 ### 7.3 The strategy axis
 
