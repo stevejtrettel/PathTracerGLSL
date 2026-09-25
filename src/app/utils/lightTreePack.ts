@@ -1,10 +1,10 @@
 // app/utils/lightTreePack.ts — the off-thread light-tree build wrapper (fable-light-bvh
 // §7). Same output as the sync buildLightTree (same core runs, different thread).
 // Plumbing rides the shared runInWorker skeleton; the policy here: inputs TRANSFER in
-// (they are built by _uploadSceneGeometry solely for this call — detaching costs
-// nothing, copying ~11 MB at 194k leaves would; a failed worker LOAD throws before
-// postMessage, so the fallback still sees intact arrays), small rosters build
-// synchronously (the shared threshold).
+// (they are built solely for this call — detaching costs nothing, copying ~11 MB at 194k
+// leaves would). If the worker fails after receiving them, the arrays are detached and the
+// build rejects rather than silently running on empty inputs (see runInWorker). Small
+// rosters build synchronously (the shared threshold).
 
 import { buildLightTree, type LightTreeResult } from '../../components/accel/light_tree/light_tree.js';
 import type { LightTreeRequest } from './lightTreeWorker.js';

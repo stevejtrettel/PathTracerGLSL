@@ -15,10 +15,14 @@
 export const WORKER_MIN_ITEMS = 4096;
 
 /** Run `req` through a dedicated one-shot worker; fall back to `fallback()` (the sync
- *  core) when Workers are unavailable or the worker fails to load, so no environment
+ *  core) when Workers are unavailable or the worker cannot be created, so no environment
  *  can lose the ability to render. `transfers` lists input buffers to MOVE rather than
- *  copy — callers transferring inputs must guarantee they are not shared views (a
- *  failed worker LOAD throws before postMessage, so the fallback still sees them). */
+ *  copy — callers transferring inputs must guarantee they are not shared views.
+ *
+ *  A worker can also fail AFTER postMessage (a module worker's script load failure arrives
+ *  as an async error event). By then transferred inputs are detached — zero-length — so the
+ *  fallback would silently compute on empty arrays; that case rejects instead. Cloned inputs
+ *  are intact, so it still falls back. */
 export async function runInWorker<Req, Res>(
     label: string,
     makeWorker: () => Worker,
@@ -28,6 +32,7 @@ export async function runInWorker<Req, Res>(
 ): Promise<Res> {
     if (typeof Worker === 'undefined') return fallback();
     let worker: Worker | undefined;
+    let posted = false;
     try {
         worker = makeWorker();
         const w = worker;
@@ -35,8 +40,10 @@ export async function runInWorker<Req, Res>(
             w.onmessage = (e: MessageEvent<Res>) => resolve(e.data);
             w.onerror = (err) => reject(new Error(`${label} worker failed: ${err.message ?? 'script error'}`));
             w.postMessage(req, transfers);
+            posted = true;
         });
     } catch (e) {
+        if (posted && transfers.length > 0) throw e;   // inputs are detached: no fallback possible
         console.warn(`${label}: worker unavailable, running on the main thread (page may hitch)`, e);
         return fallback();
     } finally {

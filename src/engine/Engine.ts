@@ -43,6 +43,11 @@ export class Engine {
     private imageSize: [number, number] = [0, 0];
     private customParameters = new Map<string, any>();
     private lostActiveRendererId: string | null = null;
+
+    /** Called after the engine has rebuilt itself following a WebGL context restore. The
+     *  engine rebuilds what it owns (programs, framebuffers, its global textures); the caller
+     *  must re-supply its external textures and re-send parameter values. */
+    onContextRestored?: () => void;
     // Monotonic RNG salt, bumped on every accumulation reset so the seed doesn't
     // replay after a reset (kills frozen-motion noise + reset-replay). See §2.11.
     private resetSalt = 0;
@@ -497,6 +502,8 @@ export class Engine {
             // Extension state resets on context loss — re-enable before rebuilding
             // float framebuffers, or they come back INCOMPLETE_ATTACHMENT.
             this.resourceManager.enableRequiredExtensions();
+            // The engine's own global texture (the display pass binds it every frame).
+            registerBlueNoise(this.gl, this.textureRegistry);
 
             for (const renderer of renderers) {
                 this.loadRenderer(renderer.id, renderer);
@@ -519,7 +526,8 @@ export class Engine {
 
         this.lostActiveRendererId = null;
 
-        // Note: environment textures are NOT rebuilt — their source (HDR) data
-        // isn't retained here. Reload via loadEnvironmentHDR() to restore it.
+        // External textures (scene data, environment) and parameter values are the caller's:
+        // the engine never kept their sources.
+        if (this.state !== 'error') this.onContextRestored?.();
     }
 }

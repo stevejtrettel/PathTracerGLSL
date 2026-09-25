@@ -4,6 +4,30 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — runtime fixes: context loss, render-loop errors, export stamps, workers
+
+- **WebGL context loss was unrecoverable.** On restore the engine rebuilt the renderers but
+  not its blue-noise texture, and nobody re-supplied the scene-data or environment textures or
+  re-sent parameter values: every later frame threw "Extern texture 'data_nodes' is not
+  registered" (and the camera and sliders would have reverted to defaults). Now the engine
+  re-registers what it owns and calls `onContextRestored`; the App re-executes the scene-data
+  plan, re-bakes / reloads the environment, re-selects the active renderer, re-sends every
+  parameter and restarts accumulation. Checked in headless Chromium with WEBGL_lose_context:
+  instance-lights, sky and proc-sky render a bit-identical image (pinned salt) after
+  loss + restore; the previous code never finished a frame after restore.
+- **A frame that threw killed the render loop silently**, leaving the state at 'rendering', a
+  production render's promise unsettled (parameters locked for good) and nothing reported. The
+  loop now stops cleanly, rejects the pending production render, and emits `RENDER_ERROR`,
+  which the App shows in its error overlay.
+- **Export stamps could describe different parameters than the pixels**: a change made while
+  rendering is stopped defers the accumulation reset, but the stamp read the current values.
+  The App now snapshots the parameters at each accumulation restart and stamps that.
+- **Worker fallback on detached inputs**: when a worker failed after receiving TRANSFERRED
+  inputs (a module worker's load failure arrives after postMessage), the main-thread fallback
+  ran on zero-length arrays. It now rejects in that case; cloned inputs still fall back.
+
+Tests: tests/app/renderCoordinator.test.ts (a throwing frame), tests/app/worker.test.ts.
+
 ## 2026-09-25 — the App packs scene data from a compiler plan (stage 2)
 
 The App no longer derives anything from the scene to build the data textures. The compiler

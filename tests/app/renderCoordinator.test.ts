@@ -95,3 +95,37 @@ describe('RenderCoordinator — mode guarding & events', () => {
         expect(emitter.events.some(e => e.event === AppEvents.RENDER_STARTED)).toBe(true);
     });
 });
+
+describe('RenderCoordinator — a frame that throws', () => {
+    // Before the fix the loop just stopped scheduling frames: state stayed 'rendering', a
+    // production render's promise never settled (so parameters stayed locked), and nothing
+    // was reported.
+    it('stops cleanly, rejects a pending production render, and reports the error', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const engine = fakeEngine();
+        const boom = new Error('extern texture missing');
+        engine.renderFrame.mockImplementation(() => { throw boom; });
+        const emitter = makeEmitter();
+        const rc = new RenderCoordinator(asEngine(engine), emitter);
+        const done = rc.startProduction({ targetSamples: 64 });
+        step();
+        await expect(done).rejects.toBe(boom);
+        expect(rc.getState()).toBe('stopped');
+        expect(rafCb).toBeNull();   // no further frame scheduled
+        const names = emitter.events.map((e) => e.event);
+        expect(names).toContain(AppEvents.RENDER_ERROR);
+        expect(names).toContain(AppEvents.RENDER_STOPPED);
+        expect(emitter.events.find((e) => e.event === AppEvents.RENDER_ERROR)!.data).toEqual({ error: boom });
+    });
+
+    it('an interactive render stops the same way', () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const engine = fakeEngine();
+        engine.renderFrame.mockImplementation(() => { throw new Error('boom'); });
+        const rc = new RenderCoordinator(asEngine(engine), makeEmitter());
+        rc.startInteractive();
+        step();
+        expect(rc.isRunning()).toBe(false);
+        expect(rafCb).toBeNull();
+    });
+});

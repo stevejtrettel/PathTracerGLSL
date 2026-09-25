@@ -40,6 +40,13 @@ export class App {
     private layout: AppLayout | null = null;
     private production: ProductionOrchestrator;
     private errorOverlay: ErrorOverlay;
+    // The parameter values the accumulated image was rendered with: taken whenever the
+    // accumulation restarts. A parameter change while rendering is stopped defers the reset
+    // (the finished image survives for export), so the CURRENT values can describe a
+    // different image than the one on screen — export stamps use this snapshot instead.
+    private imageParameters: Record<string, any> | null = null;
+    // The configuration initialize() was given: what a WebGL context restore must rebuild.
+    private config: AppConfig | null = null;
 
     constructor(canvas: HTMLCanvasElement) {
         canvas.width = canvas.clientWidth || window.innerWidth;
@@ -64,6 +71,9 @@ export class App {
         this.eventBus = new EventBus();
         this.parameterStore = new ParameterStore();
         this.coordinator = new RenderCoordinator(this.engine, this.eventBus);
+        this.eventBus.on(AppEvents.ACCUMULATION_RESET, () => { this.imageParameters = this.parameterStore.serialize(); });
+        this.eventBus.on(AppEvents.RENDER_ERROR, (data) => this._showErrorOverlay(data.error));
+        this.engine.onContextRestored = () => { void this._restoreAfterContextLoss(); };
 
         this.rendererManager = new RendererManager({
             compiler: this.compiler,
@@ -179,36 +189,77 @@ export class App {
         // Scene-driven environment load (env-as-light T2): an `image` environment's textures
         // must be in the extern registry BEFORE the first frame — the executor hard-errors on
         // a missing extern (never a silent unit-0 sample), so initialize awaits the load.
+        this.config = config;
+        await this._loadImageEnvironment(config);
+        // The first image is rendered with the values as initialized.
+        this.imageParameters = this.parameterStore.serialize();
+    }
+
+    /** Load an `image` environment (or an explicit config.environmentHDR): the radiance map,
+     *  the default sampling tables, and the (chart, compensation) variants the strategies use. */
+    private async _loadImageEnvironment(config: AppConfig): Promise<void> {
         const sceneEnv = config.scene?.environment;
         const hdrPath = config.environmentHDR ?? (sceneEnv?.type === 'image' ? sceneEnv.url : undefined);
-        if (hdrPath) {
-            try {
-                // The loader registers env_map + the DEFAULT tables (equirect, uncompensated).
-                const env = await this.engine.loadEnvironmentHDR(hdrPath, ENV_EXTERN_NAMES);
-                this.parameterStore.batch({ 'env.size': [env.width, env.height], 'env.totalWeight': env.totalWeight });
+        if (!hdrPath) return;
+        try {
+            // The loader registers env_map + the DEFAULT tables (equirect, uncompensated).
+            const env = await this.engine.loadEnvironmentHDR(hdrPath, ENV_EXTERN_NAMES);
+            this.parameterStore.batch({ 'env.size': [env.width, env.height], 'env.totalWeight': env.totalWeight });
 
-                // T5: build the non-default (chart, compensation) variants the strategies use.
-                let octaRgb: Float32Array | null = null;
-                const octaN = DEFAULT_ENV_TABLE_SIZE[1];
-                for (const { chart, compensation } of envVariants(config.strategies)) {
-                    const suffix = envVariantSuffix(chart, compensation);
-                    if (suffix === '') continue;   // default already built by the loader
-                    let rgb = env.data, w = env.width, h = env.height;
-                    if (chart === 'octahedral') {
-                        octaRgb ??= resampleEquirectToOctahedral(env.data, env.width, env.height, octaN);
-                        rgb = octaRgb; w = octaN; h = octaN;
-                        this.parameterStore.set('env.sizeOct', [octaN, octaN]);
-                    }
-                    this.engine.registerEnvironmentTable(rgb, w, h, {
-                        names: { map: ENV_EXTERN_NAMES.map, cond: `${ENV_EXTERN_NAMES.cond}${suffix}`, marg: `${ENV_EXTERN_NAMES.marg}${suffix}` },
-                        chart, compensation,
-                    });
+            // T5: build the non-default (chart, compensation) variants the strategies use.
+            let octaRgb: Float32Array | null = null;
+            const octaN = DEFAULT_ENV_TABLE_SIZE[1];
+            for (const { chart, compensation } of envVariants(config.strategies)) {
+                const suffix = envVariantSuffix(chart, compensation);
+                if (suffix === '') continue;   // default already built by the loader
+                let rgb = env.data, w = env.width, h = env.height;
+                if (chart === 'octahedral') {
+                    octaRgb ??= resampleEquirectToOctahedral(env.data, env.width, env.height, octaN);
+                    rgb = octaRgb; w = octaN; h = octaN;
+                    this.parameterStore.set('env.sizeOct', [octaN, octaN]);
                 }
-            } catch (error) {
-                console.error(`Failed to load HDR environment: ${hdrPath}`, error);
-                throw error;
+                this.engine.registerEnvironmentTable(rgb, w, h, {
+                    names: { map: ENV_EXTERN_NAMES.map, cond: `${ENV_EXTERN_NAMES.cond}${suffix}`, marg: `${ENV_EXTERN_NAMES.marg}${suffix}` },
+                    chart, compensation,
+                });
             }
+        } catch (error) {
+            console.error(`Failed to load HDR environment: ${hdrPath}`, error);
+            throw error;
         }
+    }
+
+    /**
+     * Rebuild everything the GPU lost with the WebGL context. The engine has already rebuilt
+     * the renderers' programs and framebuffers (from the compiled renderers it keeps) and its
+     * own global textures; what it cannot rebuild are the textures the App supplies — the
+     * scene data and the environment — and the parameter values, which live in the
+     * ParameterStore. Rendering is paused until everything is back.
+     */
+    private async _restoreAfterContextLoss(): Promise<void> {
+        const config = this.config;
+        if (config === null) return;
+        const wasRendering = this.coordinator.isRunning();
+        if (wasRendering) this.coordinator.pause();
+        try {
+            const active = this.engine.getActiveRendererId();
+            if (config.scene?.environment?.type === 'procedural') {
+                // The bake loads, renders and unloads its own tiny renderer, which moves the
+                // engine's selection — re-select the active renderer afterwards.
+                this._bakeProceduralEnvironment(config.scene, envVariants(config.strategies));
+                if (active !== null) this.engine.selectRenderer(active);
+            }
+            const sceneData = this.rendererManager.getSceneData();
+            if (sceneData !== null) await this._uploadSceneGeometry(sceneData);
+            await this._loadImageEnvironment(config);
+            this.parameterStore.resendAll();
+            this.coordinator.resetAccumulation('WebGL context restored');
+            console.log('Scene data, environment and parameters restored after WebGL context loss');
+        } catch (error: any) {
+            this._showErrorOverlay(error);
+            return;   // stay paused: the GPU state is incomplete
+        }
+        if (wasRendering) this.coordinator.resume();
     }
 
     /**
@@ -308,6 +359,7 @@ export class App {
             this._showErrorOverlay(error);
             throw error;
         }
+        this.imageParameters = this.parameterStore.serialize();   // the accumulation restarted
         if (wasRendering) this.coordinator.resume();
     }
 
@@ -721,7 +773,8 @@ export class App {
                 return s == null ? 'unknown' : s.provenance !== undefined ? `${s.id} [${s.provenance}]` : s.id;
             })(),
             strategy: this.rendererManager.getActiveStrategy(),
-            parameters: this.parameterStore.serialize(),
+            // The values THIS image was rendered with (see imageParameters).
+            parameters: this.imageParameters ?? this.parameterStore.serialize(),
             spp: this.coordinator.getSampleCount(),
             resolution: [width, height],
             resetSalt: this.engine.getResetSalt(),

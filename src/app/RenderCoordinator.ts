@@ -211,9 +211,14 @@ export class RenderCoordinator {
         const loop = () => {
             if (this.state !== 'rendering') return;
 
-            this.engine.renderFrame();
-            this.updateFPS();
-            this.reportProgress();
+            try {
+                this.engine.renderFrame();
+                this.updateFPS();
+                this.reportProgress();
+            } catch (error) {
+                this.fail(error);
+                return;
+            }
 
             if (this.mode === 'production' && this.checkGoalMet()) {
                 this.complete();
@@ -224,6 +229,23 @@ export class RenderCoordinator {
         };
 
         this.animationId = requestAnimationFrame(loop);
+    }
+
+    /** A frame threw. Stop cleanly instead of leaving the state at 'rendering' with no loop
+     *  running: settle a pending production render (its finally unlocks parameters and
+     *  restores the view), and report the error so the App can show it. */
+    private fail(error: unknown): void {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error('Rendering stopped: a frame threw.', err);
+        this.state = 'stopped';
+        this.animationId = undefined;
+        if (this.productionReject) {
+            this.productionReject(err);
+            this.clearProductionPromise();
+        }
+        this.goal = null;
+        this.emit(AppEvents.RENDER_ERROR, { error: err });
+        this.emit(AppEvents.RENDER_STOPPED);
     }
 
     private updateFPS(): void {

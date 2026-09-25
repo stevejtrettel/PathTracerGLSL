@@ -13,6 +13,8 @@ export const AppEvents = {
     RENDER_PAUSED:      'render.paused',
     RENDER_RESUMED:     'render.resumed',
     RENDER_PROGRESS:    'render.progress',
+    /** A frame threw; the loop has stopped. Payload: { error: Error }. */
+    RENDER_ERROR:       'render.error',
 
     // Accumulation
     ACCUMULATION_RESET: 'accumulation.reset',
