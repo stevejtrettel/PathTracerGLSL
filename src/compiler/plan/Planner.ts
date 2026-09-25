@@ -31,7 +31,6 @@ import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
 import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, dataReadsOf, READS_EVERYTHING } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
-import { trackingBudgetWarnings } from './trackingBudget.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
 import type { BlackbodyValue } from '../types.js';
@@ -396,11 +395,6 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
     // --- Build program description ---
     const program = planProgram(features, scene, strategy, lights, materials, objects, meshes, instanceBatches, instanceLights.reduce((a, b) => a + b.count, 0));
     const pipeline = planPipeline(program);
-
-    // Media whose tracking walk could reach the collision cap (see trackingBudget.ts).
-    for (const w of trackingBudgetWarnings(scene, materials, objects, meshes, instanceBatches, ambientMedium, program.media.scatteringArms)) {
-        bag.warning('invalid-material', w).add();
-    }
 
     return {
         objects,

@@ -108,8 +108,8 @@ export interface MediaDesc {
      *  estimator.volumeSampling !== 'none' — kept explicit for readers. */
     scatteringArms: boolean;
     /** Some medium routes to a null-collision arm (fable-heterogeneous-media.md;
-     *  emission P5 extends the routing): the delta/ratio-tracking occupant +
-     *  MAX_NULL_COLLISIONS exist. Independent of scatteringArms — absorbing-only
+     *  emission P5 extends the routing): the delta/ratio-tracking occupant is
+     *  included. Independent of scatteringArms — absorbing-only
      *  heterogeneous media need the ratio pass-through arm with no phase machinery. */
     heterogeneousArms: boolean;
     /** Some SCATTERING medium settles absorption by WEIGHTING the throughput (the analytic

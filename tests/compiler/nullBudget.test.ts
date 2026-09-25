@@ -1,11 +1,13 @@
-// Declared path budgets in media: measurement.maxNullCrossings (one budget for the whole path,
-// its shadow rays included) and the tracking arms' collision cap with the Planner's warning.
-// The GPU gate for the crossing budget is the null-budget witness; these check the plumbing.
+// Path budgets and step limits in media: measurement.maxNullCrossings (a budget: one for the
+// whole path, its shadow rays included) and the tracking loops' bound (a step limit, derived per
+// segment so it never decides the picture — taxonomy §4.1). The GPU gate for the crossing budget
+// is the null-budget witness; these check the plumbing and the bound's tail probability.
 
 import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
 import { DEFAULT_MAX_NULL_CROSSINGS } from '../../src/compiler/plan/measurement.js';
-import { MAX_NULL_COLLISIONS } from '../../src/compiler/plan/trackingBudget.js';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import type { SceneDescription, RenderStrategy, MediumDescription } from '../../src/compiler/types.js';
 
 function fogScene(medium: MediumDescription, box: { halfSize: number } | 'ambient'): SceneDescription {
@@ -45,8 +47,8 @@ function fragmentOf(scene: SceneDescription, strat: RenderStrategy): string {
     return main![1].fragment;
 }
 
-const budgetWarnings = (scene: SceneDescription): string[] =>
-    new Compiler().compileScene(scene, [strategy('nee')]).warnings.filter((w) => w.includes('collision cap'));
+const compileWarnings = (scene: SceneDescription): string[] =>
+    new Compiler().compileScene(scene, [strategy('nee')]).warnings;
 
 describe('measurement.maxNullCrossings', () => {
     it('defaults to 32 and reaches the walk as MAX_NULL_CROSSINGS', () => {
@@ -75,45 +77,56 @@ describe('measurement.maxNullCrossings', () => {
     });
 });
 
-describe('collision-cap warning (trackingBudget.ts)', () => {
-    it('is quiet for a small expression fog box', () => {
-        // σ̄·diagonal = 2 · 2√3 ≈ 7 ≪ cap/2
-        expect(budgetWarnings(fogScene(exprFog(2), { halfSize: 1 }))).toEqual([]);
+describe('tracking loop bound (tracking_cap, delta_tracking.glsl)', () => {
+    const glsl = readFileSync(join(__dirname, '../../src/components/transport/volume/delta_tracking/delta_tracking.glsl'), 'utf8');
+    const define = (name: string): number => {
+        const m = glsl.match(new RegExp(`#define\\s+${name}\\s+([0-9.eE+-]+)`));
+        if (!m) throw new Error(`${name} not found`);
+        return Number(m[1]);
+    };
+    const A = define('TRACKING_CAP_SIGMAS');
+    const B = define('TRACKING_CAP_SLACK');
+    const cap = (lambda: number): number => Math.ceil(lambda + A * Math.sqrt(lambda) + B);
+
+    /** log P(N ≥ c) for N ~ Poisson(λ), summed upward in log space. */
+    function logTail(lambda: number, c: number): number {
+        if (lambda === 0) return c <= 0 ? 0 : -Infinity;
+        let lp = -lambda + c * Math.log(lambda) - lgamma(c + 1);
+        let total = lp;
+        for (let k = c + 1; ; k++) {
+            lp += Math.log(lambda) - Math.log(k);
+            if (lp < total - 40) break;
+            total = Math.max(total, lp) + Math.log1p(Math.exp(-Math.abs(total - lp)));
+        }
+        return total;
+    }
+    /** ln Γ(x), Lanczos (g = 7) — accurate far beyond what a 1e-10 threshold needs. */
+    function lgamma(x: number): number {
+        const g = 7;
+        const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+            -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+        x -= 1;
+        let a = c[0];
+        const t = x + g + 0.5;
+        for (let i = 1; i < g + 2; i++) a += c[i] / (x + i);
+        return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+    }
+
+    it('a walk runs out with probability below 1e-10 for every mean collision count λ', () => {
+        // A walk over a segment with N ~ Poisson(λ) tentative collisions needs N + 1 iterations,
+        // so it runs out iff N ≥ cap. The tail is worst as λ → ∞ (the normal 6.5σ tail, 4e-11).
+        const lambdas = [0.001, 0.1, 0.5, 1, 2, 5, 10, 30, 100, 300, 1e3, 4.2e3, 8.2e3, 3e4, 1e5, 1e6];
+        for (const lambda of lambdas) {
+            expect(logTail(lambda, cap(lambda)) / Math.LN10).toBeLessThan(-10);
+        }
     });
 
-    it('warns when σ̄ × the region\'s diagonal passes half the cap', () => {
-        // halfSize 100 → diagonal 200√3 ≈ 346; σ̄ = 2 → ≈ 693 > 512
-        const w = budgetWarnings(fogScene(exprFog(2), { halfSize: 100 }));
-        expect(w).toHaveLength(1);
-        expect(w[0]).toMatch(/Lower medium\.majorant/);
-        expect(MAX_NULL_COLLISIONS / 2).toBeLessThan(2 * 200 * Math.sqrt(3));
-    });
-
-    it('warns for an ambient expression fog, recommending a bounded region', () => {
-        const w = budgetWarnings(fogScene(exprFog(2), 'ambient'));   // 2 · 1000 > 512
-        expect(w).toHaveLength(1);
-        expect(w[0]).toMatch(/Enclose the fog in a bounded region/);
-    });
-
-    it('is quiet for an ambient expression fog inside a closed room of axis-aligned walls', () => {
-        // A 4 × 3 × 6 room: the longest segment is its diagonal ≈ 7.8, so σ̄ = 8 gives ≈ 62.
-        const walls: Array<[[number, number, number], number]> = [
-            [[0, 1, 0], 0], [[0, -1, 0], 3], [[1, 0, 0], 2], [[-1, 0, 0], 2], [[0, 0, 1], 3], [[0, 0, -1], 3],
-        ];
-        const room: SceneDescription = {
-            ...fogScene(exprFog(8), 'ambient'),
-            objects: walls.map(([normal, offset]) => ({ type: 'plane', parameters: { normal, offset }, material: 'floor' })),
-        };
-        expect(budgetWarnings(room)).toEqual([]);
-        // Open one side and the fog reaches the far clip again.
-        const open: SceneDescription = { ...room, objects: room.objects.slice(0, 5) };
-        expect(budgetWarnings(open)).toHaveLength(1);
-    });
-
-    it('is quiet for constant media: the derived σ̄ is σ_t, so no collision is null', () => {
-        // A constant emissive scattering medium routes to tracking (the analytic arm has no
-        // source term), but walks at σ̄ = σ_t and always stops at its first collision.
-        const glow: MediumDescription = { sigma_a: [1, 1, 1], sigma_s: [2, 2, 2], emission: [1, 1, 1] };
-        expect(budgetWarnings(fogScene(glow, 'ambient'))).toEqual([]);
+    it('the generated trackers bound each loop by its own segment, and nothing warns', () => {
+        const scene = fogScene(exprFog(8.2), 'ambient');   // a fog to the far clip: λ up to 8200
+        const frag = fragmentOf(scene, strategy('nee'));
+        expect(frag).not.toMatch(/MAX_NULL_COLLISIONS/);
+        expect(frag).toMatch(/int cap = tracking_cap\(sigma_bar \* t_max\);/);
+        expect(frag).toMatch(/int cap = tracking_cap\(sigma_bar \* len\);/);
+        expect(compileWarnings(scene)).toEqual([]);
     });
 });

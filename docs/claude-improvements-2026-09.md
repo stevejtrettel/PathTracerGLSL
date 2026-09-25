@@ -105,15 +105,15 @@ declared. Three safety budgets break that quietly. None is reached by a registry
   at budget 10, black at 9) and `null-budget` (nee ≡ mis ≡ pt at the default budget and at 11,
   where the budget cuts the direct light under a null-walled carpet).
 - The collision cap is not a measurement field: whether it binds depends on the majorant, which
-  the scene declares. Roulette cannot replace it either: delta tracking's weight often stays
-  at 1, and ratio tracking already has pbrt's roulette. The cap is now 1024 (from 64) and the
-  Planner warns when an expression medium's σ̄ × longest segment exceeds 512
-  (`compiler/plan/trackingBudget.ts`). Constant media never warn: their σ̄ is σ_t, so no
-  collision is null. A whole-scene fog is bounded by the room its axis-aligned walls close
-  off, else by the far clip. Of the demos only groundfog was open to the sky; its fog now
-  sits in an 80 × 7 × 80 box (twin against the whole-scene version: Δmean 0.00%, and faster).
-  The old cap of 64 had changed groundfog's image by at most 0.09%: the attenuation it dropped
-  multiplied a black sky.
+  the scene declares. It is now derived per segment instead of fixed: each tracking loop is
+  bounded by `tracking_cap(σ̄·t) = ⌈λ + 6.5√λ + 12⌉`, which a walk exceeds with probability
+  below 1e-10 for any λ. No fixed number, no warning. (A fixed 1024 with a Planner warning, and
+  then a fixed-size box around groundfog's fog, were tried the same day and dropped: a number
+  chosen to be big enough decides the picture for the scene that exceeds it.) The old cap of
+  64 had changed groundfog's image by at most 0.09% (its sky is black). The cost remains: a fog
+  open to the far clip pays σ̄ × 1000 steps per escaping ray, so groundfog renders slower than
+  with the old cap. The fix for that is tighter local majorants (interval bounds on the density
+  formula along the ray), to be designed.
 - GRIN: a traversal is now one event however long (charging a bounce per 512 steps made the
   measurement depend on the step size). Long and trapped traversals end by the walker's own
   roulette every 512 steps (survival 0.9), with a hard stop at 200 rounds (probability ≈ 8·10⁻¹⁰).
@@ -346,7 +346,24 @@ anyway, so keeping all of them buys nothing. Allocating on select divides the GP
 the number of renderers (up to 9) and removes the most likely cause of an allocation
 failure at 8K. Also check requested sizes against `MAX_TEXTURE_SIZE` / `MAX_VIEWPORT_DIMS`.
 
-### 3.3 Smaller speed items
+### 3.3 Local majorants for formula fogs — to design together
+
+**What.** Delta and ratio tracking walk at one majorant σ̄ per medium, so they pay σ̄ per unit
+length everywhere, including where the density formula is essentially zero. A fog open to the
+sky pays σ̄ × 1000 tentative collisions per escaping ray (groundfog: about 4200). The loop
+bound is derived and never decides the picture (§1.2), so this is purely cost.
+
+**Plan (sketch).** Bound the formula locally instead of globally. The compiler generates an
+interval version of the density expression: given a box of space, an upper bound on σ_t inside
+it. The tracker bounds the next stretch of the ray (growing stretches, so far-away empty space
+costs a handful of bounds) and walks each stretch at its own majorant; where the bound is ~0 a
+stretch costs one step. Unbiased, no author numbers; stretch lengths change only cost. Needs a
+parser for the expression subset the formulas use and interval code generation for it (exp,
+sin, dot, products, sums, the declared slider uniforms). pbrt-v4's majorant grids are the
+stored-grid version of the same idea; interval bounds along the ray need no grid and handle
+unbounded fogs.
+
+### 3.4 Smaller speed items
 
 - `Engine.clearAccumulation` clears the ParameterManager's caches, so every reset (every
   orbit mouse-move) re-runs all uniform closures and re-uploads every uniform. Uniform

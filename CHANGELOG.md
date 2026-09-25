@@ -4,6 +4,31 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — tracking loops derive their bound; the fog box and the cap warning are gone
+
+- **Derived bound.** Each delta/ratio-tracking loop is bounded by
+  `tracking_cap(σ̄·t) = ⌈λ + 6.5√λ + 12⌉` (delta_tracking.glsl), where λ = σ̄·t is the mean number
+  of tentative collisions over the segment it walks. A walk runs out only if N ≥ cap for
+  N ~ Poisson(λ), which has probability below 1e-10 for every λ (the exact tail is checked in
+  tests/compiler/nullBudget.test.ts against the constants read from the GLSL; the worst case is
+  the normal 6.5σ limit, 4e-11). The bound adapts to slider-driven majorants, moving regions and
+  closed rooms without any analysis, so the fixed `MAX_NULL_COLLISIONS` (1024) and the Planner
+  warning (compiler/plan/trackingBudget.ts, deleted; `derivedMajorant` is back in
+  materials.ts) are gone. Taxonomy §4.1 now says step limits are derived, never fixed numbers
+  chosen to be big enough.
+- **groundfog's box is reverted**: its fog fills the scene again. A fixed box size is an
+  arbitrary cut of the world that a formula editor has to know about. With the derived bound,
+  groundfog's image is identical to five digits to the cap-1024 render (whole frame, top and
+  bottom quarters); frame time about the same under SwiftShader (14.5 s against 13.6 s, different
+  render modes).
+- **Correction** to the budgets entry below: "constant media have no null collisions" holds only
+  for grey media. For a chromatic constant medium σ̄ is the largest channel's σ_t, so the other
+  channels have null collisions. The derived bound covers them like every other medium.
+- Tested: het-const, het-slab, clamp, het-driven, emit-swap, emit-sat, emit-driven,
+  emit-scatter — 11 checks pass with numbers identical to the earlier runs. The cost of open
+  fogs (σ̄ × 1000 steps per escaping ray) is now a pure speed question: improvements §3.3
+  (local majorants from interval bounds on the formula) is the plan.
+
 ## 2026-09-25 — groundfog's fog in a box; the cap warning knows closed rooms
 
 - **groundfog**'s fog moves from the whole scene into a `'none'`-walled box, 80 × 7 × 80 (y from

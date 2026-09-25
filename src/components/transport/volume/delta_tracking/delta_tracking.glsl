@@ -29,14 +29,25 @@
 // occupant convention holds; curved-space tracking is a research item, not a respell.
 // RNG: xi carries the leading stratified draws (first jump, first lottery); the loop
 // tail draws from the stream (random()) — the equiangular precedent (volumetric §2).
-// Budget: MAX_NULL_COLLISIONS tentative collisions per call. A walk that reaches it returns
-// what it has, dropping the rest of the segment: the attenuation still owed (reads bright) and
-// the emission not yet collected (reads dark). The cap is set far above σ̄·(segment length) for
-// every scene the Planner does not warn about (compiler/plan/trackingBudget.ts), so in those it
-// is never reached.
+// Loop bound: tracking_cap below, derived per segment from σ̄ and the segment's length, so the
+// bound never decides the picture (taxonomy §4.1). A walk that did run out would drop the rest of
+// its segment — the attenuation still owed and the emission not yet collected.
 // Depends on: scene_medium_properties (generated, returns the EFFECTIVE clamped field),
 // medium_emission (generated: ε or the folded ZERO), random (sampler), structs_media
 // (MediumSample), spectrum_* (core math), ambient_geodesic.
+
+// The loop bound of a tracking walk over a segment of length t at majorant σ̄. Tentative
+// collisions along the segment form a Poisson process of mean λ = σ̄·t, whatever the field does,
+// and a walk that reaches the segment's end takes one iteration per collision plus one; it runs
+// out only if N ≥ cap for N ~ Poisson(λ). With cap = ⌈λ + 6.5·√λ + 12⌉ that probability is below
+// 1e-10 for every λ, approaching the normal 6.5σ tail (4e-11) as λ grows (the exact tail is
+// checked in tests/compiler/nullBudget.test.ts). The cost is the walk's own: a long segment at a
+// high majorant takes about λ steps, where the field is thin as well as where it is dense.
+#define TRACKING_CAP_SIGMAS 6.5
+#define TRACKING_CAP_SLACK 12.0
+int tracking_cap(float lambda) {
+    return int(ceil(lambda + TRACKING_CAP_SIGMAS * sqrt(lambda) + TRACKING_CAP_SLACK));
+}
 
 // Seam-1 delta-tracking arm (heterogeneous scattering media): Kutz Algorithm 4 on the
 // segment [0, t_max]. Scattered-at-t or transmitted, per-channel weight — the walk
@@ -54,7 +65,8 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
     float t = 0.0;
     float xi_dist = xi.x;
     float xi_evt = xi.y;
-    for (int i = 0; i < MAX_NULL_COLLISIONS; i++) {
+    int cap = tracking_cap(sigma_bar * t_max);
+    for (int i = 0; i < cap; i++) {
         t += -log(1.0 - xi_dist) / sigma_bar;
         if (t >= t_max) {                      // transmitted (deviation 3: residual = 1)
             ms.weight = w;
@@ -105,7 +117,7 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
         xi_dist = random();
         xi_evt = random();
     }
-    ms.weight = w;                             // cap reached: the rest of the segment is dropped (see header)
+    ms.weight = w;                             // cap reached (probability < 1e-10 — tracking_cap)
     return ms;
 }
 
@@ -124,7 +136,8 @@ MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float
 
     Spectrum T = SPECTRUM_ONE;
     float t = 0.0;
-    for (int i = 0; i < MAX_NULL_COLLISIONS; i++) {
+    int cap = tracking_cap(sigma_bar * t_max);
+    for (int i = 0; i < cap; i++) {
         t += -log(1.0 - random()) / sigma_bar;
         if (t >= t_max) break;
         Point p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -134,7 +147,7 @@ MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float
         ms.radiance += T * medium_emission(m) / sigma_bar;
         T *= max(Spectrum(sigma_bar) - m.sigma_a, 0.0) / sigma_bar;
     }
-    ms.weight = T;                             // reached t_max, or the cap (see header)
+    ms.weight = T;                             // reached t_max (or the cap: probability < 1e-10)
     return ms;
 }
 
@@ -148,7 +161,8 @@ MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float
 Spectrum medium_transmittance_ratio(int med, float sigma_bar, Ray ray, float len) {
     Spectrum T = SPECTRUM_ONE;
     float t = 0.0;
-    for (int i = 0; i < MAX_NULL_COLLISIONS; i++) {
+    int cap = tracking_cap(sigma_bar * len);
+    for (int i = 0; i < cap; i++) {
         t += -log(1.0 - random()) / sigma_bar;
         if (t >= len) return T;
         Point p = ambient_geodesic(ray.origin, ray.direction, t);
@@ -160,5 +174,5 @@ Spectrum medium_transmittance_ratio(int med, float sigma_bar, Ray ray, float len
             T /= (1.0 - q);
         }
     }
-    return T;                                  // cap reached: the rest of the segment is dropped (see header)
+    return T;                                  // cap reached (probability < 1e-10 — tracking_cap)
 }

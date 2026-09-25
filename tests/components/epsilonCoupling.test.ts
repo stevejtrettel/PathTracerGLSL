@@ -11,7 +11,6 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { GRIN_GRAD_EPS } from '../../src/compiler/generate/features/intersection.js';
-import { FAR_CLIP } from '../../src/compiler/plan/trackingBudget.js';
 
 const SRC = join(__dirname, '../../src');
 const read = (p: string): string => readFileSync(join(SRC, 'glsl/core', p), 'utf8');
@@ -108,12 +107,5 @@ describe('EPSILON is deleted', () => {
             if (/\bEPSILON\b/.test(code)) offenders.push(f);
         }
         expect(offenders).toEqual([]);
-    });
-});
-
-// ── Constants the compiler needs in TypeScript ────────────────────────────────────────
-describe('TypeScript copies of GLSL constants', () => {
-    it("FAR_CLIP (the tracking-budget check's ambient segment) is math.glsl's MAX_DIST", () => {
-        expect(FAR_CLIP).toBe(define(read('math.glsl'), 'MAX_DIST'));
     });
 });

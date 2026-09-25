@@ -137,13 +137,14 @@ verifies the definition for every consumer at once.
   scattering/absorbing split: constant×{scattering, absorbing} → today's arms
   (unchanged); expression×scattering → delta tracking; expression×absorbing → ratio
   tracking.
-- **Step budget**: each loop is bounded by `MAX_NULL_COLLISIONS` (1024, a `#define`
-  emitted from `compiler/plan/trackingBudget.ts`). A walk that reaches it drops the rest of
-  its segment (attenuation still owed, emission not yet collected), so it is not
-  conservative in either direction. Whether it binds depends on the majorant, which the
-  scene declares, so it is not a measurement field: the cap sits far above what scenes
-  need, and the Planner warns when an expression medium's σ̄ × its longest segment exceeds
-  half the cap (trackingBudget.ts has the bound).
+- **Step budget**: each loop derives its own bound from the segment it walks,
+  `tracking_cap(σ̄·t) = ⌈λ + 6.5√λ + 12⌉` with λ = σ̄·t the mean number of tentative
+  collisions. A walk runs out with probability below 1e-10 for every λ, so the bound never
+  decides the picture (taxonomy §4.1); a walk that did run out would drop the rest of its
+  segment. There is no fixed number and no warning. The cost is the walk's own: a long
+  segment at a high majorant takes about λ steps, thin field or not — a fog open to the far
+  clip pays σ̄ × 1000 per escaping ray. Cheaper walks through thin regions need tighter
+  local majorants, not a smaller bound.
 - **RNG**: the loops draw internally from the stream (`random()`, as the equiangular
   technique already does). The seam's `vec2 xi` stays for the leading stratified
   draws; the contract note in `fable-volumetric-component.md` §2 should gain one
@@ -248,7 +249,7 @@ only, deliberately not normative algebra):
 
 ```
 t = 0
-loop (≤ MAX_NULL_COLLISIONS):
+loop (≤ tracking_cap(σ̄·t_max)):
     t += -ln(1 - random()) / σ̄
     if t ≥ t_max: return transmitted (weight as accumulated)
     fetch EFFECTIVE props at p(t)                    // clamp already applied in the lookup
@@ -272,7 +273,7 @@ published (Novák et al. 2014; pbrt-v4 `SampleLd`):**
 
 ```
 T_c = 1;  t = 0
-loop (≤ MAX_NULL_COLLISIONS):
+loop (≤ tracking_cap(σ̄·len)):
     t += -ln(1 - random()) / σ̄
     if t ≥ len: return T
     fetch EFFECTIVE props at p(t)                    // clamp already applied in the lookup
