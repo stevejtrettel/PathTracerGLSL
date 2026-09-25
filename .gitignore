@@ -30,7 +30,3 @@ test-data/
 *.sw?
 .witness-cache/
 
-# GitHub Pages build (scripts/build-all.mjs)
-dist-pages
-demos/*/index.html
-demos/__pages

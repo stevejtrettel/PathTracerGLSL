@@ -1,0 +1,78 @@
+# Continuous integration: GitHub runs these checks on a fresh Linux machine and records a
+# pass/fail on the commit.
+#
+#   test        — every push and pull request (~3 min): typecheck + the full vitest suite.
+#                 On Linux this includes the glslang static compile of every generated
+#                 shader (tests/compiler/glsl-compile.test.ts), which cannot run on an
+#                 Apple-silicon Mac without Rosetta (the package ships an x86 binary).
+#   witnesses   — on demand only (~45–90 min): the GPU witness sweep (tools/witness.mjs) in
+#                 headless Chromium with SwiftShader. Start it from the Actions tab:
+#                 "CI" → "Run workflow" → tick "Run the GPU witness sweep". The pass/fail
+#                 table is written to the run's summary page. Its exit code is the number
+#                 of failed checks, so it stays red while the standing failures listed in
+#                 tests/witnesses/README.md remain open.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      witnesses:
+        description: 'Run the GPU witness sweep (~45–90 min)'
+        type: boolean
+        default: false
+
+# A newer push to the same branch cancels the older run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck + vitest (incl. glslang)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Tests
+        run: npx vitest run
+
+  witnesses:
+    name: GPU witness sweep (SwiftShader)
+    if: github.event_name == 'workflow_dispatch' && inputs.witnesses
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run the sweep
+        shell: bash
+        run: |
+          set +e
+          npm run witness 2>&1 | tee witness.log
+          status=${PIPESTATUS[0]}
+          {
+            echo '## GPU witness sweep'
+            echo '```'
+            sed -E 's/\x1b\[[0-9;]*m//g' witness.log | grep -E '^(PASS|FAIL|DISAGREE)|exact checks'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
