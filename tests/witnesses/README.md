@@ -21,17 +21,18 @@ lab), but nothing here imports from `compiler/scenes/`.
 - `scenes/` — the fixtures: scene + strategy definitions, with their derivations in
   comments (why 0.4, why RR is off, what a failure implicates).
 
-## Known failing witnesses — current (Sep 24 2026 sweep, updated Sep 25)
+## Known failing witnesses — current (Sep 25 2026 sweep)
 
-**Read this before diagnosing a red row.** Full sweep after the Sep 24 fixes (CHANGELOG.md):
-**175 exact checks + 1 cross-check; every check passes except these**, all standing markers
-for open work:
+**Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):
+**181 exact checks — 180 passed, 1 failed; 1 cross-check, agreed.** The one failure:
 
-- `cube-cloud` — the hang, section D below.
+- `cube-cloud` — the render does not finish in time, section D below.
 
-(`slab-albedo`, section C, is resolved. Resolved Sep 25: the four GRIN furnaces, section A — a
-region-id/material-id mix-up in the walker's exit test; and `softbeam-wall`, section B — an
-under-sampled check, not a bias.)
+Resolved Sep 25: the four GRIN furnaces (section A — lenses rendered black, a region/material
+id mix-up in the walker's exit test) and `softbeam-wall` (section B — an under-sampled check,
+not a bias). `slab-albedo` (section C) was resolved in August. New since Sep 24: `tiny-sphere`,
+`tiny-sphere-light`, `sun-haze`, `fog-area-ignored`, `instance-lights-sky` (each fails on the
+code before its fix).
 
 **`cube-cloud` (updated Sep 25).** Since the lab page stopped starting its own render loop
 under the runner, the runner takes control immediately; the failure is now the RENDER not

@@ -20,8 +20,9 @@ npm run dump:shaders   # generated shaders → generated-shaders/ (`-- --scene <
 
 - The glslang static-compile tests (`tests/compiler/glsl-compile.test.ts` and a few others)
   use `glslang-validator-prebuilt-predownloaded`, whose macOS binary is x86-only. On Apple
-  silicon without Rosetta ~338 tests fail with `spawnSync … -86`; that is the tool, not the
-  code. CI (Linux) runs them.
+  silicon without Rosetta ~350 tests fail with "glslangValidator could not be run"; that is
+  the tool, not the code. Install Rosetta, or point `GLSLANG_VALIDATOR` at a native build
+  (`brew install glslang`). CI (Linux) runs them.
 - `npm run witness` needs Playwright's headless Chromium (`npx playwright install chromium`)
   and a free port 3000; never run two at once. Finished renders are cached in
   `.witness-cache/` (keyed on source contents), so an interrupted sweep resumes.
@@ -185,7 +186,9 @@ How a program is assembled:
   functions, null interfaces, variable-index (GRIN) media.
 - Cameras: pinhole, thin lens, orthographic, equirect, fisheye, cylindrical. Box pixel
   filter; accumulators average / variance / oneshot; seven tonemaps.
-- Tooling: the witness runner, reproducibility stamps in exports, shader dumps, CI.
+- Output: exports carry reproducibility stamps; `app.renderTiled` renders any size in tiles
+  and saves one stitched HDR/PNG (byte-identical to a one-piece render at the same salt).
+- Tooling: the witness runner, shader dumps, CI.
 
 **Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
 registered); spectral transport (`color: 'spectral'` is reserved); transparent shadow rays
@@ -193,10 +196,12 @@ through glass; MIS with delta tracking; equiangular sampling of area lights; sph
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.
 
-**Known open defects** (details in tests/witnesses/README.md): the four GRIN furnace
-witnesses read ~0.30 instead of 0.40 (cause unknown); softbeam-wall's core is 3.3% high (an
-emission normalization); cube-cloud-ref hangs under SwiftShader. The Sep 24 baseline sweep
-passed 149 of 156 checks.
+**Known open defects**: cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
+README.md). Correctness items found by the Sep 25 audit and deliberately left for a decision
+(the mesh-light MIS normal on smooth meshes; three estimator-dependent budgets) are in
+docs/claude-improvements-2026-09.md, Part 1. Fixed Sep 25: the GRIN furnaces (lenses rendered
+black: a region/material id mix-up) and softbeam-wall (an under-sampled check). The Sep 25
+sweep passed 180 of 181 exact checks (only cube-cloud).
 
 ## Design authority
 
