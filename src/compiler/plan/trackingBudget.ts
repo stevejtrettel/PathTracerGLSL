@@ -18,7 +18,7 @@
 // its first tentative collision. So the check covers expression media only, and assumes the worst
 // case for them: every collision null, as where the field is near zero. The cap also bounds cost:
 // a walk crossing empty space still pays σ̄ per unit length, which is why an ambient expression
-// fog is best enclosed in a bounded region around where its density is nonzero.
+// fog open to the sky is best enclosed in a bounded region around where its density is nonzero.
 
 import type { SceneDescription } from '../types.js';
 import { isHeterogeneousMedium, isValueParam, mediumMayScatter, mediumRoutesToTracking } from '../types.js';
@@ -63,22 +63,52 @@ export function trackingMajorant(med: PlannedMedium): number {
     return isHeterogeneousMedium(med) ? med.majorant! : derivedMajorant(med);
 }
 
-/** A region that holds a material's interior, and the longest straight segment inside it. */
-interface RegionExtent { materialId: number; chord: number; where: string; ambient?: true }
+/** A region that holds a material's interior, and the longest straight segment inside it.
+ *  `open`: the ambient region with nothing closing it off, so segments reach the far clip. */
+interface RegionExtent { materialId: number; chord: number; where: string; open?: true }
 
 function diagonal(b: AABB): number {
     return Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
 }
 
+/** The longest straight segment in the ambient region, or null when nothing closes it off. A
+ *  plane is a solid half-space (dot(p, n) + offset < 0 is inside it), so the ambient region lies
+ *  on the front side of every plane. When axis-aligned planes face inward along all three axes
+ *  (a closed room), the region fits in their box. Any other plane or object only shrinks the
+ *  region, so leaving them out keeps the bound valid. */
+function ambientChord(objects: PlannedPrimitiveObject[]): number | null {
+    const lo = [-Infinity, -Infinity, -Infinity];
+    const hi = [Infinity, Infinity, Infinity];
+    for (const o of objects) {
+        if (o.type !== 'plane' || o.placement !== undefined) continue;   // world-space parameters only
+        const n = o.parameters.normal as number[];                      // unit (canonicalPlane)
+        const d = (o.parameters.offset as number | undefined) ?? 0;
+        const axis = n.findIndex((c) => Math.abs(Math.abs(c) - 1) < 1e-9);
+        if (axis < 0) continue;
+        // Front side: n·x + d ≥ 0, i.e. x_axis ≥ −d for a +axis normal, x_axis ≤ d for −axis.
+        if (n[axis] > 0) lo[axis] = Math.max(lo[axis], -d);
+        else hi[axis] = Math.min(hi[axis], d);
+    }
+    const size = [0, 1, 2].map((i) => hi[i] - lo[i]);
+    if (!size.every((w) => Number.isFinite(w) && w > 0)) return null;
+    return Math.hypot(size[0], size[1], size[2]);
+}
+
 /** Every region whose size the compiler can bound, with a chord bound: the diagonal of its world
- *  box, or the far clip for the ambient region. A region with a driven ({param}) placement or an
- *  unbounded shape has no fixed size and is left out. */
+ *  box; for the ambient region, the diagonal of the room its axis-aligned walls close off, else
+ *  the far clip. A region with a driven ({param}) placement or an unbounded shape has no fixed
+ *  size and is left out. */
 function regionExtents(
     scene: SceneDescription, objects: PlannedPrimitiveObject[], meshes: PlannedMesh[],
     batches: PlannedInstanceBatch[], ambientMedium: number,
 ): RegionExtent[] {
     const out: RegionExtent[] = [];
-    if (ambientMedium >= 0) out.push({ materialId: ambientMedium, chord: FAR_CLIP, where: 'the ambient region', ambient: true });
+    if (ambientMedium >= 0) {
+        const closed = ambientChord(objects);
+        out.push(closed === null
+            ? { materialId: ambientMedium, chord: FAR_CLIP, where: 'the ambient region', open: true }
+            : { materialId: ambientMedium, chord: Math.min(closed, FAR_CLIP), where: 'the ambient region (inside its walls)' });
+    }
     for (const o of objects) {
         if (o.placement !== undefined && isDrivenPlacement(o.placement)) continue;
         const box = primitiveBounds(o.type, o.parameters);   // local when a frame is kept, else world
@@ -124,10 +154,10 @@ export function trackingBudgetWarnings(
         if (longest === undefined) continue;
         const expected = sigmaBar * longest.chord;
         if (expected <= MAX_NULL_COLLISIONS / 2) continue;
-        const segment = longest.ambient
+        const segment = longest.open
             ? `A ray that meets nothing in ${longest.where} runs to the far clip, ${FAR_CLIP} units`
             : `A straight segment through ${longest.where} can be ${longest.chord.toPrecision(3)} units long`;
-        const remedy = longest.ambient
+        const remedy = longest.open
             ? `Enclose the fog in a bounded region ('none' walls) around where its density is nonzero: segments get short, and the walk stops paying for collisions in empty space.`
             : `Lower medium.majorant toward the field's true maximum, or make the region smaller.`;
         warnings.push(

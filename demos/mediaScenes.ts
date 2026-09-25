@@ -121,6 +121,13 @@ export const rayleighStrategy: RenderStrategy = {
 // sin-product for mod() bands; make it a vec3 for colored fog; add a third slider.
 // Keep majorant ≥ the biggest value your formula (× slider max) can reach where
 // rays travel — a too-small ceiling doesn't break anything, it just flattens peaks.
+// The fog lives in a big 'none'-walled box (80 × 7 × 80, y from −1 to 6), not in the
+// whole scene: a tracking walk pays σ̄ per unit length even where the field is ~0, so a
+// ray leaving for the sky would otherwise walk to the far clip (1000 units — about 4200
+// tentative collisions at σ̄ = 4.2, past the tracking cap). At the default falloff the
+// field at y = 6 is 1e-4 of its ground value, and near the ground the fog is opaque long
+// before 40 units, so the box edges are not visible. At falloff 0 (uniform fog) the box
+// does cut the fog above y = 6.
 // ---------------------------------------------------------------------------
 
 export const groundfogScene: SceneDescription = {
@@ -132,6 +139,9 @@ export const groundfogScene: SceneDescription = {
         { type: 'sphere', parameters: { center: [-1.2, 0.7, 0], radius: 0.7 }, material: 'chrome', name: 'orb' },
         { type: 'box', parameters: { center: [0.9, 0.75, -0.9], halfSize: [0.5, 0.75, 0.5] }, material: 'red', name: 'pillar' },
         { type: 'sphere', parameters: { center: [0.6, 0.35, 1.1], radius: 0.35 }, material: 'clay', name: 'pebble' },
+        // The fog's extent (see the header). Its bottom sits below the floor, so the floor
+        // surface is inside the fog with no coplanar faces.
+        { type: 'box', parameters: { center: [0, 2.5, 0], halfSize: [40, 3.5, 40] }, material: 'fog', name: 'fogbox' },
     ],
     materials: {
         floor: { model: 'lambert', albedo: [0.45, 0.45, 0.45] },
@@ -156,7 +166,6 @@ export const groundfogScene: SceneDescription = {
         },
     },
     lights: [{ kind: 'point', position: [1.5, 3.2, 1.5], emission: 25 }],
-    ambientMedium: 'fog',
 };
 
 export const groundfogStrategy: RenderStrategy = {

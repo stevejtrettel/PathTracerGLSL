@@ -95,6 +95,21 @@ describe('collision-cap warning (trackingBudget.ts)', () => {
         expect(w[0]).toMatch(/Enclose the fog in a bounded region/);
     });
 
+    it('is quiet for an ambient expression fog inside a closed room of axis-aligned walls', () => {
+        // A 4 × 3 × 6 room: the longest segment is its diagonal ≈ 7.8, so σ̄ = 8 gives ≈ 62.
+        const walls: Array<[[number, number, number], number]> = [
+            [[0, 1, 0], 0], [[0, -1, 0], 3], [[1, 0, 0], 2], [[-1, 0, 0], 2], [[0, 0, 1], 3], [[0, 0, -1], 3],
+        ];
+        const room: SceneDescription = {
+            ...fogScene(exprFog(8), 'ambient'),
+            objects: walls.map(([normal, offset]) => ({ type: 'plane', parameters: { normal, offset }, material: 'floor' })),
+        };
+        expect(budgetWarnings(room)).toEqual([]);
+        // Open one side and the fog reaches the far clip again.
+        const open: SceneDescription = { ...room, objects: room.objects.slice(0, 5) };
+        expect(budgetWarnings(open)).toHaveLength(1);
+    });
+
     it('is quiet for constant media: the derived σ̄ is σ_t, so no collision is null', () => {
         // A constant emissive scattering medium routes to tracking (the analytic arm has no
         // source term), but walks at σ̄ = σ_t and always stops at its first collision.

@@ -109,11 +109,11 @@ declared. Three safety budgets break that quietly. None is reached by a registry
   at 1, and ratio tracking already has pbrt's roulette. The cap is now 1024 (from 64) and the
   Planner warns when an expression medium's σ̄ × longest segment exceeds 512
   (`compiler/plan/trackingBudget.ts`). Constant media never warn: their σ̄ is σ_t, so no
-  collision is null. The warning fires on three demos, all ambient expression fogs (fogblobs,
-  glowblobs, groundfog), where rays escaping to the sky walk empty space at the majorant rate.
-  At 64 that biased groundfog's horizon (64 collisions covered about 15 units, so a shallow
-  ray dropped roughly a third of its attenuation); at 1024 those rays cost up to 16× more.
-  Enclosing such a fog in a bounded region fixes both; not done to the demos.
+  collision is null. A whole-scene fog is bounded by the room its axis-aligned walls close
+  off, else by the far clip. Of the demos only groundfog was open to the sky; its fog now
+  sits in an 80 × 7 × 80 box (twin against the whole-scene version: Δmean 0.00%, and faster).
+  The old cap of 64 had changed groundfog's image by at most 0.09%: the attenuation it dropped
+  multiplied a black sky.
 - GRIN: a traversal is now one event however long (charging a bounce per 512 steps made the
   measurement depend on the step size). Long and trapped traversals end by the walker's own
   roulette every 512 steps (survival 0.9), with a hard stop at 200 rounds (probability ≈ 8·10⁻¹⁰).
@@ -439,8 +439,10 @@ lost; each says what would settle it.
 **Transport and media**
 - The per-path null-crossing counter is never reset (see 1.2). Settle: count paths the cap
   kills in `grin-furnace` with Russian roulette off and a large `maxBounces`.
-- Tracking exhaustion on long segments (see 1.2). Settle: instrument the exhaustion rate in
-  `groundfog` under an environment or sun light.
+- Tracking exhaustion on long segments (see 1.2). Measured in `groundfog` (black sky): the old
+  cap of 64 changed the image by at most 0.09%. The cap is now 1024 with a Planner warning, and
+  groundfog's fog is boxed. Under an environment or sun light, dropped attenuation would matter
+  more; the warning covers that case.
 
 **Lights, environment, cameras**
 - Mesh-light CDF in f32: for meshes with 10⁵–10⁶+ triangles the realized per-triangle

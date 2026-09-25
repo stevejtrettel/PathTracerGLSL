@@ -4,6 +4,25 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — groundfog's fog in a box; the cap warning knows closed rooms
+
+- **groundfog**'s fog moves from the whole scene into a `'none'`-walled box, 80 × 7 × 80 (y from
+  −1 to 6). A ray leaving for the sky used to walk the fog to the far clip at the majorant rate
+  (about 4200 tentative collisions, past the 1024 cap). Measured twin, whole-scene fog vs boxed,
+  same strategy, 128 spp: Δmean 0.00%, rmse 0.01%. Render time under SwiftShader: 13.6 s whole-
+  scene at cap 1024, 8.6 s boxed (6.5 s whole-scene at the old cap 64). At the falloff slider's
+  extreme (0, uniform fog) the box cuts the fog above y = 6.
+- **The collision-cap warning** now bounds a whole-scene fog by the room its axis-aligned walls
+  close off (a plane is a solid half-space, so the fog lies on the front side of every plane);
+  only an open region reaches the far clip. fogblobs and glowblobs are in a closed Cornell room
+  (front wall at z = 5): their longest segment is the room diagonal, ≈ 7.9 units, ≈ 65
+  collisions at σ̄ = 8.2. No registry or demo scene warns now.
+- **Correction** to the budgets entry below: the three demos it named were not all affected.
+  fogblobs and glowblobs never had escaping rays. For groundfog the old cap of 64 changed the
+  image by at most 0.09% (horizon band; whole frame 0.05%), because the attenuation it dropped
+  multiplied a black sky; the claimed horizon bias was an estimate of dropped transmittance, not
+  of the image.
+
 ## 2026-09-25 — GRIN: one event per traversal, unbiased roulette for long ones
 
 A GRIN traversal charged one bounce per 512 integration steps (`MAX_ODE_STEPS`), so which paths
@@ -68,11 +87,11 @@ Three fixed budgets could make the image depend on the estimator or drop energy 
   it binds depends on the scene's majorant. Instead the Planner warns when an expression medium's
   σ̄ × longest segment exceeds 512, beyond which a segment could reach the cap
   (`compiler/plan/trackingBudget.ts`, where `derivedMajorant` now lives). Constant media never
-  warn: their σ̄ is σ_t, so no collision is null. It warns on three demos, fogblobs, glowblobs
-  and groundfog, all expression fogs filling the whole scene: rays escaping to the sky walk empty
-  space at the majorant rate. At 64 that biased groundfog near the horizon; at 1024 those rays
-  cost up to 16× more. Enclosing each fog in a bounded region would fix both; the demos are
-  unchanged.
+  warn: their σ̄ is σ_t, so no collision is null. It warned on three demos, fogblobs, glowblobs
+  and groundfog, all expression fogs filling the whole scene. (Corrected the same day in "groundfog's
+  fog in a box" above: fogblobs and glowblobs sit in a closed room and were never near either cap;
+  groundfog is open to the sky, and its escaping rays did cost more at 1024, but the old cap's
+  effect on its image measured at most 0.09%, not the horizon bias first estimated.)
 - **GRIN's `MAX_ODE_STEPS`** is left at 512: reaching it drops nothing (the walker hands back its
   state and the walk continues, spending one more event). That accounting is now stated on
   `maxBounces`, and the two exhaustion comments in grin.glsl no longer call it conservative.
