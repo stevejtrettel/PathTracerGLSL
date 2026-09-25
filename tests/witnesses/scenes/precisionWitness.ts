@@ -1,6 +1,6 @@
 // witnesses/scenes/precisionWitness.ts
-// Floating-point precision gates for small, distant spheres (the Sep 25 2026 audit). Both have
-// closed-form answers and both are placed where the old f32 formulas failed outright.
+// Floating-point and far-clip gates from the Sep 25 2026 audit. Each has a closed-form answer
+// and is placed where the old code failed outright.
 //
 //   tiny-sphere       — an emissive sphere of radius r at distance D on the camera axis, seen
 //                       through a narrow pinhole. The image is a disk of radius
@@ -16,6 +16,10 @@
 //                       1 − sqrt(1 − sin²α) rounded to 0 in f32, the 1e-8 floor took over, and
 //                       the light read exactly TWICE its value; the stable form
 //                       sin²α/(1 + cosα) is exact.
+//   sun-haze          — a Lambert wall facing a directional light through an absorbing ambient
+//                       medium. The sun sits at the far clip (MAX_DIST, the declared truncation,
+//                       like the environment), so L = (ρ/π)·E·e^{−σ_a·(MAX_DIST − SHADOW_BACKOFF)}
+//                       ·e^{−σ_a·d_cam}. The old 1e20 distance made it exactly 0.
 
 import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 
@@ -114,3 +118,41 @@ export const TINY_LIGHT_MEAN = (() => {
     }
     return WALL_RHO * LIGHT_LE * (LIGHT_R * LIGHT_R) / (LIGHT_D * LIGHT_D) * (sum / (n * n));
 })();
+
+// ---------------------------------------------------------------------------
+// sun-haze
+// ---------------------------------------------------------------------------
+
+const SUN_SIGMA_A = 0.001;
+const MAX_DIST = 1000;          // math.glsl
+const SHADOW_BACKOFF = 0.002;   // math.glsl
+
+export const sunHazeScene: SceneDescription = {
+    id: 'sun-haze',
+    name: 'Sun through ambient haze (far-clip truncation)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        { type: 'plane', parameters: { normal: [0, 0, 1], offset: 0 }, material: 'wall', name: 'wall' },
+    ],
+    materials: {
+        wall: { model: 'lambert', albedo: [WALL_RHO, WALL_RHO, WALL_RHO] },
+        haze: { model: 'none', medium: { sigma_a: SUN_SIGMA_A } },
+    },
+    lights: [
+        { kind: 'directional', direction: [0, 0, -1], emission: Math.PI },   // (ρ/π)·E = ρ head-on
+    ],
+    environment: { type: 'none' },
+    ambientMedium: 'haze',
+};
+
+export const sunHazeStrategy: RenderStrategy = {
+    id: 'pt-nee',
+    measurement: { camera: { type: 'pinhole', fov: 0.4 }, maxBounces: 1 },
+    estimator: { directLighting: 'nee', russianRoulette: null, accumulation: { type: 'average' } },
+    view: { tonemap: { type: 'none' } },
+};
+
+export const SUN_HAZE_CAMERA = { position: [0, 0, 1] as [number, number, number], target: [0, 0, 0] as [number, number, number] };
+
+/** The frame CENTER sees the wall at distance 1 (off-center pixels see it slightly farther). */
+export const SUN_HAZE_CENTER = WALL_RHO * Math.exp(-SUN_SIGMA_A * (MAX_DIST - SHADOW_BACKOFF)) * Math.exp(-SUN_SIGMA_A * 1);

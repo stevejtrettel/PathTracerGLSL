@@ -4,6 +4,18 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — the sun sits at the far clip
+
+The directional light placed its sample at distance 1e20, so any ambient medium extinguished
+the sun completely (and ratio tracking in a heterogeneous ambient medium exhausted its budget
+and returned a partial, biased transmittance), while the sky beside it has been attenuated
+over `MAX_DIST` since the Sep 24 fix; occluders beyond the far clip could also shadow it. It
+now uses `MAX_DIST`, the declared scene-scale truncation ("geometry or an ambient medium
+extending past 1000 units is cut"), like the environment. New witness `sun-haze` (a wall
+facing the sun through σ_a = 0.001 haze: (ρ/π)·E·e^{−σ_a(MAX_DIST − backoff)}·e^{−σ_a·1} =
+0.1838) read exactly 0 before and 0.1838 now; `sun` still passes. No existing registry scene
+combines a directional light with an ambient medium.
+
 ## 2026-09-25 — precision: small, distant spheres (intersection and sphere lights)
 
 Found by the Sep 25 audit (f32 emulation), confirmed on the GPU with two new exact witnesses.

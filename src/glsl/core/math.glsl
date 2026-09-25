@@ -32,9 +32,8 @@
 // surface from reading as an occluder. Deliberately NOT fp-relative: the requirement is
 // ANGLE-AMPLIFIED (a planar emitter's root error grows as ~ε/cosθ_l — the flush-panel
 // witnesses sit at cosθ_l ≈ 0.01, the dark-tops geometry) and must also exceed the
-// origin's spawn offset (light_p is computed from the UN-offset hit). Inert for
-// directional kinds (the 1e20 distance sentinel absorbs it in fp32); for the environment
-// (distance MAX_DIST) it trims 0.002 off a 1000-unit far clip.
+// origin's spawn offset (light_p is computed from the UN-offset hit). For the environment
+// and directional lights (distance MAX_DIST) it trims 0.002 off a 1000-unit far clip.
 #define SHADOW_BACKOFF 0.002
 
 // fp_uncertainty — positional error bound of a FLOATING-POINT-ACCURATE point (analytic

@@ -674,6 +674,8 @@ exports[`scene-data textures (byte fingerprints) > submerged 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sun 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > sun-haze 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > thinlens-zero 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > tiny-sphere 1`] = `null`;

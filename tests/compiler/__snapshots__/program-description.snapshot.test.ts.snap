@@ -31143,6 +31143,100 @@ exports[`ProgramDescription structural snapshot (the link map) > sun + pt-nee 1`
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > sun-haze + pt-nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.4,
+      "position": [
+        0,
+        0,
+        1,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 1,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "shadowWalker": true,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero + pathtracer 1`] = `
 {
   "emitters": {

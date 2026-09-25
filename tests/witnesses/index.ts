@@ -42,7 +42,7 @@ import { sdfTableTwin, sdfInstanceTwin, sdfInstanceTwinRef, sdfInstanceStrategy,
 import { fieldGlass, fieldGlassNeeStrategy, fieldGlassMisStrategy, fieldGlassPtStrategy } from './scenes/customFieldWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
-import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN } from './scenes/precisionWitness.js';
+import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN, sunHazeScene, sunHazeStrategy, SUN_HAZE_CAMERA, SUN_HAZE_CENTER } from './scenes/precisionWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
 import {
     slabScene, slabStrategy,
@@ -1631,7 +1631,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         scene: sunScene,
         strategies: posed([0, 3, 1.5], [0, 0, -0.5], sunNeeStrategy),
         exercises:
-            'F-SUN: the directional kind — the delta-direction class\'s first occupant (impl-plan-directional-beam). E is authored ⊥ to the propagation direction (B2\'s irradiance rung) and the BSDF supplies the cosine; distance rides the 1e20 env sentinel through the shadow walker; the sphere\'s HARD PARALLEL shadow is the class signature',
+            'F-SUN: the directional kind — the delta-direction class\'s first occupant (impl-plan-directional-beam). E is authored ⊥ to the propagation direction (B2\'s irradiance rung) and the BSDF supplies the cosine; distance is MAX_DIST (the far clip, as for the environment) through the shadow walker; the sphere\'s HARD PARALLEL shadow is the class signature',
         expected:
             'open floor reads L = ρ·E·cosθ/π = 0.5·0.8/π ≈ 0.1273 in linear HDR (0.1592 ⇒ the obliquity cosine went missing; ~0 ⇒ a distance-fold leaked in); the clay sphere upper-right casts a razor-edged parallel shadow toward +x — no penumbra at ANY distance (delta direction)',
         witness: {
@@ -1736,6 +1736,19 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             size: TINY_SIZE,
             checks: [
                 { kind: 'mean', value: TINY_LIGHT_MEAN, tol: 0.005, region: TINY_LIGHT_REGION, label: 'tiny sphere light ρ·Le·sin²α' },
+            ],
+        },
+    },
+    'sun-haze': {
+        scene: sunHazeScene,
+        strategies: posed(SUN_HAZE_CAMERA.position, SUN_HAZE_CAMERA.target, sunHazeStrategy),
+        exercises: 'the sun at the far clip: a directional light through an absorbing ambient medium is attenuated over MAX_DIST, the declared truncation the environment already uses (before Sep 25 its 1e20 distance extinguished it completely)',
+        expected: 'a flat wall at (ρ/π)·E·e^{−σ_a·(MAX_DIST − backoff)}·e^{−σ_a·1} ≈ 0.1838',
+        witness: {
+            spp: 16,
+            size: TINY_SIZE,
+            checks: [
+                { kind: 'mean', value: SUN_HAZE_CENTER, tol: 0.002, region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, label: 'sun through haze to the far clip' },
             ],
         },
     },

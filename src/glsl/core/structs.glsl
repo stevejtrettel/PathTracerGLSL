@@ -84,7 +84,7 @@ struct LightQuery {
 
 struct LightSample {
     Direction wi;         // toward the light, unit
-    float distance;       // to the sampled point (MAX_DIST for the environment, 1e20 for directional)
+    float distance;       // to the sampled point (MAX_DIST for the environment and directional lights)
     Spectrum radiance;    // incident radiance, WITHOUT visibility (delta lights fold 1/d² in)
     float pdf;            // total: selection × per-light, in solid-angle measure
     uint flags;

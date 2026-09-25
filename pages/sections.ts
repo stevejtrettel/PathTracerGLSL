@@ -164,7 +164,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Core validation',
         blurb: 'the first-principles anchors: the furnace, the minimal cross-backend twins, combined-backend shadows',
         entries: [
-            e('furnace'), e('bounce-budget'), e('tiny-sphere'), e('tiny-sphere-light'), e('minimal'), e('analytic-minimal'), e('solids-analytic', 'solids-sdf'),
+            e('furnace'), e('bounce-budget'), e('tiny-sphere'), e('tiny-sphere-light'), e('sun-haze'), e('minimal'), e('analytic-minimal'), e('solids-analytic', 'solids-sdf'),
             e('sdf-table-twin'), e('sdf-instance-twin', 'sdf-instance-twin-ref'),
             // The SDF perf ladders ride as PARTNER links, not cards (the perf-cloud
             // convention): a card compiles every strategy arm at load, and the N=128

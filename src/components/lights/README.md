@@ -23,8 +23,8 @@ angular falloff — into `radiance`, set `LIGHT_DELTA`, pdf 1 — never BSDF-hit
 MIS weight 1 (§6.4). **Delta-direction kinds** (directional, beam —
 impl-plan-directional-beam) are the same delta contract with NOTHING folded:
 collimation has no 1/d², so `radiance` is the authored irradiance E verbatim and
-transmittance is the shadow walker's job (directional's `distance` is the 1.0e20
-env sentinel; beam's is the axial distance to its aperture plane, and outside the
+transmittance is the shadow walker's job (directional's `distance` is `MAX_DIST`, the far
+clip, like the environment's; beam's is the axial distance to its aperture plane, and outside the
 beam's forward cylinder the sampler returns pdf 0 — the techniques' invalid-sample
 guard). ISOTROPIC delta kinds declare the `deltaQuery` fact (which rows are
 position/intensity — the equiangular placement query composes from it); anisotropic
