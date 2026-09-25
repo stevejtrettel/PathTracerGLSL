@@ -11,6 +11,7 @@
 // no 11 MB copy at cloud scale.
 
 import { buildLightTree } from '../../components/accel/light_tree/light_tree.js';
+import { answerWorkerTask } from './worker.js';
 
 export interface LightTreeRequest {
     boxes: Float64Array;
@@ -18,8 +19,8 @@ export interface LightTreeRequest {
     n: number;
 }
 
-self.onmessage = (e: MessageEvent<LightTreeRequest>) => {
+self.onmessage = (e: MessageEvent<LightTreeRequest>) => answerWorkerTask(() => {
     const { boxes, powers, n } = e.data;
     const tree = buildLightTree(boxes, powers, n);
-    (self as unknown as Worker).postMessage(tree, [tree.nodes.buffer as ArrayBuffer, tree.trails.buffer as ArrayBuffer]);
-};
+    return { result: tree, transfers: [tree.nodes.buffer as ArrayBuffer, tree.trails.buffer as ArrayBuffer] };
+});

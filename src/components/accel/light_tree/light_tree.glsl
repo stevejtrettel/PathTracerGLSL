@@ -35,9 +35,12 @@ float light_tree_importance(vec3 bmin, vec3 bmax, float phi, LightQuery q) {
     if (dot(q.n, q.n) < 0.5) return base;      // no orientation information
     // EXACT box-below-horizon cull (deviation from pbrt's sphere-cone-only test,
     // found by the half-space vitest): max over the box's corners of (x − p)·n is
-    // dot(n, far − p) with `far` the per-axis sign-selected corner. Boxes here are
-    // exact unions of their children's, so the cull is HEREDITARY — a descent can
-    // never die mid-tree while any above-horizon light exists.
+    // dot(n, far − p) with `far` the per-axis sign-selected corner. The cull is exact PER
+    // BOX but NOT hereditary: a parent's far corner can lie in neither child's box (a
+    // "phantom corner"), so a parent can pass while both children fail and the descent dies
+    // with pdf 0. Variance only — the trail pmf reports the true probability — measured at
+    // ~5% of selection mass on random clouds of 1000–5000 lights (Sep 25 2026 audit); the
+    // fix is a child-box lookahead.
     vec3 far_c = mix(bmin, bmax, step(vec3(0.0), q.n));
     float h = dot(q.n, far_c - q.p);           // EXACT max of n·(x−p) over the box
     if (q.two_sided) {

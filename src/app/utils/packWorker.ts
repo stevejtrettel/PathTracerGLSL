@@ -10,6 +10,7 @@
 // detach the scene's typed arrays (the .inst table views), breaking later repacks.
 
 import { packInstanceBatch, type AttributeRowSpec, type ParamsRecordSpec } from '../../components/intersection/instancing/instancing.js';
+import { answerWorkerTask } from './worker.js';
 import type { Similarity } from '../../components/geometry/similarity.js';
 import type { PackedPlacements } from '../../compiler/types.js';
 import type { AABB } from '../../components/accel/bvh/bvh.js';
@@ -24,11 +25,11 @@ export interface PackRequest {
     buildCwbvh: boolean;
 }
 
-self.onmessage = (e: MessageEvent<PackRequest>) => {
+self.onmessage = (e: MessageEvent<PackRequest>) => answerWorkerTask(() => {
     const { localBox, placements, attrs, paramsRecord, buildCwbvh } = e.data;
     const packed = packInstanceBatch(localBox, placements, attrs, paramsRecord, buildCwbvh);
     const transfers: ArrayBuffer[] = [packed.placements.buffer as ArrayBuffer, packed.nodes.buffer as ArrayBuffer];
     if (packed.attributes !== undefined) transfers.push(packed.attributes.buffer as ArrayBuffer);
     if (packed.cwbvh !== undefined) transfers.push(packed.cwbvh.nodes.buffer as ArrayBuffer, packed.cwbvh.records.buffer as ArrayBuffer);
-    (self as unknown as Worker).postMessage(packed, transfers);
-};
+    return { result: packed, transfers };
+});

@@ -16,11 +16,14 @@
 // Provides: mesh_light_sample(), mesh_light_pdf().
 
 LightSample mesh_light_sample(MeshLight l, sampler2D idxTex, sampler2D wposTex, sampler2D cdfTex, int tbase, int wposBase, int cdfBase, int triCount, Point p, vec2 xi) {
-    // Binary search the normalized cumulative-area CDF: smallest tri with cdf[tri] >= xi.x.
+    // Binary search the normalized cumulative-area CDF: smallest tri with cdf[tri] > xi.x.
+    // STRICTLY greater: a zero-area triangle has cdf[k] = cdf[k−1] and so can never be picked
+    // (with >=, ξ = 0 picked triangle 0 whatever its area — a degenerate one normalized a zero
+    // vector into a NaN sample that stuck in the pixel).
     int lo = 0, hi = triCount - 1;
     while (lo < hi) {
         int mid = (lo + hi) / 2;
-        if (texelFetch(cdfTex, data_texel1d(uint(cdfBase + mid)), 0).x < xi.x) lo = mid + 1;
+        if (texelFetch(cdfTex, data_texel1d(uint(cdfBase + mid)), 0).x <= xi.x) lo = mid + 1;
         else hi = mid;
     }
     int tri = lo;

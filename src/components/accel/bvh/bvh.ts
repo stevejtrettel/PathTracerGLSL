@@ -341,11 +341,12 @@ function buildBVHCore(boxes: Float64Array, n: number, opts: BVHCoreOpts): { orde
  *  payload (triangle indices / placement rows) in `order`. A count-weighted feeder of
  *  buildBVHCore — output stays BYTE-IDENTICAL to the pre-consolidation builder (the
  *  bvhFlat reference-twin gate). */
-export function buildBVHNodesFlat(boxes: Float64Array, n: number, leafSize: number = BVH_LEAF_SIZE): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
+export function buildBVHNodesFlat(boxes: Float64Array, n: number, leafSize: number = BVH_LEAF_SIZE, alwaysSplit: boolean = false): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
     // ONE allocation for the node array (≤ 2N−1 nodes over N leaves).
     const nodes = new Float32Array(n > 0 ? 8 * (2 * n - 1) : 0);
     const { order, nodeCount, maxDepth } = buildBVHCore(boxes, n, {
         leafSize,
+        alwaysSplit,
         fallback: 'median',
         emitLeaf: (ni, start, count, mnx, mny, mnz, mxx, mxy, mxz) => {
             nodes[ni * 8 + 0] = mnx; nodes[ni * 8 + 1] = mny; nodes[ni * 8 + 2] = mnz;
@@ -355,7 +356,9 @@ export function buildBVHNodesFlat(boxes: Float64Array, n: number, leafSize: numb
         },
         emitInternal: (ni, axis, rightIdx, mnx, mny, mnz, mxx, mxy, mxz) => {
             nodes[ni * 8 + 0] = mnx; nodes[ni * 8 + 1] = mny; nodes[ni * 8 + 2] = mnz;
-            nodes[ni * 8 + 3] = -1 - axis;     // A < 0 → internal, axis = -A-1
+            // A < 0 → internal, axis = -A-1. A fallback split has no SAH axis (−1), which would
+            // encode A = 0 — an empty LEAF; the axis only orders the children, so use 0.
+            nodes[ni * 8 + 3] = -1 - Math.max(axis, 0);
             nodes[ni * 8 + 4] = mxx; nodes[ni * 8 + 5] = mxy; nodes[ni * 8 + 6] = mxz;
             nodes[ni * 8 + 7] = rightIdx;      // B = right child index
         },

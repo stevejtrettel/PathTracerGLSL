@@ -62,7 +62,7 @@ export function parseInstances(buffer: ArrayBuffer): InstanceTable {
     }
     if (new Set(names).size !== names.length) throw new Error('inst: duplicate scalar column names');
     const provLen = view.getUint32(namesEnd, true);
-    const provPadded = (provLen + 3) & ~3;
+    const provPadded = provLen + ((4 - (provLen % 4)) % 4);   // not (provLen + 3) & ~3: 32-bit, wraps for huge lengths
     const headerBytes = namesEnd + 4 + provPadded;
     if (buffer.byteLength < headerBytes) throw new Error('inst: buffer truncated in the provenance string');
     const provenance = dec.decode(new Uint8Array(buffer, namesEnd + 4, provLen));

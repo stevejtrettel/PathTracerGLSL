@@ -45,4 +45,15 @@ describe('runInWorker', () => {
         const result = await runInWorker('test', () => { throw new Error('no workers here'); }, { input }, [input.buffer], () => input.length);
         expect(result).toBe(3);
     });
+
+    it('rejects (no fallback) when the WORK throws inside the worker', async () => {
+        class ThrowingTaskWorker extends FailingWorker {
+            postMessage(): void { setTimeout(() => this.onmessage?.({ data: { workerError: 'cwbvh: leaf child over P_max' } } as MessageEvent), 0); }
+        }
+        vi.stubGlobal('Worker', ThrowingTaskWorker);
+        const fallback = vi.fn(() => 0);
+        await expect(runInWorker('pack', () => new ThrowingTaskWorker() as unknown as Worker, {}, [], fallback))
+            .rejects.toThrow(/pack: cwbvh: leaf child over P_max/);
+        expect(fallback).not.toHaveBeenCalled();
+    });
 });

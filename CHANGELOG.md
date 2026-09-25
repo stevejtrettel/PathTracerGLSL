@@ -4,6 +4,26 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — accel and data: CWBVH on coincident centroids, mesh-light NaN, workers
+
+- **CWBVH threw on coincident centroids** (duplicate rows in a `.inst` file, concentric
+  shells: four or more coincident items). Its collapse assumes one item per binary leaf, but
+  the leaf-size-1 input tree left such ranges as multi-item leaves. The input is now built
+  with `alwaysSplit` (only degenerate ranges differ; every suite scene's packed data is
+  unchanged). That path exposed a second bug: a fallback split has no SAH axis, and the flat
+  node format encoded axis −1 as `A = 0`, i.e. an empty leaf. Test in cwbvh.test.ts.
+- **Worker task failures no longer rerun on the main thread.** A build that throws inside a
+  worker was treated as "worker unavailable", so the same failing build ran again on the main
+  thread (freezing the page for a large cloud) before failing. Worker entries now post
+  `{ workerError }` and `runInWorker` rejects with it.
+- **Mesh-light sampling** picked the first triangle with `cdf ≥ ξ`, so at ξ = 0 it took
+  triangle 0 whatever its area; a degenerate triangle there gave a NaN sample that stuck in
+  the pixel. The search is strictly greater, which never selects a zero-area triangle.
+- The light-tree importance comment claimed its box cull is hereditary ("a descent can never
+  die mid-tree"); it is not (a parent's far corner can lie in neither child). Variance only;
+  the comment now says so, with the audit's measurement and the fix (child-box lookahead).
+- `.inst` provenance padding no longer uses 32-bit arithmetic that wraps for huge lengths.
+
 ## 2026-09-25 — OBJ loader: relative indices and mixed normals
 
 - Face corners were cached by their raw token, so a relative index (`f -3 -2 -1`) meant the

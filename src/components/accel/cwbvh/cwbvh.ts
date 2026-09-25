@@ -80,8 +80,12 @@ export function buildCWBVH(boxes: Float64Array, n: number, cPrim: number = CWBVH
     if (n === 0) return { nodes: new Uint32Array(0), nodeCount: 0, order: new Uint32Array(0), maxDepth: 0 };
 
     // ── The binary SAH tree, ONE PRIM PER LEAF (collapse input only — the shipped
-    // binary occupants keep their own leaf sizes). ──────────────────────────────
-    const bin = buildBVHNodesFlat(boxes, n, 1);
+    // binary occupants keep their own leaf sizes). alwaysSplit makes "one prim per leaf"
+    // true by construction: at leaf size 1 SAH already splits every range except the
+    // degenerate ones (coincident centroids — duplicate rows in a cloud — or ties), which it
+    // left as multi-prim leaves; four or more of those broke the DP invariant below and the
+    // build threw (Sep 25 2026 audit). The fallback halves such ranges instead. ─────────
+    const bin = buildBVHNodesFlat(boxes, n, 1, true);
     const bn = bin.nodes;                    // 8 f32 per node: (min,A),(max,B)
     const BN = bin.nodeCount;
     const isLeaf = (i: number): boolean => bn[8 * i + 3] >= 0;
