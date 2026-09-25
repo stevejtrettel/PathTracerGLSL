@@ -55,7 +55,7 @@ export const gallerySections: GallerySection[] = [
             e('meshes'), e('models'), e('cacti'),
             e('mesh-furnace'),
             e('mesh-quad-twin', 'mesh-quad-ref'),
-            e('mesh-light-twin', 'mesh-light-ref'), e('mesh-light-smooth'),
+            e('mesh-light-twin', 'mesh-light-ref'), e('mesh-light-smooth'), e('mesh-slab-albedo'), e('mesh-scale-twin', 'mesh-scale-twin-ref'),
             e('mesh-glass-box', 'mesh-glass-box-ref'),
             e('mesh-fog', 'mesh-fog-ref'),
             e('mesh-submerged', 'mesh-submerged-ref'),

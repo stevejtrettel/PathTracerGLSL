@@ -198,29 +198,31 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'generated:named-shapes', source: namedShapes });
     }
 
-    // The analytic tier's Hit.eps policy (impl-plan-epsilon-discipline): fp-scale, unless
-    // the program carries a DEFLECTING medium — the GRIN walker's ∇n stencil reaches
-    // GRIN_GRAD_EPS (1e-3) from a spawned entry point and authored ior formulas need not
-    // be total outside their region, so GRIN programs floor every analytic spawn at the
-    // stencil radius (byte-stable behaviour for the GRIN suite; the coupling to grin.glsl's
-    // GRIN_GRAD_EPS is pinned by tests/components/epsilonCoupling.test.ts). Emitted only
-    // when some arm produces an analytic hit (exact linkage).
-    const hasAnalyticFill = plan.objects.some((o) => o.intersect === 'closed-form')
-        || plan.instanceBatches.some((b) => b.prototype.backend === 'primitive' && b.prototype.intersect !== 'march')
+    // Hit.eps for floating-point-accurate hits (analytic roots and triangle tests): fp-scale,
+    // unless the program carries a DEFLECTING medium — the GRIN walker's ∇n stencil reaches
+    // GRIN_GRAD_EPS (1e-3) from a spawned entry point and authored ior formulas need not be
+    // total outside their region, so GRIN programs floor every such spawn at the stencil
+    // radius (the coupling to grin.glsl's GRIN_GRAD_EPS is pinned by
+    // tests/components/epsilonCoupling.test.ts). Emitted only when some arm produces such a
+    // hit (exact linkage).
+    const hasFpFill = plan.objects.some((o) => o.intersect === 'closed-form')
+        || plan.instanceBatches.some((b) => (b.prototype.backend === 'primitive' && b.prototype.intersect !== 'march') || b.prototype.backend === 'mesh')
+        || plan.meshes.length > 0
         || (table !== undefined && table.kinds.length > 0);
     // Deflecting programs get the compiler-owned stencil radius in the header (grin.glsl's
     // #ifndef default yields to it), so the floor below and the walker read ONE number.
     if (plan.program.media.deflecting) {
         defines['GRIN_GRAD_EPS'] = formatFloat(GRIN_GRAD_EPS);
     }
-    if (hasAnalyticFill) {
+    if (hasFpFill) {
         blocks.push({
             origin: 'generated:spawn-eps',
             source: [
-                '// Analytic-hit spawn uncertainty (generated policy — impl-plan-epsilon-discipline)',
+                '// Spawn margin of a floating-point-accurate hit — an analytic root or a triangle test:',
+                '// its position error is a few ulps of its coordinates, so the margin is fp-relative.',
                 plan.program.media.deflecting
-                    ? 'float spawn_eps_analytic(Point p) { return max(fp_uncertainty(p), GRIN_GRAD_EPS); }   // floored at the ∇n stencil radius: the walker\'s entry-step stencil must stay inside the region'
-                    : 'float spawn_eps_analytic(Point p) { return fp_uncertainty(p); }',
+                    ? 'float spawn_eps_fp(Point p) { return max(fp_uncertainty(p), GRIN_GRAD_EPS); }   // floored at the ∇n stencil radius: the walker\'s entry-step stencil must stay inside the region'
+                    : 'float spawn_eps_fp(Point p) { return fp_uncertainty(p); }',
             ].join('\n'),
         });
     }
@@ -704,7 +706,7 @@ function primitiveHitFill(indent: string, o: {
     element?: string;   // default '0' — instanced arms pass the leaf-order index
     uv: string;
     /** Hit.eps — the arm's positional-uncertainty claim (impl-plan-epsilon-discipline):
-     *  `spawn_eps_analytic(hit.p)` for closed-form roots, `MARCH_CLEARANCE` for marched
+     *  `spawn_eps_fp(hit.p)` for closed-form roots, `MARCH_CLEARANCE` for marched
      *  commits. Required so no arm can silently fall back to a wrong tier. */
     eps: string;
 }): string[] {
@@ -769,7 +771,7 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
             nWorld: `placement_normal(${q}, ${d.type}_normal(lray.origin + t * lray.direction, shape))`,
             region: obj.index,
             uv: uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv),
-            eps: 'spawn_eps_analytic(hit.p)',
+            eps: 'spawn_eps_fp(hit.p)',
         }));
         lines.push(`        }`);
         lines.push(`    }`);
@@ -790,7 +792,7 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
         nWorld: `${d.type}_normal(hit.p, ${shapeRef})`,
         region: obj.index,
         uv: uvFill(d, 'hit.p', shapeRef, chartUv),
-        eps: 'spawn_eps_analytic(hit.p)',
+        eps: 'spawn_eps_fp(hit.p)',
     }));
     lines.push(`        }`);
     lines.push(`    }`);
@@ -908,7 +910,7 @@ function generateMeshDispatch(meshes: PlannedMesh[], anyQuery: boolean, meshTrav
         // hit.t was shrunk to the local (== world) t inside the leaf; the world point is the
         // world ray at that t (ray-into-local preserves the parameter, impl-plan-meshes §6).
         lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);`);
-        lines.push(`        hit.eps = MESH_T_MIN;   // the mesh tier's clearance (mesh.glsl)`);
+        lines.push(`        hit.eps = spawn_eps_fp(hit.p);   // a triangle test is fp-accurate`);
         lines.push(`        hit.frame = ambient_frame(hit.p, normalize(${pl.nWorld('nLocal')}));`);
         lines.push(`        hit.ng = normalize(${pl.nWorld('gLocal')});   // the triangle's plane normal`);
         lines.push(`        hit.region_owner = ${m.index};`);
@@ -1004,7 +1006,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
                 region: b.index,
                 element: 'i',   // the leaf-order placement index (attribute rows read it)
                 uv: uvFill(d, 'hit.p', 'shape', chartUv),
-                eps: 'spawn_eps_analytic(hit.p)',
+                eps: 'spawn_eps_fp(hit.p)',
             }),
             '}'];
     }
@@ -1027,7 +1029,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
             '    found = true;',
             '    hit.element = i;   // the leaf-order placement index (attribute rows read it)',
             '    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
-            '    hit.eps = MESH_T_MIN;   // the mesh tier\'s clearance (mesh.glsl)',
+            '    hit.eps = spawn_eps_fp(hit.p);   // a triangle test is fp-accurate',
             '    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));',
             '    hit.ng = normalize(placement_normal(q, gLocal));   // the triangle\'s plane normal',
             `    hit.region_owner = ${b.index};`,
@@ -1066,7 +1068,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
             region: b.index,
             element: 'i',   // the leaf-order placement index (attribute rows read it)
             uv: uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv),
-            eps: marched ? 'MARCH_CLEARANCE' : 'spawn_eps_analytic(hit.p)',
+            eps: marched ? 'MARCH_CLEARANCE' : 'spawn_eps_fp(hit.p)',
         }),
         '}'];
 }
@@ -1431,7 +1433,7 @@ function generateSceneTable(table: PlannedSceneTable, plan: RenderPlan, ids: Map
             nWorld: `${k.type}_normal(hit.p, shape)`,
             region: 'int(hdr.y)',
             uv: uvFill(d, 'hit.p', 'shape', plan.program.materials.materialsReadUv),
-            eps: 'spawn_eps_analytic(hit.p)',
+            eps: 'spawn_eps_fp(hit.p)',
         }));
         lines.push('            }');
         lines.push('        }');
@@ -1697,15 +1699,17 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     if (arms.table) lines.push('    if (scene_table_intersect(ray, hit)) found = true;');   // the scene TLAS (fable-object-tables)
     lines.push('    if (found) {');
     lines.push('        // §4.2/§4.3: one outside-probe along the outward normal; owner covers its own side.');
-    lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.frame.n, EPS_INTERFACE));');
-    lines.push('        if (ambient_dot(ray.direction, hit.frame.n, hit.p) < 0.0) {');
+    lines.push('        // Which side the ray is on, and where the probe lands, are GEOMETRIC facts: both use');
+    lines.push('        // the geometric normal ng, never an interpolated or perturbed shading normal.');
+    lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.ng, EPS_INTERFACE));');
+    lines.push('        if (ambient_dot(ray.direction, hit.ng, hit.p) < 0.0) {');
     lines.push('            hit.region_from = outside;              // entering the owner');
     lines.push('            hit.region_to   = hit.region_owner;');
     lines.push('        } else {');
     if (thinRegions.length > 0) {
         lines.push('            // Back-face hit on a zero-thickness owner: probe the entering (-n) side.');
         lines.push('            hit.region_from = scene_region_thin(hit.region_owner)');
-        lines.push('                ? scene_region_at(ambient_geodesic(hit.p, hit.frame.n, -EPS_INTERFACE))');
+        lines.push('                ? scene_region_at(ambient_geodesic(hit.p, hit.ng, -EPS_INTERFACE))');
         lines.push('                : hit.region_owner;             // solid owners cover their own side');
     } else {
         lines.push('            hit.region_from = hit.region_owner;     // exiting the owner');

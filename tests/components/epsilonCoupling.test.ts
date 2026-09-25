@@ -50,12 +50,10 @@ describe('march ↔ classification epsilon coupling', () => {
 describe('provenance-tier clearances', () => {
     const march = read('march.glsl');
     const math = read('math.glsl');
-    const mesh = readAt('components/intersection/mesh/mesh.glsl');
     const grin = readAt('components/transport/volume/grin/grin.glsl');
     const MARCH_EPSILON_MAX = define(march, 'MARCH_EPSILON_MAX');
     const MARCH_CLEARANCE = define(math, 'MARCH_CLEARANCE');
     const SHADOW_BACKOFF = define(math, 'SHADOW_BACKOFF');
-    const MESH_T_MIN = define(mesh, 'MESH_T_MIN');
 
     it('MARCH_CLEARANCE = 2× the marcher acceptance cap (the marched tier derivation)', () => {
         // Smaller sits at a zero-margin knife edge against the marcher's first
@@ -73,8 +71,7 @@ describe('provenance-tier clearances', () => {
         // from the UN-offset hit, so the emitter's own surface can appear up to one
         // spawn offset short of the computed distance — the dark-tops mechanism. The
         // factor 2 absorbs the light-side root error (angle-amplified; see math.glsl).
-        expect(SHADOW_BACKOFF).toBeGreaterThanOrEqual(2 * MARCH_CLEARANCE);
-        expect(SHADOW_BACKOFF).toBeGreaterThanOrEqual(2 * MESH_T_MIN);
+        expect(SHADOW_BACKOFF).toBeGreaterThanOrEqual(2 * MARCH_CLEARANCE);   // the largest tier (fp-scale tiers are far smaller)
     });
 
     it("grin.glsl's standalone GRIN_GRAD_EPS fallback matches the compiler-owned value", () => {

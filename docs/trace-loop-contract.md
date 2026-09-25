@@ -35,8 +35,8 @@ Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  �
    instanced batches, 0 elsewhere; future per-triangle/Stage-B refs ride the same channel),
    and the point's **positional uncertainty** (`eps` — owner-approved Aug 2026,
    impl-plan-epsilon-discipline: the arm that made the hit states how well it knows `p` —
-   fp-scale for analytic roots via `spawn_eps_analytic`, `MARCH_CLEARANCE` for marched commits,
-   `MESH_T_MIN` for triangle hits. `ray_spawn`'s escape offset is the one reader; the
+   fp-scale for analytic roots via `spawn_eps_fp`, `MARCH_CLEARANCE` for marched commits,
+   fp-scale for triangle hits too. `ray_spawn`'s escape offset is the one reader; the
    dispatcher seeds the conservative default so a missed fill degrades instead of reading
    garbage).
 4. **Interaction** — the scattering event (surface BSDF and medium phase unified): `sample` returns
@@ -55,24 +55,22 @@ struct Ray { Point origin; Direction direction; };   // PURE geodesic seed — n
 - **No `tmin`/`tmax` on the Ray.** Search bounds are the *query's* concern, not the ray's identity.
   We tried the interval on the Ray and it conflated three roles (ray identity / query far-bound /
   running-nearest) — the by-value-vs-`inout` confusion was the symptom. The bounds' real homes:
-  - **near bound** (`tmin`): the analytic primitives search strictly ahead (`t > 0`) —
-    self-intersection is handled entirely by the origin offset (impl-plan-epsilon-discipline);
-    the marched and mesh tiers keep their own named clearances (`MARCH_CLEARANCE`,
-    `MESH_T_MIN`), derived where they are defined.
+  - **near bound** (`tmin`): analytic primitives and triangle meshes search strictly ahead
+    (`t > 0`) — self-intersection is handled entirely by the origin offset along `ng`; the
+    marched tier keeps its own named clearance (`MARCH_CLEARANCE`), derived where it is defined.
   - **running nearest** (the old `tmax` shrinking): lives on **`hit.t`**. For a nearest-hit search
     "the bound" and "the nearest distance found" are the *same quantity*, so `hit.t` holds both —
     initialized to `MAX_DIST`, shrunk by each backend. (A Hit's fields other than `t` are valid only
     when `scene_intersect` returns true.)
   - **occlusion far-bound**: an explicit `maxDist` **argument** to `scene_intersect_any` (the light
     distance) — an input, not ray state.
-- **Self-intersection escape is an origin offset**, done via the geodesic:
-  `origin = ambient_geodesic(hit.p, n, hit.eps)` — the offset is the hit's OWN positional
-  uncertainty (provenance-filled; impl-plan-epsilon-discipline replaced the old global
-  `EPSILON` here). Robust at grazing angles (offset along the normal)
+- **Self-intersection escape is an origin offset**, done via the geodesic (`ray_spawn`):
+  `origin = ambient_geodesic(hit.p, side·ng, hit.eps)` with `side = sign(ambient_dot(wi, ng, p))`
+  — the offset is the hit's OWN positional uncertainty (provenance-filled, impl-plan-epsilon-
+  discipline), along the GEOMETRIC normal, toward the side of the true surface `wi` travels
+  into (reflection and transmission alike). Robust at grazing angles (offset along the normal)
   and curved-space-correct (the exp-map step). The true geometric point lives on `Hit.p`; the ray's
   `origin` is legitimately the escaped point.
-  - Offset direction is `+n` for reflection; dielectric transmission will offset toward `wi`'s side
-    (`sign(ambient_dot(wi, n, p))·n`) via a spawn helper — deferred to the dielectric material.
 
 ```glsl
 Ray make_ray(Point origin, Direction dir);   // just {origin, direction} — no interval
@@ -132,5 +130,5 @@ never mutated by intersection — it is a pure seed.
 
 Capability geometry (mesh/BVH `ray?`, `instances?`) and the `inout Ray` multi-backend coordination
 (one backend exists now); curved ambient spaces (H³/Schwarzschild — `ambient_*` are the seam);
-`Point`→`vec4` per space; the dielectric spawn-offset side; BVH under non-straight geodesics
+`Point`→`vec4` per space; BVH under non-straight geodesics
 (open in the archive too); Fable's bare-`f`-vs-`f·cos` cosine-placement question (orthogonal).

@@ -23,14 +23,13 @@
 // This file owns the TRIANGLE leaf + the mesh BLAS walk; addressing (data_texel1d) and
 // generic walk support (bvh_aabb_hit) come from the rail/accel files included before it.
 
-// MESH_T_MIN — the MESH tier's self-intersection floor AND spawn clearance (Hit.eps for
-// triangle hits; impl-plan-epsilon-discipline). The mesh tier deliberately keeps the old
-// 1e-3, unlike the analytic primitives (floor 0). Triangle hits are less precise than analytic
-// roots, and when ray_spawn offset along the interpolated shading normal this floor was what
-// rejected same-triangle re-hits. ray_spawn now offsets along the geometric normal (Hit.ng),
-// so a spawned ray starts on the side it travels into; whether the floor can now shrink toward
-// fp scale is untested (shrinking it without that test risks silhouette acne and NEE speckle).
-#define MESH_T_MIN 0.001
+// Self-intersection: triangle hits search strictly ahead (t > 0), exactly like the analytic
+// primitives. Escape is entirely ray_spawn's job: it offsets a new ray by Hit.eps (the
+// fp-relative spawn_eps_fp margin — a triangle test is floating-point accurate) along the
+// GEOMETRIC normal Hit.ng, to the side the ray travels into, so the triangle it left lies
+// behind it. Do not add a world-space floor here: any fixed t_min skips a sliver of medium on
+// entry and refuses shallow exits, which reads as a measurable loss in dense media (witness
+// mesh-slab-albedo, σ_t = 20) and breaks scale invariance (witness mesh-scale-twin).
 //
 // RAIL v2 ADDRESSING (fable-data-rail): ALL meshes share one channel per role; every
 // query takes baked base offsets — vbase (vertex texels: vertices/normals/uvs), tbase
@@ -92,16 +91,20 @@ void mesh_test_range(
         vec3 a, b, c;
         uvec3 tri = mesh_tri_fetch(posTex, idxTex, vbase, tbase, i, a, b, c);
         vec3 bary, gnorm; float t;
-        if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > MESH_T_MIN && t < tmax) {
+        if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > 0.0 && t < tmax) {
             tmax = t;
             found = true;
             nLocal = useSmooth
                 ? bary.x * mesh_nrm(nrmTex, vbase + tri.x) + bary.y * mesh_nrm(nrmTex, vbase + tri.y) + bary.z * mesh_nrm(nrmTex, vbase + tri.z)
                 : gnorm;
             // Shading-normal consistency (the Veach problem): near a silhouette the interpolated
-            // smooth normal can face the OPPOSITE side of the ray from the geometry, which makes
-            // the dispatcher's front/back test misclassify → black facets. Orient the shading
-            // normal to the geometric normal's ray-side. No-op for flat (nLocal == gnorm).
+            // smooth normal can face the OPPOSITE side of the ray from the geometry. The
+            // dispatcher decides the side from the geometric normal and then flips the shading
+            // frame and ng together so both face region_from; that only works if they start on
+            // the same ray-side, or the shaded side is wrong and the facet renders black. So
+            // orient the shading normal to the geometric normal's ray-side. No-op for flat
+            // (nLocal == gnorm). With normal maps this rule becomes a general one (one place,
+            // any surface) — part of that design.
             if (dot(rd, nLocal) * dot(rd, gnorm) < 0.0) nLocal = -nLocal;
             gLocal = gnorm;
             uvOut = bary.x * mesh_uv(uvTex, vbase + tri.x) + bary.y * mesh_uv(uvTex, vbase + tri.y) + bary.z * mesh_uv(uvTex, vbase + tri.z);
@@ -115,15 +118,15 @@ bool mesh_any_range(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase, 
         vec3 a, b, c;
         mesh_tri_fetch(posTex, idxTex, vbase, tbase, i, a, b, c);
         vec3 bary, gnorm; float t;
-        if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > MESH_T_MIN && t < maxDist) return true;
+        if (mesh_tri_test(ro, rd, a, b, c, bary, gnorm, t) && t > 0.0 && t < maxDist) return true;
     }
     return false;
 }
 
 // Side-of-nearest in [offset, offset+count) along the fixed containment probe ray: tracks the
-// geometric side (dot(dir, gnorm)) of the running-nearest hit. t > 0.0 (not MESH_T_MIN): the probe
-// point is already EPS_INTERFACE off any surface by the caller's discipline; skipping near hits
-// would misclassify probes standing just inside a face.
+// geometric side (dot(dir, gnorm)) of the running-nearest hit. t > 0.0: the probe point is
+// already EPS_INTERFACE off any surface by the caller's discipline; skipping near hits would
+// misclassify probes standing just inside a face.
 void mesh_side_range(sampler2D posTex, sampler2D idxTex, uint vbase, uint tbase, uint offset, uint count, vec3 p, vec3 dir, inout float tmax, inout float sideDot) {
     for (uint i = offset; i < offset + count; i++) {
         vec3 a, b, c;

@@ -52,9 +52,20 @@ limitation returns with normal mapping).
 **Built (Sep 25).** `Hit.ng` exists; `mesh_light_pdf` and `ray_spawn` read it (CHANGELOG). The
 witness showed the spawn rule mattered more than the pdf: with the shading-normal offset, a
 reflected ray sampled below a smooth lamp's true plane re-hit its own triangle and counted the
-emission under MIS only (mis 5% bright). Remaining: test whether `MESH_T_MIN` can shrink, and
-whether the dispatcher can classify front/back by `ng` so `mesh_test_range` no longer has to
-re-orient the shading normal.
+emission under MIS only (mis 5% bright).
+
+**Also built (Sep 25): the mesh margin and the side test.** `MESH_T_MIN` (a fixed 1e-3 floor
+on triangle hits) is gone: triangle hits now search `t > 0` like analytic ones and fill
+`Hit.eps` with the fp-relative margin (`spawn_eps_fp`). Measured first with two new witnesses:
+`mesh-slab-albedo` (the exact slab albedo, slab as a closed mesh) read 1–3% low with the
+fixed floor and now reads the exact values; `mesh-scale-twin` (a mesh scene against itself
+shrunk 100×) went from Δmean 0.28% / rmse 1.0% to 0.00% / 0.03%. The dispatcher's front/back
+test and its region probes now use `ng`.
+
+**Deferred to the normal-mapping design:** the rule for a shading normal that lies on the other
+side of the true surface from the ray. `mesh_test_range` still flips the interpolated normal
+onto the triangle's side of the ray; with normal maps this becomes a rule for every surface
+(flip, clamp, or bend the normal), and it should be chosen with that design.
 
 ### 1.2 Three budgets that make the image depend on the estimator — **Your call** (semantics)
 

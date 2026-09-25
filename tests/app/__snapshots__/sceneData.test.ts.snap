@@ -454,6 +454,36 @@ exports[`scene-data textures (byte fingerprints) > mesh-quad-twin 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > mesh-scale-twin 1`] = `
+{
+  "indices": "4096x1 7881e2c754044b9b",
+  "nodes": "4096x1 9082d34f959e8831",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 6d0ee7f734e5d07f",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-scale-twin-ref 1`] = `
+{
+  "indices": "4096x1 7881e2c754044b9b",
+  "nodes": "4096x1 9082d34f959e8831",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 6d0ee7f734e5d07f",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-slab-albedo 1`] = `
+{
+  "indices": "4096x1 6cf98994ae8b29c7",
+  "nodes": "4096x1 da1a901f4387b439",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 b7cd40b162ee9b5b",
+}
+`;
+
 exports[`scene-data textures (byte fingerprints) > mesh-submerged 1`] = `
 {
   "indices": "4096x1 6cfe99f7191ae7e3",

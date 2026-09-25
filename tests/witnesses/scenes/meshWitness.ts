@@ -21,7 +21,7 @@ import { withPose } from '../../../src/authoring/strategy.js';
 /** Append a quad [C, C+e1, C+e1+e2, C+e2] as two triangles whose geometric normal is
  *  cross(e1, e2) — the SAME convention as the analytic `quad` primitive, so a mesh face and
  *  an analytic quad with matching (corner, edge1, edge2) shade identically. */
-function pushQuad(pos: number[], idx: number[], c: number[], e1: number[], e2: number[]): void {
+export function pushQuad(pos: number[], idx: number[], c: number[], e1: number[], e2: number[]): void {
     const base = pos.length / 3;
     const C = c, C1 = add(c, e1), C12 = add(add(c, e1), e2), C2 = add(c, e2);
     pos.push(...C, ...C1, ...C12, ...C2);
@@ -30,20 +30,22 @@ function pushQuad(pos: number[], idx: number[], c: number[], e1: number[], e2: n
 
 function add(a: number[], b: number[]): number[] { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
 
-/** Axis-aligned cube [-h,h]³ as 12 triangles. Each face's (edge1, edge2) are ordered so
- *  cross(edge1, edge2) is the OUTWARD normal; `inward` reverses winding (flips every normal),
- *  giving the furnace's inward-facing faces. Verified by the winding scratch check. */
-export function boxMesh(h: number, inward: boolean): { positions: Float32Array; indices: Uint32Array } {
+/** Axis-aligned box [-h,h] (a cube for scalar h, per-axis half-sizes for a vec3) as 12
+ *  triangles. Each face's (edge1, edge2) are ordered so cross(edge1, edge2) is the OUTWARD
+ *  normal; `inward` reverses winding (flips every normal), giving the furnace's inward-facing
+ *  faces. Verified by the winding scratch check. */
+export function boxMesh(half: number | [number, number, number], inward: boolean): { positions: Float32Array; indices: Uint32Array } {
+    const [x, y, z] = typeof half === 'number' ? [half, half, half] : half;
     const pos: number[] = [];
     const idx: number[] = [];
     // corner, e1, e2 per face — cross(e1,e2) = OUTWARD normal (see table in the plan).
     const faces: Array<[number[], number[], number[]]> = [
-        [[h, -h, -h], [0, 2 * h, 0], [0, 0, 2 * h]],    // +X
-        [[-h, -h, h], [0, 2 * h, 0], [0, 0, -2 * h]],   // -X
-        [[-h, h, -h], [0, 0, 2 * h], [2 * h, 0, 0]],    // +Y
-        [[-h, -h, -h], [2 * h, 0, 0], [0, 0, 2 * h]],   // -Y
-        [[-h, -h, h], [2 * h, 0, 0], [0, 2 * h, 0]],    // +Z
-        [[h, -h, -h], [-2 * h, 0, 0], [0, 2 * h, 0]],   // -Z
+        [[x, -y, -z], [0, 2 * y, 0], [0, 0, 2 * z]],    // +X
+        [[-x, -y, z], [0, 2 * y, 0], [0, 0, -2 * z]],   // -X
+        [[-x, y, -z], [0, 0, 2 * z], [2 * x, 0, 0]],    // +Y
+        [[-x, -y, -z], [2 * x, 0, 0], [0, 0, 2 * z]],   // -Y
+        [[-x, -y, z], [2 * x, 0, 0], [0, 2 * y, 0]],    // +Z
+        [[x, -y, -z], [-2 * x, 0, 0], [0, 2 * y, 0]],   // -Z
     ];
     for (const [c, e1, e2] of faces) {
         // inward = reverse the two in-plane edges → cross flips sign → inward normal.

@@ -42,6 +42,7 @@ import { sdfTableTwin, sdfInstanceTwin, sdfInstanceTwinRef, sdfInstanceStrategy,
 import { fieldGlass, fieldGlassNeeStrategy, fieldGlassMisStrategy, fieldGlassPtStrategy } from './scenes/customFieldWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
+import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
 import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN, sunHazeScene, sunHazeStrategy, SUN_HAZE_CAMERA, SUN_HAZE_CENTER } from './scenes/precisionWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
 import {
@@ -556,6 +557,40 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             checks: [
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'smooth mesh light nee ≡ mis' },
             ],
+        },
+    },
+    'mesh-slab-albedo': {
+        scene: meshSlabAlbedoScene,
+        strategies: [
+            ...posed(SLAB_VIEWS.normal.position, [0, 0, 0], slabRrOffStrategy),
+            withPose(slabGrazingStrategy, SLAB_VIEWS.grazing.position, [0, 0, 0]),
+        ],
+        exercises: 'the mesh self-intersection margin: slab-albedo (the exact Chandrasekhar plane albedo of a scattering halfspace) with the slab as a CLOSED MESH — a margin of 1e-3 world units is 0.02 optical depths here, the scale that biased the analytic slab 1–3% low before its margins became fp-relative',
+        expected: 'the same exact plane albedos as slab-albedo: [0.2488, 0.4375, 0.6466] at mu = 1, [0.3741, 0.5824, 0.7654] at mu = 0.3',
+        witness: {
+            spp: 128,
+            checks: [
+                { kind: 'mean', value: SLAB_PLANE_ALBEDO.normal, tol: 0.006, strategy: 0, source: { tier: 'exact', from: 'A_p(1) via halfspace.ts' }, label: 'mesh slab exact plane albedo, mu = 1' },
+                { kind: 'mean', value: SLAB_PLANE_ALBEDO.grazing, tol: 0.006, strategy: 1, source: { tier: 'exact', from: 'A_p(0.3) via halfspace.ts' }, label: 'mesh slab exact plane albedo, mu = 0.3' },
+            ],
+        },
+    },
+    'mesh-scale-twin-ref': {
+        scene: meshScaleTwinRef,
+        strategies: posed(MESH_TWIN_POSE.position, MESH_TWIN_POSE.target, meshScaleStrategy),
+        exercises: 'reference arm of mesh-scale-twin: a mesh floor and block under a uniform sky at unit scale',
+    },
+    'mesh-scale-twin': {
+        scene: meshScaleTwin,
+        strategies: posed(
+            MESH_TWIN_POSE.position.map((c) => c * MESH_TWIN_SCALE) as [number, number, number],
+            MESH_TWIN_POSE.target.map((c) => c * MESH_TWIN_SCALE) as [number, number, number],
+            meshScaleStrategy),
+        exercises: 'scale invariance of mesh transport: the mesh-scale-twin-ref scene shrunk 100× about the origin, camera with it — no lights, so the mesh self-intersection margin is the only world-space constant involved',
+        expected: 'the same image as mesh-scale-twin-ref',
+        witness: {
+            spp: 96,
+            checks: [{ kind: 'twin', other: { scene: 'mesh-scale-twin-ref' }, meanTol: 0.001, rmse: 0.004, label: 'mesh scene ≡ the same scene ×0.01' }],
         },
     },
     'mesh-light-twin': {

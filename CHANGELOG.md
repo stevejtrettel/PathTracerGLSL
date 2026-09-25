@@ -4,6 +4,30 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — mesh self-intersection: fp-relative margin, side test by `ng`
+
+- **`MESH_T_MIN` removed.** Triangle hits ignored anything closer than a fixed 1e-3 world
+  units, and a spawned ray was pushed off by the same amount. Triangle hits now search
+  strictly ahead (`t > 0`) like analytic primitives and fill `Hit.eps` with the fp-relative
+  margin, so the only escape mechanism is `ray_spawn`'s offset along `Hit.ng`.
+  `spawn_eps_analytic` is renamed `spawn_eps_fp`, since it now serves triangle hits too.
+- **The dispatcher's front/back test and region probes use `ng`** instead of the shading
+  normal: which side of a surface a ray is on is a geometric fact. `mesh_test_range` still
+  flips a smooth mesh's interpolated normal onto the ray's side of the triangle; the general
+  rule for that belongs with the normal-mapping design.
+
+Measured before the change with two new witnesses. `mesh-slab-albedo` is the slab-albedo
+scene (exact Chandrasekhar plane albedo, σ_t = 20) with the slab as a closed mesh: with the
+fixed floor it read µ=1 (0.2420, 0.4293, 0.6395) and µ=0.3 (0.3627, 0.5704, 0.7561) against
+exact (0.2488, 0.4375, 0.6466) and (0.3741, 0.5824, 0.7654), the same 1–3% loss the analytic
+slab had in August; now (0.2487, 0.4375, 0.6465) and (0.3739, 0.5824, 0.7654).
+`mesh-scale-twin` renders a mesh floor and block under a uniform sky and the same scene shrunk
+100×: Δmean 0.28%, rmse 1.04% before; 0.00%, 0.03% after, and its tolerances are now tight
+enough (0.1%, 0.4%) to catch a world-space margin. Targeted run: the 19 checks of the mesh
+witnesses (accel-triple, mesh-furnace, mesh-quad-twin, mesh-light-smooth, mesh-light-twin,
+mesh-glass-box, mesh-fog, mesh-submerged, mesh-instance-twin, instance-glass-mesh and the two
+new ones) all pass. The full sweep was not run.
+
 ## 2026-09-25 — `Hit` carries the geometric normal (`ng`)
 
 `Hit` gained `Direction ng`: the true normal of the surface hit, oriented like `frame.n`. It

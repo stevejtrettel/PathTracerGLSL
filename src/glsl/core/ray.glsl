@@ -21,8 +21,8 @@ Ray make_ray(Point origin, Direction dir) {
 // MIS but not under NEE (witness mesh-light-smooth). Along ng the ray starts on the side it
 // actually travels into. For surfaces whose shading normal is the true normal, ng = frame.n.
 // The escape distance is the HIT'S OWN positional uncertainty (hit.eps): fp-scale for analytic
-// roots, the marcher's clearance for marched commits, MESH_T_MIN for triangles. This offset is
-// the ONE self-intersection mechanism for the analytic tier (their floors are t > 0), so the
+// roots and triangle tests, the marcher's clearance for marched commits. This offset is the ONE
+// self-intersection mechanism for analytic and triangle hits (their floors are t > 0), so the
 // fill must exceed the hit's true error with margin — the null-crossing loops' progress and
 // the media shadow walker both ride on it.
 Ray ray_spawn(Hit hit, Direction wi) {
