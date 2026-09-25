@@ -16,7 +16,10 @@ budget, which taxonomy §4.1 forbids. Now:
   and a survivor's weight is divided by it. Unbiased; only those rays get noisier. Radiance
   collected before a kill is kept (it belongs to the prefix). The walker owns the roulette, so it
   works with the strategy's roulette off (ratio tracking's precedent). Both arms (absorbing and
-  scattering) do this; capture, roulette kill and the hard stop share `grin_killed`.
+  scattering) do this; capture, roulette kill and the hard stop share one exit, `grin_no_return`
+  (first committed as `grin_killed`). A readability pass moved the round check into one helper,
+  `grin_round_survives`, and gave both arms an explicit `round_comp` (the absorbing arm had
+  divided its transmittance `absorb` by the survival probability, which read like absorption).
 - **Hard stop**: `GRIN_MAX_ROUNDS` (200) rounds, reached with probability 0.9¹⁹⁹ ≈ 8·10⁻¹⁰ per
   traversal. `MAX_ODE_STEPS` is gone.
 

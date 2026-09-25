@@ -144,11 +144,21 @@ void grin_finish(inout MediumSample ms, float n_in, float n_out, Spectrum absorb
     ms.eta_scale = er * er;
 }
 
+// The long-traversal roulette (header): at each round boundary, survive with probability
+// GRIN_ROUND_SURVIVAL; a survivor's weight is divided by it, accumulated in `comp`. Step 0 is
+// not a boundary.
+bool grin_round_survives(int step_index, inout float comp) {
+    if (step_index == 0 || step_index % GRIN_ROUND_STEPS != 0) return true;
+    if (random() >= GRIN_ROUND_SURVIVAL) return false;
+    comp /= GRIN_ROUND_SURVIVAL;
+    return true;
+}
+
 // A traversal that ends inside the region with nothing coming back: captured by a black-hole
-// point (nothing returns from beyond it), killed by the long-traversal roulette, or at the hard
+// point (nothing returns from beyond it), stopped by the long-traversal roulette, or at the hard
 // stop. Zero weight, not deflected; ms.radiance keeps what the traversal collected before it
 // ended (glowing gas in front of a hole stays visible). The walk's throughput goes to zero.
-MediumSample grin_killed(MediumSample ms, float t_max) {
+MediumSample grin_no_return(MediumSample ms, float t_max) {
     ms.scattered = false;
     ms.deflected = false;
     ms.eta_scale = 1.0;
@@ -194,15 +204,11 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
     vec3 r = ray.origin;
     vec3 T = n0 * ray.direction;               // T = n·(unit tangent) at the actual entry index
     vec3 F = grin_force(med, r);               // carried across steps — velocity Verlet reuses it
-    Spectrum absorb = SPECTRUM_ONE;
+    Spectrum absorb = SPECTRUM_ONE;                // transmittance so far along the bent path
+    float round_comp = 1.0;                         // the roulette's survivor compensation
 
     for (int i = 0; i < GRIN_MAX_ROUNDS * GRIN_ROUND_STEPS; i++) {
-        // Round boundary: the long-traversal roulette (header). absorb weights everything
-        // collected from here on, so dividing it carries the survivor compensation.
-        if (i > 0 && i % GRIN_ROUND_STEPS == 0) {
-            if (random() >= GRIN_ROUND_SURVIVAL) return grin_killed(ms, t_max);
-            absorb /= GRIN_ROUND_SURVIVAL;
-        }
+        if (!grin_round_survives(i, round_comp)) return grin_no_return(ms, t_max);
 
         // n from the carried |T| = n invariant (exact at entry, symplectically bounded after) —
         // the limiters and the capture test need no extra field evaluation.
@@ -213,7 +219,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         // collected along the sightline (ms.radiance — glowing gas in front of the hole
         // stays visible; the plunge itself contributes zero). A deterministic zero-weight
         // terminator: the walk's throughput goes to zero and roulette reaps the path.
-        if (n > GRIN_CAPTURE) return grin_killed(ms, t_max);
+        if (n > GRIN_CAPTURE) return grin_no_return(ms, t_max);
 
         // The adaptive step: h·n ≤ DS_MAX (coordinate cap) and h·|∇n| ≤ DTOL (field-change
         // cap, |∇n| = |F|/n). Far from mass neither binds and h = GRIN_STEP.
@@ -246,11 +252,11 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
             MediumProperties me = scene_medium_properties(med, r);
             Spectrum sae = max(me.sigma_a, Spectrum(1e-6));
             Spectrum tre = spectrum_exp(-sae * max(t_exit, 0.0));
-            ms.radiance += absorb * ((n0 * n0) / (n * n)) * medium_emission(me) * (SPECTRUM_ONE - tre) / sae;
+            ms.radiance += round_comp * absorb * ((n0 * n0) / (n * n)) * medium_emission(me) * (SPECTRUM_ONE - tre) / sae;
             absorb *= tre;
             ms.exit_dir = normalize(T_half);
             ms.exit_p   = r + t_exit * ms.exit_dir;
-            grin_finish(ms, n0, n_exit, absorb);
+            grin_finish(ms, n0, n_exit, round_comp * absorb);
             return ms;
         }
 
@@ -262,7 +268,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         MediumProperties mp = scene_medium_properties(med, r);
         Spectrum sa = max(mp.sigma_a, Spectrum(1e-6));
         Spectrum step_tr = spectrum_exp(-sa * (length(T_half) * h));
-        ms.radiance += absorb * ((n0 * n0) / (n * n)) * medium_emission(mp) * (SPECTRUM_ONE - step_tr) / sa;
+        ms.radiance += round_comp * absorb * ((n0 * n0) / (n * n)) * medium_emission(mp) * (SPECTRUM_ONE - step_tr) / sa;
         absorb *= step_tr;
 
         vec3 F_next = grin_force(med, r_next);   // THE one force evaluation per step (reused next)
@@ -272,7 +278,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
     }
 
     // The hard stop (probability ≈ 8e-10 per traversal — header).
-    return grin_killed(ms, t_max);
+    return grin_no_return(ms, t_max);
 }
 
 // Seam-1 GRIN SCATTERING arm (impl-plan-grin-media batch 2): the analytic arm's channel-MIS
@@ -328,15 +334,12 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
     vec3 T = n0 * ray.direction;
     vec3 F = grin_force(med, r);
     float s_acc = 0.0;                                 // accumulated arc length
-    float round_comp = 1.0;                            // 1/survival^rounds — the roulette's compensation
+    float round_comp = 1.0;                            // the roulette's survivor compensation
 
     for (int i = 0; i < GRIN_MAX_ROUNDS * GRIN_ROUND_STEPS; i++) {
-        if (i > 0 && i % GRIN_ROUND_STEPS == 0) {      // the long-traversal roulette (header)
-            if (random() >= GRIN_ROUND_SURVIVAL) return grin_killed(ms, t_max);
-            round_comp /= GRIN_ROUND_SURVIVAL;
-        }
+        if (!grin_round_survives(i, round_comp)) return grin_no_return(ms, t_max);
         float n = length(T);
-        if (n > GRIN_CAPTURE) return grin_killed(ms, t_max);   // horizon: nothing returns, event or not
+        if (n > GRIN_CAPTURE) return grin_no_return(ms, t_max);   // horizon: nothing returns, event or not
         float h = min(GRIN_STEP, GRIN_DS_MAX / n);
         h = min(h, GRIN_DTOL * n / max(length(F), 1e-6));
 
@@ -398,5 +401,5 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
     }
 
     // The hard stop (probability ≈ 8e-10 per traversal — header).
-    return grin_killed(ms, t_max);
+    return grin_no_return(ms, t_max);
 }
