@@ -60,7 +60,7 @@ import {
 import {
     cornellArea, cornellAreaNeeStrategy, cornellAreaMisStrategy, cornellAreaPtStrategy,
     cornellAreaGlass,
-    fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy,
+    fogArea, fogAreaNeeStrategy, fogAreaMisStrategy, fogAreaPtStrategy, fogAreaIgnored, fogAreaIgnoredNeeStrategy, fogAreaIgnoredMisStrategy, fogAreaIgnoredPtStrategy,
     fogPanel,
     orbScene, orbNeeStrategy, orbPtStrategy,
 } from './scenes/areaLightScenes.js';
@@ -1246,6 +1246,21 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             checks: [
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'X-FOG nee ≡ mis' },
                 { kind: 'equality', strategies: [0, 2], meanTol: 0.02, rmse: 0.65, label: 'X-FOG pt tripwire' },
+            ],
+        },
+    },
+    'fog-area-ignored': {
+        scene: fogAreaIgnored,
+        strategies: posed([0, 1, 4], [0, 1, 0], fogAreaIgnoredNeeStrategy, fogAreaIgnoredMisStrategy, fogAreaIgnoredPtStrategy),
+        exercises:
+            "measurement.scattering 'ignored' — the haze is absorbing-only for EVERY technique: camera segments and shadow rays both attenuate by σ_a alone (one extinction per medium, generateMediumTransmittance)",
+        expected:
+            'keys 1 (pt-nee), 2 (pt-mis), 3 (pt) converge to the same image: a clear, slightly dimmed box, no light shafts. Before Sep 25 2026 nee/mis were ~55% darker than pt under the quad (shadow rays kept σ_s)',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'ignored-scattering nee ≡ mis' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.02, rmse: 0.65, label: 'ignored-scattering nee ≡ pt' },
             ],
         },
     },

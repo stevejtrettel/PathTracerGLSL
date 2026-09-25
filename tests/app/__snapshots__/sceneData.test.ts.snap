@@ -138,6 +138,8 @@ exports[`scene-data textures (byte fingerprints) > flatten-tree 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > fog-area 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > fog-area-ignored 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > fog-panel 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > fog-sky 1`] = `null`;

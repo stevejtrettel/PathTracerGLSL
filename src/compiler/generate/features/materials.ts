@@ -183,7 +183,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).
         if (wantsShadowMedia) {
-            blocks.push({ origin: 'generated:medium-transmittance', source: generateMediumTransmittance(plan.materials) });
+            blocks.push({ origin: 'generated:medium-transmittance', source: generateMediumTransmittance(plan.materials, plan.program.media.scatteringArms) });
         }
     }
 
@@ -812,7 +812,12 @@ function majorantSpec(mat: PlannedMaterial): MajorantSpec {
 // Seam 2 of the volumetric component: per-segment shadow transmittance over full σ_t.
 // Called only by shadow_media's segment walker. Constant/{param} media: the analytic
 // closed form (exact). Expression media: ratio tracking (delta_tracking occupant).
-function generateMediumTransmittance(materials: PlannedMaterial[]): string {
+// One extinction per medium: a shadow ray must see the medium camera paths see. Under
+// measurement.scattering 'ignored' a scattering medium is ABSORBING-ONLY (σ_t = σ_a, the
+// dispatch above), so its shadow transmittance drops σ_s too, through the same arms: the
+// closed form on σ_a, or the σ_a ratio tracker. (Until Sep 25 2026 shadows kept σ_a + σ_s,
+// so NEE darkened light that pt carried — the estimator changed the image.)
+function generateMediumTransmittance(materials: PlannedMaterial[], scatteringLive: boolean): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const lines: string[] = ['// Generated volumetric-component dispatch (seam 2, fable-volumetric-component §2)'];
     lines.push('Spectrum medium_transmittance(int med, Ray ray, float len) {');
@@ -827,12 +832,18 @@ function generateMediumTransmittance(materials: PlannedMaterial[]): string {
             lines.push(`    if (med == ${mat.id}) return SPECTRUM_ZERO;   // '${mat.name}' — deflecting (GRIN): opaque to shadow rays`);
             continue;
         }
+        const scatteringDropped = !scatteringLive && mediumMayScatter(mat.medium!);
         if (isHeterogeneousMedium(mat.medium!)) {
             // Expression media only on this arm — the AUTHORED ceiling (Validator-paired);
             // {param}/constant media take the exact analytic branch below.
             const maj = majorantSpec(mat).expr;
-            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — heterogeneous (ratio tracking)`);
-            lines.push(`        return medium_transmittance_ratio(${mat.id}, ${maj}, ray, len);`);
+            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — heterogeneous (ratio tracking${scatteringDropped ? ', σ_a only: scattering ignored' : ''})`);
+            lines.push(scatteringDropped
+                ? `        return medium_sample_ratio_absorb(${mat.id}, ${maj}, ray, len).weight;`
+                : `        return medium_transmittance_ratio(${mat.id}, ${maj}, ray, len);`);
+        } else if (scatteringDropped) {
+            lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — σ_a only: scattering ignored`);
+            lines.push(`        return spectrum_exp(-scene_medium_properties(${mat.id}, ray.origin).sigma_a * len);`);
         } else {
             lines.push(`    if (med == ${mat.id}) {   // '${mat.name}'`);
             lines.push(`        return medium_transmittance_analytic(scene_medium_properties(${mat.id}, ray.origin), len);`);

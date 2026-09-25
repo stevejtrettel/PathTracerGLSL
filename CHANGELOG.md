@@ -4,6 +4,17 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — `scattering: 'ignored'`: shadow rays see the same medium as camera paths
+
+Under `measurement.scattering: 'ignored'` a scattering medium is absorbing-only (σ_t = σ_a),
+and camera segments were attenuated that way, but the shadow-ray transmittance was generated
+separately and kept σ_a + σ_s. So NEE and MIS darkened light through such a medium that pt
+carried: an estimator changed the image. The transmittance generator now drops σ_s exactly
+when the dispatch does (closed form on σ_a, or the σ_a ratio tracker for expression media);
+media that do not scatter emit the same code as before. New witness `fog-area-ignored` (the
+X-FOG scene under 'ignored'): nee vs pt differed by 31.8% in frame mean before, 0.03% now;
+nee ≡ mis holds in both. Found by the Sep 25 audit; no registry scene reached it before.
+
 ## 2026-09-25 — the sun sits at the far clip
 
 The directional light placed its sample at distance 1e20, so any ambient medium extinguished

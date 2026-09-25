@@ -126,6 +126,24 @@ export const fogAreaPtStrategy: RenderStrategy = {
 };
 
 // ---------------------------------------------------------------------------
+// fog-area-ignored — the same scene under measurement.scattering 'ignored': the haze is
+// ABSORBING-ONLY (σ_t = σ_a) for every technique. Shadow rays must see the medium camera
+// paths see; until Sep 25 2026 they kept σ_a + σ_s, so nee/mis darkened the quad's light by
+// e^{−σ_s·d} (≈ 0.45 across the box) while pt carried it at e^{−σ_a·d}.
+// ---------------------------------------------------------------------------
+
+export const fogAreaIgnored: SceneDescription = { ...fogArea, id: 'fog-area-ignored', name: 'Foggy Cornell + Quad, scattering ignored' };
+
+const ignored = (st: RenderStrategy): RenderStrategy => ({
+    ...st,
+    measurement: { ...st.measurement, scattering: 'ignored' },
+    estimator: { ...st.estimator, volumeSampling: undefined },
+});
+export const fogAreaIgnoredNeeStrategy = ignored(fogAreaNeeStrategy);
+export const fogAreaIgnoredMisStrategy = ignored(fogAreaMisStrategy);
+export const fogAreaIgnoredPtStrategy = ignored(fogAreaPtStrategy);
+
+// ---------------------------------------------------------------------------
 // fog-panel — the audit-H2 witness: a user-authored DIFFUSE quad (nonzero albedo, not a
 // light) floating mid-fog. Paths bounce off BOTH faces; before the back-face region_from
 // fix, every back-face bounce fabricated region_from = the quad's own region, the §4.4
