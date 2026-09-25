@@ -1,7 +1,7 @@
 // app/RendererManager.ts
 // Manages compiled renderers: compilation, switching, and metadata
 
-import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy, SourceMap } from '../compiler/types.js';
+import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy, SourceMap, DataReads } from '../compiler/types.js';
 import type { Engine } from '../engine/Engine.js';
 import type { ParameterStore } from './ParameterStore.js';
 import type { EventBus } from './EventBus.js';
@@ -42,6 +42,9 @@ export class RendererManager {
     // `${strategyId}-${sceneId}` convention lives only in the compiler.
     private strategyToRenderer: Map<string, string> = new Map();
     private activeRendererId: string | null = null;
+    // The optional scene-data structures the loaded renderers read (their union) — the App
+    // builds exactly these (see CompiledScene).
+    private dataReads: DataReads | null = null;
 
     constructor(deps: RendererManagerDeps) {
         this.compiler = deps.compiler;
@@ -66,25 +69,26 @@ export class RendererManager {
         this.scene = scene;
         console.log(`Initializing renderers for scene: ${scene.id}`);
 
-        // Compile all strategies
+        // Compile all strategies together: they share one scene-data layout.
         const reporter = new ConsoleReporter();
-        const compiledRenderers: CompiledRenderer[] = [];
-
-        for (const strategy of strategies) {
-            console.log(`  Compiling strategy: ${strategy.id}`);
-            try {
-                const renderer = this.compiler.compile(scene, strategy);
-                compiledRenderers.push(renderer);
-                this.strategies.set(strategy.id, strategy);
-                this.renderers.set(renderer.id, renderer);
-                this.strategyToRenderer.set(strategy.id, renderer.id);
-            } catch (error) {
-                if (error instanceof CompilationError) {
-                    console.error(reporter.formatBag(error.diagnostics));
-                }
-                throw error;
+        console.log(`  Compiling strategies: ${strategies.map((s) => s.id).join(', ')}`);
+        let compiledRenderers: CompiledRenderer[];
+        try {
+            const compiled = this.compiler.compileScene(scene, strategies);
+            compiledRenderers = compiled.renderers;
+            this.dataReads = compiled.dataReads;
+        } catch (error) {
+            if (error instanceof CompilationError) {
+                console.error(reporter.formatBag(error.diagnostics));
             }
+            throw error;
         }
+        strategies.forEach((strategy, i) => {
+            const renderer = compiledRenderers[i];
+            this.strategies.set(strategy.id, strategy);
+            this.renderers.set(renderer.id, renderer);
+            this.strategyToRenderer.set(strategy.id, renderer.id);
+        });
 
         // Load all renderers into engine
         try {
@@ -157,20 +161,20 @@ export class RendererManager {
         const reporter = new ConsoleReporter();
         const previouslyActive = this.activeRendererId;
 
-        // Phase 1 — compile every strategy (TS → shader source + pipeline spec).
-        // No GPU state is touched, so a CompilationError here leaves the loaded
-        // renderers intact.
-        const compiled: Array<{ strategyId: string; renderer: CompiledRenderer }> = [];
-        for (const [strategyId, strategy] of this.strategies) {
-            try {
-                compiled.push({ strategyId, renderer: this.compiler.compile(target, strategy) });
-            } catch (error) {
-                if (error instanceof CompilationError) {
-                    console.error(reporter.formatBag(error.diagnostics));
-                }
-                throw error;
+        // Phase 1 — compile every strategy together (TS → shader source + pipeline spec,
+        // one shared data layout). No GPU state is touched, so a CompilationError here
+        // leaves the loaded renderers intact.
+        const strategyIds = [...this.strategies.keys()];
+        let compiledScene;
+        try {
+            compiledScene = this.compiler.compileScene(target, [...this.strategies.values()]);
+        } catch (error) {
+            if (error instanceof CompilationError) {
+                console.error(reporter.formatBag(error.diagnostics));
             }
+            throw error;
         }
+        const compiled = compiledScene.renderers.map((renderer, i) => ({ strategyId: strategyIds[i], renderer }));
 
         // Phase 2 — validate all new shaders compile on the GPU while the current
         // renderers are still loaded. This is the atomic-commit boundary: if any
@@ -186,8 +190,10 @@ export class RendererManager {
         }
 
         // Phase 3 — commit: replace programs/resources in the engine. Every new
-        // shader is known to compile, so this no longer fails partway.
+        // shader is known to compile, so this no longer fails partway. The caller (App)
+        // must rebuild the scene data for the new layout before the next frame.
         this.scene = target;
+        this.dataReads = compiledScene.dataReads;
         // E9: renderer ids embed the scene id — a recompile with a DIFFERENT scene mints
         // all-new ids, and the old renderers (programs + GPU framebuffers) used to leak,
         // staying selectable and shifting the 1-9 keys. Diff-and-unload the stale ids.
@@ -280,6 +286,11 @@ export class RendererManager {
     getActiveRenderer(): CompiledRenderer | null {
         if (!this.activeRendererId) return null;
         return this.renderers.get(this.activeRendererId) || null;
+    }
+
+    /** The optional scene-data structures the loaded renderers read; null before initialize. */
+    getDataReads(): DataReads | null {
+        return this.dataReads;
     }
 
     getScene(): SceneDescription | null {

@@ -35,15 +35,15 @@ describe('data rail ledger', () => {
         // normals/uvs span only mesh geometry (no light bakes).
         expect(L.totals.normals).toBe(24 + 594);
         // Records: batch 0 placements (3 × 2 texels) + attrs (3), batch 1 placements
-        // (500 × 1 texel — the params tier stride) + its cwbvh record TWIN (500),
-        // then the CDF.
+        // (500 × 1 texel — the params tier stride), then the mesh-light CDF (always built),
+        // then the OPTIONAL regions — first batch 1's cwbvh record twin (500).
         expect(L.batches[0]).toMatchObject({ placementsBase: 0, attrsBase: 6, cwbvhNodesBase: -1, cwbvhRecordsBase: -1 });
         expect(L.batches[1].placementsBase).toBe(9);
         expect(L.batches[1].attrsBase).toBe(-1);
-        expect(L.batches[1].cwbvhRecordsBase).toBe(9 + 500);
+        expect(L.meshLights.get(1)!.cdfBase).toBe(9 + 500);
+        expect(L.batches[1].cwbvhRecordsBase).toBe(9 + 500 + 1152);
         expect(L.batches[1].cwbvhNodesBase).toBe(0);
         expect(L.totals.nodesq).toBe(5 * (2 * 500 - 1));
-        expect(L.meshLights.get(1)!.cdfBase).toBe(9 + 500 + 500);
         // Scene table: leaf list then analytic records after the CDF; TLAS after batch TLASes.
         expect(L.sceneTable!.leafListBase).toBe(9 + 500 + 500 + 1152);
         expect(L.sceneTable!.analyticBase).toBe(9 + 500 + 500 + 1152 + 4);
@@ -60,6 +60,26 @@ describe('data rail ledger', () => {
         expect(L.sceneTable!.tlasBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500));
         expect(L.lightTree!.treeBase).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500) + nodeTexelBound(4));
         expect(L.totals.nodes).toBe(nodeTexelBound(12) + nodeTexelBound(1152) + nodeTexelBound(3) + nodeTexelBound(500) + nodeTexelBound(4) + nodeTexelBound(5));
+    });
+
+    it('optional structures never move always-built regions', () => {
+        // A scene's renderers share one layout, sized for the optional structures ANY of them
+        // reads. Placing every optional region after every always-built one means a program
+        // that reads none of them bakes the same offsets whatever its siblings need.
+        const without: DataTenants = {
+            ...T,
+            batches: T.batches.map((b) => ({ ...b, cwbvhNodeTexels: 0, cwbvhRecordTexels: 0 })),
+            sceneTable: null, lightTree: null, regionMaterials: null,
+        };
+        const A = planDataLayout(T), B = planDataLayout(without);
+        expect(B.meshes).toEqual(A.meshes);
+        expect(B.batches.map(({ placementsBase, attrsBase, tlasBase }) => ({ placementsBase, attrsBase, tlasBase })))
+            .toEqual(A.batches.map(({ placementsBase, attrsBase, tlasBase }) => ({ placementsBase, attrsBase, tlasBase })));
+        expect([...B.meshLights]).toEqual([...A.meshLights]);
+        expect(B.batches.every((b) => b.cwbvhNodesBase === -1 && b.cwbvhRecordsBase === -1)).toBe(true);
+        expect(B.sceneTable).toBeUndefined();
+        expect(B.lightTree).toBeUndefined();
+        expect(B.regionMaterials).toBeUndefined();
     });
 
     it('the node bound holds for real SAH trees (LEAF_SIZE ≥ 1 ⇒ ≤ 2T−1 nodes)', () => {

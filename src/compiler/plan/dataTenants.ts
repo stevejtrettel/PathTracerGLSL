@@ -7,7 +7,8 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue } from '../types.js';
+import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads } from '../types.js';
+import type { ProgramDescription } from './types.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression, isValueParam, isBlackbody } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
 import { PRIMITIVES, paramsRecordFloats, primitiveIsBounded, resolveBackend, foldPlacementIntoParameters } from '../../components/geometry/index.js';
@@ -21,6 +22,29 @@ import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../
 import { cwbvhNodeTexelBound } from '../../components/accel/cwbvh/cwbvh.js';
 import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH, LEAF_SDF } from '../../components/intersection/index.js';
 import type { DataTenants } from '../../components/data/ledger.js';
+
+/** Which optional data structures a program reads — read off its decisions, which are the
+ *  only thing that determines it. Each flag names the one decision that consumes it. */
+export function dataReadsOf(program: ProgramDescription): DataReads {
+    return {
+        cwbvh: program.intersection.classes.instanced && program.intersection.instanceAccel === 'cwbvh',
+        lightTree: program.estimator.lighting?.selection === 'bvh',
+        sceneTable: program.intersection.objectDispatch === 'table',
+    };
+}
+
+/** What a set of programs sharing one scene reads: a structure is needed if ANY reads it. */
+export function unionDataReads(reads: readonly DataReads[]): DataReads {
+    return {
+        cwbvh: reads.some((r) => r.cwbvh),
+        lightTree: reads.some((r) => r.lightTree),
+        sceneTable: reads.some((r) => r.sceneTable),
+    };
+}
+
+/** Every optional structure. Used only to plan a program's DECISIONS before its data
+ *  needs are known (the decisions do not depend on the layout — tested). */
+export const READS_EVERYTHING: DataReads = { cwbvh: true, lightTree: true, sceneTable: true };
 
 /** Does material `name` read Hit.uv? — i.e. is it a PROCEDURAL material: the checker model
  *  (readsUv capability) OR any material carrying a GLSL formula (fable-imagery P2 expression
@@ -300,7 +324,10 @@ export function regionMaterialsOf(scene: SceneDescription): number[] {
     return ids;
 }
 
-export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
+/** The scene's data tenants, laid out for exactly the optional structures in `reads` (the
+ *  union of what the scene's programs read — `unionDataReads`). The Planner and the App must
+ *  pass the SAME reads, so the offsets the Planner bakes are where the App packs. */
+export function dataTenantsOf(scene: SceneDescription, reads: DataReads): SceneDataTenants {
     const meshes = sceneMeshes(scene.objects);
     const batches = sceneInstanceBatches(scene.objects);
 
@@ -316,14 +343,12 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
     }
 
     const batchPlacementRecord = batches.map((b) => batchPlacementRecordOf(b, scene));
-    // CWBVH eligibility (fable-accel-cwbvh §6 v1 pins): params-tier analytic batches
-    // WITHOUT attributes. Regions allocated whenever eligible (the always-upload
-    // precedent — ONE scene layout serves every strategy; a tlas-only session simply
-    // never reads them).
+    // CWBVH regions: only when some program reads the CWBVH, and only for the batches it
+    // can serve (params-tier analytic batches WITHOUT attributes — fable-accel-cwbvh §6).
     const batchTenants = batches.map((b, i) => {
         const n = placementCount(b.placements);
         const attrTexels = instanceAttributeRows(scene.materials[b.prototype.material]?.model ?? '', b.attributes ?? {}).length * n;
-        const cwbvhEligible = batchPlacementRecord[i] === 'params' && attrTexels === 0;
+        const cwbvhEligible = reads.cwbvh && batchPlacementRecord[i] === 'params' && attrTexels === 0;
         return {
             instanceCount: n,
             placementTexels: (batchPlacementRecord[i] === 'params' ? 1 : 2) as 1 | 2,
@@ -341,8 +366,8 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
     // ── The scene TABLE (fable-object-tables): eligible = bounded, CONSTANT-placement
     // analytic objects + constant meshes + every batch. Driven/unbounded objects stay in
     // the residual unrolled arm; SDF objects stay in the marcher arm. Analytic records
-    // order SOLIDS FIRST (the containment loop's range). Strategy-independent: allocated
-    // and packed whether or not any strategy tables them.
+    // order SOLIDS FIRST (the containment loop's range). Built only when some program uses
+    // table dispatch (reads.sceneTable).
     const analyticEligible: Array<{ sceneIndex: number; type: string; solid: boolean }> = [];
     scene.objects.forEach((o, i) => {
         if (!isPrimitiveObject(o)) return;
@@ -395,23 +420,23 @@ export function dataTenantsOf(scene: SceneDescription): SceneDataTenants {
         ...batches.map((_, i) => ({ kind: LEAF_BATCH, ref: i })),
         ...sdf.map((_, i) => ({ kind: LEAF_SDF, ref: i })),
     ];
-    const table: SceneTable | null = leaves.length > 0
+    const table: SceneTable | null = reads.sceneTable && leaves.length > 0
         ? { leaves, analytic, solidCount: analytic.filter((a) => a.solid).length, kindCodes, sdf, sdfKindCodes }
         : null;
 
     // The light tree (fable-light-bvh §5/§7): leaves = the registry roster PLUS every
-    // light-eligible batch's instances (the global light-index space). Allocated
-    // whenever that total is non-empty and the roster is tree-eligible (every kind has
-    // treeBounds) — the always-upload precedent, one scene layout serves every
-    // strategy; 'power' programs simply never read it. Table rows exist ONLY for the
-    // roster (batch lights read their placement records); trails cover the total.
+    // light-eligible batch's instances (the global light-index space). Built only when some
+    // program selects lights with it (reads.lightTree), the total is non-empty and every
+    // roster kind has treeBounds. Table rows exist ONLY for the roster (batch lights read
+    // their placement records); trails cover the total. `lightBatches` is returned either
+    // way: which instances are lights is a scene fact the Planner's decisions use.
     const roster = lightRosterOf(scene);
     const lightBatches = batches
         .map((b, ordinal) => ({ ordinal, count: placementCount(b.placements), eligible: batchLightEligible(b, scene) }))
         .filter((b) => b.eligible)
         .map(({ ordinal, count }) => ({ ordinal, count }));
     const totalLights = roster.length + lightBatches.reduce((a, b) => a + b.count, 0);
-    const lightTree = totalLights > 0 && lightRosterTreeEligible(roster)
+    const lightTree = reads.lightTree && totalLights > 0 && lightRosterTreeEligible(roster)
         ? { count: totalLights, tableTexels: roster.length * (roster.length > 0 ? lightTableLayout(roster.map((l) => l.kind)).strideTexels : 0) }
         : null;
 

@@ -1,7 +1,22 @@
 # Exact linkage for scene data
 
-Status: agreed with the owner (Sep 24 2026), not built. Build after the fixed-code witness
-sweep and the commit of the Sep 24 fixes (see CHANGELOG.md).
+Status: agreed with the owner (Sep 24–25 2026). **Stage 1 built Sep 25 2026** (see
+CHANGELOG.md); stage 2 not built.
+
+## Decisions (Sep 25 2026)
+
+- **Build up front.** When a scene loads, every renderer on its keys is compiled and linked,
+  and all the data those renderers read is built — and nothing else. A scene usually has one or
+  two renderers; if it has more, they are there for a reason. (Building lazily on first key
+  press was considered and rejected.)
+- **Renderers are chosen by key.** Roles such as an automatic fast-while-moving /
+  slow-when-still switch are not wanted now; maybe later.
+- **Several outputs per renderer (debug images) is a wanted capability, designed later.**
+  They are extra render targets written by the same program in the same pass (the variance
+  accumulator already works this way). Pictures of the scene (normal, albedo, depth) belong
+  in `measurement`; pictures of the algorithm (NEE vs BSDF share, bounce counts, NaNs) belong
+  in `estimator`. WebGL2 guarantees only 4 simultaneous outputs. This design does not depend
+  on that pass: an output that reads a data structure simply adds it to its renderer's reads.
 
 ## The rule
 

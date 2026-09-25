@@ -20,11 +20,13 @@ export interface PackRequest {
     attrs?: AttributeRowSpec[];
     /** Present iff the batch's tier is 'params' (impl-plan-placement-fold stage 3). */
     paramsRecord?: ParamsRecordSpec;
+    /** Build the CWBVH too — only when some renderer on the scene reads it. */
+    buildCwbvh: boolean;
 }
 
 self.onmessage = (e: MessageEvent<PackRequest>) => {
-    const { localBox, placements, attrs, paramsRecord } = e.data;
-    const packed = packInstanceBatch(localBox, placements, attrs, paramsRecord);
+    const { localBox, placements, attrs, paramsRecord, buildCwbvh } = e.data;
+    const packed = packInstanceBatch(localBox, placements, attrs, paramsRecord, buildCwbvh);
     const transfers: ArrayBuffer[] = [packed.placements.buffer as ArrayBuffer, packed.nodes.buffer as ArrayBuffer];
     if (packed.attributes !== undefined) transfers.push(packed.attributes.buffer as ArrayBuffer);
     if (packed.cwbvh !== undefined) transfers.push(packed.cwbvh.nodes.buffer as ArrayBuffer, packed.cwbvh.records.buffer as ArrayBuffer);

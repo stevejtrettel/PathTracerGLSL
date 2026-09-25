@@ -127,15 +127,17 @@ export function planDataLayout(t: DataTenants): DataLayout {
         tr += m.triCount;
         n += nodeTexelBound(m.triCount);
     }
+    // ORDER: every always-built region comes before every optional one (CWBVH, object table,
+    // light tree, region→material ids — each present only when some program reads it). So a
+    // program that reads no optional structure gets the same offsets whatever the scene's
+    // other renderers need; adding an optional structure never moves an always-built region.
     let nq = 0;
     const batches: BatchSlot[] = [];
     for (const b of t.batches) {
         const placementsBase = r; r += b.placementTexels * b.instanceCount;
         const attrsBase = b.attrTexels > 0 ? r : -1; r += b.attrTexels;
-        const cwbvhRecordsBase = b.cwbvhRecordTexels > 0 ? r : -1; r += b.cwbvhRecordTexels;
         const tlasBase = n; n += nodeTexelBound(b.instanceCount);
-        const cwbvhNodesBase = b.cwbvhNodeTexels > 0 ? nq : -1; nq += b.cwbvhNodeTexels;
-        batches.push({ placementsBase, tlasBase, attrsBase, cwbvhNodesBase, cwbvhRecordsBase });
+        batches.push({ placementsBase, tlasBase, attrsBase, cwbvhNodesBase: -1, cwbvhRecordsBase: -1 });
     }
     const meshLights = new Map<number, MeshLightSlot>();
     for (const l of t.meshLights) {
@@ -143,6 +145,11 @@ export function planDataLayout(t: DataTenants): DataLayout {
         v += l.vertexCount;
         r += l.triCount;
     }
+    // Optional: the CWBVH experiment's regions (nodes in their own integer channel).
+    t.batches.forEach((b, i) => {
+        if (b.cwbvhRecordTexels > 0) { batches[i].cwbvhRecordsBase = r; r += b.cwbvhRecordTexels; }
+        if (b.cwbvhNodeTexels > 0) { batches[i].cwbvhNodesBase = nq; nq += b.cwbvhNodeTexels; }
+    });
     let sceneTable: SceneTableSlot | undefined;
     if (t.sceneTable !== null && t.sceneTable.leafCount > 0) {
         const leafListBase = r; r += t.sceneTable.leafCount;

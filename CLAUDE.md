@@ -66,9 +66,12 @@ How a program is assembled:
   short generated walk calling static technique files; pt / pt-nee / pt-mis are combiner
   configurations. Math is static GLSL; policy and plumbing are generated.
 - **Scene data** (meshes, BVHs, instance placements, the light tree, the object table)
-  lives in six shared data textures. `planDataLayout` (components/data/ledger.ts) is the one
-  layout; `dataTenantsOf` (compiler/plan/dataTenants.ts) feeds it, and both the Planner
-  (baked offsets) and the App (packed bytes) call it.
+  lives in six shared data textures. A scene's renderers are compiled together
+  (`Compiler.compileScene`) and share one layout, which holds the optional structures
+  (CWBVH, light tree, object table) only if some renderer reads them (`DataReads`).
+  `planDataLayout` (components/data/ledger.ts) is the one layout; `dataTenantsOf`
+  (compiler/plan/dataTenants.ts) feeds it, and the Planner (baked offsets) and the App
+  (packed bytes) call it with the same `DataReads`. The App compiles before it packs.
 - **Which scene objects are lights** has one answer: `samplableEmitterObjects` in
   dataTenants.ts (with the authored `lights` it forms `lightRosterOf`). Use it; don't
   re-derive it.

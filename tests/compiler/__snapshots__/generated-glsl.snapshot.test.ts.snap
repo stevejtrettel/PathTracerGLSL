@@ -61063,7 +61063,7 @@ bool scene_table_intersect_any(Ray ray, float maxDist) {
 // ids packed 4/texel in the records channel at the ledger-baked base.
 int material_of(int region) {
     if (region < 0) return -1;
-    vec4 ids = texelFetch(u_data_records, data_texel1d(uint(190 + (region >> 2))), 0);
+    vec4 ids = texelFetch(u_data_records, data_texel1d(uint(186 + (region >> 2))), 0);
     int c = region & 3;
     float id = c == 0 ? ids.x : c == 1 ? ids.y : c == 2 ? ids.z : ids.w;
     return int(id + 0.5);
@@ -72468,7 +72468,7 @@ float light_tree_importance(vec3 bmin, vec3 bmax, float phi, LightQuery q) {
 
 // Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable
 PointLight point_light_row(int li) {
-    int rb = 12 + li * 3 + 1;
+    int rb = 0 + li * 3 + 1;
     vec4 t0 = texelFetch(u_data_records, data_texel1d(uint(rb + 0)), 0);
     vec4 t1 = texelFetch(u_data_records, data_texel1d(uint(rb + 1)), 0);
     return PointLight(t0.xyz, vec3(t0.w, t1.x, t1.y));
@@ -72480,15 +72480,15 @@ float random();   // ambient RNG (sampler family) — forward-declared, order-in
 int light_tree_pick(LightQuery q, float xi, out float pmf) {
     pmf = 1.0;
     int ni = 0;
-    vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 1)), 0);
+    vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 1)), 0);
     for (int lvl = 0; lvl < 48; lvl++) {
         if (n1.w < 0.0) break;
         int L = ni + 1;
         int R = int(n1.w);
-        vec4 l0 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 2 * L)), 0);
-        vec4 l1 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 2 * L + 1)), 0);
-        vec4 r0 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 2 * R)), 0);
-        vec4 r1 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 2 * R + 1)), 0);
+        vec4 l0 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 2 * L)), 0);
+        vec4 l1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 2 * L + 1)), 0);
+        vec4 r0 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 2 * R)), 0);
+        vec4 r1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 2 * R + 1)), 0);
         float iw_l = light_tree_importance(l0.xyz, l1.xyz, l0.w, q);
         float iw_r = light_tree_importance(r0.xyz, r1.xyz, r0.w, q);
         float isum = iw_l + iw_r;
@@ -72504,20 +72504,20 @@ int light_tree_pick(LightQuery q, float xi, out float pmf) {
 // MIS pmf: replay the light's stored bit trail (two u24 halves, LSB-first),
 // with the STORED query — the exact context the sampler drew from.
 float light_tree_pmf(LightQuery q, int light_index) {
-    vec4 trail = texelFetch(u_data_records, data_texel1d(uint(18 + light_index)), 0);
+    vec4 trail = texelFetch(u_data_records, data_texel1d(uint(6 + light_index)), 0);
     uint tw = uint(trail.x);
     float pmf = 1.0;
     int ni = 0;
-    vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 1)), 0);
+    vec4 n1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 1)), 0);
     for (int lvl = 0; lvl < 48; lvl++) {
         if (n1.w < 0.0) break;
         if (lvl == 24) tw = uint(trail.y);
         int L = ni + 1;
         int R = int(n1.w);
-        vec4 l0 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 2 * L)), 0);
-        vec4 l1 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 2 * L + 1)), 0);
-        vec4 r0 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 2 * R)), 0);
-        vec4 r1 = texelFetch(u_data_nodes, data_texel1d(uint(6 + 2 * R + 1)), 0);
+        vec4 l0 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 2 * L)), 0);
+        vec4 l1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 2 * L + 1)), 0);
+        vec4 r0 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 2 * R)), 0);
+        vec4 r1 = texelFetch(u_data_nodes, data_texel1d(uint(0 + 2 * R + 1)), 0);
         float iw_l = light_tree_importance(l0.xyz, l1.xyz, l0.w, q);
         float iw_r = light_tree_importance(r0.xyz, r1.xyz, r0.w, q);
         float isum = iw_l + iw_r;
@@ -72539,7 +72539,7 @@ LightSample lighting_sample(LightQuery q, vec2 xi) {
     if (light_id < 0) { ls.pdf = 0.0; return ls; }   // dead descent: unbiased zero-contribution event
     vec2 light_xi = vec2(random(), xi.y);
     if (light_id < 2) {
-        int kind = int(texelFetch(u_data_records, data_texel1d(uint(12 + light_id * 3)), 0).x);
+        int kind = int(texelFetch(u_data_records, data_texel1d(uint(0 + light_id * 3)), 0).x);
         if (kind == 0) ls = point_light_sample(point_light_row(light_id), q.p, light_xi);
         else { ls.pdf = 0.0; return ls; }   // unknown header — defensive, never packed
     }

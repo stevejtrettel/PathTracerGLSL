@@ -32,9 +32,14 @@ export function fakeEngine(sampleCount = 1) {
 
 /** A fake compiler that mints a renderer per (scene, strategy) with the pinned id. */
 export function fakeCompiler() {
+    const compile = vi.fn((scene: SceneDescription, strategy: RenderStrategy) =>
+        makeRenderer(`${strategy.id}-${scene.id}`));
     return {
-        compile: vi.fn((scene: SceneDescription, strategy: RenderStrategy) =>
-            makeRenderer(`${strategy.id}-${scene.id}`)),
+        compile,
+        compileScene: vi.fn((scene: SceneDescription, strategies: RenderStrategy[]) => ({
+            renderers: strategies.map((s) => compile(scene, s)),
+            dataReads: { cwbvh: false, lightTree: false, sceneTable: false },
+        })),
     };
 }
 

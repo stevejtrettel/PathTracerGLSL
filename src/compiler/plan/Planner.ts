@@ -1,6 +1,6 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue } from '../types.js';
+import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
 import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { MATERIAL_MODELS, EMISSION_KEY, modelTwoSidedShading } from '../../components/materials/index.js';
@@ -22,14 +22,14 @@ import {
     type Similarity,
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
-import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
+import { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, regionMaterialsOf, batchNeedsInterior, regionLightKind } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, regionMaterialsOf, batchNeedsInterior, regionLightKind, dataReadsOf, READS_EVERYTHING } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
@@ -55,7 +55,26 @@ function resolveEnvironment(env: SceneDescription['environment']): ResolvedEnvir
     return { type: 'procedural', glsl: env.glsl, intensity: env.intensity ?? 1.0, rotation: env.rotation ?? 0.0 };
 }
 
-export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag): RenderPlan {
+/**
+ * Plan one strategy. `reads` is the set of optional data structures the scene's data layout
+ * provides — the union over ALL of the scene's renderers (Compiler.compileScene). Omitted, the
+ * layout holds exactly what this strategy itself reads.
+ */
+export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag, reads?: DataReads): RenderPlan {
+    return planWithLayout(features, scene, strategy, bag, reads ?? dataReadsOf(programDecisions(features, scene, strategy)));
+}
+
+/**
+ * A strategy's decisions — its ProgramDescription, from which dataReadsOf reads the data it
+ * needs. Decisions never depend on the data layout (they read counts and kinds, not offsets),
+ * so planning against a layout with every optional structure present decides exactly what the
+ * final plan will; tests/compiler/dataReads.test.ts checks this for every suite scene.
+ */
+export function programDecisions(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): ProgramDescription {
+    return planWithLayout(features, scene, strategy, new DiagnosticBag('decisions'), READS_EVERYTHING).program;
+}
+
+function planWithLayout(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag, reads: DataReads): RenderPlan {
     // --- Assign material IDs in AUTHORED (insertion) order — naming batch N1 (audit P1).
     // Identity is STRUCTURAL, symmetric with objects/regions: renaming a material no
     // longer renumbers ids or churns artifacts; names are provenance. JS insertion order
@@ -99,9 +118,9 @@ export function plan(features: SceneFeatures, scene: SceneDescription, strategy:
     // ordinal on both sides; they just never plan).
     const meshOrdinals = new Map(sceneMeshes(scene.objects).map((m, i) => [m, i] as const));
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
-    // Rail v2 (fable-data-rail): THE layout truth — the same adapter+ledger call the App
-    // makes, so baked bases and packed bytes can never disagree.
-    const { tenants: dataTenants, batchGeometrySlot, batchPlacementRecord, table: sceneTableTruth, lightBatches: sceneLightBatches } = dataTenantsOf(scene);
+    // The data layout: the same adapter + ledger call, with the same `reads`, that the App
+    // makes to pack the bytes — so the offsets baked here are where the bytes land.
+    const { tenants: dataTenants, batchGeometrySlot, batchPlacementRecord, table: sceneTableTruth, lightBatches: sceneLightBatches } = dataTenantsOf(scene, reads);
     const dataLayout = planDataLayout(dataTenants);
     let objectIndex = 0;
     for (const obj of scene.objects) {

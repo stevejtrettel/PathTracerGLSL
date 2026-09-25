@@ -335,7 +335,7 @@ async function renderVarianceFrame(browser, registry, sceneId, strategyIdx, size
 async function renderVarianceOnce(browser, sceneId, strategyIdx, [W, H], spp) {
     const page = await browser.newPage();
     try {
-        await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}&witness`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
 
         const t0 = Date.now();
@@ -411,7 +411,7 @@ async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp)
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(String(e)));
     try {
-        await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}&witness`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
 
         // scene-lab silently falls back to DEFAULT_SCENE for unknown ids — under a
@@ -574,7 +574,7 @@ async function runCheck(browser, registry, sceneId, spec, check) {
         const warmup = check.warmup ?? 8;
         const page = await browser.newPage();
         try {
-            await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}`, { waitUntil: 'domcontentloaded' });
+            await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}&witness`, { waitUntil: 'domcontentloaded' });
             await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
             const known = await page.evaluate(sid => sid in (window.sceneSuite ?? {}), sceneId);
             if (!known) throw new Error(`scene '${sceneId}' not in the page's registry (stale dev server? restart it)`);
@@ -639,7 +639,7 @@ async function main() {
         // no TS loading in node. Fixture-partner entries (no checks) ride along so
         // twin references resolve.
         const bootstrap = await browser.newPage();
-        await bootstrap.goto(`${BASE_URL}/lab.html`, { waitUntil: 'domcontentloaded' });
+        await bootstrap.goto(`${BASE_URL}/lab.html?witness`, { waitUntil: 'domcontentloaded' });
         await bootstrap.waitForFunction(() => window.witnessSuite !== undefined, null, { timeout: 120_000 });
         const registry = await bootstrap.evaluate(() => {
             const out = {};

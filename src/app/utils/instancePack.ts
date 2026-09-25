@@ -15,11 +15,12 @@ import { runInWorker, WORKER_MIN_ITEMS } from './worker.js';
 export async function packInstanceBatchOffThread(
     localBox: AABB,
     placements: Similarity[] | PackedPlacements,
-    attrs?: AttributeRowSpec[],
-    paramsRecord?: ParamsRecordSpec,
+    attrs: AttributeRowSpec[] | undefined,
+    paramsRecord: ParamsRecordSpec | undefined,
+    buildCwbvh: boolean,
 ): Promise<PackedInstanceBatch> {
-    if (placementCount(placements) < WORKER_MIN_ITEMS) return packInstanceBatch(localBox, placements, attrs, paramsRecord);
-    const req: PackRequest = { localBox, placements, ...(attrs !== undefined ? { attrs } : {}), ...(paramsRecord !== undefined ? { paramsRecord } : {}) };
+    if (placementCount(placements) < WORKER_MIN_ITEMS) return packInstanceBatch(localBox, placements, attrs, paramsRecord, buildCwbvh);
+    const req: PackRequest = { localBox, placements, ...(attrs !== undefined ? { attrs } : {}), ...(paramsRecord !== undefined ? { paramsRecord } : {}), buildCwbvh };
     return runInWorker(
         'instance pack',
         // The literal '.ts' path is what exists on disk — Vite's worker pipeline resolves
@@ -28,6 +29,6 @@ export async function packInstanceBatchOffThread(
         () => new Worker(new URL('./packWorker.ts', import.meta.url), { type: 'module' }),
         req,
         [],   // clone-in: see header
-        () => packInstanceBatch(localBox, placements, attrs, paramsRecord),
+        () => packInstanceBatch(localBox, placements, attrs, paramsRecord, buildCwbvh),
     );
 }

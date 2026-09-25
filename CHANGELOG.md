@@ -4,6 +4,38 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — build only the scene data the renderers read (stage 1)
+
+Design: docs/claude-data-exact-linkage.md. The optional data structures — the CWBVH, the
+light tree, the object table (with its region→material ids) — were built for every scene
+whether or not any renderer read them; for large instance clouds the unused CWBVH took more
+time at load than the TLAS actually used (+2.6 s at 724k instances, +5.3 s at 1.4M).
+
+- `Compiler.compileScene(scene, strategies)` compiles a scene's renderers together: validate
+  all, take each strategy's decisions (`programDecisions`), lay out the union of what they
+  read (`dataReadsOf`, `unionDataReads` → `DataReads`), then plan and generate every program
+  against that one layout. `compile(scene, strategy)` is the one-strategy case.
+- `dataTenantsOf(scene, reads)` allocates optional structures only when read; the App packs
+  with the same reads and builds the CWBVH only where the layout gave it a region.
+- The ledger puts every always-built region before every optional one, so a renderer that
+  reads no optional structure compiles to the same text whatever its siblings read (tested).
+- The App now compiles (and validates) BEFORE packing: a bad scene fails in milliseconds
+  with its diagnostics. `App.recompile` rebuilds the scene data for the new layout, with
+  rendering paused across the swap (it previously kept the old scene's data).
+- Tests: tests/compiler/dataReads.test.ts — decisions are identical whichever layout they
+  are planned against (every suite pair), and each optional structure appears only when a
+  renderer reads it. Snapshot change: two single-strategy programs' light-tree /
+  region-material offsets moved down (the other optional structure is no longer allocated).
+- GPU check (witness runner): every scene covering an optional structure or the new
+  start-up order passes — instance-params-twin (cwbvh ≡ tlas), hundred-spheres,
+  instance-lights, accel-triple, bazaar, sdf-table-twin, mesh-light-twin, instance-twin,
+  cornell-area.
+- Witness harness: the lab page no longer starts its own render loop when opened by the
+  runner (`?witness`). At full window size, sdf-table-twin's first frames (a ~110 s shader
+  compile under SwiftShader) kept the page busy for ~111 s against the runner's 120 s wait,
+  so it passed or failed by a few seconds. cube-cloud now fails later and more precisely:
+  the runner takes control at once, but the render itself does not finish within 8 minutes.
+
 ## 2026-09-24 — architecture review; estimator and crash fixes; CI
 
 A full review (compiler, component library, emitted GLSL, engine/app, tests, docs) found the

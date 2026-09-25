@@ -33,6 +33,11 @@ markers for open work:
 
 (`slab-albedo`, section C, is resolved.)
 
+**`cube-cloud` (updated Sep 25).** Since the lab page stopped starting its own render loop
+under the runner, the runner takes control immediately; the failure is now the RENDER not
+finishing within 8 minutes — consistent with a very long SwiftShader shader compile of
+cube-cloud-ref's 25-object program (sdf-table-twin's unrolled arm compiles in ~110 s).
+
 **Runner flake.** A check can report `ERROR: page.evaluate: TypeError: Cannot read properties
 of undefined (reading 'readExport')` — the page's `app` was not ready when the runner read
 back. It hit a different check on each of the two Sep 24 sweeps and never on a re-run of the

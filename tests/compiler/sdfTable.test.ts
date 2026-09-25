@@ -3,7 +3,7 @@
 // and the rigid-tail record layout — gated BEFORE any GLSL exists.
 
 import { describe, it, expect } from 'vitest';
-import { dataTenantsOf } from '../../src/compiler/plan/dataTenants.js';
+import { dataTenantsOf, READS_EVERYTHING } from '../../src/compiler/plan/dataTenants.js';
 import { LEAF_SDF, ANALYTIC_RECORD_TEXELS } from '../../src/components/intersection/index.js';
 import { sdfRecordPack, sdfTailTexel } from '../../src/compiler/generate/records.js';
 import { primitive } from '../../src/components/geometry/index.js';
@@ -30,7 +30,7 @@ describe('boxed-SDF table plan (fable-sdf-accel T2)', () => {
             type: 'box', parameters: { halfSize: [1, 1, 1] }, material: 'm', backend: 'sdf',
             transform: { position: [2, 1, 0], rotation: { axis: [0, 1, 0], angle: 0.7 } },
         });
-        const { tenants, table } = dataTenantsOf(s);
+        const { tenants, table } = dataTenantsOf(s, READS_EVERYTHING);
         expect(table).not.toBeNull();
         expect(table!.sdf).toEqual([{ sceneIndex: 1, type: 'box', solid: true }]);
         expect(table!.leaves.filter((l) => l.kind === LEAF_SDF)).toEqual([{ kind: LEAF_SDF, ref: 0 }]);
@@ -47,7 +47,7 @@ describe('boxed-SDF table plan (fable-sdf-accel T2)', () => {
             type: 'box', parameters: { halfSize: [1, 1, 1] }, material: 'm', backend: 'sdf',
             transform: { rotation: { axis: [0, 0, 1], angle: 0.3 } },
         });
-        const { table } = dataTenantsOf(s);
+        const { table } = dataTenantsOf(s, READS_EVERYTHING);
         expect(table!.analytic.some((a) => a.type === 'box')).toBe(true);
         expect(table!.sdf.some((x) => x.type === 'box')).toBe(true);
         expect(table!.kindCodes.get('box')).not.toBe(table!.sdfKindCodes.get('box'));
@@ -60,7 +60,7 @@ describe('boxed-SDF table plan (fable-sdf-accel T2)', () => {
             transform: { position: { param: 'slide', default: [0, 0, 0] } },
         });
         s.objects.push({ type: 'plane', parameters: { normal: [0, 1, 0], offset: 0 }, material: 'm', backend: 'sdf' });
-        const { table } = dataTenantsOf(s);
+        const { table } = dataTenantsOf(s, READS_EVERYTHING);
         expect(table!.sdf.length).toBe(0);
     });
 

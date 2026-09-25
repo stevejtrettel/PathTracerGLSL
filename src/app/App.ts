@@ -34,7 +34,7 @@ import { ParameterStore } from './ParameterStore.js';
 import { EventBus } from './EventBus.js';
 import { RendererManager } from './RendererManager.js';
 import { AppLayout, type LayoutMode, type RegionName } from './layout/index.js';
-import type { ICompiler, CompiledRenderer, SceneDescription } from '../compiler/types.js';
+import type { ICompiler, CompiledRenderer, SceneDescription, DataReads } from '../compiler/types.js';
 import type { AppConfig, StrategyPreset, CreateAppOptions, SessionData } from './types.js';
 import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
@@ -173,24 +173,25 @@ export class App {
             }
         }
 
-        // Mesh geometry (impl-plan-meshes): pack each mesh's vertex/triangle data into extern
-        // data textures and register them BEFORE the renderers exist — like the env map, the
-        // executor hard-errors on a missing extern, so the textures must be in the registry
-        // before any pass could bind them. Scene-static data → uploaded once, then only bound.
-        if (config.scene !== undefined) {
-            try {
-                await this._uploadSceneGeometry(config.scene);
-            } catch (error: any) {
-                this._showErrorOverlay(error);
-                throw error;
-            }
-        }
-
+        // Compile (and validate) first: it is fast, and it decides which scene-data structures
+        // the renderers read. Only then build and upload that data — the expensive step — so
+        // a bad scene fails in milliseconds with its diagnostics, before any packing. The data
+        // textures must be registered before the first FRAME (the executor binds externs per
+        // pass and hard-errors on a missing one); loading renderers does not bind them.
         try {
             await this.rendererManager.initialize(config);
         } catch (error: any) {
             this._showErrorOverlay(error);
             throw error;
+        }
+
+        if (config.scene !== undefined) {
+            try {
+                await this._uploadSceneGeometry(config.scene, this.rendererManager.getDataReads()!);
+            } catch (error: any) {
+                this._showErrorOverlay(error);
+                throw error;
+            }
         }
 
         // Scene-driven environment load (env-as-light T2): an `image` environment's textures
@@ -229,16 +230,16 @@ export class App {
     }
 
     /**
-     * Rail v2 (fable-data-rail): assemble + register the SIX shared data channels for the
-     * whole scene — meshes, instance batches, mesh-light tables — at the LEDGER's region
-     * bases (the SAME dataTenantsOf + planDataLayout call the Planner bakes literals from,
-     * so bytes and baked bases can never disagree). Texture count is role-shaped (≤6),
-     * never tenant-shaped. Runs BEFORE the renderers exist (the executor hard-errors on a
-     * missing extern). A pack CACHE (by object reference) means a prototype shared by
+     * Build and register the shared scene-data textures — meshes, instance batches, mesh-light
+     * tables, and the optional structures in `reads` (the union of what the loaded renderers
+     * read) — at the ledger's region bases. It makes the SAME dataTenantsOf + planDataLayout
+     * call, with the same `reads`, that the Planner baked its offsets from, so bytes and
+     * offsets agree. Texture count is role-shaped (≤ 6 + the CWBVH integer channel). Must run
+     * before the first frame. A pack CACHE (by object reference) means a prototype shared by
      * batches — or used standalone too — builds its BVH once.
      */
-    private async _uploadSceneGeometry(scene: SceneDescription): Promise<void> {
-        const { tenants, batchGeometrySlot, batchPlacementRecord, table, lightBatches } = dataTenantsOf(scene);
+    private async _uploadSceneGeometry(scene: SceneDescription, reads: DataReads): Promise<void> {
+        const { tenants, batchGeometrySlot, batchPlacementRecord, table, lightBatches } = dataTenantsOf(scene, reads);
         // sceneTable joined the condition with the regionMaterials tenant (impl-plan-
         // region-materials): a tabled scene with no meshes/batches and a tree-ineligible
         // light roster still MUST upload its records — the previous condition silently
@@ -330,7 +331,9 @@ export class App {
                 : undefined;
             // Off the main thread (fable-instance-clouds §8 stage 2) — a 1M-instance SAH
             // build must not freeze the page; byte-identical output, sync fallback inside.
-            packs.push(packInstanceBatchOffThread(localBox, placements, attrs, paramsRecord));
+            // The CWBVH is built only when the ledger gave it a region, i.e. some renderer reads it.
+            const buildCwbvh = layout.batches[ordinal].cwbvhNodesBase >= 0;
+            packs.push(packInstanceBatchOffThread(localBox, placements, attrs, paramsRecord, buildCwbvh));
         }
         const packedBatches = await Promise.all(packs);
         packedBatches.forEach((packed, ordinal) => {
@@ -339,8 +342,8 @@ export class App {
             assertFits('instance TLAS nodes', packed.nodeCount * 2, nodeTexelBound(placementCount(batches[ordinal].placements)));
             writeTexels(ch.nodes, slot.tlasBase, packed.nodes.subarray(0, packed.nodeCount * 8));
             if (packed.attributes !== undefined) writeTexels(ch.records, slot.attrsBase, packed.attributes);
-            // CWBVH twin payloads (fable-accel-cwbvh §6): pack eligibility mirrors the
-            // adapter's, so presence here ⇔ the ledger allocated the regions.
+            // CWBVH payloads (fable-accel-cwbvh §6): built exactly when the ledger allocated
+            // their regions (buildCwbvh above), so presence here ⇔ allocation.
             if (packed.cwbvh !== undefined && chq !== null && slot.cwbvhNodesBase >= 0) {
                 assertFits('cwbvh nodes', packed.cwbvh.nodeCount * CWBVH_NODE_TEXELS, cwbvhNodeTexelBound(placementCount(batches[ordinal].placements)));
                 writeTexelsU32(chq, slot.cwbvhNodesBase, packed.cwbvh.nodes.subarray(0, packed.cwbvh.nodeCount * CWBVH_NODE_WORDS));
@@ -566,20 +569,35 @@ export class App {
     }
 
     /**
-     * Recompile the scene and hot-swap the renderers (compiler dev loop).
+     * Recompile the scene, hot-swap the renderers (compiler dev loop), and rebuild the scene
+     * data for the new layout — a new scene, or a new data layout, means new bytes at new
+     * offsets. Rendering is paused across the swap so no frame runs the new programs against
+     * the old data.
      *
-     * On compile/shader failure, the ErrorOverlay is shown and the error is
-     * rethrown. See {@link RendererManager.recompile} for the recovery semantics.
+     * On compile/shader failure the ErrorOverlay is shown and the error is rethrown; the old
+     * renderers and data are untouched, so rendering resumes. If rebuilding the data fails,
+     * rendering stays paused (programs and data would disagree). See
+     * {@link RendererManager.recompile} for the swap's atomicity.
      *
      * @param scene - Optional replacement scene; defaults to the current scene.
      */
-    recompile(scene?: SceneDescription): void {
+    async recompile(scene?: SceneDescription): Promise<void> {
+        const wasRendering = this.coordinator.isRunning();
+        if (wasRendering) this.coordinator.pause();
         try {
             this.rendererManager.recompile(scene);
         } catch (error: any) {
             this._showErrorOverlay(error);
+            if (wasRendering) this.coordinator.resume();
             throw error;
         }
+        try {
+            await this._uploadSceneGeometry(this.rendererManager.getScene()!, this.rendererManager.getDataReads()!);
+        } catch (error: any) {
+            this._showErrorOverlay(error);
+            throw error;
+        }
+        if (wasRendering) this.coordinator.resume();
     }
 
     /**

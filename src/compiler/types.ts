@@ -1066,6 +1066,33 @@ export interface CompiledRenderer {
 }
 
 /**
+ * The OPTIONAL scene-data structures a set of programs reads. Each is built (and given
+ * space in the shared data textures) only when some program on the scene reads it; the
+ * geometry every program needs — meshes, instance placements and their TLAS, mesh-light
+ * tables — is always built. See docs/claude-data-exact-linkage.md.
+ */
+export interface DataReads {
+    /** The compressed wide BVH over instance batches (instanceAccel 'cwbvh'). */
+    cwbvh: boolean;
+    /** The light tree (lightSelection 'bvh'). */
+    lightTree: boolean;
+    /** The object table: its TLAS, records and region→material ids (objectDispatch 'table'). */
+    sceneTable: boolean;
+}
+
+/**
+ * The renderers of one scene, compiled together. All of them share one set of scene-data
+ * textures, laid out for `dataReads` — the union of what the renderers read — so the App
+ * builds exactly the data these renderers use, and every program's baked texture offsets
+ * match the bytes it uploads.
+ */
+export interface CompiledScene {
+    /** One renderer per strategy, in the order given. */
+    renderers: CompiledRenderer[];
+    dataReads: DataReads;
+}
+
+/**
  * Compiler interface
  *
  * Compiles scene description + render strategy into executable renderer
@@ -1079,4 +1106,7 @@ export interface ICompiler {
      * @returns Compiled renderer ready for Engine execution
      */
     compile(scene: SceneDescription, strategy: RenderStrategy): CompiledRenderer;
+
+    /** Compile all of a scene's renderers against one shared data layout (see CompiledScene). */
+    compileScene(scene: SceneDescription, strategies: RenderStrategy[]): CompiledScene;
 }

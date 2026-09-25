@@ -100,9 +100,9 @@ export interface PackedInstanceBatch {
     nodeCount: number;
     /** Attr records in the SAME leaf order (A texels per instance, slot order), if any. */
     attributes?: Float32Array;
-    /** The CWBVH experiment's payloads (fable-accel-cwbvh §6) — present iff the batch
-     *  is eligible (params tier, no attrs): packed wide nodes (CWBVH_NODE_WORDS u32
-     *  per node) + the placement records TWIN in cwbvh leaf order. */
+    /** The CWBVH experiment's payloads (fable-accel-cwbvh §6) — present iff requested
+     *  (`buildCwbvh`): packed wide nodes (CWBVH_NODE_WORDS u32 per node) + the placement
+     *  records TWIN in cwbvh leaf order. */
     cwbvh?: { nodes: Uint32Array; nodeCount: number; records: Float32Array };
 }
 
@@ -112,7 +112,7 @@ export interface PackedInstanceBatch {
  *  Accepts either placement form (fable-instance-clouds §5): Similarity[] (from authored
  *  Transform[]) or the packed struct-of-arrays; both feed the SAME box/record loop via a
  *  per-instance accessor, so the two arms cannot diverge. */
-export function packInstanceBatch(localBox: AABB, placements: Similarity[] | PackedPlacements, attributeRows?: AttributeRowSpec[], paramsRecord?: ParamsRecordSpec): PackedInstanceBatch {
+export function packInstanceBatch(localBox: AABB, placements: Similarity[] | PackedPlacements, attributeRows?: AttributeRowSpec[], paramsRecord?: ParamsRecordSpec, buildCwbvh = false): PackedInstanceBatch {
     const n = Array.isArray(placements) ? placements.length : placements.count;
     const d: DecodedPlacement = { qx: 0, qy: 0, qz: 0, qw: 1, s: 1, tx: 0, ty: 0, tz: 0 };
     // World boxes, FLAT (Aug 8 allocation-discipline rewrite — no per-instance AABB
@@ -175,11 +175,13 @@ export function packInstanceBatch(localBox: AABB, placements: Similarity[] | Pac
             }
         }
     }
-    // CWBVH twin (fable-accel-cwbvh §6): same world boxes, its own leaf order, its
-    // own records region. Eligibility mirrors the dataTenants adapter's (params tier,
-    // no attrs) — the ledger allocated iff this emits (assertFits at the write).
+    // CWBVH twin (fable-accel-cwbvh §6): same world boxes, its own leaf order, its own
+    // records region. Built only on request — the caller asks exactly when the data layout
+    // gave it a region, i.e. when some renderer on the scene reads it (it is expensive:
+    // seconds at 10⁶ instances). The layout only allocates it for params-tier batches.
     let cwbvh: PackedInstanceBatch['cwbvh'];
-    if (paramsRecord !== undefined && (attributeRows === undefined || attributeRows.length === 0)) {
+    if (buildCwbvh) {
+        if (paramsRecord === undefined) throw new Error('packInstanceBatch: a CWBVH needs the params-tier record spec');
         const w = buildCWBVH(boxes, n);
         cwbvh = {
             nodes: w.nodes,
