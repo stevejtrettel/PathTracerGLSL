@@ -199,3 +199,23 @@ describe('measurement.maxBounces', () => {
         expect(nee).toBeGreaterThan(stop);
     });
 });
+
+// Batch instance lights are finite lights under 'bvh': with a samplable environment the
+// env-vs-finite selection draw is live, so its uniform must be declared. The decision used
+// to count only registry lights, so a scene whose only finite lights were a batch linked
+// against an undeclared u_envSelectProb (Sep 25 audit, C2).
+describe('env selection with batch lights only (bvh)', () => {
+    it('declares u_envSelectProb whenever the program reads it', async () => {
+        const { instanceLightsTwin, instanceLightsNeeStrategy, instanceLightsMisStrategy } = await import('../witnesses/scenes/instanceLightsWitness.js');
+        const withSky: SceneDescription = {
+            ...instanceLightsTwin,
+            environment: { type: 'constant', color: [0.2, 0.3, 0.5], intensity: 1, sampleAsLight: true },
+        };
+        for (const strategy of [instanceLightsNeeStrategy, instanceLightsMisStrategy]) {
+            const renderer = new Compiler().compile(withSky, strategy);
+            const fragment = renderer.shaders.get(`${renderer.id}-main`)!.fragment;
+            expect(fragment).toContain('u_envSelectProb');
+            expect(fragment).toMatch(/uniform float u_envSelectProb;/);
+        }
+    });
+});

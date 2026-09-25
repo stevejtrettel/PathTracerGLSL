@@ -103,7 +103,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Area lights & MIS',
         blurb: 'samplable emitters — quad, disk, sphere, spot, and the delta-direction pair (sun, beam) — the power CDF, the light tree (many lights), and the pt/pt-nee/pt-mis convergence gates',
         entries: [
-            e('two-light'), e('hundred-spheres'), e('instance-lights', 'instance-lights-ref'), e('glow-shell'), e('accel-triple'), e('embers'), e('cornell-area'), e('cornell-area-glass'), e('fog-area'), e('fog-area-ignored'),
+            e('two-light'), e('hundred-spheres'), e('instance-lights', 'instance-lights-ref'), e('instance-lights-sky'), e('glow-shell'), e('accel-triple'), e('embers'), e('cornell-area'), e('cornell-area-glass'), e('fog-area'), e('fog-area-ignored'),
             e('orb'), e('cornell-disk'),
             e('disk-bake', 'disk-bake-ref'),
             e('spot'), e('veach-mis'),

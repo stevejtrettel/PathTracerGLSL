@@ -636,7 +636,9 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         environmentPdf: envSamplable && mis,
         // Selection is live only when finite lights split mass with the env; env-only
         // programs fold the draw to certainty (changing it would be bias — plan O1).
-        environmentSelectionLive: envSamplable && lights.length > 0,
+        // Batch instance lights are finite lights under 'bvh' (the samplers' two-stage
+        // draw reads the uniform whenever the env is samplable).
+        environmentSelectionLive: envSamplable && (lights.length > 0 || batchLights),
     };
 }
 

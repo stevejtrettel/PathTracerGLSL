@@ -311,6 +311,13 @@ exports[`scene-data textures (byte fingerprints) > instance-lights-ref 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > instance-lights-sky 1`] = `
+{
+  "nodes": "4096x1 1d2189f755339fb9",
+  "records": "4096x1 1a5befc57432ac6f",
+}
+`;
+
 exports[`scene-data textures (byte fingerprints) > instance-params-frame 1`] = `
 {
   "nodes": "4096x1 c0ea3bc3ceeabb02",

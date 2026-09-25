@@ -63,6 +63,16 @@ export const instanceLightsTwin: SceneDescription = {
     environment: { type: 'none' },
 };
 
+// The twin under a samplable sky: batch lights are the ONLY finite lights, so the env-vs-finite
+// selection draw is live with no registry light in it (Sep 25 2026 — the program used to read an
+// undeclared u_envSelectProb and fail to link).
+export const instanceLightsSky: SceneDescription = {
+    ...instanceLightsTwin,
+    id: 'instance-lights-sky',
+    name: 'Instance Lights under a samplable sky',
+    environment: { type: 'constant', color: [0.05, 0.07, 0.12], intensity: 1, sampleAsLight: true },
+};
+
 export const instanceLightsRef: SceneDescription = {
     id: 'instance-lights-ref',
     name: 'Instance Lights (64 individual objects)',

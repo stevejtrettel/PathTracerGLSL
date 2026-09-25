@@ -4,6 +4,17 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — a sky plus batch lights only (under `'bvh'`) failed to link
+
+With a samplable environment the NEE samplers draw env-vs-finite with `u_envSelectProb`, but
+the Planner declared that uniform only when REGISTRY lights existed; batch instance lights
+(finite lights under `lightSelection: 'bvh'`) did not count, so such a program read an
+undeclared uniform. Now they count. Test in tests/compiler/lightCensus.test.ts (reproduced
+first); witness `instance-lights-sky` (the instance-lights twin under a samplable sky) passes
+nee ≡ mis. Still open (variance only): the derived selection probability ignores batch-light
+power, so with no registry lights it clamps to 0.99 and the batch gets 1% of NEE samples.
+Found by the Sep 25 audit's compile fuzzer.
+
 ## 2026-09-25 — table dispatch: a scaled scene-local SDF drew at the wrong size
 
 `classifyPlacement` keeps the whole similarity (scale included) as the residual for a

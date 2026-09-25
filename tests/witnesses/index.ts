@@ -20,7 +20,7 @@ import { withPose } from '../../src/authoring/strategy.js';
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy, twoLightBvhStrategy } from './scenes/twoLightScene.js';
 import { hundredSpheres, hundredNeePowerStrategy, hundredNeeBvhStrategy, hundredMisPowerStrategy, hundredMisBvhStrategy } from './scenes/hundredSpheres.js';
 import {
-    instanceLightsTwin, instanceLightsRef, instanceLightsNeeStrategy, instanceLightsMisStrategy, instanceLightsRefStrategy,
+    instanceLightsTwin, instanceLightsSky, instanceLightsRef, instanceLightsNeeStrategy, instanceLightsMisStrategy, instanceLightsRefStrategy,
     glowShell, glowShellNeeStrategy, glowShellMisStrategy, glowShellPtStrategy,
 } from './scenes/instanceLightsWitness.js';
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
@@ -186,6 +186,18 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             checks: [
                 { kind: 'twin', other: { scene: 'instance-lights-ref' }, meanTol: 0.02, label: 'batch instances ≡ individual objects (both bvh)' },
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'nee ≡ mis (the ELEMENT trail-pmf gate)' },
+            ],
+        },
+    },
+    'instance-lights-sky': {
+        scene: instanceLightsSky,
+        strategies: posed([-6.5, 1.6, -6.5], [-3, 0.5, -3], instanceLightsNeeStrategy, instanceLightsMisStrategy),
+        exercises: 'env-vs-finite selection when the only finite lights are a BATCH under the tree: the two-stage draw is live (u_envSelectProb declared) and the combiner reads the same probability',
+        expected: 'the instance-lights image under a dim blue sky; key 1 ≡ key 2',
+        witness: {
+            spp: 192,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'batch lights + sky: nee ≡ mis' },
             ],
         },
     },
