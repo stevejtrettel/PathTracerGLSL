@@ -77,6 +77,9 @@ export interface CameraModelDescriptor {
      *  required / shape / constraint via the Validator's generic loop, defaults
      *  framework-applied). 'enum' rows carry their legal `values`. */
     authoredParams?: AuthoredCameraParamSpec[];
+    /** Coupled rules the per-row schema cannot state (run only on well-shaped input);
+     *  returns messages, each a Validator error. */
+    validateAuthored?(cam: Record<string, unknown>): string[];
     /** Model-unique controls (sliders). Omit for parameterless cameras (pinhole/equirect);
      *  the shared perspective fov is minted by the feature, not declared here. */
     controls?(cam: CameraDesc): CameraControl[];

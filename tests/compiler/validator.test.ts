@@ -131,10 +131,9 @@ describe('Validator', () => {
         expect(bag.getWarnings().some(w => /ior/i.test(w.message))).toBe(true);
     });
 
-    it('warns (does not error) on an empty scene', () => {
+    it('rejects an empty scene up front (it cannot link: the intersection program is generated from the objects)', () => {
         const bag = run(s => { s.objects = []; });
-        expect(bag.hasErrors()).toBe(false);
-        expect(bag.getWarnings().some(w => w.code === 'empty-scene')).toBe(true);
+        expect(bag.getErrors().some(e => e.code === 'empty-scene')).toBe(true);
     });
 
     it('rejects unsupported accumulation (allows average/variance)', () => {
@@ -774,5 +773,86 @@ describe('Validator — lightSelection axis (fable-light-bvh §2/§6)', () => {
         });
         expect(bag.getErrors()).toEqual([]);
         expect(bag.getWarnings().some((w) => w.message.includes('bvh') && w.message.includes('inert'))).toBe(true);
+    });
+});
+
+// The Sep 25 2026 audit's validation gaps: each input below used to pass validation and then
+// crash the generator, emit unparseable GLSL, or silently render something else.
+describe('Validator — Sep 25 audit gaps', () => {
+    const errs = (bag: DiagnosticBag) => bag.getErrors().map((e) => e.message).join('\n');
+
+    it('measurement enums', () => {
+        expect(errs(run((_s, st) => { (st.measurement as any).scattering = 'none'; }))).toMatch(/measurement\.scattering must be one of/);
+        expect(errs(run((_s, st) => { (st.measurement as any).shadows = 'transparent'; }))).toMatch(/measurement\.shadows/);
+        expect(run((_s, st) => { st.measurement.scattering = 'ignored'; }).hasErrors()).toBe(false);
+    });
+
+    it('russianRoulette.startDepth is a non-negative integer', () => {
+        for (const bad of [2.5, -1, Number.NaN]) {
+            expect(errs(run((_s, st) => { st.estimator.russianRoulette = { startDepth: bad } as any; }))).toMatch(/startDepth/);
+        }
+        expect(run((_s, st) => { st.estimator.russianRoulette = { startDepth: 3 } as any; }).hasErrors()).toBe(false);
+    });
+
+    it('tonemap exposure is finite and positive', () => {
+        for (const bad of [Number.NaN, -1, 0, '2']) {
+            expect(errs(run((_s, st) => { (st.view.tonemap as any).exposure = bad; }))).toMatch(/exposure/);
+        }
+    });
+
+    it('pinhole fov is radians in (0, π)', () => {
+        expect(errs(run((_s, st) => { (st.measurement.camera as any).fov = 45; }))).toMatch(/fov/);
+        expect(run((_s, st) => { (st.measurement.camera as any).fov = 1.2; }).hasErrors()).toBe(false);
+    });
+
+    it('fisheye fov respects each projection', () => {
+        const fisheye = (projection: string, fov: number) => run((_s, st) => { st.measurement.camera = { type: 'fisheye', projection, fov } as any; });
+        expect(fisheye('orthographic', 4).hasErrors()).toBe(true);
+        expect(fisheye('orthographic', 3).hasErrors()).toBe(false);
+        expect(fisheye('stereographic', 2 * Math.PI).hasErrors()).toBe(true);
+        expect(fisheye('equidistant', 2 * Math.PI).hasErrors()).toBe(false);
+    });
+
+    it('procedural environment: no params, integer table size', () => {
+        const sky = (extra: object) => run((s) => { s.environment = { type: 'procedural', glsl: { kind: 'glsl', source: 'vec3(0.5)', ...extra } as any, ...extra } as any; });
+        expect(errs(run((s) => { s.environment = { type: 'procedural', glsl: { kind: 'glsl', source: 'vec3(u_gain)', params: { gain: { param: 'sky.gain', default: 1 } } } as any }; }))).toMatch(/cannot declare params/);
+        expect(errs(run((s) => { s.environment = { type: 'procedural', glsl: { kind: 'glsl', source: 'vec3(0.5)' }, tableSize: [512.5, 256] } as any; }))).toMatch(/tableSize/);
+        expect(sky({}).hasErrors()).toBe(false);
+    });
+
+    it('parameter paths must become valid GLSL identifiers', () => {
+        expect(errs(run((s) => { s.materials.m = { model: 'lambert', albedo: { param: 'key-light.tint', default: [1, 1, 1] } } as any; }))).toMatch(/not a valid name/);
+        expect(errs(run((s) => { s.materials.m = { model: 'lambert', albedo: { param: 'a._b', default: [1, 1, 1] } } as any; }))).toMatch(/not a valid name/);
+    });
+
+    it('a material {param} needs a default', () => {
+        expect(errs(run((s) => { s.materials.m = { model: 'lambert', albedo: { param: 'wall.albedo' } } as any; }))).toMatch(/needs a default/);
+    });
+
+    it('Transform[] instance placements are similarities', () => {
+        const batch = (placements: unknown[]) => run((s) => {
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.1 }, material: 'm' }, placements } as any);
+        });
+        expect(errs(batch([{ position: [0, 0, 0] }, { position: [1, 0, 0], scale: -1 }]))).toMatch(/placement 1: scale/);
+        expect(errs(batch([{ scale: [1, 2, 3] }]))).toMatch(/placement 0: scale must be one number/);
+        expect(errs(batch([{ rotation: { axis: [0, 0, 0], angle: 1 } }]))).toMatch(/rotation axis/);
+        expect(errs(batch([{ position: [Number.NaN, 0, 0] }]))).toMatch(/position/);
+        expect(batch([{ position: [0, 0, 0], scale: 2, rotation: { axis: [0, 1, 0], angle: 1 } }]).hasErrors()).toBe(false);
+    });
+
+    it('mesh vertices must be finite', () => {
+        const bag = run((s) => {
+            s.objects.push({ kind: 'mesh', positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, Number.NaN, 0]), indices: new Uint32Array([0, 1, 2]), material: 'm' } as any);
+        });
+        expect(errs(bag)).toMatch(/vertex 2 has a non-finite coordinate/);
+    });
+
+    it('sampleAsLight on a DRIVEN quad is an error, not a silently ignored flag', () => {
+        const bag = run((s) => {
+            s.materials.lamp = { model: 'lambert', emission: [5, 5, 5], sampleAsLight: true } as any;
+            s.objects.push({ type: 'quad', parameters: { corner: [0, 2, 0], edge1: [1, 0, 0], edge2: [0, 0, 1] }, material: 'lamp',
+                transform: { position: { param: 'lamp.pos', default: [0, 0, 0] } } } as any);
+        });
+        expect(errs(bag)).toMatch(/sampleAsLight requires a samplable object/);
     });
 });

@@ -7,7 +7,7 @@ import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { samplableEmitterObjects, batchLightEligible, batchNeedsInterior } from '../plan/dataTenants.js';
+import { samplableEmitterObjects, batchLightEligible, batchNeedsInterior, keepsLocalFrame } from '../plan/dataTenants.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
@@ -216,6 +216,14 @@ export function validate(
                     `Parameter '${path}' uses the reserved prefix '${prefix}' (engine/app-minted namespace); choose another name`)
                     .add();
             }
+            // The path becomes a GLSL identifier (u_<path with dots → underscores>): anything but
+            // dot-separated identifiers emits unparseable GLSL, and a double underscore is
+            // reserved in GLSL ES (ANGLE rejects it — the Jul 17 reserved-`__` bug).
+            if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(path) || paramToUniform(path).includes('__')) {
+                bag.error('invalid-setting',
+                    `Parameter '${path}' is not a valid name: use dot-separated identifiers (letters, digits, single underscores), e.g. 'key.tint'`)
+                    .add();
+            }
             const uniform = paramToUniform(path);
             const prior = byUniform.get(uniform);
             if (prior !== undefined && prior !== path) {
@@ -248,7 +256,7 @@ export function validate(
         if (mat.sampleAsLight !== true) continue;
         if (!samplableObjectUses(scene, name)) {
             bag.error('invalid-setting',
-                `Material '${name}': sampleAsLight requires a samplable object using it — an analytic ${Object.entries(PRIMITIVES).filter(([, d]) => d.samplableAsLight === true).map(([t]) => t).join('/')} or a constant-placement MESH (fable-mesh-lights) — V1-C2: emissive SDF/custom shapes are path-only and still glow`)
+                `Material '${name}': sampleAsLight requires a samplable object using it — an analytic ${Object.entries(PRIMITIVES).filter(([, d]) => d.samplableAsLight === true).map(([t]) => t).join('/')} with constant placement (and, if rotated, a material that does not read uv), or a constant-placement MESH (fable-mesh-lights) — V1-C2: emissive SDF/custom shapes are path-only and still glow`)
                 .add();
         }
         if (!hasConstantNonzeroEmission(mat.emission)) {   // C3: the ONE predicate
@@ -786,6 +794,18 @@ export function validate(
                 if (violation !== null) bag.error('invalid-setting', `measurement.camera (${cameraType}): '${p.name}' ${violation}`).add();
             }
         }
+        const wellShaped = rows.every((p) => {
+            const v = authored[p.name];
+            return v === undefined ? !p.required
+                : p.shape === 'enum' ? typeof v === 'string' && (p.values ?? []).includes(v)
+                : p.shape === 'vec3' ? isVec3(v)
+                : typeof (p.shape === 'value-number' && isValueParam(v) ? (v as { default?: unknown }).default : v) === 'number';
+        });
+        if (wellShaped && cameraModelDesc.validateAuthored !== undefined) {
+            for (const message of cameraModelDesc.validateAuthored(authored)) {
+                bag.error('invalid-setting', `measurement.camera (${cameraType}): ${message}`).add();
+            }
+        }
     }
     // Camera pose (CameraPose): authored defaults of the always-live
     // camera.position/camera.target parameters. The strategy is outside the scene
@@ -810,6 +830,52 @@ export function validate(
         bag.error('invalid-setting',
             `color 'spectral' not yet supported — hero-wavelength transport is contracts §8; 'rgb' is the sole implemented color model (reserved-not-removed)`)
             .add();
+    }
+
+    // Enumerated measurement fields: an unknown value used to pass through the Planner and
+    // silently mean something else ('none' for scattering turned the scattering arms OFF,
+    // i.e. changed the integral, instead of failing).
+    const measurementEnums: Array<[string, unknown, readonly string[]]> = [
+        ['scattering', strategy.measurement.scattering, ['full', 'ignored']],
+        ['shadows', strategy.measurement.shadows, ['opaque-dielectrics']],
+        ['color', strategy.measurement.color, ['rgb', 'spectral']],
+        ['response', strategy.measurement.response, ['radiance']],
+    ];
+    for (const [field, value, legal] of measurementEnums) {
+        if (value !== undefined && !legal.includes(value as string)) {
+            bag.error('invalid-setting', `measurement.${field} must be one of ${legal.map((v) => `'${v}'`).join(' | ')} (got ${JSON.stringify(value)})`).add();
+        }
+    }
+
+    // Russian roulette's start depth is spliced into the walk as an integer comparison.
+    if (rr !== null && rr !== undefined && rr.startDepth !== undefined
+        && (typeof rr.startDepth !== 'number' || !Number.isInteger(rr.startDepth) || rr.startDepth < 0)) {
+        bag.error('invalid-setting',
+            `estimator.russianRoulette.startDepth must be a non-negative integer (got ${String(rr.startDepth)})`)
+            .add();
+    }
+
+    // Exposure becomes a #define literal in the display shader.
+    const exposure = strategy.view?.tonemap?.exposure;
+    if (exposure !== undefined && (typeof exposure !== 'number' || !Number.isFinite(exposure) || exposure <= 0)) {
+        bag.error('invalid-setting', `view.tonemap.exposure must be a finite number > 0 (got ${String(exposure)})`).add();
+    }
+
+    // Procedural environment: the bake program has no uniforms (v1 pin — a live uniform would
+    // desync the direct-evaluated radiance from the frozen CDF), so a {param} in its formula
+    // would reach GLSL undeclared; the table size becomes integer literals.
+    const env = scene.environment;
+    if (env?.type === 'procedural') {
+        const params = (env.glsl as { params?: unknown }).params;
+        if (params !== undefined && (typeof params !== 'object' || params === null || Object.keys(params).length > 0)) {
+            bag.error('invalid-setting',
+                'environment (procedural): the formula cannot declare params — the sky is baked once into its sampling table, so a live slider would change the radiance without changing the table. Bake-on-change is deferred')
+                .add();
+        }
+        const ts = env.tableSize;
+        if (ts !== undefined && (!Array.isArray(ts) || ts.length !== 2 || !ts.every((n) => Number.isInteger(n) && n > 0))) {
+            bag.error('invalid-setting', `environment.tableSize must be two positive integers [width, height] (got ${JSON.stringify(ts)})`).add();
+        }
     }
 
     if (scene.ambientMedium !== undefined) {
@@ -899,9 +965,12 @@ export function validate(
         }
     }
 
-    // Warn on empty scene
+    // An empty scene cannot link: the intersection program (scene_intersect, scene_region_at,
+    // material_of) is generated from the objects, and with none there is nothing to generate.
+    // It used to pass here with a warning and fail later on internal seam errors. (A light in
+    // fog with no surfaces is a meaningful scene; supporting it means emitting stubs — open.)
     if (scene.objects.length === 0) {
-        bag.warning('empty-scene', 'Scene has no objects — nothing will be rendered').add();
+        bag.error('empty-scene', 'Scene has no objects — at least one is required (an object-free scene, e.g. a light in fog, is not supported yet)').add();
     }
 
     // Check for unsupported accumulation/tonemap types
@@ -946,6 +1015,15 @@ export function validate(
             if (obj.placements.some((p) => isDrivenTransform(p))) {
                 bag.error('invalid-setting', `Object ${i} (instanced): {param}-driven per-instance placements are not supported in v1 (constant placements only)`)
                     .withOriginal('scene', [`objects[${i}]`, 'placements']).add();
+            } else {
+                // The packed form's pins, for the Transform[] form: a similarity per placement
+                // (finite, s > 0, one scale, a real rotation). Reported once, at the first bad
+                // placement — a cloud can have millions.
+                const bad = obj.placements.findIndex((t) => placementProblem(t) !== null);
+                if (bad >= 0) {
+                    bag.error('invalid-transform', `Object ${i} (instanced): placement ${bad}: ${placementProblem(obj.placements[bad])}`)
+                        .withOriginal('scene', [`objects[${i}]`, `placements[${bad}]`]).add();
+                }
             }
         } else {
             // PACKED placements (fable-instance-clouds §4): array-length arithmetic, the
@@ -1244,8 +1322,16 @@ export function validate(
 function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag): void {
     if ('kind' in obj) {
         const vertexCount = obj.positions.length / 3;
-        const positionsOk = obj.positions.length > 0 && obj.positions.length % 3 === 0;
-        if (!positionsOk) {
+        // Finite as well as well-shaped: the scene-wide finiteness sweep skips typed arrays,
+        // and a NaN vertex surfaced only later as a formatter error naming no object (or, on
+        // a closed mesh, as "INWARD winding (volume NaN)").
+        let nonFinite = -1;
+        for (let k = 0; k < obj.positions.length; k++) if (!Number.isFinite(obj.positions[k])) { nonFinite = k; break; }
+        const positionsOk = obj.positions.length > 0 && obj.positions.length % 3 === 0 && nonFinite < 0;
+        if (nonFinite >= 0) {
+            bag.error('invalid-setting', `${label} (mesh): vertex ${Math.floor(nonFinite / 3)} has a non-finite coordinate (${obj.positions[nonFinite]})`)
+                .withOriginal('scene', [...path, 'positions']).add();
+        } else if (!positionsOk) {
             bag.error('invalid-setting', `${label} (mesh): positions length ${obj.positions.length} is not a nonzero multiple of 3`)
                 .withOriginal('scene', [...path, 'positions']).add();
         }
@@ -1407,13 +1493,18 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
 
 /** "Some SAMPLABLE object uses material `name`" — the geometry leg of the §6.2 emitter
  *  condition, shared by the sampleAsLight rule and the phantom-light rule (C3: the two
- *  inline scans were byte-identical and drifted only by luck). Samplable geometry =
- *  analytic samplable primitives (quad/sphere/disk) + MESH objects with constant
- *  placement (fable-mesh-lights — driven placement is the §6 pin's exclusion). */
+ *  inline scans were byte-identical and drifted only by luck). Samplable geometry = the
+ *  census's geometry conditions (samplableEmitterObjects, dataTenants.ts), without its
+ *  emission condition, which the rules check themselves: an analytic samplable primitive
+ *  (quad/sphere/disk) with constant placement that does not keep a local frame, or a MESH
+ *  with constant placement (fable-mesh-lights). (Until Sep 25 2026 the primitive leg skipped
+ *  the placement and frame exclusions, so sampleAsLight: true on a driven, or a rotated
+ *  uv-reading, shape passed here and was then silently dropped by the census.) */
 function samplableObjectUses(scene: SceneDescription, name: string): boolean {
     return scene.objects.some((o) =>
-        (!('kind' in o) && resolveBackend(o.type, o.backend) === 'analytic'
-            && PRIMITIVES[o.type]?.samplableAsLight === true && o.material === name)
+        (isPrimitiveObject(o) && o.material === name && PRIMITIVES[o.type]?.samplableAsLight === true
+            && resolveBackend(o.type, o.backend) === 'analytic'
+            && !isDrivenTransform(o.transform) && !keepsLocalFrame(o, scene))
         || (isMeshObject(o) && o.material === name && !isDrivenTransform(o.transform)));
 }
 
@@ -1515,6 +1606,31 @@ function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void 
             + `clearances (MARCH_EPSILON, MARCH_CLEARANCE, EPS_INTERFACE) are fixed; consider rescaling the scene`)
             .withOriginal('scene', at).add();
     }
+}
+
+/** What is wrong with one constant instance placement, or null. The rules of
+ *  validateScale/validateRotation (object transforms), as a predicate. */
+function placementProblem(t: unknown): string | null {
+    if (t === null || typeof t !== 'object') return 'a placement must be a transform { position?, rotation?, scale? }';
+    const { position, rotation, scale } = t as { position?: unknown; rotation?: unknown; scale?: unknown };
+    if (position !== undefined && !isVec3(position)) return 'position must be a vec3 of finite numbers';
+    if (scale !== undefined) {
+        if (Array.isArray(scale)) return 'scale must be one number (a similarity has one scale; nonuniform scale is not a transform)';
+        if (typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0) return `scale must be a finite number > 0 (got ${String(scale)})`;
+    }
+    if (rotation !== undefined) {
+        if (Array.isArray(rotation)) {
+            if (rotation.length !== 4 || rotation.some((c) => typeof c !== 'number' || !Number.isFinite(c))) return 'a quaternion rotation must be 4 finite numbers [x, y, z, w]';
+            if (Math.hypot(...(rotation as number[])) < 1e-6) return 'the quaternion rotation is degenerate (norm ≈ 0)';
+        } else if (typeof rotation === 'object' && rotation !== null && 'axis' in rotation && 'angle' in rotation) {
+            const { axis, angle } = rotation as { axis: unknown; angle: unknown };
+            if (!isVec3(axis) || Math.hypot(...(axis as Vec3)) < 1e-8) return 'the rotation axis must be a nonzero vec3 of finite numbers';
+            if (typeof angle !== 'number' || !Number.isFinite(angle)) return 'the rotation angle must be a finite number (radians)';
+        } else {
+            return 'rotation must be axis-angle { axis, angle } or a quaternion [x, y, z, w]';
+        }
+    }
+    return null;
 }
 
 function validatePrimitiveConstraint(

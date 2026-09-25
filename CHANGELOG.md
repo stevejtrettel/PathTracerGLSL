@@ -4,6 +4,46 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — validation: inputs that used to pass and then break or mislead
+
+From the Sep 25 compiler audit (its compile fuzzer and probes). Each case below passed
+validation and then crashed the generator, emitted GLSL that cannot compile, or silently
+rendered something other than what was written; each is now a named error.
+
+- `measurement.scattering`/`shadows`/`color`/`response` accept only their documented values
+  (`scattering: 'none'` used to switch the scattering arms off, i.e. change the integral).
+- `estimator.russianRoulette.startDepth` must be a non-negative integer (it is spliced into
+  the walk; 2.5 or NaN produced broken GLSL), like `maxBounces` since Sep 24.
+- `view.tonemap.exposure` must be finite and > 0 (NaN became `#define DISPLAY_EXPOSURE NaN`).
+- Pinhole/thin-lens `fov` must be radians in (0, π) (a degree value like 45 was accepted and
+  gave a nonsense field of view); a new `interval` row constraint states it in the camera
+  descriptors. Fisheye `fov` is checked per projection (orthographic ≤ π, stereographic < 2π,
+  the others ≤ 2π) through a new `validateAuthored` camera hook; its slider range follows.
+- A procedural environment cannot declare formula params (the bake has no uniforms; they
+  reached GLSL undeclared), and its `tableSize` must be two positive integers.
+- Parameter paths must map to valid GLSL identifiers (`key-light.tint` emitted
+  `u_key-light_tint`; `a._b` produced a reserved `__`).
+- A material `{param}` needs a default (without one the uniform stayed at GL's 0 — an ior of 0).
+- `Transform[]` instance placements are checked like object transforms (s > 0, one scale,
+  a nonzero rotation axis or a real quaternion, finite position), reported at the first bad
+  placement; the packed form was already checked.
+- Mesh vertices must be finite (a NaN vertex died later in the GLSL formatter, naming no object).
+- `sampleAsLight: true` on a driven, or rotated uv-reading, quad/sphere/disk is an error: the
+  rule re-derived the light census without its placement exclusions, so the flag was accepted
+  and then silently dropped.
+- An object-free scene is an error up front (it can never link; it used to warn "nothing will
+  be rendered" and then fail on internal seam errors). Supporting a light in fog with no
+  surfaces needs stub intersection functions: open.
+- `compileScene` rejects two strategies with the same id (they would overwrite each other's
+  programs in the engine), and now RETURNS the warnings of a successful compile
+  (`CompiledScene.warnings`, deduplicated across strategies); the App logs them. Every
+  "field is ignored" / "knob does nothing" warning used to be discarded unless the compile
+  also failed.
+- The unknown-primitive error names the object.
+
+Tests: tests/compiler/validator.test.ts (12 new cases, all failing on the old code),
+tests/compiler/compileScene.test.ts. All 192 suite scenes still compile.
+
 ## 2026-09-25 — runtime: production sessions, pause, dialogs, restore, uniforms, runner
 
 From the Sep 25 runtime audit, each confirmed by a unit test or by reading the call sequence:

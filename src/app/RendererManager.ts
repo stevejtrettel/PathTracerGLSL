@@ -78,6 +78,7 @@ export class RendererManager {
             const compiled = this.compiler.compileScene(scene, strategies);
             compiledRenderers = compiled.renderers;
             this.sceneData = compiled.sceneData;
+            for (const w of compiled.warnings) console.warn(`[compiler] ${w}`);
         } catch (error) {
             if (error instanceof CompilationError) {
                 console.error(reporter.formatBag(error.diagnostics));
@@ -169,6 +170,7 @@ export class RendererManager {
         let compiledScene;
         try {
             compiledScene = this.compiler.compileScene(target, [...this.strategies.values()]);
+            for (const w of compiledScene.warnings) console.warn(`[compiler] ${w}`);
         } catch (error) {
             if (error instanceof CompilationError) {
                 console.error(reporter.formatBag(error.diagnostics));

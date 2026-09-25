@@ -43,6 +43,7 @@ export function fakeCompiler() {
                 layout: { totals: { vertices: 0, normals: 0, uvs: 0, indices: 0, nodes: 0, records: 0, nodesq: 0 }, meshes: [], batches: [], meshLights: new Map() },
                 geometry: [], meshLights: [], batches: [],
             },
+            warnings: [],
         })),
     };
 }

@@ -27,6 +27,16 @@ function fisheyeK(projection: string, fov: number): number {
     }
 }
 
+/** The widest full field each radial map represents: θ(ρ) must stay monotone up to θmax.
+ *  Orthographic's sin θ peaks at θ = π/2 (fov π); stereographic's tan(θ/2) diverges at θ = π
+ *  (fov 2π, exclusive); equidistant and equisolid reach the full sphere (fov 2π). Past these
+ *  K stops growing or blows up and the image folds back or collapses to the axis. */
+function maxFov(projection: string): { max: number; inclusive: boolean } {
+    if (projection === 'orthographic') return { max: Math.PI, inclusive: true };
+    if (projection === 'stereographic') return { max: 2 * Math.PI, inclusive: false };
+    return { max: 2 * Math.PI, inclusive: true };
+}
+
 export const fisheyeDescriptor: CameraModelDescriptor = {
     type: 'fisheye',
     glsl: fisheyeGLSL,
@@ -34,10 +44,19 @@ export const fisheyeDescriptor: CameraModelDescriptor = {
         { name: 'fov', shape: 'number', required: true, constraint: { kind: 'positive' } },   // full angular field, radians
         { name: 'projection', shape: 'enum', required: true, values: ['equidistant', 'equisolid', 'stereographic', 'orthographic'] },
     ],
+    validateAuthored(cam) {
+        const projection = cam.projection as string;
+        const fov = cam.fov as number;
+        const { max, inclusive } = maxFov(projection);
+        return (inclusive ? fov <= max : fov < max) ? [] : [
+            `fisheye '${projection}' fov must be ${inclusive ? '≤' : '<'} ${max === Math.PI ? 'π' : '2π'} radians (the full field its radial map can represent; got ${fov})`,
+        ];
+    },
     controls(cam: CameraDesc): CameraControl[] {
         if (cam.type !== 'fisheye') throw new Error('fisheye descriptor got a non-fisheye camera');
         // Feeds u_fisheyeK only (not read raw) — the full angular field.
-        return [{ path: FOV_PATH, name: 'Fisheye FOV', default: cam.fov as number, range: [1.0, 2.0 * Math.PI] }];
+        const { max, inclusive } = maxFov(cam.projection as string);
+        return [{ path: FOV_PATH, name: 'Fisheye FOV', default: cam.fov as number, range: [1.0, inclusive ? max : max * 0.999] }];
     },
     derived(cam: CameraDesc): CameraDerived[] {
         if (cam.type !== 'fisheye') throw new Error('fisheye descriptor got a non-fisheye camera');

@@ -1094,6 +1094,10 @@ export interface CompiledScene {
     dataReads: DataReads;
     /** What to build into the shared scene-data textures, and where (the App executes it). */
     sceneData: SceneDataPlan;
+    /** Warnings from every stage, deduplicated (scene rules run once per strategy). A
+     *  successful compile used to drop them, so "this field is ignored" / "this knob does
+     *  nothing" reached no one unless the compile also failed. */
+    warnings: string[];
 }
 
 /**

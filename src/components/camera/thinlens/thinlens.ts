@@ -11,7 +11,7 @@ export const thinlensDescriptor: CameraModelDescriptor = {
     type: 'thinlens',
     glsl: thinlensGLSL,
     authoredParams: [
-        { name: 'fov', shape: 'value-number', required: true, constraint: { kind: 'positive' } },
+        { name: 'fov', shape: 'value-number', required: true, constraint: { kind: 'interval', min: 0, max: Math.PI } },   // RADIANS, full vertical angle: tan(fov/2) must exist — a degree value (45) is caught here
         { name: 'aperture', shape: 'number', required: true, constraint: { kind: 'nonnegative' } },   // 0 ≡ pinhole (the witness anchor)
         { name: 'focusDistance', shape: 'number', required: true, constraint: { kind: 'positive' } },
     ],

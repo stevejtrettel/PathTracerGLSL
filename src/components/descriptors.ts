@@ -27,7 +27,9 @@ import type { AABB } from './accel/bvh/bvh.js';
 export type RowConstraint =
     | { kind: 'nonnegative' }
     | { kind: 'positive' }
-    | { kind: 'min-length'; value: number };
+    | { kind: 'min-length'; value: number }
+    /** Open interval (min, max), per component. */
+    | { kind: 'interval'; min: number; max: number };
 
 /** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
  *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —

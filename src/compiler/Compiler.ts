@@ -26,11 +26,24 @@ export class Compiler implements ICompiler {
      */
     compileScene(scene: SceneDescription, strategies: RenderStrategy[]): CompiledScene {
         const features = analyze(scene);
+        const warnings = new Set<string>();
+        const keepWarnings = (bag: DiagnosticBag) => { for (const d of bag.getWarnings()) warnings.add(d.message); };
+
+        // Renderer ids are `${strategy.id}-${scene.id}`: two strategies with one id would
+        // silently overwrite each other's programs in the engine.
+        const ids = strategies.map((s) => s.id);
+        const duplicate = ids.find((id, i) => ids.indexOf(id) !== i);
+        if (duplicate !== undefined) {
+            const bag = new DiagnosticBag('compiler');
+            bag.error('invalid-setting', `Two strategies share the id '${duplicate}' — renderer ids must be unique within a scene`).add();
+            bag.throwIfErrors();
+        }
 
         for (const strategy of strategies) {
             const bag = new DiagnosticBag('compiler');
             validate(features, scene, strategy, bag);
             bag.throwIfErrors();
+            keepWarnings(bag);
         }
 
         const dataReads = unionDataReads(strategies.map((s) => dataReadsOf(programDecisions(features, scene, s))));
@@ -47,10 +60,11 @@ export class Compiler implements ICompiler {
             // The compiled output's structure, checked before the engine ever sees it.
             validateCompiledRenderer(renderer, bag);
             bag.throwIfErrors();
+            keepWarnings(bag);
             return renderer;
         });
 
         // Every strategy planned the same scene data against the same layout; any one serves.
-        return { renderers, dataReads, sceneData: sceneDataPlanOf(scene, plans[0]) };
+        return { renderers, dataReads, sceneData: sceneDataPlanOf(scene, plans[0]), warnings: [...warnings] };
     }
 }

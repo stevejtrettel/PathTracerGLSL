@@ -16,6 +16,7 @@ export function constraintViolation(value: number | number[], c: RowConstraint):
     const values = typeof value === 'number' ? [value] : value;
     if (c.kind === 'nonnegative') return values.some((v) => v < 0) ? 'components must be >= 0' : null;
     if (c.kind === 'positive') return values.some((v) => v <= 0) ? 'must be > 0' : null;
+    if (c.kind === 'interval') return values.some((v) => !(v > c.min && v < c.max)) ? `must be in (${c.min}, ${+c.max.toFixed(6)})` : null;
     return Array.isArray(value) && Math.hypot(...value) < c.value ? `length must be >= ${c.value}` : null;
 }
 
@@ -102,6 +103,9 @@ export function validatePropertyValue(
         authored = param.default;
         parameterMin = param.min;
         if (authored === undefined) {
+            // No default means no value until something sets the parameter: the uniform
+            // keeps GL's 0 (an ior of 0, a black albedo) with no diagnostic anywhere.
+            bag.error('invalid-setting', `${label} {param: '${String(param.param)}'} needs a default — the value the render starts with`).add();
             validateMinimum(parameterMin, contract.constraint, `${label} parameter min`, bag);
             return;
         }

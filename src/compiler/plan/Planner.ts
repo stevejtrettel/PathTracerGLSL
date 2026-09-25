@@ -215,8 +215,9 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         const backend = resolveBackend(obj.type, obj.backend);
         if (backend === undefined) {
             // Unregistered type or unhonorable pin — a diagnostic, never a throw (C7).
+            const which = `Object ${scene.objects.indexOf(obj)}${obj.name !== undefined ? ` ('${obj.name}')` : ''}`;
             bag.error('missing-geometry',
-                `Primitive '${obj.type}' is not implemented yet (available: ${implementedTypes().join(', ')})`)
+                `${which}: primitive '${obj.type}' is not implemented yet (available: ${implementedTypes().join(', ')})`)
                 .add();
             objectIndex++;   // keep region ids scene-order stable for the remaining objects
             continue;
