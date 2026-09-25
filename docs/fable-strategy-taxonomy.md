@@ -89,6 +89,29 @@ place listing every way the image differs from ground truth, each with its named
 | path-class restrictions (future: one-shot, Whitted-style delta-only continuation) | the unrestricted path space |
 | firefly/radiance clamping (future) | clamp → ∞ |
 
+### 4.1 Budgets describe paths; step limits describe computation — PINNED
+
+A program has two kinds of limit, and they belong to different sections.
+
+- **Budgets** are truncations, and a truncation must be a **predicate on paths**: a fact about
+  the path itself (how many scattering events it has, how many null interfaces it crosses, how
+  far it travels inside a region), never about how the path was sampled or traced. Only then
+  is the truncated measurement a well-defined integral over a set of paths that every
+  estimator can agree on. A budget counted per path must also be counted the same way by
+  every technique that completes a path (`maxNullCrossings` gives a shadow ray what its path
+  has left, for this reason).
+- **Step limits** bound loops inside the machinery: ODE integrator steps, null-collision
+  tracking steps, SDF march steps, traversal stack depths. They are properties of the
+  computation, so they belong to the estimator side, which is bias-free by contract. A step
+  limit may never decide the picture: it must be shown unreachable, by a bound the compiler
+  checks where one exists and a diagnostic where it cannot (the tracking collision cap:
+  compiler/plan/trackingBudget.ts). A step limit is never charged against a budget: refining
+  a step size must not change which paths are in the measurement.
+
+Test for a proposed limit: *would the set of counted paths change if the integrator's step
+size, the majorant, or the sampler changed?* If yes, it is a step limit, and declaring it as
+a measurement field does not make it one.
+
 ## 5. The camera lives in measurement
 
 The camera **is** W_j — the definition of which rays pixel j averages over. Moving it changes
