@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { uniformValuesEqual } from '../../src/engine/utils/shader-uniform-utils.js';
 
-const EPSILON = 0.00001;
-
 describe('uniformValuesEqual — fast path & null', () => {
     it('is true for identical references', () => {
         const v = [1, 2, 3];
@@ -15,9 +13,10 @@ describe('uniformValuesEqual — fast path & null', () => {
 });
 
 describe('uniformValuesEqual — typed floats', () => {
-    it('treats sub-epsilon differences as equal, super-epsilon as different', () => {
-        expect(uniformValuesEqual(1.0, 1.0 + EPSILON / 2, 'float')).toBe(true);
-        expect(uniformValuesEqual(1.0, 1.0 + EPSILON * 2, 'float')).toBe(false);
+    it('compares exactly: any change uploads, however small (no tolerance)', () => {
+        expect(uniformValuesEqual(1.0, 1.0, 'float')).toBe(true);
+        expect(uniformValuesEqual(1.0, 1.0 + 1e-9, 'float')).toBe(false);
+        expect(uniformValuesEqual(2e-6, 9e-6, 'float')).toBe(false);   // a small parameter's change is real
     });
     it('compares int and sampler types by strict equality', () => {
         expect(uniformValuesEqual(3, 3, 'int')).toBe(true);
@@ -45,10 +44,8 @@ describe('uniformValuesEqual — arrays', () => {
         expect(uniformValuesEqual([0.4, 0.6], [0.4, 0.6, 0.0], 'float[]')).toBe(false);
     });
 
-    it('documents the epsilon-boundary inconsistency between typed (>=) and untyped (>) paths', () => {
-        // arrayEquals (typed path) uses `>= EPSILON`, so an exactly-epsilon diff is NOT equal.
-        expect(uniformValuesEqual([0, 0], [EPSILON, 0], 'vec2')).toBe(false);
-        // valuesEqualUntyped uses `> EPSILON`, so the same exactly-epsilon diff IS equal.
-        expect(uniformValuesEqual([0, 0], [EPSILON, 0])).toBe(true);
+    it('typed and untyped array paths agree: exact comparison', () => {
+        expect(uniformValuesEqual([0, 0], [1e-6, 0], 'vec2')).toBe(false);
+        expect(uniformValuesEqual([0, 0], [1e-6, 0])).toBe(false);
     });
 });

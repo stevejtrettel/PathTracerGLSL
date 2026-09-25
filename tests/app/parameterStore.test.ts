@@ -111,3 +111,19 @@ describe('ParameterStore — restore / serialize', () => {
         expect(s.n).toBe(3);
     });
 });
+
+describe('ParameterStore.restore — keys the session lacks', () => {
+    it('reports them with newValue undefined, so the engine returns them to defaults', () => {
+        const store = new ParameterStore();
+        store.set('a', 1);
+        store.set('b', 2);
+        const batches: Array<{ path: string; oldValue: unknown; newValue: unknown }[]> = [];
+        store.onChange = (e) => { batches.push(e.changes); };   // (assigning replays current values)
+        store.restore({ a: 5 });
+        expect(batches.at(-1)).toEqual([
+            { path: 'a', oldValue: undefined, newValue: 5 },
+            { path: 'b', oldValue: 2, newValue: undefined },
+        ]);
+        expect(store.get('b')).toBeUndefined();
+    });
+});

@@ -156,3 +156,44 @@ describe('ProductionOrchestrator — tiled session', () => {
         expect(store.isLocked()).toBe(false);
     });
 });
+
+describe('ProductionOrchestrator — session robustness (Sep 25 audit)', () => {
+    it("a stopped run's late finally does not unlock the NEXT session", async () => {
+        const app = fakeApp();
+        let rejectFirst!: (e: Error) => void;
+        let calls = 0;
+        const coord = fakeCoordinator(() => (calls++ === 0
+            ? new Promise<void>((_, reject) => { rejectFirst = reject; })
+            : new Promise<void>(() => {})));   // the second run keeps rendering
+        const { orch, store } = mk(app, coord);
+
+        const first = orch.renderProduction(10).catch(() => {});
+        orch.exitProduction();                       // what App.stop() does after coordinator.stop()
+        orch.renderProduction(10).catch(() => {});   // a new session starts synchronously
+        rejectFirst(new Error('RenderStopped'));     // the old promise settles afterwards
+        await first;
+        expect(store.isLocked()).toBe(true);
+    });
+
+    it('a throw while applying the production view leaves nothing locked', async () => {
+        const app = fakeApp();
+        app.resize.mockImplementationOnce(() => { throw new Error('Framebuffer incomplete after resize'); });
+        const { orch, store } = mk(app, fakeCoordinator(() => Promise.resolve()));
+        await expect(orch.renderProduction(10, { width: 7680, height: 4320 })).rejects.toThrow(/Framebuffer/);
+        expect(store.isLocked()).toBe(false);
+        await expect(orch.renderProduction(10)).resolves.toBeUndefined();   // idle again
+    });
+
+    it('a new production replaces a finished one still on display', async () => {
+        const { orch } = mk(fakeApp(), fakeCoordinator(() => Promise.resolve()));
+        await orch.renderProduction(10);   // completes → settled view
+        await expect(orch.renderProduction(10)).resolves.toBeUndefined();
+    });
+
+    it('extending while a render is running is refused without unlocking it', async () => {
+        const { orch, store } = mk(fakeApp(), fakeCoordinator(() => new Promise<void>(() => {})));
+        orch.renderProduction(10).catch(() => {});
+        await expect(orch.extendProduction(5)).rejects.toThrow(/already in progress/);
+        expect(store.isLocked()).toBe(true);
+    });
+});

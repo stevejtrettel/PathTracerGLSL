@@ -398,8 +398,14 @@ export class App {
 
     // -- Content Loading --
 
+    /** Replace the image environment. Goes through the same loader as initialize(), so the
+     *  size/weight parameters the samplers read and the strategies' table variants are rebuilt
+     *  for the new map (swapping only the texture left them describing the old one — biased
+     *  env NEE for a map of another resolution), and a context restore reloads THIS map. */
     async loadEnvironmentHDR(path: string): Promise<void> {
-        await this.engine.loadEnvironmentHDR(path, ENV_EXTERN_NAMES);
+        if (this.config === null) throw new Error('loadEnvironmentHDR: call initialize() first');
+        this.config = { ...this.config, environmentHDR: path };
+        await this._loadImageEnvironment(this.config);
         this.clearAccumulation();
     }
 

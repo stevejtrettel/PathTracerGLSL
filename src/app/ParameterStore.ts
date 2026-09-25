@@ -81,10 +81,15 @@ class ParameterStore {
         return obj;
     }
 
-    // Restore parameters from session (suppresses individual change notifications)
+    // Restore parameters from session (suppresses individual change notifications). Keys the
+    // session does not carry are REMOVED, and the batch reports them with newValue undefined,
+    // so listeners (the engine) drop them back to their compiled defaults — otherwise a value
+    // set after the session was saved stayed live on the GPU while the store, the panel and
+    // the export stamp all said "default" (Sep 25 audit).
     restore(params: Record<string, any>): void {
         const oldOnChange = this._onChange;
         this._onChange = null;
+        const removed = Array.from(this.parameters.entries()).filter(([key]) => !(key in params));
         this.parameters.clear();
 
         for (const [key, value] of Object.entries(params)) {
@@ -99,9 +104,12 @@ class ParameterStore {
 
         // Send all parameters in one batch
         this._onChange?.({
-            changes: Array.from(this.parameters.entries()).map(([path, value]) => ({
-                path, oldValue: undefined, newValue: value
-            }))
+            changes: [
+                ...Array.from(this.parameters.entries()).map(([path, value]) => ({
+                    path, oldValue: undefined, newValue: value
+                })),
+                ...removed.map(([path, value]) => ({ path, oldValue: value, newValue: undefined })),
+            ]
         });
     }
 

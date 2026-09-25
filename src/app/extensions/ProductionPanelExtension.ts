@@ -37,6 +37,10 @@ export class ProductionPanelExtension extends UIExtension {
     private tiledJob: TiledJobProgressInfo | null = null;
     // Track render state so controls only rebuild on state transitions
     private lastControlsState: string | null = null;
+    // The last production progress, re-rendered with the new state on pause/resume: the
+    // render loop emits no progress while paused, so without this the panel kept offering
+    // [Pause] on a paused render and never showed [Resume].
+    private lastProgress: ProgressInfo | null = null;
 
     constructor() {
         super({ startHidden: true });
@@ -87,6 +91,16 @@ export class ProductionPanelExtension extends UIExtension {
         this.on(AppEvents.RENDER_STARTED, this.onRenderStarted);
         this.on(AppEvents.RENDER_COMPLETE, this.onRenderComplete);
         this.on(AppEvents.RENDER_STOPPED, this.onRenderStopped);
+        this.on(AppEvents.RENDER_PAUSED, () => this.onPauseChanged('paused'));
+        // A renderer switch clears the finished image (it belonged to the old renderer), so
+        // its Export buttons would save an empty frame: close the panel.
+        this.on(AppEvents.RENDERER_SWITCHED, () => {
+            if (this.isVisible && this.lastControlsState === 'complete' && !this.tiledJob) {
+                this.hide();
+                this.resetProgress();
+            }
+        });
+        this.on(AppEvents.RENDER_RESUMED, () => this.onPauseChanged('rendering'));
 
         // Progress updates (only during production)
         this.on(AppEvents.RENDER_PROGRESS, this.onProgress);
@@ -125,9 +139,16 @@ export class ProductionPanelExtension extends UIExtension {
         this.resetProgress();
     };
 
+    private onPauseChanged(state: 'paused' | 'rendering'): void {
+        if (this.isVisible && this.lastProgress !== null && this.lastProgress.state !== 'complete') {
+            this.onProgress({ ...this.lastProgress, state });
+        }
+    }
+
     private onProgress = (info: ProgressInfo): void => {
         // Only update during production mode
         if (info.mode !== 'production') return;
+        this.lastProgress = info;
 
         if (this.tiledJob) {
             // The bar and stats describe the whole image; a finished tile is not a finished
@@ -197,6 +218,7 @@ export class ProductionPanelExtension extends UIExtension {
         }
         this.tiledJob = null;
         this.lastControlsState = null;
+        this.lastProgress = null;
     }
 
     private updateProgressBar(info: ProgressInfo): void {

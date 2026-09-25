@@ -65,8 +65,9 @@ export class AppShortcutsExtension implements Extension {
     private handleKeyDown(e: KeyboardEvent): void {
         if (isTypingInInput(e)) return;
 
-        // Don't handle if locked in production (except escape)
-        if (this.app.isLocked() && e.key !== 'Escape') {
+        // Don't handle if locked in production (except Escape, and pause/resume — pausing
+        // changes no parameter, and a paused production must be resumable from the keyboard)
+        if (this.app.isLocked() && e.key !== 'Escape' && e.key !== '\\') {
             console.warn('Locked in production mode - press Escape to stop');
             return;
         }

@@ -40,6 +40,11 @@ export class ProductionOrchestrator {
     private previousResolution: [number, number] | null = null;
     private profilingWasEnabled: boolean = false;
     private productionLayoutMode: LayoutMode = 'centered';
+    // Each run (render, extend, tiled job) takes a token when it goes active; its `finally`
+    // settles or exits only if it is still the current run. A stopped run's promise settles
+    // a microtask AFTER stop() returns, by which time a new session may already be active —
+    // without the token that stale finally unlocked the new session's parameters mid-render.
+    private runId = 0;
 
     constructor(
         app: App,
@@ -52,7 +57,7 @@ export class ProductionOrchestrator {
     }
 
     async renderProduction(targetSamples: number, options?: ProductionOptions): Promise<void> {
-        this.beginProduction(options);
+        const run = this.beginProduction(options);
         try {
             await this.coordinator.startProduction({
                 targetSamples,
@@ -74,13 +79,18 @@ export class ProductionOrchestrator {
         } finally {
             // Render settled (completed or stopped): unlock + restore profiling, but
             // keep the production view (layout/resolution) for viewing/export.
-            this.settleProduction();
+            this.settleProduction(run);
         }
     }
 
     async extendProduction(additionalSamples: number): Promise<void> {
         if (this.phase === 'idle') {
             throw new Error('No production render to extend');
+        }
+        if (this.phase === 'active') {
+            // Refuse BEFORE touching the lock: letting startProduction throw here would run
+            // the finally below and unlock the render that is still going.
+            throw new Error('A production render is already in progress');
         }
 
         const currentSamples = this.coordinator.getSampleCount();
@@ -90,12 +100,13 @@ export class ProductionOrchestrator {
         // Re-enter active from the settled view: re-lock, but keep the already-saved
         // prior state and current resolution (no resize, no accumulation reset — the
         // coordinator resets only if the camera moved, via its dirty flag).
+        const run = ++this.runId;
         this.parameterStore.lock();
         this.phase = 'active';
         try {
             await this.coordinator.startProduction({ targetSamples: newTarget });
         } finally {
-            this.settleProduction();
+            this.settleProduction(run);
         }
     }
 
@@ -112,7 +123,7 @@ export class ProductionOrchestrator {
         spp: number,
         onTile: (tile: Tile, index: number) => void,
     ): Promise<void> {
-        this.beginProduction();
+        const run = this.beginProduction();
         this.previousResolution = this.app.getCanvasSize();
         this.app.setImageSize(imageSize[0], imageSize[1]);
         try {
@@ -124,9 +135,11 @@ export class ProductionOrchestrator {
                 onTile(tile, index);
             }
         } finally {
-            this.app.clearPixelOffset();
-            this.app.clearImageSize();
-            this.exitProduction();
+            if (run === this.runId) {   // not if a newer session has already replaced this one
+                this.app.clearPixelOffset();
+                this.app.clearImageSize();
+                this.exitProduction();
+            }
         }
     }
 
@@ -157,39 +170,52 @@ export class ProductionOrchestrator {
         this.phase = 'idle';
     }
 
-    private beginProduction(options?: ProductionOptions): void {
-        if (this.phase !== 'idle') {
+    private beginProduction(options?: ProductionOptions): number {
+        if (this.phase === 'active') {
             throw new Error('A production render is already in progress');
         }
+        // A finished render still on display (settled, not yet dismissed) is replaced: leave
+        // its view first, so the new session saves the interactive state, not the old view.
+        if (this.phase === 'settled') this.exitProduction();
 
         // Save prior state for exitProduction to restore.
         this.previousLayoutMode = this.app.getLayoutMode();
         this.profilingWasEnabled = this.app.isProfilingEnabled();
 
-        // Apply the production view.
+        // Apply the production view. Active from the lock on, so that if anything below
+        // throws (a resize can: framebuffer allocation), exitProduction unwinds it — the
+        // lock is never left held with the phase still 'idle'.
+        const run = ++this.runId;
         this.parameterStore.lock();
-        if (this.app.hasLayout()) {
-            this.app.setLayoutMode(this.productionLayoutMode);
-        }
-        if (options?.width && options?.height) {
-            const [originalWidth, originalHeight] = this.app.getCanvasSize();
-            if (options.width !== originalWidth || options.height !== originalHeight) {
-                console.log(`Resizing for production: ${options.width}x${options.height}`);
-                this.previousResolution = [originalWidth, originalHeight];
-                this.app.resize(options.width, options.height);
-            }
-        }
-        // Suspend GPU profiling during production — readPixels sync kills pipelining.
-        if (this.profilingWasEnabled) {
-            this.app.disableProfiling();
-        }
-
-        this.coordinator.resetAccumulation('production_start');
         this.phase = 'active';
+        try {
+            if (this.app.hasLayout()) {
+                this.app.setLayoutMode(this.productionLayoutMode);
+            }
+            if (options?.width && options?.height) {
+                const [originalWidth, originalHeight] = this.app.getCanvasSize();
+                if (options.width !== originalWidth || options.height !== originalHeight) {
+                    console.log(`Resizing for production: ${options.width}x${options.height}`);
+                    this.previousResolution = [originalWidth, originalHeight];
+                    this.app.resize(options.width, options.height);
+                }
+            }
+            // Suspend GPU profiling during production — readPixels sync kills pipelining.
+            if (this.profilingWasEnabled) {
+                this.app.disableProfiling();
+            }
+            this.coordinator.resetAccumulation('production_start');
+        } catch (error) {
+            this.exitProduction();
+            throw error;
+        }
+        return run;
     }
 
-    private settleProduction(): void {
-        if (this.phase !== 'active') return;
+    /** Unlock and restore profiling, keeping the view. `run` (when given) must still be the
+     *  current run — a stale run's finally is a no-op. */
+    private settleProduction(run: number = this.runId): void {
+        if (run !== this.runId || this.phase !== 'active') return;
         this.parameterStore.unlock();
         if (this.profilingWasEnabled) {
             this.app.enableProfiling();

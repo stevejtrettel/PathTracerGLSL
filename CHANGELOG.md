@@ -4,6 +4,44 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — runtime: production sessions, pause, dialogs, restore, uniforms, runner
+
+From the Sep 25 runtime audit, each confirmed by a unit test or by reading the call sequence:
+
+- **A stopped render's late `finally` unlocked the next session.** A production promise
+  settles a microtask after `stop()`, by which time a new session (e.g. a tiled render) may
+  be active; its `finally` then unlocked that session's parameters mid-render. Each run now
+  holds a token and settles only its own session.
+- **A throw while applying the production view** (a 4K/8K resize can fail to allocate) left
+  the parameters locked forever. `beginProduction` now unwinds itself.
+- **A new production was refused after a finished one** that was still on display (modal
+  dismissed with × or the backdrop). The finished view is now exited first.
+- **Extend Render opened two completion dialogs** (the RENDER_COMPLETE listener and the
+  extend promise both did); extending from the second one while the first extension ran
+  cancelled it. Only the event opens it now, and extending while a render runs is refused
+  before anything is touched.
+- **A paused production could not be resumed from the UI**: the panel only updated on progress
+  events, which stop while paused, and the `\` shortcut was swallowed by the production lock.
+  The panel follows RENDER_PAUSED/RESUMED; `\` works while locked.
+- **Dismissing the production dialog with × or the backdrop** left rendering paused and the
+  canvas unclickable. The cleanup now runs on every close.
+- **Switching renderer after a production finished** cleared the image while the panel kept
+  offering Export (a 0-sample frame). The panel closes on a renderer switch.
+- **Loading a session left stale values in the engine**: keys set after the session was
+  saved stayed live on the GPU while the store, the panel and the stamp said "default". The
+  restore now reports removed keys, which return to their compiled defaults.
+- **Uniform uploads skipped changes smaller than 1e-5** (an absolute tolerance), so small
+  parameters (a σ in m⁻¹) never reached the GPU. Comparison is now exact.
+- **`app.loadEnvironmentHDR(path)`** swapped the texture but left the old map's size and
+  weight (read by the env sampler) and its table variants. It now runs the full loader and
+  records the path for context restore.
+- **Witness runner**: a page reloaded mid-render (Vite reloads the lab when a watched file is
+  saved) was read as "render finished" and its empty frame accepted. A reload is now an
+  error, and readbacks are checked for the configured size.
+
+Tests: tests/app/productionOrchestrator.test.ts (four session tests, each failing on the old
+code), tests/app/parameterStore.test.ts, tests/engine/shaderUniformUtils.test.ts.
+
 ## 2026-09-25 — a sky plus batch lights only (under `'bvh'`) failed to link
 
 With a samplable environment the NEE samplers draw env-vs-finite with `u_envSelectProb`, but

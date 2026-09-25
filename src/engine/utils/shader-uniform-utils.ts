@@ -1,8 +1,10 @@
 // engine/utils/shader-uniform-utils.ts
 import type { UniformType } from '../types';
 
-// Epsilon for floating point comparison
-const EPSILON = 0.00001;
+// Uniform values compare EXACTLY. The comparison only decides whether to skip a redundant
+// upload, so "equal" must mean equal: the old absolute 1e-5 tolerance silently dropped every
+// change to a small parameter (a σ in m⁻¹, a tiny radius) — the accumulation reset and the
+// stamp recorded the new value while the GPU kept the old one (Sep 25 audit).
 
 /**
  * Set a WebGL uniform value with optional type hint
@@ -112,7 +114,7 @@ function setUniformInferred(
 function valuesEqualTyped(a: any, b: any, type: UniformType): boolean {
     switch (type) {
         case 'float':
-            return Math.abs(a - b) < EPSILON;
+            return a === b;
         case 'float[]':
             return valuesEqualUntyped(a, b);   // element-wise, any length
         case 'int':
@@ -145,7 +147,7 @@ function valuesEqualUntyped(a: any, b: any): boolean {
         if (arrA.length !== arrB.length) return false;
 
         for (let i = 0; i < arrA.length; i++) {
-            if (Math.abs(arrA[i] - arrB[i]) > EPSILON) return false;
+            if (arrA[i] !== arrB[i]) return false;
         }
         return true;
     }
@@ -158,7 +160,7 @@ function arrayEquals(a: any, b: any, length: number): boolean {
     if (a.length !== length || b.length !== length) return false;
 
     for (let i = 0; i < length; i++) {
-        if (Math.abs(a[i] - b[i]) >= EPSILON) return false;
+        if (a[i] !== b[i]) return false;
     }
 
     return true;

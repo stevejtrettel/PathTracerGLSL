@@ -372,14 +372,13 @@ async function renderVarianceOnce(browser, sceneId, strategyIdx, [W, H], spp) {
                 .then(() => { window.__witnessDone = true; })
                 .catch(e => { window.__witnessError = String(e); });
         }, spp);
-        await page.waitForFunction(() => window.__witnessDone === true || window.__witnessError !== null, null, { timeout: RENDER_TIMEOUT_MS, polling: 500 });
-        const renderErr = await page.evaluate(() => window.__witnessError);
-        if (renderErr) throw new Error(`renderProduction: ${renderErr}`);
+        await waitForRender(page);
 
         const [mean, variance] = await page.evaluate(() => [
             Array.from(window.app.readExport('hdr')),
             Array.from(window.app.readExport('variance')),
         ]);
+        if (mean.length !== W * H * 4 || variance.length !== W * H * 4) throw new Error(`readback is not ${W}×${H} — the page's app is not the one this render configured`);
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         process.stdout.write(`  rendered ${sceneId} / strategy ${strategyIdx} +variance @ ${W}×${H} ×${spp}spp (${secs}s)\n`);
 
@@ -387,6 +386,19 @@ async function renderVarianceOnce(browser, sceneId, strategyIdx, [W, H], spp) {
     } finally {
         await page.close();
     }
+}
+
+/** Wait for the production render fired with __witnessDone = false. A RELOADED page (the dev
+ *  server reloads the lab when a file in its import graph is saved) has neither flag — the old
+ *  predicate (`__witnessError !== null`) read that as "finished" and the runner then read back a
+ *  fresh app's empty frame. Now a reload is an error, never a result. */
+async function waitForRender(page) {
+    await page.waitForFunction(() => window.__witnessDone !== false || window.__witnessError != null, null, {
+        timeout: RENDER_TIMEOUT_MS, polling: 500,
+    });
+    const { done, error } = await page.evaluate(() => ({ done: window.__witnessDone, error: window.__witnessError }));
+    if (error) throw new Error(`renderProduction: ${error}`);
+    if (done !== true) throw new Error('the page reloaded during the render (a source file changed?) — rerun this scene');
 }
 
 async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp) {
@@ -443,13 +455,10 @@ async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp)
                 .then(() => { window.__witnessDone = true; })
                 .catch(e => { window.__witnessError = String(e); });
         }, spp);
-        await page.waitForFunction(() => window.__witnessDone === true || window.__witnessError !== null, null, {
-            timeout: RENDER_TIMEOUT_MS, polling: 500,
-        });
-        const renderErr = await page.evaluate(() => window.__witnessError);
-        if (renderErr) throw new Error(`renderProduction: ${renderErr}`);
+        await waitForRender(page);
 
         const px = new Float32Array(await page.evaluate(() => Array.from(window.app.readExport('hdr'))));
+        if (px.length !== W * H * 4) throw new Error(`readback is ${px.length / 4} pixels, expected ${W}×${H} — the page's app is not the one this render configured`);
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         process.stdout.write(`  rendered ${sceneId} / ${strategyId} @ ${W}×${H} ×${spp}spp (${secs}s)\n`);
         if (pageErrors.length) throw new Error(`page errors: ${pageErrors.join(' | ')}`);

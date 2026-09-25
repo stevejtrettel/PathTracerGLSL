@@ -95,18 +95,13 @@ export class RenderControlsExtension extends UIExtension {
             console.log('Extend Render clicked');
             modal.close();
             if (extendSamples > 0) {
+                // No .then here: the extension's own RENDER_COMPLETE reopens this dialog
+                // (onRenderComplete). Opening it here too stacked two dialogs, and extending
+                // from the second one while the first extension ran cancelled it.
                 this.app.extendProduction(extendSamples)
-                    .then(() => {
-                        console.log('Extended render complete, showing dialog again');
-                        // Show dialog again after extension completes
-                        // Use a delay to ensure state is settled
-                        setTimeout(() => {
-                            this.showCompletionDialog();
-                        }, 100);
-                    })
                     .catch(err => {
-                        console.error('Extended render failed:', err);
-                        // Still return to interactive on error
+                        if (!(err instanceof RenderStoppedError)) console.error('Extended render failed:', err);
+                        // Return to interactive
                         this.app.stop();
                         setTimeout(() => this.app.start(), 50);
                     });
@@ -126,7 +121,16 @@ export class RenderControlsExtension extends UIExtension {
         const canvas = this.app.getCanvas();
         if (canvas) canvas.style.pointerEvents = 'none';
 
-        const modal = new Modal('Start Production Render', { width: 400 });
+        let cleanedUp = false;
+        const cleanup = () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
+            if (canvas) canvas.style.pointerEvents = '';
+            this.app.resume();
+        };
+        // onClose runs for EVERY close — Cancel, Start, the × button and a backdrop click —
+        // so the canvas never stays paused and unclickable after the dialog goes away.
+        const modal = new Modal('Start Production Render', { width: 400, onClose: cleanup });
 
         let samples = 1000;
         let resolution = 'screen';
@@ -184,19 +188,10 @@ export class RenderControlsExtension extends UIExtension {
 
         const footer = modal.addFooter();
 
-        const cleanup = () => {
-            if (canvas) canvas.style.pointerEvents = '';
-            this.app.resume();
-        };
-
-        new Button('Cancel', () => {
-            modal.close();
-            cleanup();
-        }).mount(footer);
+        new Button('Cancel', () => modal.close()).mount(footer);
 
         new Button('Start Render', () => {
             modal.close();
-            cleanup();
             if (samples <= 0) return;
 
             const size = resolution === 'custom' ? [customWidth, customHeight] as [number, number] : RESOLUTIONS[resolution];
