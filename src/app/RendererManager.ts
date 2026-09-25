@@ -1,7 +1,8 @@
 // app/RendererManager.ts
 // Manages compiled renderers: compilation, switching, and metadata
 
-import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy, SourceMap, DataReads } from '../compiler/types.js';
+import type { ICompiler, CompiledRenderer, SceneDescription, RenderStrategy, SourceMap } from '../compiler/types.js';
+import type { SceneDataPlan } from '../compiler/sceneData.js';
 import type { Engine } from '../engine/Engine.js';
 import type { ParameterStore } from './ParameterStore.js';
 import type { EventBus } from './EventBus.js';
@@ -42,9 +43,9 @@ export class RendererManager {
     // `${strategyId}-${sceneId}` convention lives only in the compiler.
     private strategyToRenderer: Map<string, string> = new Map();
     private activeRendererId: string | null = null;
-    // The optional scene-data structures the loaded renderers read (their union) — the App
-    // builds exactly these (see CompiledScene).
-    private dataReads: DataReads | null = null;
+    // What the App must build into the shared scene-data textures for the loaded renderers
+    // (their compile output — see CompiledScene).
+    private sceneData: SceneDataPlan | null = null;
 
     constructor(deps: RendererManagerDeps) {
         this.compiler = deps.compiler;
@@ -76,7 +77,7 @@ export class RendererManager {
         try {
             const compiled = this.compiler.compileScene(scene, strategies);
             compiledRenderers = compiled.renderers;
-            this.dataReads = compiled.dataReads;
+            this.sceneData = compiled.sceneData;
         } catch (error) {
             if (error instanceof CompilationError) {
                 console.error(reporter.formatBag(error.diagnostics));
@@ -193,7 +194,7 @@ export class RendererManager {
         // shader is known to compile, so this no longer fails partway. The caller (App)
         // must rebuild the scene data for the new layout before the next frame.
         this.scene = target;
-        this.dataReads = compiledScene.dataReads;
+        this.sceneData = compiledScene.sceneData;
         // E9: renderer ids embed the scene id — a recompile with a DIFFERENT scene mints
         // all-new ids, and the old renderers (programs + GPU framebuffers) used to leak,
         // staying selectable and shifting the 1-9 keys. Diff-and-unload the stale ids.
@@ -288,9 +289,9 @@ export class RendererManager {
         return this.renderers.get(this.activeRendererId) || null;
     }
 
-    /** The optional scene-data structures the loaded renderers read; null before initialize. */
-    getDataReads(): DataReads | null {
-        return this.dataReads;
+    /** What to build into the scene-data textures for the loaded renderers; null before initialize. */
+    getSceneData(): SceneDataPlan | null {
+        return this.sceneData;
     }
 
     getScene(): SceneDescription | null {

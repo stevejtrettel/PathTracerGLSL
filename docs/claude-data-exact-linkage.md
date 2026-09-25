@@ -1,7 +1,9 @@
 # Exact linkage for scene data
 
-Status: agreed with the owner (Sep 24–25 2026). **Stage 1 built Sep 25 2026** (see
-CHANGELOG.md); stage 2 not built.
+Status: agreed with the owner (Sep 24–25 2026). **Stages 1 and 2 built Sep 25 2026** (see
+CHANGELOG.md). One App-side derivation remains outside the plan: which environment sampling
+tables to build (App `envVariants`, from strategy fields) — moving it needs the procedural-sky
+bake reordered after the main renderers load.
 
 ## Decisions (Sep 25 2026)
 

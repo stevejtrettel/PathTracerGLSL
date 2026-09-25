@@ -1,5 +1,7 @@
 // compiler/types.ts
 
+import type { SceneDataPlan } from './sceneData.js';
+
 // ============================================================================
 // Utility types
 // ============================================================================
@@ -1090,6 +1092,8 @@ export interface CompiledScene {
     /** One renderer per strategy, in the order given. */
     renderers: CompiledRenderer[];
     dataReads: DataReads;
+    /** What to build into the shared scene-data textures, and where (the App executes it). */
+    sceneData: SceneDataPlan;
 }
 
 /**

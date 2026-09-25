@@ -4,6 +4,25 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — the App packs scene data from a compiler plan (stage 2)
+
+The App no longer derives anything from the scene to build the data textures. The compiler
+returns a scene-data plan (`CompiledScene.sceneData`, built by `compiler/sceneData.ts` from
+the Planner's own results): mesh geometry per slot, mesh-light bakes, instance-batch pack
+specs, the object table's packed records and leaf-box sources, the light table rows with each
+light's box and power, and region→material ids. `app/sceneData.ts` executes it, doing only the
+data-sized work (packing vertices, building BVHs, writing bytes).
+
+- The Planner builds its lights FROM the light roster instead of mirroring it, and region ids
+  come from its own assignment — the "light roster drift" and "region-material drift" runtime
+  checks are gone (the agreement they checked now holds by construction), and so is
+  `regionMaterialsOf` (a count remains, `regionCountOf`). tests/compiler/lightRoster.test.ts
+  (roster ≡ plan) became a tautology and was removed.
+- Proof: tests/app/sceneData.test.ts fingerprints every data texture for every suite scene;
+  the fingerprints were recorded from the old App code (moved verbatim first) and the
+  plan-driven packer reproduces them exactly (187 scenes). Compiled shaders unchanged.
+  GPU smoke test (bazaar, instance-lights, mesh-light-twin): identical numbers.
+
 ## 2026-09-25 — build only the scene data the renderers read (stage 1)
 
 Design: docs/claude-data-exact-linkage.md. The optional data structures — the CWBVH, the

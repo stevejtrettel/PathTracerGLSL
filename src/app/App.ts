@@ -15,7 +15,8 @@ import { ParameterStore } from './ParameterStore.js';
 import { EventBus } from './EventBus.js';
 import { RendererManager } from './RendererManager.js';
 import { AppLayout, type LayoutMode, type RegionName } from './layout/index.js';
-import type { ICompiler, CompiledRenderer, SceneDescription, DataReads } from '../compiler/types.js';
+import type { ICompiler, CompiledRenderer, SceneDescription } from '../compiler/types.js';
+import type { SceneDataPlan } from '../compiler/sceneData.js';
 import type { AppConfig, StrategyPreset, CreateAppOptions, SessionData } from './types.js';
 import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
@@ -168,7 +169,7 @@ export class App {
 
         if (config.scene !== undefined) {
             try {
-                await this._uploadSceneGeometry(config.scene, this.rendererManager.getDataReads()!);
+                await this._uploadSceneGeometry(this.rendererManager.getSceneData()!);
             } catch (error: any) {
                 this._showErrorOverlay(error);
                 throw error;
@@ -211,11 +212,11 @@ export class App {
     }
 
     /**
-     * Build and register the shared scene-data textures for the layout the loaded renderers
-     * were compiled against (see packSceneData). Must run before the first frame.
+     * Build and register the shared scene-data textures the loaded renderers were compiled
+     * against, by executing the compiler's scene-data plan. Must run before the first frame.
      */
-    private async _uploadSceneGeometry(scene: SceneDescription, reads: DataReads): Promise<void> {
-        const packed = await packSceneData(scene, reads);
+    private async _uploadSceneGeometry(plan: SceneDataPlan): Promise<void> {
+        const packed = await packSceneData(plan);
         if (packed === null) return;
         for (const [c, channel] of Object.entries(packed.channels) as Array<[DataChannel, PackedChannel]>) {
             this.engine.registerDataTexture(channelExtern(c), channel.data, channel.width, channel.height);
@@ -302,7 +303,7 @@ export class App {
             throw error;
         }
         try {
-            await this._uploadSceneGeometry(this.rendererManager.getScene()!, this.rendererManager.getDataReads()!);
+            await this._uploadSceneGeometry(this.rendererManager.getSceneData()!);
         } catch (error: any) {
             this._showErrorOverlay(error);
             throw error;

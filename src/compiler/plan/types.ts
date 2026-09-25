@@ -15,7 +15,8 @@ export type ResolvedEnvironment =
     | { type: 'image'; url: string; intensity: number; rotation: number }
     | { type: 'procedural'; glsl: GlslExpression; intensity: number; rotation: number };
 import type { Similarity } from '../../components/geometry/similarity.js';
-import type { MeshSlot, BatchSlot, SceneTableSlot } from '../../components/data/ledger.js';
+import type { MeshSlot, BatchSlot, SceneTableSlot, DataLayout } from '../../components/data/ledger.js';
+import type { SceneDataTenants } from './dataTenants.js';
 import type { AABB } from '../../components/accel/bvh/bvh.js';
 
 // ============================================================================
@@ -592,6 +593,11 @@ export interface RenderPlan {
 
     /** Material id the ambient region (−1) resolves to via material_of(-1), or −1 = vacuum (§2.4). */
     ambientMedium: number;
+
+    /** The scene-data layout this plan's offsets were baked from, and the adapter facts it
+     *  was computed from (record order, placement tiers, batch lights) — what the scene-data
+     *  plan (sceneData.ts) needs to tell the App what to pack where. */
+    data: { tenants: SceneDataTenants; layout: DataLayout };
 
     /** What the generated program does */
     program: ProgramDescription;

@@ -39,6 +39,10 @@ export function fakeCompiler() {
         compileScene: vi.fn((scene: SceneDescription, strategies: RenderStrategy[]) => ({
             renderers: strategies.map((s) => compile(scene, s)),
             dataReads: { cwbvh: false, lightTree: false, sceneTable: false },
+            sceneData: {
+                layout: { totals: { vertices: 0, normals: 0, uvs: 0, indices: 0, nodes: 0, records: 0, nodesq: 0 }, meshes: [], batches: [], meshLights: new Map() },
+                geometry: [], meshLights: [], batches: [],
+            },
         })),
     };
 }

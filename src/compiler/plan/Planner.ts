@@ -1,9 +1,9 @@
 // compiler/plan/Planner.ts
 
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
-import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, hasConstantNonzeroEmission, isMeshObject, isInstancedObject } from '../types.js';
+import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
-import { MATERIAL_MODELS, EMISSION_KEY, modelTwoSidedShading } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, modelTwoSidedShading } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
@@ -25,11 +25,10 @@ import {
 import { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
-import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, regionMaterialsOf, batchNeedsInterior, regionLightKind, dataReadsOf, READS_EVERYTHING } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, dataReadsOf, READS_EVERYTHING } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
@@ -120,7 +119,8 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
     // The data layout: the same adapter + ledger call, with the same `reads`, that the App
     // makes to pack the bytes — so the offsets baked here are where the bytes land.
-    const { tenants: dataTenants, batchGeometrySlot, batchPlacementRecord, table: sceneTableTruth, lightBatches: sceneLightBatches } = dataTenantsOf(scene, reads);
+    const dataTenantsResult = dataTenantsOf(scene, reads);
+    const { tenants: dataTenants, batchGeometrySlot, batchPlacementRecord, table: sceneTableTruth, lightBatches: sceneLightBatches } = dataTenantsResult;
     const dataLayout = planDataLayout(dataTenants);
     let objectIndex = 0;
     for (const obj of scene.objects) {
@@ -280,120 +280,56 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         }
     }
 
-    // --- Assign lights (the §6.2 samplable registry; order = light id = CDF order) ---
-    // REGISTRY-DRIVEN desugar (A3 — the lights door): the kind descriptor declares how
-    // an authored light lowers — registry values (radiometric PRODUCTS computed once)
-    // and, for hittable kinds, the backing emitter region. Le is shared EXACTLY
-    // between the emission table and the sampler (any mismatch makes pt and pt-nee
-    // converge to different images). Unregistered kinds are Validator-rejected;
-    // skipped here.
-    const lights: PlannedLight[] = [];
-    let lightIndex = 0;
-    for (const light of scene.lights) {
-        const d = LIGHT_KINDS[light.kind];
-        if (d === undefined) continue;
-        // ONE authored word (B2): emission — Le for area kinds, radiant intensity for
-        // delta kinds; scalar broadcasts (the spectrum convention, §2.5). Driven-lights
-        // Stage A: a {param} emission flows through UNRESOLVED into both the registry
-        // values (the sampler reads its uniform) AND, for hittable kinds, the synthesized
-        // material's emission row — the SAME uniform, so pt ≡ pt-nee by construction.
-        const e = light.emission;
-        // Blackbody (impl-plan-blackbody-uv): constant dials FOLD here; a driven dial
-        // flows through as the spec — the split point mints slider + derived uniform.
-        const product: Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue =
-            isValueParam(e) ? e
-            : isBlackbody(e) ? foldBlackbody(e)
-            : (typeof e === 'number' ? [e, e, e] : e);
-        // Row defaults applied ONCE by the framework (D1) — the same record the
-        // Validator judged; toValues/region.parameters read plain values.
-        const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
-        if (d.region === undefined) {
-            lights.push({ id: lightIndex++, kind: light.kind, values: d.toValues(authored, product) });
-            continue;
+    // --- Lights: the registry, in light-id order (= selection-CDF order), IS the light roster
+    // (lightRosterOf): authored lights, then emissive analytic objects, then emissive meshes.
+    // The roster computed each light's values; here each entry is tied to its region. The data
+    // layout sized the light table and tree from the same list, so they cannot disagree.
+    //
+    // An authored HITTABLE light desugars to an emissive region: a synthesized material (the
+    // backing model is lambert with albedo 0 — the only site that chooses it) and an object of
+    // the kind's backing primitive. The material's emission is the same value the light's rows
+    // were built from (authoredLightEmission), so the hit side and the sampler agree exactly
+    // (any mismatch makes pt and pt-nee converge to different images). An emissive OBJECT's
+    // region id is its scene index.
+    const lights: PlannedLight[] = lightRosterOf(scene).map((entry, id): PlannedLight => {
+        if ('authored' in entry.source) {
+            const light = scene.lights[entry.source.authored];
+            const d = LIGHT_KINDS[entry.kind];
+            if (d.region === undefined) return { id, kind: entry.kind, values: entry.values };
+            const matId = materialIndex++;
+            materials.push({
+                id: matId,
+                name: `__light_${id}`,
+                model: 'lambert',
+                values: resolveMaterialValues('lambert', { albedo: [0.0, 0.0, 0.0], emission: authoredLightEmission(light.emission) as MaterialProperty }),
+                medium: null,
+            });
+            const regionId = objectIndex++;
+            // Row defaults applied once by the framework (the record the Validator judged);
+            // canonicalization (the disk's unit normal) is the same formula the kind's
+            // toValues applies, so hit side and sample side stay bit-identical.
+            const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
+            objects.push({
+                index: regionId,
+                materialId: matId,
+                type: d.region.primitive,
+                intersect: 'closed-form',
+                parameters: canonicalizePrimitiveParameters(d.region.primitive, d.region.parameters(authored)),
+            });
+            return { id, kind: entry.kind, regionId, values: entry.values };
         }
-        // Hittable: synthesize the emissive material + the backing region, THROUGH the
-        // same schema path as authored materials (materials-§7 — no drift possible).
-        // lambert is THE backing emitter model (albedo 0 = pure emitter) — the ONLY site
-        // that knows it: planProgram derives the model set from planned materials, so the
-        // choice propagates to includes/dispatch without a second synchronized site.
-        const matId = materialIndex++;
-        materials.push({
-            id: matId,
-            name: `__light_${lightIndex}`,
-            model: 'lambert',
-            values: resolveMaterialValues('lambert', { albedo: [0.0, 0.0, 0.0], emission: product }),
-            medium: null,
-        });
-        const regionId = objectIndex++;
-        objects.push({
-            index: regionId,
-            materialId: matId,
-            type: d.region.primitive,
-            intersect: 'closed-form',
-            // Framework canonicalization (the disk's unit normal): the same shared
-            // formula the kind's toValues applies — hit side and sample side stay
-            // bit-identical (the one-sided pin).
-            parameters: canonicalizePrimitiveParameters(d.region.primitive, d.region.parameters(authored)),
-        });
-        lights.push({ id: lightIndex++, kind: light.kind, regionId, values: d.toValues(authored, product) });
-    }
-
-    // sampleAsLight route (§6.2): emissive analytic quad/sphere OBJECTS join the registry —
-    // per REGION, so two objects sharing one emissive material become two lights. V1: constant
-    // nonzero emission only (Analyzer/Validator enforce); Le read from the material constant.
-    for (const planned of objects) {
-        const mat = materials[planned.materialId];
-        if (mat === undefined || mat.name.startsWith('__light_')) continue;   // synthesized: already registered
-        if (PRIMITIVES[planned.type]?.samplableAsLight !== true) continue;
-        // Driven placement (§6): parameters are LOCAL and the geometry is live — the
-        // registry bakes literals, so driven emitters are Validator-rejected upstream;
-        // this skip is the backstop that keeps a stale-literal light out of the CDF.
-        if (planned.placement !== undefined) continue;
-        const sceneMat = scene.materials[mat.name];
-        if (sceneMat === undefined || sceneMat.sampleAsLight === false) continue;
-        const emission = mat.values[EMISSION_KEY];
-        if (!hasConstantNonzeroEmission(emission)) continue;   // C3: the ONE predicate (shared with Analyzer/Validator)
-        const Le = emission as Vec3;
-        // Registry-driven (A3): the kind whose backing region primitive matches this
-        // object's shape converts the FOLDED parameters back to registry values —
-        // both authoring routes share one kind definition (regionLightKind, the lookup
-        // the census uses too; the contract test enforces its uniqueness).
-        const kind = regionLightKind(planned.type);
-        if (kind === undefined) continue;   // backstop; samplableAsLight already gated
-        lights.push({
-            id: lightIndex++, kind, regionId: planned.index,
-            values: LIGHT_KINDS[kind].valuesFromRegion!(planned.parameters, Le),
-        });
-    }
-
-    // Mesh emitters (fable-mesh-lights): the SAME sampleAsLight material route — an
-    // emissive-material mesh OBJECT joins the registry as the data-driven 'mesh' kind.
-    // Uniform-area: values carry Le + the WORLD total area (the identity-free pdf's one
-    // constant, s²-folded) + triCount (the CDF walk's range). Driven placement excluded
-    // (the §6 pin, Validator-enforced; the skip is the stale-literal backstop).
-    for (const planned of meshes) {
-        const mat = materials[planned.materialId];
-        if (mat === undefined) continue;
-        if (isDrivenPlacement(planned.placement)) continue;
-        const sceneMat = scene.materials[mat.name];
-        if (sceneMat === undefined || sceneMat.sampleAsLight === false) continue;
-        const emission = mat.values[EMISSION_KEY];
-        if (!hasConstantNonzeroEmission(emission)) continue;   // C3: the ONE predicate
-        const src = sceneMeshes(scene.objects)[planned.ordinal];   // the ordinal truth
-        const lslot = dataLayout.meshLights.get(planned.ordinal);
-        if (lslot === undefined) continue;   // backstop: the route predicate ≡ the adapter's (meshIsSamplableEmitter)
-        lights.push({
-            id: lightIndex++, kind: 'mesh', regionId: planned.index,
-            mesh: {
-                ordinal: planned.ordinal, triCount: planned.triCount,
-                tbase: planned.slot.tbase, wposBase: lslot.wposBase, cdfBase: lslot.cdfBase,
-            },
-            values: {
-                radiance: emission as Vec3,
-                area: meshWorldArea(src.positions, src.indices, (planned.placement as Similarity).scale),
-            },
-        });
-    }
+        const regionId = entry.source.object;
+        if (entry.kind !== 'mesh') return { id, kind: entry.kind, regionId, values: entry.values };
+        // A mesh emitter samples its triangles by area: the literal walk range and the channel
+        // bases of its world-position bake and area CDF (the ledger allocated them for exactly
+        // these meshes — meshIsSamplableEmitter, the census predicate).
+        const mesh = meshes.find((m) => m.index === regionId)!;
+        const lslot = dataLayout.meshLights.get(mesh.ordinal)!;
+        return {
+            id, kind: 'mesh', regionId, values: entry.values,
+            mesh: { ordinal: mesh.ordinal, triCount: mesh.triCount, tbase: mesh.slot.tbase, wposBase: lslot.wposBase, cdfBase: lslot.cdfBase },
+        };
+    });
 
     // Selection-power context (impl-plan-directional-beam P6): pbrt's DistantLight
     // formula Φ = E·π·R² needs the scene's bounding radius — stamped on EVERY light
@@ -420,17 +356,6 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         // split, on the SDF arm.
         const sdfTabledSet = new Set(sceneTableTruth.sdf.map((s) => s.sceneIndex));
         for (const o of objects) if (sdfTabledSet.has(o.index)) o.tabled = true;
-        // The region→material mirror assert (impl-plan-region-materials — the light-
-        // roster pattern): the App packs regionMaterialsOf(scene) at the ledger base;
-        // the plan's own region/material assignment must agree id-for-id, or 'data'
-        // programs shade with the wrong materials. Runs only when the tenant exists.
-        const mirror = regionMaterialsOf(scene);
-        const planIds = [...objects, ...meshes, ...instanceBatches].sort((a, b) => a.index - b.index).map((o) => o.materialId);
-        if (mirror.length !== planIds.length || mirror.some((m, i) => m !== planIds[i])) {
-            throw new Error(
-                `region-material drift: regionMaterialsOf(scene) = [${mirror.join(',')}] vs plan = [${planIds.join(',')}] `
-                + `— the census in dataTenants.ts must mirror the Planner's region/material assignment (impl-plan-region-materials)`);
-        }
         sceneTable = {
             slot: dataLayout.sceneTable,
             regionMaterialsBase: dataLayout.regionMaterials?.base ?? -1,
@@ -444,22 +369,10 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         };
     }
 
-    // --- The light tree's baked slot + the roster ⇄ plan consistency assert
-    // (fable-light-bvh §5): the ledger allocated regions from lightRosterOf(scene) —
-    // entry k there must BE planned light k, or the App packs at bases the generated
-    // walk doesn't read. Kind-for-kind is the runtime check (cheap, loud); values
-    // equality is the vitest invariant's job.
-    const lightRoster = lightRosterOf(scene);
-    if (lightRoster.length !== lights.length || lightRoster.some((rl, i) => rl.kind !== lights[i].kind)) {
-        throw new Error(
-            `light roster drift: lightRosterOf(scene) = [${lightRoster.map((rl) => rl.kind).join(', ')}] `
-            + `vs plan.lights = [${lights.map((l) => l.kind).join(', ')}] — the census in dataTenants.ts `
-            + `must mirror the Planner's desugar routes (fable-light-bvh §5)`);
-    }
-    // Batch instance lights (fable-light-bvh §7 stage 2): the adapter's eligibility
-    // list lowers to the GLOBAL light-index bases — registry roster first, then each
-    // eligible batch's instances in record order.
-    let lightBase = lightRoster.length;
+    // --- The light tree's baked slot. Batch instance lights (fable-light-bvh §7 stage 2) take
+    // the GLOBAL light-index bases after the registry lights: each eligible batch's instances
+    // in record order.
+    let lightBase = lights.length;
     const instanceLights = sceneLightBatches.map(({ ordinal, count }) => {
         const entry = { ordinal, base: lightBase, count };
         lightBase += count;
@@ -470,9 +383,9 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
             treeBase: dataLayout.lightTree.treeBase,
             tableBase: dataLayout.lightTree.tableBase,
             trailsBase: dataLayout.lightTree.trailsBase,
-            strideTexels: lightRoster.length > 0 ? lightTableLayout(lightRoster.map((rl) => rl.kind)).strideTexels : 0,
+            strideTexels: lights.length > 0 ? lightTableLayout(lights.map((l) => l.kind)).strideTexels : 0,
             count: lightBase,
-            registryCount: lightRoster.length,
+            registryCount: lights.length,
             instanceLights,
         }
         : undefined;
@@ -485,6 +398,7 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         objects,
         meshes,
         instanceBatches,
+        data: { tenants: dataTenantsResult, layout: dataLayout },
         ...(sceneTable !== undefined ? { sceneTable } : {}),
         ...(lightTree !== undefined ? { lightTree } : {}),
         materials,

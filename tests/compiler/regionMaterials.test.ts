@@ -4,12 +4,11 @@
 // regionMaterials tenant) and ior_of decomposes to ior_of_material(material_of(r), p)
 // — generated size follows the MATERIAL count. Under UNROLLED dispatch the baked
 // constant arms are byte-untouched (the strongest gate: small scenes cannot move).
-// The scene-side mirror (regionMaterialsOf) is Planner-ASSERTED on every tabled
-// compile, so the desugared-light case below is the drift test.
+// The ids the App packs come from the Planner's own region/material assignment (the
+// scene-data plan), so the desugared-light case below checks that assignment.
 
 import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
-import { regionMaterialsOf } from '../../src/compiler/plan/dataTenants.js';
 import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
 
 const compiler = new Compiler();
@@ -55,9 +54,11 @@ const mainSource = (dispatch: 'unrolled' | 'table'): string => {
 };
 
 describe('region→material decomposition (impl-plan-region-materials)', () => {
-    it('the scene-side mirror counts every region class (delta lights shift nothing)', () => {
+    it('the packed ids cover every region class (delta lights shift nothing)', () => {
         // objects a,b,glass,a = ids [0,1,2,0]; the quad light mints material 3 as region 4.
-        expect(regionMaterialsOf(scene)).toEqual([0, 1, 2, 0, 3]);
+        const { sceneData } = compiler.compileScene(scene, [strategy('table')]);
+        expect(sceneData.regionMaterials?.ids).toEqual([0, 1, 2, 0, 3]);
+        expect(sceneData.regionMaterials?.texels).toBe(2);
     });
 
     it("'table' dispatch emits the DATA forms — a fetch, no per-region arms", () => {

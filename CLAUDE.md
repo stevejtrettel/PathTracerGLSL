@@ -70,8 +70,10 @@ How a program is assembled:
   (`Compiler.compileScene`) and share one layout, which holds the optional structures
   (CWBVH, light tree, object table) only if some renderer reads them (`DataReads`).
   `planDataLayout` (components/data/ledger.ts) is the one layout; `dataTenantsOf`
-  (compiler/plan/dataTenants.ts) feeds it, and the Planner (baked offsets) and the App
-  (packed bytes) call it with the same `DataReads`. The App compiles before it packs.
+  (compiler/plan/dataTenants.ts) feeds it. The compiler also returns a scene-data plan
+  (`CompiledScene.sceneData`, compiler/sceneData.ts) saying what to pack where; the App
+  executes it (app/sceneData.ts) and derives nothing from the scene itself. The App compiles
+  before it packs.
 - **Which scene objects are lights** has one answer: `samplableEmitterObjects` in
   dataTenants.ts (with the authored `lights` it forms `lightRosterOf`). Use it; don't
   re-derive it.

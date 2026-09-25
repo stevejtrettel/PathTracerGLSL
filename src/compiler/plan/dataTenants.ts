@@ -7,7 +7,7 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads } from '../types.js';
+import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission } from '../types.js';
 import type { ProgramDescription } from './types.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression, isValueParam, isBlackbody } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
@@ -191,34 +191,40 @@ export function samplableEmitterObjects(scene: SceneDescription): EmitterObject[
     return out;
 }
 
-/** One light-roster entry: the kind + its UNRESOLVED registry values (driven rows stay
- *  ValueParam/Blackbody; consumers resolve). Mesh entries carry empty values — their
- *  geometry lives in the rail; radiance/area are real row values (mesh treeBounds). */
+/** One light-roster entry: the kind, its UNRESOLVED registry values (driven rows stay
+ *  ValueParam/Blackbody; consumers resolve), and where it came from — an authored light
+ *  (index into scene.lights) or an emissive object (index into scene.objects, which is also
+ *  its region id). */
 export interface LightRosterEntry {
     kind: string;
     values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
+    source: { authored: number } | { object: number };
 }
 
-/** The scene-side light CENSUS (fable-light-bvh §5) — the ONE roster truth feeding the
- *  lightTree tenant AND the App's table/tree/trails pack. It mirrors the Planner's
- *  three desugar routes IN ORDER (authored lights → sampleAsLight analytics → mesh
- *  emitters), so entry k here IS planned light k; the Planner asserts the kinds match
- *  (drift = loud error), and a vitest invariant pins values equality across the suite. */
+/** An authored light's emission as the light and its backing material use it: a {param}
+ *  passes through (the same uniform drives both), a constant blackbody folds to a spectrum,
+ *  a scalar broadcasts. One function, so the light's values and its region's emission can
+ *  never differ (pt ≡ pt-nee). */
+export function authoredLightEmission(e: LightEmission): number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue {
+    return isValueParam(e) ? e
+        : isBlackbody(e) ? foldBlackbody(e)
+        : (typeof e === 'number' ? [e, e, e] : e);
+}
+
+/** THE light registry, in light-id order (= selection-CDF order): authored lights (scene
+ *  order), then emissive analytic objects, then emissive meshes (samplableEmitterObjects'
+ *  order). The Planner builds its lights from this list, and the data layout sizes the light
+ *  table and tree from it — one list, so they cannot disagree. */
 export function lightRosterOf(scene: SceneDescription): LightRosterEntry[] {
     const roster: LightRosterEntry[] = [];
 
-    // Route 1 — authored lights (unregistered kinds are Validator-rejected; skipped
-    // exactly as the Planner skips them).
-    for (const light of scene.lights) {
+    // Authored lights (unregistered kinds are Validator-rejected, and skipped here).
+    scene.lights.forEach((light, lightIndex) => {
         const d = LIGHT_KINDS[light.kind];
-        if (d === undefined) continue;
-        const e = light.emission;
-        const product = isValueParam(e) ? e
-            : isBlackbody(e) ? foldBlackbody(e)
-            : (typeof e === 'number' ? [e, e, e] : e);
+        if (d === undefined) return;
         const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
-        roster.push({ kind: light.kind, values: d.toValues(authored, product as number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue) });
-    }
+        roster.push({ kind: light.kind, values: d.toValues(authored, authoredLightEmission(light.emission)), source: { authored: lightIndex } });
+    });
 
     // Routes 2 and 3 — emissive OBJECTS, from the one census (samplableEmitterObjects),
     // in its order: analytic objects, then meshes. The material emission is constant by
@@ -235,12 +241,14 @@ export function lightRosterOf(scene: SceneDescription): LightRosterEntry[] {
             roster.push({
                 kind,
                 values: { radiance: Le, area: meshWorldArea(o.positions, o.indices, similarityFromTransform(o.transform).scale) },
+                source: { object: index },
             });
         } else {
             roster.push({
                 kind,
                 values: LIGHT_KINDS[kind].valuesFromRegion!(
                     foldPlacementIntoParameters(o.type, o.parameters, similarityFromTransform(o.transform)), Le),
+                source: { object: index },
             });
         }
     }
@@ -298,30 +306,11 @@ export function batchNeedsInterior(b: InstancedObject, scene: SceneDescription):
         : PRIMITIVES[b.prototype.type]?.thin !== true;
 }
 
-/**
- * Region id → material id, SCENE-SIDE (impl-plan-region-materials — the census
- * pattern: the ONE mirror of the Planner's region/material assignment, packed by the
- * App and Planner-ASSERTED kind-for-kind like the light roster, so drift is loud).
- *
- * Region ids are scene.objects positions (every entry — primitive, mesh, instanced —
- * takes exactly one), followed by the desugared HITTABLE-light regions in authored
- * light order. Material ids are scene.materials insertion order (the pinned id rule),
- * followed by the minted `__light_*` materials — one per hittable light, in the same
- * order, so the j-th hittable light's region maps to id authoredCount + j.
- */
-export function regionMaterialsOf(scene: SceneDescription): number[] {
-    const matIds = new Map(Object.keys(scene.materials).map((name, i) => [name, i]));
-    const ids = scene.objects.map((o) => {
-        const name = isPrimitiveObject(o) || isMeshObject(o) ? o.material : (o as InstancedObject).prototype.material;
-        return matIds.get(name) ?? -1;   // unknown names are Validator-rejected; -1 keeps the mirror total
-    });
-    let minted = matIds.size;
-    for (const light of scene.lights) {
-        const d = LIGHT_KINDS[light.kind];
-        if (d === undefined || d.region === undefined) continue;   // delta kinds: no region, no material
-        ids.push(minted++);
-    }
-    return ids;
+/** The number of regions: one per scene object (every kind takes exactly one region id,
+ *  in scene order), plus one per authored light that desugars to a hittable region. The
+ *  ids themselves are the Planner's assignment (RenderPlan objects/meshes/instanceBatches). */
+export function regionCountOf(scene: SceneDescription): number {
+    return scene.objects.length + scene.lights.filter((l) => LIGHT_KINDS[l.kind]?.region !== undefined).length;
 }
 
 /** The scene's data tenants, laid out for exactly the optional structures in `reads` (the
@@ -451,7 +440,7 @@ export function dataTenantsOf(scene: SceneDescription, reads: DataReads): SceneD
             lightTree,
             // Allocated with the table (only 'table' programs read the data form of
             // material_of); count covers EVERY region incl. desugared light regions.
-            regionMaterials: table !== null ? { count: regionMaterialsOf(scene).length } : null,
+            regionMaterials: table !== null ? { count: regionCountOf(scene) } : null,
         },
         batchGeometrySlot,
         batchPlacementRecord,

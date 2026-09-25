@@ -6,6 +6,8 @@ import { validate } from './analyze/Validator.js';
 import { plan, programDecisions } from './plan/Planner.js';
 import { dataReadsOf, unionDataReads } from './plan/dataTenants.js';
 import { generate } from './generate/Generator.js';
+import { sceneDataPlanOf } from './sceneData.js';
+import type { RenderPlan } from './plan/types.js';
 import { DiagnosticBag } from '../errors/core/DiagnosticBag.js';
 import { validateCompiledRenderer } from '../errors/compiler/validation.js';
 
@@ -33,11 +35,13 @@ export class Compiler implements ICompiler {
 
         const dataReads = unionDataReads(strategies.map((s) => dataReadsOf(programDecisions(features, scene, s))));
 
+        const plans: RenderPlan[] = [];
         const renderers = strategies.map((strategy) => {
             const bag = new DiagnosticBag('compiler');
             // The Planner emits diagnostics like every stage (review C8).
             const renderPlan = plan(features, scene, strategy, bag, dataReads);
             bag.throwIfErrors();
+            plans.push(renderPlan);
             const renderer = generate(renderPlan, scene, strategy, bag);
             bag.throwIfErrors();
             // The compiled output's structure, checked before the engine ever sees it.
@@ -46,6 +50,7 @@ export class Compiler implements ICompiler {
             return renderer;
         });
 
-        return { renderers, dataReads };
+        // Every strategy planned the same scene data against the same layout; any one serves.
+        return { renderers, dataReads, sceneData: sceneDataPlanOf(scene, plans[0]) };
     }
 }

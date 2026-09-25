@@ -22,8 +22,8 @@ describe('scene-data textures (byte fingerprints)', () => {
     const compiler = new Compiler();
     for (const [key, entry] of Object.entries(suite)) {
         it(key, async () => {
-            const { dataReads } = compiler.compileScene(entry.scene, entry.strategies);
-            const packed = await packSceneData(entry.scene, dataReads);
+            const { sceneData } = compiler.compileScene(entry.scene, entry.strategies);
+            const packed = await packSceneData(sceneData);
             const fingerprint = packed === null ? null : {
                 ...Object.fromEntries(Object.entries(packed.channels).map(([c, ch]) => [c, `${ch.width}x${ch.height} ${hash(ch.data)}`])),
                 ...(packed.nodesq !== null ? { nodesq: `${packed.nodesq.width}x${packed.nodesq.height} ${hash(packed.nodesq.data)}` } : {}),
