@@ -114,9 +114,11 @@ declared. Three safety budgets break that quietly. None is reached by a registry
   At 64 that biased groundfog's horizon (64 collisions covered about 15 units, so a shallow
   ray dropped roughly a third of its attenuation); at 1024 those rays cost up to 16× more.
   Enclosing such a fog in a bounded region fixes both; not done to the demos.
-- GRIN's `MAX_ODE_STEPS` is not a truncation of energy: on reaching it the walker hands back
-  the current state and the walk continues, spending one more event. Left at 512 and declared
-  on `maxBounces` (a traversal counts one event per 512 steps).
+- GRIN: a traversal is now one event however long (charging a bounce per 512 steps made the
+  measurement depend on the step size). Long and trapped traversals end by the walker's own
+  roulette every 512 steps (survival 0.9), with a hard stop at 200 rounds (probability ≈ 8·10⁻¹⁰).
+  Witness `grin-long`: 30- and 60-unit `ior: 1` regions at a unit sky read 1; the per-step
+  charge read 0.
 - Export stamps now carry the resolved measurement, defaults included.
 
 ### 1.3 Two smaller GRIN items

@@ -565,9 +565,9 @@ export interface MeasurementDescription {
     response?: 'radiance';
     /** Truncation — limit: ∞. The measurement is the partial sum Σ_{n≤maxBounces} TⁿE:
      *  paths with at most this many scattering events (surface and medium events count;
-     *  null-interface crossings do not). A traversal of a gradient-index (GRIN) region is an
-     *  event too — one per MAX_ODE_STEPS (512) integration steps, so a long or trapped
-     *  traversal spends several, which is what bounds a closed orbit (a Maxwell fisheye).
+     *  null-interface crossings do not). A traversal of a gradient-index (GRIN) region is one
+     *  event, however long it is; the GRIN walker ends long or trapped traversals (a Maxwell
+     *  fisheye orbit) by its own unbiased roulette, so no step count reaches this budget.
      *  0 = directly visible emission only; 1 = one-shot
      *  direct lighting E + TE. Every estimator counts exactly this set of paths.
      *  A non-negative integer. */

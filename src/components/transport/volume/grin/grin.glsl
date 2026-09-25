@@ -20,20 +20,38 @@
 // value-consumed via scene_medium_properties) + per-step EMISSION collection (impl-plan-grin-media
 // batch 1: the E1.5 closed form per step × the (n₀/n)² basic-radiance source factor) + the
 // interior L/n² factor. The absorbing walker's path is DETERMINISTIC (xi unused there — only
-// Verlet truncation bounded by the adaptive step); the SCATTERING arm below (batch 2) consumes
+// Verlet truncation bounded by the adaptive step) up to the long-traversal roulette, which draws
+// from the stream only past GRIN_ROUND_STEPS steps; the SCATTERING arm below (batch 2) consumes
 // xi for the analytic channel-MIS draw in arc length. t_max IS respected (the near-wall
 // straight-transmit guard). Geometry-free interior (§7).
 //
 // Depends on: ior_at (generated — n(x)), scene_medium_properties (generated — σ_a/σ_s/ε fields),
+// random (sampler — the long-traversal roulette),
 // medium_emission (generated — the zero-folding ε accessor), ambient_geodesic (core),
 // scene_region_at + material_of (generated — the exit test, grin_inside), MediumSample (structs_media), spectrum_exp (core
 // math). The step is ADAPTIVE
 // (the DS_MAX/DTOL limiters below — strong fields, e.g. black holes) with GRIN_STEP as its smooth-
 // field ceiling; analytic ∇n (autodiff the ior formula) is the remaining declared polish.
 
-#ifndef MAX_ODE_STEPS
-#define MAX_ODE_STEPS 512       // exit-bound, not cost-bound (smooth media leave in ~100 steps);
-#endif                          // the headroom is for strong-field orbits under the adaptive limiters
+// LONG TRAVERSALS — Russian roulette in rounds. A traversal of the region is ONE event for
+// measurement.maxBounces however many steps it takes (step counts belong to the integrator, not
+// the path: taxonomy §4.1). Long and trapped traversals (a Maxwell fisheye orbit, rays circling a
+// black hole's photon sphere) are ended by roulette instead: every GRIN_ROUND_STEPS steps the ray
+// survives with probability GRIN_ROUND_SURVIVAL and a survivor's weight is divided by it. That is
+// unbiased — E[weight] is unchanged — and it may depend on step counts because it only changes
+// the noise. Radiance already collected stays on a kill: it belongs to the traversal's prefix,
+// which is counted with probability 1. Smooth lenses leave within ~100 steps and never draw.
+// GRIN_MAX_ROUNDS is the loop's hard stop, a step limit that must be unreachable: a traversal
+// reaches it with probability GRIN_ROUND_SURVIVAL^(GRIN_MAX_ROUNDS − 1) = 0.9^199 ≈ 8e-10.
+#ifndef GRIN_ROUND_STEPS
+#define GRIN_ROUND_STEPS 512
+#endif
+#ifndef GRIN_ROUND_SURVIVAL
+#define GRIN_ROUND_SURVIVAL 0.9
+#endif
+#ifndef GRIN_MAX_ROUNDS
+#define GRIN_MAX_ROUNDS 200
+#endif
 #ifndef GRIN_STEP
 #define GRIN_STEP 0.02          // Verlet parameter step ceiling (coordinate length ≈ n·h)
 #endif
@@ -126,6 +144,19 @@ void grin_finish(inout MediumSample ms, float n_in, float n_out, Spectrum absorb
     ms.eta_scale = er * er;
 }
 
+// A traversal that ends inside the region with nothing coming back: captured by a black-hole
+// point (nothing returns from beyond it), killed by the long-traversal roulette, or at the hard
+// stop. Zero weight, not deflected; ms.radiance keeps what the traversal collected before it
+// ended (glowing gas in front of a hole stays visible). The walk's throughput goes to zero.
+MediumSample grin_killed(MediumSample ms, float t_max) {
+    ms.scattered = false;
+    ms.deflected = false;
+    ms.eta_scale = 1.0;
+    ms.t = t_max;
+    ms.weight = SPECTRUM_ZERO;
+    return ms;
+}
+
 // Seam-1 GRIN arm: integrate the ray ODE from ray.origin/direction until the ray leaves region
 // `med`; return the bent ray from just INSIDE the wall (deflected outcome). The wall interaction
 // is NOT subsumed (impl-plan-grin-interface): the walk spawns the exit ray, the next iteration's
@@ -165,7 +196,14 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
     vec3 F = grin_force(med, r);               // carried across steps — velocity Verlet reuses it
     Spectrum absorb = SPECTRUM_ONE;
 
-    for (int i = 0; i < MAX_ODE_STEPS; i++) {
+    for (int i = 0; i < GRIN_MAX_ROUNDS * GRIN_ROUND_STEPS; i++) {
+        // Round boundary: the long-traversal roulette (header). absorb weights everything
+        // collected from here on, so dividing it carries the survivor compensation.
+        if (i > 0 && i % GRIN_ROUND_STEPS == 0) {
+            if (random() >= GRIN_ROUND_SURVIVAL) return grin_killed(ms, t_max);
+            absorb /= GRIN_ROUND_SURVIVAL;
+        }
+
         // n from the carried |T| = n invariant (exact at entry, symplectically bounded after) —
         // the limiters and the capture test need no extra field evaluation.
         float n = length(T);
@@ -175,13 +213,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         // collected along the sightline (ms.radiance — glowing gas in front of the hole
         // stays visible; the plunge itself contributes zero). A deterministic zero-weight
         // terminator: the walk's throughput goes to zero and roulette reaps the path.
-        if (n > GRIN_CAPTURE) {
-            ms.deflected = false;
-            ms.eta_scale = 1.0;
-            ms.t = t_max;
-            ms.weight = SPECTRUM_ZERO;
-            return ms;
-        }
+        if (n > GRIN_CAPTURE) return grin_killed(ms, t_max);
 
         // The adaptive step: h·n ≤ DS_MAX (coordinate cap) and h·|∇n| ≤ DTOL (field-change
         // cap, |∇n| = |F|/n). Far from mass neither binds and h = GRIN_STEP.
@@ -239,14 +271,8 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         F = F_next;
     }
 
-    // MAX_ODE_STEPS reached inside the region (a long or trapped path): hand back the current
-    // state as a deflected outcome. Nothing is dropped: the walk records it as an event and
-    // re-enters the medium from here, so a traversal counts one event per MAX_ODE_STEPS steps
-    // against measurement.maxBounces, which is what bounds a trapped orbit.
-    ms.exit_p   = r;
-    ms.exit_dir = normalize(T);
-    grin_finish(ms, n0, length(T), absorb);
-    return ms;
+    // The hard stop (probability ≈ 8e-10 per traversal — header).
+    return grin_killed(ms, t_max);
 }
 
 // Seam-1 GRIN SCATTERING arm (impl-plan-grin-media batch 2): the analytic arm's channel-MIS
@@ -302,16 +328,15 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
     vec3 T = n0 * ray.direction;
     vec3 F = grin_force(med, r);
     float s_acc = 0.0;                                 // accumulated arc length
+    float round_comp = 1.0;                            // 1/survival^rounds — the roulette's compensation
 
-    for (int i = 0; i < MAX_ODE_STEPS; i++) {
-        float n = length(T);
-        if (n > GRIN_CAPTURE) {                        // horizon: nothing returns, event or not
-            ms.deflected = false;
-            ms.eta_scale = 1.0;
-            ms.t = t_max;
-            ms.weight = SPECTRUM_ZERO;
-            return ms;
+    for (int i = 0; i < GRIN_MAX_ROUNDS * GRIN_ROUND_STEPS; i++) {
+        if (i > 0 && i % GRIN_ROUND_STEPS == 0) {      // the long-traversal roulette (header)
+            if (random() >= GRIN_ROUND_SURVIVAL) return grin_killed(ms, t_max);
+            round_comp /= GRIN_ROUND_SURVIVAL;
         }
+        float n = length(T);
+        if (n > GRIN_CAPTURE) return grin_killed(ms, t_max);   // horizon: nothing returns, event or not
         float h = min(GRIN_STEP, GRIN_DS_MAX / n);
         h = min(h, GRIN_DTOL * n / max(length(F), 1e-6));
 
@@ -343,7 +368,7 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
             ms.t         = s_star;
             ms.exit_dir  = normalize(T_half);
             ms.exit_p    = r + ds_event * ms.exit_dir;
-            ms.weight    = m0.sigma_s * tr / (max(pdf, 1e-20) * er * er);
+            ms.weight    = round_comp * m0.sigma_s * tr / (max(pdf, 1e-20) * er * er);
             ms.eta_scale = er * er;
             return ms;
         }
@@ -360,7 +385,7 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
             float    pdf = spectrum_average(spectrum_exp(-sigma_t * (s_acc + ds_wall)));
             ms.exit_dir  = normalize(T_half);
             ms.exit_p    = r + t_exit * ms.exit_dir;
-            ms.weight    = tr / (max(pdf, 1e-20) * er * er);
+            ms.weight    = round_comp * tr / (max(pdf, 1e-20) * er * er);
             ms.eta_scale = er * er;
             return ms;
         }
@@ -372,17 +397,6 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
         F = F_next;
     }
 
-    // MAX_ODE_STEPS reached: hand back the current state as a deflected outcome, as the
-    // deterministic arm does (nothing dropped; one more event against maxBounces), with the
-    // survive weight at the accumulated arc.
-    {
-        float er = length(T) / n0;
-        Spectrum tr  = spectrum_exp(-sigma_t * s_acc);
-        float    pdf = spectrum_average(tr);
-        ms.exit_p    = r;
-        ms.exit_dir  = normalize(T);
-        ms.weight    = tr / (max(pdf, 1e-20) * er * er);
-        ms.eta_scale = er * er;
-    }
-    return ms;
+    // The hard stop (probability ≈ 8e-10 per traversal — header).
+    return grin_killed(ms, t_max);
 }

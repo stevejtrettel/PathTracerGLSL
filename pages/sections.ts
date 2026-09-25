@@ -45,7 +45,7 @@ export const gallerySections: GallerySection[] = [
             e('grin-glass', 'grin-glass-ref'),
             e('grin-emit', 'grin-emit-ref'),
             e('grin-scatter', 'grin-scatter-ref'),
-            e('grin-furnace'), e('grin-furnace-hard'), e('grin-furnace-emit'), e('grin-furnace-scatter'),
+            e('grin-furnace'), e('grin-furnace-hard'), e('grin-furnace-emit'), e('grin-furnace-scatter'), e('grin-long'),
         ],
     },
     {

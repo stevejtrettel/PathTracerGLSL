@@ -4,6 +4,28 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — GRIN: one event per traversal, unbiased roulette for long ones
+
+A GRIN traversal charged one bounce per 512 integration steps (`MAX_ODE_STEPS`), so which paths
+the measurement kept depended on the integrator's step size — a step limit charged against a
+budget, which taxonomy §4.1 forbids. Now:
+
+- **A traversal is one event** of `measurement.maxBounces`, however long it is.
+- **Long and trapped traversals end by Russian roulette inside the walker**: every
+  `GRIN_ROUND_STEPS` (512) steps the ray survives with probability `GRIN_ROUND_SURVIVAL` (0.9)
+  and a survivor's weight is divided by it. Unbiased; only those rays get noisier. Radiance
+  collected before a kill is kept (it belongs to the prefix). The walker owns the roulette, so it
+  works with the strategy's roulette off (ratio tracking's precedent). Both arms (absorbing and
+  scattering) do this; capture, roulette kill and the hard stop share `grin_killed`.
+- **Hard stop**: `GRIN_MAX_ROUNDS` (200) rounds, reached with probability 0.9¹⁹⁹ ≈ 8·10⁻¹⁰ per
+  traversal. `MAX_ODE_STEPS` is gone.
+
+Lenses that leave within 512 steps (every registry GRIN witness) never draw and are unchanged.
+New witness `grin-long`: an orthographic view through a 30-unit and a 60-unit `ior: 1` region at
+a unit sky with maxBounces 1. The old walker read 0.0000 on both halves (the bounce budget cut
+every ray); now 1.0000 (2 rounds) and 1.0009 (5 rounds). Targeted run: grin-long and the eight
+GRIN witnesses, 10 checks, all pass (furnaces 0.3989–0.4002 against 0.4). Full sweep not run.
+
 ## 2026-09-25 — budgets vs step limits (taxonomy §4.1), and a survey of the step limits
 
 The taxonomy now separates **budgets** (truncations: predicates on paths, counted the same way

@@ -216,6 +216,8 @@ exports[`scene-data textures (byte fingerprints) > grin-glass 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > grin-glass-ref 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > grin-long 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > grin-scatter 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > grin-scatter-ref 1`] = `null`;

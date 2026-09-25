@@ -426,3 +426,39 @@ export const grinFurnaceHardStrategy: RenderStrategy = {
     },
     view: { tonemap: { type: 'reinhard' } },
 };
+
+// ---------------------------------------------------------------------------
+// grin-long — a traversal is ONE event however many steps it takes (taxonomy §4.1), and the
+// walker's long-traversal roulette is unbiased. An orthographic camera looks down −z through two
+// `ior: 1` boxes (straight rays, weight 1) at a constant sky of radiance 1: the left box is 30
+// units deep (1500 Verlet steps at GRIN_STEP = 0.02 — 2 roulette rounds), the right one 60 (3000
+// steps — 5 rounds). With maxBounces 1 every pixel is exactly 1: camera → traversal (the one
+// event) → sky. A per-step-count charge against the bounce budget reads 0 here, and a biased
+// give-up reads below 1 on the right more than on the left. Survivors carry 1/0.9^k, so the
+// noise grows with the depth; the mean does not move.
+// ---------------------------------------------------------------------------
+
+export const grinLongScene: SceneDescription = {
+    id: 'grin-long',
+    name: 'Two long ior:1 regions in front of a unit sky (one event per traversal)',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        { type: 'box', parameters: { center: [-0.41, 0, -15.1], halfSize: [0.39, 0.6, 15] }, material: 'vacuum', name: 'short' },
+        { type: 'box', parameters: { center: [0.41, 0, -30.1], halfSize: [0.39, 0.6, 30] }, material: 'vacuum', name: 'long' },
+    ],
+    materials: {
+        vacuum: { model: 'none', medium: { ior: 1.0 } },
+    },
+    lights: [],
+    environment: { type: 'constant', color: [1, 1, 1], intensity: 1.0 },
+};
+
+export const grinLongStrategy: RenderStrategy = {
+    id: 'pt',
+    measurement: {
+        camera: { type: 'orthographic', scale: 0.5 },   // film ±0.67 × ±0.5: every ray crosses a box or the 0.04 gap
+        maxBounces: 1,
+    },
+    estimator: { directLighting: 'none', russianRoulette: null, accumulation: { type: 'average' } },
+    view: { tonemap: { type: 'reinhard' } },
+};

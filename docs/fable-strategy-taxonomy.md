@@ -117,8 +117,10 @@ Known step limits that can still decide the picture: the SDF marcher's step budg
 (`MAX_MARCH_STEPS` or a shape's `stepBudget`) when a ray runs out of steps FARTHER than the
 grazing rule's band from a surface — it reports a miss and leaves the rest of the shape's
 interval unexplored (a ray skimming just outside a surface for a long way, or crawling through
-a fractal); the tracking collision cap where the Planner warns; GRIN's `MAX_ODE_STEPS`, which is
-charged against `maxBounces` until the unbiased give-up rule for long traversals is designed.
+a fractal); and the tracking collision cap where the Planner warns. GRIN shows the pattern for
+giving up without bias: a traversal is one event however long, long traversals end by Russian
+roulette every 512 steps (unbiased; it may depend on step counts because it only changes noise),
+and the loop's hard stop is reached with a stated probability (≈ 8·10⁻¹⁰ per traversal).
 
 ## 5. The camera lives in measurement
 

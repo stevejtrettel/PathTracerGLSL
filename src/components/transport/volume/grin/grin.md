@@ -52,8 +52,9 @@ wall's material decides the interface**. `t_max` is respected as a guard: a wall
 step returns a plain straight-transmitted outcome (this terminates the near-wall handoff).
 The walker also applies the **interior basic-radiance factor** `(n_in/n_out)²` (L/n² invariant
 along the curved ray; `= (|T_in|/|T_out|)²`, free) and reports its inverse in `ms.eta_scale`
-for the §7.2 RR metric. `xi` unused: no random choice — the path is **deterministic**, no
-Monte-Carlo bias, only Verlet truncation bounded by `GRIN_STEP`.
+for the §7.2 RR metric. `xi` unused: the path is **deterministic**, no Monte-Carlo bias, only
+Verlet truncation bounded by `GRIN_STEP` — except that a traversal longer than
+`GRIN_ROUND_STEPS` meets the long-traversal roulette (below).
 
 ## One ior, two accessors
 
@@ -100,9 +101,17 @@ two generated projections, consumed differently:
   so terminating there is EXACT for the image. The shadow is dynamics, not drawn geometry.
   Inert for weak fields (Luneburg peaks at √2). The TS twin pins the MP field end to end
   (Bouguer through a strong-field flyby + GR's weak-field deflection 4M/b within 2%).
-- Knobs: `MAX_ODE_STEPS` (512 — exit-bound budget; exhaustion = conservative pass-through),
-  `GRIN_STEP` (the smooth-field step ceiling), `GRIN_DS_MAX`/`GRIN_DTOL` (the strong-field
-  limiters), `GRIN_CAPTURE`, `GRIN_BISECT_ITERS` (exit refinement depth). All `#ifndef`-
-  guarded; per-region scale-DERIVED defaults are the remaining plan-time polish.
+- **Long traversals**: a traversal is ONE event of `measurement.maxBounces` however many
+  steps it takes (step counts belong to the integrator, not the path — taxonomy §4.1). Long
+  and trapped traversals (a Maxwell fisheye orbit, the photon sphere) end by Russian roulette:
+  every `GRIN_ROUND_STEPS` (512) steps the ray survives with probability
+  `GRIN_ROUND_SURVIVAL` (0.9) and survivors are divided by it — unbiased, noisier only for
+  those rays. Radiance collected before a kill stays (it belongs to the prefix). The loop's
+  hard stop, `GRIN_MAX_ROUNDS` (200) rounds, is reached with probability 0.9¹⁹⁹ ≈ 8·10⁻¹⁰ per
+  traversal. Witness `grin-long` (30- and 60-unit `ior: 1` regions at a unit sky read 1).
+- Knobs: `GRIN_STEP` (the smooth-field step ceiling), `GRIN_DS_MAX`/`GRIN_DTOL` (the
+  strong-field limiters), `GRIN_CAPTURE`, `GRIN_BISECT_ITERS` (exit refinement depth), and the
+  three roulette constants above. All `#ifndef`-guarded; per-region scale-DERIVED defaults are
+  the remaining plan-time polish.
 - **Spectral-ready:** the `ior` formula gains a wavelength `λ` when the spectral axis lands
   (dispersion `n(λ)`), with nothing to change here now.

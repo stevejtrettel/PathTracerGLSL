@@ -45,7 +45,7 @@ import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterial
 import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
 import { nullBudgetViewScene, nullViewStrategies, NULL_VIEW_POSE, NULL_VIEW_THROUGH, nullBudgetScene, nullBudgetStrategies, NULL_BUDGET_POSE, SLABS } from './scenes/nullBudgetWitness.js';
 import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN, sunHazeScene, sunHazeStrategy, SUN_HAZE_CAMERA, SUN_HAZE_CENTER } from './scenes/precisionWitness.js';
-import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
+import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy, grinLongScene, grinLongStrategy } from './scenes/grinWitness.js';
 import {
     slabScene, slabStrategy,
     furnaceScatterScene, furnaceScatterStrategy,
@@ -335,6 +335,20 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         witness: {
             spp: 96,
             checks: [{ kind: 'mean', value: 0.4, tol: 0.006, label: 'GRIN furnace 0.4/channel' }],
+        },
+    },
+    'grin-long': {
+        scene: grinLongScene,
+        strategies: posed([0, 0, 2], [0, 0, -10], grinLongStrategy),
+        exercises: 'a GRIN traversal is ONE event however long (taxonomy §4.1), and the walker ends long traversals by an unbiased roulette every 512 steps: an orthographic view through a 30-unit (left, 2 rounds) and a 60-unit (right, 5 rounds) ior:1 region at a unit sky, maxBounces 1',
+        expected: 'both halves read exactly 1 (a step-count charge against the bounce budget reads 0; a biased give-up reads low, more so on the right); the right half is noisier than the left',
+        witness: {
+            spp: 64,
+            // σ of each half's mean ≈ 0.0007 (left) and 0.0011 (right) at 64 spp.
+            checks: [
+                { kind: 'mean', value: 1, tol: 0.006, region: { x: 0.05, y: 0.1, w: 0.4, h: 0.8 }, label: '30-unit traversal (2 roulette rounds)' },
+                { kind: 'mean', value: 1, tol: 0.006, region: { x: 0.55, y: 0.1, w: 0.4, h: 0.8 }, label: '60-unit traversal (5 roulette rounds)' },
+            ],
         },
     },
     // Fixture partner: the plain-dielectric half of the hard-interface glass twin.
