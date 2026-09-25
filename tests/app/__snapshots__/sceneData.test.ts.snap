@@ -1,0 +1,692 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`scene-data textures (byte fingerprints) > accel-triple 1`] = `
+{
+  "indices": "4096x1 104ba4ece9989313",
+  "nodes": "4096x1 0fb72f4a5b881655",
+  "normals": "4096x1 de2f256064a0af79",
+  "records": "4096x1 681dafcae0aac626",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 1c93ccae57718d8e",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > accretion 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > analytic-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > analytic-minimal 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > attr-twin 1`] = `
+{
+  "nodes": "4096x1 bc5f5498768d3f59",
+  "records": "4096x1 e947b82aab338a20",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > attr-twin-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > bazaar 1`] = `
+{
+  "indices": "4096x1 6cfe99f7191ae7e3",
+  "nodes": "4096x1 e314455cb5b0f5ae",
+  "normals": "4096x1 de2f256064a0af79",
+  "records": "4096x1 2927830b3ac5f064",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 2611cedfea544eb6",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > beam-fog 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > beam-slab 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > beam-wall 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > blackhole 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > bounce-budget 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cacti 1`] = `
+{
+  "indices": "4096x2 52acce35509eb4a8",
+  "nodes": "4096x5 0b5dbcb21d65fb96",
+  "normals": "4096x3 29b95bf3d8a09561",
+  "records": "4096x1 45f2d92ef1c50dff",
+  "uvs": "4096x3 3381de4ca9f3a477",
+  "vertices": "4096x3 7f5067cef940549a",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > charts 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > chrome 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > clamp 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > clamp-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conjugation 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conjugation-base 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cornell 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cornell-area 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cornell-area-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cornell-disk 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cornell-fisheye 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cornell-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cornell-oneshot 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cube-cloud 1`] = `
+{
+  "nodes": "4096x1 0da1939d9b7b2faa",
+  "records": "4096x1 420d1ce19892a13e",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > cube-cloud-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > custom-fields 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > cylinders 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > disk-bake 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > disk-bake-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > driven 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > driven-baked-theta 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > driven-baked-theta2 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > driven-theta2 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > embers 1`] = `
+{
+  "nodes": "4096x9 b6ae125c4d9b689a",
+  "records": "4096x3 17b175cb92c98353",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > emit 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > emit-driven 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > emit-sat 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > emit-scatter 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > emit-swap 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > eta 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > expr-const 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > expr-const-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > field-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > flatten-tree 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > fog-area 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > fog-panel 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > fog-sky 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > fogblobs 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > fogcube 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > forest 1`] = `
+{
+  "indices": "4096x1 7c24ead49bb1a513",
+  "nodes": "4096x2 b7b77699d93d9c94",
+  "normals": "4096x1 a874b6b60c056365",
+  "records": "4096x1 957e30b9f56afe3b",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 2729c810a0f77358",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > fractals 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > furnace-scatter 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > furnace-sky 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > glass-inclusion 1`] = `
+{
+  "nodes": "4096x1 5903415b41a0a4d4",
+  "records": "4096x1 94b01dd94dc255a8",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > glass-lab 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > glassball 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > glow-shell 1`] = `
+{
+  "nodes": "4096x1 925ea92c82586fdf",
+  "records": "4096x1 40cfc0e984625869",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > glowblobs 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grand-bazaar 1`] = `
+{
+  "indices": "4096x1 4c238750ec5293ec",
+  "nodes": "4096x4 dab4ccb68a2c5925",
+  "normals": "4096x2 1ce61e0a19eb7c1a",
+  "records": "4096x1 d7a675e8028575d6",
+  "uvs": "4096x2 fa43239bcee7b97c",
+  "vertices": "4096x2 abf3e8cd1e2fe901",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > grin 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-emit 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-emit-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-furnace-emit 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-furnace-hard 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-furnace-scatter 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-glass-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-scatter 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-scatter-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-vacuum 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > grin-vacuum-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > groundfog 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > gyroid-field 1`] = `
+{
+  "nodes": "4096x1 9cbb174d926447a3",
+  "records": "4096x1 1ff853b17e39e526",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > haze 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > hearth 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > het-const 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > het-const-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > het-driven 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > het-driven-baked 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > het-driven-baked2 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > het-driven-theta2 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > het-slab 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > hundred-spheres 1`] = `
+{
+  "nodes": "4096x1 56c4ba8dc1be8a03",
+  "records": "4096x1 0da2482c95cd5bcb",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-fog 1`] = `
+{
+  "nodes": "4096x1 fd78820a418c0092",
+  "records": "4096x1 5b073dfab7f09586",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-fog-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > instance-glass 1`] = `
+{
+  "nodes": "4096x1 fd78820a418c0092",
+  "records": "4096x1 5b073dfab7f09586",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-glass-mesh 1`] = `
+{
+  "indices": "4096x1 6cfe99f7191ae7e3",
+  "nodes": "4096x1 b08057baf6b376a0",
+  "normals": "4096x1 de2f256064a0af79",
+  "records": "4096x1 31d44a29b3bdc286",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 dde4362d374f4bbd",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-glass-mesh-ref 1`] = `
+{
+  "indices": "4096x1 104ba4ece9989313",
+  "nodes": "4096x1 e43800e503b8fa02",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 535de0dd86ece533",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-glass-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > instance-lights 1`] = `
+{
+  "nodes": "4096x1 1d2189f755339fb9",
+  "records": "4096x1 1a5befc57432ac6f",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-lights-ref 1`] = `
+{
+  "nodes": "4096x1 46552e61535510d5",
+  "records": "4096x1 6a3a4630a98dbfea",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-params-frame 1`] = `
+{
+  "nodes": "4096x1 c0ea3bc3ceeabb02",
+  "records": "4096x1 50529e5efa4af5e8",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-params-twin 1`] = `
+{
+  "nodes": "4096x1 c0ea3bc3ceeabb02",
+  "nodesq": "4096x1 13ee313243f5e2ab",
+  "records": "4096x1 e9141a1f6d0445f3",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-twin 1`] = `
+{
+  "nodes": "4096x1 bc5f5498768d3f59",
+  "records": "4096x1 5bf4161ff595e3d4",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > instance-twin-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > laser 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > laser-soft 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > light-driven 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > light-driven-baked 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > light-driven-baked2 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > light-driven-theta2 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > light-off 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > light-off-baked 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > marble 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > maxwell 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-fog 1`] = `
+{
+  "indices": "4096x1 6cfe99f7191ae7e3",
+  "nodes": "4096x1 ba71f0efd9bd4804",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 7d6ed4f13541678b",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-fog-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-furnace 1`] = `
+{
+  "indices": "4096x1 6cfe99f7191ae7e3",
+  "nodes": "4096x1 536cf794662bae71",
+  "normals": "4096x1 de2f256064a0af79",
+  "records": "4096x1 eb0114b8ec28c0bf",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 7c401ae276948187",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-glass-box 1`] = `
+{
+  "indices": "4096x1 6cfe99f7191ae7e3",
+  "nodes": "4096x1 ba71f0efd9bd4804",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 7d6ed4f13541678b",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-glass-box-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-instance-ref 1`] = `
+{
+  "indices": "4096x1 f3af05c342522f76",
+  "nodes": "4096x1 52640ed3c1e3eb50",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 ff7436828a18330f",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-instance-twin 1`] = `
+{
+  "indices": "4096x1 6cfe99f7191ae7e3",
+  "nodes": "4096x1 66d4e883ff890147",
+  "normals": "4096x1 de2f256064a0af79",
+  "records": "4096x1 c8677b49b1fa7320",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 7d25b7e72aaf09e2",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-light-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-light-twin 1`] = `
+{
+  "indices": "4096x1 06d40912ce8f268d",
+  "nodes": "4096x1 d4b3ce2d8ccb957c",
+  "normals": "4096x1 de2f256064a0af79",
+  "records": "4096x1 e1402700f11a44f9",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 062db10da82170e0",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-quad-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-quad-twin 1`] = `
+{
+  "indices": "4096x1 844921fed1be5454",
+  "nodes": "4096x1 22a2daf2856ddfc5",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 5acf60f406060555",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-submerged 1`] = `
+{
+  "indices": "4096x1 6cfe99f7191ae7e3",
+  "nodes": "4096x1 ba71f0efd9bd4804",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 7d6ed4f13541678b",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > mesh-submerged-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > meshes 1`] = `
+{
+  "indices": "4096x1 0e1c4570c9debaec",
+  "nodes": "4096x1 e62ca2b20bb9c572",
+  "normals": "4096x1 2751125b284d97b7",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 a1a5ca10428b4997",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > minimal 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > mirror 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > mist 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > mixed 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > models 1`] = `
+{
+  "indices": "4096x2 2057799bd2c23779",
+  "nodes": "4096x8 adde35b7bf98729b",
+  "normals": "4096x2 12fe5dd88ca307b2",
+  "uvs": "4096x2 fa43239bcee7b97c",
+  "vertices": "4096x2 5a3d0333c6e2fc07",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > orb 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > paint 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > perf-cloud 1`] = `
+{
+  "nodes": "4096x196 c69e2d94126a9f4a",
+  "nodesq": "4096x489 15ee7e61aa469353",
+  "records": "4096x98 37b6b08301867cea",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-cloud-frame 1`] = `
+{
+  "nodes": "4096x196 c69e2d94126a9f4a",
+  "records": "4096x98 410f8c4ab045b6bd",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-instance-glass 1`] = `
+{
+  "nodes": "4096x1 b5aec94e14dbef34",
+  "records": "4096x1 b8819b35e6cc53cd",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-instance-opaque 1`] = `
+{
+  "nodes": "4096x1 b5aec94e14dbef34",
+  "records": "4096x1 b8819b35e6cc53cd",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-sdf-0 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > perf-sdf-8 1`] = `
+{
+  "nodes": "4096x1 a56f02752780e8ff",
+  "records": "4096x1 d981dc8239e0a0b3",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-sdf-32 1`] = `
+{
+  "nodes": "4096x1 ad3f7fab0657cc47",
+  "records": "4096x1 693417db69f12665",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-sdf-128 1`] = `
+{
+  "nodes": "4096x1 078b7a0586deedc5",
+  "records": "4096x1 73ea384cc6958fd9",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-sdf-blob 1`] = `
+{
+  "nodes": "4096x1 4dda321a830b2d81",
+  "records": "4096x1 7bb1733e69d8f893",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-sdf-cluster-8 1`] = `
+{
+  "nodes": "4096x1 f13a4d54765ad91a",
+  "records": "4096x1 c9ee82fe86bd0619",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-sdf-cluster-32 1`] = `
+{
+  "nodes": "4096x1 6fa3fdab9072d41a",
+  "records": "4096x1 75d13f520da4fe64",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > perf-sdf-cluster-128 1`] = `
+{
+  "nodes": "4096x1 afcd12c3295ffa24",
+  "records": "4096x1 83cccf98056a5536",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > porcelain 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > porcelain-array 1`] = `
+{
+  "nodes": "4096x1 2a8fb12f37e4ea44",
+  "records": "4096x1 ad4be44a636ef245",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > proc-sky 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > proc-sky-rotated 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > rayleigh 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > region-overlap 1`] = `
+{
+  "nodes": "4096x1 9b7e5d1a00575b22",
+  "records": "4096x1 9a553358854b5bd1",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > regions-transformed 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > regions-transformed-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > rough-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > rough-grin 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > rough-grin-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > rough-mis 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > rough-sheet 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > rough-smooth-limit 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sdf-field 1`] = `
+{
+  "nodes": "4096x1 ab53262f7e88a773",
+  "records": "4096x1 bbcbc1f51f38c884",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > sdf-instance-twin 1`] = `
+{
+  "nodes": "4096x1 57701750b26ef310",
+  "records": "4096x1 dbedab7aacdbb4c0",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > sdf-instance-twin-ref 1`] = `
+{
+  "nodes": "4096x1 401887ee37f218ba",
+  "records": "4096x1 f5d902603279ca70",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > sdf-knot 1`] = `
+{
+  "nodes": "4096x3 2f4ea36b2c46c216",
+  "records": "4096x2 1d8144348e5531dc",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > sdf-shapes 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sdf-table-twin 1`] = `
+{
+  "nodes": "4096x1 b5deb21dbd75eabf",
+  "records": "4096x1 57d9295ab0156779",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > shadow-medium 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sky 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sky-lamp 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > slab 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > slab-albedo 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > slab-albedo-aniso 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > slab-albedo-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > slab-albedo-sparse 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > softbeam-wall 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > solids-analytic 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > solids-sdf 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spheres 1`] = `
+{
+  "nodes": "4096x1 28179de8a0ce8bf9",
+  "records": "4096x1 a2af4e1873a0ca30",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > spot 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sss-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sss-lab 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sss-presets 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > submerged 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sun 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > thinlens-zero 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > tonemap 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > transform-bake 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > transform-bake-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > two-light 1`] = `
+{
+  "nodes": "4096x1 69761292f813f77e",
+  "records": "4096x1 6c9d2fd456f110cf",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > veach-mis 1`] = `null`;
