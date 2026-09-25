@@ -565,10 +565,21 @@ export interface MeasurementDescription {
     response?: 'radiance';
     /** Truncation — limit: ∞. The measurement is the partial sum Σ_{n≤maxBounces} TⁿE:
      *  paths with at most this many scattering events (surface and medium events count;
-     *  null-interface crossings do not). 0 = directly visible emission only; 1 = one-shot
+     *  null-interface crossings do not). A traversal of a gradient-index (GRIN) region is an
+     *  event too — one per MAX_ODE_STEPS (512) integration steps, so a long or trapped
+     *  traversal spends several, which is what bounds a closed orbit (a Maxwell fisheye).
+     *  0 = directly visible emission only; 1 = one-shot
      *  direct lighting E + TE. Every estimator counts exactly this set of paths.
      *  A non-negative integer. */
     maxBounces: number;
+    /** Truncation — limit: ∞. The measurement keeps only paths with at most this many
+     *  null-interface crossings (a `'none'` wall: a medium boundary with no optical surface),
+     *  counted along the WHOLE path including its last segment to a light: a shadow ray cast
+     *  from a vertex the path reached after k crossings may cross at most
+     *  maxNullCrossings − k more. Every estimator counts exactly this set of paths, whichever
+     *  technique finds the light. Crossings are not scattering events, so this budget is
+     *  separate from maxBounces. Default 32. A non-negative integer. */
+    maxNullCrossings?: number;
     /** Truncation — limit: 'full'. 'ignored' renders scattering media absorbing-only
      *  (the research A/B formerly expressed as volumeIntegrator 'none' on a scattering scene). */
     scattering?: 'full' | 'ignored';

@@ -56,12 +56,14 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
     // The Planner folds roulette into weightedAbsorption (the accessor's only consumer is this
     // rule), so f.rr is spelled out here for the startDepth read, not as a second gate.
     if (f.rr && f.weightedAbsorption) blocks.push(rouletteInterior(f));
+    if (f.nee) blocks.push(shadowCrossingsLeft(f));
     blocks.push(...kernelBlocks(f), ...lightBlocks(f), ...equiangularBlocks(f), walk(program, f));
 
-    // Numeric knobs (the house rule: budgets are NAMED pinned defines, never bare
-    // literals in the walk — MAX_SHADOW_SEGMENTS/MAX_NULL_COLLISIONS are the siblings).
+    // Numeric knobs (the house rule: budgets are NAMED defines, never bare literals in the walk).
     const defines: Record<string, string> = {};
-    if (f.nulls) defines['MAX_NULL_CROSSINGS'] = '32';   // §3.6 null-interface budget; exhaustion terminates the path
+    // measurement.maxNullCrossings — the path's null-interface budget, shared with its shadow
+    // rays through shadow_crossings_left().
+    if (f.nulls) defines['MAX_NULL_CROSSINGS'] = String(program.measurement.maxNullCrossings);
     // §7.2 survival cap — bounds the 1/p_survive weight, and (see the authored field's
     // note) is the ONLY terminator for lossless paths, whose throughput never dims.
     // Authored per strategy; 0.95 is the default, not a constant.
@@ -143,7 +145,7 @@ function pathState(f: Flags): ShaderBlock {
         ...kernelStateFields(f),
     ];
     if (f.media) lines.push('    int current_medium;      // walk, §4.4: THE medium variable — classified, never a stack');
-    if (f.nulls) lines.push('    int null_crossings;      // walk, §3.6: nulls have their own safety counter');
+    if (f.nulls) lines.push('    int null_crossings;      // walk: crossings so far, against measurement.maxNullCrossings');
     if (f.transmission) lines.push('    float eta_scale;         // walk, §7.2: η² compression divided out of the RR metric only');
     lines.push(
         '};',
@@ -160,6 +162,27 @@ function pathState(f: Flags): ShaderBlock {
     if (f.transmission) lines.push('    s.eta_scale = 1.0;');
     lines.push('    return s;', '}');
     return { origin: 'generated:transport/state', source: lines.join('\n') };
+}
+
+// ============================================================================
+// The null-crossing budget left for a shadow ray (measurement.maxNullCrossings).
+// ============================================================================
+
+// The measurement keeps paths with at most MAX_NULL_CROSSINGS null crossings, counted along
+// the whole path. A shadow ray completes a path, so the crossings it may make are what the
+// path has not yet spent; the walk's own counter stops BSDF-found light at the same total.
+// Both techniques therefore cover the same set of paths, as MIS and the nee ≡ pt equality
+// require. Without null interfaces there is nothing to cross and the budget is 0.
+function shadowCrossingsLeft(f: Flags): ShaderBlock {
+    return {
+        origin: 'generated:transport/shadow-crossings',
+        source: [
+            '// ── Null crossings a shadow ray from this vertex may make (generated) ──',
+            'int shadow_crossings_left(PathState s) {',
+            f.nulls ? '    return MAX_NULL_CROSSINGS - s.null_crossings;' : '    return 0;   // no null interfaces in this scene',
+            '}',
+        ].join('\n'),
+    };
 }
 
 // ============================================================================
@@ -366,6 +389,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
     if (f.nulls) {
         lines.push(
             '        // §3.6 null interface: not an optical event — pass through, no bounce consumed.',
+            '        // A crossing past measurement.maxNullCrossings leaves the measured set: the path ends.',
             '        if (is_null_interface(mat)) {',
             '            s.current_medium = hit.region_to;',
             '            s.ray = ray_spawn(hit, s.ray.direction);',

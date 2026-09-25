@@ -73,7 +73,6 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // medium_transmittance, seam 2) when media exist. The NEE call sites never change.
     if (plan.program.media.shadowWalker) {
         blocks.push({ origin: 'components/transport/shadow/media/media.glsl', source: shadowMediaGLSL });
-        defines['MAX_SHADOW_SEGMENTS'] = '8';   // §6.3 pin; exhaustion is conservative (ZERO)
     } else {
         blocks.push({ origin: 'components/transport/shadow/opaque/opaque.glsl', source: shadowOpaqueGLSL });
     }
@@ -219,7 +218,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // T4 seams: the §6.1/§6.2/§6.3 direct-lighting contract surface.
     const provides = [
         { name: 'lighting_sample', signature: 'LightSample lighting_sample(LightQuery q, vec2 xi)' },
-        { name: 'shadow_transmittance', signature: 'Spectrum shadow_transmittance(Ray shadow_ray, Point light_p)' },
+        { name: 'shadow_transmittance', signature: 'Spectrum shadow_transmittance(Ray shadow_ray, Point light_p, int crossings_left)' },
     ];
     if (plan.program.emitters.samplable) {
         provides.push({ name: 'light_of', signature: 'int light_of(int region, int element)' });

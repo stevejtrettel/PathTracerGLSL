@@ -83,6 +83,7 @@ place listing every way the image differs from ground truth, each with its named
 | Truncation | Exact limit |
 |---|---|
 | `maxBounces: N` | N → ∞ |
+| `maxNullCrossings: K` (default 32): paths crossing at most K null interfaces, counted along the whole path including its shadow rays, so every technique drops the same paths | K → ∞ |
 | opaque shadow rays through dielectrics (§6.3 v1 policy — currently a *pinned invisible* bias; becomes a declared field) | transparent/spectral shadow refinement |
 | `color: 'rgb'` (future field; RGB transport is a biased surrogate of spectral — projection does not commute with multiplication) | `'spectral'` (§8) |
 | path-class restrictions (future: one-shot, Whitted-style delta-only continuation) | the unrestricted path space |
@@ -128,6 +129,7 @@ artifact's identity.
 |---|---|---|
 | `camera.*` | measurement | frame-bound residuals; workflow unchanged |
 | `transport.maxBounces` | measurement (truncation) | first citizen of the bias ledger |
+| `measurement.maxNullCrossings` | measurement (truncation) | the null-crossing budget, formerly a fixed walk constant (32) plus a separate shadow-ray limit (8), which made pt-nee drop light pt counted |
 | `transport.russianRoulette` | estimator | unbiased by construction |
 | `estimator.russianRoulette.maxSurvival` | estimator | the survival CEILING (default 0.95). The taxonomy's own line made visible: a LOSSLESS path never dims (clear glass transmits at weight exactly 1), so survival pins at this ceiling and it becomes the only thing ending the path — lower it and paths shorten with NO bias (survivors are divided by the same probability), trading noise for time. Reaching for `maxBounces` instead buys the same speed by truncating uncompensated, which is measurement-side bias. Where the two sections differ in practice. |
 | `transport.directLighting` | estimator | pt/nee/mis converge identically (X-witnesses) |

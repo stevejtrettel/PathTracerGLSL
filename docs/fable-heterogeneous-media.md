@@ -137,10 +137,13 @@ verifies the definition for every consumer at once.
   scattering/absorbing split: constant×{scattering, absorbing} → today's arms
   (unchanged); expression×scattering → delta tracking; expression×absorbing → ratio
   tracking.
-- **Step budget**: each loop is bounded by a numeric knob (`MAX_NULL_COLLISIONS`
-  family — a `#define` numeric knob per the house rule, NOT structural). Exhaustion
-  = conservative pass-through with accumulated weights, documented as a truncation
-  exactly like `MAX_SHADOW_SEGMENTS`.
+- **Step budget**: each loop is bounded by `MAX_NULL_COLLISIONS` (1024, a `#define`
+  emitted from `compiler/plan/trackingBudget.ts`). A walk that reaches it drops the rest of
+  its segment (attenuation still owed, emission not yet collected), so it is not
+  conservative in either direction. Whether it binds depends on the majorant, which the
+  scene declares, so it is not a measurement field: the cap sits far above what scenes
+  need, and the Planner warns when an expression medium's σ̄ × its longest segment exceeds
+  half the cap (trackingBudget.ts has the bound).
 - **RNG**: the loops draw internally from the stream (`random()`, as the equiangular
   technique already does). The seam's `vec2 xi` stays for the leading stratified
   draws; the contract note in `fable-volumetric-component.md` §2 should gain one

@@ -787,6 +787,13 @@ describe('Validator — Sep 25 audit gaps', () => {
         expect(run((_s, st) => { st.measurement.scattering = 'ignored'; }).hasErrors()).toBe(false);
     });
 
+    it('measurement.maxNullCrossings is a non-negative integer', () => {
+        for (const bad of [2.5, -1, Number.NaN, '8']) {
+            expect(errs(run((_s, st) => { (st.measurement as any).maxNullCrossings = bad; }))).toMatch(/maxNullCrossings/);
+        }
+        expect(run((_s, st) => { st.measurement.maxNullCrossings = 0; }).hasErrors()).toBe(false);
+    });
+
     it('russianRoulette.startDepth is a non-negative integer', () => {
         for (const bad of [2.5, -1, Number.NaN]) {
             expect(errs(run((_s, st) => { st.estimator.russianRoulette = { startDepth: bad } as any; }))).toMatch(/startDepth/);

@@ -4,6 +4,46 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — declared budgets in media: `maxNullCrossings`, the collision cap
+
+Three fixed budgets could make the image depend on the estimator or drop energy silently
+(docs/claude-improvements-2026-09.md §1.2).
+
+- **`measurement.maxNullCrossings`** (default 32) replaces the walk's fixed `MAX_NULL_CROSSINGS`
+  and the shadow walker's separate `MAX_SHADOW_SEGMENTS = 8`. It is a declared truncation: paths
+  with at most K null-interface crossings, counted along the whole path. A shadow ray gets what
+  its path has left: `shadow_transmittance` takes a third argument, `crossings_left`, which the
+  NEE sites fill from the generated `shadow_crossings_left(s)`. With the old limits, a shadow ray
+  needing more than 7 crossings returned zero while pt counted the light. The Planner resolves
+  the field (`compiler/plan/measurement.ts`, `resolveMeasurement`), the Validator requires a
+  non-negative integer, and the taxonomy's bias ledger lists it.
+- **The tracking collision cap** (`MAX_NULL_COLLISIONS`, delta and ratio tracking) is 1024 instead
+  of 64. A walk that reaches it drops the rest of its segment, so the comments that called
+  exhaustion "conservative" now say what is dropped. It is not a measurement field, since whether
+  it binds depends on the scene's majorant. Instead the Planner warns when an expression medium's
+  σ̄ × longest segment exceeds 512, beyond which a segment could reach the cap
+  (`compiler/plan/trackingBudget.ts`, where `derivedMajorant` now lives). Constant media never
+  warn: their σ̄ is σ_t, so no collision is null. It warns on three demos, fogblobs, glowblobs
+  and groundfog, all expression fogs filling the whole scene: rays escaping to the sky walk empty
+  space at the majorant rate. At 64 that biased groundfog near the horizon; at 1024 those rays
+  cost up to 16× more. Enclosing each fog in a bounded region would fix both; the demos are
+  unchanged.
+- **GRIN's `MAX_ODE_STEPS`** is left at 512: reaching it drops nothing (the walker hands back its
+  state and the walk continues, spending one more event). That accounting is now stated on
+  `maxBounces`, and the two exhaustion comments in grin.glsl no longer call it conservative.
+- **Export stamps** carry the resolved measurement (`measurement=` in HDR headers and PNG text),
+  so defaulted truncations are recorded.
+
+New witnesses: `null-budget-view` (exact: a quad light through 5 null-walled absorbing slabs reads
+1.5578 against the derived 1.5576 at budgets 32 and 10, and 0 at 9) and `null-budget` (a floor
+lit through the slabs, half of it under a null-walled carpet; at budget 11 the carpet half loses
+its direct light through the stack: carpet-half mean nee/pt 0.0248/0.0244, against 0.0445/0.0440
+at the default). With the walker capped at the old 7 crossings, null-budget's pt comparison read
+180% apart. Targeted run: 22 checks across the two new witnesses and haze, fog-area, het-const,
+het-slab, clamp, emit-swap, emit-sat, emit-scatter, shadow-medium and instance-fog, all pass after
+the new pt tripwire's rmse bound was calibrated (measured 64.5% and 74.4%; set to 90%). The full
+sweep was not run.
+
 ## 2026-09-25 — mesh self-intersection: fp-relative margin, side test by `ng`
 
 - **`MESH_T_MIN` removed.** Triangle hits ignored anything closer than a fixed 1e-3 world

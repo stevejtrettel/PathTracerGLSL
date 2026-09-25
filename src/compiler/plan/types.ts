@@ -46,6 +46,7 @@ export interface ProgramDescription {
         ambient: string;
         response: 'radiance';
         maxBounces: number;
+        maxNullCrossings: number;
         scattering: 'full' | 'ignored';
         shadows: 'opaque-dielectrics';
         color: 'rgb';

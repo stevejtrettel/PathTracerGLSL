@@ -4,28 +4,34 @@
 // trace-loop contract — same segments, pinned signatures only).
 // Per segment: closed-form Beer–Lambert over full σ_t via medium_transmittance (generated,
 // seam 2). Null interfaces pass; EVERYTHING else — opaque and dielectric alike — blocks
-// (§6.3 v1 policy; transparent shadows are §10.2). Segment budget exhaustion is conservative
-// (ZERO). Depends on: scene_intersect/scene_region_at (intersection), material_of,
-// material_has_medium/is_null_interface/medium_transmittance (materials), ray_spawn (core),
-// MAX_SHADOW_SEGMENTS (define, pin: 8).
+// (§6.3 v1 policy; transparent shadows are §10.2). Depends on: scene_intersect/scene_region_at
+// (intersection), material_of, material_has_medium/is_null_interface/medium_transmittance
+// (materials), ray_spawn (core).
+//
+// CROSSING BUDGET (measurement.maxNullCrossings): the shadow ray is the last segment of a path,
+// and the measurement keeps paths with at most MAX_NULL_CROSSINGS null crossings in total.
+// `crossings_left` is what the path has not spent (shadow_crossings_left in the walk); a shadow
+// ray that would need more returns ZERO, exactly as the walk ends a BSDF path at the same total.
+// That makes the loop bound the measurement, not a safety limit: every estimator drops the
+// same paths.
 //
 // The stop bound is the LIGHT POINT, not a scalar distance (trace-loop-contract: a shadow ray
 // is defined by its destination). Each segment re-derives the SHADOW_BACKOFF against the
 // FIXED light_p — pbrt's SpawnRayTo discipline — so the back-off can never be eroded by the
-// ray_spawn offsets that accumulate across null-interface crossings. A decremented `remaining`
-// (the earlier form) drifted by one spawn offset per crossing, and after ≥2 crossings the drift
-// exceeded the back-off, letting the AREA LIGHT'S OWN surface block the shadow ray → NEE went
-// dark through any bounded medium. (length() is Euclidean; a geodesic-distance ambient helper
-// is the curved-space follow-up, like the straight-ray march itself.)
+// ray_spawn offsets that accumulate across null-interface crossings (a decremented distance
+// would drift by one spawn offset per crossing until the area light's own surface blocked the
+// shadow ray). (length() is Euclidean; a geodesic-distance ambient helper is the curved-space
+// follow-up, like the straight-ray march itself.)
 
-Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p, int crossings_left) {
     Spectrum T = SPECTRUM_ONE;
     // Starting medium recovered from the §4.4 containment oracle — self-contained
     // (works from surface points and medium event points alike).
     int medium = scene_region_at(shadow_ray.origin);
     Ray seg_ray = shadow_ray;
 
-    for (int seg = 0; seg < MAX_SHADOW_SEGMENTS; seg++) {
+    // One iteration per segment; `crossed` = null interfaces behind this segment's origin.
+    for (int crossed = 0; crossed <= crossings_left; crossed++) {
         // Distance to the light re-derived from the fixed target — drift-free by construction.
         float remaining = length(light_p - seg_ray.origin) - SHADOW_BACKOFF;
         // ARRIVED, never a negative segment (rider, impl-plan-epsilon-discipline): a medium
@@ -48,5 +54,5 @@ Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
         medium = h.region_to;                                     // pass through the null interface
         seg_ray = ray_spawn(h, seg_ray.direction);                // far side by sign(dir·n)
     }
-    return SPECTRUM_ZERO;                                         // budget exhausted: conservative
+    return SPECTRUM_ZERO;   // one more crossing than the path's budget: outside the measured set
 }

@@ -2,7 +2,7 @@
 // Both edge endpoints known immediately: sample, shadow-test, score — all local.
 // Provides: light_sample_direct().
 // Depends on: PathState core, combiner_w_light (generated), lighting_sample,
-//             shadow_transmittance, material_has_nondelta_lobes,
+//             shadow_transmittance, shadow_crossings_left (generated), material_has_nondelta_lobes,
 //             interaction_surface_eval, ray_spawn, ambient_dot.
 
 void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props) {
@@ -11,10 +11,11 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     LightSample ls = lighting_sample(light_query_surface(mat, hit), random2());
     if (ls.pdf <= 0.0) return;
     // §6.3 per-channel transmittance. Pass the LIGHT POINT (not a distance) so the walker's
-    // back-off is measured against the fixed target — drift-free across null-interface crossings.
+    // back-off is measured against the fixed target — drift-free across null-interface crossings —
+    // and the null crossings this path may still make (measurement.maxNullCrossings).
     Ray shadow_ray = ray_spawn(hit, ls.wi);
     Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
-    Spectrum vis = shadow_transmittance(shadow_ray, light_p);
+    Spectrum vis = shadow_transmittance(shadow_ray, light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)
     float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)

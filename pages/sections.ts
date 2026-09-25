@@ -95,7 +95,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Homogeneous media',
         blurb: 'constant media: Beer–Lambert, chromatic scattering, medium NEE + equiangular placement, shadow media, and random-walk subsurface scattering (a refractive boundary around a scattering interior — no subsurface model)',
         entries: [
-            e('slab'), e('furnace-scatter'), e('sss-furnace'), e('slab-albedo', 'slab-albedo-ref'), e('slab-albedo-sparse'), e('slab-albedo-aniso'), e('haze'), e('shadow-medium'), e('fog-panel'),
+            e('slab'), e('furnace-scatter'), e('sss-furnace'), e('slab-albedo', 'slab-albedo-ref'), e('slab-albedo-sparse'), e('slab-albedo-aniso'), e('haze'), e('shadow-medium'), e('null-budget-view'), e('null-budget'), e('fog-panel'),
             e('fogcube'), e('fogblobs'), e('rayleigh'), e('marble'), e('sss-lab'), e('sss-presets'), e('porcelain'), e('porcelain-array'), e('mist'),
         ],
     },

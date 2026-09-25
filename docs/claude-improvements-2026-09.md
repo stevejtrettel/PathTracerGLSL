@@ -67,7 +67,7 @@ side of the true surface from the ray. `mesh_test_range` still flips the interpo
 onto the triangle's side of the ray; with normal maps this becomes a rule for every surface
 (flip, clamp, or bend the normal), and it should be chosen with that design.
 
-### 1.2 Three budgets that make the image depend on the estimator — **Your call** (semantics)
+### 1.2 Three budgets that make the image depend on the estimator — **Built (Sep 25)**
 
 The taxonomy says estimators must not change the converged image, and truncations must be
 declared. Three safety budgets break that quietly. None is reached by a registry scene today.
@@ -95,6 +95,29 @@ declared. Three safety budgets break that quietly. None is reached by a registry
 2. Replace the tracking hard stops with Russian roulette on the running weight (unbiased).
    Keep a very large hard cap only as a GPU-watchdog guard, and declare it.
 3. Correct the "conservative" comments.
+
+**Built (Sep 25), with two changes to the plan after reading the code.**
+
+- `measurement.maxNullCrossings` (default 32) is a declared truncation: paths with at most K
+  null crossings, counted along the whole path. A shadow ray gets what the path has left
+  (`shadow_crossings_left`, passed as `shadow_transmittance`'s third argument), so
+  `MAX_SHADOW_SEGMENTS` is gone. Witnesses `null-budget-view` (exact: the light through 5 slabs
+  at budget 10, black at 9) and `null-budget` (nee ≡ mis ≡ pt at the default budget and at 11,
+  where the budget cuts the direct light under a null-walled carpet).
+- The collision cap is not a measurement field: whether it binds depends on the majorant, which
+  the scene declares. Roulette cannot replace it either: delta tracking's weight often stays
+  at 1, and ratio tracking already has pbrt's roulette. The cap is now 1024 (from 64) and the
+  Planner warns when an expression medium's σ̄ × longest segment exceeds 512
+  (`compiler/plan/trackingBudget.ts`). Constant media never warn: their σ̄ is σ_t, so no
+  collision is null. The warning fires on three demos, all ambient expression fogs (fogblobs,
+  glowblobs, groundfog), where rays escaping to the sky walk empty space at the majorant rate.
+  At 64 that biased groundfog's horizon (64 collisions covered about 15 units, so a shallow
+  ray dropped roughly a third of its attenuation); at 1024 those rays cost up to 16× more.
+  Enclosing such a fog in a bounded region fixes both; not done to the demos.
+- GRIN's `MAX_ODE_STEPS` is not a truncation of energy: on reaching it the walker hands back
+  the current state and the walk continues, spending one more event. Left at 512 and declared
+  on `maxBounces` (a traversal counts one event per 512 steps).
+- Export stamps now carry the resolved measurement, defaults included.
 
 ### 1.3 Two smaller GRIN items
 

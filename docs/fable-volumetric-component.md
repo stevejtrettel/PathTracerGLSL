@@ -202,7 +202,7 @@ same `exp(−σ·t)` in arc length).
 
 | Question | Field practice | Our pin |
 |---|---|---|
-| Null crossings consume depth? | pbrt-v3: no (literal `bounces--`); Mitsuba 3: no; Schmidt–Budge "false hits": no. (pbrt-v4 wavefront: yes, per a user issue — unverified, and users needed maxdepth 50 to compensate.) | No (§7.2). `MAX_NULL_CROSSINGS` is our safety cap; pbrt-v3 has none. |
+| Null crossings consume depth? | pbrt-v3: no (literal `bounces--`); Mitsuba 3: no; Schmidt–Budge "false hits": no. (pbrt-v4 wavefront: yes, per a user issue — unverified, and users needed maxdepth 50 to compensate.) | No (§7.2). They have their own budget, the declared truncation `measurement.maxNullCrossings` (shared with shadow rays); pbrt-v3 has none. |
 | Medium events consume depth? | pbrt-v3 & Mitsuba 3: yes | Yes (§7.2) |
 | RR metric | pbrt-v3: max-component(β·etaScale); Mitsuba 3: max-component × η², clamp 0.95 | Identical (§7.2 amended) |
 | Medium tracking | Mitsuba 3: single pointer, no stack. Mesh-world production: Schmidt–Budge priority interior lists (RenderMan/Arnold/Mantra) — exists *because* meshes lack a containment oracle | `current_medium` + `scene_region_at` oracle (§4.4); priorities remain the §10.2 answer for intentional partial overlap |

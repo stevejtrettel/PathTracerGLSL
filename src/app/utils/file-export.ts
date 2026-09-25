@@ -5,10 +5,13 @@
  * the scene, the full strategy JSON, the live parameters (camera pose etc.),
  * the sample count, the RNG salt, and the code revision. Written into the
  * Radiance header as comment lines and into PNG as tEXt chunks.
+ * `measurement` is the strategy's measurement section with every default filled in: what
+ * the image is an estimate of, including the truncations the author left at their defaults.
  */
 export interface RenderStamp {
     scene: string;
     strategy: unknown;
+    measurement: unknown;
     parameters: Record<string, unknown>;
     spp: number;
     resolution: [number, number];
@@ -24,6 +27,7 @@ function stampEntries(stamp: RenderStamp): Array<[string, string]> {
     return [
         ['scene', stamp.scene],
         ['strategy', JSON.stringify(stamp.strategy)],
+        ['measurement', JSON.stringify(stamp.measurement)],
         ['parameters', JSON.stringify(stamp.parameters)],
         ['spp', String(stamp.spp)],
         ['resolution', `${stamp.resolution[0]}x${stamp.resolution[1]}`],

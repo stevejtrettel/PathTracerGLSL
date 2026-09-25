@@ -87,8 +87,9 @@ How a program is assembled:
   declares its section. Estimator equality is tested (pt, pt-nee and pt-mis must converge to
   the same image).
 - **Truncations are declared.** Measurement fields that make the image differ from ground
-  truth are the bias ledger: `maxBounces`, opaque shadow rays through dielectrics
-  (`shadows: 'opaque-dielectrics'`), RGB color. `maxBounces: N` is Σ_{n≤N} TⁿE — at most N
+  truth are the bias ledger: `maxBounces`, `maxNullCrossings` (one budget for a path and its
+  shadow rays), opaque shadow rays through dielectrics (`shadows: 'opaque-dielectrics'`), RGB
+  color. `maxBounces: N` is Σ_{n≤N} TⁿE — at most N
   scattering events — under every estimator. `MAX_DIST` (1000, glsl/core/math.glsl) is an
   absolute far clip: the environment is found there by both BSDF rays and NEE.
 - **The trace-loop contract** (docs/trace-loop-contract.md): `Ray` is a pure geodesic
@@ -197,9 +198,7 @@ rectangle quad sampling; two-sided quad lights; driven light geometry; multi-mat
 meshes.
 
 **Known open defects**: cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
-README.md). Correctness items found by the Sep 25 audit and deliberately left for a decision
-(three estimator-dependent budgets) are in
-docs/claude-improvements-2026-09.md, Part 1. Fixed Sep 25: the GRIN furnaces (lenses rendered
+README.md). Remaining audit items are in docs/claude-improvements-2026-09.md, Part 1. Fixed Sep 25: the GRIN furnaces (lenses rendered
 black: a region/material id mix-up) and softbeam-wall (an under-sampled check). The Sep 25
 sweep passed 180 of 181 exact checks (only cube-cloud).
 

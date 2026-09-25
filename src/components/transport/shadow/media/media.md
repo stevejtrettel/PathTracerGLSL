@@ -4,7 +4,7 @@ The segment-walking form of the §6.3 contract, emitted INSTEAD of `../opaque/` 
 the scene has media + NEE: the shadow ray crosses a sequence of regions, and the
 surviving fraction is the product of each segment's Beer–Lambert factor.
 
-The walk, per segment (up to `MAX_SHADOW_SEGMENTS`, pinned 8):
+The walk, per segment (as many as the path's remaining null-crossing budget allows, below):
 
 - current medium from `scene_region_at(origin)` — the §4.4 containment oracle, so the
   walker is self-contained from surface points and medium event points alike;
@@ -15,7 +15,11 @@ The walk, per segment (up to `MAX_SHADOW_SEGMENTS`, pinned 8):
 - at the boundary: **null interfaces pass** (medium handoff, `ray_spawn` re-spawn to
   the far side); EVERYTHING else — opaque and dielectric alike — returns ZERO (the
   `opaque-dielectrics` truncation, same ledger entry as the opaque form);
-- segment budget exhaustion is conservative: ZERO, never a light leak.
+- **crossing budget**: the shadow ray is the last segment of a path, and
+  `measurement.maxNullCrossings` limits the null crossings of the whole path. The caller passes
+  what the path has not spent (`shadow_crossings_left`); a shadow ray needing more returns ZERO,
+  just as the walk ends a BSDF-sampled path at the same total. Both techniques drop the same
+  paths, so the budget is a declared truncation shared by every estimator, not a safety limit.
 
 Re-spawn (not a t-windowed query) is the pinned deviation from reference §4: the
 reference's `scene_intersect_from` predates the trace-loop contract — same segments,

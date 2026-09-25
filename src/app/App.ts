@@ -9,6 +9,7 @@ import { packSceneData } from './sceneData.js';
 import type { PackedChannel } from '../components/data/pack.js';
 import { channelExtern, NODESQ_EXTERN, type DataChannel } from '../components/data/channels.js';
 import type { RenderStrategy } from '../compiler/types.js';
+import { resolveMeasurement } from '../compiler/plan/measurement.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
 import { ParameterStore } from './ParameterStore.js';
@@ -794,14 +795,14 @@ export class App {
      *  sample count describe only the last tile. */
     buildRenderStamp(image?: { resolution: [number, number]; spp: number }): RenderStamp {
         const [width, height] = image?.resolution ?? this.getCanvasSize();
+        const scene = this.rendererManager.getScene();
+        const strategy = this.rendererManager.getActiveStrategy();
         return {
             // Data scenes append the .inst provenance — the scene id alone does not
             // determine a data-built image (fable-instance-clouds §7).
-            scene: (() => {
-                const s = this.rendererManager.getScene();
-                return s == null ? 'unknown' : s.provenance !== undefined ? `${s.id} [${s.provenance}]` : s.id;
-            })(),
-            strategy: this.rendererManager.getActiveStrategy(),
+            scene: scene == null ? 'unknown' : scene.provenance !== undefined ? `${scene.id} [${scene.provenance}]` : scene.id,
+            strategy,
+            measurement: scene != null && strategy != null ? resolveMeasurement(scene, strategy) : null,
             // The values THIS image was rendered with (see imageParameters).
             parameters: this.imageParameters ?? this.parameterStore.serialize(),
             spp: image?.spp ?? this.coordinator.getSampleCount(),

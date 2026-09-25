@@ -43,6 +43,7 @@ import { fieldGlass, fieldGlassNeeStrategy, fieldGlassMisStrategy, fieldGlassPtS
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
+import { nullBudgetViewScene, nullViewStrategies, NULL_VIEW_POSE, NULL_VIEW_THROUGH, nullBudgetScene, nullBudgetStrategies, NULL_BUDGET_POSE, SLABS } from './scenes/nullBudgetWitness.js';
 import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN, sunHazeScene, sunHazeStrategy, SUN_HAZE_CAMERA, SUN_HAZE_CENTER } from './scenes/precisionWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy } from './scenes/grinWitness.js';
 import {
@@ -2060,6 +2061,43 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // rmse is a loose chance-hit-pt tripwire (measured ~47% display-space, sibling of
             // cornell-area 40% / fog-area 65%) — NOT a tight equality (pt fireflies per pixel).
             checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.65, label: 'shadow-through-medium nee ≡ pt' }],
+        },
+    },
+    'null-budget-view': {
+        scene: nullBudgetViewScene,
+        strategies: posed(NULL_VIEW_POSE.position, NULL_VIEW_POSE.target, ...nullViewStrategies),
+        exercises: `measurement.maxNullCrossings on the camera path: a quad light seen through ${SLABS} absorbing null-walled slabs (${2 * SLABS} crossings per ray), maxBounces 0 — keys 1/2/3 = default budget / exactly ${2 * SLABS} / ${2 * SLABS - 1}`,
+        expected: `keys 1 and 2: every pixel Le·e^(−${SLABS}·σ_a·d) = ${NULL_VIEW_THROUGH.toFixed(4)}; key 3: black (the ${2 * SLABS}th crossing is past the budget, so the path is not in the measurement)`,
+        witness: {
+            spp: 16,
+            // Deterministic: every ray crosses the same slabs perpendicularly and scores only
+            // the light's emission, so the tolerance is fp only.
+            checks: [
+                { kind: 'mean', value: NULL_VIEW_THROUGH, tol: 0.002, strategy: 0, label: 'default budget: the light through the stack' },
+                { kind: 'mean', value: NULL_VIEW_THROUGH, tol: 0.002, strategy: 1, label: `budget ${2 * SLABS}: the light through the stack` },
+                { kind: 'mean', value: 0, tol: 1e-6, strategy: 2, label: `budget ${2 * SLABS - 1}: the path is cut` },
+            ],
+        },
+    },
+    'null-budget': {
+        scene: nullBudgetScene,
+        strategies: posed(NULL_BUDGET_POSE.position, NULL_BUDGET_POSE.target, ...nullBudgetStrategies),
+        exercises: `measurement.maxNullCrossings shared by a path and its shadow rays: a floor lit through ${SLABS} absorbing null-walled slabs (${2 * SLABS} crossings to the light), its right half under a null-walled carpet (one more crossing each way) — keys 1/2/3 = nee/mis/pt at the default budget, keys 4/5/6 = the same at ${2 * SLABS + 1}, where the direct light through the stack is cut under the carpet only`,
+        expected: 'at each budget nee, mis and pt converge to the same image; at the smaller budget the carpet half loses its direct light under every estimator',
+        witness: {
+            spp: 192,
+            // Δmean against pt is the gate: a shadow ray with a budget of its own would keep the
+            // carpet half lit under nee (carpet-half mean 0.044) where pt cuts it (0.024); measured
+            // nee/pt carpet halves 0.0445/0.0440 (default) and 0.0248/0.0244 (budget 11). The rmse
+            // is pt's chance-hit noise in a dim frame, measured 64.5% (default) and 74.4% (budget
+            // 11) at 192 spp — a structural tripwire only. nee ≡ mis is nearly identical-stream
+            // here (the small light gives the BSDF side little weight).
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'default budget: nee ≡ mis' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.9, label: 'default budget: pt tripwire' },
+                { kind: 'equality', strategies: [3, 4], meanTol: 0.02, label: `budget ${2 * SLABS + 1}: nee ≡ mis` },
+                { kind: 'equality', strategies: [3, 5], meanTol: 0.03, rmse: 0.9, label: `budget ${2 * SLABS + 1}: pt tripwire` },
+            ],
         },
     },
     'veach-mis': {

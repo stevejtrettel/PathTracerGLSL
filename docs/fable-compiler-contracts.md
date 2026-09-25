@@ -313,7 +313,7 @@ A material is *volumetric* iff its declared medium block has nonzero `sigma_s` o
 A material may declare **`surface: none`** — it has a medium block but its boundary is not an optical interface (a bounded fog cube, a smoke plume region). Verification trace T5 found that without this, every bounded volume would receive a spurious BSDF shell (fog with a Fresnel coating). The compiler classifies such regions' boundaries as **null interfaces**; transport handles a null hit as:
 
 - `current_medium = hit.region_to` (§4.4), continue in the *same direction* (conceptually a sample with `wi` unchanged, `weight = 1`, flags `LOBE_TRANSMISSION | LOBE_DELTA | LOBE_NULL`);
-- **no** NEE, **no** emission logic, **no** bounce consumed — null crossings have their own `MAX_NULL_CROSSINGS` safety counter (they are bookkeeping, not scattering).
+- **no** NEE, **no** emission logic, **no** bounce consumed — null crossings have their own budget, the declared truncation `measurement.maxNullCrossings`, counted along the whole path including its shadow rays (they are bookkeeping, not scattering).
 
 This is the standard "interface material" concept (PBRT's null BSDF). A material with *both* a surface model and a medium block (tinted glass) is not null — its boundary runs the surface BSDF and its interior absorbs/scatters.
 
@@ -550,8 +550,9 @@ The **environment** is a light kind in this registry (samplable via the existing
 ### 6.3 The shadow query returns transmittance — PINNED
 
 > **Signature revised by `docs/trace-loop-contract.md`:** now `shadow_transmittance(Ray shadow_ray,
-> float maxDist)` (the `Ray` is a pure seed; the far bound is an argument). The *semantics* below —
-> spectral return, boolean fast path when no media, spectral attenuation otherwise — are unchanged.
+> Point light_p, int crossings_left)` (the `Ray` is a pure seed; the destination is a point; the
+> path's remaining null-crossing budget is an argument). The *semantics* below — spectral return,
+> boolean fast path when no media, spectral attenuation otherwise — are unchanged.
 
 ```glsl
 Spectrum shadow_transmittance(Ray shadow_ray, float maxDist);   // was (Point p, Direction wi, float dist)
@@ -602,7 +603,7 @@ for (bounce = 0; bounce < MAX_BOUNCES; bounce++) {
     //                    NEE from the medium point (§6.3); phase sample (Contract 1 medium); continue
     // 3. miss          → environment radiance (MIS-weighted), break
     // 4. boundary, null interface (§3.6) → current_medium = region_to; continue
-    //                    (no bounce consumed; MAX_NULL_CROSSINGS safety counter)
+    //                    (no bounce consumed; counts against measurement.maxNullCrossings)
     // 5. boundary, surface → verify/heal current_medium against region_from (§4.4);
     //                    emission (registry logic §6.2); NEE (non-delta materials);
     //                    surface sample (Contract 1); if TRANSMISSION: current_medium = region_to;

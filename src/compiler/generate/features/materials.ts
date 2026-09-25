@@ -4,13 +4,14 @@
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
 import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, isBlackbody, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
-import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
+import type { RenderPlan, PlannedMaterial, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, emitAttributeValue, mintValueUniform, type ParamValue } from '../values.js';
 import { isAttributeValue } from '../../plan/types.js';
+import { derivedMajorant, MAX_NULL_COLLISIONS } from '../../plan/trackingBudget.js';
 
 import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, EMISSION_KEY } from '../../../components/materials/index.js';
 import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
@@ -238,11 +239,11 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     for (const list of derivedByMat.values()) for (const e of list) if (e.uniform) uniforms.push(e.uniform);
 
     // No structural defines remain (item-9 commit D): media structs/helpers arrive via
-    // core's conditionally-included structs_media/math_media blocks. MAX_NULL_COLLISIONS
-    // is a NUMERIC knob (like MAX_SHADOW_SEGMENTS, per the house rule): the null-collision
-    // loop budget — exhaustion is a conservative pass-through, a declared truncation.
+    // core's conditionally-included structs_media/math_media blocks. MAX_NULL_COLLISIONS is
+    // the tracking loops' collision cap; why it is set where it is, and the Planner's warning
+    // for media that could reach it, are in compiler/plan/trackingBudget.ts.
     const defines: Record<string, string> = {};
-    if (media.heterogeneousArms) defines['MAX_NULL_COLLISIONS'] = '64';
+    if (media.heterogeneousArms) defines['MAX_NULL_COLLISIONS'] = String(MAX_NULL_COLLISIONS);
 
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     // Each entry mirrors its emission condition above — the interface header is truthful.
@@ -757,24 +758,6 @@ function generateMediumSurvival(plan: RenderPlan): string {
     lines.push('    return SPECTRUM_ONE;   // tracking arms + non-scattering media: nothing owed');
     lines.push('}');
     return lines.join('\n');
-}
-
-/** Resolved max-channel σ_t of a NON-expression medium (constants + {param} substituted
- *  live) — THE derived majorant (impl-plan-env-power-selection batch 2): for constant and
- *  {param}-driven coefficients the exact ceiling IS the live extinction, so σ̄ can never
- *  go stale under a slider. Floored at 1e-6: sliding to vacuum keeps the tracking jump
- *  finite (one giant step → transmitted — the right physics, no ÷0). */
-export function derivedMajorant(med: PlannedMedium, params: Record<string, unknown> = {}): number {
-    const resolve = (v: Vec3 | GlslExpression | ValueParam<Vec3>): number[] => {
-        if (isValueParam(v)) {
-            const raw = params[v.param] ?? v.default;
-            return typeof raw === 'number' ? [raw, raw, raw] : (raw as number[]) ?? [0, 0, 0];
-        }
-        return v as Vec3;   // expression media never reach here (authored-σ̄ route)
-    };
-    const a = resolve(med.sigma_a);
-    const s = resolve(med.sigma_s);
-    return Math.max(1e-6, ...a.map((x, i) => x + s[i]));
 }
 
 /** How a tracking-routed medium's σ̄ is spelled in the emitted arm (batch 2):

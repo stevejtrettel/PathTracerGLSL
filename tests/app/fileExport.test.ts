@@ -5,6 +5,7 @@ import { floatToRGBE, buildHDRFile, encodePNG, type RenderStamp } from '../../sr
 const testStamp: RenderStamp = {
     scene: 'furnace',
     strategy: { id: 'furnace', estimator: { accumulation: { type: 'average' } } },
+    measurement: { maxBounces: 8, maxNullCrossings: 32 },
     parameters: { 'camera.position': [0, 0, 0] },
     spp: 48,
     resolution: [160, 120],
@@ -71,6 +72,7 @@ describe('buildHDRFile', () => {
         expect(text).toContain('# resetSalt=7');
         expect(text).toContain('# git=abc1234');
         expect(text).toContain(`# strategy=${JSON.stringify(testStamp.strategy)}`);
+        expect(text).toContain(`# measurement=${JSON.stringify(testStamp.measurement)}`);
         // The resolution line must remain the last header line (readers require it).
         expect(text.indexOf('# scene=')).toBeLessThan(text.indexOf('-Y 1 +X 1'));
     });
@@ -152,6 +154,7 @@ describe('encodePNG', () => {
         expect(byKey['pathtracer:spp']).toBe('48');
         expect(byKey['pathtracer:git']).toBe('abc1234');
         expect(byKey['pathtracer:strategy']).toBe(JSON.stringify(testStamp.strategy));
+        expect(byKey['pathtracer:measurement']).toBe(JSON.stringify(testStamp.measurement));
         expect(chunks.findIndex(c => c.type === 'IDAT')).toBe(1 + texts.length);
         expect(decodeRGB(chunks, W, H)[0]).toBe(rgba[0]);
     });

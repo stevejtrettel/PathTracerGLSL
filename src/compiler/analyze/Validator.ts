@@ -452,6 +452,14 @@ export function validate(
             `measurement.maxBounces must be a non-negative integer — the number of scattering events a path may have (got ${String(maxBounces)})`)
             .add();
     }
+    // Spliced into the walk as MAX_NULL_CROSSINGS, the same integer-literal constraint.
+    const maxNullCrossings = strategy.measurement.maxNullCrossings;
+    if (maxNullCrossings !== undefined
+        && (typeof maxNullCrossings !== 'number' || !Number.isInteger(maxNullCrossings) || maxNullCrossings < 0)) {
+        bag.error('invalid-setting',
+            `measurement.maxNullCrossings must be a non-negative integer — the number of null interfaces a path may cross, its shadow rays included (got ${String(maxNullCrossings)})`)
+            .add();
+    }
 
     // Russian roulette's survival CEILING — a probability, same class of rule as
     // envSelectWeight. 1.0 is legal and means "never cap": survival is then the

@@ -239,9 +239,10 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         F = F_next;
     }
 
-    // Budget exhausted inside the region (a long or trapped path): conservative pass-through at
-    // the current state (declared truncation, like MAX_NULL_COLLISIONS). The walk re-enters the
-    // medium branch from here — each traversal consumes a bounce, so maxBounces bounds it.
+    // MAX_ODE_STEPS reached inside the region (a long or trapped path): hand back the current
+    // state as a deflected outcome. Nothing is dropped: the walk records it as an event and
+    // re-enters the medium from here, so a traversal counts one event per MAX_ODE_STEPS steps
+    // against measurement.maxBounces, which is what bounds a trapped orbit.
     ms.exit_p   = r;
     ms.exit_dir = normalize(T);
     grin_finish(ms, n0, length(T), absorb);
@@ -371,8 +372,9 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
         F = F_next;
     }
 
-    // Budget exhausted: conservative pass-through at the current state (the deterministic
-    // arm's convention), with the survive weight at the accumulated arc.
+    // MAX_ODE_STEPS reached: hand back the current state as a deflected outcome, as the
+    // deterministic arm does (nothing dropped; one more event against maxBounces), with the
+    // survive weight at the accumulated arc.
     {
         float er = length(T) / n0;
         Spectrum tr  = spectrum_exp(-sigma_t * s_acc);

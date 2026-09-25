@@ -9,9 +9,10 @@
 // (reference-implementations §4); the NEE call site never changes. The caller passes the shadow
 // Ray (origin escaped off the surface) and the LIGHT POINT (the destination); the far bound is
 // its distance minus SHADOW_BACKOFF (core math — angle-amplified requirement, see its comment)
-// so the light's own surface is not seen as an occluder.
+// so the light's own surface is not seen as an occluder. `crossings_left` (the path's remaining
+// null-crossing budget) is unused: without media there are no null interfaces to cross.
 
-Spectrum shadow_transmittance(Ray shadow_ray, Point light_p) {
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p, int crossings_left) {
     float maxDist = length(light_p - shadow_ray.origin) - SHADOW_BACKOFF;
     return scene_intersect_any(shadow_ray, maxDist) ? SPECTRUM_ZERO : SPECTRUM_ONE;
 }

@@ -524,6 +524,10 @@ exports[`scene-data textures (byte fingerprints) > models 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > null-budget 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > null-budget-view 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > orb 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > paint 1`] = `null`;

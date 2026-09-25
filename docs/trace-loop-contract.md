@@ -98,7 +98,7 @@ There is no local-frame BSDF yet (Lambert works in world space), so **today ever
 bool     scene_intersect     (Ray ray, out Hit hit);                   // hit.t = MAX_DIST in; running nearest out. Ray READ-ONLY.
 bool     <backend>_intersect (Ray ray, inout Hit hit);                 // accumulate nearest into hit (bound = hit.t); never mutate ray
 bool     scene_intersect_any (Ray ray, float maxDist);                 // occlusion bound is an argument
-Spectrum shadow_transmittance(Ray shadow_ray, Point light_p);          // destination is a POINT, not a distance — see below
+Spectrum shadow_transmittance(Ray shadow_ray, Point light_p, int crossings_left);   // destination is a POINT — see below
 Point    ambient_geodesic    (Point origin, Direction dir, float t);   // UNCHANGED — the geodesic mechanism
 float    ambient_dot         (Direction a, Direction b, Point p);      // UNCHANGED — now actually called
 ```
@@ -112,7 +112,7 @@ never mutated by intersection — it is a pure seed.
   `ambient_geodesic(origin, dir, t) → Point`; that signature holds in *every* space, including a
   black hole (which integrates the ODE internally — an implementation/perf detail of the ambient
   module, never a type in the loop). There is no stepper state in the trace loop.
-- **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray, Point light_p)`.
+- **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray, Point light_p, int crossings_left)`.
   **A shadow ray is defined by its DESTINATION, not a distance.** The scalar `maxDist` form (an
   earlier revision) was non-robust for the media segment-walk: the walker decremented `remaining`
   and re-spawned the ray (offset) at each null-interface crossing without subtracting that
@@ -125,6 +125,12 @@ never mutated by intersection — it is a pure seed.
   `length(light_p − seg_ray.origin) − SHADOW_BACKOFF` per segment (the back-off's derivation —
   angle-amplified, never fp-relative — lives on the constant in core math). (length() is Euclidean; a geodesic
   ambient-distance helper is the curved-space follow-up, like the straight-ray march itself.)
+  **`crossings_left` is the path's unspent null-crossing budget.** `measurement.maxNullCrossings`
+  bounds the null crossings of a whole path, and a shadow ray is a path's last segment, so the
+  caller passes what the path has left (`shadow_crossings_left(s)`, generated with the walk) and
+  a shadow ray that needs more returns zero. The walk ends a BSDF-sampled path at the same total,
+  so every technique drops the same paths. The opaque form ignores the argument: without media
+  there are no null interfaces.
 
 ## Deferred (not this contract)
 

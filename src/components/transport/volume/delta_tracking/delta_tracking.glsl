@@ -29,8 +29,11 @@
 // occupant convention holds; curved-space tracking is a research item, not a respell.
 // RNG: xi carries the leading stratified draws (first jump, first lottery); the loop
 // tail draws from the stream (random()) — the equiangular precedent (volumetric §2).
-// Budget: MAX_NULL_COLLISIONS (numeric knob, pin 64) — exhaustion is a conservative
-// pass-through with the accumulated weight, a declared truncation like MAX_SHADOW_SEGMENTS.
+// Budget: MAX_NULL_COLLISIONS tentative collisions per call. A walk that reaches it returns
+// what it has, dropping the rest of the segment: the attenuation still owed (reads bright) and
+// the emission not yet collected (reads dark). The cap is set far above σ̄·(segment length) for
+// every scene the Planner does not warn about (compiler/plan/trackingBudget.ts), so in those it
+// is never reached.
 // Depends on: scene_medium_properties (generated, returns the EFFECTIVE clamped field),
 // medium_emission (generated: ε or the folded ZERO), random (sampler), structs_media
 // (MediumSample), spectrum_* (core math), ambient_geodesic.
@@ -102,7 +105,7 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
         xi_dist = random();
         xi_evt = random();
     }
-    ms.weight = w;                             // budget exhausted: conservative pass-through
+    ms.weight = w;                             // cap reached: the rest of the segment is dropped (see header)
     return ms;
 }
 
@@ -131,7 +134,7 @@ MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float
         ms.radiance += T * medium_emission(m) / sigma_bar;
         T *= max(Spectrum(sigma_bar) - m.sigma_a, 0.0) / sigma_bar;
     }
-    ms.weight = T;                             // exhaustion falls through: conservative
+    ms.weight = T;                             // reached t_max, or the cap (see header)
     return ms;
 }
 
@@ -157,5 +160,5 @@ Spectrum medium_transmittance_ratio(int med, float sigma_bar, Ray ray, float len
             T /= (1.0 - q);
         }
     }
-    return T;                                  // budget exhausted: conservative
+    return T;                                  // cap reached: the rest of the segment is dropped (see header)
 }

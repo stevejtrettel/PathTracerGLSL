@@ -30,6 +30,8 @@ import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
 import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, dataReadsOf, READS_EVERYTHING } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
+import { resolveMeasurement } from './measurement.js';
+import { trackingBudgetWarnings } from './trackingBudget.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
 import type { BlackbodyValue } from '../types.js';
@@ -395,6 +397,11 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
     const program = planProgram(features, scene, strategy, lights, materials, objects, meshes, instanceBatches, instanceLights.reduce((a, b) => a + b.count, 0));
     const pipeline = planPipeline(program);
 
+    // Media whose tracking walk could reach the collision cap (see trackingBudget.ts).
+    for (const w of trackingBudgetWarnings(scene, materials, objects, meshes, instanceBatches, ambientMedium, program.media.scatteringArms)) {
+        bag.warning('invalid-material', w).add();
+    }
+
     return {
         objects,
         meshes,
@@ -469,7 +476,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // HOW live scattering is sampled is the estimator's volumeSampling axis. 'analytic'
     // and 'delta-tracking' survive the Validator (which also enforces coherence:
     // 'analytic' × heterogeneous medium is an error, so vs matches the scene by here).
-    const scattering = strategy.measurement.scattering ?? 'full';
+    const measurement = resolveMeasurement(scene, strategy);
+    const scattering = measurement.scattering;
     const vs = strategy.estimator.volumeSampling ?? 'analytic';
     const scatteringArms = features.media.hasScatteringMedia
         && scattering === 'full'
@@ -509,20 +517,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         ?? (objects.filter((o) => o.intersect === 'march').length >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
 
     return {
-        measurement: {
-            // Straight-through: unregistered camera types are Validator-rejected upstream
-            // (reject-not-remove), so the Planner never coerces — CameraDesc mirrors the
-            // strategy's CameraDescription exactly.
-            camera: strategy.measurement.camera,
-            // Ambient space rides the SCENE (the geometry-of-space is part of the
-            // integral's domain); non-registry types are Validator-rejected upstream.
-            ambient: scene.ambientSpace?.type ?? 'euclidean',
-            response: strategy.measurement.response ?? 'radiance',
-            maxBounces: strategy.measurement.maxBounces,
-            scattering,
-            shadows: strategy.measurement.shadows ?? 'opaque-dielectrics',
-            color: 'rgb',   // 'spectral' is Validator-rejected (reserved, contracts §8)
-        },
+        measurement,
         estimator: {
             lighting,
             russianRoulette: strategy.estimator.russianRoulette,

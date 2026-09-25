@@ -11,6 +11,7 @@
 // like the analytic medium bodies; curved-space equiangular is a research item).
 // Provides: equiangular_sample_direct().
 // Depends on: PathState core, lighting_query_delta (generated), shadow_transmittance,
+//             shadow_crossings_left (generated),
 //             scene_medium_properties, interaction_medium_eval (generated dispatch),
 //             spectrum_exp, ambient_geodesic, make_ray.
 
@@ -44,7 +45,8 @@ void equiangular_sample_direct(inout PathState s, int med_mat, float t_max) {
     float d2 = max(dot(to_light, to_light), 1e-8);
     float dist = sqrt(d2);
     Direction wi = to_light / dist;
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, wi), pos);   // pos = the light POINT (drift-free target)
+    // pos = the light POINT (drift-free target); the path's remaining null-crossing budget.
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, wi), pos, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
 
     // Delta convention (§6.1): 1/d² folds into the incident radiance here. Phase EVAL,
