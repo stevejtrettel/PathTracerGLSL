@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { crc32 as zlibCrc32 } from 'node:zlib';
-import { floatToRGBE, buildHDRFile, embedPNGStamp, type RenderStamp } from '../../src/app/utils/file-export.js';
+import { crc32 as zlibCrc32, inflateSync } from 'node:zlib';
+import { floatToRGBE, buildHDRFile, encodePNG, type RenderStamp } from '../../src/app/utils/file-export.js';
 
 const testStamp: RenderStamp = {
     scene: 'furnace',
@@ -76,71 +76,83 @@ describe('buildHDRFile', () => {
     });
 });
 
-describe('embedPNGStamp', () => {
-    // A minimal valid PNG: signature + IHDR (1×1, 8-bit gray) + IDAT + IEND, with
-    // correct CRCs — enough structure for the splicer to find its insertion point.
-    function minimalPNG(): Uint8Array {
-        const chunks: Uint8Array[] = [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])];
-        const chunk = (type: string, data: number[]) => {
-            const raw = new Uint8Array(12 + data.length);
-            const view = new DataView(raw.buffer);
-            view.setUint32(0, data.length);
-            raw.set([...type].map(c => c.charCodeAt(0)), 4);
-            raw.set(data, 8);
-            view.setUint32(8 + data.length, zlibCrc32(raw.subarray(4, 8 + data.length)));
-            chunks.push(raw);
-            return raw;
-        };
-        chunk('IHDR', [0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0, 0, 0]);
-        chunk('IDAT', [0x78, 0x9c, 0x62, 0x00, 0x01, 0x00, 0x00, 0xff, 0xff, 0x00, 0x02, 0x00, 0x01]);
-        chunk('IEND', []);
-        const total = chunks.reduce((n, c) => n + c.length, 0);
-        const out = new Uint8Array(total);
-        let off = 0;
-        for (const c of chunks) { out.set(c, off); off += c.length; }
-        return out;
-    }
+describe('encodePNG', () => {
+    type Chunk = { type: string; data: Uint8Array; crcOk: boolean };
 
-    function walkChunks(png: Uint8Array): Array<{ type: string; keyword?: string; value?: string; crcOk: boolean }> {
+    function walkChunks(png: Uint8Array): Chunk[] {
+        expect(Array.from(png.subarray(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
         const view = new DataView(png.buffer, png.byteOffset);
-        const out: Array<{ type: string; keyword?: string; value?: string; crcOk: boolean }> = [];
+        const out: Chunk[] = [];
         let off = 8;
         while (off < png.length) {
             const len = view.getUint32(off);
             const type = new TextDecoder().decode(png.subarray(off + 4, off + 8));
             // Verify the CRC with node's INDEPENDENT implementation, not ours.
             const crcOk = view.getUint32(off + 8 + len) === (zlibCrc32(png.subarray(off + 4, off + 8 + len)) >>> 0);
-            const entry: { type: string; keyword?: string; value?: string; crcOk: boolean } = { type, crcOk };
-            if (type === 'tEXt') {
-                const data = new TextDecoder().decode(png.subarray(off + 8, off + 8 + len));
-                const sep = data.indexOf('\0');
-                entry.keyword = data.slice(0, sep);
-                entry.value = data.slice(sep + 1);
-            }
-            out.push(entry);
+            out.push({ type, data: png.subarray(off + 8, off + 8 + len), crcOk });
             off += 12 + len;
         }
         return out;
     }
 
-    it('splices tEXt chunks after IHDR with CRCs node agrees with, leaving pixels intact', async () => {
-        const original = minimalPNG();
-        const stamped = new Uint8Array(await (await embedPNGStamp(new Blob([original as BlobPart]), testStamp)).arrayBuffer());
-        const chunks = walkChunks(stamped);
+    /** A plain PNG decoder for 8-bit RGB, all five filter types (so the test does not
+     *  assume which filter the encoder chose). Returns RGB rows top to bottom. */
+    function decodeRGB(chunks: Chunk[], width: number, height: number): Uint8Array {
+        const idat = Buffer.concat(chunks.filter(c => c.type === 'IDAT').map(c => c.data));
+        const raw = inflateSync(idat);
+        const stride = 3 * width;
+        const out = new Uint8Array(stride * height);
+        for (let y = 0; y < height; y++) {
+            const filter = raw[y * (stride + 1)];
+            for (let i = 0; i < stride; i++) {
+                const x = raw[y * (stride + 1) + 1 + i];
+                const a = i >= 3 ? out[y * stride + i - 3] : 0;
+                const b = y > 0 ? out[(y - 1) * stride + i] : 0;
+                const c = i >= 3 && y > 0 ? out[(y - 1) * stride + i - 3] : 0;
+                const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+                const pred = [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][filter];
+                out[y * stride + i] = (x + pred) & 0xff;
+            }
+        }
+        return out;
+    }
 
-        expect(chunks[0].type).toBe('IHDR');
-        expect(chunks.at(-1)!.type).toBe('IEND');
+    // A 37×23 image of pseudo-random bytes: odd sizes, and noise, which the filters cannot flatten.
+    const W = 37, H = 23;
+    const rgba = new Uint8Array(W * H * 4);
+    let s = 12345;
+    for (let i = 0; i < rgba.length; i++) { s = (s * 1103515245 + 12345) >>> 0; rgba[i] = s >>> 24; }
+    const row = (y: number) => rgba.subarray(y * W * 4, (y + 1) * W * 4);
+
+    it('round-trips the pixels (RGB, alpha dropped) through an independent zlib', async () => {
+        const png = new Uint8Array(await (await encodePNG(W, H, row)).arrayBuffer());
+        const chunks = walkChunks(png);
         expect(chunks.every(c => c.crcOk)).toBe(true);
+        expect(chunks[0].type).toBe('IHDR');
+        expect(Array.from(chunks[0].data)).toEqual([0, 0, 0, W, 0, 0, 0, H, 8, 2, 0, 0, 0]);
+        expect(chunks.at(-1)!.type).toBe('IEND');
 
-        const texts = chunks.filter(c => c.type === 'tEXt');
-        const byKey = Object.fromEntries(texts.map(t => [t.keyword, t.value]));
+        const rgb = decodeRGB(chunks, W, H);
+        for (let p = 0; p < W * H; p++) {
+            expect([rgb[3 * p], rgb[3 * p + 1], rgb[3 * p + 2]]).toEqual([rgba[4 * p], rgba[4 * p + 1], rgba[4 * p + 2]]);
+        }
+    });
+
+    it('writes the stamp as tEXt chunks between IHDR and the image data', async () => {
+        const png = new Uint8Array(await (await encodePNG(W, H, row, testStamp)).arrayBuffer());
+        const chunks = walkChunks(png);
+        expect(chunks.every(c => c.crcOk)).toBe(true);
+        const texts = chunks.filter(c => c.type === 'tEXt').map(c => {
+            const text = new TextDecoder().decode(c.data);
+            const sep = text.indexOf('\0');
+            return [text.slice(0, sep), text.slice(sep + 1)];
+        });
+        const byKey = Object.fromEntries(texts);
         expect(byKey['pathtracer:scene']).toBe('furnace');
         expect(byKey['pathtracer:spp']).toBe('48');
         expect(byKey['pathtracer:git']).toBe('abc1234');
         expect(byKey['pathtracer:strategy']).toBe(JSON.stringify(testStamp.strategy));
-        // All stamp chunks sit between IHDR and IDAT (splice point), and the
-        // IDAT payload is byte-identical to the original.
         expect(chunks.findIndex(c => c.type === 'IDAT')).toBe(1 + texts.length);
-        expect(stamped.length).toBe(original.length + texts.reduce((n, t) => n + 12 + `${t.keyword}\0${t.value}`.length, 0));
+        expect(decodeRGB(chunks, W, H)[0]).toBe(rgba[0]);
     });
 });

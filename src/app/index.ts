@@ -13,11 +13,10 @@ export {
 
 export {
     TiledRenderer,
-    type TileJobConfig,
-    type TileGrid,
-    type TileJob,
-    type TileProgressInfo,
-    type TiledJobProgressInfo
+    DEFAULT_TILE_SIZE,
+    type TiledRenderConfig,
+    type TiledJobProgressInfo,
+    type TiledJobCompleteInfo
 } from './TiledRenderer.js';
 
 export {

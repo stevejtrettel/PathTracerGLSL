@@ -104,12 +104,14 @@ export class ProductionPanelExtension extends UIExtension {
 
     private onRenderStarted = (data: { mode: string; targetSamples?: number }): void => {
         if (data.mode === 'production') {
-            this.resetProgress();
+            // In a tiled job every tile starts a production render; the job's panel stays.
+            if (!this.tiledJob) this.resetProgress();
             this.show();
         }
     };
 
     private onRenderComplete = (): void => {
+        if (this.tiledJob) return;   // one tile finished, not the image
         // Keep visible to show completion state and export buttons
         // Will be hidden when user clicks "Close" or starts new render
         if (this.barFill) {
@@ -127,10 +129,22 @@ export class ProductionPanelExtension extends UIExtension {
         // Only update during production mode
         if (info.mode !== 'production') return;
 
-        // Skip progress bar updates during tiled job (we use tile progress instead)
-        if (!this.tiledJob) {
-            this.updateProgressBar(info);
+        if (this.tiledJob) {
+            // The bar and stats describe the whole image; a finished tile is not a finished
+            // render, so it never gets the export controls.
+            const job = this.tiledJob;
+            const tileFraction = info.targetSamples ? Math.min(1, info.samples / info.targetSamples) : 0;
+            this.setBar(((job.completedTiles + (job.current ? tileFraction : 0)) / job.totalTiles) * 100);
+            this.updateStats(info);
+            const state = info.state === 'complete' ? 'rendering' : info.state;
+            if (state !== this.lastControlsState) {
+                this.lastControlsState = state;
+                this.updateControls({ ...info, state });
+            }
+            return;
         }
+
+        this.updateProgressBar(info);
         this.updateStats(info);
 
         // Only rebuild controls when render state changes (not every progress tick)
@@ -148,21 +162,19 @@ export class ProductionPanelExtension extends UIExtension {
             this.show();
         }
 
-        // Update tile grid
         this.updateTileGrid(info);
-
-        // Update progress bar based on tile progress
-        if (this.barFill) {
-            const percent = (info.completedTiles / info.totalTiles) * 100;
-            this.barFill.style.width = `${percent}%`;
-        }
+        this.setBar((info.completedTiles / info.totalTiles) * 100);
     };
 
     private onTiledJobComplete = (): void => {
-        if (this.barFill) {
-            this.barFill.classList.add('complete');
-        }
+        // The files are saved and the App returns to interactive rendering.
+        this.hide();
+        this.resetProgress();
     };
+
+    private setBar(percent: number): void {
+        if (this.barFill) this.barFill.style.width = `${percent}%`;
+    }
 
     // ============================================================================
     // UI Updates
@@ -204,6 +216,12 @@ export class ProductionPanelExtension extends UIExtension {
         if (!this.statsContainer) return;
 
         const stats: string[] = [];
+
+        if (this.tiledJob) {
+            const { completedTiles, totalTiles, width, height } = this.tiledJob;
+            stats.push(this.createStat('Image', `${width}×${height}`));
+            stats.push(this.createStat('Tile', `${Math.min(completedTiles + 1, totalTiles)} / ${totalTiles}`));
+        }
 
         // Samples
         const samplesStr = info.targetSamples
@@ -285,7 +303,7 @@ export class ProductionPanelExtension extends UIExtension {
                 this.app.stop();
                 break;
             case 'exportPNG':
-                this.app.exportPNG();
+                this.app.exportPNG().catch((err) => console.error('PNG export failed:', err));
                 break;
             case 'exportHDR':
                 this.app.exportHDR();
@@ -305,8 +323,8 @@ export class ProductionPanelExtension extends UIExtension {
     private updateTileGrid(info: TiledJobProgressInfo): void {
         if (!this.tileGridContainer) return;
 
-        const { grid, completedPositions, currentTile } = info;
-        const completedSet = new Set(completedPositions.map(([x, y]) => `${x},${y}`));
+        const { cols, rows, completed, current } = info;
+        const completedSet = new Set(completed.map(([x, y]) => `${x},${y}`));
 
         // Build the grid HTML
         let html = `<div class="tile-grid-header">
@@ -315,14 +333,14 @@ export class ProductionPanelExtension extends UIExtension {
         </div>`;
 
         html += '<div class="tile-grid" style="' +
-            `grid-template-columns: repeat(${grid.tilesX}, 1fr);` +
-            `grid-template-rows: repeat(${grid.tilesY}, 1fr);">`;
+            `grid-template-columns: repeat(${cols}, 1fr);` +
+            `grid-template-rows: repeat(${rows}, 1fr);">`;
 
-        for (let y = 0; y < grid.tilesY; y++) {
-            for (let x = 0; x < grid.tilesX; x++) {
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
                 const key = `${x},${y}`;
                 const isComplete = completedSet.has(key);
-                const isCurrent = currentTile && currentTile.x === x && currentTile.y === y;
+                const isCurrent = current !== null && current[0] === x && current[1] === y;
 
                 let className = 'tile-cell';
                 let content = '';

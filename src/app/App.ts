@@ -22,8 +22,9 @@ import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
 import { AppEvents, shouldResetAccumulation } from './events.js';
 import { saveHDRFile, savePNGFile, type RenderStamp } from './utils/file-export.js';
-import { ExportError, SessionError } from '../errors/RenderErrors.js';
+import { ExportError, SessionError, RenderStoppedError } from '../errors/RenderErrors.js';
 import { ProductionOrchestrator, type ProductionOptions } from './ProductionOrchestrator.js';
+import { TiledRenderer, type TiledRenderConfig } from './TiledRenderer.js';
 import { ErrorOverlay } from './ui/ErrorOverlay.js';
 import { CompilationError } from '../errors/core/DiagnosticBag.js';
 import { DiagnosticBag } from '../errors/core/DiagnosticBag.js';
@@ -39,6 +40,7 @@ export class App {
     private extensions: Map<string, Extension> = new Map();
     private layout: AppLayout | null = null;
     private production: ProductionOrchestrator;
+    private tiled: TiledRenderer;
     private errorOverlay: ErrorOverlay;
     // The parameter values the accumulated image was rendered with: taken whenever the
     // accumulation restarts. A parameter change while rendering is stopped defers the reset
@@ -120,6 +122,7 @@ export class App {
         this.production = new ProductionOrchestrator(
             this, this.coordinator, this.parameterStore
         );
+        this.tiled = new TiledRenderer(this, this.production, this.eventBus);
 
         this.errorOverlay = new ErrorOverlay(document.body);
 
@@ -436,6 +439,22 @@ export class App {
         return this.production.extendProduction(additionalSamples);
     }
 
+    /** Render an image of any size in tiles and save it as one stamped HDR and/or PNG (see
+     *  TiledRenderer). Interactive rendering resumes afterwards, however the job ended. */
+    async renderTiled(config: TiledRenderConfig): Promise<void> {
+        this.stop();
+        try {
+            await this.tiled.render(config);
+        } catch (error) {
+            if (!(error instanceof RenderStoppedError)) throw error;
+            console.log('Tiled render stopped; nothing was saved');
+        } finally {
+            this.start();
+        }
+    }
+
+    isTiledRenderActive(): boolean { return this.tiled.isActive(); }
+
     // -- Rendering: Utilities --
 
     renderFrame(): void { this.engine.renderFrame(); }
@@ -657,7 +676,9 @@ export class App {
     getCanvasSize(): [number, number] { return this.engine.getCanvasSize(); }
     getCanvas(): HTMLCanvasElement { return this.gl.canvas as HTMLCanvasElement; }
 
-    exportPNG(filename?: string): void {
+    /** Resolves once the file is handed to the browser. The pixels are read synchronously
+     *  (before the first await), so a render continuing afterwards cannot change them. */
+    async exportPNG(filename?: string): Promise<void> {
         const exports = this.getAvailableExports();
         if (!exports.includes('ldr')) {
             throw new ExportError('LDR export not available for current renderer', {
@@ -670,7 +691,7 @@ export class App {
             this.renderLdr();   // on-demand: tonemap + dither → 'ldr' buffer (impl-plan-display B)
             const pixels = this.readExport('ldr') as Uint8Array;
             const name = filename || this._generateExportFilename('screenshot', 'png');
-            savePNGFile(pixels, width, height, name, this.buildRenderStamp());
+            await savePNGFile(pixels, width, height, name, this.buildRenderStamp());
             console.log(`Exported PNG: ${name}`);
         } catch (error) {
             if (error instanceof ExportError) throw error;
@@ -698,7 +719,7 @@ export class App {
         }
     }
 
-    exportAOV(aovName: string, filename?: string): void {
+    async exportAOV(aovName: string, filename?: string): Promise<void> {
         const exports = this.getAvailableExports();
         if (!exports.includes(aovName)) {
             throw new ExportError(`AOV '${aovName}' not available`, {
@@ -717,7 +738,7 @@ export class App {
                 console.log(`Exported AOV (HDR): ${name}`);
             } else {
                 const pngName = filename || this._generateExportFilename(aovName, 'png');
-                savePNGFile(pixels, width, height, pngName, this.buildRenderStamp());
+                await savePNGFile(pixels, width, height, pngName, this.buildRenderStamp());
                 console.log(`Exported AOV (PNG): ${pngName}`);
             }
         } catch (error) {
@@ -726,7 +747,7 @@ export class App {
         }
     }
 
-    exportAllAOVs(): void {
+    async exportAllAOVs(): Promise<void> {
         const exports = this.getAvailableExports();
         const aovs = exports.filter(e => e !== 'hdr' && e !== 'ldr');
 
@@ -744,7 +765,7 @@ export class App {
 
         for (const aov of aovs) {
             try {
-                this.exportAOV(aov);
+                await this.exportAOV(aov);
             } catch (error) {
                 errors.push({ aov, error });
                 console.error(`Failed to export AOV '${aov}':`, error);
@@ -762,9 +783,11 @@ export class App {
         console.log('AOV export complete');
     }
 
-    /** The reproducibility stamp embedded in every export (and readable by tooling). */
-    buildRenderStamp(): RenderStamp {
-        const [width, height] = this.getCanvasSize();
+    /** The reproducibility stamp embedded in every export (and readable by tooling).
+     *  A tiled render supplies the full image's resolution and spp: the canvas and the
+     *  sample count describe only the last tile. */
+    buildRenderStamp(image?: { resolution: [number, number]; spp: number }): RenderStamp {
+        const [width, height] = image?.resolution ?? this.getCanvasSize();
         return {
             // Data scenes append the .inst provenance — the scene id alone does not
             // determine a data-built image (fable-instance-clouds §7).
@@ -775,7 +798,7 @@ export class App {
             strategy: this.rendererManager.getActiveStrategy(),
             // The values THIS image was rendered with (see imageParameters).
             parameters: this.imageParameters ?? this.parameterStore.serialize(),
-            spp: this.coordinator.getSampleCount(),
+            spp: image?.spp ?? this.coordinator.getSampleCount(),
             resolution: [width, height],
             resetSalt: this.engine.getResetSalt(),
             git: typeof __GIT_HASH__ !== 'undefined' ? __GIT_HASH__ : 'unknown',
@@ -787,6 +810,8 @@ export class App {
     pinResetSalt(salt: number | null): void {
         this.engine.pinResetSalt(salt);
     }
+    getPinnedResetSalt(): number | null { return this.engine.getPinnedResetSalt(); }
+    getResetSalt(): number { return this.engine.getResetSalt(); }
 
     getActiveStrategy(): RenderStrategy | null {
         return this.rendererManager.getActiveStrategy();

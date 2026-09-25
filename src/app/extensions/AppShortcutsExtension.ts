@@ -123,7 +123,7 @@ export class AppShortcutsExtension implements Extension {
             // x: Export PNG screenshot
             case 'x':
                 e.preventDefault();
-                this.app.exportPNG();
+                this.app.exportPNG().catch((err) => console.error('PNG export failed:', err));
                 break;
 
             // X (shift+x): Export HDR
@@ -136,7 +136,7 @@ export class AppShortcutsExtension implements Extension {
             case 'a':
             case 'A':
                 e.preventDefault();
-                this.app.exportAllAOVs();
+                this.app.exportAllAOVs().catch((err) => console.error('AOV export failed:', err));
                 break;
 
             // j/J: Quick save session

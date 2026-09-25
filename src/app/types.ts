@@ -1,7 +1,5 @@
 // app/types.ts
 
-import type { TileJob } from './TiledRenderer.js';
-
 // Re-export compiler types that are used by app consumers
 export type {
     RenderStrategy,
@@ -104,11 +102,9 @@ export type EventHandler = (data?: any) => void;
  * Captures enough state to re-queue work on restore:
  * - Parameters + renderer: restore the scene setup
  * - productionGoal: re-start a production render
- * - tileJob: resume a tiled render (skip completed tiles)
  *
- * Does NOT capture GPU state (accumulation buffers, sample counts).
- * Restoring always re-renders from scratch, but tiled jobs skip
- * tiles whose output was already saved to disk.
+ * Does NOT capture GPU state (accumulation buffers, sample counts):
+ * restoring always re-renders from scratch.
  */
 export interface SessionData {
     version: string;
@@ -121,9 +117,6 @@ export interface SessionData {
 
     // Production job (if one was active)
     productionGoal?: { targetSamples: number };
-
-    // Tiled job (if one was active)
-    tileJob?: TileJob;
 }
 
 export const SESSION_VERSION = '1.0.0';

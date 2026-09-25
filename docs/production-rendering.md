@@ -79,74 +79,45 @@ app.getRenderState()  // 'rendering', 'paused', 'complete', 'stopped'
 
 ## Tiled Rendering
 
-For high-resolution renders (4K+), the image is split into tiles. Each tile is rendered separately and saved to disk, avoiding memory limits.
-
-### TiledRenderer
-
-Location: `src/app/TiledRenderer.ts`
+For images larger than the screen (8K stills, posters), render in tiles. The image is split
+into tiles; the canvas is resized to one tile at a time; each tile is rendered to the full
+sample count and read back; the tiles are stitched on the CPU into ONE HDR and/or PNG file
+carrying the full image's stamp. Tiles bound the work in one draw call (a whole 8K frame of a
+heavy scene can outlast the GPU watchdog) and the GPU memory the accumulation needs.
 
 ```typescript
-const bus = app.getEventBus();
-const tiled = new TiledRenderer(app, bus);
-
-await tiled.startJob({
-    targetWidth: 4096,
-    targetHeight: 2048,
-    targetTileSize: 512,
-    samplesPerTile: 1000,
-    format: 'hdr'  // 'hdr' | 'png' | 'both'
+await app.renderTiled({
+    width: 7680,
+    height: 4320,
+    spp: 2000,
+    format: 'both',      // 'hdr' | 'png' | 'both'
+    tileSize: 1024,      // optional; rounded up to a multiple of 64
 });
+// Saves render_<date>_7680x4320_2000spp.hdr / .png, then resumes interactive rendering.
 ```
 
-**Features:**
-- Calculates optimal tile grid to divide evenly
-- Renders tiles row-by-row
-- Saves each tile immediately after completion
-- Supports pause/resume
-- Emits progress events for UI
+The production dialog offers the same thing ("Render in tiles"; on by default for 8K; a
+Custom size is available). Code: `src/app/TiledRenderer.ts` (the job), `src/app/tiling.ts`
+(tile grid and stitching, pure), `ProductionOrchestrator.renderTiles` (one parameter lock
+around all tiles).
 
-### Tile Grid Configuration
+**Tiling does not change the image.** The RNG seeds with the global pixel, cameras map
+through `engine.imageSize`, tile offsets are multiples of 64 (the period of the display's
+blue-noise dither), and the job pins ONE RNG salt, recorded in the stamp. Rendering the same
+scene at the same size in one piece with that salt pinned (`app.pinResetSalt(salt)`) gives
+byte-identical files; this was checked in headless Chromium for the cornell camera family.
 
-```typescript
-interface TileJobConfig {
-    targetWidth: number;      // Full image width
-    targetHeight: number;     // Full image height
-    targetTileSize: number;   // Preferred tile size (adjusted to divide evenly)
-    samplesPerTile: number;   // Samples to render per tile
-    format: 'hdr' | 'png' | 'both';
-}
+**Memory.** The stitched image is kept at 4 bytes per pixel per format (RGBE for HDR, RGBA
+for PNG): 133 MB each at 7680×4320. Both are allocated before the first tile, so a size the
+browser cannot hold fails immediately.
 
-interface TileGrid {
-    tilesX: number;      // Number of columns
-    tilesY: number;      // Number of rows
-    tileWidth: number;   // Actual tile width
-    tileHeight: number;  // Actual tile height
-}
-```
+**Stopping** (`app.stop()`, or Cancel in the panel) discards the job; nothing is saved, and
+there is no resume.
 
-### Tiled Render Example
-
-```typescript
-import { App, TiledRenderer } from './src/app/index.js';
-
-const app = App.create(document.body, { layout: 'fullscreen' });
-await app.initialize({ scene, strategies });
-app.use(new ProductionPanelExtension());
-app.start();
-
-const bus = app.getEventBus();
-const tiled = new TiledRenderer(app, bus);
-
-await tiled.startJob({
-    targetWidth: 8192,
-    targetHeight: 4096,
-    targetTileSize: 1024,
-    samplesPerTile: 2000,
-    format: 'both'
-});
-// Tiles are saved automatically as they complete
-// ProductionPanelExtension shows progress with tile grid
-```
+**Throughput.** The render loop draws one sample per animation frame, so a small tile cannot
+use a fast GPU fully (a 512² tile at 60 fps is 16M samples/s). Prefer the default 1024 or
+larger unless a single frame of the scene is slow. Keep the tab visible: browsers stop
+animation frames in background tabs.
 
 ## Export
 
@@ -207,30 +178,24 @@ interface ProgressInfo {
 
 | Event | Data | Description |
 |-------|------|-------------|
-| `tiledJob.progress` | `TiledJobProgressInfo` | Job-level progress |
-| `tiledJob.complete` | `{ jobId, totalTiles, elapsedSeconds }` | All tiles done |
-| `tile.start` | `TileProgressInfo` | Tile begins |
-| `tile.complete` | `TileProgressInfo` | Tile finished |
+| `tiledJob.progress` | `TiledJobProgressInfo` | At the start and after each tile |
+| `tiledJob.complete` | `TiledJobCompleteInfo` | Files saved |
+
+Each tile is also an ordinary production render, so `render.started` / `render.complete`
+fire once per tile; a listener that means "the whole image" checks `app.isTiledRenderActive()`.
 
 ```typescript
 interface TiledJobProgressInfo {
-    jobId: string;
-    grid: TileGrid;
-    targetWidth: number;
-    targetHeight: number;
-    samplesPerTile: number;
-    completedTiles: number;
-    totalTiles: number;
-    completedPositions: [number, number][];
-    currentTile: { x: number; y: number } | null;
+    width: number; height: number; spp: number;
+    cols: number; rows: number;
+    completedTiles: number; totalTiles: number;
+    completed: [number, number][];        // [col, row], rows counted from the top
+    current: [number, number] | null;     // the tile rendering now
 }
 
-interface TileProgressInfo {
-    tileX: number;
-    tileY: number;
-    tileIndex: number;
-    totalTiles: number;
-    grid: TileGrid;
+interface TiledJobCompleteInfo {
+    files: string[];
+    elapsedSeconds: number;
 }
 ```
 
@@ -247,8 +212,8 @@ The `ProductionPanelExtension` automatically shows during production renders.
 - Sample counter (current / target)
 - Elapsed time and ETA
 - Pause/Resume/Cancel buttons
-- Export PNG/HDR buttons on completion
-- Tile grid visualization for tiled renders
+- Export PNG/HDR buttons on completion (not after a tile: a tiled job saves its own files)
+- Tile grid visualization for tiled renders; the bar shows the whole image's progress
 
 **Tile Grid Visualization:**
 ```

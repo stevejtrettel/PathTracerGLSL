@@ -36,11 +36,11 @@ export const AppEvents = {
     // Camera (emitted by OrbitControls / KeyboardControls)
     CAMERA_MOVED: 'camera.moved',
 
-    // Tiled rendering
-    TILE_START:         'tile.start',
-    TILE_COMPLETE:      'tile.complete',
-    TILED_JOB_PROGRESS: 'tiledJob.progress',
-    TILED_JOB_COMPLETE: 'tiledJob.complete',
+    // Tiled rendering (TiledRenderer). Each tile is also an ordinary production render, so
+    // RENDER_STARTED/RENDER_COMPLETE fire once per tile; listeners that mean "the whole
+    // image" check App.isTiledRenderActive().
+    TILED_JOB_PROGRESS: 'tiledJob.progress',   // TiledJobProgressInfo
+    TILED_JOB_COMPLETE: 'tiledJob.complete',   // TiledJobCompleteInfo
 
     // Cross-extension requests
     PRODUCTION_DIALOG_REQUESTED: 'production.dialogRequested',

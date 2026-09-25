@@ -4,6 +4,43 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — large images: tiled rendering saves one stitched file
+
+The old `TiledRenderer` was never reachable from the app, and would have failed on its second
+tile: it started a fresh production render per tile, and the first one leaves the production
+session "settled", which refuses a new one. It also downloaded one file per tile for the user
+to stitch.
+
+- **`app.renderTiled({ width, height, spp, format, tileSize })`** renders any size in tiles
+  and saves ONE HDR and/or PNG with the full image's stamp. The production dialog offers it
+  ("Render in tiles"; on by default for the new 8K size, and a Custom size).
+- **Tiling is invisible in the output.** The RNG already seeds with the global pixel, cameras
+  map through `engine.imageSize`, tile offsets are multiples of 64 (the display dither's
+  blue-noise period), and the job pins one RNG salt, recorded in the stamp. Verified in
+  headless Chromium: a 200×150 render in 64-px tiles (edge tiles 8 and 22 px) is
+  byte-identical to the one-piece render, HDR and PNG, for each of the six cornell cameras
+  (pinhole, thin lens, orthographic, equirect, fisheye, cylindrical); with the salt unpinned
+  the files differ, and the stamp records the salt actually used.
+- One parameter lock spans the whole job (`ProductionOrchestrator.renderTiles`); the canvas
+  and layout are restored and interactive rendering resumes afterwards, including after a stop.
+- The stitched image is held at 4 bytes/pixel per format (RGBE or RGBA) and allocated before
+  the first tile, so a size the browser cannot hold fails immediately.
+- **PNG export no longer goes through a canvas.** `encodePNG` writes the file directly (Paeth
+  filter, the browser's zlib via `CompressionStream`, stamp as tEXt chunks). `canvas.toBlob`
+  is capped by the browser's canvas-area limit (Safari: 16.7M pixels, below one 8K frame) and
+  its failure was silently ignored. All PNG exports use the new encoder, so `exportPNG` /
+  `exportAOV` / `exportAllAOVs` are now async (the pixels are still read synchronously).
+- `floatToRGBE` clamps negative channels at 0 (a Uint8Array stored −26 as 230).
+- The production dialog's stop check compared `err.name` with `'RenderStopped'`; the name is
+  `'RenderStoppedError'`, so every cancel was logged as a failure.
+- Removed: per-tile downloads, the never-wired session resume (`SessionData.tileJob`), and
+  the unused `TILE_START`/`TILE_COMPLETE` events.
+
+Not changed: the production loop draws one sample per animation frame, which caps small
+tiles' throughput (a 512² tile at 60 fps is 16M samples/s however fast the GPU); that is the
+reason the default tile is 1024. Tests: tests/app/tiling.test.ts, the PNG round trip in
+tests/app/fileExport.test.ts, the session in tests/app/productionOrchestrator.test.ts.
+
 ## 2026-09-25 — runtime fixes: context loss, render-loop errors, export stamps, workers
 
 - **WebGL context loss was unrecoverable.** On restore the engine rebuilt the renderers but

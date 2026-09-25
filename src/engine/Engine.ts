@@ -315,6 +315,11 @@ export class Engine {
         return this.resetSalt;
     }
 
+    /** The pinned salt, or null when resets draw a fresh one. */
+    getPinnedResetSalt(): number | null {
+        return this.pinnedResetSalt;
+    }
+
     /** Pin the RNG salt for reproducible renders; null unpins (resets bump again). */
     pinResetSalt(salt: number | null): void {
         this.pinnedResetSalt = salt;

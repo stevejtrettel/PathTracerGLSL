@@ -7,6 +7,7 @@ import type { App } from './App.js';
 import type { RenderCoordinator, ProgressInfo } from './RenderCoordinator.js';
 import type { ParameterStore } from './ParameterStore.js';
 import type { LayoutMode } from './layout/index.js';
+import type { Tile } from './tiling.js';
 
 export interface ProductionOptions {
     width?: number;
@@ -66,9 +67,9 @@ export class ProductionOrchestrator {
             // Auto-export runs here — still at target resolution, before exitProduction
             // ever restores — so a completed render is always saved before it can be
             // discarded on return to interactive.
-            if (options?.autoExportPNG) { console.log('Auto-exporting PNG...'); this.app.exportPNG(); }
+            if (options?.autoExportPNG) { console.log('Auto-exporting PNG...'); await this.app.exportPNG(); }
             if (options?.autoExportHDR) { console.log('Auto-exporting HDR...'); this.app.exportHDR(); }
-            if (options?.autoExportAllAOVs) { console.log('Auto-exporting all AOVs...'); this.app.exportAllAOVs(); }
+            if (options?.autoExportAllAOVs) { console.log('Auto-exporting all AOVs...'); await this.app.exportAllAOVs(); }
             if (options?.autoSave) { console.log('Auto-saving session...'); this.app.quickSave(); }
         } finally {
             // Render settled (completed or stopped): unlock + restore profiling, but
@@ -95,6 +96,37 @@ export class ProductionOrchestrator {
             await this.coordinator.startProduction({ targetSamples: newTarget });
         } finally {
             this.settleProduction();
+        }
+    }
+
+    /**
+     * A tiled production (TiledRenderer): ONE locked session — the parameters cannot change
+     * between tiles — in which the canvas is resized to each tile in turn, offset into the
+     * full image, and rendered to `spp`. `onTile` reads the finished tile back before the
+     * next one starts. Always leaves production at the end, finished or not: what the
+     * canvas holds then is a single tile, not a result to look at.
+     */
+    async renderTiles(
+        imageSize: [number, number],
+        tiles: readonly Tile[],
+        spp: number,
+        onTile: (tile: Tile, index: number) => void,
+    ): Promise<void> {
+        this.beginProduction();
+        this.previousResolution = this.app.getCanvasSize();
+        this.app.setImageSize(imageSize[0], imageSize[1]);
+        try {
+            for (const [index, tile] of tiles.entries()) {
+                this.app.resize(tile.width, tile.height);
+                this.app.setPixelOffset(tile.x, tile.y);
+                this.coordinator.resetAccumulation('tile');
+                await this.coordinator.startProduction({ targetSamples: spp });
+                onTile(tile, index);
+            }
+        } finally {
+            this.app.clearPixelOffset();
+            this.app.clearImageSize();
+            this.exitProduction();
         }
     }
 

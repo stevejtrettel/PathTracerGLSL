@@ -14,8 +14,18 @@
 
 import { UIExtension } from './UIExtension.js';
 import type { RegionName } from '../layout/index.js';
-import { Modal, NumberInput, Button, Dropdown } from '../ui/index.js';
+import { Modal, NumberInput, Button, Dropdown, Checkbox } from '../ui/index.js';
 import { AppEvents } from '../events.js';
+import { RenderStoppedError } from '../../errors/RenderErrors.js';
+import { DEFAULT_TILE_SIZE } from '../TiledRenderer.js';
+
+/** Production sizes offered in the dialog. */
+const RESOLUTIONS: Record<string, [number, number] | null> = {
+    screen: null,
+    '1080p': [1920, 1080],
+    '4k': [3840, 2160],
+    '8k': [7680, 4320],
+};
 
 export class RenderControlsExtension extends UIExtension {
     name = 'render-controls';
@@ -40,6 +50,7 @@ export class RenderControlsExtension extends UIExtension {
     }
 
     private onRenderComplete = (): void => {
+        if (this.app.isTiledRenderActive()) return;   // a tile finished; the job saves its own files
         console.log('RenderControlsExtension: render.complete event received');
         // Small delay to ensure exports finish
         setTimeout(() => {
@@ -118,7 +129,10 @@ export class RenderControlsExtension extends UIExtension {
         const modal = new Modal('Start Production Render', { width: 400 });
 
         let samples = 1000;
-        let resolution = 'screen'; // screen, 1080p, 4k
+        let resolution = 'screen';
+        let [customWidth, customHeight] = this.app.getCanvasSize();
+        let tiled = false;
+        let tileSize = DEFAULT_TILE_SIZE;
 
         modal.add(new NumberInput(samples, {
             label: 'Target Samples',
@@ -129,15 +143,44 @@ export class RenderControlsExtension extends UIExtension {
             onChange: (v) => { samples = v; }
         }));
 
+        const widthInput = new NumberInput(customWidth, {
+            label: 'Width', min: 1, max: 32768, step: 1, integer: true,
+            onChange: (v) => { customWidth = v; },
+        });
+        const heightInput = new NumberInput(customHeight, {
+            label: 'Height', min: 1, max: 32768, step: 1, integer: true,
+            onChange: (v) => { customHeight = v; },
+        });
+        const tiledInput = new Checkbox(tiled, {
+            label: 'Render in tiles (saves one HDR + PNG)',
+            onChange: (v) => { tiled = v; tileSizeInput[v ? 'show' : 'hide'](); },
+        });
+        const tileSizeInput = new NumberInput(tileSize, {
+            label: 'Tile size (px, multiple of 64)', min: 64, max: 4096, step: 64, integer: true,
+            onChange: (v) => { tileSize = v; },
+        });
+
         modal.add(new Dropdown(resolution, {
             label: 'Resolution',
             options: [
                 { label: 'Screen Size', value: 'screen' },
                 { label: '2K (1920x1080)', value: '1080p' },
-                { label: '4K (3840x2160)', value: '4k' }
+                { label: '4K (3840x2160)', value: '4k' },
+                { label: '8K (7680x4320)', value: '8k' },
+                { label: 'Custom', value: 'custom' },
             ],
-            onChange: (v) => { resolution = v; }
+            onChange: (v) => {
+                resolution = v;
+                widthInput[v === 'custom' ? 'show' : 'hide']();
+                heightInput[v === 'custom' ? 'show' : 'hide']();
+                // Beyond 4K a whole frame per draw risks the GPU watchdog; tiles are the default.
+                if (v === '8k') { tiled = true; tiledInput.setValue(true); tileSizeInput.show(); }
+            }
         }));
+        modal.add(widthInput.hide());
+        modal.add(heightInput.hide());
+        modal.add(tiledInput);
+        modal.add(tileSizeInput.hide());
 
         const footer = modal.addFooter();
 
@@ -154,36 +197,28 @@ export class RenderControlsExtension extends UIExtension {
         new Button('Start Render', () => {
             modal.close();
             cleanup();
+            if (samples <= 0) return;
 
-            if (samples > 0) {
-                // Determine resolution
-                let width: number | undefined;
-                let height: number | undefined;
+            const size = resolution === 'custom' ? [customWidth, customHeight] as [number, number] : RESOLUTIONS[resolution];
+            const reportFailure = (err: unknown) => {
+                if (err instanceof RenderStoppedError) console.log('Production render stopped');
+                else console.error('Production render failed:', err);
+            };
 
-                if (resolution === '1080p') {
-                    width = 1920;
-                    height = 1080;
-                } else if (resolution === '4k') {
-                    width = 3840;
-                    height = 2160;
-                }
-
-                this.app.renderProduction(samples, {
-                    width,
-                    height,
-                    autoExportPNG: true, // Fix: Ensure PNG is saved
-                    autoExportAllAOVs: true,
-                    autoSave: true
-                }).then(() => {
-                    // Completion dialog will be triggered by render.complete event
-                }).catch(err => {
-                    if (err.name === 'RenderStopped') {
-                        console.log('Production render stopped');
-                    } else {
-                        console.error('Production render failed:', err);
-                    }
-                });
+            if (tiled) {
+                const [width, height] = size ?? this.app.getCanvasSize();
+                this.app.renderTiled({ width, height, spp: samples, format: 'both', tileSize }).catch(reportFailure);
+                return;
             }
+            this.app.renderProduction(samples, {
+                width: size?.[0],
+                height: size?.[1],
+                autoExportPNG: true,
+                autoExportAllAOVs: true,
+                autoSave: true
+            }).then(() => {
+                // Completion dialog will be triggered by render.complete event
+            }).catch(reportFailure);
         }, { variant: 'primary' }).mount(footer);
 
         modal.show();
