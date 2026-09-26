@@ -200,7 +200,12 @@ export class App {
     }
 
     /** Load an `image` environment (or an explicit config.environmentHDR): the radiance map,
-     *  the default sampling tables, and the (chart, compensation) variants the strategies use. */
+     *  the default sampling tables, and the (chart, compensation) variants the strategies use.
+     *  The table sizes and total weight measured here (`env.size`, `env.sizeOct`,
+     *  `env.totalWeight`) go to the engine directly, not through the ParameterStore: the store
+     *  holds what the user chose, which a session restores, and these describe the loaded
+     *  map, so a restore must neither remove nor overwrite them. Every caller resets
+     *  accumulation after loading (or loads before the first frame). */
     private async _loadImageEnvironment(config: AppConfig): Promise<void> {
         const sceneEnv = config.scene?.environment;
         const hdrPath = config.environmentHDR ?? (sceneEnv?.type === 'image' ? sceneEnv.url : undefined);
@@ -208,7 +213,8 @@ export class App {
         try {
             // The loader registers env_map + the DEFAULT tables (equirect, uncompensated).
             const env = await this.engine.loadEnvironmentHDR(hdrPath, ENV_EXTERN_NAMES);
-            this.parameterStore.batch({ 'env.size': [env.width, env.height], 'env.totalWeight': env.totalWeight });
+            this.engine.setParameter('env.size', [env.width, env.height]);
+            this.engine.setParameter('env.totalWeight', env.totalWeight);
 
             // T5: build the non-default (chart, compensation) variants the strategies use.
             let octaRgb: Float32Array | null = null;
@@ -220,7 +226,7 @@ export class App {
                 if (chart === 'octahedral') {
                     octaRgb ??= resampleEquirectToOctahedral(env.data, env.width, env.height, octaN);
                     rgb = octaRgb; w = octaN; h = octaN;
-                    this.parameterStore.set('env.sizeOct', [octaN, octaN]);
+                    this.engine.setParameter('env.sizeOct', [octaN, octaN]);
                 }
                 this.engine.registerEnvironmentTable(rgb, w, h, {
                     names: { map: ENV_EXTERN_NAMES.map, cond: `${ENV_EXTERN_NAMES.cond}${suffix}`, marg: `${ENV_EXTERN_NAMES.marg}${suffix}` },
@@ -317,7 +323,7 @@ export class App {
                     });
                     console.log(`Baked procedural environment [${v.chart}${v.compensation ? '+comp' : ''}]: ${w}×${h}, totalWeight ${totalWeight.toFixed(3)}`);
                 }
-                this.parameterStore.set(chart === 'octahedral' ? 'env.sizeOct' : 'env.size', [w, h]);
+                this.engine.setParameter(chart === 'octahedral' ? 'env.sizeOct' : 'env.size', [w, h]);   // measured, like _loadImageEnvironment's
             } finally {
                 this.engine.unloadRenderer(bake.id);
             }
@@ -549,7 +555,11 @@ export class App {
             }
 
             if (session.parameters) {
-                this.parameterStore.restore(session.parameters);
+                // Measured environment values belong to the loaded map, not the session (see
+                // _loadImageEnvironment); a session saved by an older build still carries them.
+                const params = { ...session.parameters };
+                for (const key of MEASURED_ENV_PARAMS) delete params[key];
+                this.parameterStore.restore(params);
             }
 
             if (session.rendererId) {
@@ -958,3 +968,7 @@ function envVariants(strategies: RenderStrategy[] | undefined): Array<{ chart: s
     if (seen.size === 0) seen.set('equirect|false', { chart: 'equirect', compensation: false });
     return [...seen.values()];
 }
+
+/** Parameters the App measures from the loaded environment and gives to the engine directly
+ *  (_loadImageEnvironment, _bakeProceduralEnvironment). Never session state. */
+const MEASURED_ENV_PARAMS = ['env.size', 'env.sizeOct', 'env.totalWeight'] as const;
