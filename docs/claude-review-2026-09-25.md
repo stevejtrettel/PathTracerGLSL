@@ -246,7 +246,8 @@ your approval before any code, and its own targeted witness run.
    GRIN-hard-stop texts (1.1). Not done in this batch: stale *code comments* (Part 5, including
    the ones that still say the App calls the layout functions, and the ledger's "light tree —
    appended last"), which belong to batch 6.
-2. **Contained correctness fixes**, each with a failing test or witness first where feasible:
+2. **Contained correctness fixes. Done Sep 25** (claude-review-batch2-plan.md; CHANGELOG
+   "review batch 2"). Each with a failing test or witness first where feasible:
    session restore (1.4), tiled teardown (1.5), auto-export (1.6), context restore (1.7),
    `initialize` (1.8), environment-colour validation (1.10), and the small items in 1.11.
 3. **The shadow-ray aim (1.2)** — a transport change: its own plan and witness.

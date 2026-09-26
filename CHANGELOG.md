@@ -4,6 +4,44 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-25 — review batch 2: contained correctness fixes
+
+The fixes planned in docs/claude-review-batch2-plan.md, one commit each. Where a unit test
+was possible it was written first and failed before the fix; fixes inside `App` (which has no
+test harness) were checked by a headless probe of the live app, run on the old and the new
+code.
+
+- **Session restore** (1.4): the environment values the App measures from the loaded map go
+  to the engine directly and are dropped from restored sessions, so a session can neither
+  remove them (the engine then sampled a 1×1 table) nor overwrite them with another map's.
+  Probe: removed / overwritten before, unchanged after.
+- **Tiled rendering** (1.5): leaving production clears the tile offset and image size (unit
+  test); `renderTiled` refuses a second job instead of silently killing the first (probe: 0
+  files saved before, 1 after), rejects with `RenderStoppedError` when stopped (it resolved),
+  and restarts interactive rendering only when nothing else is running. The case that last
+  rule guards — a production started while the PNG is being written — could not be reproduced
+  in headless Chromium even at 7680×4320.
+- **Exports** (1.6): auto-export starts every export (each reads its buffer when called) before
+  awaiting any encode, and `exportAllAOVs` reads every AOV before encoding one (unit test).
+- **Context restore** (1.7): start/resume/production requests are refused while textures are
+  re-registered; any error is shown (frame errors never were, although the overnight runtime
+  entry below says they are); a failed environment load is not recorded for later restores; a
+  finished production returns to interactive. Probe: all four cases failed before, pass after.
+- **A second `initialize()`** (1.8): for the same scene, all strategies are recompiled together
+  on one scene-data layout; for another scene, the old renderers are unloaded (unit tests; the
+  witness runner's variance path re-rendered mesh-light-twin and fog-area with identical
+  numbers).
+- **Environment colour** (1.10): validated with the shared spectrum checker (unit test).
+- **Small items** (1.11): the rough dielectric compares the two indices rather than their
+  quotient against 1; mesh-light sampling rejects a NaN normal (both unreproducible on
+  SwiftShader: 18 checks of the rough and mesh-light witnesses identical before and after);
+  cancelling OBJ faces get a face normal instead of (0,0,0); `compileScene([])` reports a
+  diagnostic; `maxBounces`/`maxNullCrossings` above 2³¹ − 2 are rejected (the `<=` loops need
+  one more increment); CI's push runs no longer cancel a dispatched witness sweep (checked by
+  reading; no YAML parser here); the glslang harness reports a crashed validator as a crash.
+
+Not in this batch: the fp spawn margin (needs a measurement plan), and review items 1.1–1.3.
+
 ## 2026-09-25 — review of the Sep 24–25 work; the documents corrected
 
 - **Review.** Five read-only reviewers read the 33 commits 8d04f34 … cdccd81 against CLAUDE.md's
