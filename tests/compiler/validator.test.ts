@@ -331,7 +331,24 @@ describe('Validator — hardening pack (H1)', () => {
             s.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 }, material: 'glow' });
         });
         expect(bag.hasErrors()).toBe(false);
-        expect(bag.getWarnings().some(w => /emission is ignored/.test(w.message))).toBe(true);
+        expect(bag.getWarnings().some(w => /model 'dielectric' cannot emit .* the value is ignored/.test(w.message))).toBe(true);
+    });
+
+    it('warns once, not twice, when a model that cannot emit carries emission', () => {
+        const bag = run(s => {
+            s.materials.glow = { model: 'dielectric', ior: 1.5, emission: [5, 5, 5], sampleAsLight: false };
+            s.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 }, material: 'glow' });
+        });
+        expect(bag.getWarnings().filter(w => w.message.startsWith("Material 'glow': emission"))).toHaveLength(1);
+    });
+
+    it('the phantom-light error is not repeated as a warning', () => {
+        const bag = run(s => {
+            s.materials.glow = { model: 'dielectric', ior: 1.5, emission: [5, 5, 5] };
+            s.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 }, material: 'glow' });
+        });
+        expect(bag.getErrors().some(e => /emission dispatch returns zero/.test(e.message))).toBe(true);
+        expect(bag.getWarnings().filter(w => w.message.startsWith("Material 'glow': emission"))).toHaveLength(0);
     });
 
     it('accepts a lambert emitter on an analytic shape (the legitimate registry route)', () => {
@@ -429,10 +446,14 @@ describe('Validator — schema discipline warnings (R2)', () => {
     });
 
     it('warns when a non-emissive-capable model carries an emission value', () => {
+        // A {param} emission: never a light (the registry admits constant emission only), so
+        // the one diagnostic is this warning. (A constant emission on the sphere that uses 'm'
+        // would be the phantom-light error instead.)
         const bag = run(s => {
-            s.materials['m'] = { model: 'dielectric', ior: 1.5, emission: [1, 1, 1] };
+            s.materials['m'] = { model: 'dielectric', ior: 1.5, emission: { param: 'm.glow', default: [1, 1, 1] } };
         });
-        expect(bag.getWarnings().some(w => /model 'dielectric' cannot emit/.test(w.message))).toBe(true);
+        expect(bag.hasErrors()).toBe(false);
+        expect(bag.getWarnings().filter(w => /model 'dielectric' cannot emit/.test(w.message))).toHaveLength(1);
     });
 });
 

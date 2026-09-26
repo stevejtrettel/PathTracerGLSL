@@ -282,17 +282,22 @@ export function validate(
         if (negativeEmission) {
             bag.error('invalid-setting', `Material '${name}': emission components must be >= 0`).add();
         }
-        // A CONSTANT emission (incl. a constant blackbody) on a non-emitting model: the
-        // light registry would admit it, so this is where the phantom light is caught.
-        if (hasConstantNonzeroEmission(e) && !EMITTING_MODELS.has(mat.model)) {
-            const wouldRegister = mat.sampleAsLight !== false && samplableObjectUses(scene, name);
+        // Emission on a model whose emission dispatch returns zero — one rule, one diagnostic.
+        // A CONSTANT nonzero emission (incl. a constant blackbody) that the light registry would
+        // admit is a phantom light: an error. Otherwise the value is ignored: one warning, which
+        // also covers {param} and formula emission (for model 'none', only a constant emission
+        // is reported).
+        const constantEmission = hasConstantNonzeroEmission(e);
+        if (!EMITTING_MODELS.has(mat.model)
+            && (constantEmission || (mat.model !== 'none' && emissionMayBeNonzero(e)))) {
+            const wouldRegister = constantEmission && mat.sampleAsLight !== false && samplableObjectUses(scene, name);
             if (wouldRegister) {
                 bag.error('invalid-setting',
                     `Material '${name}': model '${mat.model}' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (${[...EMITTING_MODELS].join(', ')}) or set sampleAsLight: false`)
                     .add();
             } else {
                 bag.warning('invalid-setting',
-                    `Material '${name}': emission is ignored for model '${mat.model}' — its emission dispatch returns zero (emissive-capable models: ${[...EMITTING_MODELS].join(', ')})`)
+                    `Material '${name}': emission is set but model '${mat.model}' cannot emit (its emission is identically zero) — the value is ignored`)
                     .add();
             }
         }
@@ -975,13 +980,6 @@ export function validate(
                         `Material '${name}': '${prop}' is {param}-driven but model '${mat.model}' does not read it — the knob would control nothing (schemas: fable-module-anatomy §3)`)
                         .add();
                 }
-            }
-            // An emission VALUE on a model that cannot emit (its emission function ≡ 0).
-            const emissiveCapable = MATERIAL_MODELS[mat.model]?.capabilities.emissive ?? false;
-            if (!emissiveCapable && emissionMayBeNonzero(mat.emission)) {
-                bag.warning('invalid-setting',
-                    `Material '${name}': emission is set but model '${mat.model}' cannot emit (its emission is identically zero) — the value is ignored`)
-                    .add();
             }
         }
     }
