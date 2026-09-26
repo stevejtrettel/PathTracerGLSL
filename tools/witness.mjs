@@ -347,8 +347,9 @@ async function renderVarianceOnce(browser, sceneId, strategyIdx, [W, H], spp) {
             const strategy = JSON.parse(JSON.stringify(entry.strategies[idx]));
             strategy.estimator.accumulation = { type: 'variance' };
             strategy.id = `${strategy.id}__var`;
-            // initialize() is additive: distinct strategy id → distinct renderer id,
-            // nothing already loaded is clobbered.
+            // initialize() on the same scene adds this strategy and recompiles every loaded
+            // renderer against the one shared scene-data layout; the base renderer stays
+            // loaded and selectable.
             await app.initialize({ scene: entry.scene, strategies: [strategy], initialParameters: entry.initialParameters });
             app.resize(w, h);
             // initialize() selects the new renderer, but that selection is

@@ -36,6 +36,33 @@ describe('RendererManager.initialize', () => {
     });
 });
 
+describe('RendererManager.initialize — a second call', () => {
+    const stratB = { ...stratA, id: 'b' };
+
+    it('on the same scene, recompiles every strategy together (one layout) and selects the new one', async () => {
+        const engine = fakeEngine();
+        const { mgr, compiler } = await initialized(engine);
+        await mgr.initialize({ scene, strategies: [stratB] });
+        const lastCall = compiler.compileScene.mock.calls.at(-1)!;
+        expect(lastCall[1].map((s: { id: string }) => s.id)).toEqual(['a', 'b']);
+        expect(engine.loadRenderer).toHaveBeenCalledWith('a-scn', expect.anything());   // reloaded on the new layout
+        expect(engine.loadRenderer).toHaveBeenCalledWith('b-scn', expect.anything());
+        expect(mgr.getActiveRendererId()).toBe('b-scn');
+        mgr.selectRendererByStrategy('a');   // the first strategy is still loaded and selectable
+        expect(mgr.getActiveRendererId()).toBe('a-scn');
+    });
+
+    it('on a different scene, unloads the old renderers first', async () => {
+        const engine = fakeEngine();
+        const { mgr, compiler } = await initialized(engine);
+        const other = { ...scene, id: 'other' };
+        await mgr.initialize({ scene: other, strategies: [stratB] });
+        expect(engine.unloadRenderer).toHaveBeenCalledWith('a-scn');
+        expect(compiler.compileScene.mock.calls.at(-1)![1].map((s: { id: string }) => s.id)).toEqual(['b']);
+        expect(mgr.getActiveRendererId()).toBe('b-other');
+    });
+});
+
 describe('RendererManager.recompile — atomicity', () => {
     it('a GPU validation failure leaves existing renderers untouched (no commit)', async () => {
         const engine = fakeEngine();

@@ -21,6 +21,7 @@ export function fakeEngine(sampleCount = 1) {
         loadRenderers: vi.fn(),
         validateRenderers: vi.fn(),
         loadRenderer: vi.fn(),
+        unloadRenderer: vi.fn(),
         selectRenderer: vi.fn(),
         clearAccumulation: vi.fn(() => { samples = 0; }),
         getAvailableRendererIds: vi.fn(() => [] as string[]),

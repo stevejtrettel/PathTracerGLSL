@@ -67,6 +67,27 @@ export class RendererManager {
             throw new Error('At least one strategy required');
         }
 
+        // A second call. Every renderer on a scene shares ONE scene-data layout, so for the
+        // same scene the new strategies join the loaded ones and all of them are recompiled
+        // together (recompile validates, then swaps); loading only the new ones would leave the
+        // loaded renderers baked against a layout the new scene data no longer has. A strategy
+        // whose id is already loaded replaces it. For a different scene, everything is unloaded
+        // first.
+        if (this.scene !== null) {
+            if (scene === this.scene) {
+                for (const strategy of strategies) this.strategies.set(strategy.id, strategy);
+                this.recompile();
+                this.selectRendererByStrategy(strategies[0].id);
+                if (initialParameters) this.parameterStore.batch(initialParameters);
+                return;
+            }
+            for (const id of this.renderers.keys()) this.engine.unloadRenderer(id);
+            this.renderers.clear();
+            this.strategies.clear();
+            this.strategyToRenderer.clear();
+            this.activeRendererId = null;
+        }
+
         this.scene = scene;
         console.log(`Initializing renderers for scene: ${scene.id}`);
 
