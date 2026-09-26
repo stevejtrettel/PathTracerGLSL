@@ -786,10 +786,16 @@ export function validate(
                     .add();
             }
         }
+        // Whether every row is present when required and of the right shape — the camera's own
+        // coupled rules (validateAuthored) may assume it.
+        let wellShaped = true;
         for (const p of rows) {
             const v = authored[p.name];
             if (v === undefined) {
-                if (p.required) bag.error('invalid-setting', `measurement.camera (${cameraType}): required field '${p.name}' is missing`).add();
+                if (p.required) {
+                    bag.error('invalid-setting', `measurement.camera (${cameraType}): required field '${p.name}' is missing`).add();
+                    wellShaped = false;
+                }
                 continue;
             }
             // 'value-number' unwraps a {param} spelling to its default for the checks below.
@@ -804,6 +810,7 @@ export function validate(
                     : p.shape === 'value-number' ? 'a finite number (or a {param} with a finite default)'
                     : 'a finite number';
                 bag.error('invalid-setting', `measurement.camera (${cameraType}): field '${p.name}' must be ${want}`).add();
+                wellShaped = false;
                 continue;
             }
             if (p.constraint !== undefined && p.shape !== 'enum') {
@@ -811,13 +818,6 @@ export function validate(
                 if (violation !== null) bag.error('invalid-setting', `measurement.camera (${cameraType}): '${p.name}' ${violation}`).add();
             }
         }
-        const wellShaped = rows.every((p) => {
-            const v = authored[p.name];
-            return v === undefined ? !p.required
-                : p.shape === 'enum' ? typeof v === 'string' && (p.values ?? []).includes(v)
-                : p.shape === 'vec3' ? isVec3(v)
-                : typeof (p.shape === 'value-number' && isValueParam(v) ? (v as { default?: unknown }).default : v) === 'number';
-        });
         if (wellShaped && cameraModelDesc.validateAuthored !== undefined) {
             for (const message of cameraModelDesc.validateAuthored(authored)) {
                 bag.error('invalid-setting', `measurement.camera (${cameraType}): ${message}`).add();
