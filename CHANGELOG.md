@@ -4,49 +4,57 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
-## 2026-09-25 — tracking loops derive their bound; the fog box and the cap warning are gone
+## 2026-09-25 — review of the Sep 24–25 work; the documents corrected
 
-- **Derived bound.** Each delta/ratio-tracking loop is bounded by
-  `tracking_cap(σ̄·t) = ⌈λ + 6.5√λ + 12⌉` (delta_tracking.glsl), where λ = σ̄·t is the mean number
-  of tentative collisions over the segment it walks. A walk runs out only if N ≥ cap for
-  N ~ Poisson(λ), which has probability below 1e-10 for every λ (the exact tail is checked in
-  tests/compiler/nullBudget.test.ts against the constants read from the GLSL; the worst case is
-  the normal 6.5σ limit, 4e-11). The bound adapts to slider-driven majorants, moving regions and
-  closed rooms without any analysis, so the fixed `MAX_NULL_COLLISIONS` (1024) and the Planner
-  warning (compiler/plan/trackingBudget.ts, deleted; `derivedMajorant` is back in
-  materials.ts) are gone. Taxonomy §4.1 now says step limits are derived, never fixed numbers
-  chosen to be big enough.
-- **groundfog's box is reverted**: its fog fills the scene again. A fixed box size is an
-  arbitrary cut of the world that a formula editor has to know about. With the derived bound,
-  groundfog's image is identical to five digits to the cap-1024 render (whole frame, top and
-  bottom quarters); frame time about the same under SwiftShader (14.5 s against 13.6 s, different
-  render modes).
-- **Correction** to the budgets entry below: "constant media have no null collisions" holds only
-  for grey media. For a chromatic constant medium σ̄ is the largest channel's σ_t, so the other
-  channels have null collisions. The derived bound covers them like every other medium.
-- Tested: het-const, het-slab, clamp, het-driven, emit-swap, emit-sat, emit-driven,
-  emit-scatter — 11 checks pass with numbers identical to the earlier runs. The cost of open
-  fogs (σ̄ × 1000 steps per escaping ray) is now a pure speed question: improvements §3.3
-  (local majorants from interval bounds on the formula) is the plan.
+- **Review.** Five read-only reviewers read the 33 commits 8d04f34 … cdccd81 against CLAUDE.md's
+  standards, and their findings were checked against the code:
+  docs/claude-review-2026-09-25.md (correctness items, duplicated decisions, tests that cannot
+  fail, wrong documents, history in comments), each marked by how it is known, with a proposed
+  fix and a batch order. The review itself changed no code.
+- **Batch 1 (documents).** The normative transport documents (fable-reference-implementations
+  §4/§5, fable-compiler-contracts §6.1/§7.2) now say what is superseded — the separate shadow-
+  segment limit, the old bounce loop, a 1e20 light distance, fixed-EPSILON spawning, the old RR
+  rule — and where the implemented form lives. The GRIN hard-stop claim is corrected everywhere
+  (GRIN entry below). CLAUDE.md's status claims and the design documents are corrected (the
+  sweep's scope, the data textures, the App's remaining derivation, pixel- not byte-identical
+  tiling, built work listed as deferred, "always uploaded" structures). The same-day entries
+  below are consolidated; corrections are marked *Correction (review)*.
 
-## 2026-09-25 — groundfog's fog in a box; the cap warning knows closed rooms
+## 2026-09-25 — the tracking collision cap, derived per segment
 
-- **groundfog**'s fog moves from the whole scene into a `'none'`-walled box, 80 × 7 × 80 (y from
-  −1 to 6). A ray leaving for the sky used to walk the fog to the far clip at the majorant rate
-  (about 4200 tentative collisions, past the 1024 cap). Measured twin, whole-scene fog vs boxed,
-  same strategy, 128 spp: Δmean 0.00%, rmse 0.01%. Render time under SwiftShader: 13.6 s whole-
-  scene at cap 1024, 8.6 s boxed (6.5 s whole-scene at the old cap 64). At the falloff slider's
-  extreme (0, uniform fog) the box cuts the fog above y = 6.
-- **The collision-cap warning** now bounds a whole-scene fog by the room its axis-aligned walls
-  close off (a plane is a solid half-space, so the fog lies on the front side of every plane);
-  only an open region reaches the far clip. fogblobs and glowblobs are in a closed Cornell room
-  (front wall at z = 5): their longest segment is the room diagonal, ≈ 7.9 units, ≈ 65
-  collisions at σ̄ = 8.2. No registry or demo scene warns now.
-- **Correction** to the budgets entry below: the three demos it named were not all affected.
-  fogblobs and glowblobs never had escaping rays. For groundfog the old cap of 64 changed the
-  image by at most 0.09% (horizon band; whole frame 0.05%), because the attenuation it dropped
-  multiplied a black sky; the claimed horizon bias was an estimate of dropped transmittance, not
-  of the image.
+The delta and ratio tracking loops stopped at a fixed `MAX_NULL_COLLISIONS` = 64 tentative
+collisions. A walk that reached it dropped the rest of its segment — the attenuation still owed
+and the emission not yet collected — although the comments called that conservative. Whether it
+binds depends on the scene's majorant, so it cannot be a measurement field; it is a step limit
+(taxonomy §4.1), which must not decide the picture.
+
+- **Now** each loop is bounded by `tracking_cap(σ̄·t) = ⌈λ + 6.5√λ + 12⌉` (delta_tracking.glsl),
+  where λ = σ̄·t is the mean number of tentative collisions over the segment it walks. A walk
+  runs out only if N ≥ cap for N ~ Poisson(λ), which has probability below 1e-10 for every λ:
+  checked exactly at 16 values of λ from 1e-3 to 1e6 in tests/compiler/nullBudget.test.ts
+  (constants read from the GLSL); the supremum is the λ → ∞ normal limit, 4e-11. The tracking
+  weights are bounded, so this probability bounds the bias. The bound adapts to slider-driven
+  majorants, moving regions and closed rooms without any analysis.
+- **Tried the same day and dropped:** a fixed cap of 1024 with a Planner warning
+  (compiler/plan/trackingBudget.ts, deleted; `derivedMajorant` is back in materials.ts), and a
+  fixed-size box around groundfog's fog (reverted: a fixed box is an arbitrary cut of the world
+  that someone editing the formula has to know about).
+- **Measured on groundfog**, the one demo whose fog is open to the sky. (fogblobs and glowblobs
+  sit in a closed Cornell room — front wall at z = 5 — so their longest segment is ≈ 7.9 units,
+  ≈ 65 collisions at σ̄ = 8.2.) Witness-runner renders at 160×120, 128 spp, the pinned witness
+  salt, strategy pt-nee-het. The old cap of 64 changed the image by at most 0.09% (the horizon
+  band; whole frame 0.05%): the attenuation it dropped multiplied a black sky. With the derived
+  bound the image matches the cap-1024 render to five digits (whole frame, top and bottom
+  quarters). SwiftShader frame times, which include shader compilation and so are rough: 6.5 s
+  at cap 64, 13.6 s at cap 1024, 14.5 s with the derived bound (a variance-mode render).
+- **Correction (review):** the budgets entry below said constant media never have null
+  collisions because σ̄ = σ_t. That holds only for grey media; for a chromatic constant medium σ̄
+  is the largest channel's σ_t, so the other channels have null collisions. The derived bound
+  covers them like every other medium.
+- **Tested:** het-const, het-slab, clamp, het-driven, emit-swap, emit-sat, emit-driven and
+  emit-scatter, 11 checks, all pass with numbers identical to the earlier runs. Not run:
+  het-driven-theta2 (a slider set after load). Open fogs still pay σ̄ × 1000 steps per escaping
+  ray; improvements §3.3 (local majorants) is the plan.
 
 ## 2026-09-25 — GRIN: one event per traversal, unbiased roulette for long ones
 
@@ -64,14 +72,18 @@ budget, which taxonomy §4.1 forbids. Now:
   (first committed as `grin_killed`). A readability pass moved the round check into one helper,
   `grin_round_survives`, and gave both arms an explicit `round_comp` (the absorbing arm had
   divided its transmittance `absorb` by the survival probability, which read like absorption).
-- **Hard stop**: `GRIN_MAX_ROUNDS` (200) rounds, reached with probability 0.9¹⁹⁹ ≈ 8·10⁻¹⁰ per
-  traversal. `MAX_ODE_STEPS` is gone.
+- **Hard stop**: `GRIN_MAX_ROUNDS` (200) rounds. `MAX_ODE_STEPS` is gone.
+  *Correction (review):* this entry called the stop harmless because a traversal reaches it with
+  probability 0.9¹⁹⁹ ≈ 8·10⁻¹⁰. A survivor carries weight 0.9⁻¹⁹⁹, so the stop drops the full
+  contribution of traversals longer than 102,400 steps: a fixed step limit that can decide the
+  picture (taxonomy §4.1). Giving up without it is part of the GRIN design note.
 
 Lenses that leave within 512 steps (every registry GRIN witness) never draw and are unchanged.
 New witness `grin-long`: an orthographic view through a 30-unit and a 60-unit `ior: 1` region at
 a unit sky with maxBounces 1. The old walker read 0.0000 on both halves (the bounce budget cut
 every ray); now 1.0000 (2 rounds) and 1.0009 (5 rounds). Targeted run: grin-long and the eight
-GRIN witnesses, 10 checks, all pass (furnaces 0.3989–0.4002 against 0.4). Full sweep not run.
+`grin-*` witnesses, 10 checks, all pass (furnaces 0.3989–0.4002 against 0.4); `rough-grin`, which
+also runs the walker, was not run. Full sweep not run.
 
 ## 2026-09-25 — budgets vs step limits (taxonomy §4.1), and a survey of the step limits
 
@@ -79,16 +91,19 @@ The taxonomy now separates **budgets** (truncations: predicates on paths, counte
 by every technique) from **step limits** (loop bounds inside the machinery: estimator side,
 must be shown unreachable, never charged against a budget). A survey of every loop bound:
 
-- checked and unreachable: the light tree's 48 levels (the builder caps depth), the binary BVH
-  stack (the builder warns), and now the wide BVH stack: `buildCWBVH` warns when its depth
-  reaches `CWBVH_STACK_DEPTH` (24); a 50k-item cloud measures under half of it.
-- diagnosed: the tracking collision cap (the Planner warning).
+- checked and unreachable: the light tree's 48 levels (the builder caps depth).
+- warned at build only (fixed sizes that still drop subtrees past them): the binary BVH stack
+  (64), and now the wide BVH stack (24): `buildCWBVH` warns when its depth reaches
+  `CWBVH_STACK_DEPTH`; the random 50,000-sphere cloud in cwbvh.test.ts measures under half.
+- diagnosed: the tracking collision cap (then by a Planner warning; derived since, entry above).
 - still able to decide the picture: GRIN's `MAX_ODE_STEPS` (charged against `maxBounces`
   until an unbiased give-up rule is designed), and the SDF marcher's step budget when a ray
   runs out of steps farther than 16× the acceptance tolerance from a surface (reported as a
   miss, rest of the interval unexplored).
 - not limits: fixed-count loops that set accuracy or define a shape (GRIN exit bisection, SDF
   refinement, fractal iterations).
+- *Correction (review):* the survey said it covered every loop bound but missed the wide-BVH
+  walk's fixed 65,536-iteration guard; GRIN's later hard stop belongs on the same list.
 
 The bias ledger gains a row for numerical tolerances (the marcher's acceptance and its grazing
 rule, the ODE step, refinement counts, spawn margins), with the limit tolerances → 0.
@@ -106,20 +121,12 @@ Three fixed budgets could make the image depend on the estimator or drop energy 
   needing more than 7 crossings returned zero while pt counted the light. The Planner resolves
   the field (`compiler/plan/measurement.ts`, `resolveMeasurement`), the Validator requires a
   non-negative integer, and the taxonomy's bias ledger lists it.
-- **The tracking collision cap** (`MAX_NULL_COLLISIONS`, delta and ratio tracking) is 1024 instead
-  of 64. A walk that reaches it drops the rest of its segment, so the comments that called
-  exhaustion "conservative" now say what is dropped. It is not a measurement field, since whether
-  it binds depends on the scene's majorant. Instead the Planner warns when an expression medium's
-  σ̄ × longest segment exceeds 512, beyond which a segment could reach the cap
-  (`compiler/plan/trackingBudget.ts`, where `derivedMajorant` now lives). Constant media never
-  warn: their σ̄ is σ_t, so no collision is null. It warned on three demos, fogblobs, glowblobs
-  and groundfog, all expression fogs filling the whole scene. (Corrected the same day in "groundfog's
-  fog in a box" above: fogblobs and glowblobs sit in a closed room and were never near either cap;
-  groundfog is open to the sky, and its escaping rays did cost more at 1024, but the old cap's
-  effect on its image measured at most 0.09%, not the horizon bias first estimated.)
-- **GRIN's `MAX_ODE_STEPS`** is left at 512: reaching it drops nothing (the walker hands back its
-  state and the walk continues, spending one more event). That accounting is now stated on
-  `maxBounces`, and the two exhaustion comments in grin.glsl no longer call it conservative.
+- **The tracking collision cap** went from 64 to 1024 with a Planner warning; both were replaced
+  the same day by a bound derived per segment (the collision-cap entry above, which also records
+  the corrections to what this entry first said about constant media and the three fog demos).
+- **GRIN's `MAX_ODE_STEPS`** was left at 512 here: reaching it dropped nothing (the walker handed
+  back its state and the walk continued, spending one more event). Replaced the same day by the
+  GRIN roulette (entry above).
 - **Export stamps** carry the resolved measurement (`measurement=` in HDR headers and PNG text),
   so defaulted truncations are recorded.
 
@@ -180,9 +187,19 @@ New witness `mesh-light-smooth`: an octahedron lamp with radial vertex normals (
 from the face normals) over the mesh-light floor, nee ≡ mis. Before: nee 0.14572 vs mis
 0.15312 over four seeds (mis 5% bright); the pdf fix alone moved it only to 4.95%; with the
 spawn fix too, nee 0.14573 vs mis 0.14574. The same octahedron with flat normals agreed before
-the change. Still open (docs/claude-improvements-2026-09.md §1.1): whether the mesh tier's
-1e-3 self-intersection floor (`MESH_T_MIN`) can now shrink, and the shading-normal
-re-orientation in `mesh_test_range` that keeps the dispatcher's front/back test consistent.
+the change. Still open then (docs/claude-improvements-2026-09.md §1.1): whether the mesh tier's
+1e-3 self-intersection floor (`MESH_T_MIN`) could shrink — it was removed in the next entry — and
+the shading-normal re-orientation in `mesh_test_range`, left for the normal-mapping design.
+*Correction (review):* by these numbers the witness guards the spawn rule, not the pdf: the pdf
+fix alone moved the error from 5% to 4.95%, far below the witness's 2% tolerance.
+
+## 2026-09-25 — full witness sweep after the overnight fixes
+
+At commit c5f3543: **181 exact checks — 180 pass, 1 fails; 1 cross-check agrees.** The failure
+is `cube-cloud`, whose reference render does not finish within the runner's time under
+SwiftShader (tests/witnesses/README.md §D). The four GRIN furnaces and `softbeam-wall`, failing
+before the overnight fixes, pass. Everything committed after this sweep had targeted witness
+runs only.
 
 ## 2026-09-25 — accel and data: CWBVH on coincident centroids, mesh-light NaN, workers
 
