@@ -39,6 +39,12 @@ describe('floatToRGBE', () => {
         expect(rgbe[1]).toBe(6);
         expect(rgbe[3]).toBe(2 + 128);
     });
+
+    it('clamps a negative channel to 0 (a byte would wrap -26 to a bright 230)', () => {
+        // (0.5, -0.1, 0.25): maxVal 0.5 → exponent 0, scale 256; 128, floor(-25.6) = -26 → 0, 64
+        const rgbe = floatToRGBE(new Float32Array([0.5, -0.1, 0.25, 1]), 1, 1);
+        expect(Array.from(rgbe)).toEqual([128, 0, 64, 128]);
+    });
 });
 
 describe('buildHDRFile', () => {
