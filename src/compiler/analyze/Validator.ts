@@ -8,7 +8,6 @@ import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior } from '../plan/dataTenants.js';
-import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
@@ -1126,8 +1125,7 @@ export function validate(
         // Ineligible emissive batches stay path-found everywhere.
         {
             const pm = scene.materials[proto.material];
-            if (pm !== undefined && pm.sampleAsLight !== false && hasConstantNonzeroEmission(
-                isBlackbody(pm.emission) ? foldBlackbody(pm.emission) : pm.emission)) {
+            if (pm !== undefined && pm.sampleAsLight !== false && hasConstantNonzeroEmission(pm.emission)) {
                 const selection = strategy.estimator.lightSelection ?? DEFAULT_LIGHT_SELECTION;
                 if (!batchLightEligible(obj, scene)) {
                     bag.warning('invalid-setting', `Object ${i} (instanced): the batch's emissive material is not samplable — only params-tier SPHERE batches carry per-instance light identity (fable-light-bvh §7); this batch is path-found only. Set sampleAsLight: false to silence this`)

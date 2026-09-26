@@ -2,10 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
     placementOf,
     resolveSDFPlacement,
-    resolveColorProperty,
-    resolveScalarProperty,
 } from '../../src/compiler/plan/Planner.js';
 import { isDrivenPlacement, type PlannedPlacement } from '../../src/compiler/plan/types.js';
+import { resolveColorProperty, resolveScalarProperty } from '../../src/compiler/plan/values.js';
 import { keepsLocalFrame } from '../../src/compiler/plan/dataTenants.js';
 import type { SceneDescription, PrimitiveObject } from '../../src/compiler/types.js';
 import { foldPlacementIntoParameters } from '../../src/components/geometry/index.js';

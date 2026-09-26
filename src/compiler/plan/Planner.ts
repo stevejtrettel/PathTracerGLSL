@@ -1,8 +1,9 @@
 // compiler/plan/Planner.ts
 
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
-import { isGlslExpression, isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, isMeshObject, isInstancedObject } from '../types.js';
+import { isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
+import { resolveColorProperty, resolveScalarProperty } from './values.js';
 import { MATERIAL_MODELS, modelTwoSidedShading } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
 import { lightTableLayout } from '../../components/lights/table.js';
@@ -25,7 +26,6 @@ import {
 } from '../../components/geometry/similarity.js';
 import { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
-import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
@@ -34,7 +34,6 @@ import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
-import type { BlackbodyValue } from '../types.js';
 
 /** Registered primitive types — unknowns must diagnose here, not throw downstream
  *  (impl-plan-geometry-descriptors: the capability IS the descriptor fact). */
@@ -906,32 +905,6 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
         // continuous-boundary convention; a scalar constant/{param}/formula over p.
         ...(med.ior !== undefined ? { ior: resolveScalarProperty(med.ior, 1.0) } : {}),
     };
-}
-
-export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> | BlackbodyValue {
-    if (value === undefined) return fallback;
-    if (isGlslExpression(value)) return value;
-    if (isBlackbody(value)) return foldBlackbody(value);   // constant dials bake; driven survive
-    if (isValueParam(value)) {
-        // Scalar spectra intentionally broadcast. Do the same for a parameter default so
-        // the generated vec3 uniform can never receive a scalar on its initial upload.
-        if (typeof value.default === 'number') {
-            return { ...value, default: [value.default, value.default, value.default] } as ValueParam<Vec3>;
-        }
-        return value as ValueParam<Vec3>;  // preserve — emitted as a uniform (§2.8)
-    }
-    if (typeof value === 'number') return [value, value, value] as Vec3;
-    return value;
-}
-
-export function resolveScalarProperty(value: MaterialProperty | undefined, fallback: number): number | GlslExpression | ValueParam<number> {
-    if (value === undefined) return fallback;
-    if (isGlslExpression(value)) return value;
-    if (isValueParam(value)) return value as ValueParam<number>;  // preserve — emitted as a uniform (§2.8)
-    if (typeof value === 'number') return value;
-    // Validator reports this before planning. Keep a hard backstop for direct helper use
-    // and for untyped JavaScript callers so a malformed scalar can never compile silently.
-    throw new Error('Scalar material property cannot be a vector');
 }
 
 /** Bounding-sphere radius (about the world origin) of the scene's boundable geometry —

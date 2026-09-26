@@ -9,11 +9,11 @@
 
 import type { SceneDescription, ObjectDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission } from '../types.js';
 import type { ProgramDescription } from './types.js';
-import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression, isValueParam, isBlackbody } from '../types.js';
+import { resolveColorProperty } from './values.js';
+import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
 import { PRIMITIVES, paramsRecordFloats, primitiveIsBounded, resolveBackend, foldPlacementIntoParameters, classifyPlacement } from '../../components/geometry/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
@@ -211,14 +211,14 @@ export interface LightRosterEntry {
     source: { authored: number } | { object: number };
 }
 
-/** An authored light's emission as the light and its backing material use it: a {param}
- *  passes through (the same uniform drives both), a constant blackbody folds to a spectrum,
- *  a scalar broadcasts. One function, so the light's values and its region's emission can
- *  never differ (pt ≡ pt-nee). */
-export function authoredLightEmission(e: LightEmission): number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue {
-    return isValueParam(e) ? e
-        : isBlackbody(e) ? foldBlackbody(e)
-        : (typeof e === 'number' ? [e, e, e] : e);
+/** An authored light's emission as the light and its backing material use it, resolved like
+ *  every other spectrum property (resolveColorProperty): a {param} passes through (the same
+ *  uniform drives both; a scalar default broadcasts), a constant blackbody folds to a
+ *  spectrum, a scalar broadcasts. One function, so the light's values and its region's
+ *  emission can never differ (pt ≡ pt-nee). A light's emission is never a GLSL formula
+ *  (LightEmission excludes it), so neither is the result. */
+export function authoredLightEmission(e: LightEmission): number[] | ValueParam<number[]> | BlackbodyValue {
+    return resolveColorProperty(e, [0, 0, 0]) as number[] | ValueParam<number[]> | BlackbodyValue;
 }
 
 /** THE light registry, in light-id order (= selection-CDF order): authored lights (scene
@@ -238,13 +238,11 @@ export function lightRosterOf(scene: SceneDescription): LightRosterEntry[] {
 
     // Routes 2 and 3 — emissive OBJECTS, from the one census (samplableEmitterObjects),
     // in its order: analytic objects, then meshes. The material emission is constant by
-    // the census predicate; a blackbody spelling folds to its constant spectrum here,
-    // exactly as the Planner's resolved material value does.
+    // the census predicate, so it resolves to a spectrum — by the same function that
+    // resolves the planned material's emission (resolveColorProperty).
     for (const { index, kind } of samplableEmitterObjects(scene)) {
         const o = scene.objects[index] as PrimitiveObject | MeshObject;
-        const raw = scene.materials[o.material]!.emission;
-        const em = isBlackbody(raw) ? foldBlackbody(raw) : raw;
-        const Le = (typeof em === 'number' ? [em, em, em] : em) as number[];
+        const Le = resolveColorProperty(scene.materials[o.material]!.emission, [0, 0, 0]) as number[];
         if (isMeshObject(o)) {
             // Real values (the mesh kind is tree-eligible — its table row and power read
             // them): radiance, and the s²-folded WORLD area. Only the BOX is pack-side.
@@ -290,8 +288,7 @@ export function batchLightEligible(b: InstancedObject, scene: SceneDescription):
         && (MATERIAL_MODELS[mat.model ?? '']?.properties ?? []).some((f) => f.source === EMISSION_KEY && f.storage === 'field')) {
         return true;
     }
-    const em = isBlackbody(mat.emission) ? foldBlackbody(mat.emission) : mat.emission;
-    return hasConstantNonzeroEmission(em);
+    return hasConstantNonzeroEmission(mat.emission);
 }
 
 /** THE instanced-containment predicate (impl-plan-instanced-containment §2), shared by
