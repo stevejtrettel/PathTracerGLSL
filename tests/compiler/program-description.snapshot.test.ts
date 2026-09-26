@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { validate } from '../../src/compiler/analyze/Validator.js';
-import { plan } from '../../src/compiler/plan/Planner.js';
+import { planRenderers } from '../../src/compiler/plan/Planner.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import { witnessSuite } from '../witnesses/index.js';
 import { demoSuite } from '../../demos/index.js';
@@ -37,7 +37,7 @@ describe('ProgramDescription structural snapshot (the link map)', () => {
                 const features = analyze(entry.scene);
                 validate(features, entry.scene, strategy, bag);
                 bag.throwIfErrors();
-                const renderPlan = plan(features, entry.scene, strategy, bag);
+                const renderPlan = planRenderers(features, entry.scene, [strategy], bag).plans[0];
                 bag.throwIfErrors();
                 expect(renderPlan.program).toMatchSnapshot();
             });

@@ -3,11 +3,9 @@
 import type { ICompiler, SceneDescription, RenderStrategy, CompiledRenderer, CompiledScene } from './types.js';
 import { analyze } from './analyze/Analyzer.js';
 import { validate } from './analyze/Validator.js';
-import { plan, programDecisions } from './plan/Planner.js';
-import { dataReadsOf, unionDataReads } from './plan/dataTenants.js';
+import { planRenderers } from './plan/Planner.js';
 import { generate } from './generate/Generator.js';
 import { sceneDataPlanOf } from './sceneData.js';
-import type { RenderPlan } from './plan/types.js';
 import { DiagnosticBag } from '../errors/core/DiagnosticBag.js';
 import { validateCompiledRenderer } from '../errors/compiler/validation.js';
 
@@ -21,8 +19,9 @@ export class Compiler implements ICompiler {
      * All of a scene's renderers, against ONE shared data layout. They share the scene-data
      * textures, so the layout must hold every optional structure any of them reads — and
      * nothing none of them reads. In order: validate every strategy (any error stops the
-     * compile before work is done), take each strategy's decisions, lay out the union of what
-     * they read, then plan and generate every program against that layout.
+     * compile before work is done), plan the scene once and each strategy's decisions against
+     * it, lay out the union of what they read (planRenderers), then generate every program
+     * against that layout.
      */
     compileScene(scene: SceneDescription, strategies: RenderStrategy[]): CompiledScene {
         const features = analyze(scene);
@@ -52,16 +51,15 @@ export class Compiler implements ICompiler {
             keepWarnings(bag);
         }
 
-        const dataReads = unionDataReads(strategies.map((s) => dataReadsOf(programDecisions(features, scene, s))));
+        // The Planner emits diagnostics like every stage.
+        const planBag = new DiagnosticBag('compiler');
+        const { reads, placed, plans } = planRenderers(features, scene, strategies, planBag);
+        planBag.throwIfErrors();
+        keepWarnings(planBag);
 
-        const plans: RenderPlan[] = [];
-        const renderers = strategies.map((strategy) => {
+        const renderers = strategies.map((strategy, i) => {
             const bag = new DiagnosticBag('compiler');
-            // The Planner emits diagnostics like every stage (review C8).
-            const renderPlan = plan(features, scene, strategy, bag, dataReads);
-            bag.throwIfErrors();
-            plans.push(renderPlan);
-            const renderer = generate(renderPlan, scene, strategy, bag);
+            const renderer = generate(plans[i], scene, strategy, bag);
             bag.throwIfErrors();
             // The compiled output's structure, checked before the engine ever sees it.
             validateCompiledRenderer(renderer, bag);
@@ -70,7 +68,6 @@ export class Compiler implements ICompiler {
             return renderer;
         });
 
-        // Every strategy planned the same scene data against the same layout; any one serves.
-        return { renderers, dataReads, sceneData: sceneDataPlanOf(scene, plans[0]), warnings: [...warnings] };
+        return { renderers, dataReads: reads, sceneData: sceneDataPlanOf(scene, placed), warnings: [...warnings] };
     }
 }

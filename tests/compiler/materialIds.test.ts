@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { plan } from '../../src/compiler/plan/Planner.js';
+import { planRenderers } from '../../src/compiler/plan/Planner.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
@@ -25,7 +25,7 @@ function sceneWithMaterials(order: string[]): SceneDescription {
 
 function idsByName(order: string[]): Record<string, number> {
     const scene = sceneWithMaterials(order);
-    const p = plan(analyze(scene), scene, strategy, new DiagnosticBag('test'));
+    const p = planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag('test')).plans[0];
     const map: Record<string, number> = {};
     for (const m of p.materials) map[m.name] = m.id;
     return map;
@@ -50,7 +50,7 @@ describe('material ID assignment', () => {
 
     it('IDs are contiguous starting at 0', () => {
         const scene = sceneWithMaterials(['b', 'a', 'c', 'd']);
-        const ids = plan(analyze(scene), scene, strategy, new DiagnosticBag('test')).materials.map(m => m.id).sort((x, y) => x - y);
+        const ids = planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag('test')).plans[0].materials.map(m => m.id).sort((x, y) => x - y);
         expect(ids).toEqual([0, 1, 2, 3]);
     });
 });

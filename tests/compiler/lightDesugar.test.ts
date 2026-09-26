@@ -4,7 +4,7 @@
 // pt and pt-nee converge to different images — the Planner's own invariant comment).
 
 import { describe, it, expect } from 'vitest';
-import { plan } from '../../src/compiler/plan/Planner.js';
+import { planRenderers } from '../../src/compiler/plan/Planner.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
@@ -29,7 +29,7 @@ function baseScene(): SceneDescription {
 }
 
 function runPlan(scene: SceneDescription) {
-    return plan(analyze(scene), scene, strategy, new DiagnosticBag('test'));
+    return planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag('test')).plans[0];
 }
 
 describe('explicit-light desugar (§6.2)', () => {

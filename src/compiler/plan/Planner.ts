@@ -25,11 +25,11 @@ import {
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
+import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMesh, SceneInstanceBatch, SceneLight, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, dataReadsOf, READS_EVERYTHING } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, dataReadsOf, unionDataReads } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
@@ -56,25 +56,25 @@ function resolveEnvironment(env: SceneDescription['environment']): ResolvedEnvir
 }
 
 /**
- * Plan one strategy. `reads` is the set of optional data structures the scene's data layout
- * provides — the union over ALL of the scene's renderers (Compiler.compileScene). Omitted, the
- * layout holds exactly what this strategy itself reads.
+ * The Plan stage for a scene's renderers. The scene is planned once (planScene), and each
+ * strategy's decisions against it (planProgram). The data layout holds the union of the optional
+ * structures those decisions read, and the scene is placed in it once (placeScene). Each
+ * renderer's RenderPlan is that placed scene with its own decisions and pipeline, so every
+ * renderer on the scene sees the same scene facts at the same addresses.
  */
-export function plan(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag, reads?: DataReads): RenderPlan {
-    return planWithLayout(features, scene, strategy, bag, reads ?? dataReadsOf(programDecisions(features, scene, strategy)));
+export function planRenderers(features: SceneFeatures, scene: SceneDescription, strategies: RenderStrategy[], bag: DiagnosticBag): { reads: DataReads; placed: PlacedScene; plans: RenderPlan[] } {
+    const scenePlan = planScene(scene, bag);
+    const programs = strategies.map((strategy) => planProgram(features, scene, strategy, scenePlan));
+    const reads = unionDataReads(programs.map(dataReadsOf));
+    const placed = placeScene(scene, scenePlan, reads);
+    return { reads, placed, plans: programs.map((program) => ({ ...placed, program, pipeline: planPipeline(program) })) };
 }
 
 /**
- * A strategy's decisions — its ProgramDescription, from which dataReadsOf reads the data it
- * needs. Decisions never depend on the data layout (they read counts and kinds, not offsets),
- * so planning against a layout with every optional structure present decides exactly what the
- * final plan will; tests/compiler/dataReads.test.ts checks this for every suite scene.
+ * What the scene is (ScenePlan): its materials, objects, meshes, instance batches and lights,
+ * with ids assigned. Reads only the scene: no strategy, and no data layout.
  */
-export function programDecisions(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy): ProgramDescription {
-    return planWithLayout(features, scene, strategy, new DiagnosticBag('decisions'), READS_EVERYTHING).program;
-}
-
-function planWithLayout(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, bag: DiagnosticBag, reads: DataReads): RenderPlan {
+export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePlan {
     // --- Assign material IDs in AUTHORED (insertion) order — naming batch N1 (audit P1).
     // Identity is STRUCTURAL, symmetric with objects/regions: renaming a material no
     // longer renumbers ids or churns artifacts; names are provenance. JS insertion order
@@ -109,20 +109,15 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
     // region id (§2.3), so material_of() spans both lists and regions never collide.
     // ONE list, both intersection methods (impl-plan-sdf-as-shape T5) — scene order,
     // region ids assigned as we go.
-    const objects: PlannedPrimitiveObject[] = [];
-    const meshes: PlannedMesh[] = [];
-    const instanceBatches: PlannedInstanceBatch[] = [];
+    const objects: ScenePrimitiveObject[] = [];
+    const meshes: SceneMesh[] = [];
+    const instanceBatches: SceneInstanceBatch[] = [];
     // THE ordinal truth (audit A5): Planner (extern declaration) and App (upload) both
     // derive mesh/batch ordinals from the SAME shared enumerators — the assignment can
     // never diverge, including for Validator-rejected batches (which still hold their
     // ordinal on both sides; they just never plan).
     const meshOrdinals = new Map(sceneMeshes(scene.objects).map((m, i) => [m, i] as const));
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
-    // The data layout: the same adapter + ledger call, with the same `reads`, that the App
-    // makes to pack the bytes — so the offsets baked here are where the bytes land.
-    const dataTenantsResult = dataTenantsOf(scene, reads);
-    const { tenants: dataTenants, batchGeometrySlot, batchPlacementRecord, table: sceneTableTruth, lightBatches: sceneLightBatches } = dataTenantsResult;
-    const dataLayout = planDataLayout(dataTenants);
     let objectIndex = 0;
     for (const obj of scene.objects) {
         if (isMeshObject(obj)) {
@@ -142,7 +137,6 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
                 // containment query's baked root-box early-out.
                 closed: obj.closed === true,
                 ...(obj.closed === true ? { localBox: meshLocalBox(obj.positions) } : {}),
-                slot: dataLayout.meshes[meshOrdinals.get(obj)!],
                 placement: isDrivenTransform(obj.transform)
                     ? buildDrivenPlacement(obj.transform!, objectIndex - 1)
                     : placementOf(obj.transform),
@@ -159,26 +153,17 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
             const region = objectIndex++;
             const ordinal = batchOrdinals.get(obj)!;
             // Per-instance ATTRIBUTES (fable-instance-attributes): slot order from the ONE
-            // shared helper (the app's packer calls the same one — the layout cannot drift);
-            // the batch material's rows are patched to AttributeValue refs, so the generated
-            // fill fetches instance_k_attrs by Hit.element. The Validator guaranteed the
-            // material is exclusive to this batch, so the patch cannot affect anyone else.
+            // shared helper (the app's packer calls the same one — the layout cannot drift).
+            // Placing the scene points the batch material's rows at them (placeScene).
             const attrRows = instanceAttributeRows(scene.materials[proto.material]?.model ?? '', obj.attributes ?? {});
             const attributeRows = attrRows.length > 0 ? attrRows : undefined;
-            if (attributeRows !== undefined) {
-                const mat = materials.find((m) => m.id === matId)!;
-                attributeRows.forEach((r, slot) => {
-                    mat.values[r.source] = { attribute: { batch: ordinal, base: dataLayout.batches[ordinal].attrsBase, slot, count: attributeRows.length, shape: r.shape } };
-                });
-            }
             if (isMeshObject(proto)) {
                 instanceBatches.push({
                     ordinal, index: region, materialId: matId, name: obj.name,
                     instanceCount: placementCount(obj.placements),
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
-                    slot: dataLayout.batches[ordinal],
                     ...(batchNeedsInterior(obj, scene) ? { hasInterior: true } : {}),
-                    prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined, geometrySlot: dataLayout.meshes[batchGeometrySlot[ordinal]!] },
+                    prototype: { backend: 'mesh', triCount: proto.indices.length / 3, smooth: proto.normals !== undefined },
                 });
             } else {
                 const backend = resolveBackend(proto.type, proto.backend);
@@ -191,7 +176,6 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
                     ordinal, index: region, materialId: matId, name: obj.name,
                     instanceCount: placementCount(obj.placements),
                     ...(attributeRows !== undefined ? { attributeRows } : {}),
-                    slot: dataLayout.batches[ordinal],
                     // Containment (impl-plan-instanced-containment): omitted when false so
                     // every opaque batch's plan stays byte-identical.
                     ...(batchNeedsInterior(obj, scene) ? { hasInterior: true } : {}),
@@ -205,7 +189,7 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
                     // march both run in the prototype's own frame.
                     prototype: {
                         backend: 'primitive', shapeType: proto.type,
-                        record: backend === 'sdf' ? 'frame' : batchPlacementRecord[ordinal],
+                        record: backend === 'sdf' ? 'frame' : batchPlacementRecordOf(obj, scene),
                         parameters: canonicalizePrimitiveParameters(proto.type, proto.parameters),
                         intersect: backend === 'sdf' ? 'march' : 'closed-form',
                     },
@@ -293,7 +277,7 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
     // were built from (authoredLightEmission), so the hit side and the sampler agree exactly
     // (any mismatch makes pt and pt-nee converge to different images). An emissive OBJECT's
     // region id is its scene index.
-    const lights: PlannedLight[] = lightRosterOf(scene).map((entry, id): PlannedLight => {
+    const lights: SceneLight[] = lightRosterOf(scene).map((entry, id): SceneLight => {
         if ('authored' in entry.source) {
             const light = scene.lights[entry.source.authored];
             const d = LIGHT_KINDS[entry.kind];
@@ -322,15 +306,11 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         }
         const regionId = entry.source.object;
         if (entry.kind !== 'mesh') return { id, kind: entry.kind, regionId, values: entry.values };
-        // A mesh emitter samples its triangles by area: the literal walk range and the channel
-        // bases of its world-position bake and area CDF (the ledger allocated them for exactly
-        // these meshes — meshIsSamplableEmitter, the census predicate).
+        // A mesh emitter samples its triangles by area: the literal walk range here, and the
+        // channel bases of its triangles, world-position bake and area CDF when the scene is
+        // placed (placeScene).
         const mesh = meshes.find((m) => m.index === regionId)!;
-        const lslot = dataLayout.meshLights.get(mesh.ordinal)!;
-        return {
-            id, kind: 'mesh', regionId, values: entry.values,
-            mesh: { ordinal: mesh.ordinal, triCount: mesh.triCount, tbase: mesh.slot.tbase, wposBase: lslot.wposBase, cdfBase: lslot.cdfBase },
-        };
+        return { id, kind: 'mesh', regionId, values: entry.values, mesh: { ordinal: mesh.ordinal, triCount: mesh.triCount } };
     });
 
     // Selection-power context (impl-plan-directional-beam P6): pbrt's DistantLight
@@ -345,19 +325,68 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         ? materialIdMap.get(scene.ambientMedium) ?? -1   // unknown name already errored in the Validator
         : -1;
 
+    return { objects, meshes, instanceBatches, materials, lights, ambientMedium, lightBatches: lightBatchesOf(scene) };
+}
+
+/**
+ * The scene placed in its data layout (PlacedScene). The layout holds the optional structures in
+ * `reads`, the union over the scene's renderers, and each planned record gets the data-texture
+ * addresses it needs. It builds new records and leaves the scene plan as it was.
+ */
+export function placeScene(scene: SceneDescription, scenePlan: ScenePlan, reads: DataReads): PlacedScene {
+    // The data layout: the same adapter + ledger call, with the same `reads`, that the
+    // scene-data plan is packed from — so the offsets baked here are where the bytes land.
+    const dataTenantsResult = dataTenantsOf(scene, reads);
+    const { tenants: dataTenants, batchGeometrySlot, table: sceneTableTruth } = dataTenantsResult;
+    const dataLayout = planDataLayout(dataTenants);
+
+    const meshes: PlannedMesh[] = scenePlan.meshes.map((m) => ({ ...m, slot: dataLayout.meshes[m.ordinal] }));
+    const instanceBatches: PlannedInstanceBatch[] = scenePlan.instanceBatches.map((b) => ({
+        ...b,
+        slot: dataLayout.batches[b.ordinal],
+        prototype: b.prototype.backend === 'mesh'
+            ? { ...b.prototype, geometrySlot: dataLayout.meshes[batchGeometrySlot[b.ordinal]!] }
+            : b.prototype,
+    }));
+
+    // A batch's per-instance attribute rows: the batch material's rows are patched to
+    // AttributeValue refs, so the generated fill fetches instance_k_attrs by Hit.element. The
+    // Validator guaranteed the material is exclusive to this batch, so the patch cannot affect
+    // anyone else.
+    const materials: PlannedMaterial[] = scenePlan.materials.map((m) => ({ ...m, values: { ...m.values } }));
+    for (const b of scenePlan.instanceBatches) {
+        const rows = b.attributeRows ?? [];
+        const mat = materials.find((m) => m.id === b.materialId)!;
+        rows.forEach((r, slot) => {
+            mat.values[r.source] = { attribute: { batch: b.ordinal, base: dataLayout.batches[b.ordinal].attrsBase, slot, count: rows.length, shape: r.shape } };
+        });
+    }
+
+    // A mesh emitter's sampler reads the channel bases of its triangles, world-position bake and
+    // area CDF (the ledger allocated them for exactly these meshes — meshIsSamplableEmitter, the
+    // census predicate).
+    const lights: PlannedLight[] = scenePlan.lights.map((l) => {
+        const { mesh, ...rest } = l;
+        if (mesh === undefined) return rest;
+        const slot = meshes.find((m) => m.ordinal === mesh.ordinal)!.slot;
+        const lslot = dataLayout.meshLights.get(mesh.ordinal)!;
+        return { ...rest, mesh: { ...mesh, tbase: slot.tbase, wposBase: lslot.wposBase, cdfBase: lslot.cdfBase } };
+    });
+
     // --- The planned scene table (fable-object-tables) — bases + counts + kind codes
     // from the adapter's ONE truth; tabled analytic objects marked for the feature's
-    // residual/table split. Present whether or not this strategy tables (the data is
-    // strategy-independent; 'unrolled' programs never read it).
+    // residual/table split. Present when some renderer on the scene uses table dispatch;
+    // 'unrolled' programs never read it.
+    let objects: PlannedPrimitiveObject[] = scenePlan.objects;
     let sceneTable: PlannedSceneTable | undefined;
     if (sceneTableTruth !== null && dataLayout.sceneTable !== undefined) {
         const tabledSet = new Set(sceneTableTruth.analytic.map((a) => a.sceneIndex));
-        for (const a of objects) if (a.intersect === 'closed-form' && tabledSet.has(a.index)) a.tabled = true;
         // Boxed-SDF leaves (impl-plan-sdf-accel T2): tabled SDF objects leave the
         // global marcher for the LEAF_SDF interval march — the same residual/table
         // split, on the SDF arm.
         const sdfTabledSet = new Set(sceneTableTruth.sdf.map((s) => s.sceneIndex));
-        for (const o of objects) if (sdfTabledSet.has(o.index)) o.tabled = true;
+        objects = scenePlan.objects.map((o) =>
+            (o.intersect === 'closed-form' && tabledSet.has(o.index)) || sdfTabledSet.has(o.index) ? { ...o, tabled: true } : o);
         sceneTable = {
             slot: dataLayout.sceneTable,
             regionMaterialsBase: dataLayout.regionMaterials?.base ?? -1,
@@ -375,7 +404,7 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
     // the GLOBAL light-index bases after the registry lights: each eligible batch's instances
     // in record order.
     let lightBase = lights.length;
-    const instanceLights = sceneLightBatches.map(({ ordinal, count }) => {
+    const instanceLights = scenePlan.lightBatches.map(({ ordinal, count }) => {
         const entry = { ordinal, base: lightBase, count };
         lightBase += count;
         return entry;
@@ -392,10 +421,6 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         }
         : undefined;
 
-    // --- Build program description ---
-    const program = planProgram(features, scene, strategy, lights, materials, objects, meshes, instanceBatches, instanceLights.reduce((a, b) => a + b.count, 0));
-    const pipeline = planPipeline(program);
-
     return {
         objects,
         meshes,
@@ -405,9 +430,7 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
         ...(lightTree !== undefined ? { lightTree } : {}),
         materials,
         lights,
-        ambientMedium,
-        program,
-        pipeline,
+        ambientMedium: scenePlan.ambientMedium,
     };
 }
 
@@ -415,7 +438,9 @@ function planWithLayout(features: SceneFeatures, scene: SceneDescription, strate
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, lights: PlannedLight[], materials: PlannedMaterial[], objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], instanceBatches: PlannedInstanceBatch[], batchLightTotal: number): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, scenePlan: ScenePlan): ProgramDescription {
+    const { lights, materials, objects, meshes, instanceBatches } = scenePlan;
+    const batchLightTotal = scenePlan.lightBatches.reduce((a, b) => a + b.count, 0);
     // Surface models = the models of the PLANNED materials — the one list that already
     // includes the desugared area lights' synthesized emitter materials, so a new hittable
     // light kind can never leave its backing model out of the program (the lights-door
@@ -919,7 +944,7 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
  *  primitives — plane — and local-frame/driven objects skipped), closed meshes as
  *  placed spheres around their local boxes; SDF objects and instance batches skipped.
  *  Nothing boundable → 10, the constant the directional descriptor's ctx-fallback twins. */
-function sceneWorldRadius(analytic: PlannedPrimitiveObject[], meshes: PlannedMesh[]): number {
+function sceneWorldRadius(analytic: ScenePrimitiveObject[], meshes: SceneMesh[]): number {
     let r = 0;
     let any = false;
     for (const o of analytic) {

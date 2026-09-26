@@ -42,10 +42,6 @@ export function unionDataReads(reads: readonly DataReads[]): DataReads {
     };
 }
 
-/** Every optional structure. Used only to plan a program's DECISIONS before its data
- *  needs are known (the decisions do not depend on the layout — tested). */
-export const READS_EVERYTHING: DataReads = { cwbvh: true, lightTree: true, sceneTable: true };
-
 /** Does material `name` read Hit.uv? — i.e. is it a PROCEDURAL material: the checker model
  *  (readsUv capability) OR any material carrying a GLSL formula (fable-imagery P2 expression
  *  materials). COARSE by choice (owner Jul 21): a formula reading only `p` counts too, matching
@@ -114,9 +110,8 @@ export interface SceneDataTenants {
     batchPlacementRecord: Array<'frame' | 'params'>;
     /** The scene table, or null when no eligible objects exist. */
     table: SceneTable | null;
-    /** Light-eligible batches (fable-light-bvh §7 stage 2), by BATCH ordinal with
-     *  instance counts — the eligibility truth's output, consumed by the Planner's
-     *  instanceLights slot and the App's tree pack. Empty when none. */
+    /** Light-eligible batches (lightBatchesOf), by BATCH ordinal with instance counts —
+     *  read by the scene-data plan's tree pack. Empty when none. */
     lightBatches: Array<{ ordinal: number; count: number }>;
 }
 
@@ -291,6 +286,16 @@ export function batchLightEligible(b: InstancedObject, scene: SceneDescription):
     return hasConstantNonzeroEmission(mat.emission);
 }
 
+/** The instanced batches whose instances are lights (batchLightEligible), by batch ordinal, with
+ *  their instance counts. A scene fact: the scene plan's decisions read it, and the data layout
+ *  sizes the light tree from it. */
+export function lightBatchesOf(scene: SceneDescription): Array<{ ordinal: number; count: number }> {
+    return sceneInstanceBatches(scene.objects)
+        .map((b, ordinal) => ({ ordinal, count: placementCount(b.placements), eligible: batchLightEligible(b, scene) }))
+        .filter((b) => b.eligible)
+        .map(({ ordinal, count }) => ({ ordinal, count }));
+}
+
 /** THE instanced-containment predicate (impl-plan-instanced-containment §2), shared by
  *  the Planner's thin-set decision, the generator's arm emission, and the Validator —
  *  `batchLightEligible`'s sibling, same one-spelling discipline.
@@ -430,12 +435,9 @@ export function dataTenantsOf(scene: SceneDescription, reads: DataReads): SceneD
     // program selects lights with it (reads.lightTree), the total is non-empty and every
     // roster kind has treeBounds. Table rows exist ONLY for the roster (batch lights read
     // their placement records); trails cover the total. `lightBatches` is returned either
-    // way: which instances are lights is a scene fact the Planner's decisions use.
+    // way, for the scene-data plan's tree pack.
     const roster = lightRosterOf(scene);
-    const lightBatches = batches
-        .map((b, ordinal) => ({ ordinal, count: placementCount(b.placements), eligible: batchLightEligible(b, scene) }))
-        .filter((b) => b.eligible)
-        .map(({ ordinal, count }) => ({ ordinal, count }));
+    const lightBatches = lightBatchesOf(scene);
     const totalLights = roster.length + lightBatches.reduce((a, b) => a + b.count, 0);
     const lightTree = reads.lightTree && totalLights > 0 && lightRosterTreeEligible(roster)
         ? { count: totalLights, tableTexels: roster.length * (roster.length > 0 ? lightTableLayout(roster.map((l) => l.kind)).strideTexels : 0) }

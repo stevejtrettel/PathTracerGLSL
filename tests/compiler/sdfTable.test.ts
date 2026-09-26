@@ -3,16 +3,19 @@
 // and the rigid-tail record layout — gated BEFORE any GLSL exists.
 
 import { describe, it, expect } from 'vitest';
-import { dataTenantsOf, READS_EVERYTHING } from '../../src/compiler/plan/dataTenants.js';
+import { dataTenantsOf } from '../../src/compiler/plan/dataTenants.js';
 import { LEAF_SDF, ANALYTIC_RECORD_TEXELS } from '../../src/components/intersection/index.js';
 import { sdfRecordPack, sdfTailTexel } from '../../src/compiler/generate/records.js';
 import { primitive } from '../../src/components/geometry/index.js';
 import { defineSDF } from '../../src/components/geometry/custom.js';
-import type { SceneDescription } from '../../src/compiler/types.js';
-import { plan as planScene } from '../../src/compiler/plan/Planner.js';
+import type { SceneDescription, DataReads } from '../../src/compiler/types.js';
+import { planRenderers } from '../../src/compiler/plan/Planner.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import { sdfTableTwin, sdfUnrolledStrategy, sdfTableStrategy } from '../witnesses/scenes/sdfTableWitness.js';
+
+/** Every optional data structure, so the table is laid out whatever the scene's renderers read. */
+const READS_EVERYTHING: DataReads = { cwbvh: true, lightTree: true, sceneTable: true };
 
 const base = (): SceneDescription => ({
     id: 's',
@@ -84,7 +87,7 @@ describe('boxed-SDF table plan (fable-sdf-accel T2)', () => {
 // the twin passed at 0.00%/0.00% while comparing the table against itself.
 describe('the sdf-table-twin arms stay two regimes', () => {
     const dispatchOf = (strategy: typeof sdfTableStrategy) =>
-        planScene(analyze(sdfTableTwin), sdfTableTwin, strategy, new DiagnosticBag('test')).program.intersection.objectDispatch;
+        planRenderers(analyze(sdfTableTwin), sdfTableTwin, [strategy], new DiagnosticBag('test')).plans[0].program.intersection.objectDispatch;
 
     it('the unrolled arm really plans unrolled (never inherits the scene-dependent default)', () => {
         expect(dispatchOf(sdfUnrolledStrategy)).toBe('unrolled');

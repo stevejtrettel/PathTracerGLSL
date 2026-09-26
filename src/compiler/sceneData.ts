@@ -7,7 +7,7 @@
 // instance clouds and lights, and writing the bytes.
 
 import type { SceneDescription, MeshObject, PackedPlacements } from './types.js';
-import type { RenderPlan, PlannedPrimitiveObject } from './plan/types.js';
+import type { PlacedScene, PlannedPrimitiveObject } from './plan/types.js';
 import { isAttributeValue } from './plan/types.js';
 import type { DataLayout, MeshSlot, MeshLightSlot, BatchSlot, SceneTableSlot, LightTreeSlot } from '../components/data/ledger.js';
 import { similarityFromTransform, similarityApplyPoint, rigidInverse, type Similarity } from '../components/geometry/similarity.js';
@@ -75,10 +75,8 @@ export interface SceneDataPlan {
     regionMaterials?: { base: number; texels: number; ids: number[] };
 }
 
-/** Build the scene-data plan from a strategy's RenderPlan. Every strategy of a scene compiled
- *  together plans the same scene data (same layout, same objects and lights), so any one of
- *  them serves. */
-export function sceneDataPlanOf(scene: SceneDescription, plan: RenderPlan): SceneDataPlan {
+/** Build the scene-data plan from the placed scene, which every renderer on the scene shares. */
+export function sceneDataPlanOf(scene: SceneDescription, plan: PlacedScene): SceneDataPlan {
     const { tenants, layout } = plan.data;
     const meshObjects = sceneMeshes(scene.objects);
     const batchObjects = sceneInstanceBatches(scene.objects);

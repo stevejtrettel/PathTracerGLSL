@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { validate } from '../../src/compiler/analyze/Validator.js';
-import { plan } from '../../src/compiler/plan/Planner.js';
+import { planRenderers } from '../../src/compiler/plan/Planner.js';
 import { Compiler } from '../../src/compiler/Compiler.js';
 import { DiagnosticBag, CompilationError } from '../../src/errors/core/DiagnosticBag.js';
 import { lightRosterOf, samplableEmitterObjects } from '../../src/compiler/plan/dataTenants.js';
@@ -56,7 +56,7 @@ function planOf(s: SceneDescription, st: RenderStrategy) {
     const features = analyze(s);
     validate(features, s, st, bag);
     bag.throwIfErrors();
-    return { features, plan: plan(features, s, st, bag) };
+    return { features, plan: planRenderers(features, s, [st], bag).plans[0] };
 }
 
 /** An emitter's light must describe the surface a ray hits (pt ≡ pt-nee needs them equal): its

@@ -122,6 +122,11 @@ compiles (all 91 fail).
 - `sceneDataPlanOf` takes the placed scene.
 - Proof: the digest. I also record compile time for the largest suite scenes before and after,
   as a measurement, not a gate.
+- *Done (step 2):* the digest is identical for all 203 scenes. vitest 2696 passing: 362 fewer,
+  exactly the deleted test's one case per scene and strategy pair. With step 1's planned breakage
+  (a generator appending to the shared `materials`), all 91 order tests fail. Compile time shows
+  no measurable change: the whole suite takes 240–400 ms before and 240–290 ms after, and repeat
+  runs vary more than the difference.
 
 **3. An emitter's light comes from its planned surface** (batch 4 item 2 (b)).
 - `planScene` builds each emissive object's light from the planned object and the planned

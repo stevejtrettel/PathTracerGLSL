@@ -564,11 +564,12 @@ export function isDrivenPlacement(p: PlannedPlacement): p is DrivenPlacement {
 }
 
 /**
- * Complete render plan — everything the Generator needs to emit code.
+ * One renderer's complete plan — everything the Generator needs to emit code: the placed scene
+ * (shared by every renderer on the scene) plus this renderer's decisions and pipeline.
  *
- * T2 rule (impl-plan-decision-hoist): the Generator reads `program` (decisions) and the
- * resolved data tables below — analyzer facts (`SceneFeatures`) are Planner-internal and
- * deliberately NOT carried here, so a feature generator CANNOT re-derive a decision.
+ * The Generator reads `program` (decisions) and the resolved data tables below. Analyzer facts
+ * (`SceneFeatures`) stay inside the Planner and are not carried here, so a feature generator
+ * cannot re-derive a decision.
  */
 export interface RenderPlan {
     /** Resolved scene data for code generators */
@@ -609,3 +610,37 @@ export interface RenderPlan {
     /** How the GPU program executes */
     pipeline: PlannedPipeline;
 }
+
+/** The scene placed in its data layout: one per scene, shared by every renderer's generation
+ *  and by the scene-data plan (compiler/sceneData.ts). */
+export type PlacedScene = Omit<RenderPlan, 'program' | 'pipeline'>;
+
+/**
+ * What the scene is: its planned objects, meshes, instance batches, materials and lights, with
+ * ids assigned — the same for every renderer on the scene (planScene). It reads nothing from any
+ * renderer's strategy, and holds no data-texture addresses: those depend on which optional
+ * structures the scene's renderers read, and are added when the scene is placed (placeScene).
+ *
+ * A material row that a batch supplies per instance (SceneInstanceBatch.attributeRows) still
+ * holds its authored value here; placing the scene replaces it with an attribute reference.
+ */
+export interface ScenePlan {
+    objects: ScenePrimitiveObject[];
+    meshes: SceneMesh[];
+    instanceBatches: SceneInstanceBatch[];
+    materials: PlannedMaterial[];
+    lights: SceneLight[];
+    /** Material id the ambient region (−1) resolves to, or −1 = vacuum (§2.4). */
+    ambientMedium: number;
+    /** The instanced batches whose instances are lights (lightBatchesOf), by batch ordinal. */
+    lightBatches: Array<{ ordinal: number; count: number }>;
+}
+
+// The scene plan's records are the placed records without their address fields.
+export type ScenePrimitiveObject = Omit<PlannedPrimitiveObject, 'tabled'>;
+export type SceneMesh = Omit<PlannedMesh, 'slot'>;
+type PlannedPrototype = PlannedInstanceBatch['prototype'];
+export type SceneInstanceBatch = Omit<PlannedInstanceBatch, 'slot' | 'prototype'> & {
+    prototype: Omit<Extract<PlannedPrototype, { backend: 'mesh' }>, 'geometrySlot'> | Exclude<PlannedPrototype, { backend: 'mesh' }>;
+};
+export type SceneLight = Omit<PlannedLight, 'mesh'> & { mesh?: Pick<NonNullable<PlannedLight['mesh']>, 'ordinal' | 'triCount'> };
