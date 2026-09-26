@@ -4,6 +4,64 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-26 — review batch 4: one answer per fact
+
+Review Part 2, as planned in docs/claude-review-batch4-plan.md: twelve commits (d61e76a …
+db0c163), each a fact that was decided in more than one place, now decided once by the layer that
+owns it. No step was meant to change a picture.
+- **The approved plan was re-checked mid-batch.** Its "nothing reads `CompiledScene.dataReads`"
+  was false: a search cut off at ten lines hid a test reader. The re-check, with complete searches,
+  corrected seven claims before any further code. `dataReads` is kept.
+
+- **Removed:** the materials feature's always-empty `defines`.
+- **App:** `RenderCoordinator.fail` calls the one stop sequence. A test pins the event order
+  (error, then stop).
+- **Validator:**
+  - one rule for emission on a model that cannot emit (it gave two diagnostics);
+  - camera rows shape-checked once;
+  - the similarity scale and rotation rules are stated once, in similarity.ts
+    (`scaleProblem`, `quaternionProblem`, `AXIS_DEGENERATE_LENGTH`). Object transforms, instance
+    placements and the Planner's runtime quaternion guard all use them.
+- **Witness constants:** fixtures read `MAX_DIST` and `SHADOW_BACKOFF` from math.glsl (sun-haze;
+  fog-sky's e^{−σ·1000}). A test pins the three expected values, and they are unchanged.
+- **Lighting generator:** reads the Planner's `environmentSelectionLive` in its four functions.
+- **Which objects are lights:** the light registry answers "shape T can be sampled"
+  (`regionLightKind`); the geometry descriptor flag `samplableAsLight` is removed. The census's
+  shape leg is its own predicate (`isSamplableEmitterShape`), used by the census, the mesh
+  predicate and the Validator.
+- **One spectrum resolver:** `resolveColorProperty`, moved to compiler/plan/values.ts, also
+  resolves emissive objects' and authored lights' emission. Two redundant blackbody pre-folds are
+  gone.
+- **Scattering media:** the Planner records which media scatter
+  (`ProgramDescription.media.scatteringMedia`, via `mediumScatters`), and the generators read the
+  record.
+- **Instanced sphere lights:** the App computes their tree boxes and powers with the sphere light
+  descriptor's `treeBounds`/`power`, from a plan entry that now carries the kind and the emission
+  colour.
+- **One equirect mapping:** `equirect_uv` (components/env/equirect/equirect_map.glsl) is used by
+  the chart and by the image sky's lookup. The chart registry's `needs` includes it wherever the
+  chart is, the bake shader included.
+
+**How "no change" was shown:**
+- The generated GLSL changed only at step 4.12, in 6 environment programs, and only as planned.
+- The full compiled output of all 202 suite scenes (shaders, uniforms, defaults, parameters, the
+  scene-data plan) was digested before and after steps 4.9–4.11 and is byte-identical. The only
+  intended differences were the new `scatteringMedia` record, which is not shipped, and the
+  batch-light plan entries of the five scenes with instanced lights.
+- The scene-data byte fingerprints are unchanged, light tree included. That includes a new case
+  with per-instance emission colours, which no suite scene covered; it was recorded before the
+  change.
+- `sky`, `sky-lamp` and `proc-sky` give identical results on their 7 checks (160×120, spp as in
+  the registry, salt 1234, fresh renders). The `sky` scene rotated by 2.0 gives identical frame
+  means to 10 digits on its four estimators.
+- tsc clean; vitest 2950 passing.
+
+**Left open:**
+- A `{param}` emission on a model that cannot emit still gets two warnings (this rule's, and the
+  general "knob the model doesn't read" rule). This predates the batch.
+- The scene/program restructure: plan the scene once, then each renderer against it. Item 2's
+  option (b) waits for it.
+
 ## 2026-09-26 — review batch 3: shadow rays aimed at the light point
 
 Review item 1.2, as planned in docs/claude-review-batch3-plan.md, in two commits. The three
