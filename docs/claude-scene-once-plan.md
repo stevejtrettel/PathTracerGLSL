@@ -1,7 +1,7 @@
 # Plan: plan the scene once, then each renderer
 
-**Status:** proposed Sep 26, 2026, for the owner's approval. No code is written. Line numbers are
-at 104521e.
+**Status:** approved Sep 26, 2026. Owner decisions 1–3 answered (below); decision 4 is asked at
+step 5. Line numbers are at 104521e.
 
 **Decided with the owner (Sep 26):**
 - Keep N renderers per scene. The real uses are a real renderer plus a fast preview, and
@@ -183,14 +183,14 @@ and the CHANGELOG.
 1. **Write the spectral design before step 4** (docs only, starting from
    fable-compiler-contracts.md §8). Its first question is how shared GPU memory serves an RGB and
    a spectral renderer on one scene, and step 4 builds to that answer. It can be written while
-   steps 0–3 are built. **Recommend:** yes. Either I write it after steps 0–3, or another instance
-   writes it now; a docs-only design does not collide with this work.
+   steps 0–3 are built. **Decided:** yes; another instance writes the spectral design now.
 2. **Delete the test "decisions do not depend on the data layout"** (dataReads.test.ts:30). After
    step 2 the decisions function has no layout input, so the test cannot fail. The other tests in
-   that file stay. **Recommend:** delete.
+   that file stay. **Decided:** delete.
 3. **Commit the digest tool** (step 0). Both refactor batches relied on it, and the scratch copy
-   was broken. **Recommend:** yes.
+   was broken. **Decided:** yes.
 4. **Split Planner.ts** after the restructure (step 5). **Recommend:** yes, as its own commit.
+   Asked at step 5.
 
 ## Not in this plan
 
