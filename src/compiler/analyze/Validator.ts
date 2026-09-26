@@ -16,7 +16,7 @@ import { PRIMITIVES, primitiveBounds, primitiveIsBounded, resolveBackend, resolv
 import { BOUND_FIELDS, checkBoundContainment, checkConservativeness } from '../../components/geometry/boundCheck.js';
 import { MARCHED_TABLE_THRESHOLD, MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
-import { isDrivenTransform } from '../../components/geometry/similarity.js';
+import { isDrivenTransform, scaleProblem, quaternionProblem, AXIS_DEGENERATE_LENGTH } from '../../components/geometry/similarity.js';
 import { placementCount } from '../../components/intersection/instancing/instancing.js';
 import { nodeTexelBound } from '../../components/data/ledger.js';
 import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
@@ -1533,13 +1533,15 @@ function samplableObjectUses(scene: SceneDescription, name: string): boolean {
 function validateRotation(rotation: unknown, index: number, bag: DiagnosticBag): void {
     const at = (field: string) => [`objects[${index}]`, `transform.rotation${field}`] as [string, string];
     const checkQuat = (q: unknown, what: string): void => {
-        if (!Array.isArray(q) || q.length !== 4 || q.some((c) => typeof c !== 'number' || !Number.isFinite(c))) {
+        const problem = quaternionProblem(q);
+        if (problem === 'not-four-finite-numbers') {
             bag.error('invalid-transform', `Object ${index}: ${what} must be 4 finite numbers [x, y, z, w]`)
                 .withOriginal('scene', at('')).add();
             return;
         }
-        const norm = Math.hypot(q[0], q[1], q[2], q[3]);
-        if (norm < 1e-6) {
+        const [x, y, z, w] = q as number[];
+        const norm = Math.hypot(x, y, z, w);
+        if (problem === 'degenerate') {
             bag.error('invalid-transform', `Object ${index}: ${what} is degenerate (norm ${norm})`)
                 .withOriginal('scene', at('')).add();
         } else if (Math.abs(norm - 1) > 1e-3) {
@@ -1560,7 +1562,7 @@ function validateRotation(rotation: unknown, index: number, bag: DiagnosticBag):
     }
     if (typeof rotation === 'object' && rotation !== null && 'axis' in rotation && 'angle' in rotation) {
         const aa = rotation as { axis: unknown; angle: unknown };
-        if (!isVec3(aa.axis) || Math.hypot(...(aa.axis as Vec3)) < 1e-8) {
+        if (!isVec3(aa.axis) || Math.hypot(...(aa.axis as Vec3)) < AXIS_DEGENERATE_LENGTH) {
             bag.error('invalid-transform', `Object ${index}: rotation axis must be a nonzero vec3 of finite numbers (the axis is always constant — drive the angle)`)
                 .withOriginal('scene', at('.axis')).add();
         }
@@ -1581,7 +1583,8 @@ function validateRotation(rotation: unknown, index: number, bag: DiagnosticBag):
  *  hygiene against the fixed world-space epsilons, not bias). */
 function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void {
     const at = [`objects[${index}]`, 'transform.scale'] as [string, string];
-    if (Array.isArray(scale)) {
+    const problem = isValueParam(scale) ? null : scaleProblem(scale);
+    if (problem === 'nonuniform') {
         bag.error('invalid-transform',
             `Object ${index}: nonuniform scale is not a transform — a similarity has one scale. `
             + `Shape stretching belongs in primitive parameters (e.g. box halfSize), not placement`)
@@ -1604,19 +1607,19 @@ function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void 
         }
         return;
     }
-    if (typeof scale !== 'number' || !Number.isFinite(scale)) {
+    if (problem === 'not-a-finite-number') {
         bag.error('invalid-transform', `Object ${index}: transform.scale must be a finite number`)
             .withOriginal('scene', at).add();
         return;
     }
-    if (scale <= 0) {
+    if (problem === 'not-positive') {
         bag.error('invalid-transform',
             `Object ${index}: transform.scale must be > 0 (reflections are rejected — a mirror `
             + `would silently flip the one-sided quad pin and frame handedness)`)
             .withOriginal('scene', at).add();
         return;
     }
-    if (Math.abs(Math.log10(scale)) > 2) {
+    if (Math.abs(Math.log10(scale as number)) > 2) {   // a finite positive number (scaleProblem is null)
         // Analytic spawn offsets are fp-relative and scale-free since impl-plan-epsilon-
         // discipline; the MARCHED tier's clearances are still world-fixed, so the warning
         // stays for scenes that march.
@@ -1627,23 +1630,25 @@ function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void 
     }
 }
 
-/** What is wrong with one constant instance placement, or null. The rules of
- *  validateScale/validateRotation (object transforms), as a predicate. */
+/** What is wrong with one constant instance placement, or null. The scale and rotation rules
+ *  are similarity.ts's, shared with object transforms (validateScale/validateRotation). */
 function placementProblem(t: unknown): string | null {
     if (t === null || typeof t !== 'object') return 'a placement must be a transform { position?, rotation?, scale? }';
     const { position, rotation, scale } = t as { position?: unknown; rotation?: unknown; scale?: unknown };
     if (position !== undefined && !isVec3(position)) return 'position must be a vec3 of finite numbers';
     if (scale !== undefined) {
-        if (Array.isArray(scale)) return 'scale must be one number (a similarity has one scale; nonuniform scale is not a transform)';
-        if (typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0) return `scale must be a finite number > 0 (got ${String(scale)})`;
+        const problem = scaleProblem(scale);
+        if (problem === 'nonuniform') return 'scale must be one number (a similarity has one scale; nonuniform scale is not a transform)';
+        if (problem !== null) return `scale must be a finite number > 0 (got ${String(scale)})`;
     }
     if (rotation !== undefined) {
         if (Array.isArray(rotation)) {
-            if (rotation.length !== 4 || rotation.some((c) => typeof c !== 'number' || !Number.isFinite(c))) return 'a quaternion rotation must be 4 finite numbers [x, y, z, w]';
-            if (Math.hypot(...(rotation as number[])) < 1e-6) return 'the quaternion rotation is degenerate (norm ≈ 0)';
+            const problem = quaternionProblem(rotation);
+            if (problem === 'not-four-finite-numbers') return 'a quaternion rotation must be 4 finite numbers [x, y, z, w]';
+            if (problem === 'degenerate') return 'the quaternion rotation is degenerate (norm ≈ 0)';
         } else if (typeof rotation === 'object' && rotation !== null && 'axis' in rotation && 'angle' in rotation) {
             const { axis, angle } = rotation as { axis: unknown; angle: unknown };
-            if (!isVec3(axis) || Math.hypot(...(axis as Vec3)) < 1e-8) return 'the rotation axis must be a nonzero vec3 of finite numbers';
+            if (!isVec3(axis) || Math.hypot(...(axis as Vec3)) < AXIS_DEGENERATE_LENGTH) return 'the rotation axis must be a nonzero vec3 of finite numbers';
             if (typeof angle !== 'number' || !Number.isFinite(angle)) return 'the rotation angle must be a finite number (radians)';
         } else {
             return 'rotation must be axis-angle { axis, angle } or a quaternion [x, y, z, w]';

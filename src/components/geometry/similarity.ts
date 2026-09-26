@@ -174,6 +174,41 @@ function isParamRef(v: unknown): boolean {
     return typeof v === 'object' && v !== null && !Array.isArray(v) && 'param' in v;
 }
 
+// ---------------------------------------------------------------------------
+// What makes an authored placement a similarity (fable-transforms §7)
+// ---------------------------------------------------------------------------
+// The scale and rotation rules, stated once. The Validator applies them to object transforms
+// and to instance placements, and words its own diagnostics. (Every number's finiteness is
+// the Validator's scene-wide sweep.)
+
+export type ScaleProblem = 'nonuniform' | 'not-a-finite-number' | 'not-positive';
+
+/** Why `s` is not a similarity's scale, or null: one finite number, strictly positive
+ *  (a reflection would flip handedness; nonuniform scale is not a similarity). */
+export function scaleProblem(s: unknown): ScaleProblem | null {
+    if (Array.isArray(s)) return 'nonuniform';
+    if (typeof s !== 'number' || !Number.isFinite(s)) return 'not-a-finite-number';
+    if (s <= 0) return 'not-positive';
+    return null;
+}
+
+export type QuaternionProblem = 'not-four-finite-numbers' | 'degenerate';
+
+/** Below this norm a quaternion has no rotation to normalize to. */
+export const QUAT_DEGENERATE_NORM = 1e-6;
+
+/** Why `q` is not a usable rotation quaternion, or null. A non-unit quaternion is usable:
+ *  similarityFromTransform normalizes it. */
+export function quaternionProblem(q: unknown): QuaternionProblem | null {
+    if (!Array.isArray(q) || q.length !== 4 || q.some((c) => typeof c !== 'number' || !Number.isFinite(c))) {
+        return 'not-four-finite-numbers';
+    }
+    return Math.hypot(q[0], q[1], q[2], q[3]) < QUAT_DEGENERATE_NORM ? 'degenerate' : null;
+}
+
+/** Below this length a rotation axis has no direction. */
+export const AXIS_DEGENERATE_LENGTH = 1e-8;
+
 /** Authored CONSTANT `Transform` (TRS sugar: axis-angle | quaternion) → the canonical
  *  Similarity (fable-transforms §2). The Validator has already diagnosed degenerate
  *  axes and quaternions, so this only normalizes. Shared by the Planner (constant

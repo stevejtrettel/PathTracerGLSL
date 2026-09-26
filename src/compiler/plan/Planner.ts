@@ -18,6 +18,7 @@ import {
     rigidInverse,
     similarityCompose,
     similarityFromTransform,
+    quaternionProblem,
     type Quat,
     type Similarity,
     type Vec3Tuple,
@@ -725,9 +726,9 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
     let readRotation: FieldReader<Quat>;
     const rot = transform.rotation;
     const safeQuat = (q: number[] | undefined, fallback: Quat): Quat => {
-        if (!Array.isArray(q) || q.length !== 4 || !q.every(Number.isFinite)) return fallback;
-        const norm = Math.hypot(q[0], q[1], q[2], q[3]);
-        if (norm < 1e-6) { warnOnce('degenerate quaternion — using identity'); return IDENTITY_QUAT; }
+        const problem = quaternionProblem(q);   // the similarity rule the Validator applies to defaults
+        if (problem === 'not-four-finite-numbers') return fallback;
+        if (problem === 'degenerate') { warnOnce('degenerate quaternion — using identity'); return IDENTITY_QUAT; }
         return quatNormalize(q as Quat);
     };
     if (rot === undefined) {
