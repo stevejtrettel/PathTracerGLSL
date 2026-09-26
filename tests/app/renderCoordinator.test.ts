@@ -118,6 +118,18 @@ describe('RenderCoordinator — a frame that throws', () => {
         expect(emitter.events.find((e) => e.event === AppEvents.RENDER_ERROR)!.data).toEqual({ error: boom });
     });
 
+    it('reports the error before the stop, each once', () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const engine = fakeEngine();
+        engine.renderFrame.mockImplementation(() => { throw new Error('boom'); });
+        const emitter = makeEmitter();
+        const rc = new RenderCoordinator(asEngine(engine), emitter);
+        rc.startInteractive();
+        step();
+        const names = emitter.events.map((e) => e.event).filter((n) => n === AppEvents.RENDER_ERROR || n === AppEvents.RENDER_STOPPED);
+        expect(names).toEqual([AppEvents.RENDER_ERROR, AppEvents.RENDER_STOPPED]);
+    });
+
     it('an interactive render stops the same way', () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const engine = fakeEngine();

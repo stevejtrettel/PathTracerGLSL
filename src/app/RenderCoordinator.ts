@@ -185,7 +185,10 @@ export class RenderCoordinator {
 
     // -- Private --
 
-    private stopInternal(emitEvents: boolean): void {
+    /** The one stop sequence. `error` is set when a frame threw: a pending production render
+     *  is rejected with it instead of RenderStoppedError, and RENDER_ERROR precedes
+     *  RENDER_STOPPED. */
+    private stopInternal(emitEvents: boolean, error?: Error): void {
         if (this.state === 'stopped') return;
 
         this.state = 'stopped';
@@ -196,13 +199,14 @@ export class RenderCoordinator {
         }
 
         if (this.productionReject) {
-            this.productionReject(new RenderStoppedError());
+            this.productionReject(error ?? new RenderStoppedError());
             this.clearProductionPromise();
         }
 
         this.goal = null;
 
         if (emitEvents) {
+            if (error !== undefined) this.emit(AppEvents.RENDER_ERROR, { error });
             this.emit(AppEvents.RENDER_STOPPED);
         }
     }
@@ -237,15 +241,7 @@ export class RenderCoordinator {
     private fail(error: unknown): void {
         const err = error instanceof Error ? error : new Error(String(error));
         console.error('Rendering stopped: a frame threw.', err);
-        this.state = 'stopped';
-        this.animationId = undefined;
-        if (this.productionReject) {
-            this.productionReject(err);
-            this.clearProductionPromise();
-        }
-        this.goal = null;
-        this.emit(AppEvents.RENDER_ERROR, { error: err });
-        this.emit(AppEvents.RENDER_STOPPED);
+        this.stopInternal(true, err);
     }
 
     private updateFPS(): void {
