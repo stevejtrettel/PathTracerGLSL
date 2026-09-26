@@ -22,6 +22,7 @@
 //                       ·e^{−σ_a·d_cam}. The old 1e20 distance made it exactly 0.
 
 import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
+import { MAX_DIST, SHADOW_BACKOFF } from './shaderConstants.js';
 
 // ---------------------------------------------------------------------------
 // tiny-sphere
@@ -124,8 +125,6 @@ export const TINY_LIGHT_MEAN = (() => {
 // ---------------------------------------------------------------------------
 
 const SUN_SIGMA_A = 0.001;
-const MAX_DIST = 1000;          // math.glsl
-const SHADOW_BACKOFF = 0.002;   // math.glsl
 
 export const sunHazeScene: SceneDescription = {
     id: 'sun-haze',

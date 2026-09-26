@@ -44,6 +44,7 @@ import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } fro
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
 import { nullBudgetViewScene, nullViewStrategies, NULL_VIEW_POSE, NULL_VIEW_THROUGH, nullBudgetScene, nullBudgetStrategies, NULL_BUDGET_POSE, SLABS } from './scenes/nullBudgetWitness.js';
+import { MAX_DIST } from './scenes/shaderConstants.js';
 import { shadowAimMarch, shadowAimFar, shadowAimFog, shadowAimStrategies, AIM_OPEN, AIM_FOG, AIM_CAMERA_Y, AIM_FOG_CAMERA_Y, AIM_FAR_X } from './scenes/shadowAimWitness.js';
 import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN, sunHazeScene, sunHazeStrategy, SUN_HAZE_CAMERA, SUN_HAZE_CENTER } from './scenes/precisionWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy, grinLongScene, grinLongStrategy } from './scenes/grinWitness.js';
@@ -1466,8 +1467,8 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // so the 2% tolerance would be only ~2σ. Measured: +2.2% at 96 spp, +0.5% at 384.
             spp: 384,
             checks: [0, 1, 2].flatMap((k) => [
-                { kind: 'mean' as const, value: 0.4 * Math.exp(-1) * Math.exp(-2.5 * FOG_SKY_SIGMA), tol: 0.003, strategy: k, region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, label: `sphere = ρ·L·e^{−σ(1000+2.5)} (key ${k + 1})` },
-                { kind: 'mean' as const, value: Math.exp(-1), tol: 0.002, strategy: k, region: { x: 0.02, y: 0.88, w: 0.1, h: 0.1 }, label: `sky = L·e^{−σ·1000} (key ${k + 1})` },
+                { kind: 'mean' as const, value: 0.4 * Math.exp(-FOG_SKY_SIGMA * MAX_DIST) * Math.exp(-2.5 * FOG_SKY_SIGMA), tol: 0.003, strategy: k, region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 }, label: `sphere = ρ·L·e^{−σ(1000+2.5)} (key ${k + 1})` },
+                { kind: 'mean' as const, value: Math.exp(-FOG_SKY_SIGMA * MAX_DIST), tol: 0.002, strategy: k, region: { x: 0.02, y: 0.88, w: 0.1, h: 0.1 }, label: `sky = L·e^{−σ·1000} (key ${k + 1})` },
             ]),
         },
     },

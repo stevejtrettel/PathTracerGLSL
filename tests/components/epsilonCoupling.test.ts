@@ -11,23 +11,18 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { GRIN_GRAD_EPS } from '../../src/compiler/generate/features/intersection.js';
+import { glslDefine } from '../helpers/glslDefine.js';
 
 const SRC = join(__dirname, '../../src');
 const read = (p: string): string => readFileSync(join(SRC, 'glsl/core', p), 'utf8');
 const readAt = (p: string): string => readFileSync(join(SRC, p), 'utf8');
 
-const define = (src: string, name: string): number => {
-    const m = src.match(new RegExp(`#define\\s+${name}\\s+([0-9.eE+-]+)`));
-    if (!m) throw new Error(`${name} not found`);
-    return Number(m[1]);
-};
-
 describe('march ↔ classification epsilon coupling', () => {
     const march = read('march.glsl');
     const math = read('math.glsl');
-    const MARCH_EPSILON = define(march, 'MARCH_EPSILON');
-    const MARCH_EPSILON_MAX = define(march, 'MARCH_EPSILON_MAX');
-    const EPS_INTERFACE = define(math, 'EPS_INTERFACE');
+    const MARCH_EPSILON = glslDefine(march, 'MARCH_EPSILON');
+    const MARCH_EPSILON_MAX = glslDefine(march, 'MARCH_EPSILON_MAX');
+    const EPS_INTERFACE = glslDefine(math, 'EPS_INTERFACE');
 
     it('EPS_INTERFACE is the documented 10× MARCH_EPSILON', () => {
         expect(EPS_INTERFACE).toBeCloseTo(10 * MARCH_EPSILON, 12);
@@ -51,8 +46,8 @@ describe('provenance-tier clearances', () => {
     const march = read('march.glsl');
     const math = read('math.glsl');
     const grin = readAt('components/transport/volume/grin/grin.glsl');
-    const MARCH_EPSILON_MAX = define(march, 'MARCH_EPSILON_MAX');
-    const MARCH_CLEARANCE = define(math, 'MARCH_CLEARANCE');
+    const MARCH_EPSILON_MAX = glslDefine(march, 'MARCH_EPSILON_MAX');
+    const MARCH_CLEARANCE = glslDefine(math, 'MARCH_CLEARANCE');
 
     it('MARCH_CLEARANCE = 2× the marcher acceptance cap (the marched tier derivation)', () => {
         // Smaller sits at a zero-margin knife edge against the marcher's first
@@ -61,23 +56,23 @@ describe('provenance-tier clearances', () => {
     });
 
     it('fp_uncertainty carries the transcribed Wächter–Binder constants', () => {
-        expect(define(math, 'FP_UNCERTAINTY_REL')).toBeCloseTo(256 * 2 ** -23, 18);
-        expect(define(math, 'FP_UNCERTAINTY_ABS')).toBeCloseTo(2 ** -16, 18);
+        expect(glslDefine(math, 'FP_UNCERTAINTY_REL')).toBeCloseTo(256 * 2 ** -23, 18);
+        expect(glslDefine(math, 'FP_UNCERTAINTY_ABS')).toBeCloseTo(2 ** -16, 18);
     });
 
     it("grin.glsl's standalone GRIN_GRAD_EPS fallback matches the compiler-owned value", () => {
         // The compiler owns the number (emitted as a header define that the #ifndef
         // default yields to); the .glsl fallback exists only for standalone reading and
         // must not drift from it.
-        expect(GRIN_GRAD_EPS).toBeCloseTo(define(grin, 'GRIN_GRAD_EPS'), 12);
+        expect(GRIN_GRAD_EPS).toBeCloseTo(glslDefine(grin, 'GRIN_GRAD_EPS'), 12);
     });
 
     it('the GRIN exit pull-back clears the walker residual and a marched wall, below the guard', () => {
-        const DS_MAX = define(grin, 'GRIN_DS_MAX');
-        const DTOL = define(grin, 'GRIN_DTOL');
-        const ITERS = define(grin, 'GRIN_BISECT_ITERS');
-        const STEP = define(grin, 'GRIN_STEP');
-        const PULLBACK = define(grin, 'GRIN_EXIT_PULLBACK');
+        const DS_MAX = glslDefine(grin, 'GRIN_DS_MAX');
+        const DTOL = glslDefine(grin, 'GRIN_DTOL');
+        const ITERS = glslDefine(grin, 'GRIN_BISECT_ITERS');
+        const STEP = glslDefine(grin, 'GRIN_STEP');
+        const PULLBACK = glslDefine(grin, 'GRIN_EXIT_PULLBACK');
         const bisectResidual = (DS_MAX * (1 + DTOL / 2)) / 2 ** ITERS;
         expect(PULLBACK).toBeGreaterThanOrEqual(2 * bisectResidual);          // strictly inside `med`
         expect(PULLBACK).toBeGreaterThanOrEqual(2 * MARCH_EPSILON_MAX);       // clears a marched wall's band
