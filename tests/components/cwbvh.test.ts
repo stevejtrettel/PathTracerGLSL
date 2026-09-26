@@ -258,7 +258,7 @@ describe('cwbvh: coincident centroids', () => {
     it('builds over 4 identical boxes and over a cloud with one point repeated 5 times', () => {
         const same = new Float64Array(6 * 4);
         for (let i = 0; i < 4; i++) same.set([-1, -1, -1, 1, 1, 1], 6 * i);
-        expect(buildCWBVH(same, 4).order.length).toBe(4);
+        expect([...buildCWBVH(same, 4).order].sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);   // every item exactly once
 
         const { boxes } = sphereCloud(1000, 77);
         for (let i = 1; i <= 5; i++) boxes.set(boxes.subarray(0, 6), 6 * i);   // items 1..5 = item 0
