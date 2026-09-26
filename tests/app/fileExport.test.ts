@@ -146,6 +146,23 @@ describe('encodePNG', () => {
         }
     });
 
+    it('round-trips an image several write batches tall (the filter carries the row above across batches)', async () => {
+        // encodePNG writes about 1 MiB of filtered rows per batch: at width 1000 a row is 3001
+        // bytes, so ~349 rows per batch, and 800 rows take three. The Paeth filter of each
+        // batch's first row reads the previous batch's last row.
+        const w = 1000, h = 800;
+        const big = new Uint8Array(w * h * 4);
+        let t = 424242;
+        for (let i = 0; i < big.length; i++) { t = (t * 1103515245 + 12345) >>> 0; big[i] = t >>> 24; }
+        const png = new Uint8Array(await (await encodePNG(w, h, (y) => big.subarray(y * w * 4, (y + 1) * w * 4))).arrayBuffer());
+        const rgb = decodeRGB(walkChunks(png), w, h);
+        let firstMismatch = -1;
+        for (let p = 0; p < w * h && firstMismatch < 0; p++) {
+            for (let c = 0; c < 3; c++) if (rgb[3 * p + c] !== big[4 * p + c]) { firstMismatch = p; break; }
+        }
+        expect(firstMismatch).toBe(-1);
+    });
+
     it('writes the stamp as tEXt chunks between IHDR and the image data', async () => {
         const png = new Uint8Array(await (await encodePNG(W, H, row, testStamp)).arrayBuffer());
         const chunks = walkChunks(png);
