@@ -102,6 +102,7 @@ bool     scene_intersect_any (Ray ray, float maxDist);                 // occlus
 Spectrum shadow_transmittance(Ray shadow_ray, Point light_p, int crossings_left);   // destination is a POINT — see below
 Point    ambient_geodesic    (Point origin, Direction dir, float t);   // UNCHANGED — the geodesic mechanism
 float    ambient_dot         (Direction a, Direction b, Point p);      // UNCHANGED — now actually called
+Direction ambient_direction_to(Point from, Point to);                 // unit start direction of the geodesic from → to (aims shadow rays)
 ```
 The **running nearest lives on `hit.t`** (not on the Ray, and not `inout Ray`): each backend reads
 `hit.t` as its far bound and, on a closer hit, fills the whole Hit and shrinks `hit.t`. The Ray is
@@ -122,7 +123,14 @@ never mutated by intersection — it is a pure seed.
   LIGHT'S OWN surface blocked the shadow ray → NEE went dark through any bounded medium (pt, which
   reaches the light via the emitter-hit, stayed correct). Passing the light POINT lets each segment
   re-derive the back-off against the fixed target (pbrt's `SpawnRayTo` discipline), so no drift can
-  accumulate. The opaque fast path derives its `maxDist` from the point; the media walk measures
+  accumulate. **The ray is aimed at the destination as well.** The caller takes the origin from `ray_spawn`
+  (moved ε off the surface) and sets the direction to `ambient_direction_to(origin, light_p)`. A
+  ray that kept the direction computed from the unmoved hit point would be the true segment shifted
+  by ε: it passes beside the light point, and when the light is seen at a slant it meets the light's
+  own surface before the back-off — whenever ε·[(−n_g·n_l)/cos θ_l − cos θ] > `SHADOW_BACKOFF`
+  (θ from the receiver's normal n_g, θ_l from the light's normal n_l). Only visibility uses the
+  aimed direction; the BSDF, the cosine and the pdfs keep the sampled one (witnesses
+  `shadow-aim-march`, `shadow-aim-far`). The opaque fast path derives its `maxDist` from the point; the media walk measures
   `length(light_p − seg_ray.origin) − SHADOW_BACKOFF` per segment (the back-off's derivation —
   angle-amplified, never fp-relative — lives on the constant in core math). (length() is Euclidean; a geodesic
   ambient-distance helper is the curved-space follow-up, like the straight-ray march itself.)

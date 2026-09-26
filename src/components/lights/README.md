@@ -88,8 +88,8 @@ from the BLAS root); kinds without it (directional, beam) are Validator-rejected
 
 ## Invariants & witnesses
 
-pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2); the shadow-ray
-back-off is `SHADOW_BACKOFF` (math.glsl), which must exceed `ray_spawn`'s offset (the
-dark-tops bug — documented at the call sites). Deferred: spherical-rectangle quads (Ureña), two-sided quads,
+pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2); a shadow ray is aimed
+at the sampled light point and stops `SHADOW_BACKOFF` (math.glsl) short of it, so a light's own
+surface does not block it (shadow-aim-march, shadow-aim-far). Deferred: spherical-rectangle quads (Ureña), two-sided quads,
 inside-sphere fallback, p-independent area arms (equiangular's area exit),
 `Value<T>` light params (the generated struct + hoisted const are the ready ABI).

@@ -44,6 +44,7 @@ import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } fro
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
 import { nullBudgetViewScene, nullViewStrategies, NULL_VIEW_POSE, NULL_VIEW_THROUGH, nullBudgetScene, nullBudgetStrategies, NULL_BUDGET_POSE, SLABS } from './scenes/nullBudgetWitness.js';
+import { shadowAimMarch, shadowAimFar, shadowAimStrategies, AIM_OPEN, AIM_CAMERA_Y, AIM_FAR_X } from './scenes/shadowAimWitness.js';
 import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN, sunHazeScene, sunHazeStrategy, SUN_HAZE_CAMERA, SUN_HAZE_CENTER } from './scenes/precisionWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy, grinLongScene, grinLongStrategy } from './scenes/grinWitness.js';
 import {
@@ -2111,6 +2112,43 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.9, label: 'default budget: pt tripwire' },
                 { kind: 'equality', strategies: [3, 4], meanTol: 0.02, label: `budget ${2 * SLABS + 1}: nee ≡ mis` },
                 { kind: 'equality', strategies: [3, 5], meanTol: 0.03, rmse: 0.9, label: `budget ${2 * SLABS + 1}: pt tripwire` },
+            ],
+        },
+    },
+    // Shadow rays end at the light point they were aimed at (shadowAimWitness.ts has the geometry
+    // and the derivation). pt uses no shadow ray: it is the control for each scene's exact value.
+    // Tolerances from the spread over three salts (11, 22, 33) at 160×120 × 256 spp, measured
+    // before the fix: pt-nee sd ≈ 0.0037 in every scene (tol 0.015); pt-mis sd ≈ 0.00013 and pt
+    // sd ≈ 0.00005 (tol 0.005). pt reads slightly high because its BSDF rays see the disk from the
+    // moved origin, height h − ε: 4/(4 + (0.25 − ε)²) = 0.98474 at ε = 10⁻³ and 0.98498 at
+    // ε = 3·10⁻³, both as measured (0.98474, 0.98498); in the fog scene pt reads 0.95106.
+    // Before the fix pt-nee read 0.828 / 0.474 / 0.599 and pt-mis 0.876 / 0.863 / 0.839
+    // (march / far / fog, three-salt means).
+    'shadow-aim-march': {
+        scene: shadowAimMarch,
+        strategies: posed([0, AIM_CAMERA_Y, 0], [0, 0, 0], ...shadowAimStrategies),
+        exercises: 'the NEE shadow ray from a MARCHED receiver (spawn margin 10⁻³) to an authored disk light: the ray must be aimed at the sampled light point, or the light\'s own surface blocks it at grazing angles',
+        expected: `keys 1/2/3 (pt-nee, pt-mis, pt) all read ρ·Le·R²/(R²+h²) = ${AIM_OPEN.toFixed(5)}`,
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'mean', value: AIM_OPEN, tol: 0.015, strategy: 0, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'marched floor, pt-nee' },
+                { kind: 'mean', value: AIM_OPEN, tol: 0.005, strategy: 1, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'marched floor, pt-mis' },
+                { kind: 'mean', value: AIM_OPEN, tol: 0.005, strategy: 2, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'marched floor, pt (control)' },
+            ],
+        },
+    },
+    'shadow-aim-far': {
+        scene: shadowAimFar,
+        strategies: posed([AIM_FAR_X, AIM_CAMERA_Y, 0], [AIM_FAR_X, 0, 0], ...shadowAimStrategies),
+        exercises: 'the NEE shadow ray from an analytic receiver 100 units from the origin (fp-relative spawn margin ≈ 3·10⁻³) to an emissive disk object',
+        expected: `keys 1/2/3 (pt-nee, pt-mis, pt) all read ${AIM_OPEN.toFixed(5)}`,
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'mean', value: AIM_OPEN, tol: 0.015, strategy: 0, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'floor at x = 100, pt-nee' },
+                { kind: 'mean', value: AIM_OPEN, tol: 0.005, strategy: 1, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'floor at x = 100, pt-mis' },
+                { kind: 'mean', value: AIM_OPEN, tol: 0.005, strategy: 2, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'floor at x = 100, pt (control)' },
             ],
         },
     },

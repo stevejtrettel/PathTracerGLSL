@@ -53,7 +53,6 @@ describe('provenance-tier clearances', () => {
     const grin = readAt('components/transport/volume/grin/grin.glsl');
     const MARCH_EPSILON_MAX = define(march, 'MARCH_EPSILON_MAX');
     const MARCH_CLEARANCE = define(math, 'MARCH_CLEARANCE');
-    const SHADOW_BACKOFF = define(math, 'SHADOW_BACKOFF');
 
     it('MARCH_CLEARANCE = 2× the marcher acceptance cap (the marched tier derivation)', () => {
         // Smaller sits at a zero-margin knife edge against the marcher's first
@@ -64,14 +63,6 @@ describe('provenance-tier clearances', () => {
     it('fp_uncertainty carries the transcribed Wächter–Binder constants', () => {
         expect(define(math, 'FP_UNCERTAINTY_REL')).toBeCloseTo(256 * 2 ** -23, 18);
         expect(define(math, 'FP_UNCERTAINTY_ABS')).toBeCloseTo(2 ** -16, 18);
-    });
-
-    it('SHADOW_BACKOFF exceeds every spawn tier (light_p is computed from the un-offset hit)', () => {
-        // The shadow ray starts at the OFFSET origin but aims at a light point derived
-        // from the UN-offset hit, so the emitter's own surface can appear up to one
-        // spawn offset short of the computed distance — the dark-tops mechanism. The
-        // factor 2 absorbs the light-side root error (angle-amplified; see math.glsl).
-        expect(SHADOW_BACKOFF).toBeGreaterThanOrEqual(2 * MARCH_CLEARANCE);   // the largest tier (fp-scale tiers are far smaller)
     });
 
     it("grin.glsl's standalone GRIN_GRAD_EPS fallback matches the compiler-owned value", () => {

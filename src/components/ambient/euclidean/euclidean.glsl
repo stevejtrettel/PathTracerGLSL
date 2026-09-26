@@ -1,6 +1,7 @@
 // Euclidean Ambient Geometry
 // Flat-space geometric operations
-// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport()
+// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport(),
+//           ambient_direction_to()
 
 Point ambient_geodesic(Point origin, Direction dir, float t) {
     return origin + dir * t;
@@ -23,4 +24,10 @@ float ambient_dot(Direction v1, Direction v2, Point p) {
 
 Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
     return v;
+}
+
+// The unit direction at `from` of the geodesic to `to` (the normalized log map). Shadow rays
+// are aimed with it at their light point.
+Direction ambient_direction_to(Point from, Point to) {
+    return normalize(to - from);
 }

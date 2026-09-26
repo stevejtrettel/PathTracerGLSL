@@ -1,6 +1,6 @@
 # Euclidean space — what it computes and why
 
-The flat-space occupant of the metric seam — four functions that are trivial here
+The flat-space occupant of the metric seam — five functions that are trivial here
 precisely so they can be non-trivial later:
 
 - `ambient_geodesic(o, d, t) = o + d·t` — straight lines are the geodesics.
@@ -9,6 +9,9 @@ precisely so they can be non-trivial later:
   avoid a degenerate tangent seed).
 - `ambient_parallel_transport(v, from, to) = v` — flat connection: vectors compare
   across points with no correction.
+- `ambient_direction_to(from, to) = normalize(to − from)` — the unit start direction of the
+  geodesic to a point (the normalized log map); shadow rays are aimed with it at their
+  light point.
 
 Every component writes THESE names instead of the raw operations — that discipline is
 the entire preparation for H³/Nil/Schwarzschild: a curved occupant replaces this file

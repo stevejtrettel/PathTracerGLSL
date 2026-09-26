@@ -689,6 +689,10 @@ exports[`scene-data textures (byte fingerprints) > sdf-table-twin 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > shadow-aim-far 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > shadow-aim-march 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > shadow-medium 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sky 1`] = `null`;

@@ -29,11 +29,14 @@
 #define MARCH_CLEARANCE 0.001
 
 // SHADOW_BACKOFF — the far-end back-off of a shadow ray, keeping the LIGHT'S OWN
-// surface from reading as an occluder. Deliberately NOT fp-relative: the requirement is
-// ANGLE-AMPLIFIED (a planar emitter's root error grows as ~ε/cosθ_l — the flush-panel
-// witnesses sit at cosθ_l ≈ 0.01, the dark-tops geometry) and must also exceed the
-// origin's spawn offset (light_p is computed from the UN-offset hit). For the environment
-// and directional lights (distance MAX_DIST) it trims 0.002 off a 1000-unit far clip.
+// surface from reading as an occluder. The shadow ray is aimed at the light point, so in
+// exact arithmetic it meets the light's surface exactly there; the back-off covers the
+// rounding error of the light point and of that intersection. Deliberately NOT
+// fp-relative: the error is ANGLE-AMPLIFIED (a planar emitter's root error grows as
+// ~δ/cosθ_l for a positional error δ, without bound as the arrival grazes, cosθ_l → 0).
+// It is a fixed length, not derived: NEE does not see an occluder within 0.002 of the
+// light point, which a BSDF ray would. For the environment and directional lights
+// (distance MAX_DIST) it trims 0.002 off a 1000-unit far clip.
 #define SHADOW_BACKOFF 0.002
 
 // fp_uncertainty — positional error bound of a FLOATING-POINT-ACCURATE point (analytic

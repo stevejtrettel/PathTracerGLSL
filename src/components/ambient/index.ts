@@ -1,6 +1,7 @@
 // Ambient-space registry (measurement pick-one family — the GEOMETRY-of-space axis,
 // the non-Euclidean seam). An ambient occupant = one folder (the ambient_* contract
-// GLSL: ambient_geodesic / ambient_frame / ambient_dot / ambient_parallel_transport)
+// GLSL: ambient_geodesic / ambient_frame / ambient_dot / ambient_parallel_transport /
+// ambient_direction_to)
 // + one line below (D3: the door exists BEFORE the first curved-space occupant, so
 // H³/Nil/Schwarzschild walk through a finished front door — the GGX lesson).
 //

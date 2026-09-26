@@ -10,6 +10,7 @@ pick-one — one space per program.
 ```glsl
 float ambient_dot(Direction a, Direction b, Point p);   // metric at p
 Point ambient_geodesic(Point o, Direction d, float t);  // exp map along the geodesic
+Direction ambient_direction_to(Point from, Point to);   // unit start direction of the geodesic from → to
 ```
 
 plus whatever `ray_spawn`/`make_ray` need from the space. Euclidean unpacks to

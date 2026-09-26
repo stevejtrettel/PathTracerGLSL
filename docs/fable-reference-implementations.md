@@ -212,8 +212,10 @@ Note the asymmetry with the main loop: *only null interfaces* pass shadow rays i
 >   rays (§4 note), not against a separate safety counter.
 > - **Spawning.** Continuation and shadow rays start from `ray_spawn(hit, wi)`: offset by the hit's
 >   own positional uncertainty `hit.eps` along the geometric normal `hit.ng`, to the side `wi`
->   travels into — not a fixed `EPSILON` along `hit.frame.n`. Shadow rays pass the light point
->   and the remaining crossing budget (§4 note).
+>   travels into — not a fixed `EPSILON` along `hit.frame.n`. A shadow ray then has its direction
+>   re-aimed at the light point (`ambient_direction_to(origin, light_p)`), so it ends at the point
+>   it was sampled toward. Shadow rays pass the light point and the remaining crossing budget
+>   (§4 note).
 > - **Russian roulette** survives with `min(RR_MAX_SURVIVAL, spectrum_max(throughput))` (times the
 >   η² compression when transmissive materials exist) at surface events, and medium collisions in
 >   weighted-absorption arms use their own interior rule (`roulette_interior`,
