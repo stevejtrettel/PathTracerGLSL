@@ -16,11 +16,12 @@ import { transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
 import { sceneMeshes } from '../components/intersection/mesh/mesh.js';
 import { sceneInstanceBatches, type AttributeRowSpec, type ParamsRecordSpec } from '../components/intersection/instancing/instancing.js';
 import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_SDF } from '../components/intersection/index.js';
-import { LIGHT_KINDS, radiantScalar } from '../components/lights/index.js';
+import { LIGHT_KINDS } from '../components/lights/index.js';
 import { lightTableLayout, packLightTable } from '../components/lights/table.js';
 import { EMISSION_KEY } from '../components/materials/index.js';
 import { recordPack, sdfRecordPack } from './generate/records.js';
 import { resolveLightValues } from './generate/features/lighting.js';
+import { regionLightKind } from './plan/dataTenants.js';
 
 /** Where a world-space box comes from: known now, or the root box of a BVH the App builds
  *  (a mesh geometry slot's BLAS under a placement, or an instance batch's TLAS). */
@@ -64,9 +65,11 @@ export interface SceneDataPlan {
         table: Float32Array;
         /** The registry lights' boxes and powers (light-id order). */
         lights: Array<{ box: BoxSource; power: number }>;
-        /** Light-eligible batches: their instances are lights after the registry ones, in
-         *  record order. Boxes and powers come from the packed sphere records (center, r). */
-        batchLights: Array<{ batch: number; count: number; emission: { constant: number } | { attribute: { slot: number; rows: number } } }>;
+        /** Light-eligible batches: their instances are lights of `kind` after the registry ones,
+         *  in record order. The App computes each one's tree box and power with that kind's
+         *  treeBounds and power, from the instance's packed sphere record (center, r) and its
+         *  emission: the material's constant colour, or the batch's per-instance attribute. */
+        batchLights: Array<{ batch: number; count: number; kind: string; emission: { constant: number[] } | { attribute: { slot: number; rows: number } } }>;
     };
     /** Region→material ids, four per texel (present with the object table). */
     regionMaterials?: { base: number; texels: number; ids: number[] };
@@ -162,11 +165,15 @@ export function sceneDataPlanOf(scene: SceneDescription, plan: RenderPlan): Scen
             const pb = plan.instanceBatches.find((b) => b.ordinal === ordinal)!;
             const e = plan.materials[pb.materialId].values[EMISSION_KEY];
             // Per-instance emission rides the batch's attribute records; otherwise every
-            // instance shares the material's constant emission (radiant scalar = channel mean).
+            // instance shares the material's constant emission colour.
             const emission = isAttributeValue(e)
                 ? { attribute: { slot: e.attribute.slot, rows: e.attribute.count } }
-                : { constant: Array.isArray(e) ? radiantScalar(e as number[]) : 0 };
-            return { batch: ordinal, count, emission };
+                : { constant: Array.isArray(e) ? (e as number[]) : [0, 0, 0] };
+            // The light kind comes from the registry, like an emissive object's. A light-eligible
+            // batch's prototype is a params-tier sphere (batchLightEligible).
+            if (pb.prototype.backend !== 'primitive') throw new Error(`sceneData: light-eligible batch ${ordinal} has no primitive prototype`);
+            const kind = regionLightKind(pb.prototype.shapeType)!;
+            return { batch: ordinal, count, kind, emission };
         });
         out.lightTree = { slot: layout.lightTree, table, lights, batchLights };
     }

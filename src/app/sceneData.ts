@@ -10,6 +10,7 @@ import { packInstanceBatchOffThread } from './utils/instancePack.js';
 import { similarityApplyPoint } from '../components/geometry/similarity.js';
 import { buildBVHNodes, rootBoxOf, transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
 import { packMeshLight } from '../components/lights/mesh/mesh.js';
+import { LIGHT_KINDS } from '../components/lights/index.js';
 import { buildLightTreeOffThread } from './utils/lightTreePack.js';
 import { nodeTexelBound, assertFits } from '../components/data/ledger.js';
 import { allocChannel, allocChannelU32, writeTexels, writeTexelsU32, writeVec3s, writeVec2s, writeScalars, writeUvec3s, type PackedChannel, type PackedChannelU32 } from '../components/data/pack.js';
@@ -109,23 +110,29 @@ export async function packSceneData(plan: SceneDataPlan): Promise<PackedSceneDat
             powers[i] = l.power;
         });
         let li = lights.length;
-        for (const { batch, count, emission } of batchLights) {
-            // Params-tier sphere records: (center.xyz, r). A sphere light's box is center ± r
-            // and its power Φ = π·(4πr²)·Le, with Le the mean over channels of its emission.
+        for (const { batch, count, kind, emission } of batchLights) {
+            // Each instance is a light of `kind` (a sphere): its tree box and power are the
+            // kind's own treeBounds and power, over the instance's values — its params-tier
+            // record (center.xyz, r) and its emission colour. One values object is reused
+            // across instances (the kind's functions read it and keep nothing).
+            const d = LIGHT_KINDS[kind];
+            const treeBounds = d.treeBounds;
+            if (typeof treeBounds !== 'function') throw new Error(`sceneData: batch light kind '${kind}' has no treeBounds function`);
             const recs = packedBatches[batch].placements;
             const attrs = packedBatches[batch].attributes;
+            const center = [0, 0, 0];
+            const radiance = 'constant' in emission ? [...emission.constant] : [0, 0, 0];
+            const values: Record<string, number | number[]> = { center, radius: 0, radiance };
             for (let k = 0; k < count; k++) {
-                const cx = recs[4 * k], cy = recs[4 * k + 1], cz = recs[4 * k + 2], r = recs[4 * k + 3];
-                boxes[6 * li] = cx - r; boxes[6 * li + 1] = cy - r; boxes[6 * li + 2] = cz - r;
-                boxes[6 * li + 3] = cx + r; boxes[6 * li + 4] = cy + r; boxes[6 * li + 5] = cz + r;
-                let le: number;
+                center[0] = recs[4 * k]; center[1] = recs[4 * k + 1]; center[2] = recs[4 * k + 2];
+                values.radius = recs[4 * k + 3];
                 if ('attribute' in emission && attrs !== undefined) {
                     const t = (k * emission.attribute.rows + emission.attribute.slot) * 4;
-                    le = (attrs[t] + attrs[t + 1] + attrs[t + 2]) / 3;
-                } else {
-                    le = 'constant' in emission ? emission.constant : 0;
+                    radiance[0] = attrs[t]; radiance[1] = attrs[t + 1]; radiance[2] = attrs[t + 2];
                 }
-                powers[li] = Math.max(1e-8, Math.PI * 4 * Math.PI * r * r * le);
+                const b = treeBounds(values);
+                boxes.set(b.min, 6 * li); boxes.set(b.max, 6 * li + 3);
+                powers[li] = d.power(values);
                 li++;
             }
         }

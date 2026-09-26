@@ -758,3 +758,10 @@ exports[`scene-data textures (byte fingerprints) > two-light 1`] = `
 `;
 
 exports[`scene-data textures (byte fingerprints) > veach-mis 1`] = `null`;
+
+exports[`scene-data textures — instanced sphere lights with per-instance emission > instance-lights with an emission attribute 1`] = `
+{
+  "nodes": "4096x1 cae592ce6843dc6a",
+  "records": "4096x1 1f1366ee541f5ddc",
+}
+`;
