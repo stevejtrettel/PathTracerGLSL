@@ -5,6 +5,14 @@ a context break. Update it or delete it when the review is done. Nothing here ov
 [claude-review-2026-09-25.md](claude-review-2026-09-25.md), which has the findings; this page
 covers the state, the working rules and the next step.
 
+**Starting a new session:**
+1. Read this page, CLAUDE.md, and review Part 7.
+2. Then write the batch 3 plan (§3) and ask the owner to approve it. Write no code before that.
+
+The full Sep 24–25 conversation is at
+`~/.claude/projects/-Users-stevetrettel-Code-PathTracerGLSL/82cdb188-a9ad-46c5-9cfb-c8888062efff.jsonl`,
+if a detail is needed.
+
 ---
 
 ## 1. Where things stand
@@ -50,6 +58,19 @@ covers the state, the working rules and the next step.
   claims were made and corrected during the review.)
 - **Discuss loop and interface changes with the owner before implementing.** Don't mix
   refactors with feature work.
+- **"Unused" is not "broken".** Keep working alternatives (for example CWBVH). What is wrong
+  is doing runtime work nothing reads. Fix or park broken code. Ask before deleting anything.
+- **Don't run things for the sake of it.** Answer from what is known, and run a check only
+  when a change needs verifying.
+- **These rules replace the overnight mandate** of Sep 25 ("fix bugs yourself and report
+  back"). They were set after that mandate produced implement-then-correct work.
+
+**Earlier decisions recorded elsewhere:**
+- **Renderers are chosen by key**, with no automatic switching, and every declared renderer
+  is built up front. Debug images (AOVs) come in two kinds, scene and algorithm, and get a
+  later design pass. All of this is in
+  [claude-data-exact-linkage.md](claude-data-exact-linkage.md), "Decisions".
+- **The owner plans normal and bump mapping.** That is why `Hit.ng` exists.
 
 ## 3. Next step: batch 3, the shadow-ray aim (review 1.2)
 
@@ -106,17 +127,42 @@ set).
   - the equirect mapping;
   - `fail` / `stopInternal`;
   - the witness constants copied from GLSL;
-  - the dead output (`CompiledScene.dataReads`, the always-empty `defines`).
+  - the dead output (`CompiledScene.dataReads`, the always-empty `defines`). Propose this
+    and ask; don't remove it as a matter of course (see the unused-code rule in §2).
 - **Batch 5 — tests that can't fail (Part 3).** Replace them with tests that can.
 - **Batch 6 — history in comments (Part 5).** Mechanical, one commit. It also covers the stale
   "App calls the layout functions" comments and the ledger's "light tree — appended last".
-- **Batch 7 — the GRIN design note (review 1.1, 1.3). Open decisions:**
-  - **A:** the thin-edge pass skips the glass rule's delta record.
-  - **B:** whether a traversal is a bounce. The recommendation was "no bounce, like glass".
-    **The owner has not decided.**
-  - **C:** reject an ambient GRIN medium at validation. It is out of scope by design.
-  - **D:** how to give up on long traversals without a fixed stop. Today GRIN_MAX_ROUNDS = 200
-    drops traversals longer than 102,400 steps, and this is documented as a bias.
+- **Batch 7 — the GRIN design note (review 1.1, 1.3).** Start from `docs/fable-variable-ior.md`,
+  which already settles:
+  - the two wall models;
+  - the glass rule: every pass through the region is recorded as delta, and shadow rays treat
+    it as opaque;
+  - that the ambient (whole-space) case is out of scope.
+
+  **The owner's framing (Sep 25):** GRIN is used in two situations.
+  - **Seamless:** an ambient space, or n drops to 1 before the boundary. There must be no
+    visible edge. This is the `'none'` wall.
+  - **Encased in an object** with n ≠ 1 at the boundary. It wants the option of refraction
+    at the boundary. This is the `'dielectric'` wall.
+
+  **Open items:**
+  - **A: the thin-edge pass skips the delta record.** This is a bug against the existing glass
+    rule. Plan: a witness (a GRIN slab thinner than one step) that shows pt ≠ nee today,
+    measured before any fix.
+  - **B: whether a traversal is a bounce. Undecided.**
+    - At 18:19 the owner agreed that "one trip through GRIN is one event". That rule is built:
+      it replaced the old charge of one bounce per 512 steps.
+    - At 23:08 the owner asked how glass works, saying "I imagine this should work like
+      glass". I proposed "no bounce": glass charges its wall hits, not its inside.
+    - The owner then stopped the discussion to insist on plans first.
+    - Treat the built rule as current until the owner decides. Before "no bounce" could be
+      adopted, it must be shown that the path walk still always ends.
+  - **C: whether the Validator rejects an ambient GRIN medium.** It is out of scope by design
+    and misrenders silently. The owner's call.
+  - **D: how to give up on long traversals without a fixed stop.** Today
+    GRIN_MAX_ROUNDS = 200 drops traversals longer than 102,400 steps. This is documented as a
+    bias.
+  - **Separately, `eta_scale`:** an item that affects noise only, never the answer.
 
 **Also open (not in any batch yet):**
 - **The fp spawn margin** (review 1.11, suspected). It needs a measurement plan before any fix.
