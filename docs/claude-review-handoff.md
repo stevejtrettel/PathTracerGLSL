@@ -26,9 +26,10 @@ if a detail is needed.
   [claude-review-batch4-plan.md](claude-review-batch4-plan.md), CHANGELOG "review batch 4".
   Batch 5 (tests that can fail, review Part 3; test-only, owner-approved in principle):
   [claude-review-batch5-plan.md](claude-review-batch5-plan.md), CHANGELOG "review batch 5".
-- **The working tree is clean.** 91 commits on `main` are **not pushed**. CI has never run on
-  any of them, and the CI concurrency change (46cf2dc) is unverified until the first push.
-- **`npx vitest run`:** 2967 passing. `npx tsc --noEmit` is clean.
+- **The working tree is clean.** `main` was pushed up to 104521e (the tiled-check records) on
+  Sep 26; the scene-once commits after it are not pushed. The CI result of that push, and so
+  of the CI concurrency change (46cf2dc), has not been looked at.
+- **`npx vitest run`:** 2696 passing. `npx tsc --noEmit` is clean.
 - **Full witness sweep:** not run since c5f3543. Only targeted witnesses have run since then.
   Ask the owner before running the full sweep (45 min).
 - **Review web page (the owner's copy):** https://claude.ai/artifact/HVH8Rs64ECjcEFCdso2iZY
