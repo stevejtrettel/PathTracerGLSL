@@ -24,19 +24,38 @@ export interface MeshAuthoring {
     closed?: boolean;
 }
 
-/** Area-weighted vertex normals from an indexed triangle soup (the cross product's magnitude
- *  IS twice the triangle area, so accumulating the raw cross weights by area for free). */
+/** Area-weighted normals, one per OUTPUT vertex of an indexed triangle list (the cross
+ *  product's magnitude is twice the triangle area, so summing raw cross products weights by
+ *  area). Output vertices are OBJ corners (`v/vt/vn` keys), so a position used both by corners
+ *  with a normal and by bare corners is several vertices, averaged separately. Where the
+ *  adjacent faces cancel exactly (back-to-back triangles) the sum is zero; such a vertex takes
+ *  its largest adjacent face's normal. A vertex only on zero-area faces gets +z: those faces are
+ *  never hit (the triangle test rejects them), so the value only has to be finite. */
 function computeVertexNormals(positions: Float32Array, indices: Uint32Array): Float32Array {
     const n = new Float32Array(positions.length);
+    const largest = new Float32Array(positions.length);   // the largest adjacent face's cross product
+    const largestLen = new Float32Array(positions.length / 3);
     for (let t = 0; t < indices.length; t += 3) {
         const ia = indices[t] * 3, ib = indices[t + 1] * 3, ic = indices[t + 2] * 3;
         const e1x = positions[ib] - positions[ia], e1y = positions[ib + 1] - positions[ia + 1], e1z = positions[ib + 2] - positions[ia + 2];
         const e2x = positions[ic] - positions[ia], e2y = positions[ic + 1] - positions[ia + 1], e2z = positions[ic + 2] - positions[ia + 2];
         const cx = e1y * e2z - e1z * e2y, cy = e1z * e2x - e1x * e2z, cz = e1x * e2y - e1y * e2x;
-        for (const i of [ia, ib, ic]) { n[i] += cx; n[i + 1] += cy; n[i + 2] += cz; }
+        const cl = Math.hypot(cx, cy, cz);
+        for (const i of [ia, ib, ic]) {
+            n[i] += cx; n[i + 1] += cy; n[i + 2] += cz;
+            if (cl > largestLen[i / 3]) {
+                largestLen[i / 3] = cl;
+                largest[i] = cx; largest[i + 1] = cy; largest[i + 2] = cz;
+            }
+        }
     }
     for (let i = 0; i < n.length; i += 3) {
-        const l = Math.hypot(n[i], n[i + 1], n[i + 2]) || 1;
+        let l = Math.hypot(n[i], n[i + 1], n[i + 2]);
+        if (l === 0) {
+            n[i] = largest[i]; n[i + 1] = largest[i + 1]; n[i + 2] = largest[i + 2];
+            l = largestLen[i / 3];
+        }
+        if (l === 0) { n[i] = 0; n[i + 1] = 0; n[i + 2] = 1; continue; }
         n[i] /= l; n[i + 1] /= l; n[i + 2] /= l;
     }
     return n;
@@ -126,7 +145,7 @@ export function parseOBJ(text: string, opts: MeshAuthoring): MeshObject {
     if (usedNormals) {
         mesh.normals = new Float32Array(outNrm);
         // Corners the file gave no normal (a file mixing `v//vn` and bare `v` faces) would
-        // interpolate a zero normal — NaN once normalized. Give them the area-weighted normal.
+        // interpolate a zero normal — NaN once normalized. Give them a synthesized normal.
         if (cornerHasNormal.includes(false)) {
             const synthesized = computeVertexNormals(mesh.positions, mesh.indices);
             cornerHasNormal.forEach((has, i) => {

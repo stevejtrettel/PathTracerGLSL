@@ -78,3 +78,17 @@ describe('parseOBJ — Sep 25 audit', () => {
         }
     });
 });
+
+describe('parseOBJ — synthesized normals where adjacent faces cancel', () => {
+    it('gives every vertex a finite unit normal (a face normal), never (0,0,0)', () => {
+        // Two triangles back to back on the same three vertices: their face normals sum to zero.
+        const m = parseOBJ('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nf 1 3 2\n', { material: 'm', smoothNormals: true });
+        const n = m.normals!;
+        for (let i = 0; i < n.length; i += 3) {
+            const len = Math.hypot(n[i], n[i + 1], n[i + 2]);
+            expect(len).toBeCloseTo(1, 6);
+            // One of the two faces' normals: ±z.
+            expect(Math.abs(n[i + 2])).toBeCloseTo(1, 6);
+        }
+    });
+});
