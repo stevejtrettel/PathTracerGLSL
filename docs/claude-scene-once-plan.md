@@ -101,6 +101,11 @@ CHANGELOG; the re-check confirmed batch 4's result.
 strategies, compiling them in reverse order gives each renderer the same output and the same
 GPU data plan. Today this tests the `plans[0]` premise; after step 2 it guards the shared placed
 scene. *Breakage:* a generator that appends to a plan array must fail it.
+*Done (step 1):* 91 suite scenes have two or more strategies; all pass, so the `plans[0]` premise
+holds across the suite today. The planned breakage cannot fail today, because each renderer still
+has its own plan; it is run after step 2. Two other breakages fail it now: a light's radiance
+doubled only under light-tree selection (3 scenes fail), and a generator counter kept between
+compiles (all 91 fail).
 
 **2. The split.** In Planner.ts:
 - `planScene(scene, bag)`: the scene half without addresses. Which batch instances are lights
