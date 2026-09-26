@@ -24,10 +24,12 @@ on:
         type: boolean
         default: false
 
-# A newer push to the same branch cancels the older run still in progress.
+# A newer push (or pull-request update) to the same branch cancels the older run still in
+# progress. A dispatched run — the witness sweep — is in its own group and is never cancelled
+# by a push, nor does starting one cancel a push's run.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
