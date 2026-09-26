@@ -6,7 +6,7 @@
 // seam 2). Null interfaces pass; EVERYTHING else — opaque and dielectric alike — blocks
 // (§6.3 v1 policy; transparent shadows are §10.2). Depends on: scene_intersect/scene_region_at
 // (intersection), material_of, material_has_medium/is_null_interface/medium_transmittance
-// (materials), ray_spawn (core).
+// (materials), ray_spawn (core), ambient_direction_to (ambient).
 //
 // CROSSING BUDGET (measurement.maxNullCrossings): the shadow ray is the last segment of a path,
 // and the measurement keeps paths with at most MAX_NULL_CROSSINGS null crossings in total.
@@ -21,7 +21,10 @@
 // ray_spawn offsets that accumulate across null-interface crossings (a decremented distance
 // would drift by one spawn offset per crossing until the area light's own surface blocked the
 // shadow ray). (length() is Euclidean; a geodesic-distance ambient helper is the curved-space
-// follow-up, like the straight-ray march itself.)
+// follow-up, like the straight-ray march itself.) Each re-spawn also RE-AIMS the ray at light_p:
+// the new origin sits h.eps past the boundary, and a ray that kept its direction would run
+// parallel to the segment it should test, shifted by that offset (one offset more per crossing),
+// and at a slant would meet the light's own surface before the back-off.
 
 Spectrum shadow_transmittance(Ray shadow_ray, Point light_p, int crossings_left) {
     Spectrum T = SPECTRUM_ONE;
@@ -53,6 +56,7 @@ Spectrum shadow_transmittance(Ray shadow_ray, Point light_p, int crossings_left)
         }
         medium = h.region_to;                                     // pass through the null interface
         seg_ray = ray_spawn(h, seg_ray.direction);                // far side by sign(dir·n)
+        seg_ray.direction = ambient_direction_to(seg_ray.origin, light_p);   // re-aimed at the light point
     }
     return SPECTRUM_ZERO;   // one more crossing than the path's budget: outside the measured set
 }

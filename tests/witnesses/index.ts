@@ -44,7 +44,7 @@ import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } fro
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
 import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
 import { nullBudgetViewScene, nullViewStrategies, NULL_VIEW_POSE, NULL_VIEW_THROUGH, nullBudgetScene, nullBudgetStrategies, NULL_BUDGET_POSE, SLABS } from './scenes/nullBudgetWitness.js';
-import { shadowAimMarch, shadowAimFar, shadowAimStrategies, AIM_OPEN, AIM_CAMERA_Y, AIM_FAR_X } from './scenes/shadowAimWitness.js';
+import { shadowAimMarch, shadowAimFar, shadowAimFog, shadowAimStrategies, AIM_OPEN, AIM_FOG, AIM_CAMERA_Y, AIM_FOG_CAMERA_Y, AIM_FAR_X } from './scenes/shadowAimWitness.js';
 import { tinySphereScene, tinySphereStrategy, TINY_SIZE, TINY_SPHERE_MEAN, tinySphereLightScene, tinySphereLightStrategy, TINY_LIGHT_CAMERA, TINY_LIGHT_REGION, TINY_LIGHT_MEAN, sunHazeScene, sunHazeStrategy, SUN_HAZE_CAMERA, SUN_HAZE_CENTER } from './scenes/precisionWitness.js';
 import { grinVacuum, grinVacuumRef, grinVacuumStrategy, grinFurnaceScene, grinFurnaceStrategy, grinGlass, grinGlassRef, grinGlassStrategy, grinFurnaceHardScene, grinFurnaceHardStrategy, grinEmit, grinEmitRef, grinEmitStrategy, grinFurnaceEmitScene, grinFurnaceEmitStrategy, grinScatter, grinScatterRef, grinScatterStrategy, grinFurnaceScatterScene, grinFurnaceScatterStrategy, grinLongScene, grinLongStrategy } from './scenes/grinWitness.js';
 import {
@@ -2149,6 +2149,20 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean', value: AIM_OPEN, tol: 0.015, strategy: 0, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'floor at x = 100, pt-nee' },
                 { kind: 'mean', value: AIM_OPEN, tol: 0.005, strategy: 1, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'floor at x = 100, pt-mis' },
                 { kind: 'mean', value: AIM_OPEN, tol: 0.005, strategy: 2, source: { tier: 'exact', from: 'ρ·Le·R²/(R²+h²), coaxial disk view factor' }, label: 'floor at x = 100, pt (control)' },
+            ],
+        },
+    },
+    'shadow-aim-fog': {
+        scene: shadowAimFog,
+        strategies: posed([0, AIM_FOG_CAMERA_Y, 0], [0, 0, 0], ...shadowAimStrategies),
+        exercises: 'the media shadow walker across two MARCHED null interfaces (a thin absorbing slab between the floor and a disk light): after each crossing the re-spawned ray must be aimed at the light point again',
+        expected: `keys 1/2/3 (pt-nee, pt-mis, pt) all read 2ρ·Le·∫u·e^{−τ/u}du = ${AIM_FOG.toFixed(5)}`,
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'mean', value: AIM_FOG, tol: 0.015, strategy: 0, source: { tier: 'exact', from: '2ρ·Le·∫_{u₀}^1 u·e^{−τ/u} du (Simpson)' }, label: 'fog slab, pt-nee' },
+                { kind: 'mean', value: AIM_FOG, tol: 0.005, strategy: 1, source: { tier: 'exact', from: '2ρ·Le·∫_{u₀}^1 u·e^{−τ/u} du (Simpson)' }, label: 'fog slab, pt-mis' },
+                { kind: 'mean', value: AIM_FOG, tol: 0.005, strategy: 2, source: { tier: 'exact', from: '2ρ·Le·∫_{u₀}^1 u·e^{−τ/u} du (Simpson)' }, label: 'fog slab, pt (control)' },
             ],
         },
     },

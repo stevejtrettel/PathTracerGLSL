@@ -153,7 +153,8 @@ float hg_pdf(Direction wi, Direction wo, MediumProperties mp) { return spectrum_
 > - **The signature.** A shadow ray is defined by its destination point, and it carries the
 >   path's remaining null-crossing budget: `shadow_transmittance(Ray shadow_ray, Point light_p,
 >   int crossings_left)` (trace-loop-contract.md). Each segment re-derives its far bound from the
->   fixed light point and re-spawns with `ray_spawn`; `scene_intersect_from` and `EPS_SHADOW` do
+>   fixed light point and re-spawns with `ray_spawn`, re-aimed at the light point
+>   (`ambient_direction_to`); `scene_intersect_from` and `EPS_SHADOW` do
 >   not exist.
 > - **The loop bound.** There is no separate `MAX_SHADOW_SEGMENTS`. A shadow ray is the last
 >   segment of a path, and `measurement.maxNullCrossings` limits the null crossings of the whole

@@ -13,7 +13,9 @@ The walk, per segment (as many as the path's remaining null-crossing budget allo
   seg_len)` — the generated seam-2 dispatch into the volume bodies; spectral, so
   chromatic media cast chromatic shadows;
 - at the boundary: **null interfaces pass** (medium handoff, `ray_spawn` re-spawn to
-  the far side); EVERYTHING else — opaque and dielectric alike — returns ZERO (the
+  the far side, then the direction re-aimed at the light point with `ambient_direction_to` —
+  kept, it would run parallel to the segment it should test, one spawn offset off per
+  crossing, and meet the light's own surface at a slant); EVERYTHING else — opaque and dielectric alike — returns ZERO (the
   `opaque-dielectrics` truncation, same ledger entry as the opaque form);
 - **crossing budget**: the shadow ray is the last segment of a path, and
   `measurement.maxNullCrossings` limits the null crossings of the whole path. The caller passes

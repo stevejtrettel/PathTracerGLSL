@@ -130,7 +130,8 @@ never mutated by intersection — it is a pure seed.
   own surface before the back-off — whenever ε·[(−n_g·n_l)/cos θ_l − cos θ] > `SHADOW_BACKOFF`
   (θ from the receiver's normal n_g, θ_l from the light's normal n_l). Only visibility uses the
   aimed direction; the BSDF, the cosine and the pdfs keep the sampled one (witnesses
-  `shadow-aim-march`, `shadow-aim-far`). The opaque fast path derives its `maxDist` from the point; the media walk measures
+  `shadow-aim-march`, `shadow-aim-far`). The media walk re-aims the same way at every null
+  crossing, where it re-spawns (`shadow-aim-fog`). The opaque fast path derives its `maxDist` from the point; the media walk measures
   `length(light_p − seg_ray.origin) − SHADOW_BACKOFF` per segment (the back-off's derivation —
   angle-amplified, never fp-relative — lives on the constant in core math). (length() is Euclidean; a geodesic
   ambient-distance helper is the curved-space follow-up, like the straight-ray march itself.)
