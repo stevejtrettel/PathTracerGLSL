@@ -444,20 +444,24 @@ export function validate(
         }
     }
 
-    // The bounce budget is spliced into the walk as an integer loop bound; anything but a
-    // non-negative integer would emit GLSL that fails to compile (or silently never loops).
+    // The bounce and null-crossing budgets are spliced into the generated walk as integer
+    // literals and counted with `<=` loops (`bounce <= N`; the shadow walker's
+    // `crossed <= left`), so a budget must be a non-negative integer that leaves room for one
+    // more increment in a 32-bit int: at most 2^31 − 2. Anything else emits GLSL that fails to
+    // compile or never terminates.
+    const maxLoopBudget = 2 ** 31 - 2;
+    const isLoopBudget = (v: unknown): boolean =>
+        typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= maxLoopBudget;
     const maxBounces = strategy.measurement.maxBounces;
-    if (typeof maxBounces !== 'number' || !Number.isInteger(maxBounces) || maxBounces < 0) {
+    if (!isLoopBudget(maxBounces)) {
         bag.error('invalid-setting',
-            `measurement.maxBounces must be a non-negative integer — the number of scattering events a path may have (got ${String(maxBounces)})`)
+            `measurement.maxBounces must be an integer from 0 to ${maxLoopBudget} — the number of scattering events a path may have (got ${String(maxBounces)})`)
             .add();
     }
-    // Spliced into the walk as MAX_NULL_CROSSINGS, the same integer-literal constraint.
     const maxNullCrossings = strategy.measurement.maxNullCrossings;
-    if (maxNullCrossings !== undefined
-        && (typeof maxNullCrossings !== 'number' || !Number.isInteger(maxNullCrossings) || maxNullCrossings < 0)) {
+    if (maxNullCrossings !== undefined && !isLoopBudget(maxNullCrossings)) {
         bag.error('invalid-setting',
-            `measurement.maxNullCrossings must be a non-negative integer — the number of null interfaces a path may cross, its shadow rays included (got ${String(maxNullCrossings)})`)
+            `measurement.maxNullCrossings must be an integer from 0 to ${maxLoopBudget} — the number of null interfaces a path may cross, its shadow rays included (got ${String(maxNullCrossings)})`)
             .add();
     }
 

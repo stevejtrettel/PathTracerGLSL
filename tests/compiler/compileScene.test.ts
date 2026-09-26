@@ -25,6 +25,10 @@ describe('compileScene', () => {
         expect(() => new Compiler().compileScene(scene, [strategy('a'), strategy('a')])).toThrow(/share the id 'a'/);
     });
 
+    it('rejects an empty strategy list with a diagnostic', () => {
+        expect(() => new Compiler().compileScene(scene, [])).toThrow(/at least one strategy/);
+    });
+
     it('returns the warnings of a successful compile, once each', () => {
         const compiled = new Compiler().compileScene(scene, [strategy('a', { aperture: 1 }), strategy('b', { aperture: 1 })]);
         const unknown = compiled.warnings.filter((w) => w.includes("unknown field 'aperture'"));

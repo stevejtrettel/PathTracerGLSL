@@ -180,7 +180,7 @@ describe('measurement.maxBounces', () => {
     it('must be a non-negative integer (it is spliced into the walk as an integer loop bound)', () => {
         const s = scene(10);
         for (const bad of [2.5, -1, Number.NaN]) {
-            expect(compileErrors(s, strategy({}, bad)).some((m) => /maxBounces must be a non-negative integer/.test(m)), `maxBounces ${bad}`).toBe(true);
+            expect(compileErrors(s, strategy({}, bad)).some((m) => /maxBounces must be an integer from 0 to/.test(m)), `maxBounces ${bad}`).toBe(true);
         }
         expect(compileErrors(s, strategy({}, 0))).toEqual([]);
     });

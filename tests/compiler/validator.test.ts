@@ -787,6 +787,16 @@ describe('Validator — Sep 25 audit gaps', () => {
         expect(run((_s, st) => { st.measurement.scattering = 'ignored'; }).hasErrors()).toBe(false);
     });
 
+    it('maxBounces and maxNullCrossings stay within what the generated loops can count to', () => {
+        // The walk loops `bounce <= N` and the shadow walker `crossed <= left`: N must leave room
+        // for one more increment inside a 32-bit int, so the largest value is 2^31 - 2.
+        const top = 2 ** 31 - 2;
+        expect(errs(run((_s, st) => { st.measurement.maxBounces = top + 1; }))).toMatch(/maxBounces/);
+        expect(errs(run((_s, st) => { st.measurement.maxNullCrossings = top + 1; }))).toMatch(/maxNullCrossings/);
+        expect(errs(run((_s, st) => { st.measurement.maxBounces = 1e21; }))).toMatch(/maxBounces/);
+        expect(run((_s, st) => { st.measurement.maxBounces = top; st.measurement.maxNullCrossings = top; }).hasErrors()).toBe(false);
+    });
+
     it('measurement.maxNullCrossings is a non-negative integer', () => {
         for (const bad of [2.5, -1, Number.NaN, '8']) {
             expect(errs(run((_s, st) => { (st.measurement as any).maxNullCrossings = bad; }))).toMatch(/maxNullCrossings/);

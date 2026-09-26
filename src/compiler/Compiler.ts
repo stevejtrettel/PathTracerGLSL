@@ -29,6 +29,12 @@ export class Compiler implements ICompiler {
         const warnings = new Set<string>();
         const keepWarnings = (bag: DiagnosticBag) => { for (const d of bag.getWarnings()) warnings.add(d.message); };
 
+        if (strategies.length === 0) {
+            const bag = new DiagnosticBag('compiler');
+            bag.error('missing-required', 'compileScene needs at least one strategy').add();
+            bag.throwIfErrors();
+        }
+
         // Renderer ids are `${strategy.id}-${scene.id}`: two strategies with one id would
         // silently overwrite each other's programs in the engine.
         const ids = strategies.map((s) => s.id);
