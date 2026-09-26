@@ -838,6 +838,19 @@ describe('Validator — Sep 25 audit gaps', () => {
         }
     });
 
+    it("a {param} fov's slider bounds must lie in (0, π), like its default", () => {
+        const fov = (f: object) => run((_s, st) => { st.measurement.camera = { type: 'pinhole', fov: { param: 'camera.fov', default: 0.8, ...f } } as RenderStrategy['measurement']['camera']; });
+        expect(errs(fov({ min: 0.3, max: 4 }))).toMatch(/'fov' slider max must be in \(0, 3.14159/);
+        expect(errs(fov({ min: 0, max: 1.5 }))).toMatch(/'fov' slider min must be in \(0, 3.14159/);
+        const ok = fov({ min: 0.3, max: 1.5 });
+        expect(ok.hasErrors()).toBe(false);
+        expect(ok.getWarnings().filter((w) => /'fov'/.test(w.message))).toHaveLength(0);
+        // No bounds: the panel shows a free number box, so the value is unchecked — a warning.
+        const free = fov({});
+        expect(free.hasErrors()).toBe(false);
+        expect(free.getWarnings().filter((w) => /'fov' is \{param\}-driven without slider bounds/.test(w.message))).toHaveLength(1);
+    });
+
     it('pinhole fov is radians in (0, π)', () => {
         expect(errs(run((_s, st) => { (st.measurement.camera as any).fov = 45; }))).toMatch(/fov/);
         expect(run((_s, st) => { (st.measurement.camera as any).fov = 1.2; }).hasErrors()).toBe(false);

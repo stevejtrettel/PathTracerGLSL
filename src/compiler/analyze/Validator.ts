@@ -815,6 +815,26 @@ export function validate(
                 const violation = constraintViolation(numeric as number | number[], p.constraint);
                 if (violation !== null) bag.error('invalid-setting', `measurement.camera (${cameraType}): '${p.name}' ${violation}`).add();
             }
+            // A {param} row's slider reaches its min and max, not just its default, so the row's
+            // constraint holds for both. Without both bounds the panel shows a free number box and
+            // the value is unchecked — a warning (as for a driven scale without a positive min).
+            if (p.constraint !== undefined && p.shape === 'value-number' && isValueParam(v)) {
+                const bounds = v as { min?: unknown; max?: unknown };
+                for (const [which, bound] of [['min', bounds.min], ['max', bounds.max]] as const) {
+                    if (bound === undefined) continue;
+                    const violation = typeof bound === 'number' && Number.isFinite(bound)
+                        ? constraintViolation(bound, p.constraint)
+                        : 'must be a finite number';
+                    if (violation !== null) {
+                        bag.error('invalid-setting', `measurement.camera (${cameraType}): '${p.name}' slider ${which} ${violation}`).add();
+                    }
+                }
+                if (bounds.min === undefined || bounds.max === undefined) {
+                    bag.warning('invalid-setting',
+                        `measurement.camera (${cameraType}): '${p.name}' is {param}-driven without slider bounds — the panel shows a free number box and a value outside the row's domain is not checked; declare min and max`)
+                        .add();
+                }
+            }
         }
         if (wellShaped && cameraModelDesc.validateAuthored !== undefined) {
             for (const message of cameraModelDesc.validateAuthored(authored)) {

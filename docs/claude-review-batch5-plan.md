@@ -85,9 +85,15 @@ recorded here and in the CHANGELOG.
 
 ## For the owner (not done here)
 
-1. **The fov slider range (item 9)** is a missing Validator rule: a `{param}` fov's `min`/`max`
-   must lie in (0, π). Precedent: the phase-g slider range (Validator.ts:420). It is production
-   code, so it needs your go-ahead.
+1. **The fov slider range (item 9)** — **approved Sep 26**, done as 5.10. The rule: a `{param}`
+   camera row's slider bounds (`min`, `max`) must satisfy the row's constraint, as its default
+   already must. Only `fov` on pinhole and thin-lens is such a row, with the open interval (0, π).
+   - Without both bounds the panel shows a free number box and the value is unchecked, so a
+     missing bound gets a warning (precedent: a driven scale without a positive `min` warns).
+   - Boundaries: the camera loop in Validator.ts, and validator.test.ts.
+   - Tests first; they fail today.
+   - All 20 slider-driven fovs in the suite declare bounds inside (0, π), so no scene gains a
+     diagnostic.
 2. **Tiled rendering (item 7)**: an automated pixel-identity check means teaching the witness
    runner to render a scene in tiles and compare it with a one-piece render. That is test
    infrastructure, but a new feature of the runner. Do it, or leave it as checked once by hand?
