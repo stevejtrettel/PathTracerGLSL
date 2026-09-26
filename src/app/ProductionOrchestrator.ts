@@ -152,6 +152,8 @@ export class ProductionOrchestrator {
 
     /** No production session is active or on display. */
     isIdle(): boolean { return this.phase === 'idle'; }
+    /** A finished production is on display (rendering stopped at its target). */
+    isSettled(): boolean { return this.phase === 'settled'; }
 
     /**
      * Restore the interactive view when leaving a production session. Idempotent —

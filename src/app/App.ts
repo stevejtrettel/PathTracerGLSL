@@ -41,6 +41,8 @@ export class App {
     private extensions: Map<string, Extension> = new Map();
     private layout: AppLayout | null = null;
     private production: ProductionOrchestrator;
+    // A WebGL context restore is re-registering textures (_restoreAfterContextLoss).
+    private restoring = false;
     private tiled: TiledRenderer;
     private errorOverlay: ErrorOverlay;
     // The parameter values the accumulated image was rendered with: taken whenever the
@@ -251,6 +253,9 @@ export class App {
         if (config === null) return;
         const wasRendering = this.coordinator.isRunning();
         if (wasRendering) this.coordinator.pause();
+        // Until the textures are registered again a frame would fail, so nothing may restart
+        // rendering in the awaits below (see refuseWhileRestoring).
+        this.restoring = true;
         try {
             const active = this.engine.getActiveRendererId();
             if (config.scene?.environment?.type === 'procedural') {
@@ -266,10 +271,18 @@ export class App {
             this.coordinator.resetAccumulation('WebGL context restored');
             console.log('Scene data, environment and parameters restored after WebGL context loss');
         } catch (error: any) {
-            this._showErrorOverlay(error);
+            console.error('Restoring after WebGL context loss failed:', error);
+            this._showErrorOverlay(error, 'context-lost');
             return;   // stay paused: the GPU state is incomplete
+        } finally {
+            this.restoring = false;
         }
-        if (wasRendering) this.coordinator.resume();
+        if (this.production.isSettled()) {
+            // A finished production's image was on the lost context: leave it for interactive.
+            this.start();
+        } else if (wasRendering && this.coordinator.isPaused()) {
+            this.coordinator.resume();
+        }
     }
 
     /**
@@ -388,19 +401,22 @@ export class App {
     }
 
     /**
-     * Extract a DiagnosticBag from a compilation or mapped shader error and show
-     * it in the full-screen overlay. No-op if the error carries no diagnostics.
+     * Show an error in the full-screen overlay: a compilation or mapped shader error with its
+     * diagnostics, or any other error as a one-entry bag under `code` (the overlay's only
+     * input is a DiagnosticBag).
      */
-    private _showErrorOverlay(error: any): void {
+    private _showErrorOverlay(error: any, code: string = 'invalid-state'): void {
         let bag: DiagnosticBag | undefined;
         if (error instanceof CompilationError) {
             bag = error.diagnostics;
         } else if (error?.__diagnostics) {
             bag = error.__diagnostics;
         }
-        if (bag) {
-            this.errorOverlay.show(bag);
+        if (bag === undefined) {
+            bag = new DiagnosticBag('runtime');
+            bag.error(code, error instanceof Error ? error.message : String(error)).add();
         }
+        this.errorOverlay.show(bag);
     }
 
     // -- Content Loading --
@@ -411,8 +427,11 @@ export class App {
      *  env NEE for a map of another resolution), and a context restore reloads THIS map. */
     async loadEnvironmentHDR(path: string): Promise<void> {
         if (this.config === null) throw new Error('loadEnvironmentHDR: call initialize() first');
-        this.config = { ...this.config, environmentHDR: path };
-        await this._loadImageEnvironment(this.config);
+        // Recorded only once the load succeeds: a context restore reloads config's map, so a
+        // failed path recorded here would make every later restore fail.
+        const config = { ...this.config, environmentHDR: path };
+        await this._loadImageEnvironment(config);
+        this.config = config;
         this.clearAccumulation();
     }
 
@@ -427,6 +446,7 @@ export class App {
     // -- Rendering: Interactive --
 
     start(): void {
+        if (this.refuseWhileRestoring('start')) return;
         // Leaving any production session (no-op if idle) restores layout/resolution
         // first, so the interactive loop runs at the restored size.
         this.production.exitProduction();
@@ -437,7 +457,16 @@ export class App {
         this.production.exitProduction();
     }
     pause(): void { this.coordinator.pause(); }
-    resume(): void { this.coordinator.resume(); }
+    resume(): void { if (!this.refuseWhileRestoring('resume')) this.coordinator.resume(); }
+
+    /** True (and logged) while a WebGL context restore is re-registering textures: a frame
+     *  rendered before they are back would fail, so start/resume/production requests are
+     *  refused until the restore finishes (it resumes by itself if it paused rendering). */
+    private refuseWhileRestoring(action: string): boolean {
+        if (!this.restoring) return false;
+        console.warn(`${action} ignored: the WebGL context is being restored`);
+        return true;
+    }
     isActive(): boolean { return this.coordinator.isRunning(); }
     isPaused(): boolean { return this.coordinator.isPaused(); }
     isLocked(): boolean { return this.parameterStore.isLocked(); }
@@ -445,10 +474,12 @@ export class App {
     // -- Rendering: Production --
 
     async renderProduction(targetSamples: number, options?: ProductionOptions): Promise<void> {
+        if (this.refuseWhileRestoring('renderProduction')) throw new Error('The WebGL context is being restored; try again when it is back');
         return this.production.renderProduction(targetSamples, options);
     }
 
     async extendProduction(additionalSamples: number): Promise<void> {
+        if (this.refuseWhileRestoring('extendProduction')) throw new Error('The WebGL context is being restored; try again when it is back');
         return this.production.extendProduction(additionalSamples);
     }
 
@@ -458,6 +489,7 @@ export class App {
      *  started meanwhile: after the last tile the files are still being written while the
      *  session is already idle, and a production started then must not be torn down. */
     async renderTiled(config: TiledRenderConfig): Promise<void> {
+        if (this.refuseWhileRestoring('renderTiled')) throw new Error('The WebGL context is being restored; try again when it is back');
         if (this.tiled.isActive()) throw new Error('A tiled render is already running');
         this.stop();
         try {
