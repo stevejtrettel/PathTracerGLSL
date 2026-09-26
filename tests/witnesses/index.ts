@@ -1293,6 +1293,9 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             checks: [
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'X-CORNELL nee ≡ mis' },
                 { kind: 'equality', strategies: [0, 2], meanTol: 0.02, rmse: 0.4, label: 'X-CORNELL pt tripwire' },
+                // 160×120 in tiles of 64: a 3×2 grid whose right column and bottom row are
+                // partial tiles.
+                { kind: 'tiled', tileSize: 64, label: 'tiled ≡ one piece (HDR and PNG)' },
             ],
         },
     },

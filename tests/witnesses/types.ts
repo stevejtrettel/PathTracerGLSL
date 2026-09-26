@@ -134,6 +134,22 @@ export type WitnessCheck =
           /** Untimed warmup frames (default 8). */
           warmup?: number;
           label?: string;
+      }
+    | {
+          /**
+           * Tiling does not change the image (app/TiledRenderer.ts, app/tiling.ts): a tiled
+           * render's saved HDR and PNG equal a one-piece render's at the same size, spp and
+           * pinned salt. The runner renders both in one page, catches the four downloads, and
+           * requires the HDR pixel bytes (after the header) and the PNG's decompressed image
+           * data to be identical (the stamps differ; the encoder is deterministic). Uses the
+           * spec's size and spp. `tileSize` (a multiple of 64, default 64) should leave partial
+           * tiles at the right and top edges.
+           */
+          kind: 'tiled';
+          /** Strategy index into `strategies` (default 0). */
+          strategy?: number;
+          tileSize?: number;
+          label?: string;
       };
 
 export interface WitnessSpec {

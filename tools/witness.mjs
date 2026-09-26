@@ -35,6 +35,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
 
 const BASE_URL = 'http://localhost:3000';
@@ -618,7 +619,102 @@ async function runCheck(browser, registry, sceneId, spec, check) {
         }
     }
 
+    if (check.kind === 'tiled') {
+        // Tiling must not change the image (app/TiledRenderer.ts, app/tiling.ts): the files a
+        // tiled render saves equal a one-piece render's at the same size, spp and pinned salt.
+        // Both run in one page and save through the app's own writers; the runner catches the
+        // downloads and compares the HDR pixel bytes (after the header) and the PNG's
+        // decompressed image data (the stamps differ by date; the encoder is deterministic, so
+        // equal pixels give equal bytes).
+        const entry = registry[sceneId];
+        const strategyId = entry.strategyIds[check.strategy ?? 0];
+        const [W, H] = size;
+        const tileSize = check.tileSize ?? 64;
+        const page = await browser.newPage();
+        const files = new Map();   // suggested filename → contents
+        const saving = [];
+        page.on('download', (d) => { saving.push(d.path().then((p) => files.set(d.suggestedFilename(), readFileSync(p)))); });
+        const named = (re) => [...files.keys()].find((k) => re.test(k));
+        const waitFor = async (have, what) => {
+            const t0 = Date.now();
+            for (;;) {
+                await Promise.all(saving);
+                if (have()) return;
+                if (Date.now() - t0 > 60_000) throw new Error(`tiled check: ${what} never arrived (have: ${[...files.keys()].join(', ') || 'none'})`);
+                await new Promise((r) => setTimeout(r, 200));
+            }
+        };
+        try {
+            await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}&witness`, { waitUntil: 'domcontentloaded' });
+            await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
+            const known = await page.evaluate(sid => sid in (window.sceneSuite ?? {}), sceneId);
+            if (!known) throw new Error(`scene '${sceneId}' not in the page's registry (stale dev server? restart it)`);
+            const t0 = Date.now();
+            await page.evaluate(async ([sid, w, h, n, tile, salt]) => {
+                const app = window.app;
+                app.stop();
+                app.pinResetSalt(salt);   // the tiled job keeps a pin that is already set
+                app.selectRendererByStrategy(sid);
+                await app.renderTiled({ width: w, height: h, spp: n, format: 'both', tileSize: tile });
+            }, [strategyId, W, H, spp, tileSize, WITNESS_SALT]);
+            await waitFor(() => named(/^render_.*\.hdr$/) && named(/^render_.*\.png$/), "the tiled render's files");
+            await page.evaluate(async ([w, h, n, salt]) => {
+                const app = window.app;
+                app.stop();
+                app.pinResetSalt(salt);
+                app.resize(w, h);
+                await app.renderProduction(n);
+                app.exportHDR('one-piece.hdr');
+                await app.exportPNG('one-piece.png');
+            }, [W, H, spp, WITNESS_SALT]);
+            await waitFor(() => files.has('one-piece.hdr') && files.has('one-piece.png'), "the one-piece render's files");
+            const secs = ((Date.now() - t0) / 1000).toFixed(1);
+            process.stdout.write(`  rendered ${sceneId} / ${strategyId} tiled (${tileSize}px) and in one piece @ ${W}×${H} ×${spp}spp (${secs}s)\n`);
+
+            const hdrTiled = hdrPixels(files.get(named(/^render_.*\.hdr$/)));
+            const hdrWhole = hdrPixels(files.get('one-piece.hdr'));
+            const pngTiled = pngImageData(files.get(named(/^render_.*\.png$/)));
+            const pngWhole = pngImageData(files.get('one-piece.png'));
+            const dHdr = differingBytes(hdrTiled, hdrWhole);
+            const dPng = differingBytes(pngTiled, pngWhole);
+            const tiles = `${Math.ceil(W / tileSize)}×${Math.ceil(H / tileSize)} tiles of ${tileSize}px`;
+            return {
+                sceneId, label, pass: dHdr === 0 && dPng === 0,
+                detail: `HDR ${dHdr} of ${hdrWhole.length} bytes differ, PNG ${dPng} of ${pngWhole.length} (${tiles})`,
+            };
+        } finally {
+            await page.close();
+        }
+    }
+
     return { sceneId, label, pass: false, detail: `unknown check kind '${check.kind}'` };
+}
+
+/** The pixel bytes of a Radiance .hdr the app wrote: everything after the resolution line
+ *  (the header's last line, file-export.ts hdrHeader). */
+function hdrPixels(buf) {
+    const m = /\n-Y \d+ \+X \d+\n/.exec(buf.toString('latin1'));
+    if (!m) throw new Error('not an HDR file written by the app (no resolution line)');
+    return buf.subarray(m.index + m[0].length);
+}
+
+/** A PNG's image data: its IDAT chunks concatenated and inflated (the filtered scanlines). */
+function pngImageData(buf) {
+    const idat = [];
+    for (let off = 8; off < buf.length;) {
+        const len = buf.readUInt32BE(off);
+        if (buf.toString('latin1', off + 4, off + 8) === 'IDAT') idat.push(buf.subarray(off + 8, off + 8 + len));
+        off += 12 + len;
+    }
+    return inflateSync(Buffer.concat(idat));
+}
+
+/** How many bytes differ (every byte, when the lengths differ). */
+function differingBytes(a, b) {
+    if (a.length !== b.length) return Math.max(a.length, b.length);
+    let n = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++;
+    return n;
 }
 
 // ---------------------------------------------------------------------------

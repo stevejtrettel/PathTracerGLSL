@@ -105,9 +105,11 @@ around all tiles).
 through `engine.imageSize`, tile offsets are multiples of 64 (the period of the display's
 blue-noise dither), and the job pins ONE RNG salt, recorded in the stamp. Rendering the same
 scene at the same size in one piece with that salt pinned (`app.pinResetSalt(salt)`) gives
-pixel-identical images (the files differ only in their stamps, which carry the date). This was
-checked once by hand in headless Chromium for the cornell camera family; no automated test
-checks it.
+pixel-identical images (the files differ only in their stamps, which carry the date). The
+witness check `kind: 'tiled'` (tests/witnesses/README.md) tests this on `cornell-area`
+(pinhole camera, 160×120 in a 3×2 grid of 64px tiles with partial edge tiles), comparing the
+HDR pixel bytes and the PNG image data. The other cameras of the cornell camera family were
+checked once by hand in headless Chromium.
 
 **Memory.** The stitched image is kept at 4 bytes per pixel per format (RGBE for HDR, RGBA
 for PNG): 133 MB each at 7680×4320. Both are allocated before the first tile, so a size the

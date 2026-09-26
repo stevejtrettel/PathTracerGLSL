@@ -194,7 +194,8 @@ How a program is assembled:
   filter; accumulators average / variance / oneshot; seven tonemaps.
 - Output: exports carry reproducibility stamps; `app.renderTiled` renders any size in tiles
   and saves one stitched HDR/PNG (pixel-identical to a one-piece render at the same salt;
-  checked once by hand in headless Chromium, not by an automated test).
+  the `cornell-area` witness checks this with a pinhole camera; other cameras were checked
+  once by hand).
 - Tooling: the witness runner, shader dumps, CI.
 
 **Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is

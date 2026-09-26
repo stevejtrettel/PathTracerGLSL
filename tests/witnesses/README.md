@@ -238,6 +238,19 @@ The runner pins `resetSalt` (`WITNESS_SALT` in tools/witness.mjs) for EVERY rend
   nothing at any other salt. Changing `WITNESS_SALT` re-rolls every pt tripwire —
   recalibrate them if you touch it.
 
+## Tiled checks
+
+`kind: 'tiled'` checks that tiling does not change the image. In one page, the runner
+renders the scene with `app.renderTiled` (HDR and PNG), then in one piece at the same
+size, spp and pinned salt, saved through `exportHDR`/`exportPNG`. It catches the four
+downloads and requires the HDR pixel bytes (everything after the resolution line) and
+the PNGs' inflated image data to be identical, byte for byte. The headers are not
+compared, since the stamps carry the date. `tileSize` (a multiple of 64, the blue-noise
+tile) should leave partial tiles at the right and bottom edges; `cornell-area` uses 64
+at 160×120, a 3×2 grid. The check reads files, not frames, so it is never cached. It can
+fail: with `renderTiles` not setting the tile's pixel offset, about 70% of the bytes
+differ.
+
 ## Perf checks (`--perf` mode)
 
 `kind: 'perf'` rows measure **ms per accumulation frame** and run ONLY under
