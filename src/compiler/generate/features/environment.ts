@@ -5,7 +5,8 @@
 // with a different body + resources:
 //   none     → black
 //   constant → baked (or {param}-driven) color * u_envIntensity
-//   image    → equirect lookup through the chart (env_equirect.glsl; T2). The radiance
+//   image    → the equirect map read through equirect_uv (components/env/equirect/
+//              equirect_map.glsl), whichever chart the sampler uses. The radiance
 //              texture arrives via `extern:env_map` — the app loads the .hdr into the
 //              engine registry; the executor binds it like any pass input (§2.10).
 //   procedural → T4 (bake-to-table); rejected with a diagnostic until then.
@@ -17,7 +18,7 @@ import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { formatSpectrum } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
-import { ENV_CHARTS } from '../../../components/env/index.js';
+import { ENV_CHARTS, EQUIRECT_MAP } from '../../../components/env/index.js';
 import envSamplerCdfGLSL from '../../../components/env/sampler_cdf.glsl?raw';
 
 const ORIGIN = 'generated:environment';
@@ -49,10 +50,11 @@ export function envVariantSuffix(chart: string, compensation: boolean): string {
     return (chart === 'octahedral' ? '_oct' : '') + (compensation ? '_comp' : '');
 }
 
-function chartBlock(chart: string) {
-    // From the chart registry (D3) — origin derived from the key.
+/** A chart's program blocks, from the chart registry (D3; origin derived from the key): the
+ *  files its GLSL calls into (`needs`), then the chart itself. */
+function chartBlocks(chart: string) {
     const d = ENV_CHARTS[chart];
-    return { origin: `components/env/${d.id}/${d.id}.glsl`, source: d.glsl };
+    return [...d.needs, { origin: `components/env/${d.id}/${d.id}.glsl`, source: d.glsl }];
 }
 
 /** Per-chart table dimensions live on separate parameter paths (they differ: W×H vs N×N). */
@@ -147,26 +149,22 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
             'env.rotation': { type: 'float', default: rotation, range: [-Math.PI, Math.PI], name: 'Env rotation', group: 'Environment', triggersReset: true },
         };
         // RADIANCE IS CHART-INDEPENDENT (D11: the integrand is held fixed across samplers):
-        // the map is equirect, so the lookup uses its own fixed equirect mapping — the
-        // swappable env_chart_* seam belongs exclusively to the SAMPLER below.
+        // the map is equirect, so the lookup reads it through the equirect mapping (equirect_uv)
+        // whichever chart the sampler uses — the swappable env_chart_* seam belongs to the
+        // SAMPLER below. The equirect chart needs the same file; it is included once, first.
         const blocks = [
-            { origin: ORIGIN, source: '// Fixed equirect map lookup (sampler-chart-independent)\n'
-                + 'vec2 env_map_uv(vec3 dir) {\n'
-                + '    vec3 n = normalize(dir);\n'
-                + '    return vec2((atan(n.z, n.x) + u_envRotation) * (1.0 / TWO_PI) + 0.5,\n'
-                + '                acos(clamp(n.y, -1.0, 1.0)) * (1.0 / PI));\n'
-                + '}\n'
-                + radianceFn('return texture(u_envMap, env_map_uv(dir)).rgb * u_envIntensity;') },
+            EQUIRECT_MAP,
+            { origin: ORIGIN, source: '// Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)\n'
+                + radianceFn('return texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity;') },
         ];
         const textures = [{ name: 'u_envMap', source: 'extern:env_map' }];
         if (samplable) {
             const { chart, compensation } = plan.program.estimator.envSampler;
             const suffix = envVariantSuffix(chart, compensation);
-            // env_rotate_y's only image-env caller is the octahedral chart (the equirect
-            // chart and the fixed map lookup apply u_envRotation inline).
-            blocks.unshift(chartBlock(chart));   // chart before radiance/sampler
+            // Chart files before the radiance/sampler, after the map (which they may need).
+            blocks.splice(1, 0, ...chartBlocks(chart).filter((b) => b.origin !== EQUIRECT_MAP.origin));
             if (chart === 'octahedral') {
-                blocks.unshift(ROTATE_BLOCK);        // rotate before its caller (the octahedral chart)
+                blocks.splice(1, 0, ROTATE_BLOCK);    // rotate before its caller (the octahedral chart)
                 uniforms.push(rotCsUniform(rotation));   // its matrix rotation ships u_envRotCS
             }
             blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: envSamplerCdfGLSL });
@@ -217,7 +215,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         const textures: FeatureContribution['textures'] = [];
         if (samplable) {
             const suffix = envVariantSuffix(chart, compensation);
-            blocks.splice(1, 0, chartBlock(chart));   // chart before radiance/sampler
+            blocks.splice(1, 0, ...chartBlocks(chart));   // chart (and the files it needs) before radiance/sampler
             blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: envSamplerCdfGLSL });
             textures.push(
                 { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },

@@ -2,26 +2,22 @@
 // Provides: env_chart_uv(), env_chart_dir(), env_texel_dOmega(). This file is the chart seam —
 // T5's octahedral chart is a drop-in replacement behind the same names. (Unlike octahedral,
 // this chart applies u_envRotation inline — it does not call the shared env_rotate_y block.)
+// Depends on: equirect_uv (equirect_map.glsl, which the chart descriptor's `needs` includes).
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
 // (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
-// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and is WRAPPED into
-// [0, 1) here. The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and
-// environment_pdf turns u into a CDF-table column index, so an unwrapped u would be clamped
-// to the edge column and the pdf would be read from the wrong column over a band of
-// longitudes as wide as the rotation (MIS weights then no longer sum to 1).
+// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
+// The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
+// which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
 // Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
 // by it; this file owns only the mapping.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
 vec2 env_chart_uv(vec3 dir) {
-    vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
-    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+    return equirect_uv(dir);
 }
 
 vec3 env_chart_dir(vec2 uv) {

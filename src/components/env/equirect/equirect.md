@@ -1,11 +1,15 @@
 # Equirect chart — what it computes and why
 
-The lat-long parametrization of direction space: `env_chart_uv(dir)` maps a direction
-to `(φ/2π + ½, θ/π)` with θ = acos(y) (v = 0 at the +Y pole); `env_chart_dir(uv)`
-inverts it. The chart Jacobian is dΩ ∝ sinθ — polar texels subtend less solid angle —
-so the CPU CDF builder weights rows by sinθ and the sampler's pdf divides it back out.
-This file owns ONLY the mapping; radiance bodies, CDF plumbing, and the two-stage
-selection live in the compiler's environment feature.
+The lat-long parametrization of direction space: `equirect_uv(dir)` (equirect_map.glsl)
+maps a direction to `(φ/2π + ½, θ/π)` with θ = acos(y) (v = 0 at the +Y pole), and the
+chart's `env_chart_uv` is that mapping; `env_chart_dir(uv)` (equirect.glsl) inverts it.
+The mapping has its own file because the image environment's radiance lookup reads its
+equirect map through it whichever chart the sampler uses; the chart registry's `needs`
+includes it wherever the equirect chart is. The chart Jacobian is dΩ ∝ sinθ — polar
+texels subtend less solid angle — so the CPU CDF builder weights rows by sinθ and the
+sampler's pdf divides it back out. This folder owns ONLY the mapping and the chart;
+radiance bodies, CDF plumbing, and the two-stage selection live in the compiler's
+environment feature.
 
 Two conventions that are load-bearing:
 

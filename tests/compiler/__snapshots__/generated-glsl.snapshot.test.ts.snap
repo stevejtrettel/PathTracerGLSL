@@ -59546,30 +59546,47 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
 vec3 env_rotate_cs(vec3 d, vec2 cs) {
     return vec3(cs.x * d.x - cs.y * d.z, d.y, cs.y * d.x + cs.x * d.z);
 }
+// The equirect mapping of direction space: direction → (u, v) = (φ/2π + ½, θ/π), θ = acos(y)
+// (v = 0 at the +Y pole), with the azimuth rotation u_envRotation ADDED and u WRAPPED into
+// [0, 1). Its inverse, which SUBTRACTS the rotation, is env_chart_dir (equirect.glsl).
+// Two readers: the equirect chart (env_chart_uv — the sampler's table coordinates) and the image
+// environment's radiance lookup, which reads its equirect map through this mapping whichever
+// chart the sampler uses.
+// The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and environment_pdf
+// turns u into a CDF-table column index, so an unwrapped u would be clamped to the edge column
+// and the pdf read from the wrong column over a band of longitudes as wide as the rotation. (The
+// radiance lookup would survive an unwrapped u: the map texture repeats horizontally.)
+// METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
+// the environment lives on direction-space S², not in scene space (§5.3).
+// Provides: equirect_uv().
+
+vec2 equirect_uv(vec3 dir) {
+    vec3 n = normalize(dir);
+    float phi = atan(n.z, n.x) + u_envRotation;
+    float theta = acos(clamp(n.y, -1.0, 1.0));
+    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+}
+
 // Equirect environment CHART (env-as-light D11: a sampler = a chart × a weight policy).
 // Provides: env_chart_uv(), env_chart_dir(), env_texel_dOmega(). This file is the chart seam —
 // T5's octahedral chart is a drop-in replacement behind the same names. (Unlike octahedral,
 // this chart applies u_envRotation inline — it does not call the shared env_rotate_y block.)
+// Depends on: equirect_uv (equirect_map.glsl, which the chart descriptor's \`needs\` includes).
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
 // (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
-// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and is WRAPPED into
-// [0, 1) here. The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and
-// environment_pdf turns u into a CDF-table column index, so an unwrapped u would be clamped
-// to the edge column and the pdf would be read from the wrong column over a band of
-// longitudes as wide as the rotation (MIS weights then no longer sum to 1).
+// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
+// The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
+// which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
 // Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
 // by it; this file owns only the mapping.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
 vec2 env_chart_uv(vec3 dir) {
-    vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
-    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+    return equirect_uv(dir);
 }
 
 vec3 env_chart_dir(vec2 uv) {
@@ -60069,79 +60086,84 @@ void main() {
         "startLine": 848,
       },
       {
-        "endLine": 891,
-        "origin": "components/env/equirect/equirect.glsl",
+        "endLine": 872,
+        "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 852,
       },
       {
-        "endLine": 896,
+        "endLine": 908,
+        "origin": "components/env/equirect/equirect.glsl",
+        "startLine": 873,
+      },
+      {
+        "endLine": 913,
         "origin": "generated:environment",
-        "startLine": 892,
+        "startLine": 909,
       },
       {
-        "endLine": 980,
+        "endLine": 997,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 897,
+        "startLine": 914,
       },
       {
-        "endLine": 987,
+        "endLine": 1004,
         "origin": "generated:transport/light-query",
-        "startLine": 981,
+        "startLine": 998,
       },
       {
-        "endLine": 1010,
+        "endLine": 1027,
         "origin": "generated:transport/state",
-        "startLine": 988,
+        "startLine": 1005,
       },
       {
-        "endLine": 1024,
+        "endLine": 1041,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 1011,
+        "startLine": 1028,
       },
       {
-        "endLine": 1038,
+        "endLine": 1055,
         "origin": "generated:transport/combiner",
-        "startLine": 1025,
+        "startLine": 1042,
       },
       {
-        "endLine": 1046,
+        "endLine": 1063,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1039,
+        "startLine": 1056,
       },
       {
-        "endLine": 1054,
+        "endLine": 1071,
         "origin": "generated:transport/roulette",
-        "startLine": 1047,
+        "startLine": 1064,
       },
       {
-        "endLine": 1058,
+        "endLine": 1075,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1055,
+        "startLine": 1072,
       },
       {
-        "endLine": 1093,
+        "endLine": 1110,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1059,
+        "startLine": 1076,
       },
       {
-        "endLine": 1122,
+        "endLine": 1139,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1094,
+        "startLine": 1111,
       },
       {
-        "endLine": 1149,
+        "endLine": 1166,
         "origin": "generated:transport/walk",
-        "startLine": 1123,
+        "startLine": 1140,
       },
       {
-        "endLine": 1150,
+        "endLine": 1167,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1150,
+        "startLine": 1167,
       },
       {
-        "endLine": 1177,
+        "endLine": 1194,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1151,
+        "startLine": 1168,
       },
     ],
   },
@@ -61305,30 +61327,47 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
 vec3 env_rotate_cs(vec3 d, vec2 cs) {
     return vec3(cs.x * d.x - cs.y * d.z, d.y, cs.y * d.x + cs.x * d.z);
 }
+// The equirect mapping of direction space: direction → (u, v) = (φ/2π + ½, θ/π), θ = acos(y)
+// (v = 0 at the +Y pole), with the azimuth rotation u_envRotation ADDED and u WRAPPED into
+// [0, 1). Its inverse, which SUBTRACTS the rotation, is env_chart_dir (equirect.glsl).
+// Two readers: the equirect chart (env_chart_uv — the sampler's table coordinates) and the image
+// environment's radiance lookup, which reads its equirect map through this mapping whichever
+// chart the sampler uses.
+// The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and environment_pdf
+// turns u into a CDF-table column index, so an unwrapped u would be clamped to the edge column
+// and the pdf read from the wrong column over a band of longitudes as wide as the rotation. (The
+// radiance lookup would survive an unwrapped u: the map texture repeats horizontally.)
+// METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
+// the environment lives on direction-space S², not in scene space (§5.3).
+// Provides: equirect_uv().
+
+vec2 equirect_uv(vec3 dir) {
+    vec3 n = normalize(dir);
+    float phi = atan(n.z, n.x) + u_envRotation;
+    float theta = acos(clamp(n.y, -1.0, 1.0));
+    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+}
+
 // Equirect environment CHART (env-as-light D11: a sampler = a chart × a weight policy).
 // Provides: env_chart_uv(), env_chart_dir(), env_texel_dOmega(). This file is the chart seam —
 // T5's octahedral chart is a drop-in replacement behind the same names. (Unlike octahedral,
 // this chart applies u_envRotation inline — it does not call the shared env_rotate_y block.)
+// Depends on: equirect_uv (equirect_map.glsl, which the chart descriptor's \`needs\` includes).
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
 // (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
-// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and is WRAPPED into
-// [0, 1) here. The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and
-// environment_pdf turns u into a CDF-table column index, so an unwrapped u would be clamped
-// to the edge column and the pdf would be read from the wrong column over a band of
-// longitudes as wide as the rotation (MIS weights then no longer sum to 1).
+// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
+// The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
+// which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
 // Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
 // by it; this file owns only the mapping.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
 vec2 env_chart_uv(vec3 dir) {
-    vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
-    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+    return equirect_uv(dir);
 }
 
 vec3 env_chart_dir(vec2 uv) {
@@ -61805,74 +61844,79 @@ void main() {
         "startLine": 843,
       },
       {
-        "endLine": 886,
-        "origin": "components/env/equirect/equirect.glsl",
+        "endLine": 867,
+        "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 847,
       },
       {
-        "endLine": 891,
+        "endLine": 903,
+        "origin": "components/env/equirect/equirect.glsl",
+        "startLine": 868,
+      },
+      {
+        "endLine": 908,
         "origin": "generated:environment",
-        "startLine": 887,
+        "startLine": 904,
       },
       {
-        "endLine": 975,
+        "endLine": 992,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 892,
+        "startLine": 909,
       },
       {
-        "endLine": 982,
+        "endLine": 999,
         "origin": "generated:transport/light-query",
-        "startLine": 976,
+        "startLine": 993,
       },
       {
-        "endLine": 1000,
+        "endLine": 1017,
         "origin": "generated:transport/state",
-        "startLine": 983,
+        "startLine": 1000,
       },
       {
-        "endLine": 1012,
+        "endLine": 1029,
         "origin": "generated:transport/combiner",
-        "startLine": 1001,
+        "startLine": 1018,
       },
       {
-        "endLine": 1018,
+        "endLine": 1035,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1013,
+        "startLine": 1030,
       },
       {
-        "endLine": 1026,
+        "endLine": 1043,
         "origin": "generated:transport/roulette",
-        "startLine": 1019,
+        "startLine": 1036,
       },
       {
-        "endLine": 1030,
+        "endLine": 1047,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1027,
+        "startLine": 1044,
       },
       {
-        "endLine": 1065,
+        "endLine": 1082,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1031,
+        "startLine": 1048,
       },
       {
-        "endLine": 1094,
+        "endLine": 1111,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1066,
+        "startLine": 1083,
       },
       {
-        "endLine": 1121,
+        "endLine": 1138,
         "origin": "generated:transport/walk",
-        "startLine": 1095,
+        "startLine": 1112,
       },
       {
-        "endLine": 1122,
+        "endLine": 1139,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1122,
+        "startLine": 1139,
       },
       {
-        "endLine": 1149,
+        "endLine": 1166,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1123,
+        "startLine": 1140,
       },
     ],
   },
@@ -65056,15 +65100,31 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     return make_ray(u_cameraPosition, dir);   // unbounded ahead; the far clip (MAX_DIST) is the query's concern
 }
 
-// Fixed equirect map lookup (sampler-chart-independent)
-vec2 env_map_uv(vec3 dir) {
+// The equirect mapping of direction space: direction → (u, v) = (φ/2π + ½, θ/π), θ = acos(y)
+// (v = 0 at the +Y pole), with the azimuth rotation u_envRotation ADDED and u WRAPPED into
+// [0, 1). Its inverse, which SUBTRACTS the rotation, is env_chart_dir (equirect.glsl).
+// Two readers: the equirect chart (env_chart_uv — the sampler's table coordinates) and the image
+// environment's radiance lookup, which reads its equirect map through this mapping whichever
+// chart the sampler uses.
+// The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and environment_pdf
+// turns u into a CDF-table column index, so an unwrapped u would be clamped to the edge column
+// and the pdf read from the wrong column over a band of longitudes as wide as the rotation. (The
+// radiance lookup would survive an unwrapped u: the map texture repeats horizontally.)
+// METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
+// the environment lives on direction-space S², not in scene space (§5.3).
+// Provides: equirect_uv().
+
+vec2 equirect_uv(vec3 dir) {
     vec3 n = normalize(dir);
-    return vec2((atan(n.z, n.x) + u_envRotation) * (1.0 / TWO_PI) + 0.5,
-                acos(clamp(n.y, -1.0, 1.0)) * (1.0 / PI));
+    float phi = atan(n.z, n.x) + u_envRotation;
+    float theta = acos(clamp(n.y, -1.0, 1.0));
+    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
 }
+
+// Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)
 // Environment radiance
 vec3 environment_radiance(vec3 dir) {
-    return texture(u_envMap, env_map_uv(dir)).rgb * u_envIntensity;
+    return texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity;
 }
 // ── Light-query constructors (generated policy — fable-light-bvh §3.2) ──
 LightQuery light_query_surface(int mat, Hit hit) {
@@ -65378,54 +65438,59 @@ void main() {
         "startLine": 768,
       },
       {
-        "endLine": 796,
-        "origin": "generated:environment",
+        "endLine": 807,
+        "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 787,
       },
       {
-        "endLine": 803,
+        "endLine": 812,
+        "origin": "generated:environment",
+        "startLine": 808,
+      },
+      {
+        "endLine": 819,
         "origin": "generated:transport/light-query",
-        "startLine": 797,
+        "startLine": 813,
       },
       {
-        "endLine": 821,
+        "endLine": 837,
         "origin": "generated:transport/state",
-        "startLine": 804,
+        "startLine": 820,
       },
       {
-        "endLine": 828,
+        "endLine": 844,
         "origin": "generated:transport/combiner",
-        "startLine": 822,
+        "startLine": 838,
       },
       {
-        "endLine": 834,
+        "endLine": 850,
         "origin": "generated:transport/kernel-record",
-        "startLine": 829,
+        "startLine": 845,
       },
       {
-        "endLine": 842,
+        "endLine": 858,
         "origin": "generated:transport/roulette",
-        "startLine": 835,
+        "startLine": 851,
       },
       {
-        "endLine": 877,
+        "endLine": 893,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 843,
+        "startLine": 859,
       },
       {
-        "endLine": 903,
+        "endLine": 919,
         "origin": "generated:transport/walk",
-        "startLine": 878,
+        "startLine": 894,
       },
       {
-        "endLine": 904,
+        "endLine": 920,
         "origin": "generated:accumulation-inputs",
-        "startLine": 904,
+        "startLine": 920,
       },
       {
-        "endLine": 931,
+        "endLine": 947,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 905,
+        "startLine": 921,
       },
     ],
   },
@@ -66578,6 +66643,27 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     return make_ray(u_cameraPosition, dir);   // unbounded ahead; the far clip (MAX_DIST) is the query's concern
 }
 
+// The equirect mapping of direction space: direction → (u, v) = (φ/2π + ½, θ/π), θ = acos(y)
+// (v = 0 at the +Y pole), with the azimuth rotation u_envRotation ADDED and u WRAPPED into
+// [0, 1). Its inverse, which SUBTRACTS the rotation, is env_chart_dir (equirect.glsl).
+// Two readers: the equirect chart (env_chart_uv — the sampler's table coordinates) and the image
+// environment's radiance lookup, which reads its equirect map through this mapping whichever
+// chart the sampler uses.
+// The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and environment_pdf
+// turns u into a CDF-table column index, so an unwrapped u would be clamped to the edge column
+// and the pdf read from the wrong column over a band of longitudes as wide as the rotation. (The
+// radiance lookup would survive an unwrapped u: the map texture repeats horizontally.)
+// METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
+// the environment lives on direction-space S², not in scene space (§5.3).
+// Provides: equirect_uv().
+
+vec2 equirect_uv(vec3 dir) {
+    vec3 n = normalize(dir);
+    float phi = atan(n.z, n.x) + u_envRotation;
+    float theta = acos(clamp(n.y, -1.0, 1.0));
+    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+}
+
 // Azimuth rotation, cs = (cos a, sin a) shipped as u_envRotCS (negate .y for −a)
 vec3 env_rotate_cs(vec3 d, vec2 cs) {
     return vec3(cs.x * d.x - cs.y * d.z, d.y, cs.y * d.x + cs.x * d.z);
@@ -66648,15 +66734,10 @@ vec2 env_chart_uv(vec3 dir) {
     return vec2((uu + 1.0) * 0.5, (vv + 1.0) * 0.5);
 }
 
-// Fixed equirect map lookup (sampler-chart-independent)
-vec2 env_map_uv(vec3 dir) {
-    vec3 n = normalize(dir);
-    return vec2((atan(n.z, n.x) + u_envRotation) * (1.0 / TWO_PI) + 0.5,
-                acos(clamp(n.y, -1.0, 1.0)) * (1.0 / PI));
-}
+// Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)
 // Environment radiance
 vec3 environment_radiance(vec3 dir) {
-    return texture(u_envMap, env_map_uv(dir)).rgb * u_envIntensity;
+    return texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity;
 }
 // Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
 // Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
@@ -67131,84 +67212,89 @@ void main() {
         "startLine": 830,
       },
       {
-        "endLine": 852,
-        "origin": "generated:env-rotate",
+        "endLine": 869,
+        "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 849,
       },
       {
-        "endLine": 918,
+        "endLine": 873,
+        "origin": "generated:env-rotate",
+        "startLine": 870,
+      },
+      {
+        "endLine": 939,
         "origin": "components/env/octahedral/octahedral.glsl",
-        "startLine": 853,
+        "startLine": 874,
       },
       {
-        "endLine": 928,
+        "endLine": 944,
         "origin": "generated:environment",
-        "startLine": 919,
+        "startLine": 940,
       },
       {
-        "endLine": 1012,
+        "endLine": 1028,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 929,
+        "startLine": 945,
       },
       {
-        "endLine": 1019,
+        "endLine": 1035,
         "origin": "generated:transport/light-query",
-        "startLine": 1013,
+        "startLine": 1029,
       },
       {
-        "endLine": 1042,
+        "endLine": 1058,
         "origin": "generated:transport/state",
-        "startLine": 1020,
+        "startLine": 1036,
       },
       {
-        "endLine": 1056,
+        "endLine": 1072,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 1043,
-      },
-      {
-        "endLine": 1070,
-        "origin": "generated:transport/combiner",
-        "startLine": 1057,
-      },
-      {
-        "endLine": 1078,
-        "origin": "generated:transport/kernel-record",
-        "startLine": 1071,
+        "startLine": 1059,
       },
       {
         "endLine": 1086,
-        "origin": "generated:transport/roulette",
-        "startLine": 1079,
+        "origin": "generated:transport/combiner",
+        "startLine": 1073,
       },
       {
-        "endLine": 1090,
-        "origin": "generated:transport/shadow-crossings",
+        "endLine": 1094,
+        "origin": "generated:transport/kernel-record",
         "startLine": 1087,
       },
       {
-        "endLine": 1125,
+        "endLine": 1102,
+        "origin": "generated:transport/roulette",
+        "startLine": 1095,
+      },
+      {
+        "endLine": 1106,
+        "origin": "generated:transport/shadow-crossings",
+        "startLine": 1103,
+      },
+      {
+        "endLine": 1141,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1091,
+        "startLine": 1107,
       },
       {
-        "endLine": 1154,
+        "endLine": 1170,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1126,
+        "startLine": 1142,
       },
       {
-        "endLine": 1181,
+        "endLine": 1197,
         "origin": "generated:transport/walk",
-        "startLine": 1155,
+        "startLine": 1171,
       },
       {
-        "endLine": 1182,
+        "endLine": 1198,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1182,
+        "startLine": 1198,
       },
       {
-        "endLine": 1209,
+        "endLine": 1225,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1183,
+        "startLine": 1199,
       },
     ],
   },
@@ -68369,30 +68455,47 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     return make_ray(u_cameraPosition, dir);   // unbounded ahead; the far clip (MAX_DIST) is the query's concern
 }
 
+// The equirect mapping of direction space: direction → (u, v) = (φ/2π + ½, θ/π), θ = acos(y)
+// (v = 0 at the +Y pole), with the azimuth rotation u_envRotation ADDED and u WRAPPED into
+// [0, 1). Its inverse, which SUBTRACTS the rotation, is env_chart_dir (equirect.glsl).
+// Two readers: the equirect chart (env_chart_uv — the sampler's table coordinates) and the image
+// environment's radiance lookup, which reads its equirect map through this mapping whichever
+// chart the sampler uses.
+// The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and environment_pdf
+// turns u into a CDF-table column index, so an unwrapped u would be clamped to the edge column
+// and the pdf read from the wrong column over a band of longitudes as wide as the rotation. (The
+// radiance lookup would survive an unwrapped u: the map texture repeats horizontally.)
+// METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
+// the environment lives on direction-space S², not in scene space (§5.3).
+// Provides: equirect_uv().
+
+vec2 equirect_uv(vec3 dir) {
+    vec3 n = normalize(dir);
+    float phi = atan(n.z, n.x) + u_envRotation;
+    float theta = acos(clamp(n.y, -1.0, 1.0));
+    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+}
+
 // Equirect environment CHART (env-as-light D11: a sampler = a chart × a weight policy).
 // Provides: env_chart_uv(), env_chart_dir(), env_texel_dOmega(). This file is the chart seam —
 // T5's octahedral chart is a drop-in replacement behind the same names. (Unlike octahedral,
 // this chart applies u_envRotation inline — it does not call the shared env_rotate_y block.)
+// Depends on: equirect_uv (equirect_map.glsl, which the chart descriptor's \`needs\` includes).
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
 // (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
-// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and is WRAPPED into
-// [0, 1) here. The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and
-// environment_pdf turns u into a CDF-table column index, so an unwrapped u would be clamped
-// to the edge column and the pdf would be read from the wrong column over a band of
-// longitudes as wide as the rotation (MIS weights then no longer sum to 1).
+// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
+// The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
+// which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
 // Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
 // by it; this file owns only the mapping.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
 vec2 env_chart_uv(vec3 dir) {
-    vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
-    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+    return equirect_uv(dir);
 }
 
 vec3 env_chart_dir(vec2 uv) {
@@ -68409,15 +68512,10 @@ float env_texel_dOmega(int j, ivec2 sz) {
     return (TWO_PI / float(sz.x)) * (PI / float(sz.y)) * max(1.0e-6, sin(theta));
 }
 
-// Fixed equirect map lookup (sampler-chart-independent)
-vec2 env_map_uv(vec3 dir) {
-    vec3 n = normalize(dir);
-    return vec2((atan(n.z, n.x) + u_envRotation) * (1.0 / TWO_PI) + 0.5,
-                acos(clamp(n.y, -1.0, 1.0)) * (1.0 / PI));
-}
+// Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)
 // Environment radiance
 vec3 environment_radiance(vec3 dir) {
-    return texture(u_envMap, env_map_uv(dir)).rgb * u_envIntensity;
+    return texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity;
 }
 // Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
 // Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
@@ -68869,74 +68967,79 @@ void main() {
         "startLine": 824,
       },
       {
-        "endLine": 882,
-        "origin": "components/env/equirect/equirect.glsl",
+        "endLine": 863,
+        "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 843,
       },
       {
-        "endLine": 892,
+        "endLine": 899,
+        "origin": "components/env/equirect/equirect.glsl",
+        "startLine": 864,
+      },
+      {
+        "endLine": 904,
         "origin": "generated:environment",
-        "startLine": 883,
+        "startLine": 900,
       },
       {
-        "endLine": 976,
+        "endLine": 988,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 893,
+        "startLine": 905,
       },
       {
-        "endLine": 983,
+        "endLine": 995,
         "origin": "generated:transport/light-query",
-        "startLine": 977,
-      },
-      {
-        "endLine": 1001,
-        "origin": "generated:transport/state",
-        "startLine": 984,
+        "startLine": 989,
       },
       {
         "endLine": 1013,
-        "origin": "generated:transport/combiner",
-        "startLine": 1002,
+        "origin": "generated:transport/state",
+        "startLine": 996,
       },
       {
-        "endLine": 1019,
-        "origin": "generated:transport/kernel-record",
+        "endLine": 1025,
+        "origin": "generated:transport/combiner",
         "startLine": 1014,
       },
       {
-        "endLine": 1027,
-        "origin": "generated:transport/roulette",
-        "startLine": 1020,
-      },
-      {
         "endLine": 1031,
-        "origin": "generated:transport/shadow-crossings",
-        "startLine": 1028,
+        "origin": "generated:transport/kernel-record",
+        "startLine": 1026,
       },
       {
-        "endLine": 1066,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "endLine": 1039,
+        "origin": "generated:transport/roulette",
         "startLine": 1032,
       },
       {
-        "endLine": 1095,
+        "endLine": 1043,
+        "origin": "generated:transport/shadow-crossings",
+        "startLine": 1040,
+      },
+      {
+        "endLine": 1078,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 1044,
+      },
+      {
+        "endLine": 1107,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1067,
+        "startLine": 1079,
       },
       {
-        "endLine": 1122,
+        "endLine": 1134,
         "origin": "generated:transport/walk",
-        "startLine": 1096,
+        "startLine": 1108,
       },
       {
-        "endLine": 1123,
+        "endLine": 1135,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1123,
+        "startLine": 1135,
       },
       {
-        "endLine": 1150,
+        "endLine": 1162,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1124,
+        "startLine": 1136,
       },
     ],
   },
@@ -70257,30 +70360,47 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     return make_ray(u_cameraPosition, dir);   // unbounded ahead; the far clip (MAX_DIST) is the query's concern
 }
 
+// The equirect mapping of direction space: direction → (u, v) = (φ/2π + ½, θ/π), θ = acos(y)
+// (v = 0 at the +Y pole), with the azimuth rotation u_envRotation ADDED and u WRAPPED into
+// [0, 1). Its inverse, which SUBTRACTS the rotation, is env_chart_dir (equirect.glsl).
+// Two readers: the equirect chart (env_chart_uv — the sampler's table coordinates) and the image
+// environment's radiance lookup, which reads its equirect map through this mapping whichever
+// chart the sampler uses.
+// The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and environment_pdf
+// turns u into a CDF-table column index, so an unwrapped u would be clamped to the edge column
+// and the pdf read from the wrong column over a band of longitudes as wide as the rotation. (The
+// radiance lookup would survive an unwrapped u: the map texture repeats horizontally.)
+// METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
+// the environment lives on direction-space S², not in scene space (§5.3).
+// Provides: equirect_uv().
+
+vec2 equirect_uv(vec3 dir) {
+    vec3 n = normalize(dir);
+    float phi = atan(n.z, n.x) + u_envRotation;
+    float theta = acos(clamp(n.y, -1.0, 1.0));
+    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+}
+
 // Equirect environment CHART (env-as-light D11: a sampler = a chart × a weight policy).
 // Provides: env_chart_uv(), env_chart_dir(), env_texel_dOmega(). This file is the chart seam —
 // T5's octahedral chart is a drop-in replacement behind the same names. (Unlike octahedral,
 // this chart applies u_envRotation inline — it does not call the shared env_rotate_y block.)
+// Depends on: equirect_uv (equirect_map.glsl, which the chart descriptor's \`needs\` includes).
 //
 // ROTATION SIGN: env_chart_uv ADDS the rotation, env_chart_dir SUBTRACTS it — the pair must
 // be exact inverses or sample↔pdf and sample↔radiance silently disagree whenever rotation ≠ 0.
 // (An earlier reference implementation had them BOTH adding — env-plan pitfall 1. Do not "fix"
 // the asymmetry back.)
-// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and is WRAPPED into
-// [0, 1) here. The wrap is required, not cosmetic: the rotation shifts u by up to ±½, and
-// environment_pdf turns u into a CDF-table column index, so an unwrapped u would be clamped
-// to the edge column and the pdf would be read from the wrong column over a band of
-// longitudes as wide as the rotation (MIS weights then no longer sum to 1).
+// Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
+// The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
+// which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
 // Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
 // by it; this file owns only the mapping.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
 vec2 env_chart_uv(vec3 dir) {
-    vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
-    return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
+    return equirect_uv(dir);
 }
 
 vec3 env_chart_dir(vec2 uv) {
@@ -70297,15 +70417,10 @@ float env_texel_dOmega(int j, ivec2 sz) {
     return (TWO_PI / float(sz.x)) * (PI / float(sz.y)) * max(1.0e-6, sin(theta));
 }
 
-// Fixed equirect map lookup (sampler-chart-independent)
-vec2 env_map_uv(vec3 dir) {
-    vec3 n = normalize(dir);
-    return vec2((atan(n.z, n.x) + u_envRotation) * (1.0 / TWO_PI) + 0.5,
-                acos(clamp(n.y, -1.0, 1.0)) * (1.0 / PI));
-}
+// Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)
 // Environment radiance
 vec3 environment_radiance(vec3 dir) {
-    return texture(u_envMap, env_map_uv(dir)).rgb * u_envIntensity;
+    return texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity;
 }
 // Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
 // Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
@@ -70815,79 +70930,84 @@ void main() {
         "startLine": 991,
       },
       {
-        "endLine": 1049,
-        "origin": "components/env/equirect/equirect.glsl",
+        "endLine": 1030,
+        "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 1010,
       },
       {
-        "endLine": 1059,
+        "endLine": 1066,
+        "origin": "components/env/equirect/equirect.glsl",
+        "startLine": 1031,
+      },
+      {
+        "endLine": 1071,
         "origin": "generated:environment",
-        "startLine": 1050,
+        "startLine": 1067,
       },
       {
-        "endLine": 1143,
+        "endLine": 1155,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 1060,
+        "startLine": 1072,
       },
       {
-        "endLine": 1150,
+        "endLine": 1162,
         "origin": "generated:transport/light-query",
-        "startLine": 1144,
+        "startLine": 1156,
       },
       {
-        "endLine": 1173,
+        "endLine": 1185,
         "origin": "generated:transport/state",
-        "startLine": 1151,
+        "startLine": 1163,
       },
       {
-        "endLine": 1187,
+        "endLine": 1199,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 1174,
+        "startLine": 1186,
       },
       {
-        "endLine": 1206,
+        "endLine": 1218,
         "origin": "generated:transport/combiner",
-        "startLine": 1188,
-      },
-      {
-        "endLine": 1214,
-        "origin": "generated:transport/kernel-record",
-        "startLine": 1207,
-      },
-      {
-        "endLine": 1222,
-        "origin": "generated:transport/roulette",
-        "startLine": 1215,
+        "startLine": 1200,
       },
       {
         "endLine": 1226,
-        "origin": "generated:transport/shadow-crossings",
-        "startLine": 1223,
+        "origin": "generated:transport/kernel-record",
+        "startLine": 1219,
       },
       {
-        "endLine": 1261,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "endLine": 1234,
+        "origin": "generated:transport/roulette",
         "startLine": 1227,
       },
       {
-        "endLine": 1290,
+        "endLine": 1238,
+        "origin": "generated:transport/shadow-crossings",
+        "startLine": 1235,
+      },
+      {
+        "endLine": 1273,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 1239,
+      },
+      {
+        "endLine": 1302,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1262,
+        "startLine": 1274,
       },
       {
-        "endLine": 1317,
+        "endLine": 1329,
         "origin": "generated:transport/walk",
-        "startLine": 1291,
+        "startLine": 1303,
       },
       {
-        "endLine": 1318,
+        "endLine": 1330,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1318,
+        "startLine": 1330,
       },
       {
-        "endLine": 1345,
+        "endLine": 1357,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1319,
+        "startLine": 1331,
       },
     ],
   },

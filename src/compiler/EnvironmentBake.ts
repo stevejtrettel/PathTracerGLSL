@@ -56,6 +56,7 @@ export function compileEnvironmentBake(scene: SceneDescription, chart: string = 
         '    return vec3(cs.x * d.x - cs.y * d.z, d.y, cs.y * d.x + cs.x * d.z);',
         '}',
         '',
+        ...ENV_CHARTS[chart].needs.map((f) => f.source),   // the files the chart calls into
         ENV_CHARTS[chart].glsl,   // D3: from the chart registry
         '',
         '// gl_FragCoord centers at +0.5, so uv hits texel centers; readback row j then',
