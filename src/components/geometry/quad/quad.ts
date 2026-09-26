@@ -42,7 +42,6 @@ export const quadDescriptor: PrimitiveDescriptor = {
     // what makes it ONE-SIDED under region_to emission (and why back-face hits need
     // the entering-side probe, audit H2).
     thin: true,
-    samplableAsLight: true,   // §6.2: emissive analytic quads join the light registry
     // Quad.normal — the precompiled emitting side (unit cross is scale-invariant
     // under s>0, so it is never scaled).
     derivedFields: [{ name: 'normal', kind: 'direction', shape: 'vec3' }],

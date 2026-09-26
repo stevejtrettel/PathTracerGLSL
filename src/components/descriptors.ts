@@ -395,9 +395,6 @@ export interface PrimitiveDescriptor {
      *  2026): every primitive provides sdf XOR declares thin — contract-test-enforced.
      *  Default false. */
     thin?: boolean;
-    /** §6.2 sampleAsLight eligibility (quad/sphere) — Planner registry entry +
-     *  Validator V1-C2 both read this fact. Default false. */
-    samplableAsLight?: boolean;
     /** Local-space AABB of the primitive given its (canonical) values — the prototype box
      *  when this primitive is an instance prototype (transformed per placement → the TLAS,
      *  impl-plan-tlas). Absent = UNBOUNDED (e.g. plane): cannot be an instance prototype

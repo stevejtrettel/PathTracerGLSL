@@ -7,7 +7,7 @@ import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { samplableEmitterObjects, batchLightEligible, batchNeedsInterior, keepsLocalFrame } from '../plan/dataTenants.js';
+import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior } from '../plan/dataTenants.js';
 import { foldBlackbody } from '../../components/lights/blackbody.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
@@ -256,7 +256,7 @@ export function validate(
         if (mat.sampleAsLight !== true) continue;
         if (!samplableObjectUses(scene, name)) {
             bag.error('invalid-setting',
-                `Material '${name}': sampleAsLight requires a samplable object using it — an analytic ${Object.entries(PRIMITIVES).filter(([, d]) => d.samplableAsLight === true).map(([t]) => t).join('/')} with constant placement (and, if rotated, a material that does not read uv), or a constant-placement MESH (fable-mesh-lights) — V1-C2: emissive SDF/custom shapes are path-only and still glow`)
+                `Material '${name}': sampleAsLight requires a samplable object using it — an analytic ${Object.keys(PRIMITIVES).filter((t) => regionLightKind(t) !== undefined).join('/')} with constant placement (and, if rotated, a material that does not read uv), or a constant-placement MESH (fable-mesh-lights) — V1-C2: emissive SDF/custom shapes are path-only and still glow`)
                 .add();
         }
         if (!hasConstantNonzeroEmission(mat.emission)) {   // C3: the ONE predicate
@@ -1305,7 +1305,7 @@ export function validate(
         }
         if (isDrivenTransform(t) && !('kind' in obj)
             && resolveBackend(obj.type, obj.backend) === 'analytic') {
-            if (PRIMITIVES[obj.type]?.samplableAsLight === true) {
+            if (regionLightKind(obj.type) !== undefined) {
                 const mat = scene.materials[obj.material];
                 if (mat !== undefined && mat.sampleAsLight !== false && hasConstantNonzeroEmission(mat.emission)) {
                     bag.error('invalid-transform',
@@ -1510,21 +1510,12 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
     }
 }
 
-/** "Some SAMPLABLE object uses material `name`" — the geometry leg of the §6.2 emitter
- *  condition, shared by the sampleAsLight rule and the phantom-light rule (C3: the two
- *  inline scans were byte-identical and drifted only by luck). Samplable geometry = the
- *  census's geometry conditions (samplableEmitterObjects, dataTenants.ts), without its
- *  emission condition, which the rules check themselves: an analytic samplable primitive
- *  (quad/sphere/disk) with constant placement that does not keep a local frame, or a MESH
- *  with constant placement (fable-mesh-lights). (Until Sep 25 2026 the primitive leg skipped
- *  the placement and frame exclusions, so sampleAsLight: true on a driven, or a rotated
- *  uv-reading, shape passed here and was then silently dropped by the census.) */
+/** "Some object using material `name` can be sampled as a light" — the census's shape leg
+ *  (isSamplableEmitterShape, dataTenants.ts) without its material leg, which the
+ *  sampleAsLight rule and the phantom-light rule check themselves. */
 function samplableObjectUses(scene: SceneDescription, name: string): boolean {
     return scene.objects.some((o) =>
-        (isPrimitiveObject(o) && o.material === name && PRIMITIVES[o.type]?.samplableAsLight === true
-            && resolveBackend(o.type, o.backend) === 'analytic'
-            && !isDrivenTransform(o.transform) && !keepsLocalFrame(o, scene))
-        || (isMeshObject(o) && o.material === name && !isDrivenTransform(o.transform)));
+        (isPrimitiveObject(o) || isMeshObject(o)) && o.material === name && isSamplableEmitterShape(o, scene));
 }
 
 /** §7 rules 2: quaternion normalized-within-tolerance (warn + the Planner normalizes),

@@ -7,7 +7,7 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission } from '../types.js';
+import type { SceneDescription, ObjectDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission } from '../types.js';
 import type { ProgramDescription } from './types.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression, isValueParam, isBlackbody } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
@@ -140,7 +140,7 @@ export function batchPlacementRecordOf(b: InstancedObject, scene: SceneDescripti
 export function meshIsSamplableEmitter(scene: SceneDescription, mesh: MeshObject): boolean {
     const mat = scene.materials[mesh.material];
     return mat !== undefined && mat.sampleAsLight !== false
-        && hasConstantNonzeroEmission(mat.emission) && !isDrivenTransform(mesh.transform);
+        && hasConstantNonzeroEmission(mat.emission) && isSamplableEmitterShape(mesh, scene);
 }
 
 /** The light kind an emissive OBJECT of primitive `type` becomes, or undefined if none.
@@ -148,6 +148,20 @@ export function meshIsSamplableEmitter(scene: SceneDescription, mesh: MeshObject
  *  onto a 'disk' region, but an emissive disk object is a disk light. */
 export function regionLightKind(type: string): string | undefined {
     return Object.values(LIGHT_KINDS).find((k) => k.region?.primitive === type && k.valuesFromRegion !== undefined)?.kind;
+}
+
+/** The census's SHAPE leg: object `o` can be sampled as a light, whatever its material. An
+ *  analytic primitive qualifies when the light registry builds a light from its shape
+ *  (regionLightKind), its placement is constant, and it keeps no local frame; a mesh
+ *  qualifies when its placement is constant. The census adds the material leg; the
+ *  Validator asks about the shape alone to explain why it rejects a sampleAsLight request or
+ *  a phantom light. */
+export function isSamplableEmitterShape(o: ObjectDescription, scene: SceneDescription): boolean {
+    if (isMeshObject(o)) return !isDrivenTransform(o.transform);
+    if (!isPrimitiveObject(o)) return false;
+    return regionLightKind(o.type) !== undefined
+        && resolveBackend(o.type, o.backend) === 'analytic'
+        && !isDrivenTransform(o.transform) && !keepsLocalFrame(o, scene);
 }
 
 /** A scene object that enters the light registry as a samplable emitter. */
@@ -162,28 +176,24 @@ export interface EmitterObject {
  * THE answer to "which scene OBJECTS are lights" — the object half of the light roster,
  * identity only (no values), in roster order: emissive analytic objects in scene order,
  * then emissive meshes in scene order. An object qualifies when its shape can be sampled
- * as a light (analytic, samplableAsLight, constant placement, no retained local frame)
- * and its material has CONSTANT nonzero emission and has not opted out (sampleAsLight:
- * false). Authored `lights` are the other half of the roster.
+ * as a light (isSamplableEmitterShape) and its material has CONSTANT nonzero emission and
+ * has not opted out (sampleAsLight: false). Authored `lights` are the other half of the
+ * roster.
  *
  * Everything that needs this fact reads it here — the Analyzer's light count, the
- * Validator's light rules, and lightRosterOf (hence the data layout and the App). Before
- * this, four modules each re-derived it from the raw scene and disagreed at the edges
- * (a blackbody emission, an omitted sampleAsLight flag). Safe on unvalidated scenes: it
- * computes no values, and the cheap material guards run before any placement math.
+ * Validator's light rules, and lightRosterOf (hence the data layout and the App). Safe on
+ * unvalidated scenes: it computes no values, and the cheap material guards run before the
+ * shape leg's placement math.
  */
 export function samplableEmitterObjects(scene: SceneDescription): EmitterObject[] {
     const out: EmitterObject[] = [];
     scene.objects.forEach((o, index) => {
         if (!isPrimitiveObject(o)) return;
-        if (PRIMITIVES[o.type]?.samplableAsLight !== true) return;
         const mat = scene.materials[o.material];
         if (mat === undefined || mat.sampleAsLight === false) return;
         if (!hasConstantNonzeroEmission(mat.emission)) return;
-        if (resolveBackend(o.type, o.backend) !== 'analytic') return;
-        if (isDrivenTransform(o.transform) || keepsLocalFrame(o, scene)) return;
-        const kind = regionLightKind(o.type);
-        if (kind !== undefined) out.push({ index, kind });
+        if (!isSamplableEmitterShape(o, scene)) return;
+        out.push({ index, kind: regionLightKind(o.type)! });   // defined: the shape leg checked it
     });
     scene.objects.forEach((o, index) => {
         if (isMeshObject(o) && meshIsSamplableEmitter(scene, o)) out.push({ index, kind: 'mesh' });

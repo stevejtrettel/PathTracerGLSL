@@ -115,7 +115,6 @@ export const sphereDescriptor: PrimitiveDescriptor = {
     hasSdf: true,
     analytic: {
         thin: false,
-        samplableAsLight: true,
         fold: (v, g) => ({ ...v, center: similarityApplyPoint(g, v.center), radius: g.scale * v.radius }),
     },
 };
@@ -136,7 +135,6 @@ export const sphereDescriptor: PrimitiveDescriptor = {
     glsl: sphereGLSL,
     provides: { sdf: true, analytic: true },   // declare-and-verify, both directions (T4)
     thin: false,
-    samplableAsLight: true,
     // fold DERIVED from kinds: point → g·p, length → s·ℓ, direction → R·d.
     // Plane keeps its coupled-fold override; non-separable families declare a closure gate.
 };
@@ -347,7 +345,7 @@ fields (`ior_of` in §1.3 — the far side of a boundary has no shading point).
 | | geometry | materials |
 |---|---|---|
 | authored math | `T_sdf / T_intersect / T_normal` over `struct <Type>` | `<id>_eval/sample/pdf/emission` over `MaterialProperties` |
-| authored facts | kind-typed rows; provides / thin / samplableAsLight; folds | property schemas; capabilities |
+| authored facts | kind-typed rows; provides / thin; folds | property schemas; capabilities |
 | struct scope | per primitive type (compile-time carrier) | per scene, union of present models (runtime carrier) |
 | generated plumbing | per-object functions (enumerable) | id-switched lookups (runtime id) |
 | generated policy | backends present, placement tiers, thin, region tables | seam-gated ops, folded capability tables |

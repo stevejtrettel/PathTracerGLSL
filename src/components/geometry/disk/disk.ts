@@ -34,7 +34,6 @@ export const diskDescriptor: PrimitiveDescriptor = {
     // Zero-thickness (the dichotomy: no sdf ⇒ thin): never claims containment, so it
     // is one-sided under region_to emission; back-face hits probe the entering side.
     thin: true,
-    samplableAsLight: true,   // §6.2: emissive analytic disks join the light registry
     // Unit normal — framework-applied ONCE per parameter set; folds preserve it
     // (direction kinds transform by R alone).
     canonicalize: (v) => ({ ...v, normal: unitVec3(v.normal as number[]) }),

@@ -66,7 +66,7 @@ A primitive supplies:
    row (`params` — ROW ORDER = GENERATED STRUCT FIELD ORDER = CTOR ORDER; each param
    declares `kind` (point | vector | direction | length — how it transforms under a
    similarity), `shape`, `required`, `default`, `constraint`), the declared surface
-   (`provides.sdf` / `provides.analytic`), flat facts (`thin`, `samplableAsLight`),
+   (`provides.sdf` / `provides.analytic`), flat facts (`thin`),
    and — only when genuinely irregular — the `derivedFields`/`derivedCtorFields`
    pair (quad: the precompiled one-sided normal, a compile-time literal shared with
    the quad light's sampler so hit side and sample side agree bit-exactly) or a
