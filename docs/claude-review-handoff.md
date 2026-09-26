@@ -1,6 +1,6 @@
 # Handoff — where the Sep 25 review stands, and what comes next
 
-**Status:** current as of the tiled-check records commit (Sep 26, 2026). This page is for resuming work after
+**Status:** current as of the scene-once records commit (Sep 26, 2026). This page is for resuming work after
 a context break. Update it or delete it when the review is done. Nothing here overrides
 [claude-review-2026-09-25.md](claude-review-2026-09-25.md), which has the findings; this page
 covers the state, the working rules and the next step.
@@ -26,7 +26,7 @@ if a detail is needed.
   [claude-review-batch4-plan.md](claude-review-batch4-plan.md), CHANGELOG "review batch 4".
   Batch 5 (tests that can fail, review Part 3; test-only, owner-approved in principle):
   [claude-review-batch5-plan.md](claude-review-batch5-plan.md), CHANGELOG "review batch 5".
-- **The working tree is clean.** 79 commits on `main` are **not pushed**. CI has never run on
+- **The working tree is clean.** 91 commits on `main` are **not pushed**. CI has never run on
   any of them, and the CI concurrency change (46cf2dc) is unverified until the first push.
 - **`npx vitest run`:** 2967 passing. `npx tsc --noEmit` is clean.
 - **Full witness sweep:** not run since c5f3543. Only targeted witnesses have run since then.
@@ -130,10 +130,10 @@ open" below.
     still checks the twin against itself;
   - a witness for the mesh light's MIS pdf normal (research).
 - **From batch 4:**
-  - The scene/program restructure: plan a scene's objects, lights and materials once, then each
-    renderer's decisions against them. Today each renderer's plan repeats the scene part, and the
-    scene data is built from `plans[0]`. Batch 4's item 2 option (b), deriving an emitter's light
-    from its planned surface, waits for it. Owner to discuss.
+  - The scene/program restructure: **steps 0–3 done Sep 26** (docs/claude-scene-once-plan.md,
+    CHANGELOG "plan the scene once"), including batch 4's item 2 option (b). Step 4 (colour
+    conversion becomes a renderer step) waits for the spectral design, which another instance
+    is writing. Step 5 (split Planner.ts into files) is the owner's call.
   - A `{param}` emission on a model that cannot emit gets two warnings (predates batch 4).
 - **The fp spawn margin** (review 1.11, suspected). It needs a measurement plan before any fix.
   Batch 3 measured two effects of the spawn offset itself in its witnesses: pt sees a light
