@@ -88,7 +88,7 @@ export const gallerySections: GallerySection[] = [
             e('clamp', 'clamp-ref'),
             e('het-driven', 'het-driven-baked'),
             e('het-driven-theta2', 'het-driven-baked2'),
-            e('emit'), e('emit-swap'), e('emit-sat'), e('emit-driven'), e('emit-scatter'),
+            e('emit'), e('emit-swap'), e('emit-sat'), e('emit-sat-budget'), e('emit-driven'), e('emit-scatter'),
         ],
     },
     {

@@ -19,6 +19,8 @@
 //   emit-scatter — glowing scattering fog under a ceiling quad: pt-nee ≡ pt (emission
 //                  + scattering + NEE compose; NEE never double-counts glow — volumes
 //                  are never light-sampled, P4).
+//   emit-sat-budget — the emit-sat fog at maxBounces 0, 1, 2: the bounce budget inside a
+//                  medium, against exact truncated values.
 
 import type { SceneDescription, RenderStrategy, MediumDescription } from '../../../src/compiler/types.js';
 
@@ -109,6 +111,37 @@ export const emitSatScene: SceneDescription = {
     },
     lights: [],
     ambientMedium: 'glow',
+};
+
+// ---------------------------------------------------------------------------
+// emit-sat-budget — the bounce budget inside a medium, exactly. `maxBounces: N` renders
+// Σ_{n≤N} TⁿE: at most N scattering events, medium events included (CLAUDE.md, invariants).
+// Deep inside the uniform infinite emit-sat fog, every segment collects ε/σ_t and every
+// scattering event keeps the fraction α = σ_s/σ_t = 1/3, so the n-th order contributes
+// (ε/σ_t)·αⁿ and
+//   L_N = (ε/σ_t)·Σ_{n=0}^{N} αⁿ:   N = 0 → ε/3,   N = 1 → 4ε/9,   N = 2 → 13ε/27,
+// with ε = (1, 2, 4) and σ_t = 3; N → ∞ gives emit-sat's ε/σ_a. Neighbouring N differ by 33%
+// and 8%, so a budget off by one in the medium branch fails. At N = 0 every path scores exactly
+// ε/σ_t at its first collision (certain, in an infinite medium): no noise.
+// ---------------------------------------------------------------------------
+
+export const EMIT_SAT_BUDGETS = [0, 1, 2] as const;
+
+/** L_N per channel for the emit-sat fog. */
+export function emitSatBudgetValue(n: number): [number, number, number] {
+    const eps = emitSatScene.materials.glow.medium!.emission as [number, number, number];
+    const sa = (emitSatScene.materials.glow.medium!.sigma_a as number[])[0];
+    const ss = (emitSatScene.materials.glow.medium!.sigma_s as number[])[0];
+    const st = sa + ss, alpha = ss / st;
+    let series = 0;
+    for (let k = 0; k <= n; k++) series += alpha ** k;
+    return eps.map((e) => (e / st) * series) as [number, number, number];
+}
+
+export const emitSatBudgetScene: SceneDescription = {
+    ...emitSatScene,
+    id: 'emit-sat-budget',
+    name: 'The bounce budget inside a medium (emit-sat at maxBounces 0, 1, 2)',
 };
 
 export const emitSatStrategy: RenderStrategy = {
@@ -209,3 +242,8 @@ export const emitScatterPtStrategy: RenderStrategy = {
     id: 'pt-emit',
     estimator: { ...emitScatterNeeStrategy.estimator, directLighting: 'none' },
 };
+
+/** emit-sat's estimator at a small bounce budget. */
+export function emitSatBudgetStrategy(n: number): RenderStrategy {
+    return { ...emitSatStrategy, id: `budget-${n}`, measurement: { ...emitSatStrategy.measurement, maxBounces: n } };
+}

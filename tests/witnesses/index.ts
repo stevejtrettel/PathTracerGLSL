@@ -116,6 +116,7 @@ import {
 import {
     emitScene, emitSwapScene, emitStrategy, emitSwapStrategy,
     emitSatScene, emitSatStrategy, emitDrivenScene,
+    emitSatBudgetScene, emitSatBudgetStrategy, emitSatBudgetValue, EMIT_SAT_BUDGETS,
     emitScatterScene, emitScatterNeeStrategy, emitScatterPtStrategy,
 } from './scenes/emissionWitness.js';
 import {
@@ -2050,6 +2051,24 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         witness: {
             spp: 96,
             checks: [{ kind: 'mean', value: [0.5, 1.0, 2.0], tol: [0.005, 0.01, 0.02], label: 'F-EMIT-SAT ε/σ_a saturation' }],
+        },
+    },
+    'emit-sat-budget': {
+        scene: emitSatBudgetScene,
+        strategies: posed([30, 1, 0], [31, 1, 0], ...EMIT_SAT_BUDGETS.map((n) => emitSatBudgetStrategy(n))),
+        exercises: 'the bounce budget INSIDE a medium: the emit-sat fog at maxBounces 0, 1, 2 (keys 1–3) against the exact truncated Neumann sums — an off-by-one in the medium branch\'s budget reads a neighbouring N',
+        expected: 'every pixel = (ε/σ_t)·Σ_{n≤N} (1/3)ⁿ with ε = (1, 2, 4), σ_t = 3: N = 0 → (0.3333, 0.6667, 1.3333), N = 1 → (0.4444, 0.8889, 1.7778), N = 2 → (0.4815, 0.9630, 1.9259)',
+        witness: {
+            spp: 96,
+            // Tolerance 1% of each channel. Measured at salts 11/22/33 (channel means): N = 0 reads
+            // exactly 0.77778 (no noise: the first collision is certain), N = 1 1.0372 ± 0.0004
+            // (exact 1.0370), N = 2 1.1236 ± 0.0004 (exact 1.1235). A budget off by one reads 25%
+            // (N = 1) or 7.7% (N = 2) low.
+            checks: EMIT_SAT_BUDGETS.map((n, k) => ({
+                kind: 'mean' as const, value: emitSatBudgetValue(n), tol: emitSatBudgetValue(n).map((v) => 0.01 * v) as [number, number, number], strategy: k,
+                source: { tier: 'exact' as const, from: '(ε/σ_t)·Σ_{n≤N} αⁿ, α = σ_s/σ_t' },
+                label: `medium budget, maxBounces ${n}`,
+            })),
         },
     },
     'emit-scatter': {

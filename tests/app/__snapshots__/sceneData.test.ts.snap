@@ -122,6 +122,8 @@ exports[`scene-data textures (byte fingerprints) > emit-driven 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > emit-sat 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > emit-sat-budget 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > emit-scatter 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > emit-swap 1`] = `null`;

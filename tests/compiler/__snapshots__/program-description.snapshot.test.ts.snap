@@ -7060,6 +7060,300 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat + path
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget + budget-0 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        30,
+        1,
+        0,
+      ],
+      "target": [
+        31,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 0,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget + budget-1 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        30,
+        1,
+        0,
+      ],
+      "target": [
+        31,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget + budget-2 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "delta-tracking",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        30,
+        1,
+        0,
+      ],
+      "target": [
+        31,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 2,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + pt-emit 1`] = `
 {
   "emitters": {
