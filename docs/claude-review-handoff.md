@@ -24,9 +24,9 @@ if a detail is needed.
   [claude-review-batch4-plan.md](claude-review-batch4-plan.md), CHANGELOG "review batch 4".
   Batch 5 (tests that can fail, review Part 3; test-only, owner-approved in principle):
   [claude-review-batch5-plan.md](claude-review-batch5-plan.md), CHANGELOG "review batch 5".
-- **The working tree is clean.** 75 commits on `main` are **not pushed**. CI has never run on
+- **The working tree is clean.** 77 commits on `main` are **not pushed**. CI has never run on
   any of them, and the CI concurrency change (46cf2dc) is unverified until the first push.
-- **`npx vitest run`:** 2966 passing. `npx tsc --noEmit` is clean.
+- **`npx vitest run`:** 2967 passing. `npx tsc --noEmit` is clean.
 - **Full witness sweep:** not run since c5f3543. Only targeted witnesses have run since then.
   Ask the owner before running the full sweep (45 min).
 - **Review web page (the owner's copy):** https://claude.ai/artifact/HVH8Rs64ECjcEFCdso2iZY
@@ -126,7 +126,6 @@ open" below.
 - **From batch 5** (details in its plan):
   - rough glass is discontinuous at η = 1 (measured; a modelling question), and its η = 1 test
     still checks the twin against itself;
-  - a Validator rule for a `{param}` fov's slider range (production code);
   - an automated tiled-render check (a runner feature);
   - a witness for the mesh light's MIS pdf normal (research).
 - **From batch 4:**

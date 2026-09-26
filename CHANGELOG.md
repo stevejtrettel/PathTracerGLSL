@@ -30,11 +30,14 @@ restored. The breakages were never committed.
   (cos θ, roughness) = (0.9, 0.3), (0.3, 0.8) and (0.1, 0.9), while the η = 1 shortcut transmits
   everything. The rough dielectric is therefore discontinuous at η = 1 (microfacet masking loss),
   and the shortcut is the physical answer, not the model's limit.
-- **For the owner (production code, not done):**
-  - a Validator rule for a `{param}` fov's slider range;
+- **Owner-approved, done (d10152a):** a `{param}` camera row's slider bounds must satisfy the
+  row's constraint, as its default does. For `fov` that is (0, π). A missing bound warns, because
+  the panel then shows a free number box. The test was written first and failed before the rule.
+  All 20 slider-driven fovs in the suite already comply.
+- **For the owner (not done):**
   - an automated tiled-render check (a runner feature);
   - a witness for the mesh light's pdf normal (research).
-- vitest 2966 passing; tsc clean.
+- vitest 2967 passing; tsc clean.
 
 ## 2026-09-26 — review batch 4: one answer per fact
 
