@@ -61,8 +61,12 @@ export function glslangCheck(source: string, stageExt: 'vert' | 'frag', label: s
         execFileSync(bin, [file], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
         validated.set(source, null);
     } catch (e) {
-        const err = e as { stdout?: string; status?: number | null; code?: string };
-        // The binary never ran (no exit status): report the machine, not the shader.
+        const err = e as { stdout?: string; status?: number | null; code?: string; signal?: string | null };
+        // Killed by a signal: the validator ran and crashed on THIS shader.
+        if (err.signal) {
+            throw new Error(`${label}: glslangValidator crashed (killed by ${err.signal}) on the generated shader`);
+        }
+        // Never started (a spawn error, no exit status): report the machine, not the shader.
         if (err.status === null || err.status === undefined || typeof err.code === 'string') {
             throw new Error(`${label}: glslangValidator could not be run (${String(e).split('\n')[0]}). On Apple silicon the packaged `
                 + 'binary needs Rosetta (`softwareupdate --install-rosetta`), or set GLSLANG_VALIDATOR to a native glslangValidator.');
