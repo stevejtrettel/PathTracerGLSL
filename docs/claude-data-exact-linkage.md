@@ -47,8 +47,9 @@ selection and the object table under `unrolled` dispatch.
 
 1. `compileScene(scene, strategies)` compiles a scene's strategies together.
    `compile(scene, strategy)` remains as the one-strategy case.
-2. Each strategy is planned as today. A small function maps a `ProgramDescription` to the set
-   of data it reads — the decisions are already there: `instanceAccel: 'cwbvh'` (CWBVH),
+2. The scene is planned once, and each strategy's decisions against it (`planScene`,
+   `planProgram` — docs/claude-scene-once-plan.md). A small function maps a
+   `ProgramDescription` to the set of data it reads — the decisions are already there: `instanceAccel: 'cwbvh'` (CWBVH),
    `lightSelection: 'bvh'` (light tree), `objectDispatch: 'table'` (object table + region
    materials), `meshTraversal` (BLAS nodes, also needed by containment), `instanceAccel`
    `'tlas'` vs `'linear'` (TLAS nodes), NEE with mesh emitters (mesh-light tables),
@@ -57,7 +58,8 @@ selection and the object table under `unrolled` dispatch.
    region→material ids); BLAS nodes, TLAS nodes and the mesh-light tables are always built;
    the environment variants stay App-side (status line above).
 3. The union over the scene's strategies is what gets built. `dataTenantsOf` takes that set
-   and lays out only those regions — still the one layout function, called once.
+   and lays out only those regions — still the one layout function, called once, when the
+   scene is placed (`placeScene`).
 4. Every program is generated against that one layout.
 5. The result is the renderers plus a data plan: which structures to build and where they go
    (bases and sizes). *As built,* stage 2 also puts the packing inputs in the plan — folded

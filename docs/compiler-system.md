@@ -12,7 +12,7 @@ SceneDescription + RenderStrategy
         │
         ├─ 1. Analyze  → SceneFeatures
         ├─ 2. Validate → ValidationError[]
-        ├─ 3. Plan     → RenderPlan
+        ├─ 3. Plan     → a RenderPlan per renderer (the scene planned once)
         └─ 4. Generate → CompiledRenderer
                               │
                               ├─ shaders: Map<string, ShaderProgram>
@@ -132,43 +132,38 @@ The Compiler filters for `severity === 'error'` and throws with all messages con
 
 ## Phase 3: Plan
 
-**File:** `src/compiler/plan/Planner.ts`
+**Files:** `src/compiler/plan/Planner.ts`, with `dataTenants.ts` (the light census and the
+scene→data-layout adapter), `values.ts` and `measurement.ts`.
 
-Transforms the scene description into a concrete generation plan. All ambiguity is resolved here — the Generator receives fully concrete data.
-
-```typescript
-function plan(features, scene, strategy): RenderPlan
-```
-
-### What the Planner does:
-
-**1. Assigns material IDs.** Materials are sorted alphabetically by name for deterministic ordering, then assigned integer IDs (0, 1, 2...). Property values are resolved: scalars are normalized (a single number becomes `[n, n, n]` for colors), missing values get defaults (albedo defaults to `[0.8, 0.8, 0.8]`, roughness to `1.0`).
-
-**2. Resolves SDF objects.** Filters to `kind === 'sdf'` objects, looks up material IDs from the name→id map, extracts SDF type and parameters. Each object gets a sequential index.
-
-**3. Resolves lights.** Point lights get color defaulted to white if not specified. Each light gets a sequential ID.
-
-**4. Makes code emission decisions based on features + strategy:**
-- `brdfModels`: which BRDF includes are needed (e.g. `['lambert']`)
-- `emitNEE`: true if `directLighting !== 'none'` AND the scene has lights
-- `emitRussianRoulette`: from strategy config
-- `maxBounces`: from strategy config
-- `unrollSDFDispatch`: true if ≤ 8 objects (currently always true)
-
-**5. Plans uniforms.** Lists all uniforms the shader needs with their types, parameter paths (for the Engine's parameter system), and default values:
+A scene's renderers are planned together, because they share one set of scene-data textures:
 
 ```typescript
-[
-    { name: 'u_resolution',     type: 'vec2',  parameterPath: 'engine.resolution' },
-    { name: 'u_sampleCount',    type: 'int',   parameterPath: 'engine.sampleCount' },
-    { name: 'u_frameIndex',     type: 'int',   parameterPath: 'engine.frameIndex' },
-    { name: 'u_time',           type: 'float', parameterPath: 'engine.time' },
-    { name: 'u_pixelOffset',    type: 'vec2',  parameterPath: 'engine.pixelOffset' },
-    { name: 'u_imageSize',      type: 'vec2',  parameterPath: 'engine.imageSize' },
-    { name: 'u_cameraPosition', type: 'vec3',  parameterPath: 'camera.position' },
-    { name: 'u_cameraTarget',   type: 'vec3',  parameterPath: 'camera.target' },
-]
+function planRenderers(features, scene, strategies, bag): { reads, placed, plans: RenderPlan[] }
 ```
+
+1. **`planScene(scene)` → `ScenePlan`**, once: what the scene is, the same for every renderer. It
+   reads no strategy and no data layout.
+   - Material ids follow authored (insertion) order. Each material resolves exactly its model's
+     schema rows (`authored ?? row.default`).
+   - Objects, meshes and instance batches get region ids in scene order. Each object's
+     intersection routine is resolved: the closed form if the primitive provides one, else the
+     marched SDF; an authored `backend` pin overrides. Constant placements fold into the
+     parameters where the shape allows it; driven placements become uniform records.
+   - Lights, in light-id order (`lightRosterOf`: authored lights, then emissive analytic
+     objects, then emissive meshes). An authored area light desugars to an emissive region; an
+     emissive object's light is built from its planned surface and material.
+2. **`planProgram(scene plan, strategy)` → `ProgramDescription`**, per renderer: every decision
+   (measurement, estimator, view, and the link tables saying what the program contains).
+3. The data layout holds the union of the optional structures the decisions read
+   (`dataReadsOf`, `unionDataReads`: the CWBVH, the light tree, the object table).
+4. **`placeScene(scene plan, reads)` → `PlacedScene`**, once: the layout (`dataTenantsOf`,
+   `planDataLayout`) and the data-texture addresses each planned record needs.
+
+Each renderer's `RenderPlan` is the placed scene plus its own decisions and pipeline. The
+scene-data plan the App executes (`compiler/sceneData.ts`) is built from the placed scene.
+Nothing the renderers share depends on any renderer's settings;
+`tests/compiler/compileOrder.test.ts` checks that the order of a scene's strategies changes
+nothing.
 
 ## Phase 4: Generate
 

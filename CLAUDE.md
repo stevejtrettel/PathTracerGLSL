@@ -16,6 +16,8 @@ npx vitest run         # all tests, once (`npm test` is watch mode)
 npx tsc --noEmit       # typecheck
 npm run witness        # GPU numeric tests (~45 min); `-- <scene…>` filters, `-- --list` lists
 npm run dump:shaders   # generated shaders → generated-shaders/ (`-- --scene <module>` for one)
+npm run digest -- <out.json>              # digest of every suite scene's compiled output
+npm run digest -- --compare <a> <b>       # which scenes and parts differ between two digests
 ```
 
 - The glslang static-compile tests (`tests/compiler/glsl-compile.test.ts` and a few others)
@@ -78,6 +80,11 @@ How a program is assembled:
   executes it (app/sceneData.ts) and derives nothing else from the scene, except which
   environment sampling tables to build (`envVariants`; docs/claude-data-exact-linkage.md).
   The App compiles before it packs.
+- **The Plan stage** (`planRenderers`, compiler/plan/Planner.ts) plans the scene once
+  (`planScene`: no strategy, no data-texture addresses), each renderer's decisions against it
+  (`planProgram`), and places the scene in the shared layout once (`placeScene`). Anything the
+  renderers share must not depend on any renderer's settings;
+  `tests/compiler/compileOrder.test.ts` checks that strategy order changes nothing.
 - **Which scene objects are lights** has one answer: `samplableEmitterObjects` in
   dataTenants.ts (with the authored `lights` it forms `lightRosterOf`). Use it; don't
   re-derive it.
@@ -166,6 +173,10 @@ How a program is assembled:
   equalities, noise). Run it after any change to sampling, lighting or transport GLSL.
   Adding a witness = one fixture in `tests/witnesses/scenes/` + one registry entry; gate
   policy and the standing failures are in tests/witnesses/README.md.
+- A change that must not alter the compiled output (a refactor): `npm run digest` before and
+  after, then `--compare`. It covers shader text, uniforms, parameters, source maps, the
+  scene-data plan's packed contents and warnings, for every suite scene except the 7 async
+  data scenes.
 - CI (`.github/workflows/ci.yml`) runs typecheck + vitest (incl. glslang) on every push;
   the witness sweep is a manual job.
 - The generated-GLSL snapshot diff is large and mostly source-map line numbers: review it

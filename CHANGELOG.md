@@ -4,6 +4,45 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-26 — plan the scene once, then each renderer (steps 0–3)
+
+As planned in docs/claude-scene-once-plan.md (owner-approved). Decided with the owner first: keep
+N renderers per scene (a real renderer plus a fast preview; strategies compared side by side),
+plan the scene once, and let nothing the renderers share depend on any renderer's settings.
+Spectral is being built next, so the colour step is designed for it.
+
+| Commit | Step |
+|---|---|
+| 54e576c | `npm run digest`: a digest of every suite scene's compiled output (shader text, uniforms, parameters, source maps, the scene-data plan's packed contents, warnings); `--compare` names the scenes and parts that differ. It refuses to write a digest without shader text. |
+| fed4950 | Test: compiling a scene's strategies in reverse order changes no renderer's output and not the scene-data plan (91 suite scenes with two or more strategies). |
+| 97cb768 | `planRenderers`: `planScene` (no strategy, no layout) → `planProgram` per renderer → the union of reads → `placeScene` (addresses, once). The scene-data plan comes from the placed scene, not `plans[0]`. The trial runs against every optional structure (`programDecisions`, `READS_EVERYTHING`) are gone. |
+| eb06bae | An emissive object's light is built from its planned surface and material; `lightRosterOf` keeps only identity (batch 4 item 2, option b). |
+
+- **No change to the compiled output:** the digest is identical for all 203 non-async suite
+  scenes after steps 2 and 3. The 7 async data scenes fetch `.inst` files and are not compiled
+  by it; their code paths (instance clouds, instanced lights, the light tree) are in 5 other
+  suite scenes.
+- **The `plans[0]` premise held:** before step 2, all 91 multi-strategy scenes already compiled
+  identically in either order.
+- **The tests can fail.** The order test fails with a light's radiance doubled only under
+  light-tree selection (3 scenes), with a generator counter kept between compiles (91), and with
+  a generator appending to the shared materials after step 2 (91). The rewritten census test
+  fails with lights built from the unplaced authored parameters, and with the mesh light's area
+  missing the scale. The digest tool refuses when Maps are not expanded, and reports a changed
+  GLSL comment (196 scenes) and one changed packed float (6 scenes).
+- **Tests:** "decisions do not depend on the data layout" is deleted (owner), since the
+  decisions function has no layout input any more: 362 cases, one per scene and strategy pair,
+  so vitest went from 3058 to 2696. The census test's comparison of object lights with their
+  surfaces became true by construction. It now checks authored area lights against their
+  regions, and the object lights against values it computes with its own rotation.
+- **Compile time:** no measurable change (the whole suite takes 240–400 ms either way; repeat
+  runs vary more than any difference).
+- **Open:** step 4 (colour conversion becomes a renderer step) waits for the spectral design,
+  which another instance is writing. Step 5 (split Planner.ts) is the owner's call. The docs
+  describing the Plan stage are updated: CLAUDE.md, docs/compiler-system.md (its Plan section,
+  stale before this, now rewritten) and docs/claude-data-exact-linkage.md.
+- tsc clean; vitest 2696 passing.
+
 ## 2026-09-26 — review batch 5: tests that can fail
 
 Review Part 3, test-only work as planned in docs/claude-review-batch5-plan.md (owner: "if this is
