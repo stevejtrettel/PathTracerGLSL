@@ -53,7 +53,9 @@ LightSample mesh_light_sample(MeshLight l, sampler2D idxTex, sampler2D wposTex, 
 
     vec3 gn = cross(b - a, c - a);          // outward by winding (one-sided pin)
     float cos_l = dot(normalize(gn), -ls.wi);
-    if (cos_l <= 0.0) { ls.pdf = 0.0; return ls; }   // behind the face: invalid sample
+    // Behind the face, or a triangle degenerate in f32 (a zero cross product normalizes to
+    // NaN, and NaN fails every comparison): an invalid sample either way.
+    if (!(cos_l > 0.0)) { ls.pdf = 0.0; return ls; }
 
     // Uniform-area over the WHOLE mesh: pdf_area = 1/A_total, converted to solid angle.
     ls.pdf = d2 / (l.area * cos_l);
