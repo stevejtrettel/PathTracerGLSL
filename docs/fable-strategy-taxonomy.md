@@ -84,8 +84,9 @@ place listing every way the image differs from ground truth, each with its named
 |---|---|
 | `maxBounces: N` | N → ∞ |
 | `maxNullCrossings: K` (default 32): paths crossing at most K null interfaces, counted along the whole path including its shadow rays, so every technique drops the same paths | K → ∞ |
-| opaque shadow rays through dielectrics (§6.3 v1 policy — currently a *pinned invisible* bias; becomes a declared field) | transparent/spectral shadow refinement |
-| `color: 'rgb'` (future field; RGB transport is a biased surrogate of spectral — projection does not commute with multiplication) | `'spectral'` (§8) |
+| `scattering: 'ignored'`: scattering media rendered absorbing-only | `'full'` |
+| `shadows: 'opaque-dielectrics'`: shadow rays treat dielectric interfaces (and GRIN regions) as opaque | transparent/spectral shadow refinement |
+| `color: 'rgb'`: RGB transport is a biased surrogate of spectral (projection does not commute with multiplication) | `'spectral'` (§8; reserved, Validator-rejected) |
 | path-class restrictions (future: one-shot, Whitted-style delta-only continuation) | the unrestricted path space |
 | firefly/radiance clamping (future) | clamp → ∞ |
 | numerical tolerances — fixed constants, not fields: the marcher's acceptance (`march_epsilon`, including its grazing rule: a ray still within 16× the acceptance of a surface when its steps run out counts as a hit), GRIN's ODE step and exit bisection, SDF refinement counts, spawn margins | tolerances → 0 |

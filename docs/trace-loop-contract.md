@@ -5,9 +5,9 @@
 `pillars/objects.md` design and refined in discussion. **This supersedes Fable's `GeodesicState`
 stepper (`fable-compiler-contracts.md` §5) — see "Supersedes" below.**
 
-> **Where the loop lives (item-9 split, July 2026):** the loop is GENERATED — its source of
-> truth is `emitTransportTrace` + the segment emitters in
-> `src/compiler/generate/features/transport.ts` (`path_trace.glsl` is deleted). This contract
+> **Where the loop lives:** the loop is GENERATED — its source of truth is the walk generator
+> in `src/components/transport/integrators/pt/pt.ts`, which composes the static technique
+> files under `src/components/transport/techniques/`. This contract
 > still governs the loop's types and semantics; read it before touching the emitters. To READ
 > a concrete loop, dump the shader for a (scene, strategy) pair — each emitted program contains
 > exactly its own estimator.
@@ -20,10 +20,10 @@ stepper (`fable-compiler-contracts.md` §5) — see "Supersedes" below.**
 Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  →  make_ray  →  repeat
 ```
 
-1. **`Ray`** — a *geodesic seed*: a position and a unit direction, plus the interval to search.
+1. **`Ray`** — a *geodesic seed*: a position and a unit direction (no search interval; see below).
 2. **`scene_intersect(Ray) → Hit`** — advance to the next intersection. One contract; it subsumes
-   SDF marching, analytic intersection, and (future) mesh/BVH as geometry **capabilities**
-   (`sdf?` / `ray?` / `instances?`), taking the nearest hit and coordinating via `tmax`.
+   SDF marching, analytic intersection, triangle meshes with BVHs and instanced batches, taking
+   the nearest hit; the backends coordinate through the running nearest distance `hit.t`.
 3. **`Hit`** — the landing record: where you arrived, the shading frame, the **geometric
    normal** (`ng` — the true normal of the surface hit, oriented like the shading normal;
    equal to it except where shading is interpolated or perturbed: smooth meshes now, normal
@@ -65,7 +65,7 @@ struct Ray { Point origin; Direction direction; };   // PURE geodesic seed — n
   - **occlusion far-bound**: an explicit `maxDist` **argument** to `scene_intersect_any` (the light
     distance) — an input, not ray state.
 - **Self-intersection escape is an origin offset**, done via the geodesic (`ray_spawn`):
-  `origin = ambient_geodesic(hit.p, side·ng, hit.eps)` with `side = sign(ambient_dot(wi, ng, p))`
+  `origin = ambient_geodesic(hit.p, side·ng, hit.eps)` with `side = +1` if `ambient_dot(wi, ng, p) ≥ 0`, else `−1`
   — the offset is the hit's OWN positional uncertainty (provenance-filled, impl-plan-epsilon-
   discipline), along the GEOMETRIC normal, toward the side of the true surface `wi` travels
   into (reflection and transmission alike). Robust at grazing angles (offset along the normal)
@@ -89,8 +89,9 @@ day curvature turns on, which is exactly why we name it now.
   metric-orthonormal by construction, so the metric is the identity there. *The metric is paid
   exactly once, at the world↔frame crossing.*
 
-There is no local-frame BSDF yet (Lambert works in world space), so **today every physical dot is
-`ambient_dot`**; the raw-`dot` exception first appears with GGX-style `to_local` materials.
+Lambert works in world space, so every dot it takes is `ambient_dot`. The GGX-family materials
+evaluate in a local frame: `microfacet_to_local` (glsl/core/microfacet.glsl) projects each world
+direction with `ambient_dot`, and dots between the resulting local vectors are raw `dot`.
 
 ## Updated signatures (vs the current slice)
 
@@ -134,7 +135,6 @@ never mutated by intersection — it is a pure seed.
 
 ## Deferred (not this contract)
 
-Capability geometry (mesh/BVH `ray?`, `instances?`) and the `inout Ray` multi-backend coordination
-(one backend exists now); curved ambient spaces (H³/Schwarzschild — `ambient_*` are the seam);
+Curved ambient spaces (H³/Schwarzschild — `ambient_*` are the seam);
 `Point`→`vec4` per space; BVH under non-straight geodesics
 (open in the archive too); Fable's bare-`f`-vs-`f·cos` cosine-placement question (orthogonal).

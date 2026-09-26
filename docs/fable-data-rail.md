@@ -41,8 +41,9 @@ Two structural conclusions:
   refs) — only fetches add the base. The addressing idiom everywhere:
   `texelFetch(channel, data_texel1d(base + local), 0)`.
 - **Ledger** — THE layout truth: one pure function computing every region's base and every
-  channel's total from scene counts. Planner calls it to bake literals; the App calls the
-  SAME function to pack payloads. The ordinal-truth pattern (audit A5), promoted from
+  channel's total from scene counts. The Planner calls it to bake literals; the compiler's
+  scene-data plan (compiler/sceneData.ts) says what to pack where in that same layout, and the
+  App executes the plan without computing any layout of its own. The ordinal-truth pattern (audit A5), promoted from
   "who is tenant #k" to "where tenant #k's bytes live."
 
 Modularity lives in the LEDGER AND THE PACKERS, not in texture separation: each family
@@ -74,9 +75,12 @@ buys nothing and couples systems. Revisit only if unit pressure returns.
 ## 4. The ledger — deterministic, baked, padded where honesty requires
 
 `planDataLayout(tenants) → { channelTotals, regions }`, pure, in the rail module.
-Region order = the shared enumerators' order (sceneMeshes, then mesh-prototype batches,
-then batches' records, then mesh lights) — Planner and App cannot disagree by
-construction.
+Region order: every always-built region first, in the shared enumerators' order (the
+meshes, then the instance batches, then the mesh lights), then the optional regions, each
+present only when some renderer on the scene reads it (`DataReads`): the CWBVH, the object
+table, the light tree, the region→material ids. So a program that reads no optional
+structure gets the same offsets whatever the scene's other renderers need. The layout is
+computed once, by the compiler.
 
 **Offsets are BAKED LITERALS** (fork §9.2, my pick): the precompute-ship rule, zero
 runtime indirection, and the compiler knows the whole layout (dumps read plainly). The

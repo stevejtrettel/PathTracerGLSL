@@ -53,19 +53,23 @@ selection and the object table under `unrolled` dispatch.
    materials), `meshTraversal` (BLAS nodes, also needed by containment), `instanceAccel`
    `'tlas'` vs `'linear'` (TLAS nodes), NEE with mesh emitters (mesh-light tables),
    env chart/compensation (environment CDF variants).
+   *As built:* `DataReads` covers the CWBVH, the light tree and the object table (with its
+   region→material ids); BLAS nodes, TLAS nodes and the mesh-light tables are always built;
+   the environment variants stay App-side (status line above).
 3. The union over the scene's strategies is what gets built. `dataTenantsOf` takes that set
    and lays out only those regions — still the one layout function, called once.
 4. Every program is generated against that one layout.
 5. The result is the renderers plus a data plan: which structures to build and where they go
-   (bases and sizes; no bytes).
+   (bases and sizes). *As built,* stage 2 also puts the packing inputs in the plan — folded
+   records, light-table rows, region→material ids — so the plan does carry some bytes.
 6. The App compiles FIRST, then runs the plan (builds in workers) and uploads. It decides
    nothing itself.
 
 Consequences: no unneeded builds; a bad scene fails at compile time with diagnostics before any
-packing (currently packing runs first); `recompile` produces a new plan and the App
-re-uploads when it changed (currently a recompile with a new scene keeps the old scene's
-data); the App's separate derivation of environment-table variants from strategy fields
-becomes part of the plan.
+packing; `recompile` produces a new plan and the App re-uploads when it changed. (Before stage
+1, packing ran first, and a recompile with a new scene kept the old scene's data.) The App's
+separate derivation of environment-table variants was meant to become part of the plan; it has
+not (status line above).
 
 Cost: a program's baked offsets depend on which sibling strategies share its scene (adding a
 `cwbvh` strategy can shift later regions). Images are unaffected. Keep the effect small by

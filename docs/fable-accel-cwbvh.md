@@ -181,8 +181,8 @@ the binary walk.
   children interleave with internal children in binary order, and the 5-bit meta
   offsets cannot span it). Records are packed in leaf order, so the cwbvh occupant
   takes a SECOND placement-records region (same float channel, cwbvh order — ~1
-  texel/instance duplicated; +5.6 MB at octic scale), allocated always (the
-  sceneTable always-upload precedent: ONE scene layout serves every strategy).
+  texel/instance duplicated; +5.6 MB at octic scale), allocated only when some renderer on
+  the scene reads the CWBVH (`DataReads.cwbvh`).
   v1 pins, Validator-enforced: cwbvh ∧ (mesh prototypes ∨ frame-tier batches ∨
   per-instance attributes) → rejected — `Hit.element`'s leaf-order semantics stay
   moot under cwbvh until the attrs region gets the same twin treatment (deferred

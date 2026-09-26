@@ -30,9 +30,14 @@ lab), but nothing here imports from `compiler/scenes/`.
 
 Resolved Sep 25: the four GRIN furnaces (section A — lenses rendered black, a region/material
 id mix-up in the walker's exit test) and `softbeam-wall` (section B — an under-sampled check,
-not a bias). `slab-albedo` (section C) was resolved in August. New since Sep 24: `tiny-sphere`,
-`tiny-sphere-light`, `sun-haze`, `fog-area-ignored`, `instance-lights-sky`, `mesh-light-smooth`
+not a bias). `slab-albedo` (section C) was resolved in August. New since Sep 24 and in that
+sweep: `tiny-sphere`, `tiny-sphere-light`, `sun-haze`, `fog-area-ignored`, `instance-lights-sky`
 (each fails on the code before its fix).
+
+**Not yet in a full sweep.** The sweep ran at commit c5f3543. The transport changes after it
+(`Hit.ng`, the mesh margin, `maxNullCrossings`, the GRIN roulette, the derived tracking bound)
+had targeted runs only, and these witnesses were added with them: `mesh-light-smooth`,
+`mesh-slab-albedo`, `mesh-scale-twin`, `null-budget-view`, `null-budget`, `grin-long`.
 
 **`cube-cloud` (updated Sep 25).** Since the lab page stopped starting its own render loop
 under the runner, the runner takes control immediately; the failure is now the RENDER not
@@ -53,10 +58,9 @@ what makes quad lights one-sided. The Validator's thin-surface warning ("will re
 
 ## The Aug 12 2026 sweep (historical record)
 
-**Read this before diagnosing a red row.** The suite is not expected to be all-green: ten checks
-fail, in four unrelated groups, and every one is a standing marker for real work rather than an
-oversight. If your change did not touch these areas and these are the only reds, you have not
-broken anything.
+At the time the suite was not expected to be all-green: ten checks failed, in four unrelated
+groups, each a standing marker for real work rather than an oversight. The current state is
+the section above.
 
 Sweep result: **153 exact checks — 143 passed, 10 failed; 1 cross-check, agreed.**
 
@@ -123,10 +127,15 @@ renderer bias** in the world-space surface-proximity constants. The resolution a
   including the interior-roulette arm (step 2's gate) and the aniso cross-check.
 
 The expected values were never loosened along the way — hiding a measured bias behind a tolerance
-is how the next real defect gets missed. Full-suite re-gate after the batch is the remaining step
-(every program's frames changed: pt tripwires recalibrate).
+is how the next real defect gets missed. (The full-suite re-gate after the batch was done by the
+Sep 24 and Sep 25 sweeps.)
 
-### D. `cube-cloud` — a hang, not a slow render
+### D. `cube-cloud` — the Aug 12 investigation
+
+*Superseded in part:* since Sep 25 the page no longer blocks — the runner takes control
+immediately and the render does not finish within 8 minutes (the update in the current section
+above). claude-improvements-2026-09.md Part 7 lists a third hypothesis, a runner stall. The
+Aug 12 findings follow.
 
 `ERROR: page.waitForFunction: Timeout 120000ms exceeded`. Investigated Aug 12, headless
 SwiftShader, not resolved:

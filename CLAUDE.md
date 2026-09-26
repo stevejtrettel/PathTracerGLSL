@@ -36,8 +36,9 @@ upward.
   group flattening (`flattenGroups`), OBJ and `.inst` loaders, instance clouds, the
   subsurface albedo inversion, camera poses.
 - **App** (`src/app/`) — the facade and managers: renderer switching, the render loop,
-  production renders, parameters, events, UI. It also packs scene data into textures
-  (`App._uploadSceneGeometry`).
+  production renders, parameters, events, UI. It also executes the compiler's scene-data
+  plan, packing the data textures (`app/sceneData.ts`, called from
+  `App._uploadSceneGeometry`).
 - **Engine** (`src/engine/`) — executes a `CompiledRenderer` blindly (programs,
   framebuffers, passes, uniforms, textures). It must not know about scenes, materials or
   algorithms. The compiler↔engine types are **locked** (docs/compiler-engine-contract.md).
@@ -67,14 +68,16 @@ How a program is assembled:
   short generated walk calling static technique files; pt / pt-nee / pt-mis are combiner
   configurations. Math is static GLSL; policy and plumbing are generated.
 - **Scene data** (meshes, BVHs, instance placements, the light tree, the object table)
-  lives in six shared data textures. A scene's renderers are compiled together
+  lives in six shared float data textures, plus an integer one for the CWBVH. A scene's
+  renderers are compiled together
   (`Compiler.compileScene`) and share one layout, which holds the optional structures
   (CWBVH, light tree, object table) only if some renderer reads them (`DataReads`).
   `planDataLayout` (components/data/ledger.ts) is the one layout; `dataTenantsOf`
   (compiler/plan/dataTenants.ts) feeds it. The compiler also returns a scene-data plan
   (`CompiledScene.sceneData`, compiler/sceneData.ts) saying what to pack where; the App
-  executes it (app/sceneData.ts) and derives nothing from the scene itself. The App compiles
-  before it packs.
+  executes it (app/sceneData.ts) and derives nothing else from the scene, except which
+  environment sampling tables to build (`envVariants`; docs/claude-data-exact-linkage.md).
+  The App compiles before it packs.
 - **Which scene objects are lights** has one answer: `samplableEmitterObjects` in
   dataTenants.ts (with the authored `lights` it forms `lightRosterOf`). Use it; don't
   re-derive it.
@@ -88,10 +91,12 @@ How a program is assembled:
   the same image).
 - **Truncations are declared.** Measurement fields that make the image differ from ground
   truth are the bias ledger: `maxBounces`, `maxNullCrossings` (one budget for a path and its
-  shadow rays), opaque shadow rays through dielectrics (`shadows: 'opaque-dielectrics'`), RGB
-  color. `maxBounces: N` is Σ_{n≤N} TⁿE — at most N
-  scattering events — under every estimator. `MAX_DIST` (1000, glsl/core/math.glsl) is an
-  absolute far clip: the environment is found there by both BSDF rays and NEE.
+  shadow rays), `scattering: 'ignored'` (scattering media rendered absorbing-only), opaque
+  shadow rays through dielectrics (`shadows: 'opaque-dielectrics'`), RGB color.
+  `maxBounces: N` is Σ_{n≤N} TⁿE — at most N events (surface and medium scattering events;
+  each traversal of a GRIN region also counts as one) — under every estimator. `MAX_DIST`
+  (1000, glsl/core/math.glsl) is an absolute far clip: the environment and the directional
+  light are found there, by both BSDF rays and NEE.
 - **The trace-loop contract** (docs/trace-loop-contract.md): `Ray` is a pure geodesic
   seed; `scene_intersect` fills a `Hit`; dot products go through `ambient_dot` (the
   curved-space seam).
@@ -188,7 +193,8 @@ How a program is assembled:
 - Cameras: pinhole, thin lens, orthographic, equirect, fisheye, cylindrical. Box pixel
   filter; accumulators average / variance / oneshot; seven tonemaps.
 - Output: exports carry reproducibility stamps; `app.renderTiled` renders any size in tiles
-  and saves one stitched HDR/PNG (byte-identical to a one-piece render at the same salt).
+  and saves one stitched HDR/PNG (pixel-identical to a one-piece render at the same salt;
+  checked once by hand in headless Chromium, not by an automated test).
 - Tooling: the witness runner, shader dumps, CI.
 
 **Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
@@ -198,9 +204,13 @@ rectangle quad sampling; two-sided quad lights; driven light geometry; multi-mat
 meshes.
 
 **Known open defects**: cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
-README.md). Remaining audit items are in docs/claude-improvements-2026-09.md, Part 1. Fixed Sep 25: the GRIN furnaces (lenses rendered
-black: a region/material id mix-up) and softbeam-wall (an under-sampled check). The Sep 25
-sweep passed 180 of 181 exact checks (only cube-cloud).
+README.md). docs/claude-review-2026-09-25.md lists what the review of the Sep 24–25 work
+found (correctness items, duplicated decisions, tests that cannot fail, wrong documents), with
+proposed fixes; docs/claude-improvements-2026-09.md has the other suggested improvements.
+The last full sweep (180 of 181 exact checks; only cube-cloud) ran at commit c5f3543. The
+transport changes after it — `Hit.ng`, the mesh margin, `maxNullCrossings`, the GRIN
+roulette, the derived tracking bound — had targeted witness runs only, and the witnesses
+added with them have never been in a full sweep.
 
 ## Design authority
 

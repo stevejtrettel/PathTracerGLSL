@@ -3,17 +3,19 @@
 Written after the Sep 24–25 review, bug-fix and audit sessions. What was already fixed is in
 `CHANGELOG.md` (Sep 24 and Sep 25 entries). This document is what remains: things we could
 do next, most valuable first, with a worked-out plan wherever I could research one fully.
-Nothing here is built except where marked. Items marked **Your call** need a decision from
-you before any code (1.1 has since been decided and built).
+Nothing here is built except where marked. Items that need a decision from you before any
+code say so. The review of the Sep 24–25 work (claude-review-2026-09-25.md) lists defects
+found in that work itself.
 
 Each item says: what it is, why it matters (with the evidence), and the plan.
 
 ---
 
-## Part 1 — Correctness items found but not fixed
+## Part 1 — Correctness items (1.1 and 1.2 since built)
 
-These are real defects or estimator-dependent truncations. I left them unfixed because each
-one changes an interface or a declared semantic, which you prefer to decide yourself.
+Defects or estimator-dependent truncations found by the audit. Each changes an interface or a
+declared semantic, so each waited for your decision; 1.1 and 1.2 have been decided and built,
+1.3 and 1.4 remain.
 
 ### 1.1 Mesh lights under MIS use the wrong normal for smooth meshes — **Built (Sep 25): `Hit.ng`**
 
@@ -70,7 +72,9 @@ onto the triangle's side of the ray; with normal maps this becomes a rule for ev
 ### 1.2 Three budgets that make the image depend on the estimator — **Built (Sep 25)**
 
 The taxonomy says estimators must not change the converged image, and truncations must be
-declared. Three safety budgets break that quietly. None is reached by a registry scene today.
+declared. As found, three safety budgets broke that quietly (the constants below no longer
+exist; the built fix follows the plan). The audit believed no registry scene reached them;
+groundfog did reach the collision cap, with an effect on its image of at most 0.09%.
 
 - **`MAX_SHADOW_SEGMENTS = 8`** (the media shadow walker). A shadow ray crossing more than 8
   null boundaries (e.g. several `'none'`-walled fog boxes, or instanced fog spheres) returns
@@ -102,8 +106,9 @@ declared. Three safety budgets break that quietly. None is reached by a registry
   null crossings, counted along the whole path. A shadow ray gets what the path has left
   (`shadow_crossings_left`, passed as `shadow_transmittance`'s third argument), so
   `MAX_SHADOW_SEGMENTS` is gone. Witnesses `null-budget-view` (exact: the light through 5 slabs
-  at budget 10, black at 9) and `null-budget` (nee ≡ mis ≡ pt at the default budget and at 11,
-  where the budget cuts the direct light under a null-walled carpet).
+  at budget 10, black at 9) and `null-budget` (nee ≡ mis, with a pt tripwire on the mean, at the
+  default budget and at 11, where the budget cuts the direct light under a null-walled
+  carpet).
 - The collision cap is not a measurement field: whether it binds depends on the majorant, which
   the scene declares. It is now derived per segment instead of fixed: each tracking loop is
   bounded by `tracking_cap(σ̄·t) = ⌈λ + 6.5√λ + 12⌉`, which a walk exceeds with probability
@@ -372,8 +377,6 @@ unbounded fogs.
   values do not change on a reset; drop that clear.
 - The witness runner compiles and packs each scene once per strategy. With the salt pinned
   it could render all of a scene's strategies from one page (`selectRendererByStrategy`).
-- `pages/scene-lab.ts` enables GPU profiling by default, which forces a readback sync after
-  every pass.
 
 ---
 
@@ -456,12 +459,9 @@ were plausible but unconfirmed, or confirmed but too small to act on yet. Listed
 lost; each says what would settle it.
 
 **Transport and media**
-- The per-path null-crossing counter is never reset (see 1.2). Settle: count paths the cap
-  kills in `grin-furnace` with Russian roulette off and a large `maxBounces`.
-- Tracking exhaustion on long segments (see 1.2). Measured in `groundfog` (black sky): the old
-  cap of 64 changed the image by at most 0.09%. The cap is now 1024 with a Planner warning, and
-  groundfog's fog is boxed. Under an environment or sun light, dropped attenuation would matter
-  more; the warning covers that case.
+- Settled by 1.2: the per-path null-crossing count is now the declared `maxNullCrossings`
+  budget, and the tracking loops derive their bound per segment (groundfog under the old cap
+  of 64: at most 0.09% effect on its image, measured).
 
 **Lights, environment, cameras**
 - Mesh-light CDF in f32: for meshes with 10⁵–10⁶+ triangles the realized per-triangle
@@ -486,7 +486,8 @@ lost; each says what would settle it.
   orthographic view with no jitter over integer-coordinate boxes, on hardware that propagates NaN.
 - The mesh triangle test rejects |det| < 1e-12 in local space; for finely tessellated meshes
   scaled up by 10³ or more, valid grazing hits may be rejected.
-- No guard ties the CWBVH's maximum depth to `CWBVH_STACK_DEPTH` (24). Harmless for today's
+- `buildCWBVH` warns when a tree's depth reaches `CWBVH_STACK_DEPTH` (24), but the walk still
+  drops subtrees past it (taxonomy §4.1, known step limits). Not reached by today's
   sphere-only batches.
 - Data textures: no check of a channel's total height against `MAX_TEXTURE_SIZE`, and BVH
   child/leaf indices stored in f32 are exact only below 2²⁴ (meshes above ~8.4M triangles).

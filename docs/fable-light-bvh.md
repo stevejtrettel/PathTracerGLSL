@@ -213,10 +213,10 @@ gate.)
 ## 5. Rail tenants (the ledger stanza)
 
 New tenant `lightTree`, allocated whenever the scene's light roster is non-empty AND
-every roster kind declares the `treeBounds` fact (the always-upload precedent — one
-scene layout serves every strategy; cost is trivial at authored-light counts). The
-stanza is appended LAST in `planDataLayout`, so every existing tenant's baked bases
-are byte-stable:
+every roster kind declares the `treeBounds` fact, and some renderer on the scene reads it
+(`lightSelection: 'bvh'` — `DataReads.lightTree`). It is one of the optional stanzas that
+`planDataLayout` places after every always-built region, so adding it never moves an
+always-built base:
 
 ```
 records: tableBase   = r;  r += n · rowStride        // §4 rows (stride from the layout truth)
@@ -288,7 +288,7 @@ intersection feature's `needDataRail` learns the bvh-selection condition so
     'power' they stay path-found (the pre-stage-2 behavior). This is estimator-only:
     NEE-with-bookkeeping and pure path-found emission converge to the SAME image
     (§11.2), so the taxonomy is clean and the power CDF never meets a 100k-entry
-    bake. Tenant + pack stay strategy-independent (always-upload).
+    bake. The tenant is packed only when some renderer reads the tree.
   - **The `light_of` seam becomes `int light_of(int region, int element)`** globally
     (one seam, no per-selection signatures; individual-light arms ignore `element`;
     the batch arm returns `R + base_b + element`). The emitter-hit call site passes

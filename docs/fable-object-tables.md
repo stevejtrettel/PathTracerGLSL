@@ -152,8 +152,9 @@ NOT this batch; probes are per-vertex, not per-node.)
 - **Ledger/adapter**: `DataTenants.sceneTable` + `SceneTableSlot` (leafList + analytic
   records in `records`, the scene TLAS in `nodes`, 2(2L−1)-padded); the adapter's
   `SceneTable` = THE truth (eligibility, SOLIDS-FIRST record order, registry-order kind
-  codes, canonical leaf order) read by Planner and App alike. Strategy-independent:
-  packed always, read only by 'table' programs.
+  codes, canonical leaf order) read by the Planner and by the compiler's scene-data plan
+  (compiler/sceneData.ts), which the App executes. Built only when some renderer on the
+  scene reads it (a 'table' program — `DataReads.sceneTable`).
 - **Records — a §3 strengthening**: BOTH sides generated from the descriptor ROWS
   (`compiler/generate/records.ts`: `recordPack` + `generateRecordReader`) — zero
   per-descriptor record code; stride overflow is a loud generator error. Wire format:

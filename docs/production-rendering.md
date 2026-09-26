@@ -19,7 +19,7 @@ app.start();
 
 // Later: Start production render
 await app.renderProduction(1000);  // Render 1000 samples
-app.exportPNG();
+await app.exportPNG();
 ```
 
 ## Production Render API
@@ -105,7 +105,9 @@ around all tiles).
 through `engine.imageSize`, tile offsets are multiples of 64 (the period of the display's
 blue-noise dither), and the job pins ONE RNG salt, recorded in the stamp. Rendering the same
 scene at the same size in one piece with that salt pinned (`app.pinResetSalt(salt)`) gives
-byte-identical files; this was checked in headless Chromium for the cornell camera family.
+pixel-identical images (the files differ only in their stamps, which carry the date). This was
+checked once by hand in headless Chromium for the cornell camera family; no automated test
+checks it.
 
 **Memory.** The stitched image is kept at 4 bytes per pixel per format (RGBE for HDR, RGBA
 for PNG): 133 MB each at 7680×4320. Both are allocated before the first tile, so a size the
@@ -124,20 +126,20 @@ animation frames in background tabs.
 After rendering:
 
 ```typescript
-// Export PNG (8-bit, tonemapped)
-app.exportPNG();
-app.exportPNG('my-render.png');
+// Export PNG (8-bit, tonemapped; encoding is async)
+await app.exportPNG();
+await app.exportPNG('my-render.png');
 
 // Export HDR (32-bit float, linear)
 app.exportHDR();
 app.exportHDR('my-render.hdr');
 
 // Export specific AOV
-app.exportAOV('albedo');
-app.exportAOV('normal', 'normals.png');
+await app.exportAOV('albedo');
+await app.exportAOV('normal', 'normals.png');
 
 // Export all AOVs
-app.exportAllAOVs();
+await app.exportAllAOVs();
 ```
 
 ## Events
@@ -154,8 +156,7 @@ All event names are defined as constants in `src/app/events.ts` (`AppEvents`):
 | `RENDER_STOPPED` | `render.stopped` | - | Render cancelled |
 | `RENDER_PAUSED` | `render.paused` | - | Render paused |
 | `RENDER_RESUMED` | `render.resumed` | - | Render resumed |
-| `RENDER_LOCKED` | `render.locked` | - | Parameters locked |
-| `RENDER_UNLOCKED` | `render.unlocked` | - | Parameters unlocked |
+| `RENDER_ERROR` | `render.error` | `{ error }` | A frame failed; the render loop stops |
 
 ### ProgressInfo
 
@@ -295,7 +296,6 @@ app.setLayoutMode('split');
 
 | Feature | Description | Priority |
 |---------|-------------|----------|
-| Settings Modal | UI for configuring render before starting (resolution presets, sample count, tiling options) | High |
 | Low-res preview | Thumbnail composite of completed tiles during tiled rendering | Medium |
 | Time estimation | ETA based on average tile render time | Low |
 | Settings persistence | localStorage for render settings | Low |

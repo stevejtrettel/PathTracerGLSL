@@ -1,7 +1,7 @@
 # Heterogeneous Media — Design Authority
 
 **Status: owner-approved design (July 17 2026); BUILT the same day (V0→V2, build
-record: `impl-plan-heterogeneous-media.md`) — the GPU witness sweep is owner-pending.
+record: `impl-plan-heterogeneous-media.md`); its witnesses pass in the full sweeps.
 Medium emission (`impl-plan-medium-emission.md`) landed the same evening, filling this
 build's reserved slots.**
 **Amended July 17 2026 (implementation kickoff, owner-decided):** (a) the D1 clamp is
@@ -279,7 +279,7 @@ loop (≤ tracking_cap(σ̄·len)):
     fetch EFFECTIVE props at p(t)                    // clamp already applied in the lookup
     T_c *= (σ̄ − σ_t_eff,c) / σ̄
     (optional early-out when max channel of T < ε)
-return T   // on budget exhaustion: conservative (current T)
+return T   // cap reached (probability < 1e-10 per segment): the rest of the segment is dropped
 ```
 
 Notes: exact per channel with one shared collision stream. On constant-σ media this
