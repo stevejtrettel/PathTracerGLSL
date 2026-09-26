@@ -72,12 +72,17 @@ export class ProductionOrchestrator {
                 }
             });
 
-            // Auto-export runs here — still at target resolution, before exitProduction
-            // ever restores — so a completed render is always saved before it can be
-            // discarded on return to interactive.
-            if (options?.autoExportPNG) { console.log('Auto-exporting PNG...'); await this.app.exportPNG(); }
+            // Auto-export runs here — still at target resolution, before exitProduction ever
+            // restores — so a completed render is saved before it can be discarded on return
+            // to interactive. Every buffer is READ before the first await: each export reads
+            // its pixels synchronously when called and only its encoding is async, so starting
+            // them all and then waiting means a stop during an encode (which resizes and clears
+            // the buffer) cannot change what the later exports save.
+            const saves: Promise<void>[] = [];
+            if (options?.autoExportPNG) { console.log('Auto-exporting PNG...'); saves.push(this.app.exportPNG()); }
             if (options?.autoExportHDR) { console.log('Auto-exporting HDR...'); this.app.exportHDR(); }
-            if (options?.autoExportAllAOVs) { console.log('Auto-exporting all AOVs...'); await this.app.exportAllAOVs(); }
+            if (options?.autoExportAllAOVs) { console.log('Auto-exporting all AOVs...'); saves.push(this.app.exportAllAOVs()); }
+            await Promise.all(saves);
             if (options?.autoSave) { console.log('Auto-saving session...'); this.app.quickSave(); }
         } finally {
             // Render settled (completed or stopped): unlock + restore profiling, but

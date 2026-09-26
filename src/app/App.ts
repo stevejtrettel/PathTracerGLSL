@@ -728,6 +728,13 @@ export class App {
     }
 
     async exportAOV(aovName: string, filename?: string): Promise<void> {
+        await this.captureAOV(aovName, filename)();
+    }
+
+    /** Read one AOV buffer (and build its stamp) NOW, synchronously; the returned function
+     *  encodes and saves what was read. Separating the two lets exportAllAOVs read every AOV
+     *  before encoding any. */
+    private captureAOV(aovName: string, filename?: string): () => Promise<void> {
         const exports = this.getAvailableExports();
         if (!exports.includes(aovName)) {
             throw new ExportError(`AOV '${aovName}' not available`, {
@@ -739,16 +746,22 @@ export class App {
         try {
             const [width, height] = this.getCanvasSize();
             const pixels = this.readExport(aovName);
-            const name = filename || this._generateExportFilename(aovName, 'hdr');
-
-            if (pixels instanceof Float32Array) {
-                saveHDRFile(pixels, width, height, name, this.buildRenderStamp());
-                console.log(`Exported AOV (HDR): ${name}`);
-            } else {
-                const pngName = filename || this._generateExportFilename(aovName, 'png');
-                await savePNGFile(pixels, width, height, pngName, this.buildRenderStamp());
-                console.log(`Exported AOV (PNG): ${pngName}`);
-            }
+            const stamp = this.buildRenderStamp();
+            return async () => {
+                try {
+                    if (pixels instanceof Float32Array) {
+                        const name = filename || this._generateExportFilename(aovName, 'hdr');
+                        saveHDRFile(pixels, width, height, name, stamp);
+                        console.log(`Exported AOV (HDR): ${name}`);
+                    } else {
+                        const name = filename || this._generateExportFilename(aovName, 'png');
+                        await savePNGFile(pixels, width, height, name, stamp);
+                        console.log(`Exported AOV (PNG): ${name}`);
+                    }
+                } catch (error) {
+                    throw new ExportError(`Failed to export AOV '${aovName}'`, { aovName, error });
+                }
+            };
         } catch (error) {
             if (error instanceof ExportError) throw error;
             throw new ExportError(`Failed to export AOV '${aovName}'`, { aovName, error });
@@ -771,9 +784,20 @@ export class App {
         console.log(`Exporting ${aovs.length} AOVs...`);
         const errors: Array<{ aov: string; error: any }> = [];
 
+        // Read every AOV before encoding any: encoding is async, and a render continuing (or a
+        // stop clearing the buffer) between two reads would otherwise mix frames in one export.
+        const saves: Array<{ aov: string; save: () => Promise<void> }> = [];
         for (const aov of aovs) {
             try {
-                await this.exportAOV(aov);
+                saves.push({ aov, save: this.captureAOV(aov) });
+            } catch (error) {
+                errors.push({ aov, error });
+                console.error(`Failed to export AOV '${aov}':`, error);
+            }
+        }
+        for (const { aov, save } of saves) {
+            try {
+                await save();
             } catch (error) {
                 errors.push({ aov, error });
                 console.error(`Failed to export AOV '${aov}':`, error);

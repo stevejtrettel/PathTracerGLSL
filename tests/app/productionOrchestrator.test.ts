@@ -157,6 +157,24 @@ describe('ProductionOrchestrator — tiled session', () => {
     });
 });
 
+describe('ProductionOrchestrator — auto-export', () => {
+    it('reads every buffer before awaiting any encode', async () => {
+        const app = fakeApp();
+        let releasePNG!: () => void;
+        app.exportPNG.mockImplementation(() => { app.log.push('exportPNG'); return new Promise<void>((r) => { releasePNG = r; }) as never; });
+        const coord = fakeCoordinator(() => Promise.resolve());
+        const { orch } = mk(app, coord);
+
+        const done = orch.renderProduction(10, { autoExportPNG: true, autoExportHDR: true, autoExportAllAOVs: true });
+        await vi.waitFor(() => expect(app.exportPNG).toHaveBeenCalled());
+        // The PNG is still encoding: the HDR and the AOVs must already have been read.
+        expect(app.exportHDR).toHaveBeenCalled();
+        expect(app.exportAllAOVs).toHaveBeenCalled();
+        releasePNG();
+        await done;
+    });
+});
+
 describe('ProductionOrchestrator — stopping a tiled job', () => {
     const tiles = [{ col: 0, row: 0, x: 0, y: 0, width: 64, height: 64 }];
 
