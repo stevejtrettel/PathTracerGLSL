@@ -237,11 +237,6 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // DERIVED material-field uniforms (D4) — same discipline as the majorants.
     for (const list of derivedByMat.values()) for (const e of list) if (e.uniform) uniforms.push(e.uniform);
 
-    // No structural defines remain (item-9 commit D): media structs/helpers arrive via
-    // core's conditionally-included structs_media/math_media blocks. The tracking loops derive
-    // their own bound per segment (tracking_cap in delta_tracking.glsl).
-    const defines: Record<string, string> = {};
-
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     // Each entry mirrors its emission condition above — the interface header is truthful.
     const provides = [
@@ -314,7 +309,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         requires.push('data_texel1d');
     }
 
-    return { ...emptyContribution('materials'), blocks, defines, uniforms, parameters, textures, provides, requires };
+    return { ...emptyContribution('materials'), blocks, uniforms, parameters, textures, provides, requires };
 }
 
 // ============================================================================
