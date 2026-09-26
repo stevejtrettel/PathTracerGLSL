@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { validate } from '../../src/compiler/analyze/Validator.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
-import type { SceneDescription, RenderStrategy, PrimitiveObject } from '../../src/compiler/types.js';
+import type { SceneDescription, RenderStrategy, PrimitiveObject, GlslExpression } from '../../src/compiler/types.js';
 
 function baseScene(): SceneDescription {
     return {
@@ -852,10 +852,12 @@ describe('Validator — Sep 25 audit gaps', () => {
     });
 
     it('procedural environment: no params, integer table size', () => {
-        const sky = (extra: object) => run((s) => { s.environment = { type: 'procedural', glsl: { kind: 'glsl', source: 'vec3(0.5)', ...extra } as any, ...extra } as any; });
-        expect(errs(run((s) => { s.environment = { type: 'procedural', glsl: { kind: 'glsl', source: 'vec3(u_gain)', params: { gain: { param: 'sky.gain', default: 1 } } } as any }; }))).toMatch(/cannot declare params/);
-        expect(errs(run((s) => { s.environment = { type: 'procedural', glsl: { kind: 'glsl', source: 'vec3(0.5)' }, tableSize: [512.5, 256] } as any; }))).toMatch(/tableSize/);
-        expect(sky({}).hasErrors()).toBe(false);
+        const sky = (glsl: GlslExpression, tableSize?: [number, number]) =>
+            run((s) => { s.environment = { type: 'procedural', glsl, ...(tableSize !== undefined ? { tableSize } : {}) }; });
+        expect(errs(sky({ kind: 'glsl', source: 'vec3(u_sky_gain)', params: [{ param: 'sky.gain', default: 1 }] }))).toMatch(/cannot declare params/);
+        expect(sky({ kind: 'glsl', source: 'vec3(0.5)', params: [] }).hasErrors()).toBe(false);   // an empty list declares nothing
+        expect(errs(sky({ kind: 'glsl', source: 'vec3(0.5)' }, [512.5, 256]))).toMatch(/tableSize/);
+        expect(sky({ kind: 'glsl', source: 'vec3(0.5)' }).hasErrors()).toBe(false);
     });
 
     it('parameter paths must become valid GLSL identifiers', () => {
