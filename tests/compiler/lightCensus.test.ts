@@ -17,11 +17,12 @@ import { validate } from '../../src/compiler/analyze/Validator.js';
 import { planRenderers } from '../../src/compiler/plan/Planner.js';
 import { Compiler } from '../../src/compiler/Compiler.js';
 import { DiagnosticBag, CompilationError } from '../../src/errors/core/DiagnosticBag.js';
-import { lightRosterOf, samplableEmitterObjects } from '../../src/compiler/plan/dataTenants.js';
+import { samplableEmitterObjects } from '../../src/compiler/plan/dataTenants.js';
 import { envSelectionProbability } from '../../src/compiler/generate/features/lighting.js';
 import type { SceneDescription, RenderStrategy, SpectrumProperty } from '../../src/compiler/types.js';
 import type { RenderPlan } from '../../src/compiler/plan/types.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
+import { blackbodyRGB } from '../../src/components/lights/blackbody.js';
 
 const BLACKBODY: SpectrumProperty = { blackbody: { kelvin: 3000, scale: 5 } };
 
@@ -59,29 +60,50 @@ function planOf(s: SceneDescription, st: RenderStrategy) {
     return { features, plan: planRenderers(features, s, [st], bag).plans[0] };
 }
 
-/** An emitter's light must describe the surface a ray hits (pt ≡ pt-nee needs them equal): its
- *  values are the kind's valuesFromRegion applied to the PLANNED surface's parameters and the
- *  PLANNED material's emission; a mesh light's radiance is its planned material's emission. The
- *  light values and the surface are planned on separate paths (lightRosterOf; the Planner's
- *  object and material planning), so this compares two computations, not one with itself.
- *  Returns how many lights it checked. */
-function expectLightsDescribeTheirSurfaces(p: RenderPlan): number {
+/** An authored area light must describe the region it desugars to (pt ≡ pt-nee needs them
+ *  equal): its values (the kind's toValues of the authored fields) equal the kind's
+ *  valuesFromRegion applied to the planned region's parameters and the planned material's
+ *  emission. The two are built from the authored light by separate code (toValues;
+ *  region.parameters), so this compares two computations. An emissive object's light is built
+ *  from its planned surface, so for those the test below checks independently computed values
+ *  instead. Returns how many lights it checked. */
+function expectAuthoredLightsDescribeTheirRegions(p: RenderPlan, s: SceneDescription): number {
     let checked = 0;
     for (const l of p.lights) {
-        if (l.regionId === undefined) continue;   // delta lights have no surface
-        const surface = p.objects.find((o) => o.index === l.regionId) ?? p.meshes.find((m) => m.index === l.regionId);
-        expect(surface).toBeDefined();
-        const emission = p.materials.find((m) => m.id === surface!.materialId)!.values.emission;
-        if (l.kind === 'mesh') {
-            expect(l.values.radiance).toEqual(emission);
-        } else {
-            const fromRegion = LIGHT_KINDS[l.kind].valuesFromRegion;
-            if (fromRegion === undefined) continue;   // softbeam: its cone is not a region property
-            expect(l.values).toEqual(fromRegion((surface as RenderPlan['objects'][number]).parameters, emission as number[]));
-        }
+        // Delta lights have no region; regions below scene.objects.length are scene objects.
+        if (l.regionId === undefined || l.regionId < s.objects.length) continue;
+        const region = p.objects.find((o) => o.index === l.regionId)!;
+        const emission = p.materials.find((m) => m.id === region.materialId)!.values.emission;
+        const fromRegion = LIGHT_KINDS[l.kind].valuesFromRegion;
+        if (fromRegion === undefined) continue;   // softbeam: its cone is not a region property
+        expect(l.values).toEqual(fromRegion(region.parameters, emission as number[]));
         checked++;
     }
     return checked;
+}
+
+/** v rotated by `angle` about `axis` (Rodrigues' formula), written here independently of the
+ *  placement code under test. */
+function rotate(axis: number[], angle: number, v: number[]): number[] {
+    const n = Math.hypot(axis[0], axis[1], axis[2]);
+    const k = axis.map((a) => a / n);
+    const c = Math.cos(angle), sn = Math.sin(angle);
+    const kv = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
+    const kxv = [k[1] * v[2] - k[2] * v[1], k[2] * v[0] - k[0] * v[2], k[0] * v[1] - k[1] * v[0]];
+    return [0, 1, 2].map((i) => v[i] * c + kxv[i] * sn + k[i] * kv * (1 - c));
+}
+const add = (a: number[], b: number[]) => a.map((x, i) => x + b[i]);
+const scaled = (s: number, v: number[]) => v.map((x) => s * x);
+
+/** `actual` has exactly the rows of `expected`, each equal to 12 decimal places. */
+function expectValues(actual: Record<string, unknown>, expected: Record<string, number | number[]>): void {
+    expect(Object.keys(actual).sort()).toEqual(Object.keys(expected).sort());
+    for (const [row, want] of Object.entries(expected)) {
+        const got = actual[row] as number | number[];
+        const [g, w] = [[got].flat(), [want].flat()];
+        expect(g.length, row).toBe(w.length);
+        g.forEach((x, i) => expect(x, `${row}[${i}]`).toBeCloseTo(w[i], 12));
+    }
 }
 
 /** The compile error's messages, or a failure if it threw anything else (a raw TypeError
@@ -104,11 +126,11 @@ describe('blackbody material emission', () => {
         expect(features.lighting.totalLightCount).toBe(1);
         expect(p.lights.map((l) => l.kind)).toEqual(['sphere']);
         expect(p.program.estimator.lighting).not.toBeNull();   // NEE really is on
-        expect(expectLightsDescribeTheirSurfaces(p)).toBe(1);
+        expectValues(p.lights[0].values, { center: [0, 2, 0], radius: 0.5, radiance: blackbodyRGB(3000, 5) });
         expect(() => new Compiler().compile(s, strategy({ directLighting: 'mis' }))).not.toThrow();
     });
 
-    it('a blackbody MESH emitter joins the roster with its folded radiance (not the raw spelling)', () => {
+    it('a blackbody MESH emitter becomes a light with its folded radiance (not the raw spelling)', () => {
         const quad: SceneDescription['objects'][number] = {
             kind: 'mesh',
             positions: new Float32Array([-1, 2, -1, 1, 2, -1, 1, 2, 1, -1, 2, 1]),
@@ -119,8 +141,7 @@ describe('blackbody material emission', () => {
         s.objects = [s.objects[0], quad];
         const { plan: p } = planOf(s, strategy());
         expect(p.lights.map((l) => l.kind)).toEqual(['mesh']);
-        expect(Array.isArray(lightRosterOf(s)[0].values.radiance)).toBe(true);
-        expect(expectLightsDescribeTheirSurfaces(p)).toBe(1);
+        expectValues(p.lights[0].values, { radiance: blackbodyRGB(3000, 5), area: 4 });   // two triangles of area 2
     });
 
     it('a DRIVEN blackbody is not a samplable light (v1: power must bake) — it is path-found', () => {
@@ -146,7 +167,7 @@ describe('blackbody material emission', () => {
     });
 });
 
-describe("an emitter's light values describe its planned surface", () => {
+describe("an emitter's light values describe its surface", () => {
     it('emissive objects (moved, rotated, scaled; scalar, vec3 and blackbody emission), authored area lights, and a mesh', () => {
         const s: SceneDescription = {
             id: 'emitters',
@@ -178,7 +199,21 @@ describe("an emitter's light values describe its planned surface", () => {
             ],
         };
         const { plan: p } = planOf(s, strategy());
-        expect(expectLightsDescribeTheirSurfaces(p)).toBe(6);   // 3 objects, 2 authored lights, 1 mesh
+        expect(expectAuthoredLightsDescribeTheirRegions(p, s)).toBe(2);
+
+        // The emissive objects' lights, in world space. A placement maps x to R(s·x) + t: points
+        // move, edge vectors rotate and scale, normals rotate, radii scale.
+        const light = (region: number) => p.lights.find((l) => l.regionId === region)!.values;
+        expectValues(light(1), { center: add(scaled(1.5, [0, 2, 0]), [1, 0, -2]), radius: 0.75, radiance: [3, 3, 3] });
+        const r = (v: number[]) => rotate([0, 1, 1], 0.7, scaled(2, v));
+        expectValues(light(2), {
+            corner: add(r([-0.5, 3, -0.5]), [0.3, -0.2, 0.1]), edge1: r([1, 0, 0]), edge2: r([0, 0, 1]), radiance: [1, 2, 3],
+        });
+        expectValues(light(3), {
+            center: rotate([1, 0, 0], 0.4, [2, 3, 1]), normal: rotate([1, 0, 0], 0.4, [0, -1, 0]), radius: 0.4,
+            radiance: blackbodyRGB(4500, 2),
+        });
+        expectValues(light(4), { radiance: [1, 2, 3], area: 0.5 * 0.5 * 4 });   // a 2×2 square at scale 0.5
     });
 });
 

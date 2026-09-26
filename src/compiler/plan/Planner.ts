@@ -1,12 +1,13 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
+import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
 import { isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
-import { MATERIAL_MODELS, modelTwoSidedShading } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, modelTwoSidedShading, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
 import { lightTableLayout } from '../../components/lights/table.js';
+import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
 import { PRIMITIVES, primitive, primitiveBounds, canonicalizePrimitiveParameters, classifyPlacement, resolveBackend } from '../../components/geometry/index.js';
@@ -268,8 +269,8 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
 
     // --- Lights: the registry, in light-id order (= selection-CDF order), IS the light roster
     // (lightRosterOf): authored lights, then emissive analytic objects, then emissive meshes.
-    // The roster computed each light's values; here each entry is tied to its region. The data
-    // layout sized the light table and tree from the same list, so they cannot disagree.
+    // Each light's values are made here. The data layout sizes the light table and tree from
+    // the same list, so they cannot disagree.
     //
     // An authored HITTABLE light desugars to an emissive region: a synthesized material (the
     // backing model is lambert with albedo 0 — the only site that chooses it) and an object of
@@ -278,10 +279,13 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
     // (any mismatch makes pt and pt-nee converge to different images). An emissive OBJECT's
     // region id is its scene index.
     const lights: SceneLight[] = lightRosterOf(scene).map((entry, id): SceneLight => {
+        const d = LIGHT_KINDS[entry.kind];
         if ('authored' in entry.source) {
             const light = scene.lights[entry.source.authored];
-            const d = LIGHT_KINDS[entry.kind];
-            if (d.region === undefined) return { id, kind: entry.kind, values: entry.values };
+            // Row defaults applied once by the framework (the record the Validator judged).
+            const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
+            const values = d.toValues(authored, authoredLightEmission(light.emission));
+            if (d.region === undefined) return { id, kind: entry.kind, values };
             const matId = materialIndex++;
             materials.push({
                 id: matId,
@@ -291,10 +295,8 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
                 medium: null,
             });
             const regionId = objectIndex++;
-            // Row defaults applied once by the framework (the record the Validator judged);
-            // canonicalization (the disk's unit normal) is the same formula the kind's
-            // toValues applies, so hit side and sample side stay bit-identical.
-            const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
+            // Canonicalization (the disk's unit normal) is the same formula the kind's toValues
+            // applies, so hit side and sample side stay bit-identical.
             objects.push({
                 index: regionId,
                 materialId: matId,
@@ -302,15 +304,27 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
                 intersect: 'closed-form',
                 parameters: canonicalizePrimitiveParameters(d.region.primitive, d.region.parameters(authored)),
             });
-            return { id, kind: entry.kind, regionId, values: entry.values };
+            return { id, kind: entry.kind, regionId, values };
         }
+        // An emissive object's light is built from its planned surface: the planned object's
+        // folded parameters and its planned material's emission. The sampler then describes
+        // exactly the surface rays hit (pt ≡ pt-nee needs them equal). The emission is constant
+        // by the census predicate, so it has resolved to a spectrum.
         const regionId = entry.source.object;
-        if (entry.kind !== 'mesh') return { id, kind: entry.kind, regionId, values: entry.values };
-        // A mesh emitter samples its triangles by area: the literal walk range here, and the
-        // channel bases of its triangles, world-position bake and area CDF when the scene is
-        // placed (placeScene).
-        const mesh = meshes.find((m) => m.index === regionId)!;
-        return { id, kind: 'mesh', regionId, values: entry.values, mesh: { ordinal: mesh.ordinal, triCount: mesh.triCount } };
+        const emissionOf = (materialId: number) => materials.find((m) => m.id === materialId)!.values[EMISSION_KEY] as number[];
+        if (entry.kind === 'mesh') {
+            // A mesh emitter samples its triangles by area: the literal walk range here, and the
+            // channel bases of its triangles, world-position bake and area CDF when the scene is
+            // placed (placeScene). Its values are the radiance and the s²-folded world area.
+            const mesh = meshes.find((m) => m.index === regionId)!;
+            const o = scene.objects[regionId] as MeshObject;
+            const area = meshWorldArea(o.positions, o.indices, (mesh.placement as Similarity).scale);
+            return { id, kind: 'mesh', regionId, values: { radiance: emissionOf(mesh.materialId), area }, mesh: { ordinal: mesh.ordinal, triCount: mesh.triCount } };
+        }
+        // Emitter shapes are similarity-closed, so a constant placement folds entirely into the
+        // parameters (classifyPlacement) and the planned object keeps no placement.
+        const surface = objects.find((o) => o.index === regionId)!;
+        return { id, kind: entry.kind, regionId, values: d.valuesFromRegion!(surface.parameters, emissionOf(surface.materialId)) };
     });
 
     // Selection-power context (impl-plan-directional-beam P6): pbrt's DistantLight

@@ -140,6 +140,12 @@ compiles (all 91 fail).
   for the translated, rotated and scaled quad, sphere and disk emitters and the mesh's area, so it
   can still fail.
 - Proof: the digest.
+- *Done (step 3):* the digest is identical for all 203 scenes; vitest 2696 passing. The census
+  helper now checks only authored area lights against their regions (still two computations: 2
+  lights). The four object lights are checked against values the test computes with its own
+  rotation (Rodrigues' formula) and the placement rule x ↦ R(s·x) + t. The two blackbody-emitter
+  tests check their values directly. *Breakages,* each failing the emitter test: the light built
+  from the authored (unplaced) parameters; the mesh area without the placement's scale.
 
 **4. Colour conversion becomes a renderer step.**
 - `resolveColorProperty` stops converting a constant blackbody, so the scene plan holds colours

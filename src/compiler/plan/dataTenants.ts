@@ -12,9 +12,8 @@ import type { ProgramDescription } from './types.js';
 import { resolveColorProperty } from './values.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
-import { PRIMITIVES, paramsRecordFloats, primitiveIsBounded, resolveBackend, foldPlacementIntoParameters, classifyPlacement } from '../../components/geometry/index.js';
-import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
+import { PRIMITIVES, paramsRecordFloats, primitiveIsBounded, resolveBackend, classifyPlacement } from '../../components/geometry/index.js';
+import { LIGHT_KINDS } from '../../components/lights/index.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
@@ -196,13 +195,11 @@ export function samplableEmitterObjects(scene: SceneDescription): EmitterObject[
     return out;
 }
 
-/** One light-roster entry: the kind, its UNRESOLVED registry values (driven rows stay
- *  ValueParam/Blackbody; consumers resolve), and where it came from — an authored light
- *  (index into scene.lights) or an emissive object (index into scene.objects, which is also
- *  its region id). */
+/** One light-roster entry: the kind, and where it came from — an authored light (index into
+ *  scene.lights) or an emissive object (index into scene.objects, which is also its region
+ *  id). */
 export interface LightRosterEntry {
     kind: string;
-    values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
     source: { authored: number } | { object: number };
 }
 
@@ -218,44 +215,17 @@ export function authoredLightEmission(e: LightEmission): number[] | ValueParam<n
 
 /** THE light registry, in light-id order (= selection-CDF order): authored lights (scene
  *  order), then emissive analytic objects, then emissive meshes (samplableEmitterObjects'
- *  order). The Planner builds its lights from this list, and the data layout sizes the light
- *  table and tree from it — one list, so they cannot disagree. */
+ *  order). Identity only; the Planner computes each light's values (planScene). The data
+ *  layout sizes the light table and tree from this list too — one list, so they cannot
+ *  disagree. */
 export function lightRosterOf(scene: SceneDescription): LightRosterEntry[] {
     const roster: LightRosterEntry[] = [];
-
     // Authored lights (unregistered kinds are Validator-rejected, and skipped here).
     scene.lights.forEach((light, lightIndex) => {
-        const d = LIGHT_KINDS[light.kind];
-        if (d === undefined) return;
-        const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
-        roster.push({ kind: light.kind, values: d.toValues(authored, authoredLightEmission(light.emission)), source: { authored: lightIndex } });
+        if (LIGHT_KINDS[light.kind] !== undefined) roster.push({ kind: light.kind, source: { authored: lightIndex } });
     });
-
-    // Routes 2 and 3 — emissive OBJECTS, from the one census (samplableEmitterObjects),
-    // in its order: analytic objects, then meshes. The material emission is constant by
-    // the census predicate, so it resolves to a spectrum — by the same function that
-    // resolves the planned material's emission (resolveColorProperty).
-    for (const { index, kind } of samplableEmitterObjects(scene)) {
-        const o = scene.objects[index] as PrimitiveObject | MeshObject;
-        const Le = resolveColorProperty(scene.materials[o.material]!.emission, [0, 0, 0]) as number[];
-        if (isMeshObject(o)) {
-            // Real values (the mesh kind is tree-eligible — its table row and power read
-            // them): radiance, and the s²-folded WORLD area. Only the BOX is pack-side.
-            roster.push({
-                kind,
-                values: { radiance: Le, area: meshWorldArea(o.positions, o.indices, similarityFromTransform(o.transform).scale) },
-                source: { object: index },
-            });
-        } else {
-            roster.push({
-                kind,
-                values: LIGHT_KINDS[kind].valuesFromRegion!(
-                    foldPlacementIntoParameters(o.type, o.parameters, similarityFromTransform(o.transform)), Le),
-                source: { object: index },
-            });
-        }
-    }
-
+    // Emissive objects, from the one census, in its order: analytic objects, then meshes.
+    for (const { index, kind } of samplableEmitterObjects(scene)) roster.push({ kind, source: { object: index } });
     return roster;
 }
 
