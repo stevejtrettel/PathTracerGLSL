@@ -23,7 +23,7 @@ import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
 import { AppEvents, shouldResetAccumulation } from './events.js';
 import { saveHDRFile, savePNGFile, type RenderStamp } from './utils/file-export.js';
-import { ExportError, SessionError, RenderStoppedError } from '../errors/RenderErrors.js';
+import { ExportError, SessionError } from '../errors/RenderErrors.js';
 import { ProductionOrchestrator, type ProductionOptions } from './ProductionOrchestrator.js';
 import { TiledRenderer, type TiledRenderConfig } from './TiledRenderer.js';
 import { ErrorOverlay } from './ui/ErrorOverlay.js';
@@ -447,16 +447,17 @@ export class App {
     }
 
     /** Render an image of any size in tiles and save it as one stamped HDR and/or PNG (see
-     *  TiledRenderer). Interactive rendering resumes afterwards, however the job ended. */
+     *  TiledRenderer). Rejects with RenderStoppedError if stopped (nothing is saved), like
+     *  renderProduction. Afterwards interactive rendering resumes, unless something else
+     *  started meanwhile: after the last tile the files are still being written while the
+     *  session is already idle, and a production started then must not be torn down. */
     async renderTiled(config: TiledRenderConfig): Promise<void> {
+        if (this.tiled.isActive()) throw new Error('A tiled render is already running');
         this.stop();
         try {
             await this.tiled.render(config);
-        } catch (error) {
-            if (!(error instanceof RenderStoppedError)) throw error;
-            console.log('Tiled render stopped; nothing was saved');
         } finally {
-            this.start();
+            if (this.production.isIdle()) this.start();
         }
     }
 

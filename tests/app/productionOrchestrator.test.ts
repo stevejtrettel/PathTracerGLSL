@@ -157,6 +157,31 @@ describe('ProductionOrchestrator — tiled session', () => {
     });
 });
 
+describe('ProductionOrchestrator — stopping a tiled job', () => {
+    const tiles = [{ col: 0, row: 0, x: 0, y: 0, width: 64, height: 64 }];
+
+    it('clears the tile offset and image size even when a new production starts before the job settles', async () => {
+        const app = Object.assign(fakeApp(), {
+            setImageSize: vi.fn(), clearImageSize: vi.fn(), setPixelOffset: vi.fn(), clearPixelOffset: vi.fn(),
+        });
+        let rejectTile!: (e: Error) => void;
+        let calls = 0;
+        const coord = fakeCoordinator(() => (calls++ === 0
+            ? new Promise<void>((_, reject) => { rejectTile = reject; })
+            : new Promise<void>(() => {})));   // the new production keeps rendering
+        const { orch } = mk(app, coord);
+
+        const job = orch.renderTiles([64, 64], tiles, 16, () => {}).catch(() => {});
+        orch.exitProduction();                       // what App.stop() does
+        orch.renderProduction(10).catch(() => {});   // a new session starts synchronously
+        rejectTile(new Error('RenderStopped'));      // the tile loop settles afterwards
+        await job;
+
+        expect(app.clearPixelOffset).toHaveBeenCalled();
+        expect(app.clearImageSize).toHaveBeenCalled();
+    });
+});
+
 describe('ProductionOrchestrator — session robustness (Sep 25 audit)', () => {
     it("a stopped run's late finally does not unlock the NEXT session", async () => {
         const app = fakeApp();

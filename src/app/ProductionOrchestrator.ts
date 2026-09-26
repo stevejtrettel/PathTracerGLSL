@@ -40,6 +40,9 @@ export class ProductionOrchestrator {
     private previousResolution: [number, number] | null = null;
     private profilingWasEnabled: boolean = false;
     private productionLayoutMode: LayoutMode = 'centered';
+    // A tiled job has set a pixel offset and a full-image size on the App. They are part of
+    // the production view, so leaving production clears them — whichever call leaves it.
+    private tileView = false;
     // Each run (render, extend, tiled job) takes a token when it goes active; its `finally`
     // settles or exits only if it is still the current run. A stopped run's promise settles
     // a microtask AFTER stop() returns, by which time a new session may already be active —
@@ -126,6 +129,7 @@ export class ProductionOrchestrator {
         const run = this.beginProduction();
         this.previousResolution = this.app.getCanvasSize();
         this.app.setImageSize(imageSize[0], imageSize[1]);
+        this.tileView = true;
         try {
             for (const [index, tile] of tiles.entries()) {
                 this.app.resize(tile.width, tile.height);
@@ -135,13 +139,14 @@ export class ProductionOrchestrator {
                 onTile(tile, index);
             }
         } finally {
-            if (run === this.runId) {   // not if a newer session has already replaced this one
-                this.app.clearPixelOffset();
-                this.app.clearImageSize();
-                this.exitProduction();
-            }
+            // Not if a newer session has already replaced this one: whatever left this session
+            // (App.stop → exitProduction) has already cleared the tile view.
+            if (run === this.runId) this.exitProduction();
         }
     }
+
+    /** No production session is active or on display. */
+    isIdle(): boolean { return this.phase === 'idle'; }
 
     /**
      * Restore the interactive view when leaving a production session. Idempotent —
@@ -152,6 +157,12 @@ export class ProductionOrchestrator {
 
         // Ensure params/profiling are restored even if we abort straight from 'active'.
         this.settleProduction();
+
+        if (this.tileView) {
+            this.app.clearPixelOffset();
+            this.app.clearImageSize();
+            this.tileView = false;
+        }
 
         if (this.previousLayoutMode && this.app.hasLayout()) {
             if (this.app.getLayoutMode() !== this.previousLayoutMode) {
