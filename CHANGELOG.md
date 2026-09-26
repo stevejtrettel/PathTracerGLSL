@@ -4,6 +4,38 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-26 — review batch 5: tests that can fail
+
+Review Part 3, test-only work as planned in docs/claude-review-batch5-plan.md (owner: "if this is
+test stuff do it"). Every item was re-checked first. Every new or changed test was run against a
+deliberately broken version of the code it guards: it failed there, and passed once the code was
+restored. The breakages were never committed.
+
+| Commit | Test | Broken code it was run against |
+|---|---|---|
+| 2269993 | The CWBVH over four identical boxes keeps every item once (the old check was `order.length`, always n) | the builder writing item 0 twice |
+| 827c32f | The procedural-sky params rule, with the real `params` shape (no `as any`), and an empty list accepted | the rule inverted |
+| b4b7d3d | RGBE export clamps a negative channel to 0 | the clamp removed (the byte came out 230) |
+| 535af02 | PNG export round-trips a 1000×800 image, which spans three write batches | the filter's previous row reset at each batch (the small-image test still passed) |
+| a018f4b | Each emitter's light values equal `valuesFromRegion` of its **planned** surface and material emission, across 6 lights (2 self-comparing assertions replaced) | emission without the blackbody fold (3 tests fail); placement ignoring the transform (the new test fails; the old assertions passed) |
+| 1d4b287 | `mesh-light-smooth`'s text: it guards the spawn rule, not the MIS pdf normal (worth ~0.05% here) | — |
+| 67a95d1 | `null-budget`'s pt tripwires at 1.5× the measured rmse (97%, 112%) | — (a black arm reads ≥ 200%) |
+| 18a6051 | New witness `emit-sat-budget`: the fog budget at `maxBounces` 0, 1, 2 against the exact truncated sums | the fog branch's budget off by one: N = 1 read N = 0's value, N = 2 read N = 1's |
+
+- **`emit-sat-budget` numbers:** channel means over salts 11/22/33 (160×120, 96 spp): N = 0 exactly
+  0.77778 (no noise); N = 1 1.0372 ± 0.0004 against the exact 1.0370; N = 2 1.1236 ± 0.0004 against
+  1.1235. So the renderer honours "at most N events" inside media.
+- **Paused (plan §"Paused"):** 5.5, rough glass at η = 1. Its premise was wrong. Measured with the
+  twin at η = 1 ± 10⁻⁴: the samples converge on −wo, but the weight is 0.999, 0.612 and 0.219 for
+  (cos θ, roughness) = (0.9, 0.3), (0.3, 0.8) and (0.1, 0.9), while the η = 1 shortcut transmits
+  everything. The rough dielectric is therefore discontinuous at η = 1 (microfacet masking loss),
+  and the shortcut is the physical answer, not the model's limit.
+- **For the owner (production code, not done):**
+  - a Validator rule for a `{param}` fov's slider range;
+  - an automated tiled-render check (a runner feature);
+  - a witness for the mesh light's pdf normal (research).
+- vitest 2966 passing; tsc clean.
+
 ## 2026-09-26 — review batch 4: one answer per fact
 
 Review Part 2, as planned in docs/claude-review-batch4-plan.md: twelve commits (d61e76a …

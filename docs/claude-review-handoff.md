@@ -1,13 +1,13 @@
 # Handoff — where the Sep 25 review stands, and what comes next
 
-**Status:** current as of the batch 4 records commit (Sep 26, 2026). This page is for resuming work after
+**Status:** current as of the batch 5 records commit (Sep 26, 2026). This page is for resuming work after
 a context break. Update it or delete it when the review is done. Nothing here overrides
 [claude-review-2026-09-25.md](claude-review-2026-09-25.md), which has the findings; this page
 covers the state, the working rules and the next step.
 
 **Starting a new session:**
 1. Read this page, CLAUDE.md, and review Part 7.
-2. Then write the batch 5 plan (§4) and ask the owner to approve it. Write no code before that.
+2. Then ask the owner about batch 5's open items (§4), and write the batch 6 plan for approval.
 
 The full Sep 24–25 conversation is at
 `~/.claude/projects/-Users-stevetrettel-Code-PathTracerGLSL/82cdb188-a9ad-46c5-9cfb-c8888062efff.jsonl`,
@@ -17,18 +17,20 @@ if a detail is needed.
 
 ## 1. Where things stand
 
-- **Batches 1–4 are done.** Batch 2: [claude-review-batch2-plan.md](claude-review-batch2-plan.md),
+- **Batches 1–5 are done** (batch 5 but for its paused and owner items). Batch 2: [claude-review-batch2-plan.md](claude-review-batch2-plan.md),
   CHANGELOG "review batch 2". Batch 3 (the shadow-ray aim, review 1.2):
   [claude-review-batch3-plan.md](claude-review-batch3-plan.md), CHANGELOG "review batch 3".
   Batch 4 (one answer per fact, review Part 2):
   [claude-review-batch4-plan.md](claude-review-batch4-plan.md), CHANGELOG "review batch 4".
-- **The working tree is clean.** 66 commits on `main` are **not pushed**. CI has never run on
+  Batch 5 (tests that can fail, review Part 3; test-only, owner-approved in principle):
+  [claude-review-batch5-plan.md](claude-review-batch5-plan.md), CHANGELOG "review batch 5".
+- **The working tree is clean.** 75 commits on `main` are **not pushed**. CI has never run on
   any of them, and the CI concurrency change (46cf2dc) is unverified until the first push.
-- **`npx vitest run`:** 2950 passing. `npx tsc --noEmit` is clean.
+- **`npx vitest run`:** 2966 passing. `npx tsc --noEmit` is clean.
 - **Full witness sweep:** not run since c5f3543. Only targeted witnesses have run since then.
   Ask the owner before running the full sweep (45 min).
 - **Review web page (the owner's copy):** https://claude.ai/artifact/HVH8Rs64ECjcEFCdso2iZY
-  (batches 1–4 marked done). Its source is in the session scratchpad
+  (batches 1–5 marked done). Its source is in the session scratchpad
   (`sep25-review.html`), which does not survive a new session. To update the page, read it
   back with the Artifact tool's `read` action.
 
@@ -81,12 +83,11 @@ every null crossing in the media walker. The plan, its decisions and deviations 
 [claude-review-batch3-plan.md](claude-review-batch3-plan.md); the numbers are in the CHANGELOG.
 Two things it left open are listed under "Also open" below.
 
-## 4. Next: batches 5–7 (order from review Part 7; each needs its own approved plan)
+## 4. Next: batches 6–7 (order from review Part 7; each needs its own approved plan)
 
-Batch 4 is done (its plan and deviations: claude-review-batch4-plan.md). Its own open items are
-under "Also open" below.
+Batches 4 and 5 are done (their plans record the deviations). Their open items are under "Also
+open" below.
 
-- **Batch 5 — tests that can't fail (Part 3).** Replace them with tests that can.
 - **Batch 6 — history in comments (Part 5).** Mechanical, one commit. It also covers the stale
   "App calls the layout functions" comments and the ledger's "light tree — appended last".
 - **Batch 7 — the GRIN design note (review 1.1, 1.3).** Start from `docs/fable-variable-ior.md`,
@@ -122,6 +123,12 @@ under "Also open" below.
   - **Separately, `eta_scale`:** an item that affects noise only, never the answer.
 
 **Also open (not in any batch yet):**
+- **From batch 5** (details in its plan):
+  - rough glass is discontinuous at η = 1 (measured; a modelling question), and its η = 1 test
+    still checks the twin against itself;
+  - a Validator rule for a `{param}` fov's slider range (production code);
+  - an automated tiled-render check (a runner feature);
+  - a witness for the mesh light's MIS pdf normal (research).
 - **From batch 4:**
   - The scene/program restructure: plan a scene's objects, lights and materials once, then each
     renderer's decisions against them. Today each renderer's plan repeats the scene part, and the
