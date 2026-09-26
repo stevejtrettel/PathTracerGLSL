@@ -567,8 +567,8 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     'mesh-light-smooth': {
         scene: meshLightSmooth,
         strategies: meshLightStrategies.slice(0, 2),
-        exercises: 'a SMOOTH-SHADED emissive mesh (an octahedron lamp with radial vertex normals, up to 54.7° off the face normals): the MIS pdf query at a BSDF-found lamp hit must use the geometric normal (Hit.ng), as the sampler does',
-        expected: 'keys 1 (pt-nee) and 2 (pt-mis) converge to the same image; a facet-shaped difference means the pdf query is reading the shading normal',
+        exercises: 'a SMOOTH-SHADED emissive mesh (an octahedron lamp with radial vertex normals, up to 54.7° off the face normals): a ray spawned from the lamp must start on the side of the TRUE surface it travels into (ray_spawn offsets along Hit.ng). Does not guard the MIS pdf query\'s use of Hit.ng, which is worth ~0.05% here',
+        expected: 'keys 1 (pt-nee) and 2 (pt-mis) converge to the same image; pt-mis ~5% bright means spawned rays are crossing back through their own triangle',
         witness: {
             spp: 192,
             checks: [

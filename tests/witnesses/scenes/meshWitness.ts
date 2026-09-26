@@ -272,15 +272,19 @@ export const meshLightRef: SceneDescription = {
 };
 
 // ---------------------------------------------------------------------------
-// mesh-light-smooth — a SMOOTH-SHADED emissive mesh: the MIS pdf must use the geometric normal.
+// mesh-light-smooth — a SMOOTH-SHADED emissive mesh: a spawned ray must start on the side of the
+// TRUE surface it travels into.
 //
 // A regular octahedron lamp (6 shared vertices, 8 faces) with RADIAL vertex normals. Face
 // normals point along the diagonals (±1, ±1, ±1)/√3 and vertex normals along the axes, so the
 // interpolated shading normal leaves the plane normal by up to 54.7° toward the vertices (they
-// agree at face centers). The NEE sampler converts area to solid angle with the plane normal;
-// the MIS pdf query at a BSDF-found lamp hit must use the same one (Hit.ng). With the shading
-// normal there, the two pdfs differ, the MIS weights stop summing to 1, and pt-mis drifts from
-// pt-nee in a pattern that follows the facets.
+// agree at face centers). ray_spawn offsets along the geometric normal (Hit.ng). With the
+// shading normal there, a direction sampled below the true plane started on the outside and
+// crossed back through its own triangle; on the lamp that spurious hit counted its emission
+// under MIS but not under NEE, and pt-mis read 5% bright.
+// What this does NOT guard: the MIS pdf query also uses Hit.ng (the sampler's area → solid
+// angle conversion), but in this scene that fix is worth about 0.05% (5% → 4.95% with it alone),
+// below the check's tolerance and noise. It has no witness.
 // ---------------------------------------------------------------------------
 
 function octahedronMesh(center: number[], r: number): { positions: Float32Array; indices: Uint32Array; normals: Float32Array } {
