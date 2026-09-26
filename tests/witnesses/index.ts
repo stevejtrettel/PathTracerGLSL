@@ -2106,13 +2106,15 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // carpet half lit under nee (carpet-half mean 0.044) where pt cuts it (0.024); measured
             // nee/pt carpet halves 0.0445/0.0440 (default) and 0.0248/0.0244 (budget 11). The rmse
             // is pt's chance-hit noise in a dim frame, measured 64.5% (default) and 74.4% (budget
-            // 11) at 192 spp — a structural tripwire only. nee ≡ mis is nearly identical-stream
-            // here (the small light gives the BSDF side little weight).
+            // 11) at 192 spp; each tripwire is 1.5× its measurement (the README rule) — a
+            // structural tripwire only (a black arm reads ≥ 200% by the statistic's definition).
+            // nee ≡ mis is nearly identical-stream here (the small light gives the BSDF side
+            // little weight).
             checks: [
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.02, label: 'default budget: nee ≡ mis' },
-                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.9, label: 'default budget: pt tripwire' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 0.97, label: 'default budget: pt tripwire' },
                 { kind: 'equality', strategies: [3, 4], meanTol: 0.02, label: `budget ${2 * SLABS + 1}: nee ≡ mis` },
-                { kind: 'equality', strategies: [3, 5], meanTol: 0.03, rmse: 0.9, label: `budget ${2 * SLABS + 1}: pt tripwire` },
+                { kind: 'equality', strategies: [3, 5], meanTol: 0.03, rmse: 1.12, label: `budget ${2 * SLABS + 1}: pt tripwire` },
             ],
         },
     },
