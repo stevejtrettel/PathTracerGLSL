@@ -1,6 +1,6 @@
 # Handoff — where the Sep 25 review stands, and what comes next
 
-**Status:** current as of the batch 5 records commit (Sep 26, 2026). This page is for resuming work after
+**Status:** current as of the tiled-check records commit (Sep 26, 2026). This page is for resuming work after
 a context break. Update it or delete it when the review is done. Nothing here overrides
 [claude-review-2026-09-25.md](claude-review-2026-09-25.md), which has the findings; this page
 covers the state, the working rules and the next step.
@@ -17,14 +17,16 @@ if a detail is needed.
 
 ## 1. Where things stand
 
-- **Batches 1–5 are done** (batch 5 but for its paused and owner items). Batch 2: [claude-review-batch2-plan.md](claude-review-batch2-plan.md),
+- **Batches 1–5 are done**, except batch 5's paused item (5.5) and one owner item (a
+  mesh-light witness). The fov slider rule and the automated tiled check were owner-approved and
+  done. Batch 2: [claude-review-batch2-plan.md](claude-review-batch2-plan.md),
   CHANGELOG "review batch 2". Batch 3 (the shadow-ray aim, review 1.2):
   [claude-review-batch3-plan.md](claude-review-batch3-plan.md), CHANGELOG "review batch 3".
   Batch 4 (one answer per fact, review Part 2):
   [claude-review-batch4-plan.md](claude-review-batch4-plan.md), CHANGELOG "review batch 4".
   Batch 5 (tests that can fail, review Part 3; test-only, owner-approved in principle):
   [claude-review-batch5-plan.md](claude-review-batch5-plan.md), CHANGELOG "review batch 5".
-- **The working tree is clean.** 77 commits on `main` are **not pushed**. CI has never run on
+- **The working tree is clean.** 79 commits on `main` are **not pushed**. CI has never run on
   any of them, and the CI concurrency change (46cf2dc) is unverified until the first push.
 - **`npx vitest run`:** 2967 passing. `npx tsc --noEmit` is clean.
 - **Full witness sweep:** not run since c5f3543. Only targeted witnesses have run since then.
@@ -126,7 +128,6 @@ open" below.
 - **From batch 5** (details in its plan):
   - rough glass is discontinuous at η = 1 (measured; a modelling question), and its η = 1 test
     still checks the twin against itself;
-  - an automated tiled-render check (a runner feature);
   - a witness for the mesh light's MIS pdf normal (research).
 - **From batch 4:**
   - The scene/program restructure: plan a scene's objects, lights and materials once, then each

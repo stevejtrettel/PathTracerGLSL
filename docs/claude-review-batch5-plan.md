@@ -1,9 +1,10 @@
 # Batch 5 plan — tests that can't fail (review Part 3)
 
-**Status:** done Sep 26 except 5.5 (paused; see below) and the three owner items (2269993 …
-18a6051; CHANGELOG "review batch 5"). The owner approved doing the test-only work directly ("if
-this is test stuff do it"). This plan records the re-check of every Part 3 item, the test-only steps, and the items that
-need production code, which come back to the owner and are not done here. All line numbers are at
+**Status:** done Sep 26 (2269993 … 18a6051; CHANGELOG "review batch 5"), except 5.5 (paused; see
+below) and owner item 3 (open). Owner items 1 and 2 were approved and done as 5.10 and 5.11. The
+owner approved doing the test-only work directly ("if this is test stuff do it"). This plan
+records the re-check of every Part 3 item, the test-only steps, and the items that need
+production code, which came back to the owner. All line numbers are at
 ef5cfdd. "Confirmed" means read in the code, with complete searches.
 
 **How every new or changed test is shown to be able to fail.** Each is run against a deliberately
@@ -94,9 +95,21 @@ recorded here and in the CHANGELOG.
    - Tests first; they fail today.
    - All 20 slider-driven fovs in the suite declare bounds inside (0, π), so no scene gains a
      diagnostic.
-2. **Tiled rendering (item 7)**: an automated pixel-identity check means teaching the witness
-   runner to render a scene in tiles and compare it with a one-piece render. That is test
-   infrastructure, but a new feature of the runner. Do it, or leave it as checked once by hand?
+2. **Tiled rendering (item 7)** — **approved Sep 26**, done as 5.11. The runner gets a check kind,
+   `tiled`. It renders the scene in one page, first with `app.renderTiled` (format 'both', a
+   small tile size so edge tiles are partial) and then in one piece at the same size, spp and
+   pinned salt, saved through `exportHDR`/`exportPNG`. It catches the four downloads and requires:
+   - the HDR files' pixel bytes (after the header) to be identical;
+   - the PNG files' decompressed image data to be identical. The stamps differ (date), and the
+     encoder is deterministic, so equal pixels give equal bytes.
+   - Boundaries: tools/witness.mjs (the branch), tests/witnesses/types.ts (the variant), the check
+     added to `cornell-area` (160×120, tiles of 64 → 3×2 with partial edge tiles), the witness
+     README, and CLAUDE.md's status line. docs/production-rendering.md made the same "no
+     automated test" statement and is updated with it.
+   - Proof it can fail: with `renderTiles` temporarily not setting the tile's pixel offset, the
+     check must fail.
+   - Result: passes on the real code (0 of 76800 HDR bytes and 0 of 57720 PNG bytes differ). With
+     the offset removed it fails: 54291 HDR bytes and 41637 PNG bytes differ.
 3. **A witness for the mesh light's pdf normal (item 1)**: in the one scene we have, that fix is
    worth about 0.05%. A witness that isolates it would need a scene built to make the shading and
    true normals disagree where both MIS techniques matter. That is research with an uncertain

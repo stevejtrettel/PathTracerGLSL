@@ -34,9 +34,13 @@ restored. The breakages were never committed.
   row's constraint, as its default does. For `fov` that is (0, π). A missing bound warns, because
   the panel then shows a free number box. The test was written first and failed before the rule.
   All 20 slider-driven fovs in the suite already comply.
-- **For the owner (not done):**
-  - an automated tiled-render check (a runner feature);
-  - a witness for the mesh light's pdf normal (research).
+- **Owner-approved, done (4635a64):** a witness check kind, `tiled`. On `cornell-area` the runner
+  renders with `app.renderTiled` (160×120 in 64px tiles: a 3×2 grid with partial edge tiles),
+  then in one piece at the same size, spp and pinned salt, and compares the saved files: the HDR
+  pixel bytes and the PNG image data must be identical. It passes. With `renderTiles` not
+  setting the tile's pixel offset, it fails (54291 of 76800 HDR bytes and 41637 of 57720 PNG bytes
+  differ). CLAUDE.md and docs/production-rendering.md no longer call this untested.
+- **For the owner (not done):** a witness for the mesh light's pdf normal (research).
 - vitest 2967 passing; tsc clean.
 
 ## 2026-09-26 — review batch 4: one answer per fact
