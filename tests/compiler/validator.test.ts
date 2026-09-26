@@ -863,3 +863,26 @@ describe('Validator — Sep 25 audit gaps', () => {
         expect(errs(bag)).toMatch(/sampleAsLight requires a samplable object/);
     });
 });
+
+describe('Validator — the constant environment', () => {
+    const errs = (bag: DiagnosticBag) => bag.getErrors().map((e) => e.message).join('\n');
+    const withSky = (color: unknown, intensity?: unknown) => run((s) => {
+        (s as any).environment = { type: 'constant', color, ...(intensity !== undefined ? { intensity } : {}) };
+    });
+
+    it('rejects a negative colour, a bad blackbody and a negative intensity', () => {
+        expect(errs(withSky(-1))).toMatch(/environment\.color/);
+        expect(errs(withSky([0.5, -0.2, 0.5]))).toMatch(/environment\.color/);
+        expect(errs(withSky({ blackbody: { kelvin: -100 } }))).toMatch(/environment\.color.*kelvin/);
+        expect(errs(withSky({ blackbody: { kelvin: 6500, scale: -2 } }))).toMatch(/environment\.color.*scale/);
+        expect(errs(withSky([1, 1, 1], -1))).toMatch(/environment\.intensity/);
+        expect(errs(withSky([1, 1, 1], Number.NaN))).toMatch(/environment\.intensity/);
+    });
+
+    it('accepts valid spellings', () => {
+        for (const color of [0.2, [0.1, 0.2, 0.3], { blackbody: { kelvin: 6500 } }, { param: 'sky.color', default: [0.3, 0.3, 0.3] }]) {
+            expect(withSky(color).hasErrors()).toBe(false);
+        }
+        expect(withSky([1, 1, 1], 0).hasErrors()).toBe(false);
+    });
+});

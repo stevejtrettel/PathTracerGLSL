@@ -23,7 +23,7 @@ import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
-import { validateSceneProperties, constraintViolation } from './propertyValidation.js';
+import { validateSceneProperties, validatePropertyValue, constraintViolation } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
@@ -873,6 +873,15 @@ export function validate(
     // desync the direct-evaluated radiance from the frozen CDF), so a {param} in its formula
     // would reach GLSL undeclared; the table size becomes integer literals.
     const env = scene.environment;
+    // A constant sky's radiance: the same spectrum rules as material and light values (the one
+    // shared checker), since it is emitted radiance and feeds the env-selection power.
+    if (env?.type === 'constant') {
+        validatePropertyValue(env.color, { shape: 'spectrum', constraint: { kind: 'nonnegative' } }, 'environment.color', bag);
+        const I = env.intensity;
+        if (I !== undefined && (typeof I !== 'number' || !Number.isFinite(I) || I < 0)) {
+            bag.error('invalid-setting', `environment.intensity must be a finite number >= 0 (got ${String(I)})`).add();
+        }
+    }
     if (env?.type === 'procedural') {
         const params = (env.glsl as { params?: unknown }).params;
         if (params !== undefined && (typeof params !== 'object' || params === null || Object.keys(params).length > 0)) {
