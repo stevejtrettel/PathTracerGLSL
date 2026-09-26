@@ -186,8 +186,8 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     blocks.push({
         origin: 'generated:light-sampling',
         source: bvh && layout !== null && plan.lightTree !== undefined
-            ? generateLightSamplingBvh(layout, plan.lightTree, envSamplable, batchArms, plan.lights.filter((l) => l.mesh !== undefined))
-            : generateLightSampling(plan.lights, selectPdf, envSamplable, driven),
+            ? generateLightSamplingBvh(layout, plan.lightTree, plan.program.environmentSelectionLive, batchArms, plan.lights.filter((l) => l.mesh !== undefined))
+            : generateLightSampling(plan.lights, selectPdf, envSamplable, plan.program.environmentSelectionLive, driven),
     });
 
     // Equiangular placement needs the light's POSITION before choosing t — a query the
@@ -208,8 +208,8 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
             blocks.push({
                 origin: 'generated:lighting-pdf',
                 source: bvh && layout !== null && plan.lightTree !== undefined
-                    ? generateLightingPdfBvh(layout, plan.lightTree, envSamplable, batchArms)
-                    : generateLightingPdf(plan.lights, selectPdf, envSamplable, driven),
+                    ? generateLightingPdfBvh(layout, plan.lightTree, plan.program.environmentSelectionLive, batchArms)
+                    : generateLightingPdf(plan.lights, selectPdf, plan.program.environmentSelectionLive, driven),
                 // (mesh pdf arms need no per-light bases — the mesh pdf is identity-free)
             });
         }
@@ -572,7 +572,9 @@ export function computeSelectPdf(lights: PlannedLight[], selection: string, para
     return weights.map((w) => w / total);
 }
 
-function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean, driven: boolean): string {
+// envSamplable: the sky has a sampler (a sky-only program samples it directly). selectionLive:
+// the plan's environmentSelectionLive, whether the two-stage sky-vs-lights draw exists.
+function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean, selectionLive: boolean, driven: boolean): string {
     const lines: string[] = ['// Generated light selection dispatcher (§6.1)'];
 
     if (lights.length === 0) {
@@ -592,7 +594,7 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
     // With a samplable env, the finite-light dispatcher keeps its exact body under a private
     // name and a two-stage wrapper owns the env-vs-finite draw (cdf_rescale on stage 0's
     // random — pitfall 4 applies across stages too).
-    const finiteName = envSamplable ? 'lighting_sample_finite' : 'lighting_sample';
+    const finiteName = selectionLive ? 'lighting_sample_finite' : 'lighting_sample';
 
     lines.push(`LightSample ${finiteName}(LightQuery q, vec2 xi) {`);
     lines.push('    LightSample ls;');
@@ -635,7 +637,7 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
     lines.push('    return ls;');
     lines.push('}');
 
-    if (envSamplable) {
+    if (selectionLive) {
         lines.push('');
         lines.push('// Two-stage selection (env-as-light D3): stage 0 picks env vs the finite set;');
         lines.push('// pdfs scale by the SAME uniform on both sides (and in lighting_pdf and the');
@@ -665,12 +667,13 @@ function generateLightSampling(lights: PlannedLight[], selectPdf: number[], envS
 // carry no arm; unknown ids return 0 (weight → 1 on the BSDF side, conservative).
 // ============================================================================
 
-function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], envSamplable: boolean, driven: boolean): string {
+function generateLightingPdf(lights: PlannedLight[], selectPdf: number[], selectionLive: boolean, driven: boolean): string {
     const lines: string[] = ['// Generated MIS pdf query (§6.1) — must mirror lighting_sample exactly'];
-    // With a samplable env, every finite light's selection pdf carries the stage-0 factor —
-    // exactly what the sampler applied. The env itself has no arm here (never hit; the miss
-    // branch queries u_envSelectProb * environment_pdf directly, reference §8 line 3).
-    const stage0 = envSamplable ? ' * (1.0 - u_envSelectProb)' : '';
+    // With the sky-vs-lights draw live (the plan's environmentSelectionLive), every finite light's
+    // selection pdf carries the stage-0 factor — exactly what the sampler applied. The env itself
+    // has no arm here (never hit; the miss branch queries u_envSelectProb * environment_pdf
+    // directly, reference §8 line 3).
+    const stage0 = selectionLive ? ' * (1.0 - u_envSelectProb)' : '';
     const sel = selectionExprs(selectPdf, driven && lights.length > 1);
     lines.push('float lighting_pdf(LightQuery q, Direction wi, int light_id, Hit light_hit) {');
     for (let i = 0; i < lights.length; i++) {
@@ -843,8 +846,8 @@ function lightKindHeaderExpr(slot: LightTreeSlotBaked): string {
     return `int(texelFetch(u_data_records, data_texel1d(uint(${slot.tableBase} + light_id * ${slot.strideTexels})), 0).x)`;
 }
 
-function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, envSamplable: boolean, batchArms: BatchLightArm[], meshLights: PlannedLight[]): string {
-    const finiteName = envSamplable ? 'lighting_sample_finite' : 'lighting_sample';
+function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, selectionLive: boolean, batchArms: BatchLightArm[], meshLights: PlannedLight[]): string {
+    const finiteName = selectionLive ? 'lighting_sample_finite' : 'lighting_sample';
     const R = slot.registryCount;
     const lines: string[] = ['// Generated light selection dispatcher (fable-light-bvh §3/§7): tree descent over'];
     lines.push('// the GLOBAL index space — [0, R) table-resident registry lights, then per-batch');
@@ -896,7 +899,7 @@ function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotB
     lines.push('    ls.pdf *= select_pdf;   // total = per-light × selection (§6.1)');
     lines.push('    return ls;');
     lines.push('}');
-    if (envSamplable) {
+    if (selectionLive) {
         lines.push('');
         lines.push('// Two-stage selection (env-as-light D3): identical to the CDF regime — the tree');
         lines.push('// replaces only the finite stage; u_envSelectProb is the pInfinite stage.');
@@ -916,12 +919,12 @@ function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotB
     return lines.join('\n');
 }
 
-function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, envSamplable: boolean, batchArms: BatchLightArm[]): string {
+function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, selectionLive: boolean, batchArms: BatchLightArm[]): string {
     // Registry arms exist only for HITTABLE kinds present; delta kinds are never
     // queried, so the header check runs BEFORE the pmf walk (no wasted descent).
     // Batch arms replay the instance's trail and recompute the sphere pdf from its
     // placement record — the same row the sampler read.
-    const stage0 = envSamplable ? ' * (1.0 - u_envSelectProb)' : '';
+    const stage0 = selectionLive ? ' * (1.0 - u_envSelectProb)' : '';
     const R = slot.registryCount;
     const lines: string[] = ['// Generated MIS pdf query (fable-light-bvh §3.3/§7) — the trail-replayed selection pmf'];
     lines.push('float lighting_pdf(LightQuery q, Direction wi, int light_id, Hit light_hit) {');
