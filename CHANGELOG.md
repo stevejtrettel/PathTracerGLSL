@@ -82,11 +82,17 @@ owns it. No step was meant to change a picture.
   chart is, the bake shader included.
 
 **How "no change" was shown:**
-- The generated GLSL changed only at step 4.12, in 6 environment programs, and only as planned.
-- The full compiled output of all 202 suite scenes (shaders, uniforms, defaults, parameters, the
-  scene-data plan) was digested before and after steps 4.9–4.11 and is byte-identical. The only
-  intended differences were the new `scatteringMedia` record, which is not shipped, and the
-  batch-light plan entries of the five scenes with instanced lights.
+- The generated GLSL changed only at step 4.12, and only as planned: the `equirect_uv` function
+  and its comments, in 19 renderers of 5 scenes (proc-sky, proc-sky-rotated, sky, sky-lamp,
+  tonemap).
+- The compiled output of all 202 suite scenes (shaders, uniforms, defaults, parameters, the
+  scene-data plan) is identical before and after steps 4.9–4.11. The only intended differences
+  were the new `scatteringMedia` record, which is not shipped, and the batch-light plan entries
+  of the five scenes with instanced lights.
+- *Corrected Sep 26:* the digest first used for this recorded no shader text (it wrote the
+  shader Map as `{}`) and packed arrays only by length, and the "6 programs" count came from the
+  GLSL snapshot test, which covers about 40 cases. Both claims were re-checked with a digest that
+  includes shader text and array contents, at bb80148, d35859b and db0c163: the results above.
 - The scene-data byte fingerprints are unchanged, light tree included. That includes a new case
   with per-instance emission colours, which no suite scene covered; it was recorded before the
   change.
