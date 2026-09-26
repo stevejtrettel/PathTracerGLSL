@@ -4,6 +4,73 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-26 — review batch 3: shadow rays aimed at the light point
+
+Review item 1.2, as planned in docs/claude-review-batch3-plan.md, in two commits. The three
+witnesses below were written first and failed on the old code.
+
+- **The fault.** A shadow ray starts `hit.eps` off the surface (`ray_spawn`) but kept the
+  direction computed from the unmoved hit point, so it ran parallel to the segment it should
+  test and passed beside the light point. Seen at a slant, a light that is scene geometry then
+  blocked its own light — whenever ε·[(−n_g·n_l)/cos θ_l − cos θ] > `SHADOW_BACKOFF` — and
+  pt-nee and pt-mis read darker than pt.
+  - Receivers affected: marched surfaces (ε = 10⁻³); every surface in a program with a GRIN
+    medium (the spawn margin is floored at 10⁻³ there); surfaces far from the origin (the
+    fp-relative margin is 3·10⁻³ at 100 units).
+  - Lights affected: every light that is scene geometry — emissive objects, mesh lights, and
+    authored quad, disk, sphere and softbeam lights, which become scene objects. The review had
+    said authored lights were safe.
+  - The media shadow walker added one more offset at every null-interface crossing, where it
+    re-spawns the ray.
+- **The fix.** The ray keeps `ray_spawn`'s origin and is re-aimed at the light point with a new
+  ambient function, `ambient_direction_to(from, to)` (Euclidean: `normalize(to − from)`). The
+  walker re-aims after every re-spawn. Only visibility changes: the BSDF, the cosine and the
+  pdfs keep the sampled direction. Every light is aimed the same way, the sky and the sun
+  included (their light point is on the far clip).
+- **Witnesses** `shadow-aim-march`, `shadow-aim-far`, `shadow-aim-fog`: a floor under a disk
+  light, with an exact value. The first two use the coaxial-disk view factor; the fog slab uses
+  a Simpson quadrature, checked in shadowAim.test.ts. pt, which casts no shadow ray, is the
+  control. Measured at 160×120, 256 spp, the runner's salt 1234:
+
+  | witness | exact | before: pt-nee / pt-mis / pt | after: pt-nee / pt-mis / pt |
+  |---|---|---|---|
+  | march (marched floor, authored light) | 0.9846 | 0.827 / 0.876 / 0.985 | 0.983 / 0.985 / 0.985 |
+  | far (floor at x = 100, emissive object) | 0.9846 | 0.473 / 0.863 / 0.985 | 0.983 / 0.986 / 0.985 |
+  | fog (two marched null crossings) | 0.9504 | 0.598 / 0.839 / 0.951 | 0.950 / 0.952 / 0.951 |
+
+  - The "before" values match the plan's geometric predictions (0.828 / 0.876, 0.475 / 0.862,
+    0.603 / 0.838).
+  - With only the surface fix, fog still read 0.600 / 0.839; it passed after the walker fix.
+  - Tolerances come from a three-salt spread (salts 11, 22, 33) measured before the fix: pt-nee
+    sd ≈ 0.0037, so its tolerance is 0.015; pt-mis and pt have tolerance 0.005.
+- **Measured, not fixed.** Both effects below come from the spawn offset itself, not from the
+  aim. They belong to the open fp-spawn-margin item.
+  - pt reads 0.98474 and 0.98498 in the open scenes. That is exactly the disk's view factor from
+    the raised origin, 4/(4 + (0.25 − ε)²).
+  - After the fix, pt-mis reads +0.05% (march) and +0.14% (far), growing with ε. A hypothesis,
+    not checked: the MIS weight converts the BSDF sample's density from the hit point while its
+    ray starts at the raised origin.
+- **Also.**
+  - The epsilonCoupling check that `SHADOW_BACKOFF` ≥ 2·`MARCH_CLEARANCE` is removed; its
+    premise was this fault.
+  - `SHADOW_BACKOFF`'s comment now states its one remaining job (the light's own rounding
+    error). It also says the back-off is a fixed length: NEE ignores an occluder within 0.002 of
+    the light point, which a BSDF ray sees.
+  - Corrected the texts that described the old premise: light.md, lights/README.md,
+    trace-loop-contract.md, and the reference-implementations §4/§5 notes.
+  - Deviation from the plan: the witnesses also had to be filed in a gallery section
+    (pages/sections.ts).
+- **Targeted witnesses** (21 existing scenes, 42 checks): all pass — cornell-area,
+  cornell-disk, orb, mesh-light-twin, mesh-light-smooth, softbeam-wall, tiny-sphere-light,
+  veach-mis, hundred-spheres, instance-lights, field-glass, shadow-medium, emit-scatter,
+  fog-area, null-budget, region-overlap, instance-fog, sun-haze, sky, beam-slab, spot.
+  region-overlap needed a re-run. Its first attempts ran while the Mac was in idle sleep, which
+  made them look like a 170× slowdown (a timeout and a page reload). Awake, the same code renders
+  8 samples in 3.9 s, against 6.0 s before the fix, and the check passes.
+
+Not in this batch: deriving `SHADOW_BACKOFF` (it needs the light's normal in `LightSample`),
+and the curved-space distance in the walker (`length()`).
+
 ## 2026-09-25 — review batch 2: contained correctness fixes
 
 The fixes planned in docs/claude-review-batch2-plan.md, one commit each. Where a unit test

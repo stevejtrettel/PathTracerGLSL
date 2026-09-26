@@ -1,13 +1,13 @@
 # Handoff — where the Sep 25 review stands, and what comes next
 
-**Status:** current as of commit 6e528d6 (Sep 25, 2026). This page is for resuming work after
+**Status:** current as of the batch 3 records commit (Sep 26, 2026). This page is for resuming work after
 a context break. Update it or delete it when the review is done. Nothing here overrides
 [claude-review-2026-09-25.md](claude-review-2026-09-25.md), which has the findings; this page
 covers the state, the working rules and the next step.
 
 **Starting a new session:**
 1. Read this page, CLAUDE.md, and review Part 7.
-2. Then write the batch 3 plan (§3) and ask the owner to approve it. Write no code before that.
+2. Then write the batch 4 plan (§4) and ask the owner to approve it. Write no code before that.
 
 The full Sep 24–25 conversation is at
 `~/.claude/projects/-Users-stevetrettel-Code-PathTracerGLSL/82cdb188-a9ad-46c5-9cfb-c8888062efff.jsonl`,
@@ -17,16 +17,16 @@ if a detail is needed.
 
 ## 1. Where things stand
 
-- **Batch 1 (documents) and batch 2 (contained correctness fixes) are done.** Batch 2's plan
-  and its deviations are in [claude-review-batch2-plan.md](claude-review-batch2-plan.md), and
-  the CHANGELOG entry is "review batch 2".
-- **The working tree is clean.** 48 commits on `main` are **not pushed**. CI has never run on
+- **Batches 1–3 are done.** Batch 2: [claude-review-batch2-plan.md](claude-review-batch2-plan.md),
+  CHANGELOG "review batch 2". Batch 3 (the shadow-ray aim, review 1.2):
+  [claude-review-batch3-plan.md](claude-review-batch3-plan.md), CHANGELOG "review batch 3".
+- **The working tree is clean.** 53 commits on `main` are **not pushed**. CI has never run on
   any of them, and the CI concurrency change (46cf2dc) is unverified until the first push.
-- **`npx vitest run`:** 2902 passing. `npx tsc --noEmit` is clean.
+- **`npx vitest run`:** 2944 passing. `npx tsc --noEmit` is clean.
 - **Full witness sweep:** not run since c5f3543. Only targeted witnesses have run since then.
   Ask the owner before running the full sweep (45 min).
 - **Review web page (the owner's copy):** https://claude.ai/artifact/HVH8Rs64ECjcEFCdso2iZY
-  (version 3, batches 1–2 marked done). Its source is in the session scratchpad
+  (batches 1–3 marked done). Its source is in the session scratchpad
   (`sep25-review.html`), which does not survive a new session. To update the page, read it
   back with the Artifact tool's `read` action.
 
@@ -72,50 +72,14 @@ if a detail is needed.
   [claude-data-exact-linkage.md](claude-data-exact-linkage.md), "Decisions".
 - **The owner plans normal and bump mapping.** That is why `Hit.ng` exists.
 
-## 3. Next step: batch 3, the shadow-ray aim (review 1.2)
+## 3. Batch 3 — done
 
-**Nothing is written yet.** The next action is to **write the plan** as
-`docs/claude-review-batch3-plan.md` and ask the owner to approve it. What follows is the
-starting material, not an approved design.
+The shadow ray is re-aimed at the light point (`ambient_direction_to`), at the surface and after
+every null crossing in the media walker. The plan, its decisions and deviations are in
+[claude-review-batch3-plan.md](claude-review-batch3-plan.md); the numbers are in the CHANGELOG.
+Two things it left open are listed under "Also open" below.
 
-**The problem (checked by reading and geometry, not rendered):**
-- light.glsl:16–18 starts the shadow ray at the offset point (`ray_spawn(hit, ls.wi)`, offset
-  along `ng`), but keeps the direction `ls.wi` computed from the un-offset `hit.p`.
-  `light_p` is also computed from `hit.p`.
-- For a receiver under a parallel emitter, the ray meets the emitter at d − ε/cosθ, but the
-  search stops at ≈ d − ε·cosθ − `SHADOW_BACKOFF` (0.002, math.glsl:37). So the emitter
-  blocks its own light when ε(1/cosθ − cosθ) > 0.002. This happens:
-  - at cosθ < 0.4 for marched receivers (ε = 10⁻³);
-  - at grazing angles for receivers far from the origin (|p| ≈ 100 at 45°).
-- **Effect:** pt-nee and pt-mis read darker than pt. This affects emissive objects and mesh
-  lights, not authored analytic lights.
-- tests/components/epsilonCoupling.test.ts:69–74 models this shortfall without the 1/cosθ
-  factor. Its premise is the bug.
-
-**Candidate fix (pbrt's SpawnRayTo):** aim the shadow ray from its spawned origin at
-`light_p`. Only the visibility ray changes. The BSDF, the cosine and the pdf keep `ls.wi` from
-`hit.p`. **Questions the plan must settle with the owner:**
-1. **Curved spaces.** Aiming "from o at p" needs a direction-to-point operation.
-   - In Euclidean space it is `normalize(p − o)`; in H³ or Nil it is a log map.
-   - Adding it (for example `ambient_direction_to`) extends the `ambient_*` seam. That is an
-     interface change, so discuss it first.
-2. **Infinitely distant lights** (directional, environment). Their `light_p` is at `MAX_DIST`.
-   Re-aiming turns a delta direction by about ε/1000.
-   - The candidate rule: keep `ls.wi` for lights at infinity, and re-aim only for lights at a
-     finite distance. Decide this explicitly.
-3. **The medium techniques.** light_medium.glsl:15 and equiangular.glsl:49 use
-   `make_ray(p_evt, …)` with no offset. As read, the bug doesn't apply there. Confirm this in
-   the plan.
-4. **The null-interface shadow walker.** media.glsl:36 recomputes the remaining distance per
-   segment, and :55 re-spawns at each crossing. Decide whether each segment also re-aims.
-
-**Verification to write first:** a witness in which pt and pt-nee disagree today. For example,
-an emissive surface at a grazing angle over a marched receiver with cosθ < 0.4, checked for
-pt ≡ pt-nee. Run it on the old code and see it fail. Then fix the coupling test's model. Then
-run the targeted light and emitter witnesses (mesh-light-*, cornell-*, the estimator-equality
-set).
-
-## 4. After batch 3 (order from review Part 7; each needs its own approved plan)
+## 4. Next: batches 4–7 (order from review Part 7; each needs its own approved plan)
 
 - **Batch 4 — one answer per fact (review Part 2).** Refactors only, with no behaviour
   change, proven by unchanged snapshots and witnesses. It includes:
@@ -166,11 +130,23 @@ set).
 
 **Also open (not in any batch yet):**
 - **The fp spawn margin** (review 1.11, suspected). It needs a measurement plan before any fix.
+  Batch 3 measured two effects of the spawn offset itself in its witnesses: pt sees a light
+  from the raised origin (reads 4/(4 + (0.25 − ε)²), exactly), and pt-mis reads +0.05% / +0.14%
+  high at ε = 10⁻³ / 3·10⁻³ — a hypothesis, unchecked: the MIS weight converts the BSDF sample's
+  density from the hit point, while its ray starts at the raised origin.
+- **`SHADOW_BACKOFF` is a fixed 0.002.** After batch 3 its only job is the light's own rounding
+  error, but NEE still ignores an occluder within 0.002 of the light point, which a BSDF ray
+  sees. Deriving it (pbrt-v4 offsets the light point along its normal by its error bound) needs
+  the light's normal in `LightSample`, an interface change. Needs its own plan.
 - `pages/scene-lab.ts` contains NUL bytes, so git treats it as binary (Part 6).
 - **Pushing, and the first CI run:** the owner decides when.
 
 ## 5. Practical notes
 
+- **Keep the Mac awake during witness runs** (`caffeinate -i npm run witness -- …`). In idle
+  sleep, renders make progress only during brief maintenance wakes, so they time out or the
+  page reloads. On Sep 26 this looked like a 170× slowdown from the batch 3 change; it was sleep
+  (`pmset -g log` has the times).
 - **Targeted witnesses:** `npm run witness -- name1 name2`. In zsh, pass the names literally.
   An unquoted `$VAR` passes them as one argument, and the run silently renders nothing. Check
   that the logs are non-empty.
@@ -181,6 +157,10 @@ set).
   - `window.app` is exposed.
   - Batch 2's probes (`probe-tiled.mjs` and others) are in the session scratchpad, which is
     lost in a new session.
+  - To measure a witness's noise (batch 3), render one arm at several salts with the runner's
+    steps (tools/witness.mjs `renderFrame`): `app.stop()`, `app.pinResetSalt(salt)`,
+    `app.selectRendererByStrategy(id)`, `app.resize(w, h)`, `app.renderProduction(spp)`, then
+    average `app.readExport('hdr')`.
 - **Manager tests** use the fakes in tests/app/fakes.ts. `App` itself has no harness.
 - On Apple silicon without Rosetta, the glslang tests fail with "could not be run". That is
   the tool, not the code (see CLAUDE.md).
