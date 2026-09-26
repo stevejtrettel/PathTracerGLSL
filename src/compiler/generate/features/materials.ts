@@ -119,7 +119,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     const majorants = new Map<number, MajorantSpec>();
     for (const mat of plan.materials) {
         if (mat.medium === null) continue;
-        const scatters = scatteringLive && mediumMayScatter(mat.medium);
+        const scatters = media.scatteringMedia.includes(mat.id);   // the Planner's record
         if (mediumRoutesToTracking(mat.medium, scatters)) majorants.set(mat.id, majorantSpec(mat));
     }
     if (media.present) {
@@ -183,7 +183,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).
         if (wantsShadowMedia) {
-            blocks.push({ origin: 'generated:medium-transmittance', source: generateMediumTransmittance(plan.materials, plan.program.media.scatteringArms) });
+            blocks.push({ origin: 'generated:medium-transmittance', source: generateMediumTransmittance(plan.materials, plan.program.media.scatteringMedia) });
         }
     }
 
@@ -655,7 +655,7 @@ function generateIorAt(materials: PlannedMaterial[]): string {
 
 function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantSpec>): string {
     const withMedium = plan.materials.filter((m) => m.medium !== null);
-    const scatteringLive = plan.program.media.scatteringArms;
+    const scatteringMedia = plan.program.media.scatteringMedia;   // the Planner's record
 
     const lines: string[] = ['// Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)'];
     lines.push('MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {');
@@ -674,11 +674,11 @@ function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantS
             // Absorbing(+emitting) media take the deterministic walker; scattering media take
             // the arc-length channel-MIS sampler (compile-time routing — policy generated,
             // math static in grin.glsl). Precedes the straight scatter/absorb routing.
-            const grinScatters = scatteringLive && mediumMayScatter(med);
+            const grinScatters = scatteringMedia.includes(mat.id);
             lines.push(`    if (med == ${mat.id}) return ${grinScatters ? 'medium_sample_grin_scatter' : 'medium_sample_grin'}(${mat.id}, ray, t_max, xi);   // '${mat.name}' — variable-IOR (GRIN, ${grinScatters ? 'scattering' : 'deterministic'})`);
             continue;
         }
-        const scatters = scatteringLive && mediumMayScatter(med);   // the ONE census predicate (types.ts)
+        const scatters = scatteringMedia.includes(mat.id);
         if (mediumRoutesToTracking(med, scatters)) {
             const maj = majorants.get(mat.id)!.expr;
             lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — tracking arms, ${scatters ? 'scattering (delta tracking)' : 'absorbing-only (ratio-tracked pass-through)'}`);
@@ -730,7 +730,7 @@ function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantS
 // not merely `scatteringArms`: an all-delta-tracked program carries neither this function nor
 // roulette_interior.
 function generateMediumSurvival(plan: RenderPlan): string {
-    const scatteringLive = plan.program.media.scatteringArms;
+    const scatteringMedia = plan.program.media.scatteringMedia;   // the Planner's record
     const lines: string[] = [
         '// Generated interior survival (docs/fable-subsurface.md §6): the physical continuation',
         '// probability of a scattering collision — σ_s/σ_t on the WEIGHTED arms, 1 where the',
@@ -740,7 +740,7 @@ function generateMediumSurvival(plan: RenderPlan): string {
     ];
     for (const mat of plan.materials) {
         if (mat.medium === null) continue;
-        const scatters = scatteringLive && mediumMayScatter(mat.medium);
+        const scatters = scatteringMedia.includes(mat.id);
         if (!mediumWeightsAbsorption(mat.medium, scatters)) continue;
         lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — weighted absorption`);
         lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, p);`);
@@ -810,7 +810,7 @@ function majorantSpec(mat: PlannedMaterial): MajorantSpec {
 // dispatch above), so its shadow transmittance drops σ_s too, through the same arms: the
 // closed form on σ_a, or the σ_a ratio tracker. (Until Sep 25 2026 shadows kept σ_a + σ_s,
 // so NEE darkened light that pt carried — the estimator changed the image.)
-function generateMediumTransmittance(materials: PlannedMaterial[], scatteringLive: boolean): string {
+function generateMediumTransmittance(materials: PlannedMaterial[], scatteringMedia: number[]): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const lines: string[] = ['// Generated volumetric-component dispatch (seam 2, fable-volumetric-component §2)'];
     lines.push('Spectrum medium_transmittance(int med, Ray ray, float len) {');
@@ -825,7 +825,7 @@ function generateMediumTransmittance(materials: PlannedMaterial[], scatteringLiv
             lines.push(`    if (med == ${mat.id}) return SPECTRUM_ZERO;   // '${mat.name}' — deflecting (GRIN): opaque to shadow rays`);
             continue;
         }
-        const scatteringDropped = !scatteringLive && mediumMayScatter(mat.medium!);
+        const scatteringDropped = mediumMayScatter(mat.medium!) && !scatteringMedia.includes(mat.id);   // σ_s authored, not computed
         if (isHeterogeneousMedium(mat.medium!)) {
             // Expression media only on this arm — the AUTHORED ceiling (Validator-paired);
             // {param}/constant media take the exact analytic branch below.

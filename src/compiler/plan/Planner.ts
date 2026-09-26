@@ -1,7 +1,7 @@
 // compiler/plan/Planner.ts
 
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
-import { isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, isMeshObject, isInstancedObject } from '../types.js';
+import { isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
 import { MATERIAL_MODELS, modelTwoSidedShading } from '../../components/materials/index.js';
@@ -483,21 +483,25 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // counts (even under scattering 'ignored' — the D1 clamp couples the fields), and
     // so does a constant-ε SCATTERING medium (the analytic channel-MIS arm has no
     // source term; its σ̄ is auto-derived at emit time).
+    // Which media scatter in this program — decided once here, recorded in media.scatteringMedia,
+    // and read by every decision below and by the generators.
+    const scatteringMedia = materials
+        .filter((m) => m.medium !== null && mediumScatters(m.medium, scattering))
+        .map((m) => m.id);
+    const scatters = (m: PlannedMaterial) => scatteringMedia.includes(m.id);
     const heterogeneousArms = materials.some((m) =>
-        m.medium !== null && mediumRoutesToTracking(
-            m.medium, scattering === 'full' && mediumMayScatter(m.medium)));
+        m.medium !== null && mediumRoutesToTracking(m.medium, scatters(m)));
     // The interior termination rule's precondition (docs/fable-subsurface.md §6): some
     // scattering medium settles absorption by WEIGHT rather than by the tracking lottery, so a
-    // per-collision survival probability is genuinely owed. Same `scatters` resolution as the
-    // routing above and as generateMediumSample's — one predicate, three readers.
+    // per-collision survival probability is genuinely owed. Same `scatters` record as the
+    // routing above and as generateMediumSample's.
     //
     // ROULETTE IS PART OF THE DECISION, not a separate gate downstream. The rule is the accessor's
     // ONLY consumer, so without roulette the accessor would link with nothing calling it — the
     // seam-unused case §2.12 exists to forbid. One decision, both emissions.
     const weightedAbsorptionArms = strategy.estimator.russianRoulette != null
         && materials.some((m) =>
-            m.medium !== null && mediumWeightsAbsorption(
-                m.medium, scatteringArms && mediumMayScatter(m.medium)));
+            m.medium !== null && mediumWeightsAbsorption(m.medium, scatters(m)));
 
     // §6.2: samplable-emitter machinery exists iff some light entered the registry with a
     // region (delta-only scenes compile to the pre-area-light program) — or batch
@@ -592,6 +596,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         media: {
             present: features.media.hasMedia,
             scatteringArms,
+            scatteringMedia,
             heterogeneousArms,
             weightedAbsorptionArms,
             // Emissive media (impl-plan-medium-emission): the MediumProperties ε field,

@@ -107,6 +107,9 @@ export interface MediaDesc {
      *  phase functions + the channel-MIS scattering arms exist. Equivalent to
      *  estimator.volumeSampling !== 'none' — kept explicit for readers. */
     scatteringArms: boolean;
+    /** Material ids whose medium scatters in this program (mediumScatters under the
+     *  measurement). Generators route each medium by this list, never by re-deriving it. */
+    scatteringMedia: number[];
     /** Some medium routes to a null-collision arm (fable-heterogeneous-media.md;
      *  emission P5 extends the routing): the delta/ratio-tracking occupant is
      *  included. Independent of scatteringArms — absorbing-only

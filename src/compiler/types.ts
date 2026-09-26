@@ -353,6 +353,14 @@ export function isEmissiveMedium(med: { emission?: unknown }): boolean {
 }
 
 /** The medium may scatter: σ_s may be nonzero (the Analyzer's census rule). */
+/** The medium scatters under this measurement: it may scatter (mediumMayScatter) and the
+ *  measurement computes scattering ('full'; under 'ignored' it renders absorbing-only). The
+ *  Planner records the answer per medium (ProgramDescription.media.scatteringMedia), which is
+ *  what generators read; the Validator, which runs before the Planner, calls this directly. */
+export function mediumScatters(med: { sigma_s?: unknown }, scattering: 'full' | 'ignored'): boolean {
+    return scattering === 'full' && mediumMayScatter(med);
+}
+
 export function mediumMayScatter(med: { sigma_s?: unknown }): boolean {
     return mediumPropertyMayBeNonzero(med.sigma_s);
 }

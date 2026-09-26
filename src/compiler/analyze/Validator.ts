@@ -2,7 +2,7 @@
 
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
@@ -513,8 +513,7 @@ export function validate(
     // under the computed measurement only.
     const trackScattering = strategy.measurement.scattering ?? 'full';
     const sceneNeedsTracking = Object.values(scene.materials).some((m) =>
-        m.medium !== undefined && mediumRoutesToTracking(
-            m.medium, trackScattering === 'full' && mediumMayScatter(m.medium)));
+        m.medium !== undefined && mediumRoutesToTracking(m.medium, mediumScatters(m.medium, trackScattering)));
 
     // Equiangular medium NEE — v1 scope pins (impl-plan-equiangular §3).
     if (strategy.estimator.mediumLightSampling === 'equiangular') {
