@@ -11,8 +11,10 @@ at 104521e.
 - One rule: **anything the renderers share (the scene plan, the GPU data) must not depend on any
   renderer's settings.**
 - Colour, option (a): the shared parts keep colours as the author wrote them, and each renderer
-  converts. Spectral may come soon, and an RGB preview beside a spectral renderer is a natural
-  case of the first use.
+  converts.
+- **Spectral is being built next. Plan as if it exists tomorrow.** An RGB preview beside a
+  spectral renderer on one scene is a target case, so this plan's colour step builds the seam
+  spectral plugs into.
 
 ---
 
@@ -129,12 +131,19 @@ scene. *Breakage:* a generator that appends to a plan array must fail it.
   can still fail.
 - Proof: the digest.
 
-**4. Colours as authored in the scene plan.**
-- `resolveColorProperty` stops converting a constant blackbody. It still turns a scalar into a
-  grey triple; a grey RGB triple is the same colour under any colour model.
-- The RGB conversion (`foldBlackbody`) is applied on the renderer side, where the colour is
-  used. Two users already do this (`emitValue`, `resolveRadiometricValue`). Four sites assume
-  plan entry did it and must convert first:
+**4. Colour conversion becomes a renderer step.**
+- `resolveColorProperty` stops converting a constant blackbody, so the scene plan holds colours
+  as authored. It still turns a scalar into a grey triple; a grey RGB triple is the same colour
+  under any colour model.
+- One function converts an authored colour for a colour model (the renderer's
+  `measurement.color`). It is called wherever a colour is used for a renderer, and nowhere else.
+  Today it has the RGB branch (`foldBlackbody`); spectral adds its branch in this one function.
+  The call sites:
+  - the generator's value writer (`emitValue`) and the CPU light-value evaluator
+    (`resolveRadiometricValue`), which convert already;
+  - four sites that assume plan entry converted, and must call the function first (below);
+  - the GPU data packer (sceneData.ts), for the colours in shared memory.
+- The four sites:
   - the Planner's `emitters.driven` (Planner.ts:627) counts any blackbody as driven. It gets a
     "driven value" predicate. The Validator spells the same predicate (Validator.ts:666), so both
     call one function.
@@ -144,6 +153,14 @@ scene. *Breakage:* a generator that appends to a plan array must fail it.
     would throw.
   - sceneData.ts:171: the same emission packed for the light tree; a blackbody would silently
     become black.
+- **Shared GPU memory.** It holds a few colours: the light tree's rows, per-instance colours and
+  image skies. Today the packer stores them as RGB; after this step it gets them through the one
+  function, with identical bytes. When an RGB preview and a spectral renderer share a scene,
+  shared memory must serve both. It can hold one copy per colour model that some renderer on the
+  scene uses, the way optional structures are already laid out (`DataReads`). Or it can hold one
+  form that each shader converts when it reads. That choice is the spectral design's (contracts §8
+  upsamples RGB with fitted coefficients, which bears on it). Step 4 should be built to match it,
+  so **the spectral design comes before step 4** (owner decision 1). Steps 0–3 do not touch colour.
 - **Test first, since no suite scene covers this:** a constant blackbody compiles to exactly the
   output of its RGB triple, in each place a colour can be one: an emissive object's material, an
   authored area light and point light, an instanced light batch, the constant sky, and the scale-0
@@ -163,13 +180,11 @@ and the CHANGELOG.
 
 ## Owner decisions
 
-1. **Blackbody in GPU memory.** Everything in the shared GPU data is already in the authored form
-   (RGB triples, per-instance values, image skies) except one case: a constant-blackbody light is
-   stored as RGB in the light tree's rows. Storing its temperature instead would mean GPU data
-   and GLSL that no renderer reads, which your unused-code rule forbids.
-   **Recommend:** keep RGB there until a spectral renderer exists; the spectral plan changes it.
-   This is narrower than the "(a)" I described: the scene plan is fully as authored, the GPU data
-   is except for this one case.
+1. **Write the spectral design before step 4** (docs only, starting from
+   fable-compiler-contracts.md §8). Its first question is how shared GPU memory serves an RGB and
+   a spectral renderer on one scene, and step 4 builds to that answer. It can be written while
+   steps 0–3 are built. **Recommend:** yes. Either I write it after steps 0–3, or another instance
+   writes it now; a docs-only design does not collide with this work.
 2. **Delete the test "decisions do not depend on the data layout"** (dataReads.test.ts:30). After
    step 2 the decisions function has no layout input, so the test cannot fail. The other tests in
    that file stay. **Recommend:** delete.
@@ -181,7 +196,7 @@ and the CHANGELOG.
 
 - Validation split the same way. Today a scene's rules run once per strategy, and repeated
   warnings are merged by their text.
-- Spectral itself. RGB-only authored forms it will have to handle: GLSL-formula colours,
-  image skies, media coefficients given as RGB.
+- Building spectral (its own design and plan, next). Authored forms that are RGB today and that
+  its design must cover: GLSL-formula colours, image skies, media coefficients given as RGB.
 - The App's own derivation of environment-table variants (claude-data-exact-linkage.md, status).
 - A `{param}` emission on a model that cannot emit still gets two warnings.
