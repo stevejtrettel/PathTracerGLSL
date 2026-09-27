@@ -16,7 +16,7 @@ float fisheye_theta_equisolid(float rho, float K)     { return 2.0 * asin(clamp(
 float fisheye_theta_stereographic(float rho, float K) { return 2.0 * atan(rho * K); }                     // r = 2f·tan(θ/2) conformal
 float fisheye_theta_orthographic(float rho, float K)  { return asin(clamp(rho * K, 0.0, 1.0)); }          // r = f·sin θ     hemisphere flat
 
-Ray camera_generateRay(vec2 film, vec2 xiLens) {
+Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
     // Aspect-corrected centered coords: |c| = 1 at the top/bottom edge (the inscribed
     // circle rim, where theta = theta_max). Corners (|c| > 1) extend past it.
     vec2 c = (2.0 * film / u_imageSize) - 1.0;
@@ -30,10 +30,10 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     vec3 right = u_cameraRight;
     vec3 up = u_cameraUp;
 
-    if (rho < 1e-6) return make_ray(u_cameraPosition, forward);   // center pixel: on axis
+    if (rho < 1e-6) return make_ray(u_cameraPosition, forward, wl);   // center pixel: on axis
 
     float theta = FISHEYE_THETA(rho, u_fisheyeK);   // radial map (aliased per projection)
     vec2 t = c / rho;                          // unit azimuth direction in the image plane
     vec3 dir = cos(theta) * forward + sin(theta) * (t.x * right + t.y * up);
-    return make_ray(u_cameraPosition, normalize(dir));
+    return make_ray(u_cameraPosition, normalize(dir), wl);
 }

@@ -6,7 +6,7 @@
 // stretch, they don't crop. Center pixel looks along `forward`; +x wraps toward `right`
 // with the seam behind, +y tilts toward `up` (top of image = straight up).
 
-Ray camera_generateRay(vec2 film, vec2 xiLens) {
+Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
     // film = continuous sub-pixel point (pixel/ owns the footprint); xiLens unused.
     vec2 uv = film / u_imageSize;   // [0,1]²
 
@@ -24,5 +24,5 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     float ct = cos(theta);
     vec3 dir = ct * (cos(phi) * forward + sin(phi) * right) + sin(theta) * up;
 
-    return make_ray(u_cameraPosition, normalize(dir));
+    return make_ray(u_cameraPosition, normalize(dir), wl);
 }

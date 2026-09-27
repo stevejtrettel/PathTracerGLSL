@@ -9,7 +9,7 @@
 // Requires: u_imageSize, u_cameraPosition, u_cameraForward/Right/Up,
 //           u_cylFocal (cylinder radius in pixels = imageSize.x / radians(hfov), CPU-precomputed).
 
-Ray camera_generateRay(vec2 film, vec2 xiLens) {
+Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
     float f = u_cylFocal;                // cylinder radius in pixels (CPU-precomputed from the width)
     vec2 c = film - 0.5 * u_imageSize;   // centered pixel coords
 
@@ -24,5 +24,5 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
 
     // Horizontal part rides the unit cylinder; h·up climbs it.
     vec3 dir = cos(phi) * forward + sin(phi) * right + h * up;
-    return make_ray(u_cameraPosition, normalize(dir));
+    return make_ray(u_cameraPosition, normalize(dir), wl);
 }

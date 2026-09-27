@@ -30,7 +30,7 @@ export const spotLightDescriptor: LightKindDescriptor = {
         { name: 'direction', shape: 'vec3', semantic: 'geometric', kind: 'direction' },
         { name: 'cos_falloff_start', shape: 'number', semantic: 'geometric', kind: 'angle' },
         { name: 'cos_falloff_end', shape: 'number', semantic: 'geometric', kind: 'angle' },
-        { name: 'intensity', shape: 'vec3', semantic: 'radiometric' },   // W/sr on-axis, precomputed product
+        { name: 'intensity', shape: 'vec3', semantic: 'radiometric', role: 'emission' },   // W/sr on-axis, precomputed product
     ],
     // pbrt-v4 SpotLight power: Φ = 2π·I·[(1−cosStart) + (cosStart−cosEnd)/2]
     // (the smoothstep band integrates to half its width).

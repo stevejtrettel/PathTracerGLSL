@@ -19,7 +19,7 @@ void equiangular_sample_direct(inout PathState s, int med_mat, float t_max) {
     Point o = s.ray.origin;
     Direction d = s.ray.direction;
     Point pos; Spectrum intensity;
-    float select_pdf = lighting_query_delta(random(), pos, intensity);
+    float select_pdf = lighting_query_delta(random(), pos, intensity, s.ray.wl);
 
     // The light's frame over the segment: closest approach t_c, perpendicular h.
     vec3 D = pos - o;
@@ -35,7 +35,7 @@ void equiangular_sample_direct(inout PathState s, int med_mat, float t_max) {
     float pdf_t = h / ((theta_b - theta_a) * (h2 + (t - t_c) * (t - t_c)));
 
     Point p_evt = ambient_geodesic(o, d, t);
-    MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
+    MediumProperties m_evt = scene_medium_properties(med_mat, p_evt, s.ray.wl);
 
     // Segment transmittance to the sampled vertex — analytic, homogeneous (§4; the v1
     // homogeneous pin — the analytic arm's closed form, restated at this second site).
@@ -46,7 +46,7 @@ void equiangular_sample_direct(inout PathState s, int med_mat, float t_max) {
     float dist = sqrt(d2);
     Direction wi = to_light / dist;
     // pos = the light POINT (drift-free target); the path's remaining null-crossing budget.
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, wi), pos, shadow_crossings_left(s));
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, wi, s.ray.wl), pos, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
 
     // Delta convention (§6.1): 1/d² folds into the incident radiance here. Phase EVAL,

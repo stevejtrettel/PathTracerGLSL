@@ -4,6 +4,41 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-26 — wavelength carriage and RGB conversion boundaries
+
+Implemented S0b: current wavelengths live on `Ray`, arrival wavelengths on `Hit`, and resolved
+material/medium records retain their evaluation carrier. All six cameras take the already
+sampled carrier. Continuations, shadows, local-frame rays, index queries, GRIN, light accessors,
+packed light rows and environments pass it explicitly. The original camera sample remains
+with the accumulator for sensor integration; throughput and radiance remain path state.
+
+Radiometric rows declare reflectance/coefficient/emission roles. The colour model evaluates
+constants, live bindings, expressions, attributes and texture reads at the supplied wavelengths;
+RGB conversions are identities. Authored RGB medium clamps and sky filtering/formulas run
+before conversion. Blackbody keeps its existing RGB calculation; authored-form preservation
+and physical spectral rendering are still later stages.
+
+Added `npm run witness:wavelengths`, sharing a small float-framebuffer runner with the colour
+probes. Thirty numerical cases use a visible four-value carrier and nonidentity test lifts.
+Ten mutations must compile and fail numerically: lost arrival/spawn/property/local carriers,
+substitution or overwrite of camera wavelengths, discarded packed RGB, bypassed coefficient
+conversion and the wrong clamp order. Camera and current-ray test wavelengths differ;
+placement/camera bindings use valid defaults, skies use nonzero intensities, and the light
+row test uploads the actual scene-data pack. The shared property-struct builder owns `wl`;
+the obsolete empty-struct placeholder is removed.
+The probes run in the existing opt-in GPU CI job. Updated camera/trace/colour contracts.
+
+Validation: typecheck and build passed; all 89 test files / 2707 tests passed, including 377
+static shader cases. All 47 shader snapshots were reviewed by change category; non-shader /
+source-map metadata is identical. The digest retains identical packed data, resource reads
+and warnings across 203 synchronous scenes (seven async scenes excluded). Five fixed-salt
+SwiftShader renders match the committed foundation exactly: Cornell/average, furnace/variance,
+furnace/oneshot, slab and GRIN scattering furnace, including the variance attachment.
+The 14 colour probes and three mutations pass; the 30 carrier probes and ten mutations pass.
+Targeted furnace, scattering furnace, slab, heterogeneous slab, clamp and GRIN scattering
+witnesses pass all nine checks. This is targeted GPU coverage, not a full scene sweep or a
+measurement of the future four-wavelength model's performance.
+
 ## 2026-09-26 — review and close the RGB foundation gaps
 
 Added `npm run witness:color`: a standalone SwiftShader check of the shipped colour GLSL,

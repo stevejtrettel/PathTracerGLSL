@@ -3,7 +3,7 @@
 //           u_aperture (lens radius), u_focusDistance, concentric_disk (core math).
 // aperture → 0 collapses exactly to pinhole (the witness's correctness anchor).
 
-Ray camera_generateRay(vec2 film, vec2 xiLens) {
+Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
     // film = continuous sub-pixel point (pixel/ owns the footprint).
     vec2 ndc = (2.0 * film / u_imageSize) - 1.0;
     ndc.x *= u_aspect;   // aspect precomputed on the CPU (u_aspect), not per-ray
@@ -28,5 +28,5 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     vec3 origin = u_cameraPosition + lens.x * right + lens.y * up;
     vec3 lens_dir = normalize(focus_point - origin);
 
-    return make_ray(origin, lens_dir);
+    return make_ray(origin, lens_dir, wl);
 }

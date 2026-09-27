@@ -36,7 +36,7 @@ float environment_pdf(vec3 dir) {
 // texel coordinate never rounds up into the next row/column.
 const float CDF_FRAC_MAX = 0.9999999;
 
-LightSample environment_sample(Point p, vec2 xi) {
+LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
     ivec2 sz = ivec2(u_envSize + 0.5);
 
     // Row: lower_bound over the marginal CDF (first j with cdf >= xi.x)
@@ -75,7 +75,7 @@ LightSample environment_sample(Point p, vec2 xi) {
     // branch would see for this direction — image envs re-fetch through the chart (an exact
     // round-trip), procedural envs direct-eval the formula. This is the MIS requirement
     // stated as code, and it frees procedural tables from carrying a radiance texture at all.
-    ls.radiance = environment_radiance(ls.wi);                // without visibility
+    ls.radiance = environment_radiance(ls.wi, wl);                // without visibility
     ls.pdf = (dCond * dMarg) / env_texel_dOmega(j, sz);       // per-light density; selection applied by lighting_sample
     ls.flags = 0u;                                            // NOT delta — BSDF paths hit the env on miss
     ls.light_id = -1;                                         // never consulted via light_of

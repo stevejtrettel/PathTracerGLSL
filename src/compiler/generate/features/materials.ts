@@ -3,12 +3,13 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
+import { emitColor } from '../color.js';
 import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, isBlackbody, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatSpectrum, formatVec3 } from '../../../components/glsl-format.js';
+import { formatFloat, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, emitAttributeValue, mintValueUniform, type ParamValue } from '../values.js';
 import { isAttributeValue } from '../../plan/types.js';
 
@@ -240,7 +241,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     // Each entry mirrors its emission condition above — the interface header is truthful.
     const provides = [
-        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element)' },
+        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element, Wavelengths wl)' },
         { name: 'interaction_surface_sample', signature: 'InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u)' },
         { name: 'interaction_surface_emission', signature: 'Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp)' },
         { name: 'material_is_emissive', signature: 'bool material_is_emissive(int mat)' },
@@ -264,13 +265,13 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         requires.push('scene_medium_properties');
         provides.push(
             { name: 'material_has_medium', signature: 'bool material_has_medium(int mat)' },
-            { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, vec3 p)' },
+            { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, vec3 p, Wavelengths wl)' },
             { name: 'medium_sample', signature: 'MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi)' },
         );
         if (media.deflecting) {
             // The GRIN arm (grin.glsl) calls ior_at (self-provided) + scene_region_at and
             // material_of (its exit test: has the MEDIUM changed?) — honest linkage.
-            provides.push({ name: 'ior_at', signature: 'float ior_at(int med, vec3 p)' });
+            provides.push({ name: 'ior_at', signature: 'float ior_at(int med, vec3 p, Wavelengths wl)' });
             requires.push('ior_at', 'scene_region_at', 'material_of');
         }
         if (wantsNullTable) {
@@ -294,7 +295,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             if (media.weightedAbsorptionArms) {
                 // Exists ONLY where a weighted arm leaves a survival owed — an all-tracked
                 // program links neither this nor transport's roulette_interior (§2.12).
-                provides.push({ name: 'medium_survival', signature: 'Spectrum medium_survival(int med, Point p)' });
+                provides.push({ name: 'medium_survival', signature: 'Spectrum medium_survival(int med, Point p, Wavelengths wl)' });
             }
         }
     }
@@ -334,15 +335,16 @@ function resolveDerivedInputs(mat: PlannedMaterial, inputs: string[], params: Re
 }
 
 function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec): DerivedExpr {
-    const fmt = (s.glslType === 'Spectrum' ? formatSpectrum : formatFloat) as (x: never) => string;
+    const fmt = (s.glslType === 'Spectrum' ? formatVec3 : formatFloat) as (x: never) => string;
+    const evaluate = (expr: string) => s.glslType === 'Spectrum' ? emitColor(expr, s.role, 'wl') : expr;
     const deps = s.inputs.map((src) => mat.values[src]).filter((v) => isValueParam(v)).map((v) => (v as ValueParam<number>).param);
     if (deps.length === 0) {
-        return { name: s.name, expr: fmt(s.fn(resolveDerivedInputs(mat, s.inputs)) as never) };
+        return { name: s.name, expr: evaluate(fmt(s.fn(resolveDerivedInputs(mat, s.inputs)) as never)) };
     }
     const uName = `u_${s.name}_${mat.id}`;
     return {
         name: s.name,
-        expr: uName,
+        expr: evaluate(uName),
         uniform: {
             name: uName,
             type: s.glslType === 'Spectrum' ? 'vec3' : 'float',
@@ -359,12 +361,13 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
     lines.push('// a material sets exactly the fields its model reads, nothing else. `p` (shading point)');
     lines.push('// and `uv` (surface chart, fable-imagery P2) are the coordinates an expression row may');
     lines.push('// reference; `element` = Hit.element (the owner\'s sub-element) — read only by ATTRIBUTE rows.');
-    lines.push('MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element) {');
+    lines.push('MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element, Wavelengths wl) {');
     lines.push('    MaterialProperties props;');
+    lines.push('    props.wl = wl;');
     // Defaults from the union schemas — the GLSL expression DERIVED from the row's
     // numeric default.
     for (const f of fields) {
-        lines.push(`    props.${f.name} = ${defaultExpr(f)};`);
+        lines.push(`    props.${f.name} = ${defaultExpr(f, 'wl')};`);
     }
 
     let arms = 0;
@@ -375,23 +378,15 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
         for (const f of schemas) {
             const raw = mat.values[f.source];
             const target = `        props.${f.name}`;
-            // ATTRIBUTE row (fable-instance-attributes): per-instance value fetched by
-            // Hit.element from the batch's attrs table — the fourth storage class's one
-            // legal use site (emission/ior/derived-inputs Validator-excluded).
-            if (isAttributeValue(raw)) {
-                body.push(`${target} = ${emitAttributeValue(raw)};`);
-                continue;
-            }
-            const value = raw as ParamValue;
-            const fmt = (f.glslType === 'Spectrum' ? formatSpectrum : formatFloat) as (x: never) => string;
-            // Constant emission is assigned only when nonzero (the gate's `> 0` twin); a
-            // driven/expression emission always assigns (it may be nonzero at runtime).
-            if (f.name === 'emission' && !isValueParam(value) && !isGlslExpression(value) && !isBlackbody(value)) {
-                const rgb = value as Vec3;
-                if (rgb[0] > 0 || rgb[1] > 0 || rgb[2] > 0) body.push(`${target} = ${formatSpectrum(rgb)};`);
-                continue;
-            }
-            body.push(`${target} = ${emitValue(value, fmt)};`);
+            // Constant black emission uses the initialized default, matching the
+            // emission-presence predicate. Driven values must still read their binding.
+            if (f.name === 'emission' && Array.isArray(raw) && !raw.some(c => c > 0)) continue;
+            const fmt = (f.glslType === 'Spectrum' ? formatVec3 : formatFloat) as (x: never) => string;
+            const expr = isAttributeValue(raw)
+                ? emitAttributeValue(raw)
+                : emitValue(raw as ParamValue, fmt);
+            const resolved = f.semantic === 'radiometric' ? emitColor(expr, f.role, 'wl') : expr;
+            body.push(`${target} = ${resolved};`);
         }
         // DERIVED fields (D4): assigned after the rows they derive from.
         for (const e of derivedByMat.get(mat.id) ?? []) {
@@ -526,10 +521,10 @@ function mediumPropertyExpr(prop: ParamValue, name: string, format: (v: never) =
     return emitValue(prop, format, (e) => {
         if (isCoefficient) {
             // Heterogeneous coefficient (fable-heterogeneous-media.md D4): the authored
-            // formula of `p` (+ declared-param uniforms). Spectrum(...) broadcasts a scalar
+            // formula of `p` (+ declared-param uniforms). vec3(...) broadcasts a scalar
             // source and passes a vec3 one through; the max(…, 0.0) floor makes coefficients
             // nonnegative by definition (σ < 0 would poison probabilities and weights).
-            return `max(Spectrum(${e.source}), 0.0)`;
+            return `max(vec3(${e.source}), 0.0)`;
         }
         throw new Error(`materials: medium.${name} cannot be a GLSL expression (only sigma_a/sigma_s may vary spatially)`);
     });
@@ -542,22 +537,23 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
     // union core.ts builds the struct from). An absorbing-only program has extinction
     // fields and nothing else.
     const lines: string[] = ['// Generated medium-properties lookup (§3.5; heterogeneous media read p)'];
-    lines.push('MediumProperties scene_medium_properties(int mat, vec3 p) {');
+    lines.push('MediumProperties scene_medium_properties(int mat, vec3 p, Wavelengths wl) {');
     lines.push('    MediumProperties m;');
+    lines.push('    m.wl = wl;');
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');
     lines.push('    m.sigma_s = SPECTRUM_ZERO;');
     if (wantsEmission) lines.push('    m.emission = SPECTRUM_ZERO;');
-    for (const f of phaseFields) lines.push(`    m.${f.name} = ${defaultExpr(f)};`);
+    for (const f of phaseFields) lines.push(`    m.${f.name} = ${defaultExpr(f, 'wl')};`);
     if (hasModel) lines.push('    m.model = 0;');
     for (let i = 0; i < withMedium.length; i++) {
         const mat = withMedium[i];
         const med = mat.medium!;
         const cond = i === 0 ? 'if' : 'else if';
         lines.push(`    ${cond} (mat == ${mat.id}) {   // '${mat.name}'`);
-        lines.push(`        m.sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatSpectrum)};`);
-        lines.push(`        m.sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatSpectrum)};`);
+        lines.push(`        vec3 sigma_a = ${mediumPropertyExpr(med.sigma_a, 'sigma_a', formatVec3)};`);
+        lines.push(`        vec3 sigma_s = ${mediumPropertyExpr(med.sigma_s, 'sigma_s', formatVec3)};`);
         if (wantsEmission && isEmissiveMedium(med)) {
-            lines.push(`        m.emission = ${mediumPropertyExpr(med.emission, 'emission', formatSpectrum)};`);
+            lines.push(`        vec3 emission = ${mediumPropertyExpr(med.emission, 'emission', formatVec3)};`);
         }
         if (isHeterogeneousMedium(med) && !mediumIsDeflecting(med)) {
             // D1 clamp IN THE LOOKUP (fable-heterogeneous-media.md, amended Jul 17): the
@@ -571,22 +567,31 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
                 // Backstop — the Validator pairs expressions with a declared majorant.
                 throw new Error(`materials: medium of '${mat.name}' has expression coefficients but no majorant`);
             }
-            lines.push(`        float sigma_max = spectrum_max(m.sigma_a + m.sigma_s);   // D1: medium IS min(σ, σ̄)`);
+            lines.push(`        vec3 sigma_t = sigma_a + sigma_s;`);
+            lines.push('        float sigma_max = max(sigma_t.x, max(sigma_t.y, sigma_t.z));');
             lines.push(`        float sigma_scale = sigma_max > ${formatFloat(maj)} ? ${formatFloat(maj)} / sigma_max : 1.0;`);
-            lines.push('        m.sigma_a *= sigma_scale;');
-            lines.push('        m.sigma_s *= sigma_scale;');
+            lines.push('        sigma_a *= sigma_scale;');
+            lines.push('        sigma_s *= sigma_scale;');
             if (wantsEmission && isEmissiveMedium(med)) {
                 // P2 (owner-pinned): ε scales with the extinction — a clamped region
                 // preserves its source function ε/σ_t, exactly as the scale preserves albedo.
-                lines.push('        m.emission *= sigma_scale;');
+                lines.push('        emission *= sigma_scale;');
             }
+        }
+        lines.push(`        m.sigma_a = ${emitColor('sigma_a', 'coefficient', 'wl')};`);
+        lines.push(`        m.sigma_s = ${emitColor('sigma_s', 'coefficient', 'wl')};`);
+        if (wantsEmission && isEmissiveMedium(med)) {
+            lines.push(`        m.emission = ${emitColor('emission', 'emission', 'wl')};`);
         }
         for (const f of phaseFields) {
             // Union fields of OTHER present models fall back to their row default —
             // this medium's values hold exactly its own model's rows.
             const value = med.values[f.source] as number | GlslExpression | ValueParam<number> | undefined;
-            const format = f.glslType === 'Spectrum' ? formatSpectrum : formatFloat;
-            lines.push(`        m.${f.name} = ${value === undefined ? defaultExpr(f) : mediumPropertyExpr(value, f.name, format as (v: never) => string)};`);
+            const format = f.glslType === 'Spectrum' ? formatVec3 : formatFloat;
+            if (value === undefined) continue; // already initialized from this row's default
+            const expr = mediumPropertyExpr(value, f.name, format as (v: never) => string);
+            const resolved = f.semantic === 'radiometric' ? emitColor(expr, f.role, 'wl') : expr;
+            lines.push(`        m.${f.name} = ${resolved};`);
         }
         if (hasModel) lines.push(`        m.model = ${models.indexOf(med.model)};   // '${med.model}'`);
         lines.push('    }');
@@ -638,12 +643,11 @@ function generateMediumDispatch(models: string[], wantsEval: boolean, wantsPdf: 
 // medium — a scalar formula over `p` (raw: no Spectrum wrap, no clamp; the walker floors its own
 // divisions). SEPARATE from scene_medium_properties because ior is consumed by its GRADIENT (the
 // ray bends by ∇n, sampled at many nearby points per step), not by value alongside σ_a/σ_s/ε.
-// Default 1.0 = vacuum / non-deflecting. Spectral-ready: a `float lambda` arg joins here under a
-// future spectral axis (dispersion n(λ)), the same one-arg extension `uv` used for materials.
+// Default 1.0 = vacuum / non-deflecting. Wavelengths stay fixed across gradient queries.
 function generateIorAt(materials: PlannedMaterial[]): string {
     const deflecting = materials.filter((m) => m.medium !== null && m.medium.ior !== undefined);
     const lines: string[] = ['// Generated IOR accessor (fable-variable-ior; consumed by ∇n, so NOT a MediumProperties field)'];
-    lines.push('float ior_at(int med, vec3 p) {');
+    lines.push('float ior_at(int med, vec3 p, Wavelengths wl) {');
     deflecting.forEach((mat, i) => {
         const cond = i === 0 ? 'if' : 'else if';
         lines.push(`    ${cond} (med == ${mat.id}) return ${emitValue(mat.medium!.ior as ParamValue, formatFloat)};   // '${mat.name}'`);
@@ -688,9 +692,9 @@ function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantS
         } else {
             lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — ${scatters ? 'scattering (analytic channel-MIS)' : 'absorbing-only (deterministic)'}`);
             if (scatters) {
-                lines.push(`        return medium_sample_analytic(scene_medium_properties(${mat.id}, ray.origin), ray, t_max, xi);`);
+                lines.push(`        return medium_sample_analytic(scene_medium_properties(${mat.id}, ray.origin, ray.wl), ray, t_max, xi);`);
             } else {
-                lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, ray.origin);`);
+                lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, ray.origin, ray.wl);`);
                 if (wantsEmission && isEmissiveMedium(med)) {
                     // Emission closed form (impl-plan-medium-emission E1.5): the exact
                     // ∫₀ᵗ e^{−σ_a s} ε ds = ε·(1−e^{−σ_a t})/σ_a. σ_a floored at 1e-6
@@ -736,14 +740,14 @@ function generateMediumSurvival(plan: RenderPlan): string {
         '// probability of a scattering collision — σ_s/σ_t on the WEIGHTED arms, 1 where the',
         '// tracking lottery already settled absorption. No clamp: this is a probability by',
         '// construction, unlike the event weight it replaced.',
-        'Spectrum medium_survival(int med, Point p) {',
+        'Spectrum medium_survival(int med, Point p, Wavelengths wl) {',
     ];
     for (const mat of plan.materials) {
         if (mat.medium === null) continue;
         const scatters = scatteringMedia.includes(mat.id);
         if (!mediumWeightsAbsorption(mat.medium, scatters)) continue;
         lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — weighted absorption`);
-        lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, p);`);
+        lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, p, wl);`);
         lines.push('        return m.sigma_s / max(m.sigma_s + m.sigma_a, Spectrum(1e-9));');
         lines.push('    }');
     }
@@ -836,10 +840,10 @@ function generateMediumTransmittance(materials: PlannedMaterial[], scatteringMed
                 : `        return medium_transmittance_ratio(${mat.id}, ${maj}, ray, len);`);
         } else if (scatteringDropped) {
             lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — σ_a only: scattering ignored`);
-            lines.push(`        return spectrum_exp(-scene_medium_properties(${mat.id}, ray.origin).sigma_a * len);`);
+            lines.push(`        return spectrum_exp(-scene_medium_properties(${mat.id}, ray.origin, ray.wl).sigma_a * len);`);
         } else {
             lines.push(`    if (med == ${mat.id}) {   // '${mat.name}'`);
-            lines.push(`        return medium_transmittance_analytic(scene_medium_properties(${mat.id}, ray.origin), len);`);
+            lines.push(`        return medium_transmittance_analytic(scene_medium_properties(${mat.id}, ray.origin, ray.wl), len);`);
         }
         lines.push('    }');
     }

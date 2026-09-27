@@ -65,8 +65,8 @@ describe('region→material decomposition (impl-plan-region-materials)', () => {
         const glsl = mainSource('table');
         expect(glsl).toMatch(/int material_of\(int region\) \{\n {4}if \(region < 0\)/);
         expect(glsl).toContain('ids = texelFetch(u_data_records');
-        expect(glsl).toContain('float ior_of_material(int mat, vec3 p)');
-        expect(glsl).toContain('return ior_of_material(material_of(region), p);');
+        expect(glsl).toContain('float ior_of_material(int mat, vec3 p, Wavelengths wl)');
+        expect(glsl).toContain('return ior_of_material(material_of(region), p, wl);');
         // No per-region constant arm survives in either table.
         expect(glsl).not.toMatch(/material_of[\s\S]{0,400}if \(region == 2\) return/);
     });

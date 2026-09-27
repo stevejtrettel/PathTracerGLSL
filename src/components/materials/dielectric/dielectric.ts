@@ -10,7 +10,7 @@ export const dielectricDescriptor: MaterialModelDescriptor = {
     // ior is region-indexed (read for the FAR side of the boundary via ior_of — the
     // reason the region-table storage kind exists).
     properties: [
-        { name: 'transmittance', glslType: 'Spectrum', semantic: 'radiometric', source: 'transmittance', default: 1, storage: 'field' },
+        { name: 'transmittance', glslType: 'Spectrum', semantic: 'radiometric', role: 'reflectance', source: 'transmittance', default: 1, storage: 'field' },
         { name: 'ior', glslType: 'float', semantic: 'geometric', source: 'ior', default: 1.5, storage: 'region-table', constraint: { kind: 'positive' } },
     ],
     capabilities: {

@@ -25,7 +25,7 @@ export const meshLightDescriptor: LightKindDescriptor = {
     // emissive mesh OBJECT instead (validateAuthored fires on any well-shaped attempt).
     authoredParams: [],
     params: [
-        { name: 'radiance', shape: 'vec3', semantic: 'radiometric' },        // Le
+        { name: 'radiance', shape: 'vec3', semantic: 'radiometric', role: 'emission' },        // Le
         { name: 'area', shape: 'number', semantic: 'geometric', kind: 'area' },   // WORLD total (s²-folded)
         // triCount is NOT a row: it is CDF-walk plumbing, baked as a literal sampler arg
         // (PlannedLight.mesh.triCount) — rows are the light's physical vocabulary.

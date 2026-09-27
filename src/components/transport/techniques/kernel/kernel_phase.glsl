@@ -8,8 +8,8 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
-    s.ray = make_ray(p_evt, ps.wi);   // continue from the event — no surface offset
+    s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
 }

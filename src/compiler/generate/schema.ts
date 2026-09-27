@@ -6,6 +6,7 @@
 // model's struct (module-anatomy §1's degeneracy, where the numeric witnesses live).
 
 import type { PropertySchema, ParamKind } from '../../components/descriptors.js';
+import { emitColor } from './color.js';
 import { formatFloat } from '../../components/glsl-format.js';
 
 /** A struct-emittable row (A1): geometry PrimitiveParamSpec, LightParamSpec, and
@@ -39,16 +40,11 @@ export function structFromRows(structName: string, rows: StructRow[]): string {
     ].join('\n');
 }
 
-/** GLSL default expression DERIVED from the row's numeric default (materials-§7:
- *  defaults live once, as numbers). Spectrum rows broadcast through the §2.5
- *  constants/constructor; float rows format directly. */
-export function defaultExpr(f: PropertySchema<string>): string {
-    if (f.glslType === 'Spectrum') {
-        if (f.default === 0) return 'SPECTRUM_ZERO';
-        if (f.default === 1) return 'SPECTRUM_ONE';
-        return `Spectrum(${formatFloat(f.default)})`;
-    }
-    return formatFloat(f.default);
+/** Resolve the row's authored grey default at the current wavelengths. */
+export function defaultExpr(f: PropertySchema<string>, wl: string): string {
+    return f.semantic === 'radiometric'
+        ? emitColor(`vec3(${formatFloat(f.default)})`, f.role, wl)
+        : formatFloat(f.default);
 }
 
 /**
@@ -73,27 +69,14 @@ export function unionFields<S extends string>(schemaSets: PropertySchema<S>[][])
     return [...byName.values()];
 }
 
-/** The generated struct text — fields are EXACTLY the union rows (A1: no riders; the
- *  fixed-struct-era emission_strength was merged away, its product was identically
- *  `emission`). */
+/** Common wavelength carrier plus the fields read by this scene's models. */
 export function buildPropertiesStruct<S extends string>(structName: string, fields: PropertySchema<S>[], baseFields: string[] = []): string {
     const lines = [`// Generated ${structName} — the union of fields the models PRESENT read (§3.4)`];
     lines.push(`struct ${structName} {`);
+    lines.push('    Wavelengths wl;');
     for (const b of baseFields) lines.push(`    ${b}`);
     for (const f of fields) {
         lines.push(`    ${f.glslType} ${f.name};`);
-    }
-    if (baseFields.length === 0 && fields.length === 0) {
-        // GLSL forbids an empty struct, and the §3.4 union CAN legitimately be empty: a scene whose
-        // only material is `model: 'none'` (a null interface) has no model declaring any property
-        // row, so nothing contributes a field. That scene is legal — an index-matched medium with no
-        // optical surface anywhere — and it compiled to `struct MaterialProperties {};`, which
-        // glslang rejects outright. Found by the `slab-albedo` witness, the first scene in the suite
-        // with a null interface and nothing else.
-        //
-        // A placeholder keeps the type well-formed. Nothing reads it, by construction: the union is
-        // empty precisely because no model declares a field to read.
-        lines.push('    float _unused;   // §3.4 union is empty (e.g. only a null-interface material)');
     }
     lines.push('};');
     return lines.join('\n');

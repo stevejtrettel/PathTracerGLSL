@@ -31,6 +31,17 @@ the numerical assertions: divide by three, select only three channels, and bypas
 This is a repeatable primitive gate, separate from the scene witnesses and static Vitest checks.
 It runs before the scene sweep in the existing opt-in GPU CI job.
 
+`npm run witness:wavelengths` compiles small scene fixtures, then executes their generated GLSL
+with a test-only carrier containing four distinct wavelengths. It checks all six cameras,
+a wavelength-dependent camera through the accumulator, arrival/spawn/copy, placed analytic
+and marched geometry, properties/defaults, light and sky reads, the RGB-before-lift medium
+clamp, phase continuation, medium shadow spawning/null crossings and the GRIN gradient/handoff.
+Camera and current-ray carriers differ. Camera/placement uniforms have valid inputs, skies
+have nonzero intensity, and the light row reads the actual packed texture. Deliberate carrier
+loss/substitution, discarded packed RGB and conversion errors must compile and fail numerical assertions.
+These probes use test-only observable evaluations, not a physical spectral colour model.
+They share the standalone float-framebuffer runner with `witness:color` and run in GPU CI.
+
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):

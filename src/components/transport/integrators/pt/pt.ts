@@ -347,7 +347,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
                 lines.push('                s.eta_scale *= ms.eta_scale;   // interior L/n² compression (§7.2)');
             }
             lines.push(
-                '                s.ray = make_ray(ms.exit_p, ms.exit_dir);',
+                '                s.ray = make_ray(ms.exit_p, ms.exit_dir, s.ray.wl);',
                 '                continue;',
                 '            }',
             );
@@ -368,7 +368,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             // of the MEDIUM at the event point — not read off ms.weight, which carries the
             // channel-MIS ratio and (under GRIN) an eta^2 factor alongside the albedo.
             if (f.rr && f.weightedAbsorption) {
-                lines.push('                if (!roulette_interior(s, bounce, medium_survival(med_mat, p_evt))) break;');
+                lines.push('                if (!roulette_interior(s, bounce, medium_survival(med_mat, p_evt, s.ray.wl))) break;');
             }
             lines.push(
                 '                continue;   // medium events COUNT toward the bounce budget (§7.2)',
@@ -402,7 +402,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         );
     }
     lines.push(
-        '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element);',
+        '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element, hit.wl);',
         '        Direction wo = -s.ray.direction;',
         '',
         '        kernel_score_emitter_hit(s, hit, mat, wo, props);   // settle last bounce\'s deferred estimate',
@@ -418,7 +418,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         lines.push(
             '        // Accumulate the η² compression this crossing added (§7.2).',
             '        if ((bs.flags & LOBE_TRANSMISSION) != 0u) {',
-            '            float r = ior_of(hit.region_to, hit.p) / ior_of(hit.region_from, hit.p);',
+            '            float r = ior_of(hit.region_to, hit.p, hit.wl) / ior_of(hit.region_from, hit.p, hit.wl);',
             '            s.eta_scale *= r * r;',
             '        }',
         );

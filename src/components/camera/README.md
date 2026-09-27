@@ -8,12 +8,12 @@
 One GLSL file providing:
 
 ```glsl
-Ray camera_generateRay(vec2 film, vec2 xiLens);
+Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl);
 ```
 
 where `film` is the continuous sub-pixel point (the `pixel/` family owns the footprint /
 sub-pixel jitter — the camera is a pure film-point → ray map, no RNG of its own). Returns a
-pure geodesic seed (`Ray` = origin + unit direction, no interval — the trace-loop contract). Camera parameters arrive as uniforms/defines the compiler's
+light-propagation seed (`Ray` = origin + unit direction + current wavelengths, no interval — the trace-loop contract). Camera parameters arrive as uniforms/defines the compiler's
 camera feature owns (`u_cameraPosition/Target`, `TAN_FOV` — a constant fov bakes to a
 literal define; a `{param}` fov becomes a live uniform aliased through the same
 define, so the GLSL is unchanged either way — the §2.8 Value<T> pattern). Model-unique
@@ -36,17 +36,11 @@ The film occupant draws the samples from the stream (`pixel_sample` for the foot
 camera a pure, stratifiable, TS-twin-able map.
 
 **Category B — shutter time and wavelength — are path coordinates, not camera random inputs.**
-Their sampling belongs outside the camera. Shutter time and wavelength carriage are not yet
-implemented; `color: 'spectral'` remains reserved. Do not add `xiTime` or `xiLambda` draws to
-the camera interface.
-
-**Accepted spectral amendment (not implemented):** the reviewed spectral implementation plan
-passes an already-sampled `Wavelengths wl` into `camera_generateRay(film, xiLens, wl)`.
-Sampling remains in the accumulator; `wl` is a physical coordinate, not a new random input.
-Current camera models will pass it into `make_ray`, while a future dispersive lens can use it during
-camera ray construction. S0b must update the signature above, all callers and the camera
-contract test together. The amendment does not add a time input or build the deferred
-weighted/dispersive camera result.
+Their sampling belongs outside the camera. The accumulator passes the already-sampled
+`Wavelengths wl` into `camera_generateRay`. Current cameras pass it to `make_ray`; a future
+dispersive lens can use it during construction. RGB uses an initialized placeholder and
+consumes no wavelength random draw. Shutter time, weighted/dispersive camera results and
+spectral rendering remain unimplemented. Do not add `xiTime` or `xiLambda` draws to this seam.
 See [spectral plan §3.2](../../../docs/claude-spectral-implementation-plan.md#32-fully-initialized-rays-including-the-camera).
 
 ## Status

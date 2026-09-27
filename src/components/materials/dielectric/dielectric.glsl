@@ -16,8 +16,8 @@ InteractionSample dielectric_sample(Direction wo, Hit hit, MaterialProperties mp
     // is the GRIN-interface unification (impl-plan-grin-interface): a deflecting region answers
     // with its n(x) evaluated AT THE WALL POINT — Snell/Fresnel with the local index on each
     // side; constant regions ignore p.
-    float n_i = ior_of(hit.region_from, hit.p);
-    float n_t = ior_of(hit.region_to, hit.p);
+    float n_i = ior_of(hit.region_from, hit.p, hit.wl);
+    float n_t = ior_of(hit.region_to, hit.p, hit.wl);
     float eta = n_i / n_t;
 
     Direction n = hit.frame.n;                        // oriented toward region_from (§4.1)

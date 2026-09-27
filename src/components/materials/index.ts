@@ -25,12 +25,15 @@ export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescrip
 /** The model's STRUCT surface (D4): its rows plus its derived fields as pseudo-rows —
  *  ONE list for the struct union, the lookup's default lines, and the resolver, so a
  *  derived field can never drift from the fields the occupant reads. Derived pseudo-rows
- *  are semantic 'geometric' with default 0 (never read outside the model's own arms). */
+ *  carry the declared colour role, with default 0 outside the model's own arms. */
 export function modelStructFields(d: MaterialModelDescriptor): PropertySchema[] {
     return [
         ...d.properties,
         ...(d.derived ?? []).map((s): PropertySchema => ({
-            name: s.name, glslType: s.glslType, semantic: 'geometric',
+            name: s.name,
+            ...(s.glslType === 'Spectrum'
+                ? { glslType: s.glslType, semantic: 'radiometric', role: s.role }
+                : { glslType: s.glslType, semantic: 'geometric' }),
             source: s.name, default: 0, storage: 'field',
         })),
     ];

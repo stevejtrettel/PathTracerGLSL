@@ -10,7 +10,7 @@
 
 void kernel_score_miss(inout PathState s) {
     // Deferred scoring, boundary case: the sample escaped to the environment.
-    s.radiance += s.throughput * combiner_w_env(s) * environment_radiance(s.ray.direction);
+    s.radiance += s.throughput * combiner_w_env(s) * environment_radiance(s.ray.direction, s.ray.wl);
 }
 
 void kernel_score_emitter_hit(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props) {
@@ -20,7 +20,7 @@ void kernel_score_emitter_hit(inout PathState s, Hit hit, int mat, Direction wo,
     if (!material_is_emissive(mat_emit)) return;
     // No ternary: ANGLE rejects '?:' on struct operands (ESSL restriction).
     MaterialProperties eprops = props;
-    if (mat_emit != mat) eprops = scene_material_properties(mat_emit, hit.p, hit.uv, hit.element);
+    if (mat_emit != mat) eprops = scene_material_properties(mat_emit, hit.p, hit.uv, hit.element, hit.wl);
     s.radiance += s.throughput * combiner_w_emitter(s, hit) * interaction_surface_emission(mat_emit, wo, hit, eprops);
 }
 

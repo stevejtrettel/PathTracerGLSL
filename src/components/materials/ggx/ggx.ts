@@ -10,7 +10,7 @@ export const ggxDescriptor: MaterialModelDescriptor = {
     // Fields read (matches ggx.glsl's header): f0, roughness. NO albedo — a conductor's
     // color IS its Fresnel f0; declaring both would invite double-tinting.
     properties: [
-        { name: 'f0', glslType: 'Spectrum', semantic: 'radiometric', source: 'f0', default: 0.9, storage: 'field' },
+        { name: 'f0', glslType: 'Spectrum', semantic: 'radiometric', role: 'reflectance', source: 'f0', default: 0.9, storage: 'field' },
         { name: 'roughness', glslType: 'float', semantic: 'geometric', source: 'roughness', default: 0.5, storage: 'field' },
     ],
     // D4 derived: alpha = max(1e-3, roughness²) — declared ONCE, host-computed (baked

@@ -29,7 +29,7 @@ vec2 pixel_sample(vec2 coord, vec2 xi);   // integer pixel coord → continuous 
 sub-pixel sample from the sampler stream. The occupant importance-samples its kernel:
 `box` places the sample uniformly over the footprint; `tent`/`gaussian` warp `xi` to their
 weighting. The film's `main()` draws `xi`, calls `pixel_sample`, and hands the film point
-to `camera_generateRay(film, xiLens)`.
+to `camera_generateRay(film, xiLens, wl)`.
 
 ## Status
 

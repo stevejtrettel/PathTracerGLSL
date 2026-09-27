@@ -70,7 +70,7 @@ export interface CameraDerived {
 export interface CameraModelDescriptor {
     /** Registry key (D2: the OPEN door — no union to edit; the registry gatekeeps). */
     type: string;
-    /** ?raw source providing `Ray camera_generateRay(vec2 film, vec2 xiLens)`. */
+    /** ?raw source providing `Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl)`. */
     glsl: string;
     /** The model's AUTHORED strategy fields beyond `type`/pose (D2: the validation the
      *  old typed union used to do, now schema-shaped like the lights' — unknown-key /

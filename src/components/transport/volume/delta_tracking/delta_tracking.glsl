@@ -73,7 +73,7 @@ MediumSample medium_sample_delta(int med, float sigma_bar, Ray ray, float t_max,
             return ms;
         }
         Point p = ambient_geodesic(ray.origin, ray.direction, t);
-        MediumProperties m = scene_medium_properties(med, p);
+        MediumProperties m = scene_medium_properties(med, p, ray.wl);
         Spectrum sigma_n = max(Spectrum(sigma_bar) - (m.sigma_a + m.sigma_s), 0.0);
 
         // Emission (impl-plan-medium-emission P3): per-tentative-collision track-length
@@ -141,7 +141,7 @@ MediumSample medium_sample_ratio_absorb(int med, float sigma_bar, Ray ray, float
         t += -log(1.0 - random()) / sigma_bar;
         if (t >= t_max) break;
         Point p = ambient_geodesic(ray.origin, ray.direction, t);
-        MediumProperties m = scene_medium_properties(med, p);
+        MediumProperties m = scene_medium_properties(med, p, ray.wl);
         // Emission (P3, ratio-arm sibling): collected with the PRE-update T — the
         // weight of collisions prior. E[Σ_i T_i · ε(x_i)/σ̄] = ∫ T·ε ds.
         ms.radiance += T * medium_emission(m) / sigma_bar;
@@ -166,7 +166,7 @@ Spectrum medium_transmittance_ratio(int med, float sigma_bar, Ray ray, float len
         t += -log(1.0 - random()) / sigma_bar;
         if (t >= len) return T;
         Point p = ambient_geodesic(ray.origin, ray.direction, t);
-        MediumProperties m = scene_medium_properties(med, p);
+        MediumProperties m = scene_medium_properties(med, p, ray.wl);
         T *= max(Spectrum(sigma_bar) - (m.sigma_a + m.sigma_s), 0.0) / sigma_bar;
         float q = 0.75;                        // pbrt's termination prob — compensation below is 1/(1−q)
         if (spectrum_max(T) < 0.05) {

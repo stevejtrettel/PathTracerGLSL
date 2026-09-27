@@ -104,7 +104,7 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
 
     const contribution: FeatureContribution = {
         ...emptyContribution('camera'),
-        provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 film, vec2 xiLens)' }],
+        provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl)' }],
         // Origin DERIVED from the registry key (D2: the materials way — the path
         // convention is the one truth; no hand-written origin to drift).
         blocks: [{ origin: `components/camera/${model.type}/${model.type}.glsl`, source: model.glsl }],

@@ -67,6 +67,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Colour primitive witnesses
         run: npm run witness:color
+      - name: Wavelength carrier witnesses
+        run: npm run witness:wavelengths
       - name: Run the sweep
         shell: bash
         run: |

@@ -20,7 +20,7 @@ export const directionalLightDescriptor: LightKindDescriptor = {
     ],
     params: [
         { name: 'direction', shape: 'vec3', semantic: 'geometric', kind: 'direction' },
-        { name: 'irradiance', shape: 'vec3', semantic: 'radiometric' },   // E (W/m²), precomputed product
+        { name: 'irradiance', shape: 'vec3', semantic: 'radiometric', role: 'emission' },   // E (W/m²), precomputed product
     ],
     // pbrt DistantLight power: Φ = E·π·R²_world — the one kind that reads the
     // Planner-stamped powerCtx (a VARIANCE-ONLY selection fact; the fallback matches

@@ -7,11 +7,11 @@
 // A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
 // interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
 // occlusion takes a maxDist argument. See docs/trace-loop-contract.md.
-// This is the geometric seed; wavelength carriage is specified in camera/README.md
-// and the spectral plan but is not implemented here yet.
+// Current wavelengths travel with the seed; throughput and radiance belong to the path.
 struct Ray {
     Point origin;
     Direction direction;
+    Wavelengths wl;
 };
 
 struct Frame {
@@ -22,6 +22,7 @@ struct Frame {
 };
 
 struct Hit {
+    Wavelengths wl;     // arrival wavelengths, inherited from the intersected ray
     float t;
     Point p;
     Frame frame;        // shading frame; n oriented toward region_from (§4.1)

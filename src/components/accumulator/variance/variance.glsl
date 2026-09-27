@@ -16,7 +16,7 @@ void main() {
     vec2 film = pixel_sample(pixel, random2());   // sub-pixel placement (pixel/ footprint)
     vec2 xiLens = random2();                       // lens-disk sample — cameras without aperture ignore it
     WavelengthSample camera_sample = wavelengths_sample();
-    Ray ray = camera_generateRay(film, xiLens);
+    Ray ray = camera_generateRay(film, xiLens, camera_sample.wl);
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 

@@ -22,9 +22,15 @@ The sensor owns the measurement response; the colour model owns the wavelength i
 Each accumulator samples the camera, traces radiance, and projects it before updating its
 film statistics. Display transforms remain downstream.
 
-Authored-value conversion still uses the existing RGB binding path. Wavelength carriage on
-rays and model-specific value conversion are the next implementation step; neither is built
-by this film boundary.
+`Ray.wl` carries current wavelengths; `Hit.wl` records arrival wavelengths. Material and
+medium resolution records carry their evaluation wavelengths. The original camera sample
+stays with the accumulator for sensor integration.
+
+`color_lift_reflectance`, `color_lift_coefficient` and `color_lift_emission` evaluate authored
+RGB at an explicit carrier. Radiometric descriptor rows declare their role. All three are
+identities in RGB. Uniforms and packed rows stay authored RGB; filtering, expression evaluation
+and medium clamps happen before conversion. Blackbody still uses the existing RGB projection;
+preserving its authored form through scene planning is the next stage.
 
 To add an occupant, define its descriptor and GLSL inside its own folder and register it in
 `index.ts`. Enable authoring/validation only when its supported paths are implemented. The
@@ -33,3 +39,7 @@ choices, separate from the measurement's colour representation.
 
 `npm run witness:color` executes the spectrum operations at N=2,3,4 and the RGB film projection
 with identity and nonidentity sensors. It also checks that deliberately broken versions fail.
+
+`npm run witness:wavelengths` runs generated shaders with a visible four-value carrier,
+including cameras, arrivals, property resolution, lighting, phase continuation, shadow
+crossings and GRIN. Test-only nonidentity lifts expose conversion bypasses and clamp order.

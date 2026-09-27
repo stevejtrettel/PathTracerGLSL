@@ -47,8 +47,8 @@ Spectrum rough_dielectric_eval(Direction wi, Direction wo, Hit hit, MaterialProp
     vec3 wil = microfacet_to_local(hit.frame, hit.p, wi);
     vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
     if (wol.z <= 0.0 || wil.z == 0.0) return SPECTRUM_ZERO;   // grazing/degenerate
-    float n_i = ior_of(hit.region_from, hit.p);
-    float n_t = ior_of(hit.region_to, hit.p);
+    float n_i = ior_of(hit.region_from, hit.p, hit.wl);
+    float n_t = ior_of(hit.region_to, hit.p, hit.wl);
     if (n_i == n_t) return SPECTRUM_ZERO;   // index-matched: pure delta pass-through (see sample)
     float eta = n_i / n_t;
     vec3 m;
@@ -79,8 +79,8 @@ InteractionSample rough_dielectric_sample(Direction wo, Hit hit, MaterialPropert
     float a = mp.alpha;
     // Media on both sides come from the HIT (§4.1). The point argument is the
     // GRIN-interface unification: a deflecting region answers with its n(x) AT THE WALL.
-    float n_i = ior_of(hit.region_from, hit.p);
-    float n_t = ior_of(hit.region_to, hit.p);
+    float n_i = ior_of(hit.region_from, hit.p, hit.wl);
+    float n_t = ior_of(hit.region_to, hit.p, hit.wl);
     float eta = n_i / n_t;
 
     // Index-matched interface (η = 1, e.g. both sides of a thin sheet, or glass inside
@@ -136,8 +136,8 @@ float rough_dielectric_pdf(Direction wi, Direction wo, Hit hit, MaterialProperti
     vec3 wil = microfacet_to_local(hit.frame, hit.p, wi);
     vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
     if (wol.z <= 0.0 || wil.z == 0.0) return 0.0;
-    float n_i = ior_of(hit.region_from, hit.p);
-    float n_t = ior_of(hit.region_to, hit.p);
+    float n_i = ior_of(hit.region_from, hit.p, hit.wl);
+    float n_t = ior_of(hit.region_to, hit.p, hit.wl);
     if (n_i == n_t) return 0.0;             // index-matched: pure delta pass-through (see sample)
     float eta = n_i / n_t;
     vec3 m;

@@ -28,7 +28,7 @@ export const quadLightDescriptor: LightKindDescriptor = {
         { name: 'corner', shape: 'vec3', semantic: 'geometric', kind: 'point' },
         { name: 'edge1', shape: 'vec3', semantic: 'geometric', kind: 'vector' },
         { name: 'edge2', shape: 'vec3', semantic: 'geometric', kind: 'vector' },
-        { name: 'radiance', shape: 'vec3', semantic: 'radiometric' },   // Le, precomputed product
+        { name: 'radiance', shape: 'vec3', semantic: 'radiometric', role: 'emission' },   // Le, precomputed product
     ],
     // QuadLight.normal + QuadLight.area — compile-time data (the one-sided pin).
     derivedFields: [

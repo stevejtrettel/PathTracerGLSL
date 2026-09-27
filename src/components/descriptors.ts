@@ -36,6 +36,13 @@ export type RowConstraint =
  *  the caller substitutes via `resolveLightValues` first. */
 export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue;   // blackbody: driven-only past plan entry (constants fold)
 
+export type RadiometricRole = 'reflectance' | 'coefficient' | 'emission';
+
+/** Radiometric rows declare how authored RGB is interpreted by the colour model. */
+export type ColorSemantic =
+    | { semantic: 'geometric' }
+    | { semantic: 'radiometric'; role: RadiometricRole };
+
 /**
  * A field of a scene-scoped properties struct (MaterialProperties / MediumProperties)
  * that a model READS. The struct is the union of declared fields of the models present
@@ -43,13 +50,11 @@ export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<
  * property vocabulary (materials-§7): no compiler type names a property, so a new model
  * with a new property adds a row here and nothing anywhere else.
  */
-export interface PropertySchema<TSource extends string = string> {
+export type PropertySchema<TSource extends string = string> = ColorSemantic & {
     /** Struct field name; shared across models by name+type (same name, different
      *  glslType is a Validator error — module-anatomy §3). */
     name: string;
     glslType: 'float' | 'Spectrum';
-    /** radiometric constants format via formatSpectrum (§2.5); geometric via formatFloat. */
-    semantic: 'radiometric' | 'geometric';
     /** Mathematical input domain required by the implementation (the shared RowConstraint
      *  vocabulary — D1). Omitted means the model accepts the full numeric range; this is
      *  not a general artistic-policy clamp. */
@@ -58,8 +63,8 @@ export interface PropertySchema<TSource extends string = string> {
      *  reads (materials-§7 reorg: resolution derives from the row). */
     source: TSource;
     /** Numeric default — ONE truth (the geometry batch's defaults-in-rows lesson).
-     *  Spectrum rows broadcast the scalar; the GLSL default expression is DERIVED
-     *  (semantic formatter + the SPECTRUM_ZERO/ONE constants), never authored. */
+     *  Radiometric rows lift the authored grey through their declared colour role;
+     *  geometric rows format the scalar directly. */
     default: number;
     /** 'field' → struct member resolved at the shading point; 'region-table' → a
      *  generated <name>_of(region) table (read for the FAR side of a boundary — a
@@ -74,9 +79,11 @@ export interface PropertySchema<TSource extends string = string> {
  *  so the two can never drift). Lands in MaterialProperties as a struct field the
  *  occupant reads (`mp.<name>`) — GLSL never recomputes a pure function of its own
  *  rows per evaluation (ggx's alpha = max(1e-3, roughness²) is the first occupant). */
-export interface MaterialDerivedSpec {
+export type MaterialDerivedSpec = (
+    | { glslType: 'float' }
+    | { glslType: 'Spectrum'; role: RadiometricRole }
+) & {
     name: string;
-    glslType: 'float' | 'Spectrum';
     /** Row SOURCE names this value depends on. */
     inputs: string[];
     /** Pure derivation over resolved input values ({param} rows substituted live). */
@@ -150,12 +157,9 @@ export interface AuthoredParamSpec {
  *  AND `PlannedLight.values` key. ROW ORDER = STRUCT FIELD ORDER = CTOR ORDER —
  *  the struct itself is GENERATED from these rows (A1: one declaration, everything
  *  derived), and the dispatcher constructs it positionally. */
-export interface LightParamSpec {
+export type LightParamSpec = ColorSemantic & {
     name: string;
     shape: 'number' | 'vec3';
-    /** radiometric values format via formatSpectrum + type Spectrum (§2.5); geometric
-     *  via formatFloat/Vec3. */
-    semantic: 'radiometric' | 'geometric';
     /** Geometric kind (required for geometric rows): drives the generated struct's
      *  typedef (point → Point, direction → Direction, vector → vec3, length → float)
      *  and, later, the Value<T>-light-params transform rules — the same table as

@@ -38,7 +38,7 @@ The following five constraints define the v1 implementation scope. **They are sc
 
 **V1-C1. Media are homogeneous** (constant `sigma_s`/`sigma_a`/phase params per medium; procedural density rejected).
 *Simplifies:* distance sampling is closed-form (`t = −ln ξ / σ_t` — no delta tracking, no rejection loops), transmittance is analytic Beer–Lambert *per segment* (no stochastic transmittance estimation; shadow rays still find their segments via boundary intersections — a few intersections, not a marching loop, per verification F4), the volume-integrator axis collapses to one exact implementation, and the majorant requirement (§3.5) is trivially satisfied (`majorant = σ_t`).
-*Not ruled out because:* `scene_medium_properties(int mat, vec3 p)` keeps its `p` parameter unused-but-present, `MediumProperties` keeps its shape, and the `volumeIntegrator` strategy axis (§7.3) keeps its `delta-tracking`/`ratio-tracking` values as rejected-not-removed options.
+*Not ruled out because:* `scene_medium_properties(int mat, vec3 p, Wavelengths wl)` keeps its `p` parameter unused-but-present, `MediumProperties` keeps its shape, and the `volumeIntegrator` strategy axis (§7.3) keeps its `delta-tracking`/`ratio-tracking` values as rejected-not-removed options.
 *Relaxation:* implement majorant declaration/validation (§3.5) + a delta-tracking loop generator. Contracts untouched.
 
 **V1-C2. Samplable lights are analytic only** (point, quad, sphere, environment). Emissive materials on SDF geometry are always path-only (`sampleAsLight: true` on a non-analytic shape is a Validator error).
@@ -286,7 +286,7 @@ No Disney code in the shader if no material uses Disney. A material model plugin
 
 ### 3.4 `MaterialProperties` is generated per scene — PINNED
 
-The archive tried three times to stabilize a universal `MaterialProperties` struct (fields drifted: `light_id`, `sigma_*`, `flags` in and out). We end the churn structurally: **the struct is emitted by the Generator as the union of fields declared by the material models actually present**. A Lambert-only scene gets `{albedo, emission}`; adding one dielectric object adds `{ior, transmittance}` for that scene only. (Note: unlike the archive design, `light_id` is *not* a material field — light identity is geometric and lives on regions via `light_of(region_id)`, §6.2. Two objects sharing one emissive material are two distinct lights.) The property-resolution machinery (constants baked, `Value<T>` → uniforms, procedural GLSL expressions inlined into `scene_material_properties(int mat, vec3 p)`) is unchanged from the current design.
+The archive tried three times to stabilize a universal `MaterialProperties` struct (fields drifted: `light_id`, `sigma_*`, `flags` in and out). We end the churn structurally: **the struct is emitted by the Generator as the union of fields declared by the material models actually present**. A Lambert-only scene gets `{albedo, emission}`; adding one dielectric object adds `{ior, transmittance}` for that scene only. (Note: unlike the archive design, `light_id` is *not* a material field — light identity is geometric and lives on regions via `light_of(region_id)`, §6.2. Two objects sharing one emissive material are two distinct lights.) The property-resolution machinery (constants baked, `Value<T>` → uniforms, procedural GLSL expressions inlined into `scene_material_properties(int mat, vec3 p, vec2 uv, int element, Wavelengths wl)`) is unchanged from the current design.
 
 ### 3.5 Medium interface
 
@@ -299,7 +299,7 @@ struct MediumProperties {   // generated per scene, like MaterialProperties
     Spectrum emission;      // volumetric emission (0 usually)
     float    phase_g;       // + fields declared by phase models present
 };
-MediumProperties scene_medium_properties(int mat, vec3 p);   // heterogeneous media vary with p
+MediumProperties scene_medium_properties(int mat, vec3 p, Wavelengths wl);   // heterogeneous media vary with p
 
 Spectrum          <phase>_eval  (Direction wi, Direction wo, MediumProperties mp);  // integrates to 1 over sphere
 InteractionSample <phase>_sample(Direction wo, MediumProperties mp, vec2 xi);        // flags include LOBE_MEDIUM
@@ -499,7 +499,7 @@ struct LightSample {
     int       light_id;
 };
 
-LightSample lighting_sample(Point p, vec2 xi);   // generated: selection + per-kind sampling
+LightSample lighting_sample(LightQuery q, vec2 xi, Wavelengths wl);   // generated: selection + per-kind sampling
 
 // MIS pdf query: the density with which lighting_sample(p, ·) would have produced
 // direction wi *toward the specific light that was hit*. Transport already knows the
@@ -545,7 +545,7 @@ if (!spectrum_is_black(Le)) {
 }
 ```
 
-The **environment** is a light kind in this registry (samplable via the existing HDRI CDF machinery from the archive/reference implementation; `environment_radiance(dir)` / `environment_sample` / `environment_pdf`). The hardcoded sky in the current `path_trace.glsl` is retired: environments are scene data.
+The **environment** is a light kind in this registry (samplable via the existing HDRI CDF machinery from the archive/reference implementation; `environment_radiance(dir, wl)` / `environment_sample` / `environment_pdf`). The hardcoded sky in the current `path_trace.glsl` is retired: environments are scene data.
 
 ### 6.3 The shadow query returns transmittance — PINNED
 
@@ -646,16 +646,18 @@ Scene = specimen; strategy = experiment. The existing multi-renderer infrastruct
 
 ## 8. Spectral appendix — what changes when we flip the switch
 
-Design: **hero-wavelength sampling** (PBRT-v4 style), fully compatible with a WebGL2 megakernel. Each path samples one hero wavelength + 3 stratified companions; `Spectrum` becomes a `vec4` of spectral samples; the film integrates to CIE XYZ via color-matching functions; display converts XYZ→sRGB.
+The current design authority is [the spectral implementation plan](claude-spectral-implementation-plan.md).
+The RGB foundation is implemented: the colour family supplies transport types, conversion
+and film integration; the sensor owns its measurement response. `Ray` carries current
+wavelengths and `Hit` records arrival wavelengths. Cameras accept the sampled carrier;
+material, medium, index, light and sky lookups receive it explicitly. The estimator keeps
+the original camera wavelengths/PDFs for projection to signed linear-sRGB accumulation.
 
-What changes (and *only* this, given the §2.5 discipline):
-
-1. **Planner constant resolution** — RGB material/light constants are upsampled to spectral reflectance via CPU-side sigmoid-polynomial fits (Jakob–Hanika); the constant formatter emits coefficient evaluation instead of `vec3` literals. This is a Planner mode, invisible to scene authors.
-2. **Film + display blocks** — accumulate XYZ; convert in display. Two swapped GLSL blocks under the same pipeline.
-3. **Transport λ state** — the loop carries `lambda`; chromatic events (dispersive refraction, wavelength-dependent `sigma_t`) collapse to the hero wavelength (companions zeroed) — standard technique, a few lines in the relevant samplers.
-4. **Redshift** (the black-hole payoff) — frequency shift along geodesics is a transform of `lambda` plus a throughput factor; only spectral transport makes this *correct* rather than a fake color tint.
-
-What does **not** change: every struct and signature in Contracts 1–5 (all typedef'd), the scene format, the pipeline, the Engine. Estimated scope when the time comes: the formatter mode, two film blocks, λ plumbing in the transport generator, spectral MIS for chromatic media. Plausibly lands in *this* tracer.
+Spectral rendering, authored non-RGB form preservation, lookup assets, dispersion collapse
+and wavelength-changing physics remain planned. RGB's carrier is an initialized placeholder,
+and its role-specific conversions are identities. These changes do not require an engine
+or pipeline contract change. The earlier prediction that spectral work would leave every
+struct/signature unchanged is superseded by the implemented carrier contract.
 
 ---
 

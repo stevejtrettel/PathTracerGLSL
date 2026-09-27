@@ -18,7 +18,7 @@ export const sphereLightDescriptor: LightKindDescriptor = {
     params: [
         { name: 'center', shape: 'vec3', semantic: 'geometric', kind: 'point' },
         { name: 'radius', shape: 'number', semantic: 'geometric', kind: 'length' },
-        { name: 'radiance', shape: 'vec3', semantic: 'radiometric' },   // Le, precomputed product
+        { name: 'radiance', shape: 'vec3', semantic: 'radiometric', role: 'emission' },   // Le, precomputed product
     ],
     // pbrt PowerLightSampler: π·4πr²·Le.
     power(v) {

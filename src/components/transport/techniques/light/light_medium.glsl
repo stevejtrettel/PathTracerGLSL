@@ -6,13 +6,13 @@
 
 void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Direction wo_med) {
     // Phase EVAL, NO cosine (§2.2 — the cosine is a surface Jacobian).
-    MediumProperties m_evt = scene_medium_properties(med_mat, p_evt);
-    LightSample ls = lighting_sample(light_query_medium(p_evt), random2());
+    MediumProperties m_evt = scene_medium_properties(med_mat, p_evt, s.ray.wl);
+    LightSample ls = lighting_sample(light_query_medium(p_evt), random2(), s.ray.wl);
     if (ls.pdf <= 0.0) return;
     // Pass the LIGHT POINT (drift-free target; the walker measures its back-off against it) and
     // the null crossings this path may still make.
     Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
-    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi), light_p, shadow_crossings_left(s));
+    Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi, s.ray.wl), light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
     s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
 }

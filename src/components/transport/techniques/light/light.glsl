@@ -8,7 +8,7 @@
 void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props) {
     // Pure-delta materials skip NEE: their eval is zero, the march would be wasted.
     if (!material_has_nondelta_lobes(mat)) return;
-    LightSample ls = lighting_sample(light_query_surface(mat, hit), random2());
+    LightSample ls = lighting_sample(light_query_surface(mat, hit), random2(), hit.wl);
     if (ls.pdf <= 0.0) return;
     // The shadow ray tests the segment from the surface to the sampled LIGHT POINT. Its origin is
     // moved hit.eps off the surface (ray_spawn), so its direction is re-aimed from there at the

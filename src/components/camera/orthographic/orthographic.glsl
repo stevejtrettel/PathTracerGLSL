@@ -3,7 +3,7 @@
 // the view). No fov, no aperture (ignores xiLens).
 // Requires: u_imageSize, u_cameraPosition, u_cameraForward/Right/Up, u_orthoScale.
 
-Ray camera_generateRay(vec2 film, vec2 xiLens) {
+Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
     vec2 ndc = (2.0 * film / u_imageSize) - 1.0;
     ndc.x *= u_aspect;   // aspect precomputed on the CPU (u_aspect), not per-ray
 
@@ -16,5 +16,5 @@ Ray camera_generateRay(vec2 film, vec2 xiLens) {
     // Parallel rays: the origin spans the film plane (half-height u_orthoScale, half-width
     // aspect·u_orthoScale), the direction is constant. No perspective foreshortening.
     vec3 origin = u_cameraPosition + ndc.x * u_orthoScale * right + ndc.y * u_orthoScale * up;
-    return make_ray(origin, forward);
+    return make_ray(origin, forward, wl);
 }

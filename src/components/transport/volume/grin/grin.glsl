@@ -99,16 +99,16 @@
                                 // is pure dynamics, not drawn geometry. Inert for weak fields
                                 // (Luneburg peaks at √2).
 
-float grin_n(int med, vec3 p) {
-    return max(ior_at(med, p), 1e-3);   // fp-safety floor (physical n ≥ 1)
+float grin_n(int med, vec3 p, Wavelengths wl) {
+    return max(ior_at(med, p, wl), 1e-3);   // fp-safety floor (physical n ≥ 1)
 }
 
-vec3 grin_grad_n(int med, vec3 p) {
+vec3 grin_grad_n(int med, vec3 p, Wavelengths wl) {
     vec2 e = vec2(GRIN_GRAD_EPS, 0.0);
     return vec3(
-        grin_n(med, p + e.xyy) - grin_n(med, p - e.xyy),
-        grin_n(med, p + e.yxy) - grin_n(med, p - e.yxy),
-        grin_n(med, p + e.yyx) - grin_n(med, p - e.yyx)
+        grin_n(med, p + e.xyy, wl) - grin_n(med, p - e.xyy, wl),
+        grin_n(med, p + e.yxy, wl) - grin_n(med, p - e.yxy, wl),
+        grin_n(med, p + e.yyx, wl) - grin_n(med, p - e.yyx, wl)
     ) / (2.0 * GRIN_GRAD_EPS);
 }
 
@@ -127,8 +127,8 @@ bool grin_inside(int med, vec3 p) {
 }
 
 // The conservative force F(r) = n·∇n = ∇(n²/2) — position-only (the Verlet enabler).
-vec3 grin_force(int med, vec3 r) {
-    return grin_n(med, r) * grin_grad_n(med, r);
+vec3 grin_force(int med, vec3 r, Wavelengths wl) {
+    return grin_n(med, r, wl) * grin_grad_n(med, r, wl);
 }
 
 // Interior basic-radiance factor (impl-plan-grin-interface): along a curved ray in varying n,
@@ -182,7 +182,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
     ms.scattered = false;
     ms.radiance = SPECTRUM_ZERO;
 
-    float n0 = grin_n(med, ray.origin);
+    float n0 = grin_n(med, ray.origin, ray.wl);
 
     // THE t_max GUARD: the straight-line boundary (scene_intersect's hit.t) is within one step
     // — fly straight instead of relaunching the walker on a sub-resolution segment (this is
@@ -192,7 +192,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
     // through to the surface hit and the wall material fires there. Emission over the
     // micro-segment rides the E1.5 closed form (n change is sub-resolution — factor 1).
     if (t_max <= min(n0 * GRIN_STEP, GRIN_DS_MAX)) {
-        MediumProperties mg = scene_medium_properties(med, ray.origin);
+        MediumProperties mg = scene_medium_properties(med, ray.origin, ray.wl);
         Spectrum sag = max(mg.sigma_a, Spectrum(1e-6));
         ms.deflected = false;
         ms.eta_scale = 1.0;
@@ -207,7 +207,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
 
     vec3 r = ray.origin;
     vec3 T = n0 * ray.direction;               // T = n·(unit tangent) at the actual entry index
-    vec3 F = grin_force(med, r);               // carried across steps — velocity Verlet reuses it
+    vec3 F = grin_force(med, r, ray.wl);               // carried across steps — velocity Verlet reuses it
     Spectrum absorb = SPECTRUM_ONE;                // transmittance so far along the bent path
     float round_comp = 1.0;                         // the roulette's survivor compensation
 
@@ -253,7 +253,7 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
             float n_exit  = length(T_half);
             float t_cross = hi * h * n_exit;                       // world distance from r to the crossing
             float t_exit  = t_cross - GRIN_EXIT_PULLBACK;          // may rewind past r at grazing — by design
-            MediumProperties me = scene_medium_properties(med, r);
+            MediumProperties me = scene_medium_properties(med, r, ray.wl);
             Spectrum sae = max(me.sigma_a, Spectrum(1e-6));
             Spectrum tre = spectrum_exp(-sae * max(t_exit, 0.0));
             ms.radiance += round_comp * absorb * ((n0 * n0) / (n * n)) * medium_emission(me) * (SPECTRUM_ONE - tre) / sae;
@@ -269,13 +269,13 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         // TELESCOPES to the inline arm's exact result). Emitted radiance at index n reaches
         // the segment start (index n₀) scaled by (n₀/n)² — basic radiance L/n² invariance,
         // paid by the carried |T| = n (impl-plan-grin-media batch 1).
-        MediumProperties mp = scene_medium_properties(med, r);
+        MediumProperties mp = scene_medium_properties(med, r, ray.wl);
         Spectrum sa = max(mp.sigma_a, Spectrum(1e-6));
         Spectrum step_tr = spectrum_exp(-sa * (length(T_half) * h));
         ms.radiance += round_comp * absorb * ((n0 * n0) / (n * n)) * medium_emission(mp) * (SPECTRUM_ONE - step_tr) / sa;
         absorb *= step_tr;
 
-        vec3 F_next = grin_force(med, r_next);   // THE one force evaluation per step (reused next)
+        vec3 F_next = grin_force(med, r_next, ray.wl);   // THE one force evaluation per step (reused next)
         T = T_half + 0.5 * h * F_next;
         r = r_next;
         F = F_next;
@@ -300,9 +300,9 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
     ms.scattered = false;
     ms.radiance = SPECTRUM_ZERO;
 
-    MediumProperties m0 = scene_medium_properties(med, ray.origin);
+    MediumProperties m0 = scene_medium_properties(med, ray.origin, ray.wl);
     Spectrum sigma_t = m0.sigma_a + m0.sigma_s;       // constant over the region (Validator)
-    float n0 = grin_n(med, ray.origin);
+    float n0 = grin_n(med, ray.origin, ray.wl);
 
     // Channel-MIS draw, up front: uniform channel, exponential target arc s*.
     int   c  = spectrum_sample_channel(xi.x);
@@ -336,7 +336,7 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
 
     vec3 r = ray.origin;
     vec3 T = n0 * ray.direction;
-    vec3 F = grin_force(med, r);
+    vec3 F = grin_force(med, r, ray.wl);
     float s_acc = 0.0;                                 // accumulated arc length
     float round_comp = 1.0;                            // the roulette's survivor compensation
 
@@ -398,7 +398,7 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
         }
 
         s_acc += ds;
-        vec3 F_next = grin_force(med, r_next);
+        vec3 F_next = grin_force(med, r_next, ray.wl);
         T = T_half + 0.5 * h * F_next;
         r = r_next;
         F = F_next;

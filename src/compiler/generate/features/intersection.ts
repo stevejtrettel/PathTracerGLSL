@@ -397,7 +397,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         provides.push({ name: 'scene_intersect_any', signature: 'bool scene_intersect_any(Ray ray, float maxDist)' });
     }
     if (plan.materials.some((m) => modelTransmission(m.model))) {
-        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, vec3 p)' });
+        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, vec3 p, Wavelengths wl)' });
     }
 
     // Self-require: the generated scene_intersect classifies its boundary through
@@ -556,7 +556,7 @@ function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, cha
     const lines: string[] = ['    {'];
     for (const s of pl.setup) lines.push(`        ${s}`);
     const rayRef = pl.local ? 'lray' : 'ray';
-    if (pl.local) lines.push(`        Ray lray = make_ray(${pl.ro}, ${pl.rd});`);
+    if (pl.local) lines.push(`        Ray lray = make_ray(${pl.ro}, ${pl.rd}, ray.wl);`);
     // A hoisted const carries UNSCALED params, so an object still holding a scale
     // residual constructs inline (post-fold, that is the driven tier only).
     let ref = pl.scale === undefined ? hoistedShapeName(obj, ids) : null;
@@ -758,7 +758,7 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
         // FOLDED constant arm below).
         const { q, ts } = placementRefs(obj.placement);
         lines.push(`    {`);
-        lines.push(`        Ray lray = make_ray(placement_rigid(${q}, ${ts}, ray.origin), placement_dir(${q}, ray.direction));`);
+        lines.push(`        Ray lray = make_ray(placement_rigid(${q}, ${ts}, ray.origin), placement_dir(${q}, ray.direction), ray.wl);`);
         lines.push(`        float s = placement_scale(${ts});`);
         if (bound !== null) {
             lines.push(`        if (${analyticTest(obj, 'lray', ids, 's')} && t < ${bound}) return true;`);
@@ -1041,7 +1041,7 @@ function instanceLeafItem(b: PlannedInstanceBatch, forAny: boolean, chartUv: boo
     const conj = [
         'vec3 ro = placement_rigid(q, ts, ray.origin);',
         'vec3 rd = placement_dir(q, ray.direction);   // unit — <type>_intersect assumes it',
-        'Ray lray = make_ray(ro, rd);',
+        'Ray lray = make_ray(ro, rd, ray.wl);',
         `${structName(d)} shape = ${emitCtor(d, b.prototype.parameters, 's')};`,
         'float t;',
     ];
@@ -1353,7 +1353,7 @@ function sdfLeafArm(k: { type: string; code: number }, chartUv: boolean, bound: 
     lines.push(`            ${sn} shape = ${k.type}_from_record(u_data_records, rbase);`);
     lines.push(`            vec4 rq = texelFetch(u_data_records, data_texel1d(rbase + ${tail}u), 0);`);
     lines.push(`            vec4 rts = texelFetch(u_data_records, data_texel1d(rbase + ${tail + 1}u), 0);`);
-    lines.push('            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction));');
+    lines.push('            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction), ray.wl);');
     const call = `${k.type}_sdf_intersect(lray, shape, lt0, min(lt1, ${far}), t)`;
     if (bound !== null) {
         lines.push(`            if (${call} && t < ${far}) return true;`);
@@ -1559,7 +1559,7 @@ function generateMaterialOfData(base: number, ambientMedium: number): string {
 }
 
 /** The DATA form of the IOR table: the decomposition ior_of(region, p) =
- *  ior_of_material(material_of(region), p). The material half STAYS generated —
+ *  ior_of_material(material_of(region), p, wl). The material half STAYS generated —
  *  an index may be a FORMULA (GRIN) or a driven uniform, which is exactly why fusing
  *  it to regions was the O(N) mistake — and is sized by the MATERIAL count. The two
  *  semantic pins of the baked form carry over exactly: region −1 answers 1.0 before
@@ -1567,7 +1567,7 @@ function generateMaterialOfData(base: number, ambientMedium: number): string {
  *  1.0 arms, sized by the open-transmissive-mesh count (a warned configuration). */
 function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[]): string {
     const lines: string[] = ['// Generated material -> IOR (impl-plan-region-materials: the region half is data)'];
-    lines.push('float ior_of_material(int mat, vec3 p) {');
+    lines.push('float ior_of_material(int mat, vec3 p, Wavelengths wl) {');
     for (const mat of materials) {
         if (mat.medium?.ior !== undefined) {
             lines.push(`    if (mat == ${mat.id}) return ${emitValue(mat.medium.ior as ParamValue, formatFloat)};   // '${mat.name}' — deflecting: the medium's n(p)`);
@@ -1585,7 +1585,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
     lines.push('    return 1.0;'); // non-transmissive / ambient
     lines.push('}');
     lines.push('');
-    lines.push('float ior_of(int region, vec3 p) {');
+    lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
     lines.push('    if (region < 0) return 1.0;');
     const byId = new Map(materials.map((m) => [m.id, m]));
     for (const m of meshes) {
@@ -1603,7 +1603,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
             lines.push(`    if (region == ${b.index}) return 1.0;   // batch without containment (thin): no interior`);
         }
     }
-    lines.push('    return ior_of_material(material_of(region), p);');
+    lines.push('    return ior_of_material(material_of(region), p, wl);');
     lines.push('}');
     return lines.join('\n');
 }
@@ -1619,7 +1619,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
 function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[]): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
     const lines: string[] = ['// Generated region -> IOR table (§2.3 family; p = the GRIN-interface point argument)'];
-    lines.push('float ior_of(int region, vec3 p) {');
+    lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
     // CLOSED meshes have a real interior (fable-mesh-containment) and earn rows like any
     // solid; open meshes stay off the table (thin — the Validator's warning covers them).
     // Instanced batches CLAIMING an interior (impl-plan-instanced-containment) earn rows by
@@ -1690,6 +1690,7 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
 
     // scene_intersect — hit.t is the running nearest (a Hit is valid only when this returns true).
     lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
+    lines.push('    hit.wl = ray.wl;');
     lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
     lines.push('    hit.eps = MARCH_CLEARANCE;   // conservative seed (the largest tier) — every arm overwrites; a missed arm degrades, never garbage');
     lines.push('    bool found = false;');

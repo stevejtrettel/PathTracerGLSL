@@ -1,7 +1,7 @@
 // compiler/generate/features/environment.ts
 // Environment: what a ray sees when it hits nothing (contracts §2.10 / review C3).
 //
-// Every kind fills the same function — `environment_radiance(vec3 dir) -> vec3` —
+// Every kind fills the same function — `environment_radiance(vec3 dir, Wavelengths wl) -> Radiance` —
 // with a different body + resources:
 //   none     → black
 //   constant → baked (or {param}-driven) color * u_envIntensity
@@ -9,14 +9,15 @@
 //              equirect_map.glsl), whichever chart the sampler uses. The radiance
 //              texture arrives via `extern:env_map` — the app loads the .hdr into the
 //              engine registry; the executor binds it like any pass input (§2.10).
-//   procedural → T4 (bake-to-table); rejected with a diagnostic until then.
+//   procedural → direct formula evaluation; the bake guides sampling only.
 
+import { emitColor } from '../color.js';
 import type { RenderPlan } from '../../plan/types.js';
 import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import { formatSpectrum } from '../../../components/glsl-format.js';
+import { formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { ENV_CHARTS, EQUIRECT_MAP } from '../../../components/env/index.js';
 import envSamplerCdfGLSL from '../../../components/env/sampler_cdf.glsl?raw';
@@ -71,14 +72,14 @@ const CONSTANT_PDF = `float environment_pdf(vec3 dir) {
 }`;
 // The color is a SCENE_VALUE — `colorExpr` is its baked literal (constant) or `u_` name (driven).
 const constantSampler = (colorExpr: string) => `// Constant environment as a light (uniform sphere, T3)
-LightSample environment_sample(Point p, vec2 xi) {
+LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
     LightSample ls;
     float z = 1.0 - 2.0 * xi.x;
     float r = sqrt(max(0.0, 1.0 - z * z));
     float phi = TWO_PI * xi.y;
     ls.wi = vec3(r * cos(phi), z, r * sin(phi));
     ls.distance = MAX_DIST;                                        // the far clip — where a missed BSDF ray finds the sky
-    ls.radiance = ${colorExpr} * u_envIntensity;         // without visibility
+    ls.radiance = ${emitColor(`${colorExpr} * u_envIntensity`, 'emission', 'wl')};         // without visibility
     ls.pdf = 1.0 / (4.0 * PI);                                     // per-light; selection applied by lighting_sample
     ls.flags = 0u;                                                 // not delta — BSDF paths see the env on miss
     ls.light_id = -1;
@@ -91,9 +92,9 @@ LightSample environment_sample(Point p, vec2 xi) {
  *  provide is declared component-scoped for the seam-unused check. */
 function envProvides(samplable: boolean, pdf: 'none' | 'generated' | 'component'): Array<{ name: string; signature: string; componentScoped?: boolean }> {
     const provides: Array<{ name: string; signature: string; componentScoped?: boolean }> =
-        [{ name: 'environment_radiance', signature: 'vec3 environment_radiance(vec3 dir)' }];
+        [{ name: 'environment_radiance', signature: 'Radiance environment_radiance(vec3 dir, Wavelengths wl)' }];
     if (samplable) {
-        provides.push({ name: 'environment_sample', signature: 'LightSample environment_sample(Point p, vec2 xi)' });
+        provides.push({ name: 'environment_sample', signature: 'LightSample environment_sample(Point p, vec2 xi, Wavelengths wl)' });
         if (pdf !== 'none') {
             provides.push({
                 name: 'environment_pdf',
@@ -117,7 +118,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
         // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
         // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
-        const colorExpr = emitValue(env.color as ParamValue, formatSpectrum as (x: never) => string);
+        const colorExpr = emitValue(env.color as ParamValue, formatVec3 as (x: never) => string);
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
         ];
@@ -125,7 +126,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Sky intensity', group: 'Environment', triggersReset: true },
         };
         mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set(), true);   // no-op if constant; sky radiance is HDR (E2)
-        const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${colorExpr} * u_envIntensity;`) }];
+        const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${emitColor(`${colorExpr} * u_envIntensity`, 'emission', 'wl')};`) }];
         if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: constantSampler(colorExpr) });
         if (plan.program.environmentPdf) blocks.push({ origin: 'generated:environment-pdf', source: CONSTANT_PDF });
         return {
@@ -155,7 +156,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         const blocks = [
             EQUIRECT_MAP,
             { origin: ORIGIN, source: '// Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)\n'
-                + radianceFn('return texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity;') },
+                + radianceFn(`return ${emitColor('texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity', 'emission', 'wl')};`) },
         ];
         const textures = [{ name: 'u_envMap', source: 'extern:env_map' }];
         if (samplable) {
@@ -187,7 +188,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
     if (env.type === 'procedural') {
         // T4: the formula IS the radiance (direct-eval — sharp, resolution-free, D7); the
         // baked table exists only as CPU CDF food. No radiance texture at all: the sampler's
-        // radiance is environment_radiance(ls.wi) by the T4 unification.
+        // radiance is environment_radiance(ls.wi, wl) by the T4 unification.
         const intensity = env.intensity;   // C2: plan-resolved, no re-defaulting
         const rotation = env.rotation;
         // u_envRotation (the additive angle) is minted below ONLY for the equirect chart; the
@@ -208,7 +209,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
             // and the CDF (baked unrotated, sampled through the chart) agree under rotation.
             // GLSL params are value copies: reassigning `dir` scopes the rotation to the
             // formula without touching the author's expression.
-            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_cs(normalize(dir), u_envRotCS);\n    return (${env.glsl.source}) * u_envIntensity;`) },
+            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_cs(normalize(dir), u_envRotCS);\n    return ${emitColor(`(${env.glsl.source}) * u_envIntensity`, 'emission', 'wl')};`) },
         ];
         // Procedural radiance always uses the matrix rotation → always ships u_envRotCS.
         uniforms.push(rotCsUniform(rotation));
@@ -244,5 +245,5 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
 }
 
 function radianceFn(body: string): string {
-    return `// Environment radiance\nvec3 environment_radiance(vec3 dir) {\n    ${body}\n}`;
+    return `// Environment radiance\nRadiance environment_radiance(vec3 dir, Wavelengths wl) {\n    ${body}\n}`;
 }

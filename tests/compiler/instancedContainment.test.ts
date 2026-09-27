@@ -76,7 +76,7 @@ describe('instanced containment: the region is real end to end', () => {
         // baked ior table iterated objects + closed meshes only — batches were never in it
         // (they had never had interiors). ior_of returned 1.0 for the batch region, so
         // every glass instance refracted at η = 1: perfectly transparent, invisible.
-        const ior = bodyOf(fragmentOf(glassBatchScene()), 'float ior_of(int region, vec3 p) {');
+        const ior = bodyOf(fragmentOf(glassBatchScene()), 'float ior_of(int region, vec3 p, Wavelengths wl) {');
         expect(ior).toMatch(/if \(region == \d+\) return 1\.5;/);
     });
 
@@ -88,7 +88,7 @@ describe('instanced containment: the region is real end to end', () => {
         // scene_region_thin must NOT list the batch region any more. (In this scene the
         // thin set empties out entirely, so the predicate may fold away — either way, the
         // batch must not be in it.)
-        const batchRegion = /if \(region == (\d+)\) return 1\.5;/.exec(bodyOf(frag, 'float ior_of(int region, vec3 p) {'))![1];
+        const batchRegion = /if \(region == (\d+)\) return 1\.5;/.exec(bodyOf(frag, 'float ior_of(int region, vec3 p, Wavelengths wl) {'))![1];
         const thinAt = frag.indexOf('bool scene_region_thin(int region) {');
         if (thinAt >= 0) {
             expect(bodyOf(frag, 'bool scene_region_thin(int region) {')).not.toContain(`region == ${batchRegion}`);

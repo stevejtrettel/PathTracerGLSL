@@ -15,7 +15,7 @@ export const roughDielectricDescriptor: MaterialModelDescriptor = {
     // MaterialProperties. No f0: a dielectric's Fresnel is exact, not a Schlick fit.
     properties: [
         { name: 'roughness', glslType: 'float', semantic: 'geometric', source: 'roughness', default: 0.2, storage: 'field' },
-        { name: 'transmittance', glslType: 'Spectrum', semantic: 'radiometric', source: 'transmittance', default: 1, storage: 'field' },
+        { name: 'transmittance', glslType: 'Spectrum', semantic: 'radiometric', role: 'reflectance', source: 'transmittance', default: 1, storage: 'field' },
         { name: 'ior', glslType: 'float', semantic: 'geometric', source: 'ior', default: 1.5, storage: 'region-table', constraint: { kind: 'positive' } },
     ],
     // D4 derived, SHARED with ggx by name + type (the union dedupes; the fn is the same

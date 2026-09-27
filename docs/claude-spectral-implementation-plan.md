@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** implementation started, Sep 26, 2026. The RGB colour/film foundation of S0a is implemented; wavelength carriage, authored-value conversion and spectral rendering remain planned.
+**Status:** implementation started, Sep 26, 2026. The RGB colour/film foundation (S0a) and wavelength carriage with RGB conversion seams (S0b) are implemented. Authored-form preservation (S0c) and spectral rendering remain planned.
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -610,7 +610,7 @@ are explained by category; random draws and RGB computations are preserved. No s
 strategy is publicly accepted yet. Sensor and camera-contract changes are recorded as proposed
 interfaces becoming implemented, not historical claims that they always existed.
 
-### S0b — carry wavelengths through rays and resolution
+### S0b — carry wavelengths through rays and resolution (implemented)
 
 Implement the sampled-carrier camera input in §3, placeholders and camera-sample split. Update
 all transport, intersection, camera, shadow, property, light, environment, index and GRIN
@@ -624,6 +624,12 @@ Gate: every registered camera and intersection backend compiles; generated exact
 prototypes match definitions; targeted RGB pixels match baseline at fixed salts; carrier
 probes verify actual propagation at distinct nonuniform test wavelengths. A constant or empty
 RGB placeholder cannot detect a lost carrier, so use a test-only carrier with visible values.
+
+Implementation evidence: `npm run witness:wavelengths` exercises 30 numerical carrier cases
+and rejects ten compiled defects. The full static suite passes; five fixed-salt RGB renders
+match the S0a foundation exactly, and the targeted medium/GRIN scene checks pass. See the
+Sep 26 S0b changelog entry for the precise coverage; this does not satisfy the broader S0 exit
+matrix or measure a physical four-wavelength model's cost.
 
 ### S0c — complete authored-data preservation and enforcement
 

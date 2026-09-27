@@ -7,3 +7,8 @@ WavelengthSample wavelengths_sample() {
 vec3 color_to_pixel(vec2 film, Direction ray_dir, Radiance L, WavelengthSample camera_sample) {
     return sensor_response(film, ray_dir) * L;
 }
+
+// Authored linear RGB already is the transport representation in this model.
+Spectrum color_lift_reflectance(vec3 rgb, Wavelengths wl) { return rgb; }
+Spectrum color_lift_coefficient(vec3 rgb, Wavelengths wl) { return rgb; }
+Spectrum color_lift_emission(vec3 rgb, Wavelengths wl) { return rgb; }

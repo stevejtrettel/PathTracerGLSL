@@ -14,15 +14,14 @@ stepper (`fable-compiler-contracts.md` §5) — see "Supersedes" below.**
 
 ---
 
-## Approved spectral extension (not implemented)
+## Wavelength carriage
 
-For spectral mode, `Ray` is a seed for light propagation and gains the current wavelength
-carrier. `Hit` records the arriving carrier. The original camera wavelengths and sampling
+`Ray` is a seed for light propagation and carries the current wavelength coordinates. `Hit` records the arriving carrier. The original camera wavelengths and sampling
 PDFs remain with the estimator; throughput and accumulated radiance remain on `PathState`.
 Search bounds still belong to queries. Transport ray construction must supply or inherit the
 carrier; wavelength-changing propagation or scattering must be able to produce a new one.
 See [spectral design §3.4](claude-spectral-design.md#34-wavelengths-belong-on-the-ray-d3--decided).
-The signatures below describe the current implementation until that extension is built.
+RGB uses an initialized placeholder; spectral rendering remains unimplemented.
 
 ## The loop — five abstractions
 
@@ -30,7 +29,7 @@ The signatures below describe the current implementation until that extension is
 Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  →  make_ray  →  repeat
 ```
 
-1. **`Ray`** — a *geodesic seed*: a position and a unit direction (no search interval; see below).
+1. **`Ray`** — a *geodesic seed*: a position, a unit direction and current wavelengths (no search interval; see below).
 2. **`scene_intersect(Ray) → Hit`** — advance to the next intersection. One contract; it subsumes
    SDF marching, analytic intersection, triangle meshes with BVHs and instanced batches, taking
    the nearest hit; the backends coordinate through the running nearest distance `hit.t`.
@@ -56,11 +55,13 @@ Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  �
 ## `Ray` — the universal, geometry-independent abstraction
 
 ```glsl
-struct Ray { Point origin; Direction direction; };   // PURE geodesic seed — no search interval
+struct Ray { Point origin; Direction direction; Wavelengths wl; }; // no search interval
 ```
 - A `Ray` **encodes a geodesic by its initial conditions** — `(origin, direction)`, a point of the
   unit tangent bundle. It flows via `ambient_geodesic(origin, direction, t)`; only the *space*
   changes (Euclidean → line, H³ → hyperbolic geodesic, Schwarzschild → light path). Same `Ray`.
+- `scene_intersect` seeds `Hit.wl` from `Ray.wl`; geometry helpers preserve it.
+  `ray_spawn` inherits `Hit.wl`; local-frame rays preserve wavelengths without spatial scaling.
 - `direction` is a **unit** tangent — unit *in the metric*.
 - **No `tmin`/`tmax` on the Ray.** Search bounds are the *query's* concern, not the ray's identity.
   We tried the interval on the Ray and it conflated three roles (ray identity / query far-bound /
@@ -83,7 +84,7 @@ struct Ray { Point origin; Direction direction; };   // PURE geodesic seed — n
   `origin` is legitimately the escaped point.
 
 ```glsl
-Ray make_ray(Point origin, Direction dir);   // just {origin, direction} — no interval
+Ray make_ray(Point origin, Direction dir, Wavelengths wl); // explicit carrier, no interval
 ```
 
 ## The Riemannian metric — `ambient_dot`, paid once
