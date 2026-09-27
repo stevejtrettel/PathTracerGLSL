@@ -46,7 +46,7 @@ export function spectralLimitations(scene: SceneDescription): string[] {
     if (scene.lights.some(l => !rgbInput(l.emission)))
         reasons.push('spectral lights require nonnegative RGB emission, including parameter defaults and bounds');
     const env = scene.environment;
-    if (env && env.type !== 'none' && (env.type !== 'constant' || !rgbInput(env.color)))
-        reasons.push('spectral environments require a constant-type nonnegative RGB sky, including parameter defaults and bounds');
+    if (env?.type === 'constant' && !rgbInput(env.color))
+        reasons.push('spectral constant environments require nonnegative RGB, including parameter defaults and bounds');
     return reasons;
 }

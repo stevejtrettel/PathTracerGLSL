@@ -33,17 +33,18 @@ function expected(rgb: Vec3, emission: boolean): number[] {
 const width = 96;
 const compiler = new Compiler();
 const probes: Array<{ name: string; source: string; textures: object[]; expected: number[][] }> = [];
-async function add(name: string, scene: SceneDescription, body: string, values: number[][]) {
+async function add(name: string, scene: SceneDescription, body: string, values: number[][],
+    uniforms: Record<string, { type: string; value: number | number[] }> = {}) {
     const compiled = compiler.compileScene(scene, [packedStrategy('mis', 'bvh')]);
     const source = [...compiled.renderers[0].shaders.values()].find(s => s.fragment.includes('transport_trace'))!.fragment;
     const main = source.lastIndexOf('void main()');
     assert(main >= 0, 'generated accumulator entry point');
     const packed = await packSceneData(compiled.sceneData);
     assert(packed);
-    const textures = Object.entries(packed.channels).map(([channel, data]) => ({
+    const textures: object[] = Object.entries(packed.channels).map(([channel, data]) => ({
         uniform: `u_data_${channel}`, width: data.width, height: data.height, data: Array.from(data.data),
     }));
-    const probe = { name, source: source.slice(0, main) + `void main() { ${body} }`, textures, expected: values };
+    const probe = { name, source: source.slice(0, main) + `void main() { ${body} }`, textures, uniforms, expected: values };
     probes.push(probe);
     return probe;
 }
@@ -143,6 +144,22 @@ for (const model of ['mirror', 'ggx', 'checker', 'dielectric', 'rough_dielectric
             [lifted.map(v => v * scale)]);
     }
 }
+// Image filtering and procedural evaluation are authored RGB operations, before lift.
+const imageScene = { ...spectralPackedReference, environment: { type: 'image' as const, url: 'probe.hdr' } };
+const imageProbe = await add('filtered image sky', imageScene,
+    `fragColor = environment_radiance(vec3(1.0,0.0,0.0),${carrier});`,
+    [expected([0.3*1.7, 0.4*1.7, 0.5*1.7], true)],
+    { u_envIntensity: { type:'float', value:1.7 }, u_envRotation: { type:'float', value:0 } });
+imageProbe.textures.push({ uniform:'u_envMap', width:2, height:2,
+    data:[0.1,0.2,0.3,1, 0.5,0.2,0.3,1, 0.1,0.6,0.7,1, 0.5,0.6,0.7,1], filter:'linear' });
+const procScene = { ...spectralPackedReference, environment: { type:'procedural' as const,
+    glsl:{ kind:'glsl' as const, source:'vec3(0.2,0.5,0.8) * (1.0 + 0.5 * dir.z)' }, tableSize:[4,2] as [number,number] } };
+const rotation = 0.73;
+await add('rotated procedural sky', procScene,
+    `fragColor = environment_radiance(vec3(1.0,0.0,0.0),${carrier});`,
+    [expected([0.2,0.5,0.8].map(v=>v*1.7*(1+0.5*Math.sin(rotation))) as Vec3,true)],
+    { u_envIntensity:{type:'float',value:1.7}, u_envRotCS:{type:'vec2',value:[Math.cos(rotation),Math.sin(rotation)]} });
+
 function verify(probe: typeof probes[number], values: number[]) {
     for (let x = 0; x < width; x++) for (let c = 0; c < 4; c++) {
         const target = probe.expected[x % probe.expected.length][c];

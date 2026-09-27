@@ -3,13 +3,16 @@
 The lat-long parametrization of direction space: `equirect_uv(dir)` (equirect_map.glsl)
 maps a direction to `(φ/2π + ½, θ/π)` with θ = acos(y) (v = 0 at the +Y pole), and the
 chart's `env_chart_uv` is that mapping; `env_chart_dir(uv)` (equirect.glsl) inverts it.
-The mapping has its own file because the image environment's radiance lookup reads its
-equirect map through it whichever chart the sampler uses; the chart registry's `needs`
-includes it wherever the equirect chart is. The chart Jacobian is dΩ ∝ sinθ — polar
-texels subtend less solid angle — so the CPU CDF builder weights rows by sinθ and the
-sampler's pdf divides it back out. This folder owns ONLY the mapping and the chart;
-radiance bodies, CDF plumbing, and the two-stage selection live in the compiler's
-environment feature.
+The radiance lookup uses this mapping regardless of the sampling chart. The sampler
+selects a CDF cell, then `env_chart_sample` chooses azimuth uniformly and cos(theta)
+uniformly between its row edges. The exact cell area is
+`(2π/W) * 2 sin(π(j+1/2)/H) sin(π/(2H))`, a stable form of the cosine difference.
+The density is the stored CDF cell mass divided by this area. The CPU's midpoint
+sine weights are only an importance heuristic; they do not define the directional PDF.
+
+Within-cell sampling uses squared half-angle coordinates to retain the transverse
+direction near a pole. The inverse uses `atan(length(n.xz), n.y)`, preserving small
+polar angles even when the axial component rounds to ±1.
 
 Two conventions that are load-bearing:
 

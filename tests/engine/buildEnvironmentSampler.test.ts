@@ -81,18 +81,9 @@ describe('buildEnvironmentSampler', () => {
         }
         expect(sum).toBeCloseTo(1.0, 6);
 
-        // Solid-angle pdf form: pdf = density/dΩ with dΩ = (2π/W)(π/H)sinθ — integrates to 1.
-        let integral = 0;
-        for (let j = 0; j < H; j++) {
-            const sinT = Math.sin(Math.PI * (j + 0.5) / H);
-            const dOmega = (2 * Math.PI / W) * (Math.PI / H) * sinT;
-            for (let i = 0; i < W; i++) {
-                const dCond = cond[j * W + i] - (i > 0 ? cond[j * W + i - 1] : 0);
-                const dMarg = marg[j] - (j > 0 ? marg[j - 1] : 0);
-                integral += ((dCond * dMarg) / dOmega) * dOmega;
-            }
-        }
-        expect(integral).toBeCloseTo(1.0, 6);
+        // Directional density and within-cell sampling are checked independently on
+        // the GPU by witness:environment, rather than multiplying a PDF by its divisor.
+
     });
 
     // env-plan D2.3: the default blur guarantees pdf support wherever bilinear radiance is

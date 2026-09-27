@@ -61277,8 +61277,9 @@ vec3 env_rotate_cs(vec3 d, vec2 cs) {
 
 vec2 equirect_uv(vec3 dir) {
     vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
+    // Azimuth is arbitrary at the poles; choose zero for the exact RNG endpoints.
+    float phi = (n.x == 0.0 && n.z == 0.0 ? 0.0 : atan(n.z, n.x)) + u_envRotation;
+    float theta = atan(length(n.xz), n.y);
     return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
 }
 
@@ -61295,8 +61296,8 @@ vec2 equirect_uv(vec3 dir) {
 // Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
 // The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
 // which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
-// Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
-// by it; this file owns only the mapping.
+// Cell sampling is uniform in solid angle; the CDF's luminance/sine weights are
+// only an importance heuristic. The exact cell area determines the density.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
@@ -61311,11 +61312,24 @@ vec3 env_chart_dir(vec2 uv) {
     return vec3(cos(phi) * s, cos(theta), sin(phi) * s);
 }
 
-// Chart Jacobian: solid angle of table texel (i, j) — equirect texels shrink by sinθ toward
-// the poles. MUST match the CPU builder's θ_j = π(j+½)/H row-center convention.
+// Exact cell area: (2π/W)(cos θ0 − cos θ1), using the stable difference identity.
 float env_texel_dOmega(int j, ivec2 sz) {
     float theta = PI * (float(j) + 0.5) / float(sz.y);
-    return (TWO_PI / float(sz.x)) * (PI / float(sz.y)) * max(1.0e-6, sin(theta));
+    return (TWO_PI / float(sz.x)) * 2.0 * sin(theta) * sin(0.5 * PI / float(sz.y));
+}
+
+// Uniform azimuth and uniform cos(theta) within a cell. Half-angle coordinates
+// retain the transverse direction even when the axial component rounds to ±1.
+vec3 env_chart_sample(ivec2 cell, vec2 u, ivec2 sz) {
+    float phi = ((float(cell.x) + u.x) / float(sz.x) - 0.5) * TWO_PI - u_envRotation;
+    bool north = 2 * cell.y < sz.y;
+    float row = north ? float(cell.y) : float(sz.y - cell.y - 1);
+    float a = sin(0.5 * PI * row / float(sz.y));
+    float b = sin(0.5 * PI * (row + 1.0) / float(sz.y));
+    float h = mix(a * a, b * b, north ? u.y : 1.0 - u.y);
+    float y = (north ? 1.0 : -1.0) * (1.0 - 2.0 * h);
+    float r = 2.0 * sqrt(h * (1.0 - h));
+    return vec3(r * cos(phi), y, r * sin(phi));
 }
 
 // Environment radiance
@@ -61323,31 +61337,20 @@ Radiance environment_radiance(vec3 dir, Wavelengths wl) {
     dir = env_rotate_cs(normalize(dir), u_envRotCS);
     return color_lift_emission((mix(vec3(0.06, 0.08, 0.12), vec3(0.35, 0.45, 0.65), 0.5 * (dir.y + 1.0)) + vec3(18.0, 16.0, 13.0) * smoothstep(0.9994, 0.9999, dot(dir, normalize(vec3(0.4, 0.35, 0.2))))) * u_envIntensity, wl);
 }
-// Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
-// Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
-// (the chart file), environment_radiance (the radiance body — T4 unification),
-// u_envCdfCond (W×H R32F), u_envCdfMarg (1×H R32F), u_envSize (vec2).
-//
-// THE PDF COMES FROM CDF DIFFERENCES — density(i,j) = Δcond·Δmarg read off the same textures
-// the sampler inverts, never recomputed from the radiance map. Whatever weight policy built
-// the table (sinθ Jacobian, blur, compensation), sample↔pdf byte-match holds BY CONSTRUCTION.
-// (The reference's env_pdf recomputed luminance from radiance×intensity while the CPU total
-// excluded intensity — the pdf stopped integrating to 1 at intensity ≠ 1. This kills the class.)
-//
-// Sub-texel placement uses the CDF INVERSION REMAINDER of each axis's own random number —
-// not the reference's crossed fract(xi·W) reuse (pitfall 4: never reuse a selection random).
-// pdf and radiance both evaluate in TABLE uv-space; env_chart_dir/env_chart_uv are exact
-// inverses (rotation sign fix), so directions and table texels agree under rotation.
-// CDF fetches are texelFetch on R32F/NEAREST — required (LINEAR on R32F without the float-
-// linear extension is incomplete → silent zeros; interpolated CDFs also bias inversion).
+const bool ENV_COMPENSATED = true;
+// Tabulated environment sampling: CDF cell masses followed by uniform solid-angle
+// sampling inside the selected chart cell. PDFs use the stored CDF differences.
+// Uncompensated proposals mix in a uniform sphere; compensated MIS proposals can
+// intentionally have zero mass and rely on the competing BSDF proposal.
+// Depends on chart mapping/cell sampling, environment_radiance, ENV_COMPENSATED,
+// u_envCdfCond/u_envCdfMarg (R32F NEAREST), and u_envSize.
 
 float env_cdf_marg(int j) { return texelFetch(u_envCdfMarg, ivec2(0, j), 0).r; }
 float env_cdf_cond(int j, int i) { return texelFetch(u_envCdfCond, ivec2(i, j), 0).r; }
 
-// env_texel_dOmega comes from the CHART file (T5, D11): equirect = sinθ row form,
-// octahedral = constant 4π/N². The pdf below is chart-generic.
+// The chart owns each cell's exact solid angle and its within-cell sampling.
 
-float environment_pdf(vec3 dir) {
+float env_table_pdf(vec3 dir) {
     ivec2 sz = ivec2(u_envSize + 0.5);
     vec2 uv = env_chart_uv(dir);
     int i = clamp(int(uv.x * float(sz.x)), 0, sz.x - 1);
@@ -61357,18 +61360,17 @@ float environment_pdf(vec3 dir) {
     return (dCond * dMarg) / env_texel_dOmega(j, sz);
 }
 
-// One-minus-ULP guard: keeps the intra-texel fractions strictly < 1 so the composed
-// texel coordinate never rounds up into the next row/column.
+// Keep inversion remainders below the upper cell boundary.
 const float CDF_FRAC_MAX = 0.9999999;
 
-LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+vec3 env_sample_table(vec2 xi) {
     ivec2 sz = ivec2(u_envSize + 0.5);
 
-    // Row: lower_bound over the marginal CDF (first j with cdf >= xi.x)
+    // Row: lower_bound over the marginal CDF (first j with cdf > xi.x)
     int lo = 0, hi = sz.y - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.x > env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
+        if (xi.x >= env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
     }
     int j = lo;
     float mLo = (j > 0) ? env_cdf_marg(j - 1) : 0.0;
@@ -61379,29 +61381,43 @@ LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
     lo = 0; hi = sz.x - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.y > env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
+        if (xi.y >= env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
     }
     int i = lo;
     float cLo = (i > 0) ? env_cdf_cond(j, i - 1) : 0.0;
     float dCond = env_cdf_cond(j, i) - cLo;
     float uFrac = (dCond > 0.0) ? clamp((xi.y - cLo) / dCond, 0.0, CDF_FRAC_MAX) : 0.5;
 
-    vec2 uv = vec2((float(i) + uFrac) / float(sz.x), (float(j) + vFrac) / float(sz.y));
+    return env_chart_sample(ivec2(i, j), vec2(uFrac, vFrac), sz);
+}
 
+// A bake can miss procedural detail, and float32 CDFs can erase dim HDR cells.
+// The independent sphere component gives those directions nonzero density.
+float env_uniform_fraction() {
+    if (ENV_COMPENSATED) return 0.0;
+    return env_cdf_marg(int(u_envSize.y) - 1) > 0.0 ? 0.0625 : 1.0;
+}
+
+float environment_pdf(vec3 dir) {
+    float a = env_uniform_fraction();
+    return (1.0 - a) * env_table_pdf(dir) + a / (4.0 * PI);
+}
+
+LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+    float a = env_uniform_fraction();
     LightSample ls;
-    ls.wi = env_chart_dir(uv);
-    // The sky sits at the FAR CLIP, exactly where a BSDF ray that misses finds it: its shadow
-    // ray tests occluders out to MAX_DIST and its media walk attenuates over MAX_DIST — the
-    // same world a missed BSDF ray sees, so NEE and BSDF sampling estimate the same term.
-    // (A 1e20 sentinel here saw planes beyond the clip, and extinguished the sky entirely
-    // in any ambient medium, while missed BSDF rays were attenuated over only MAX_DIST.)
+    if (xi.x < a) {
+        float y = 1.0 - 2.0 * (xi.x / a);
+        float r = sqrt(max(0.0, 1.0 - y * y));
+        float phi = TWO_PI * xi.y;
+        ls.wi = vec3(r * cos(phi), y, r * sin(phi));
+    } else {
+        ls.wi = env_sample_table(vec2((xi.x - a) / (1.0 - a), xi.y));
+    }
+    // Sky visibility ends at the same far clip used by BSDF misses.
     ls.distance = MAX_DIST;
-    // DEFINITIONAL consistency (T4): the sampler returns exactly the radiance the miss
-    // branch would see for this direction — image envs re-fetch through the chart (an exact
-    // round-trip), procedural envs direct-eval the formula. This is the MIS requirement
-    // stated as code, and it frees procedural tables from carrying a radiance texture at all.
-    ls.radiance = environment_radiance(ls.wi, wl);                // without visibility
-    ls.pdf = (dCond * dMarg) / env_texel_dOmega(j, sz);       // per-light density; selection applied by lighting_sample
+    ls.radiance = environment_radiance(ls.wi, wl);
+    ls.pdf = environment_pdf(ls.wi); // full mixture, before sky-versus-light selection
     ls.flags = 0u;                                            // NOT delta — BSDF paths hit the env on miss
     ls.light_id = -1;                                         // never consulted via light_of
     return ls;
@@ -61818,84 +61834,84 @@ void main() {
         "startLine": 879,
       },
       {
-        "endLine": 903,
+        "endLine": 904,
         "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 883,
       },
       {
-        "endLine": 939,
+        "endLine": 953,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 904,
+        "startLine": 905,
       },
       {
-        "endLine": 944,
+        "endLine": 958,
         "origin": "generated:environment",
-        "startLine": 940,
+        "startLine": 954,
       },
       {
-        "endLine": 1028,
+        "endLine": 1044,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 945,
+        "startLine": 959,
       },
       {
-        "endLine": 1035,
+        "endLine": 1051,
         "origin": "generated:transport/light-query",
-        "startLine": 1029,
+        "startLine": 1045,
       },
       {
-        "endLine": 1058,
+        "endLine": 1074,
         "origin": "generated:transport/state",
-        "startLine": 1036,
+        "startLine": 1052,
       },
       {
-        "endLine": 1072,
+        "endLine": 1088,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 1059,
-      },
-      {
-        "endLine": 1086,
-        "origin": "generated:transport/combiner",
-        "startLine": 1073,
-      },
-      {
-        "endLine": 1094,
-        "origin": "generated:transport/kernel-record",
-        "startLine": 1087,
+        "startLine": 1075,
       },
       {
         "endLine": 1102,
-        "origin": "generated:transport/roulette",
-        "startLine": 1095,
+        "origin": "generated:transport/combiner",
+        "startLine": 1089,
       },
       {
-        "endLine": 1106,
-        "origin": "generated:transport/shadow-crossings",
+        "endLine": 1110,
+        "origin": "generated:transport/kernel-record",
         "startLine": 1103,
       },
       {
-        "endLine": 1141,
+        "endLine": 1118,
+        "origin": "generated:transport/roulette",
+        "startLine": 1111,
+      },
+      {
+        "endLine": 1122,
+        "origin": "generated:transport/shadow-crossings",
+        "startLine": 1119,
+      },
+      {
+        "endLine": 1157,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1107,
+        "startLine": 1123,
       },
       {
-        "endLine": 1170,
+        "endLine": 1186,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1142,
+        "startLine": 1158,
       },
       {
-        "endLine": 1197,
+        "endLine": 1213,
         "origin": "generated:transport/walk",
-        "startLine": 1171,
+        "startLine": 1187,
       },
       {
-        "endLine": 1198,
+        "endLine": 1214,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1198,
+        "startLine": 1214,
       },
       {
-        "endLine": 1227,
+        "endLine": 1243,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1199,
+        "startLine": 1215,
       },
     ],
   },
@@ -63106,8 +63122,9 @@ vec3 env_rotate_cs(vec3 d, vec2 cs) {
 
 vec2 equirect_uv(vec3 dir) {
     vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
+    // Azimuth is arbitrary at the poles; choose zero for the exact RNG endpoints.
+    float phi = (n.x == 0.0 && n.z == 0.0 ? 0.0 : atan(n.z, n.x)) + u_envRotation;
+    float theta = atan(length(n.xz), n.y);
     return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
 }
 
@@ -63124,8 +63141,8 @@ vec2 equirect_uv(vec3 dir) {
 // Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
 // The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
 // which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
-// Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
-// by it; this file owns only the mapping.
+// Cell sampling is uniform in solid angle; the CDF's luminance/sine weights are
+// only an importance heuristic. The exact cell area determines the density.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
@@ -63140,11 +63157,24 @@ vec3 env_chart_dir(vec2 uv) {
     return vec3(cos(phi) * s, cos(theta), sin(phi) * s);
 }
 
-// Chart Jacobian: solid angle of table texel (i, j) — equirect texels shrink by sinθ toward
-// the poles. MUST match the CPU builder's θ_j = π(j+½)/H row-center convention.
+// Exact cell area: (2π/W)(cos θ0 − cos θ1), using the stable difference identity.
 float env_texel_dOmega(int j, ivec2 sz) {
     float theta = PI * (float(j) + 0.5) / float(sz.y);
-    return (TWO_PI / float(sz.x)) * (PI / float(sz.y)) * max(1.0e-6, sin(theta));
+    return (TWO_PI / float(sz.x)) * 2.0 * sin(theta) * sin(0.5 * PI / float(sz.y));
+}
+
+// Uniform azimuth and uniform cos(theta) within a cell. Half-angle coordinates
+// retain the transverse direction even when the axial component rounds to ±1.
+vec3 env_chart_sample(ivec2 cell, vec2 u, ivec2 sz) {
+    float phi = ((float(cell.x) + u.x) / float(sz.x) - 0.5) * TWO_PI - u_envRotation;
+    bool north = 2 * cell.y < sz.y;
+    float row = north ? float(cell.y) : float(sz.y - cell.y - 1);
+    float a = sin(0.5 * PI * row / float(sz.y));
+    float b = sin(0.5 * PI * (row + 1.0) / float(sz.y));
+    float h = mix(a * a, b * b, north ? u.y : 1.0 - u.y);
+    float y = (north ? 1.0 : -1.0) * (1.0 - 2.0 * h);
+    float r = 2.0 * sqrt(h * (1.0 - h));
+    return vec3(r * cos(phi), y, r * sin(phi));
 }
 
 // Environment radiance
@@ -63152,31 +63182,20 @@ Radiance environment_radiance(vec3 dir, Wavelengths wl) {
     dir = env_rotate_cs(normalize(dir), u_envRotCS);
     return color_lift_emission((mix(vec3(0.06, 0.08, 0.12), vec3(0.35, 0.45, 0.65), 0.5 * (dir.y + 1.0)) + vec3(18.0, 16.0, 13.0) * smoothstep(0.9994, 0.9999, dot(dir, normalize(vec3(0.4, 0.35, 0.2))))) * u_envIntensity, wl);
 }
-// Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
-// Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
-// (the chart file), environment_radiance (the radiance body — T4 unification),
-// u_envCdfCond (W×H R32F), u_envCdfMarg (1×H R32F), u_envSize (vec2).
-//
-// THE PDF COMES FROM CDF DIFFERENCES — density(i,j) = Δcond·Δmarg read off the same textures
-// the sampler inverts, never recomputed from the radiance map. Whatever weight policy built
-// the table (sinθ Jacobian, blur, compensation), sample↔pdf byte-match holds BY CONSTRUCTION.
-// (The reference's env_pdf recomputed luminance from radiance×intensity while the CPU total
-// excluded intensity — the pdf stopped integrating to 1 at intensity ≠ 1. This kills the class.)
-//
-// Sub-texel placement uses the CDF INVERSION REMAINDER of each axis's own random number —
-// not the reference's crossed fract(xi·W) reuse (pitfall 4: never reuse a selection random).
-// pdf and radiance both evaluate in TABLE uv-space; env_chart_dir/env_chart_uv are exact
-// inverses (rotation sign fix), so directions and table texels agree under rotation.
-// CDF fetches are texelFetch on R32F/NEAREST — required (LINEAR on R32F without the float-
-// linear extension is incomplete → silent zeros; interpolated CDFs also bias inversion).
+const bool ENV_COMPENSATED = false;
+// Tabulated environment sampling: CDF cell masses followed by uniform solid-angle
+// sampling inside the selected chart cell. PDFs use the stored CDF differences.
+// Uncompensated proposals mix in a uniform sphere; compensated MIS proposals can
+// intentionally have zero mass and rely on the competing BSDF proposal.
+// Depends on chart mapping/cell sampling, environment_radiance, ENV_COMPENSATED,
+// u_envCdfCond/u_envCdfMarg (R32F NEAREST), and u_envSize.
 
 float env_cdf_marg(int j) { return texelFetch(u_envCdfMarg, ivec2(0, j), 0).r; }
 float env_cdf_cond(int j, int i) { return texelFetch(u_envCdfCond, ivec2(i, j), 0).r; }
 
-// env_texel_dOmega comes from the CHART file (T5, D11): equirect = sinθ row form,
-// octahedral = constant 4π/N². The pdf below is chart-generic.
+// The chart owns each cell's exact solid angle and its within-cell sampling.
 
-float environment_pdf(vec3 dir) {
+float env_table_pdf(vec3 dir) {
     ivec2 sz = ivec2(u_envSize + 0.5);
     vec2 uv = env_chart_uv(dir);
     int i = clamp(int(uv.x * float(sz.x)), 0, sz.x - 1);
@@ -63186,18 +63205,17 @@ float environment_pdf(vec3 dir) {
     return (dCond * dMarg) / env_texel_dOmega(j, sz);
 }
 
-// One-minus-ULP guard: keeps the intra-texel fractions strictly < 1 so the composed
-// texel coordinate never rounds up into the next row/column.
+// Keep inversion remainders below the upper cell boundary.
 const float CDF_FRAC_MAX = 0.9999999;
 
-LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+vec3 env_sample_table(vec2 xi) {
     ivec2 sz = ivec2(u_envSize + 0.5);
 
-    // Row: lower_bound over the marginal CDF (first j with cdf >= xi.x)
+    // Row: lower_bound over the marginal CDF (first j with cdf > xi.x)
     int lo = 0, hi = sz.y - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.x > env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
+        if (xi.x >= env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
     }
     int j = lo;
     float mLo = (j > 0) ? env_cdf_marg(j - 1) : 0.0;
@@ -63208,29 +63226,43 @@ LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
     lo = 0; hi = sz.x - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.y > env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
+        if (xi.y >= env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
     }
     int i = lo;
     float cLo = (i > 0) ? env_cdf_cond(j, i - 1) : 0.0;
     float dCond = env_cdf_cond(j, i) - cLo;
     float uFrac = (dCond > 0.0) ? clamp((xi.y - cLo) / dCond, 0.0, CDF_FRAC_MAX) : 0.5;
 
-    vec2 uv = vec2((float(i) + uFrac) / float(sz.x), (float(j) + vFrac) / float(sz.y));
+    return env_chart_sample(ivec2(i, j), vec2(uFrac, vFrac), sz);
+}
 
+// A bake can miss procedural detail, and float32 CDFs can erase dim HDR cells.
+// The independent sphere component gives those directions nonzero density.
+float env_uniform_fraction() {
+    if (ENV_COMPENSATED) return 0.0;
+    return env_cdf_marg(int(u_envSize.y) - 1) > 0.0 ? 0.0625 : 1.0;
+}
+
+float environment_pdf(vec3 dir) {
+    float a = env_uniform_fraction();
+    return (1.0 - a) * env_table_pdf(dir) + a / (4.0 * PI);
+}
+
+LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+    float a = env_uniform_fraction();
     LightSample ls;
-    ls.wi = env_chart_dir(uv);
-    // The sky sits at the FAR CLIP, exactly where a BSDF ray that misses finds it: its shadow
-    // ray tests occluders out to MAX_DIST and its media walk attenuates over MAX_DIST — the
-    // same world a missed BSDF ray sees, so NEE and BSDF sampling estimate the same term.
-    // (A 1e20 sentinel here saw planes beyond the clip, and extinguished the sky entirely
-    // in any ambient medium, while missed BSDF rays were attenuated over only MAX_DIST.)
+    if (xi.x < a) {
+        float y = 1.0 - 2.0 * (xi.x / a);
+        float r = sqrt(max(0.0, 1.0 - y * y));
+        float phi = TWO_PI * xi.y;
+        ls.wi = vec3(r * cos(phi), y, r * sin(phi));
+    } else {
+        ls.wi = env_sample_table(vec2((xi.x - a) / (1.0 - a), xi.y));
+    }
+    // Sky visibility ends at the same far clip used by BSDF misses.
     ls.distance = MAX_DIST;
-    // DEFINITIONAL consistency (T4): the sampler returns exactly the radiance the miss
-    // branch would see for this direction — image envs re-fetch through the chart (an exact
-    // round-trip), procedural envs direct-eval the formula. This is the MIS requirement
-    // stated as code, and it frees procedural tables from carrying a radiance texture at all.
-    ls.radiance = environment_radiance(ls.wi, wl);                // without visibility
-    ls.pdf = (dCond * dMarg) / env_texel_dOmega(j, sz);       // per-light density; selection applied by lighting_sample
+    ls.radiance = environment_radiance(ls.wi, wl);
+    ls.pdf = environment_pdf(ls.wi); // full mixture, before sky-versus-light selection
     ls.flags = 0u;                                            // NOT delta — BSDF paths hit the env on miss
     ls.light_id = -1;                                         // never consulted via light_of
     return ls;
@@ -63624,79 +63656,79 @@ void main() {
         "startLine": 874,
       },
       {
-        "endLine": 898,
+        "endLine": 899,
         "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 878,
       },
       {
-        "endLine": 934,
+        "endLine": 948,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 899,
+        "startLine": 900,
       },
       {
-        "endLine": 939,
+        "endLine": 953,
         "origin": "generated:environment",
-        "startLine": 935,
+        "startLine": 949,
       },
       {
-        "endLine": 1023,
+        "endLine": 1039,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 940,
+        "startLine": 954,
       },
       {
-        "endLine": 1030,
+        "endLine": 1046,
         "origin": "generated:transport/light-query",
-        "startLine": 1024,
+        "startLine": 1040,
       },
       {
-        "endLine": 1048,
+        "endLine": 1064,
         "origin": "generated:transport/state",
-        "startLine": 1031,
+        "startLine": 1047,
       },
       {
-        "endLine": 1060,
+        "endLine": 1076,
         "origin": "generated:transport/combiner",
-        "startLine": 1049,
+        "startLine": 1065,
       },
       {
-        "endLine": 1066,
+        "endLine": 1082,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1061,
+        "startLine": 1077,
       },
       {
-        "endLine": 1074,
+        "endLine": 1090,
         "origin": "generated:transport/roulette",
-        "startLine": 1067,
+        "startLine": 1083,
       },
       {
-        "endLine": 1078,
+        "endLine": 1094,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1075,
+        "startLine": 1091,
       },
       {
-        "endLine": 1113,
+        "endLine": 1129,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1079,
+        "startLine": 1095,
       },
       {
-        "endLine": 1142,
+        "endLine": 1158,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1114,
+        "startLine": 1130,
       },
       {
-        "endLine": 1169,
+        "endLine": 1185,
         "origin": "generated:transport/walk",
-        "startLine": 1143,
+        "startLine": 1159,
       },
       {
-        "endLine": 1170,
+        "endLine": 1186,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1170,
+        "startLine": 1186,
       },
       {
-        "endLine": 1199,
+        "endLine": 1215,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1171,
+        "startLine": 1187,
       },
     ],
   },
@@ -66975,8 +67007,9 @@ Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
 
 vec2 equirect_uv(vec3 dir) {
     vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
+    // Azimuth is arbitrary at the poles; choose zero for the exact RNG endpoints.
+    float phi = (n.x == 0.0 && n.z == 0.0 ? 0.0 : atan(n.z, n.x)) + u_envRotation;
+    float theta = atan(length(n.xz), n.y);
     return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
 }
 
@@ -67314,59 +67347,59 @@ void main() {
         "startLine": 799,
       },
       {
-        "endLine": 838,
+        "endLine": 839,
         "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 818,
       },
       {
-        "endLine": 843,
+        "endLine": 844,
         "origin": "generated:environment",
-        "startLine": 839,
+        "startLine": 840,
       },
       {
-        "endLine": 850,
+        "endLine": 851,
         "origin": "generated:transport/light-query",
-        "startLine": 844,
+        "startLine": 845,
       },
       {
-        "endLine": 868,
+        "endLine": 869,
         "origin": "generated:transport/state",
-        "startLine": 851,
+        "startLine": 852,
       },
       {
-        "endLine": 875,
+        "endLine": 876,
         "origin": "generated:transport/combiner",
-        "startLine": 869,
+        "startLine": 870,
       },
       {
-        "endLine": 881,
+        "endLine": 882,
         "origin": "generated:transport/kernel-record",
-        "startLine": 876,
+        "startLine": 877,
       },
       {
-        "endLine": 889,
+        "endLine": 890,
         "origin": "generated:transport/roulette",
-        "startLine": 882,
+        "startLine": 883,
       },
       {
-        "endLine": 924,
+        "endLine": 925,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 890,
-      },
-      {
-        "endLine": 950,
-        "origin": "generated:transport/walk",
-        "startLine": 925,
+        "startLine": 891,
       },
       {
         "endLine": 951,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 951,
+        "origin": "generated:transport/walk",
+        "startLine": 926,
       },
       {
-        "endLine": 980,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 952,
+        "origin": "generated:accumulation-inputs",
         "startLine": 952,
+      },
+      {
+        "endLine": 981,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 953,
       },
     ],
   },
@@ -68566,8 +68599,9 @@ Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
 
 vec2 equirect_uv(vec3 dir) {
     vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
+    // Azimuth is arbitrary at the poles; choose zero for the exact RNG endpoints.
+    float phi = (n.x == 0.0 && n.z == 0.0 ? 0.0 : atan(n.z, n.x)) + u_envRotation;
+    float theta = atan(length(n.xz), n.y);
     return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
 }
 
@@ -68641,36 +68675,29 @@ vec2 env_chart_uv(vec3 dir) {
     return vec2((uu + 1.0) * 0.5, (vv + 1.0) * 0.5);
 }
 
+vec3 env_chart_sample(ivec2 cell, vec2 u, ivec2 sz) {
+    return env_chart_dir((vec2(cell) + u) / vec2(sz));
+}
+
 // Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)
 // Environment radiance
 Radiance environment_radiance(vec3 dir, Wavelengths wl) {
     return color_lift_emission(texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity, wl);
 }
-// Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
-// Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
-// (the chart file), environment_radiance (the radiance body — T4 unification),
-// u_envCdfCond (W×H R32F), u_envCdfMarg (1×H R32F), u_envSize (vec2).
-//
-// THE PDF COMES FROM CDF DIFFERENCES — density(i,j) = Δcond·Δmarg read off the same textures
-// the sampler inverts, never recomputed from the radiance map. Whatever weight policy built
-// the table (sinθ Jacobian, blur, compensation), sample↔pdf byte-match holds BY CONSTRUCTION.
-// (The reference's env_pdf recomputed luminance from radiance×intensity while the CPU total
-// excluded intensity — the pdf stopped integrating to 1 at intensity ≠ 1. This kills the class.)
-//
-// Sub-texel placement uses the CDF INVERSION REMAINDER of each axis's own random number —
-// not the reference's crossed fract(xi·W) reuse (pitfall 4: never reuse a selection random).
-// pdf and radiance both evaluate in TABLE uv-space; env_chart_dir/env_chart_uv are exact
-// inverses (rotation sign fix), so directions and table texels agree under rotation.
-// CDF fetches are texelFetch on R32F/NEAREST — required (LINEAR on R32F without the float-
-// linear extension is incomplete → silent zeros; interpolated CDFs also bias inversion).
+const bool ENV_COMPENSATED = false;
+// Tabulated environment sampling: CDF cell masses followed by uniform solid-angle
+// sampling inside the selected chart cell. PDFs use the stored CDF differences.
+// Uncompensated proposals mix in a uniform sphere; compensated MIS proposals can
+// intentionally have zero mass and rely on the competing BSDF proposal.
+// Depends on chart mapping/cell sampling, environment_radiance, ENV_COMPENSATED,
+// u_envCdfCond/u_envCdfMarg (R32F NEAREST), and u_envSize.
 
 float env_cdf_marg(int j) { return texelFetch(u_envCdfMarg, ivec2(0, j), 0).r; }
 float env_cdf_cond(int j, int i) { return texelFetch(u_envCdfCond, ivec2(i, j), 0).r; }
 
-// env_texel_dOmega comes from the CHART file (T5, D11): equirect = sinθ row form,
-// octahedral = constant 4π/N². The pdf below is chart-generic.
+// The chart owns each cell's exact solid angle and its within-cell sampling.
 
-float environment_pdf(vec3 dir) {
+float env_table_pdf(vec3 dir) {
     ivec2 sz = ivec2(u_envSize + 0.5);
     vec2 uv = env_chart_uv(dir);
     int i = clamp(int(uv.x * float(sz.x)), 0, sz.x - 1);
@@ -68680,18 +68707,17 @@ float environment_pdf(vec3 dir) {
     return (dCond * dMarg) / env_texel_dOmega(j, sz);
 }
 
-// One-minus-ULP guard: keeps the intra-texel fractions strictly < 1 so the composed
-// texel coordinate never rounds up into the next row/column.
+// Keep inversion remainders below the upper cell boundary.
 const float CDF_FRAC_MAX = 0.9999999;
 
-LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+vec3 env_sample_table(vec2 xi) {
     ivec2 sz = ivec2(u_envSize + 0.5);
 
-    // Row: lower_bound over the marginal CDF (first j with cdf >= xi.x)
+    // Row: lower_bound over the marginal CDF (first j with cdf > xi.x)
     int lo = 0, hi = sz.y - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.x > env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
+        if (xi.x >= env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
     }
     int j = lo;
     float mLo = (j > 0) ? env_cdf_marg(j - 1) : 0.0;
@@ -68702,29 +68728,43 @@ LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
     lo = 0; hi = sz.x - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.y > env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
+        if (xi.y >= env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
     }
     int i = lo;
     float cLo = (i > 0) ? env_cdf_cond(j, i - 1) : 0.0;
     float dCond = env_cdf_cond(j, i) - cLo;
     float uFrac = (dCond > 0.0) ? clamp((xi.y - cLo) / dCond, 0.0, CDF_FRAC_MAX) : 0.5;
 
-    vec2 uv = vec2((float(i) + uFrac) / float(sz.x), (float(j) + vFrac) / float(sz.y));
+    return env_chart_sample(ivec2(i, j), vec2(uFrac, vFrac), sz);
+}
 
+// A bake can miss procedural detail, and float32 CDFs can erase dim HDR cells.
+// The independent sphere component gives those directions nonzero density.
+float env_uniform_fraction() {
+    if (ENV_COMPENSATED) return 0.0;
+    return env_cdf_marg(int(u_envSize.y) - 1) > 0.0 ? 0.0625 : 1.0;
+}
+
+float environment_pdf(vec3 dir) {
+    float a = env_uniform_fraction();
+    return (1.0 - a) * env_table_pdf(dir) + a / (4.0 * PI);
+}
+
+LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+    float a = env_uniform_fraction();
     LightSample ls;
-    ls.wi = env_chart_dir(uv);
-    // The sky sits at the FAR CLIP, exactly where a BSDF ray that misses finds it: its shadow
-    // ray tests occluders out to MAX_DIST and its media walk attenuates over MAX_DIST — the
-    // same world a missed BSDF ray sees, so NEE and BSDF sampling estimate the same term.
-    // (A 1e20 sentinel here saw planes beyond the clip, and extinguished the sky entirely
-    // in any ambient medium, while missed BSDF rays were attenuated over only MAX_DIST.)
+    if (xi.x < a) {
+        float y = 1.0 - 2.0 * (xi.x / a);
+        float r = sqrt(max(0.0, 1.0 - y * y));
+        float phi = TWO_PI * xi.y;
+        ls.wi = vec3(r * cos(phi), y, r * sin(phi));
+    } else {
+        ls.wi = env_sample_table(vec2((xi.x - a) / (1.0 - a), xi.y));
+    }
+    // Sky visibility ends at the same far clip used by BSDF misses.
     ls.distance = MAX_DIST;
-    // DEFINITIONAL consistency (T4): the sampler returns exactly the radiance the miss
-    // branch would see for this direction — image envs re-fetch through the chart (an exact
-    // round-trip), procedural envs direct-eval the formula. This is the MIS requirement
-    // stated as code, and it frees procedural tables from carrying a radiance texture at all.
-    ls.radiance = environment_radiance(ls.wi, wl);                // without visibility
-    ls.pdf = (dCond * dMarg) / env_texel_dOmega(j, sz);       // per-light density; selection applied by lighting_sample
+    ls.radiance = environment_radiance(ls.wi, wl);
+    ls.pdf = environment_pdf(ls.wi); // full mixture, before sky-versus-light selection
     ls.flags = 0u;                                            // NOT delta — BSDF paths hit the env on miss
     ls.light_id = -1;                                         // never consulted via light_of
     return ls;
@@ -69136,89 +69176,89 @@ void main() {
         "startLine": 861,
       },
       {
-        "endLine": 900,
+        "endLine": 901,
         "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 880,
       },
       {
-        "endLine": 904,
+        "endLine": 905,
         "origin": "generated:env-rotate",
-        "startLine": 901,
-      },
-      {
-        "endLine": 970,
-        "origin": "components/env/octahedral/octahedral.glsl",
-        "startLine": 905,
+        "startLine": 902,
       },
       {
         "endLine": 975,
-        "origin": "generated:environment",
-        "startLine": 971,
+        "origin": "components/env/octahedral/octahedral.glsl",
+        "startLine": 906,
       },
       {
-        "endLine": 1059,
-        "origin": "components/env/sampler_cdf.glsl",
+        "endLine": 980,
+        "origin": "generated:environment",
         "startLine": 976,
       },
       {
         "endLine": 1066,
-        "origin": "generated:transport/light-query",
-        "startLine": 1060,
+        "origin": "components/env/sampler_cdf.glsl",
+        "startLine": 981,
       },
       {
-        "endLine": 1089,
-        "origin": "generated:transport/state",
+        "endLine": 1073,
+        "origin": "generated:transport/light-query",
         "startLine": 1067,
       },
       {
-        "endLine": 1103,
+        "endLine": 1096,
+        "origin": "generated:transport/state",
+        "startLine": 1074,
+      },
+      {
+        "endLine": 1110,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 1090,
+        "startLine": 1097,
       },
       {
-        "endLine": 1117,
+        "endLine": 1124,
         "origin": "generated:transport/combiner",
-        "startLine": 1104,
+        "startLine": 1111,
       },
       {
-        "endLine": 1125,
+        "endLine": 1132,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1118,
+        "startLine": 1125,
       },
       {
-        "endLine": 1133,
+        "endLine": 1140,
         "origin": "generated:transport/roulette",
-        "startLine": 1126,
+        "startLine": 1133,
       },
       {
-        "endLine": 1137,
+        "endLine": 1144,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1134,
+        "startLine": 1141,
       },
       {
-        "endLine": 1172,
+        "endLine": 1179,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1138,
+        "startLine": 1145,
       },
       {
-        "endLine": 1201,
+        "endLine": 1208,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1173,
+        "startLine": 1180,
       },
       {
-        "endLine": 1228,
+        "endLine": 1235,
         "origin": "generated:transport/walk",
-        "startLine": 1202,
+        "startLine": 1209,
       },
       {
-        "endLine": 1229,
+        "endLine": 1236,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1229,
+        "startLine": 1236,
       },
       {
-        "endLine": 1258,
+        "endLine": 1265,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1230,
+        "startLine": 1237,
       },
     ],
   },
@@ -70426,8 +70466,9 @@ Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
 
 vec2 equirect_uv(vec3 dir) {
     vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
+    // Azimuth is arbitrary at the poles; choose zero for the exact RNG endpoints.
+    float phi = (n.x == 0.0 && n.z == 0.0 ? 0.0 : atan(n.z, n.x)) + u_envRotation;
+    float theta = atan(length(n.xz), n.y);
     return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
 }
 
@@ -70444,8 +70485,8 @@ vec2 equirect_uv(vec3 dir) {
 // Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
 // The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
 // which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
-// Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
-// by it; this file owns only the mapping.
+// Cell sampling is uniform in solid angle; the CDF's luminance/sine weights are
+// only an importance heuristic. The exact cell area determines the density.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
@@ -70460,11 +70501,24 @@ vec3 env_chart_dir(vec2 uv) {
     return vec3(cos(phi) * s, cos(theta), sin(phi) * s);
 }
 
-// Chart Jacobian: solid angle of table texel (i, j) — equirect texels shrink by sinθ toward
-// the poles. MUST match the CPU builder's θ_j = π(j+½)/H row-center convention.
+// Exact cell area: (2π/W)(cos θ0 − cos θ1), using the stable difference identity.
 float env_texel_dOmega(int j, ivec2 sz) {
     float theta = PI * (float(j) + 0.5) / float(sz.y);
-    return (TWO_PI / float(sz.x)) * (PI / float(sz.y)) * max(1.0e-6, sin(theta));
+    return (TWO_PI / float(sz.x)) * 2.0 * sin(theta) * sin(0.5 * PI / float(sz.y));
+}
+
+// Uniform azimuth and uniform cos(theta) within a cell. Half-angle coordinates
+// retain the transverse direction even when the axial component rounds to ±1.
+vec3 env_chart_sample(ivec2 cell, vec2 u, ivec2 sz) {
+    float phi = ((float(cell.x) + u.x) / float(sz.x) - 0.5) * TWO_PI - u_envRotation;
+    bool north = 2 * cell.y < sz.y;
+    float row = north ? float(cell.y) : float(sz.y - cell.y - 1);
+    float a = sin(0.5 * PI * row / float(sz.y));
+    float b = sin(0.5 * PI * (row + 1.0) / float(sz.y));
+    float h = mix(a * a, b * b, north ? u.y : 1.0 - u.y);
+    float y = (north ? 1.0 : -1.0) * (1.0 - 2.0 * h);
+    float r = 2.0 * sqrt(h * (1.0 - h));
+    return vec3(r * cos(phi), y, r * sin(phi));
 }
 
 // Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)
@@ -70472,31 +70526,20 @@ float env_texel_dOmega(int j, ivec2 sz) {
 Radiance environment_radiance(vec3 dir, Wavelengths wl) {
     return color_lift_emission(texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity, wl);
 }
-// Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
-// Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
-// (the chart file), environment_radiance (the radiance body — T4 unification),
-// u_envCdfCond (W×H R32F), u_envCdfMarg (1×H R32F), u_envSize (vec2).
-//
-// THE PDF COMES FROM CDF DIFFERENCES — density(i,j) = Δcond·Δmarg read off the same textures
-// the sampler inverts, never recomputed from the radiance map. Whatever weight policy built
-// the table (sinθ Jacobian, blur, compensation), sample↔pdf byte-match holds BY CONSTRUCTION.
-// (The reference's env_pdf recomputed luminance from radiance×intensity while the CPU total
-// excluded intensity — the pdf stopped integrating to 1 at intensity ≠ 1. This kills the class.)
-//
-// Sub-texel placement uses the CDF INVERSION REMAINDER of each axis's own random number —
-// not the reference's crossed fract(xi·W) reuse (pitfall 4: never reuse a selection random).
-// pdf and radiance both evaluate in TABLE uv-space; env_chart_dir/env_chart_uv are exact
-// inverses (rotation sign fix), so directions and table texels agree under rotation.
-// CDF fetches are texelFetch on R32F/NEAREST — required (LINEAR on R32F without the float-
-// linear extension is incomplete → silent zeros; interpolated CDFs also bias inversion).
+const bool ENV_COMPENSATED = false;
+// Tabulated environment sampling: CDF cell masses followed by uniform solid-angle
+// sampling inside the selected chart cell. PDFs use the stored CDF differences.
+// Uncompensated proposals mix in a uniform sphere; compensated MIS proposals can
+// intentionally have zero mass and rely on the competing BSDF proposal.
+// Depends on chart mapping/cell sampling, environment_radiance, ENV_COMPENSATED,
+// u_envCdfCond/u_envCdfMarg (R32F NEAREST), and u_envSize.
 
 float env_cdf_marg(int j) { return texelFetch(u_envCdfMarg, ivec2(0, j), 0).r; }
 float env_cdf_cond(int j, int i) { return texelFetch(u_envCdfCond, ivec2(i, j), 0).r; }
 
-// env_texel_dOmega comes from the CHART file (T5, D11): equirect = sinθ row form,
-// octahedral = constant 4π/N². The pdf below is chart-generic.
+// The chart owns each cell's exact solid angle and its within-cell sampling.
 
-float environment_pdf(vec3 dir) {
+float env_table_pdf(vec3 dir) {
     ivec2 sz = ivec2(u_envSize + 0.5);
     vec2 uv = env_chart_uv(dir);
     int i = clamp(int(uv.x * float(sz.x)), 0, sz.x - 1);
@@ -70506,18 +70549,17 @@ float environment_pdf(vec3 dir) {
     return (dCond * dMarg) / env_texel_dOmega(j, sz);
 }
 
-// One-minus-ULP guard: keeps the intra-texel fractions strictly < 1 so the composed
-// texel coordinate never rounds up into the next row/column.
+// Keep inversion remainders below the upper cell boundary.
 const float CDF_FRAC_MAX = 0.9999999;
 
-LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+vec3 env_sample_table(vec2 xi) {
     ivec2 sz = ivec2(u_envSize + 0.5);
 
-    // Row: lower_bound over the marginal CDF (first j with cdf >= xi.x)
+    // Row: lower_bound over the marginal CDF (first j with cdf > xi.x)
     int lo = 0, hi = sz.y - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.x > env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
+        if (xi.x >= env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
     }
     int j = lo;
     float mLo = (j > 0) ? env_cdf_marg(j - 1) : 0.0;
@@ -70528,29 +70570,43 @@ LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
     lo = 0; hi = sz.x - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.y > env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
+        if (xi.y >= env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
     }
     int i = lo;
     float cLo = (i > 0) ? env_cdf_cond(j, i - 1) : 0.0;
     float dCond = env_cdf_cond(j, i) - cLo;
     float uFrac = (dCond > 0.0) ? clamp((xi.y - cLo) / dCond, 0.0, CDF_FRAC_MAX) : 0.5;
 
-    vec2 uv = vec2((float(i) + uFrac) / float(sz.x), (float(j) + vFrac) / float(sz.y));
+    return env_chart_sample(ivec2(i, j), vec2(uFrac, vFrac), sz);
+}
 
+// A bake can miss procedural detail, and float32 CDFs can erase dim HDR cells.
+// The independent sphere component gives those directions nonzero density.
+float env_uniform_fraction() {
+    if (ENV_COMPENSATED) return 0.0;
+    return env_cdf_marg(int(u_envSize.y) - 1) > 0.0 ? 0.0625 : 1.0;
+}
+
+float environment_pdf(vec3 dir) {
+    float a = env_uniform_fraction();
+    return (1.0 - a) * env_table_pdf(dir) + a / (4.0 * PI);
+}
+
+LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+    float a = env_uniform_fraction();
     LightSample ls;
-    ls.wi = env_chart_dir(uv);
-    // The sky sits at the FAR CLIP, exactly where a BSDF ray that misses finds it: its shadow
-    // ray tests occluders out to MAX_DIST and its media walk attenuates over MAX_DIST — the
-    // same world a missed BSDF ray sees, so NEE and BSDF sampling estimate the same term.
-    // (A 1e20 sentinel here saw planes beyond the clip, and extinguished the sky entirely
-    // in any ambient medium, while missed BSDF rays were attenuated over only MAX_DIST.)
+    if (xi.x < a) {
+        float y = 1.0 - 2.0 * (xi.x / a);
+        float r = sqrt(max(0.0, 1.0 - y * y));
+        float phi = TWO_PI * xi.y;
+        ls.wi = vec3(r * cos(phi), y, r * sin(phi));
+    } else {
+        ls.wi = env_sample_table(vec2((xi.x - a) / (1.0 - a), xi.y));
+    }
+    // Sky visibility ends at the same far clip used by BSDF misses.
     ls.distance = MAX_DIST;
-    // DEFINITIONAL consistency (T4): the sampler returns exactly the radiance the miss
-    // branch would see for this direction — image envs re-fetch through the chart (an exact
-    // round-trip), procedural envs direct-eval the formula. This is the MIS requirement
-    // stated as code, and it frees procedural tables from carrying a radiance texture at all.
-    ls.radiance = environment_radiance(ls.wi, wl);                // without visibility
-    ls.pdf = (dCond * dMarg) / env_texel_dOmega(j, sz);       // per-light density; selection applied by lighting_sample
+    ls.radiance = environment_radiance(ls.wi, wl);
+    ls.pdf = environment_pdf(ls.wi); // full mixture, before sky-versus-light selection
     ls.flags = 0u;                                            // NOT delta — BSDF paths hit the env on miss
     ls.light_id = -1;                                         // never consulted via light_of
     return ls;
@@ -70939,79 +70995,79 @@ void main() {
         "startLine": 855,
       },
       {
-        "endLine": 894,
+        "endLine": 895,
         "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 874,
       },
       {
-        "endLine": 930,
+        "endLine": 944,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 895,
+        "startLine": 896,
       },
       {
-        "endLine": 935,
+        "endLine": 949,
         "origin": "generated:environment",
-        "startLine": 931,
+        "startLine": 945,
       },
       {
-        "endLine": 1019,
+        "endLine": 1035,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 936,
+        "startLine": 950,
       },
       {
-        "endLine": 1026,
+        "endLine": 1042,
         "origin": "generated:transport/light-query",
-        "startLine": 1020,
+        "startLine": 1036,
       },
       {
-        "endLine": 1044,
+        "endLine": 1060,
         "origin": "generated:transport/state",
-        "startLine": 1027,
+        "startLine": 1043,
       },
       {
-        "endLine": 1056,
+        "endLine": 1072,
         "origin": "generated:transport/combiner",
-        "startLine": 1045,
+        "startLine": 1061,
       },
       {
-        "endLine": 1062,
+        "endLine": 1078,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1057,
+        "startLine": 1073,
       },
       {
-        "endLine": 1070,
+        "endLine": 1086,
         "origin": "generated:transport/roulette",
-        "startLine": 1063,
+        "startLine": 1079,
       },
       {
-        "endLine": 1074,
+        "endLine": 1090,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1071,
+        "startLine": 1087,
       },
       {
-        "endLine": 1109,
+        "endLine": 1125,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1075,
+        "startLine": 1091,
       },
       {
-        "endLine": 1138,
+        "endLine": 1154,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1110,
+        "startLine": 1126,
       },
       {
-        "endLine": 1165,
+        "endLine": 1181,
         "origin": "generated:transport/walk",
-        "startLine": 1139,
+        "startLine": 1155,
       },
       {
-        "endLine": 1166,
+        "endLine": 1182,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1166,
+        "startLine": 1182,
       },
       {
-        "endLine": 1195,
+        "endLine": 1211,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1167,
+        "startLine": 1183,
       },
     ],
   },
@@ -72379,8 +72435,9 @@ Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
 
 vec2 equirect_uv(vec3 dir) {
     vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
+    // Azimuth is arbitrary at the poles; choose zero for the exact RNG endpoints.
+    float phi = (n.x == 0.0 && n.z == 0.0 ? 0.0 : atan(n.z, n.x)) + u_envRotation;
+    float theta = atan(length(n.xz), n.y);
     return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
 }
 
@@ -72397,8 +72454,8 @@ vec2 equirect_uv(vec3 dir) {
 // Convention: v = 0 at the +Y pole (θ = acos(y)); u is periodic in φ and WRAPPED into [0, 1).
 // The mapping itself, with the wrap and the reason for it, is equirect_uv (equirect_map.glsl),
 // which the image environment's radiance lookup also reads; env_chart_uv is that mapping.
-// Chart Jacobian dΩ ∝ sinθ — the CDF builder weights by it and the sampler's pdf divides
-// by it; this file owns only the mapping.
+// Cell sampling is uniform in solid angle; the CDF's luminance/sine weights are
+// only an importance heuristic. The exact cell area determines the density.
 // METRIC EXEMPTION (trace-loop contract): raw math on world-space directions is deliberate —
 // the environment lives on direction-space S², not in scene space (§5.3).
 
@@ -72413,11 +72470,24 @@ vec3 env_chart_dir(vec2 uv) {
     return vec3(cos(phi) * s, cos(theta), sin(phi) * s);
 }
 
-// Chart Jacobian: solid angle of table texel (i, j) — equirect texels shrink by sinθ toward
-// the poles. MUST match the CPU builder's θ_j = π(j+½)/H row-center convention.
+// Exact cell area: (2π/W)(cos θ0 − cos θ1), using the stable difference identity.
 float env_texel_dOmega(int j, ivec2 sz) {
     float theta = PI * (float(j) + 0.5) / float(sz.y);
-    return (TWO_PI / float(sz.x)) * (PI / float(sz.y)) * max(1.0e-6, sin(theta));
+    return (TWO_PI / float(sz.x)) * 2.0 * sin(theta) * sin(0.5 * PI / float(sz.y));
+}
+
+// Uniform azimuth and uniform cos(theta) within a cell. Half-angle coordinates
+// retain the transverse direction even when the axial component rounds to ±1.
+vec3 env_chart_sample(ivec2 cell, vec2 u, ivec2 sz) {
+    float phi = ((float(cell.x) + u.x) / float(sz.x) - 0.5) * TWO_PI - u_envRotation;
+    bool north = 2 * cell.y < sz.y;
+    float row = north ? float(cell.y) : float(sz.y - cell.y - 1);
+    float a = sin(0.5 * PI * row / float(sz.y));
+    float b = sin(0.5 * PI * (row + 1.0) / float(sz.y));
+    float h = mix(a * a, b * b, north ? u.y : 1.0 - u.y);
+    float y = (north ? 1.0 : -1.0) * (1.0 - 2.0 * h);
+    float r = 2.0 * sqrt(h * (1.0 - h));
+    return vec3(r * cos(phi), y, r * sin(phi));
 }
 
 // Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)
@@ -72425,31 +72495,20 @@ float env_texel_dOmega(int j, ivec2 sz) {
 Radiance environment_radiance(vec3 dir, Wavelengths wl) {
     return color_lift_emission(texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity, wl);
 }
-// Tabulated environment sampler — chart-generic 2D-CDF inversion (env-as-light T3, plan D11).
-// Provides: environment_sample(), environment_pdf(). Depends on: env_chart_uv/env_chart_dir
-// (the chart file), environment_radiance (the radiance body — T4 unification),
-// u_envCdfCond (W×H R32F), u_envCdfMarg (1×H R32F), u_envSize (vec2).
-//
-// THE PDF COMES FROM CDF DIFFERENCES — density(i,j) = Δcond·Δmarg read off the same textures
-// the sampler inverts, never recomputed from the radiance map. Whatever weight policy built
-// the table (sinθ Jacobian, blur, compensation), sample↔pdf byte-match holds BY CONSTRUCTION.
-// (The reference's env_pdf recomputed luminance from radiance×intensity while the CPU total
-// excluded intensity — the pdf stopped integrating to 1 at intensity ≠ 1. This kills the class.)
-//
-// Sub-texel placement uses the CDF INVERSION REMAINDER of each axis's own random number —
-// not the reference's crossed fract(xi·W) reuse (pitfall 4: never reuse a selection random).
-// pdf and radiance both evaluate in TABLE uv-space; env_chart_dir/env_chart_uv are exact
-// inverses (rotation sign fix), so directions and table texels agree under rotation.
-// CDF fetches are texelFetch on R32F/NEAREST — required (LINEAR on R32F without the float-
-// linear extension is incomplete → silent zeros; interpolated CDFs also bias inversion).
+const bool ENV_COMPENSATED = false;
+// Tabulated environment sampling: CDF cell masses followed by uniform solid-angle
+// sampling inside the selected chart cell. PDFs use the stored CDF differences.
+// Uncompensated proposals mix in a uniform sphere; compensated MIS proposals can
+// intentionally have zero mass and rely on the competing BSDF proposal.
+// Depends on chart mapping/cell sampling, environment_radiance, ENV_COMPENSATED,
+// u_envCdfCond/u_envCdfMarg (R32F NEAREST), and u_envSize.
 
 float env_cdf_marg(int j) { return texelFetch(u_envCdfMarg, ivec2(0, j), 0).r; }
 float env_cdf_cond(int j, int i) { return texelFetch(u_envCdfCond, ivec2(i, j), 0).r; }
 
-// env_texel_dOmega comes from the CHART file (T5, D11): equirect = sinθ row form,
-// octahedral = constant 4π/N². The pdf below is chart-generic.
+// The chart owns each cell's exact solid angle and its within-cell sampling.
 
-float environment_pdf(vec3 dir) {
+float env_table_pdf(vec3 dir) {
     ivec2 sz = ivec2(u_envSize + 0.5);
     vec2 uv = env_chart_uv(dir);
     int i = clamp(int(uv.x * float(sz.x)), 0, sz.x - 1);
@@ -72459,18 +72518,17 @@ float environment_pdf(vec3 dir) {
     return (dCond * dMarg) / env_texel_dOmega(j, sz);
 }
 
-// One-minus-ULP guard: keeps the intra-texel fractions strictly < 1 so the composed
-// texel coordinate never rounds up into the next row/column.
+// Keep inversion remainders below the upper cell boundary.
 const float CDF_FRAC_MAX = 0.9999999;
 
-LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+vec3 env_sample_table(vec2 xi) {
     ivec2 sz = ivec2(u_envSize + 0.5);
 
-    // Row: lower_bound over the marginal CDF (first j with cdf >= xi.x)
+    // Row: lower_bound over the marginal CDF (first j with cdf > xi.x)
     int lo = 0, hi = sz.y - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.x > env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
+        if (xi.x >= env_cdf_marg(mid)) lo = mid + 1; else hi = mid;
     }
     int j = lo;
     float mLo = (j > 0) ? env_cdf_marg(j - 1) : 0.0;
@@ -72481,29 +72539,43 @@ LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
     lo = 0; hi = sz.x - 1;
     while (lo < hi) {
         int mid = (lo + hi) >> 1;
-        if (xi.y > env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
+        if (xi.y >= env_cdf_cond(j, mid)) lo = mid + 1; else hi = mid;
     }
     int i = lo;
     float cLo = (i > 0) ? env_cdf_cond(j, i - 1) : 0.0;
     float dCond = env_cdf_cond(j, i) - cLo;
     float uFrac = (dCond > 0.0) ? clamp((xi.y - cLo) / dCond, 0.0, CDF_FRAC_MAX) : 0.5;
 
-    vec2 uv = vec2((float(i) + uFrac) / float(sz.x), (float(j) + vFrac) / float(sz.y));
+    return env_chart_sample(ivec2(i, j), vec2(uFrac, vFrac), sz);
+}
 
+// A bake can miss procedural detail, and float32 CDFs can erase dim HDR cells.
+// The independent sphere component gives those directions nonzero density.
+float env_uniform_fraction() {
+    if (ENV_COMPENSATED) return 0.0;
+    return env_cdf_marg(int(u_envSize.y) - 1) > 0.0 ? 0.0625 : 1.0;
+}
+
+float environment_pdf(vec3 dir) {
+    float a = env_uniform_fraction();
+    return (1.0 - a) * env_table_pdf(dir) + a / (4.0 * PI);
+}
+
+LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
+    float a = env_uniform_fraction();
     LightSample ls;
-    ls.wi = env_chart_dir(uv);
-    // The sky sits at the FAR CLIP, exactly where a BSDF ray that misses finds it: its shadow
-    // ray tests occluders out to MAX_DIST and its media walk attenuates over MAX_DIST — the
-    // same world a missed BSDF ray sees, so NEE and BSDF sampling estimate the same term.
-    // (A 1e20 sentinel here saw planes beyond the clip, and extinguished the sky entirely
-    // in any ambient medium, while missed BSDF rays were attenuated over only MAX_DIST.)
+    if (xi.x < a) {
+        float y = 1.0 - 2.0 * (xi.x / a);
+        float r = sqrt(max(0.0, 1.0 - y * y));
+        float phi = TWO_PI * xi.y;
+        ls.wi = vec3(r * cos(phi), y, r * sin(phi));
+    } else {
+        ls.wi = env_sample_table(vec2((xi.x - a) / (1.0 - a), xi.y));
+    }
+    // Sky visibility ends at the same far clip used by BSDF misses.
     ls.distance = MAX_DIST;
-    // DEFINITIONAL consistency (T4): the sampler returns exactly the radiance the miss
-    // branch would see for this direction — image envs re-fetch through the chart (an exact
-    // round-trip), procedural envs direct-eval the formula. This is the MIS requirement
-    // stated as code, and it frees procedural tables from carrying a radiance texture at all.
-    ls.radiance = environment_radiance(ls.wi, wl);                // without visibility
-    ls.pdf = (dCond * dMarg) / env_texel_dOmega(j, sz);       // per-light density; selection applied by lighting_sample
+    ls.radiance = environment_radiance(ls.wi, wl);
+    ls.pdf = environment_pdf(ls.wi); // full mixture, before sky-versus-light selection
     ls.flags = 0u;                                            // NOT delta — BSDF paths hit the env on miss
     ls.light_id = -1;                                         // never consulted via light_of
     return ls;
@@ -72950,84 +73022,84 @@ void main() {
         "startLine": 1022,
       },
       {
-        "endLine": 1061,
+        "endLine": 1062,
         "origin": "components/env/equirect/equirect_map.glsl",
         "startLine": 1041,
       },
       {
-        "endLine": 1097,
+        "endLine": 1111,
         "origin": "components/env/equirect/equirect.glsl",
-        "startLine": 1062,
+        "startLine": 1063,
       },
       {
-        "endLine": 1102,
+        "endLine": 1116,
         "origin": "generated:environment",
-        "startLine": 1098,
+        "startLine": 1112,
       },
       {
-        "endLine": 1186,
+        "endLine": 1202,
         "origin": "components/env/sampler_cdf.glsl",
-        "startLine": 1103,
+        "startLine": 1117,
       },
       {
-        "endLine": 1193,
+        "endLine": 1209,
         "origin": "generated:transport/light-query",
-        "startLine": 1187,
+        "startLine": 1203,
       },
       {
-        "endLine": 1216,
+        "endLine": 1232,
         "origin": "generated:transport/state",
-        "startLine": 1194,
+        "startLine": 1210,
       },
       {
-        "endLine": 1230,
+        "endLine": 1246,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 1217,
-      },
-      {
-        "endLine": 1249,
-        "origin": "generated:transport/combiner",
-        "startLine": 1231,
-      },
-      {
-        "endLine": 1257,
-        "origin": "generated:transport/kernel-record",
-        "startLine": 1250,
+        "startLine": 1233,
       },
       {
         "endLine": 1265,
-        "origin": "generated:transport/roulette",
-        "startLine": 1258,
+        "origin": "generated:transport/combiner",
+        "startLine": 1247,
       },
       {
-        "endLine": 1269,
-        "origin": "generated:transport/shadow-crossings",
+        "endLine": 1273,
+        "origin": "generated:transport/kernel-record",
         "startLine": 1266,
       },
       {
-        "endLine": 1304,
+        "endLine": 1281,
+        "origin": "generated:transport/roulette",
+        "startLine": 1274,
+      },
+      {
+        "endLine": 1285,
+        "origin": "generated:transport/shadow-crossings",
+        "startLine": 1282,
+      },
+      {
+        "endLine": 1320,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1270,
+        "startLine": 1286,
       },
       {
-        "endLine": 1333,
+        "endLine": 1349,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1305,
+        "startLine": 1321,
       },
       {
-        "endLine": 1360,
+        "endLine": 1376,
         "origin": "generated:transport/walk",
-        "startLine": 1334,
+        "startLine": 1350,
       },
       {
-        "endLine": 1361,
+        "endLine": 1377,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1361,
+        "startLine": 1377,
       },
       {
-        "endLine": 1390,
+        "endLine": 1406,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1362,
+        "startLine": 1378,
       },
     ],
   },

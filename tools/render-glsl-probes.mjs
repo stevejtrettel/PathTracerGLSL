@@ -1,15 +1,15 @@
 // Run small GLSL programs in a float framebuffer, without an app or dev server.
-export async function renderProbes(page, shaders, width = 1, sharedTextures = []) {
-    return await page.evaluate(({ shaders, width, sharedTextures }) => {
+export async function renderProbes(page, shaders, width = 1, sharedTextures = [], height = 1) {
+    return await page.evaluate(({ shaders, width, height, sharedTextures }) => {
         const gl = document.createElement('canvas').getContext('webgl2');
         if (!gl || !gl.getExtension('EXT_color_buffer_float')) throw new Error('Float WebGL2 is required');
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, width, 1);
+        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, width, height);
         gl.bindFramebuffer(gl.FRAMEBUFFER, gl.createFramebuffer());
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
         if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('Incomplete framebuffer');
-        gl.viewport(0, 0, width, 1);
+        gl.viewport(0, 0, width, height);
 
         function compile(type, source) {
             const shader = gl.createShader(type);
@@ -39,24 +39,25 @@ void main() {
                 else if (type === 'float') gl.uniform1f(location, value);
                 else gl[`uniform${type.slice(3)}fv`](location, value);
             }
-            const inputs = [...sharedTextures, ...textures].map(({ uniform, width, height, data }, unit) => {
+            const inputs = [...sharedTextures, ...textures].map(({ uniform, width, height, data, filter = 'nearest' }, unit) => {
                 const input = gl.createTexture();
                 gl.activeTexture(gl.TEXTURE0 + unit);
                 gl.bindTexture(gl.TEXTURE_2D, input);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, new Float32Array(data));
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                if (filter === 'linear' && !gl.getExtension('OES_texture_float_linear')) throw new Error('Probe requires float linear filtering');
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter === 'linear' ? gl.LINEAR : gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter === 'linear' ? gl.LINEAR : gl.NEAREST);
                 gl.uniform1i(gl.getUniformLocation(program, uniform), unit);
                 return input;
             });
             gl.drawArrays(gl.TRIANGLES, 0, 3);
-            const pixels = new Float32Array(width * 4);
-            gl.readPixels(0, 0, width, 1, gl.RGBA, gl.FLOAT, pixels);
+            const pixels = new Float32Array(width * height * 4);
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.FLOAT, pixels);
             if (gl.getError() !== gl.NO_ERROR) throw new Error(`WebGL error: ${name}`);
             inputs.forEach(input => gl.deleteTexture(input));
             gl.deleteProgram(program);
             gl.deleteShader(fragment);
             return Array.from(pixels);
         });
-    }, { shaders, width, sharedTextures });
+    }, { shaders, width, height, sharedTextures });
 }

@@ -63,3 +63,7 @@ vec2 env_chart_uv(vec3 dir) {
     vv = env_copysign(vv, n.z);
     return vec2((uu + 1.0) * 0.5, (vv + 1.0) * 0.5);
 }
+
+vec3 env_chart_sample(ivec2 cell, vec2 u, ivec2 sz) {
+    return env_chart_dir((vec2(cell) + u) / vec2(sz));
+}

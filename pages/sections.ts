@@ -34,7 +34,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'Spectral foundations',
         blurb: 'four-wavelength transport, CIE sensor response, live colours, packed data and surface materials',
-        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref'), e('spectral-materials'), e('spectral-mirror'), e('spectral-eta'), e('spectral-inclusion')],
+        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref'), e('spectral-materials'), e('spectral-mirror'), e('spectral-eta'), e('spectral-inclusion'), e('spectral-sky'), e('spectral-proc-sky'), e('sky-missed-cap'), e('spectral-comp-empty'), e('spectral-image-constant', 'spectral-image-constant-ref')],
     },
     {
         title: 'Instance clouds',

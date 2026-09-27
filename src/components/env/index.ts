@@ -24,7 +24,7 @@ export const EQUIRECT_MAP: EnvGlslFile = { origin: 'components/env/equirect/equi
 export interface EnvChartDescriptor {
     /** Registry key — `estimator.envSampler` (Validator-gated). */
     id: string;
-    /** ?raw source providing the chart seam (env_chart_uv/dir, env_texel_dOmega). */
+    /** ?raw source providing the chart seam (env_chart_uv/dir/sample, env_texel_dOmega). */
     glsl: string;
     /** Files the chart's GLSL calls into, included before it wherever the chart is. */
     needs: EnvGlslFile[];

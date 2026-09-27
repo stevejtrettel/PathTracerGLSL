@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored surface scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes and live RGB uniforms; expressions/media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored surface scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, and image/procedural skies; material expressions/media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -397,13 +397,13 @@ in HDR images even after the coverage blur. NEE-only suppresses non-delta BSDF m
 are missing contributions, not merely poor importance sampling. Both risks exist in RGB.
 Formula evaluation at the sampled direction is necessary but does not fix missing support.
 
-**Proposed correction before public S1:** for uncompensated tabulated environments, use
+**Implemented Sep 27:** for uncompensated tabulated environments, use
 
 ```
 q_env(w) = (1 - epsilon) * q_table(w) + epsilon / (4*pi)
 ```
 
-Start with epsilon=1/16 as a tunable efficiency choice, and epsilon=1 when the stored table
+Use epsilon=1/16 as an internal efficiency choice, and epsilon=1 when the stored table
 has no usable mass. Sample the uniform component independently of CDF quantization; adding
 a tiny floor to the CPU weights alone does not establish support after float32 rounding.
 Both branches return the full mixture density, and `environment_pdf` evaluates that same
@@ -414,13 +414,13 @@ and the intentionally empty compensated MIS technique. Handle invalid/nonfinite 
 explicitly. Do not silently turn the proposed epsilon into an authoring control.
 
 Support alone is insufficient: `q_table` must match the actual directional distribution.
-The current equirect sampler uses uniform subtexel UV but divides cell mass by a midpoint
-solid angle. Its evaluated PDF is consequently not the UV sampler's exact directional PDF.
-With H rows and the usual midpoint sine, its sphere integral is
+Before the correction, the equirect sampler used uniform subtexel UV but divided cell
+mass by a midpoint solid angle. Its evaluated PDF did not match that directional
+distribution. With H rows and the midpoint sine, its sphere integral was
 `sin(pi/(2*H))/(pi/(2*H))`, rather than one (ignoring pole guards and float rounding).
 Checking that `sample.pdf == environment_pdf(sample.wi)` would miss this shared error.
 
-Proposed equirect correction: sample azimuth uniformly within the chosen column and cos(theta)
+Implemented equirect correction: sample azimuth uniformly within the chosen column and cos(theta)
 uniformly between the selected row's edges. Divide cell mass by its exact solid angle
 `(2*pi/W)*(cos(pi*j/H)-cos(pi*(j+1)/H))`. Give the chart ownership of within-cell sampling and
 cell solid angle, with a numerically stable formula near the poles. The CDF weights may still
@@ -431,7 +431,13 @@ seams and finite-RNG endpoints; neither a CPU twin nor sample/evaluate agreement
 
 Land these environment corrections as an identified estimator fix separate from S0's RGB
 identity gate. Record the intentional RGB result changes and verify them before advertising
-spectral support for the affected strategies. No environment code is changed by this plan.
+spectral support for the affected strategies. The implemented correction is checked by
+`witness:environment` (independent sphere quadrature, histograms and four mutations),
+fixed-wavelength sky probes, and the sky render fixtures. Table construction now rejects
+negative/nonfinite RGB samples and uses float64 accumulation before CDF storage.
+Procedural formulas carry the finite/nonnegative author contract between bake samples;
+no runtime clamp was added. The existing nonzero sky-versus-finite-light selection
+probability already preserves that stage of support.
 
 ## 5. Media: field definition and estimator bounds are different
 
@@ -731,7 +737,8 @@ policy. No packet collapse, BSDF rewrite or transport change was needed. Default
 slider bounds are checked at compilation; runtime writes retain the same author contract.
 `setParameter` does not enforce UI ranges or clamp the lift. Repeated live updates and
 session restoration are compared to constant renders, including changes to the selection
-CDF and sky/finite split. Expressions remain validation-gated; spectral media bounds,
+CDF and sky/finite split. Image and procedural skies are also enabled, with the
+support/density corrections in §4.5. Material expressions remain validation-gated; spectral media bounds,
 non-RGB form codes and CPU constant precomputation remain unimplemented. Reflectance inputs above
 one still have a diagnostic while the proposed gain policy is unresolved.
 

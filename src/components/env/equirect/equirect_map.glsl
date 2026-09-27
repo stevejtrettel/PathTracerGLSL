@@ -14,7 +14,8 @@
 
 vec2 equirect_uv(vec3 dir) {
     vec3 n = normalize(dir);
-    float phi = atan(n.z, n.x) + u_envRotation;
-    float theta = acos(clamp(n.y, -1.0, 1.0));
+    // Azimuth is arbitrary at the poles; choose zero for the exact RNG endpoints.
+    float phi = (n.x == 0.0 && n.z == 0.0 ? 0.0 : atan(n.z, n.x)) + u_envRotation;
+    float theta = atan(length(n.xz), n.y);
     return vec2(fract(phi * (1.0 / TWO_PI) + 0.5), theta * (1.0 / PI));
 }

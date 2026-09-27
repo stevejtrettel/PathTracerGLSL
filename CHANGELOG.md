@@ -4,6 +4,55 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — spectral image and procedural skies
+
+Enabled image and procedural environments in spectral mode. The existing radiance
+paths already filter/evaluate authored RGB, apply intensity, and lift at the supplied
+wavelengths. Procedural radiance still comes from the formula; its bake only guides
+sampling. Formulas carry a finite/nonnegative RGB author contract between bake samples.
+Table construction rejects invalid samples, and intensity validation now covers all
+environment kinds. No runtime radiance clamp or transport-loop changes were added.
+
+Corrected two inherited environment estimator issues in both RGB and spectral modes.
+Uncompensated tables mix 1/16 uniform-sphere sampling with their CDF proposal, becoming
+entirely uniform when empty; both branches return the full mixture density. This covers
+features missed by the bake and HDR masses lost in float32 CDFs. Compensated tables
+remain MIS-only and may intentionally have zero density. Equirectangular cells now use
+uniform azimuth/cos(theta) sampling and exact solid angles, with stable polar coordinates
+and an explicit azimuth convention at the poles. CDF normalization uses float64 row
+sums before float32 storage and no longer floors positive row mass at 1e-20.
+
+`witness:environment` passes ten GPU cases across both charts: independent sphere
+quadrature, directional histograms, HDR support, empty/compensated tables and RNG
+endpoints. The largest quadrature discrepancy was 0.32% on the discontinuous octahedral
+table density. Four deliberately wrong implementations fail: missing uniform support,
+component-only density, midpoint cell area and uniform-UV equirect placement. The
+spectral binding probe now has 23 passing cases, including filtered image RGB and rotated
+procedural radiance at four unequal wavelengths.
+
+Twelve rendered checks pass. Image/procedural showcases with a finite light agree across
+NEE/MIS and charts within 0.37%/0.12%. A cap missed by both bakes returns its analytic
+0.095 target in RGB and spectral modes; empty compensated skies return 0.5. A loaded
+RGBE image matches an equivalent decoded-RGB constant sky within 0.07%, chart/estimator
+agreement is 0.15%, and the existing rotated RGB sky regression differs by 0.02%.
+The initial 4×2 image fixture was rejected by the loader's existing 16×16 minimum;
+the corrected fixture passes through the real load path. The first eight render checks
+preceded the final explicit-pole convention, which was separately checked by the GPU
+endpoint/histogram probes and static shader tests.
+
+All 96 files / 3,430 tests pass; final fixture/pole edits additionally pass 701 targeted
+tests, typecheck and production build. Of 217 existing synchronous scenes, 212 compile
+identically. Only the five tabulated-sky scenes (sky, sky-lamp, proc-sky, proc-sky-rotated,
+tonemap) have intentional shader/source-map changes; existing scene data and planning
+snapshots are unchanged. Six sky fixtures were added. This is a targeted GPU run, not
+a full witness sweep or native-GPU performance measurement.
+
+Separate finding: HDR import divides mantissas by 255 while the exporter scales by
+256 (`engine/loaders/hdr-loader.ts` versus `app/utils/file-export.ts`), a 256/255 scale
+mismatch before quantization. This stage preserves the decoder; the image reference
+uses its actual decoded RGB and does not certify RGBE format accuracy. Correcting that
+decoder and its existing tests needs its own before/after record.
+
 ## 2026-09-27 — spectral surface materials
 
 Enabled the existing mirror, GGX, checker, dielectric and rough-dielectric models in

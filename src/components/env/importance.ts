@@ -1,10 +1,5 @@
-// components/env/importance.ts — the env importance-table math (engine-app pass E6:
-// relocated from src/engine/loaders — ESTIMATOR math never belonged in the blind layer).
-// It lives HERE because every line must mirror the chart GLSL beside it: the per-row
-// Jacobian weight is env_texel_dOmega's twin (equirect sinθ rows vs octahedral
-// equal-area), and the CDF-by-differences invariant is exactly what sampler_cdf.glsl's
-// pdf relies on (the octahedral.ts TS-twin precedent). PURE — no GL: the engine keeps
-// only "upload these arrays, register these textures" (loaders/build-environment-sampler).
+// Environment importance tables: an RGB luminance proposal, independent of colour
+// representation. The sampler reads probabilities from the stored CDF differences.
 
 export interface EnvImportanceTable {
     /** Conditional CDF per row (W×H) — texel column selection within the chosen row. */
@@ -38,6 +33,8 @@ export function buildEnvImportanceTable(
     const blur = opts.blur ?? true;
     const chart = opts.chart ?? 'equirect';
     const compensation = opts.compensation ?? false;
+    if (hdrRGB.some(c => !Number.isFinite(c) || c < 0))
+        throw new Error('Environment RGB samples must be finite and nonnegative');
 
     // 1) luminance per texel
     let Y = new Float32Array(W * H);
@@ -49,11 +46,8 @@ export function buildEnvImportanceTable(
         }
     }
 
-    // 1b) Support coverage: radiance LOOKUPS are bilinear, so a black texel adjacent to a
-    // bright one still contributes nonzero radiance in its neighborhood. A one-texel 3×3
-    // tent blur on the IMPORTANCE table (not the radiance!) guarantees pdf > 0 wherever
-    // bilinear L > 0 — without it, NEE-only estimators are biased near black↔bright texel
-    // boundaries (MIS never needed this; NEE does).
+    // Blur the proposal to cover the image filter's footprint. The independent
+    // uniform-sphere component covers detail the bake or float32 CDFs lose.
     if (blur) {
         const blurred = new Float32Array(W * H);
         // Neighborhood policy per chart: equirect wraps u (the φ seam) and clamps v (poles);
@@ -78,7 +72,8 @@ export function buildEnvImportanceTable(
         Y = blurred;
     }
 
-    // Per-texel solid angle in the table's chart (mirrors the GLSL chart's env_texel_dOmega)
+    // Solid-angle weights for the mean. The equirect midpoint correction is a
+    // common factor across rows, so it cancels in this weighted average.
     const texelOmega = (j: number): number =>
         chart === 'octahedral'
             ? (4 * Math.PI) / (W * H)
@@ -86,7 +81,7 @@ export function buildEnvImportanceTable(
 
     // 1c) MIS compensation (post-blur): subtract the dΩ-weighted mean luminance — the level
     // BSDF sampling already covers — and clamp at zero. A uniform env compensates to an
-    // all-zero table → the uniform-fallback CDF with pdf 0 everywhere → miss-MIS weight 1
+    // all-zero table → zero CDFs with pdf 0 everywhere → miss-MIS weight 1
     // on the BSDF side. Unbiased by construction, MIS-only by Validator rule.
     if (compensation) {
         let num = 0, den = 0;
@@ -101,7 +96,8 @@ export function buildEnvImportanceTable(
     // 2) conditional CDF per row & marginal CDF over rows
     const condCDF = new Float32Array(W * H);
     const margCDF = new Float32Array(H);
-    const rowSum = new Float32Array(H);
+    // Accumulate and normalize in one precision; only the stored CDFs are float32.
+    const rowSum = new Float64Array(H);
 
     let total = 0.0;
     const PI = Math.PI;
@@ -114,11 +110,10 @@ export function buildEnvImportanceTable(
         let sum = 0.0;
         for (let i = 0; i < W; ++i) sum += Math.max(0, Y[j * W + i]) * sinT;
         rowSum[j] = sum;
-        const safe = Math.max(sum, 1e-20);
         let c = 0.0;
         for (let i = 0; i < W; ++i) {
             c += Math.max(0, Y[j * W + i]) * sinT;
-            condCDF[j * W + i] = c / safe;
+            condCDF[j * W + i] = sum > 0 ? c / sum : 0;
         }
         total += sum;
     }
@@ -126,7 +121,7 @@ export function buildEnvImportanceTable(
     let acc = 0.0;
     for (let j = 0; j < H; ++j) {
         acc += rowSum[j];
-        margCDF[j] = total > 0 ? (acc / total) : (j + 1) / H;
+        margCDF[j] = total > 0 ? (acc / total) : 0;
     }
 
     return { condCDF, margCDF, totalWeight: total };

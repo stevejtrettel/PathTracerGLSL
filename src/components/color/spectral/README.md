@@ -2,9 +2,10 @@
 
 `measurement.color: 'spectral'` uses four wavelengths in nanometres on [360, 830],
 with a CIE 1931 sensor by default. Current public support is nonnegative RGB
-emission and constant-type skies, reflectance colours in [0,1], live RGB colour parameters, PT/NEE/MIS,
+emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
+colour parameters, PT/NEE/MIS,
 light-tree selection and instancing with constant or per-instance RGB colours. Media,
-expressions and non-RGB forms remain rejected. All six existing surface models are
+material expressions and non-RGB forms remain rejected. All six existing surface models are
 supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
 a wavelength-independent scalar IOR; dispersion is not implemented.
 
@@ -184,3 +185,28 @@ checks a mixed coloured scene's NEE/MIS agreement, grey mirror reflectance, glas
 radiance compression and rough glass's two-sided light-tree selection at the first
 surface event. The mixed
 scene is available in the lab as `spectral-materials`.
+
+## Image and procedural skies
+
+Image textures are filtered in authored RGB, multiplied by intensity, then lifted as
+emission at the ray wavelengths. Procedural skies evaluate their RGB formula after
+direction rotation, apply intensity, then lift. Their RGB bake only guides sampling.
+Image data and formula results must be finite and nonnegative. The table builder checks
+its input samples; the author contract applies between bake samples too. Formula
+parameters remain unsupported, while environment intensity and rotation stay live.
+
+Uncompensated tabulated proposals include a 1/16 uniform-sphere component (entirely
+uniform for an empty table). Equirectangular cell sampling and PDF use exact solid
+angles. Compensated tables remain MIS-only, including the intentionally empty case.
+These estimator corrections apply in RGB as well; see [env](../../env/README.md).
+
+The `spectral-sky` and `spectral-proc-sky` lab scenes compare NEE/MIS and both charts.
+`sky-missed-cap` has a bright cap missed by both bakes and an analytic reflection
+target in RGB and spectral modes. `spectral-comp-empty` checks the zero-table MIS
+case. `spectral-image-constant` compares an actual RGBE texture with a constant sky.
+The fixed-wavelength binding probe separately checks filtered image RGB and rotated
+procedural radiance in all four lanes.
+
+The image fixture compares against the loader's decoded RGB. Its existing `/255`
+mantissa conversion differs from the exporter's 256 scaling; that independent HDR
+decoder discrepancy is recorded in the changelog and is not corrected by spectral lifting.

@@ -73,6 +73,8 @@ jobs:
         run: npm run witness:spectral
       - name: Spectral packed-reader witnesses
         run: npm run witness:spectral-bindings
+      - name: Environment sampling witnesses
+        run: npm run witness:environment
       - name: Wavelength carrier witnesses
         run: npm run witness:wavelengths
       - name: Run the sweep

@@ -919,6 +919,8 @@ export function validate(
     // shared checker), since it is emitted radiance and feeds the env-selection power.
     if (env?.type === 'constant') {
         validatePropertyValue(env.color, { shape: 'spectrum', constraint: { kind: 'nonnegative' } }, 'environment.color', bag);
+    }
+    if (env && env.type !== 'none') {
         const I = env.intensity;
         if (I !== undefined && (typeof I !== 'number' || !Number.isFinite(I) || I < 0)) {
             bag.error('invalid-setting', `environment.intensity must be a finite number >= 0 (got ${String(I)})`).add();

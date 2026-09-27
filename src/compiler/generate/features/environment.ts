@@ -168,7 +168,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
                 blocks.splice(1, 0, ROTATE_BLOCK);    // rotate before its caller (the octahedral chart)
                 uniforms.push(rotCsUniform(rotation));   // its matrix rotation ships u_envRotCS
             }
-            blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: envSamplerCdfGLSL });
+            blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: `const bool ENV_COMPENSATED = ${compensation};\n` + envSamplerCdfGLSL });
             textures.push(
                 { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },
                 { name: 'u_envCdfMarg', source: `extern:env_cdf_marg${suffix}` },
@@ -217,7 +217,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         if (samplable) {
             const suffix = envVariantSuffix(chart, compensation);
             blocks.splice(1, 0, ...chartBlocks(chart));   // chart (and the files it needs) before radiance/sampler
-            blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: envSamplerCdfGLSL });
+            blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: `const bool ENV_COMPENSATED = ${compensation};\n` + envSamplerCdfGLSL });
             textures.push(
                 { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },
                 { name: 'u_envCdfMarg', source: `extern:env_cdf_marg${suffix}` },
