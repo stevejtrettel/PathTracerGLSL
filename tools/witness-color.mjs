@@ -11,6 +11,8 @@ const rgb = read('color/rgb/rgb.glsl');
 const ideal = read('sensor/ideal/ideal.glsl');
 // Distinct, exactly representable weights expose a projection that bypasses the sensor.
 const weighted = 'Spectrum sensor_response(vec2 film, Direction ray_dir) { return Spectrum(2.0, 3.0, 4.0); }';
+const canaryTypes = readFileSync(new URL('../tests/helpers/rgCanary/types.glsl', import.meta.url), 'utf8');
+const canary = readFileSync(new URL('../tests/helpers/rgCanary/rgCanary.glsl', import.meta.url), 'utf8');
 const width = 120; // Divisible by 2, 3 and 4: midpoint samples give equal channel counts.
 
 function spectrumCase(n, values, helpers = spectrum) {
@@ -44,12 +46,30 @@ void main() {
     };
 }
 
+function canaryCase(role, projection = canary) {
+    return {
+        name: `two-channel canary ${role} lift and film`,
+        source: `${canaryTypes}
+${spectrum}
+Spectrum sensor_response(vec2 film, Direction ray_dir) { return Spectrum(2.0, 3.0); }
+${projection}
+void main() {
+    WavelengthSample camera_sample = wavelengths_sample();
+    Spectrum L = color_lift_${role}(values.xyz, camera_sample.wl);
+    result = vec4(color_to_pixel(vec2(0.0), vec3(0.0, 0.0, 1.0), L, camera_sample), 1.0);
+}`,
+        values: [0.25, 1.5, 4, 1],
+        expected: [0.5, 4.5, 0, 1],
+    };
+}
+
 function mutate(source, from, to) {
     assert(source.includes(from), `Mutation target missing: ${from}`);
     return source.replace(from, to);
 }
 
 const cases = [
+    ...['reflectance', 'coefficient', 'emission'].map(role => canaryCase(role)),
     ...[2, 3, 4].flatMap(n => [[1, 2, 3, 8], [-4, -3, -2, -1], [0, 0, 0, 0], [0, 0, 0, 1]]
         .map(values => spectrumCase(n, values))),
     filmCase('identity sensor, signed/HDR film', ideal, [-0.25, 1.5, 4, 1]),
@@ -58,6 +78,8 @@ const cases = [
 // These shaders must compile and run, then fail numerical checks. A compile failure does
 // not count as catching the defect. Mutations affect only these in-memory shader strings.
 const mutations = [
+    canaryCase('emission', mutate(canary, 'color_lift_emission(vec3 rgb, Wavelengths wl) { return rgb.rg;', 'color_lift_emission(vec3 rgb, Wavelengths wl) { return rgb.gb;')),
+    canaryCase('emission', mutate(canary, 'sensor_response(film, ray_dir) * L', 'L')),
     spectrumCase(4, [1, 2, 3, 8], mutate(spectrum, '1.0 / float(SPECTRUM_N)', '1.0 / 3.0')),
     spectrumCase(4, [1, 2, 3, 8], mutate(spectrum,
         'min(int(u * float(SPECTRUM_N)), SPECTRUM_N - 1)', 'min(int(u * 3.0), 2)')),

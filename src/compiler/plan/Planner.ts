@@ -1,6 +1,8 @@
 // compiler/plan/Planner.ts
 
-import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
+import { COLOR_MODELS, resolveWavelengthSampler } from '../../components/color/index.js';
+import { isDrivenRadiometric } from '../../components/color/values.js';
+import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, BlackbodyValue, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
 import { isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
@@ -46,7 +48,7 @@ function resolveEnvironment(env: SceneDescription['environment']): ResolvedEnvir
     if (env === undefined || env.type === 'none') return { type: 'none' };
     if (env.type === 'constant') {
         // The color goes through the SAME spectrum normalization as material spectra: a
-        // scalar broadcasts to a vec3, a constant blackbody folds, a scalar {param} default
+        // scalar broadcasts to a vec3, blackbody forms survive, a scalar {param} default
         // broadcasts. (Passed through raw, a scalar color crashed the GLSL formatter.)
         // (The cast drops GlslExpression from the return type: an env color cannot be one.)
         const color = resolveColorProperty(env.color, [0, 0, 0]) as SpectrumValue;
@@ -309,9 +311,9 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
         // An emissive object's light is built from its planned surface: the planned object's
         // folded parameters and its planned material's emission. The sampler then describes
         // exactly the surface rays hit (pt ≡ pt-nee needs them equal). The emission is constant
-        // by the census predicate, so it has resolved to a spectrum.
+        // by the census predicate; its authored radiometric form remains intact.
         const regionId = entry.source.object;
-        const emissionOf = (materialId: number) => materials.find((m) => m.id === materialId)!.values[EMISSION_KEY] as number[];
+        const emissionOf = (materialId: number) => materials.find((m) => m.id === materialId)!.values[EMISSION_KEY] as Vec3 | BlackbodyValue;
         if (entry.kind === 'mesh') {
             // A mesh emitter samples its triangles by area: the literal walk range here, and the
             // channel bases of its triangles, world-position bake and area CDF when the scene is
@@ -556,6 +558,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     return {
         measurement,
         estimator: {
+            wavelengths: resolveWavelengthSampler(COLOR_MODELS[measurement.color], strategy.estimator.wavelengths),
             lighting,
             russianRoulette: strategy.estimator.russianRoulette,
             // Reserved values ('raymarch'/'ratio-tracking') are Validator-rejected before
@@ -663,7 +666,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // Driven-lights Stage A: a ValueParam reaches PlannedLight.values ONLY via a
             // driven radiometric row (geometry stays constant in v1), so this is exactly
             // "some light's emission is a {param}".
-            driven: lighting !== null && lights.some((l) => Object.values(l.values).some((v) => isValueParam(v) || isBlackbody(v))),   // a driven blackbody dial is driven emission
+            driven: lighting !== null && lights.some((l) => Object.values(l.values).some(isDrivenRadiometric)),   // a driven blackbody dial is driven emission
         },
         environment: resolveEnvironment(scene.environment),
         environmentSamplable: envSamplable,

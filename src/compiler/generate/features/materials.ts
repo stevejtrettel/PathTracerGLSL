@@ -3,8 +3,9 @@
 // A material property that is a { param } (§2.8) becomes a uniform named from its
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
+import { emissionMayBeNonzero } from '../../../components/color/values.js';
 import { emitColor } from '../color.js';
-import { isGlslExpression, isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, isBlackbody, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
+import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -42,11 +43,7 @@ function surfaceMaterials(materials: PlannedMaterial[]): PlannedMaterial[] {
  * fetches positive constants — negatives are Validator-rejected anyway (audit H1.3).
  */
 function isEmissive(mat: PlannedMaterial): boolean {
-    const e = mat.values[EMISSION_KEY];
-    if (e === undefined) return false;   // model declares no emission row
-    if (isValueParam(e) || isGlslExpression(e) || isBlackbody(e)) return true;   // driven blackbody: may be nonzero
-    if (isAttributeValue(e)) return true;   // per-instance emission (fable-light-bvh §7.1): may be nonzero
-    return Array.isArray(e) && e.some((c) => c > 0);
+    return emissionMayBeNonzero(mat.values[EMISSION_KEY]);
 }
 
 export function contributeMaterials(plan: RenderPlan): FeatureContribution {
@@ -379,8 +376,8 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             const raw = mat.values[f.source];
             const target = `        props.${f.name}`;
             // Constant black emission uses the initialized default, matching the
-            // emission-presence predicate. Driven values must still read their binding.
-            if (f.name === 'emission' && Array.isArray(raw) && !raw.some(c => c > 0)) continue;
+            // emission-presence predicate. Potentially nonzero values read their binding.
+            if (f.name === 'emission' && !emissionMayBeNonzero(raw)) continue;
             const fmt = (f.glslType === 'Spectrum' ? formatVec3 : formatFloat) as (x: never) => string;
             const expr = isAttributeValue(raw)
                 ? emitAttributeValue(raw)

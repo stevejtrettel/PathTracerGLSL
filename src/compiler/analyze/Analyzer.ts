@@ -1,7 +1,8 @@
 // compiler/analyze/Analyzer.ts
 
+import { emissionMayBeNonzero } from '../../components/color/values.js';
 import type { SceneDescription } from '../types.js';
-import { isEmissiveMedium, isValueParam, isBlackbody, mediumMayScatter } from '../types.js';
+import { isEmissiveMedium, mediumMayScatter } from '../types.js';
 import type { SceneFeatures } from './types.js';
 import { samplableEmitterObjects } from '../plan/dataTenants.js';
 
@@ -43,8 +44,7 @@ export function analyze(scene: SceneDescription): SceneFeatures {
         // color is now a SCENE_VALUE (SpectrumValue): a driven {param} color counts as
         // maybe-nonzero (the maybe-emitting rule); a constant is checked directly.
         const c = env.color;
-        const colorMaybeNonzero = isValueParam(c) || isBlackbody(c) ? true
-            : typeof c === 'number' ? c > 0 : c.some((ch) => ch > 0);
+        const colorMaybeNonzero = emissionMayBeNonzero(c);
         envSamplable = env.sampleAsLight === true && (env.intensity ?? 1) > 0 && colorMaybeNonzero;
     }
 

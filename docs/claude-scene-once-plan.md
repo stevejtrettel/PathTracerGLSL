@@ -46,8 +46,7 @@ step 5. Line numbers are at 104521e.
   light roster (`lightRosterOf`, dataTenants.ts:228) and, as a surface, by the Planner. They
   agree (the census test, a018f4b), but nothing makes them agree by construction. This is
   batch 4's item 2 option (b), which was waiting for this restructure.
-- Colour: a constant blackbody is turned into RGB at plan entry (`resolveColorProperty`,
-  plan/values.ts:17). The generator already converts a blackbody itself wherever it writes a
+- Colour (initial audit, before step 4): a constant blackbody was turned into RGB at plan entry (`resolveColorProperty`). The generator already converts a blackbody itself wherever it writes a
   value (`emitValue`, generate/values.ts:58), and so does the CPU evaluator for light values
   (`resolveRadiometricValue`, lighting.ts:353). No suite scene uses a constant blackbody
   (hearth's lamp is driven).
@@ -147,42 +146,24 @@ compiles (all 91 fail).
   tests check their values directly. *Breakages,* each failing the emitter test: the light built
   from the authored (unplaced) parameters; the mesh area without the placement's scale.
 
-**4. Colour conversion becomes a renderer step.**
-- `resolveColorProperty` stops converting a constant blackbody, so the scene plan holds colours
-  as authored. It still turns a scalar into a grey triple; a grey RGB triple is the same colour
-  under any colour model.
-- One function converts an authored colour for a colour model (the renderer's
-  `measurement.color`). It is called wherever a colour is used for a renderer, and nowhere else.
-  Today it has the RGB branch (`foldBlackbody`); spectral adds its branch in this one function.
-  The call sites:
-  - the generator's value writer (`emitValue`) and the CPU light-value evaluator
-    (`resolveRadiometricValue`), which convert already;
-  - four sites that assume plan entry converted, and must call the function first (below);
-  - the GPU data packer (sceneData.ts), for the colours in shared memory.
-- The four sites:
-  - the Planner's `emitters.driven` (Planner.ts:627) counts any blackbody as driven. It gets a
-    "driven value" predicate. The Validator spells the same predicate (Validator.ts:666), so both
-    call one function.
-  - materials.ts:46 and :389: "is this emission nonzero" treats any blackbody as nonzero. A
-    constant blackbody with scale 0 is legal and is zero.
-  - lighting.ts:97: an instanced light's emission must be a triple or an attribute; a blackbody
-    would throw.
-  - sceneData.ts:171: the same emission packed for the light tree; a blackbody would silently
-    become black.
-- **Shared GPU memory.** It holds a few colours: the light tree's rows, per-instance colours and
-  image skies. Today the packer stores them as RGB; after this step it gets them through the one
-  function, with identical bytes. When an RGB preview and a spectral renderer share a scene,
-  shared memory must serve both. It can hold one copy per colour model that some renderer on the
-  scene uses, the way optional structures are already laid out (`DataReads`). Or it can hold one
-  form that each shader converts when it reads. That choice is the spectral design's (contracts §8
-  upsamples RGB with fitted coefficients, which bears on it). Step 4 should be built to match it,
-  so **the spectral design comes before step 4** (owner decision 1). Steps 0–3 do not touch colour.
-- **Test first, since no suite scene covers this:** a constant blackbody compiles to exactly the
-  output of its RGB triple, in each place a colour can be one: an emissive object's material, an
-  authored area light and point light, an instanced light batch, the constant sky, and the scale-0
-  case. It passes today and must pass after. *Breakage:* drop the conversion at the sceneData
-  site; the instanced-light case must fail.
-- Proof: the digest and the new test.
+**4. Colour conversion becomes a renderer step — done Sep 27, 2026.**
+- `resolveColorProperty` preserves blackbody temperature and scale. Scalar colours still
+  broadcast to grey triples. Material, light and environment records keep the authored form.
+- The colour family's `values.ts` owns the authored predicates and `projectRGB`.
+  RGB projection happens at shader emission, live uniform evaluation, RGB light-power
+  evaluation and packing. The existing blackbody approximation moved to `color/rgb/blackbody.ts`.
+- Planner and Validator share the driven predicate. Emission gates and the constant-sky
+  census share the possible-emission predicate; a fixed zero blackbody scale is black.
+  Instanced light arms retain the form and project it at their read boundary; their tree
+  power data uses the same projection, with no fallback to black for a retained form.
+- Shared GPU rows remain RGB with identical bytes. The spectral plan §4.3 specifies the
+  original-form registry and reader-gated form codes for S1b, when spectral readers first need
+  them; those are not built by this RGB step.
+- Validation: 26 tests cover form preservation, exact RGB compiled/packed equivalence at six
+  sites (including zero scale), renderer order, and live colour/selection updates. The first
+  11 equivalence cases passed before the refactor. The twelfth, zero-scale sky, fixes an
+  existing census inconsistency. All 203 scene digests are identical. The spectral plan and
+  Sep 27 changelog record the whole-suite canary and targeted GPU evidence.
 
 **5. (Owner decision 4) Split Planner.ts** into the scene plan, the program plan and placement,
 as a pure move. Proof: the digest.

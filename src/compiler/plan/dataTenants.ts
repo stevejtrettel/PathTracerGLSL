@@ -205,8 +205,8 @@ export interface LightRosterEntry {
 
 /** An authored light's emission as the light and its backing material use it, resolved like
  *  every other spectrum property (resolveColorProperty): a {param} passes through (the same
- *  uniform drives both; a scalar default broadcasts), a constant blackbody folds to a
- *  spectrum, a scalar broadcasts. One function, so the light's values and its region's
+ *  uniform drives both; a scalar default broadcasts), a blackbody retains its dials,
+ *  and a scalar broadcasts. One function, so the light's values and its region's
  *  emission can never differ (pt ≡ pt-nee). A light's emission is never a GLSL formula
  *  (LightEmission excludes it), so neither is the result. */
 export function authoredLightEmission(e: LightEmission): number[] | ValueParam<number[]> | BlackbodyValue {

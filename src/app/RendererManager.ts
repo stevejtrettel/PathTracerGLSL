@@ -317,6 +317,8 @@ export class RendererManager {
         return this.sceneData;
     }
 
+    getCompiledRenderers(): CompiledRenderer[] { return [...this.renderers.values()]; }
+
     getScene(): SceneDescription | null {
         return this.scene;
     }

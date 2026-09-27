@@ -1,8 +1,9 @@
+import { projectRGB, isDrivenRadiometric, emissionMayBeNonzero, hasConstantNonzeroEmission } from '../../src/components/color/values.js';
 // The kelvin → RGB parameterization (impl-plan-blackbody-uv): physical sanity pins on
 // the Kim-et-al locus pipeline, and the fold's bake ≡ ship identity.
 
 import { describe, it, expect } from 'vitest';
-import { kelvinToRGB, blackbodyRGB, foldBlackbody } from '../../src/components/lights/blackbody.js';
+import { kelvinToRGB, blackbodyRGB } from '../../src/components/color/rgb/blackbody.js';
 
 describe('kelvinToRGB (Planckian locus → normalized linear sRGB)', () => {
     it('is max-channel normalized everywhere', () => {
@@ -47,16 +48,33 @@ describe('kelvinToRGB (Planckian locus → normalized linear sRGB)', () => {
     });
 });
 
-describe('foldBlackbody (plan-entry constant folding)', () => {
+describe('authored blackbody RGB projection', () => {
     it('constant dials fold to blackbodyRGB (bake ≡ ship: one body)', () => {
-        expect(foldBlackbody({ blackbody: { kelvin: 3200, scale: 5 } })).toEqual(blackbodyRGB(3200, 5));
-        expect(foldBlackbody({ blackbody: { kelvin: 3200 } })).toEqual(blackbodyRGB(3200, 1));
+        expect(projectRGB({ blackbody: { kelvin: 3200, scale: 5 } })).toEqual(blackbodyRGB(3200, 5));
+        expect(projectRGB({ blackbody: { kelvin: 3200 } })).toEqual(blackbodyRGB(3200, 1));
     });
 
-    it('a driven dial survives to the split point', () => {
+    it('projects driven dials from defaults and live parameters', () => {
         const driven = { blackbody: { kelvin: { param: 'lamp.kelvin', default: 3200 }, scale: 5 } };
-        expect(foldBlackbody(driven)).toBe(driven);
+        expect(projectRGB(driven)).toEqual(blackbodyRGB(3200, 5));
+        expect(projectRGB(driven, { 'lamp.kelvin': 6500 })).toEqual(blackbodyRGB(6500, 5));
         const drivenScale = { blackbody: { kelvin: 3200, scale: { param: 'lamp.power', default: 5 } } };
-        expect(foldBlackbody(drivenScale)).toBe(drivenScale);
+        expect(projectRGB(drivenScale)).toEqual(blackbodyRGB(3200, 5));
+        expect(projectRGB(drivenScale, { 'lamp.power': 9 })).toEqual(blackbodyRGB(3200, 9));
+    });
+});
+
+describe('authored emission classification', () => {
+    it('distinguishes constant forms from driven dials', () => {
+        expect(isDrivenRadiometric({ blackbody: { kelvin: 3200, scale: 5 } })).toBe(false);
+        expect(isDrivenRadiometric({ blackbody: { kelvin: { param: 'k' }, scale: 5 } })).toBe(true);
+        expect(isDrivenRadiometric({ blackbody: { kelvin: 3200, scale: { param: 's' } } })).toBe(true);
+    });
+    it('a fixed zero scale cannot emit, even with driven temperature', () => {
+        for (const kelvin of [3200, { param: 'k' }]) {
+            expect(emissionMayBeNonzero({ blackbody: { kelvin, scale: 0 } })).toBe(false);
+            expect(hasConstantNonzeroEmission({ blackbody: { kelvin, scale: 0 } })).toBe(false);
+        }
+        expect(emissionMayBeNonzero({ blackbody: { kelvin: 3200, scale: { param: 's', default: 0 } } })).toBe(true);
     });
 });

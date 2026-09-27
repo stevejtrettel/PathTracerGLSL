@@ -121,7 +121,7 @@ How a program is assembled:
 
 - **GLSL naming:** occupant functions are `<occupant>_<op>` (`sphere_sdf`, `lambert_eval`;
   lights keep the `_light_` infix, `quad_light_sample`). Write against the typedefs `Point`,
-  `Direction`, `Spectrum`, `Radiance` (vec3 today; `Point` may become vec4 for curved
+  `Direction`, `Spectrum`, `Radiance` (RGB vec3 or spectral vec4; `Point` may become vec4 for curved
   spaces).
 - **Spectral discipline:** no raw `vec3(...)` literals for radiometric quantities in library
   GLSL; reduce spectra with `spectrum_*`; the generator formats radiometric constants.
@@ -207,10 +207,15 @@ How a program is assembled:
   and saves one stitched HDR/PNG (pixel-identical to a one-piece render at the same salt;
   the `cornell-area` witness checks this with a pinhole camera; other cameras were checked
   once by hand).
+- Spectral foundation: four wavelengths, CIE 1931 sensor, uniform/visible proposals,
+  signed linear-RGB film and versioned RGB-to-spectrum assets. Currently restricted to
+  RGB Lambert scenes, including instance colour attributes and light-tree selection;
+  media, live colour parameters and non-RGB forms remain gated. See
+  src/components/color/spectral/README.md.
 - Tooling: the witness runner, shader dumps, CI.
 
 **Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
-registered); spectral transport (`color: 'spectral'` is reserved); transparent shadow rays
+registered); general spectral bindings/media, spectral blackbody and dispersion; transparent shadow rays
 through glass; MIS with delta tracking; equiangular sampling of area lights; spherical-
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.

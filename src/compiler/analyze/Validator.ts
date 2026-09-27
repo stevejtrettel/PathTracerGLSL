@@ -1,5 +1,9 @@
 // compiler/analyze/Validator.ts
 
+import { spectralLimitations } from './spectral.js';
+import { COLOR_MODELS } from '../../components/color/index.js';
+import { SENSORS } from '../../components/sensor/index.js';
+import { isDrivenRadiometric } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
 import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
@@ -663,7 +667,7 @@ export function validate(
         }
         const drivenLight = scene.lights.find((l) => {
             const e = (l as { emission?: unknown }).emission;
-            return isValueParam(e) || (isBlackbody(e) && (isValueParam(e.blackbody.kelvin) || isValueParam(e.blackbody.scale)));
+            return isDrivenRadiometric(e);
         });
         if (drivenLight !== undefined) {
             bag.error('incompatible-options',
@@ -861,10 +865,21 @@ export function validate(
                 .add();
         }
     }
-    if (strategy.measurement.color === 'spectral') {
-        bag.error('invalid-setting',
-            `color 'spectral' not yet supported — hero-wavelength transport is contracts §8; 'rgb' is the sole implemented color model (reserved-not-removed)`)
-            .add();
+    const colorId = strategy.measurement.color ?? 'rgb';
+    const color = COLOR_MODELS[colorId];
+    if (color) {
+        const sensorId = strategy.measurement.sensor ?? color.defaultSensor;
+        const sensor = SENSORS[sensorId];
+        if (!sensor || !sensor.colorModels.includes(colorId)) {
+            bag.error('invalid-setting', `measurement.sensor '${sensorId}' does not support color '${colorId}'`).add();
+        }
+        const wavelengths = strategy.estimator.wavelengths;
+        if (wavelengths !== undefined && !color.wavelengthSamplers?.[wavelengths]) {
+            bag.error('invalid-setting', `estimator.wavelengths '${wavelengths}' is not supported by color '${colorId}'`).add();
+        }
+        for (const reason of colorId === 'spectral' ? spectralLimitations(scene) : []) {
+            bag.error('invalid-setting', reason).add();
+        }
     }
 
     // Enumerated measurement fields: an unknown value used to pass through the Planner and

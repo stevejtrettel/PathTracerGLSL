@@ -719,6 +719,28 @@ exports[`scene-data textures (byte fingerprints) > solids-analytic 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > solids-sdf 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-colored-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-direct 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-packed 1`] = `
+{
+  "nodes": "4096x1 f09f0195d6f270e3",
+  "records": "4096x1 f13dc50d0f5f280e",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-packed-ref 1`] = `
+{
+  "nodes": "4096x1 cdb7b072d5793af2",
+  "records": "4096x1 2837e394fe70a2c5",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-plane 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spheres 1`] = `
 {
   "nodes": "4096x1 28179de8a0ce8bf9",

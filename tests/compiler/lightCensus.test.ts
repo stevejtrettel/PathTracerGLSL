@@ -22,9 +22,9 @@ import { envSelectionProbability } from '../../src/compiler/generate/features/li
 import type { SceneDescription, RenderStrategy, SpectrumProperty } from '../../src/compiler/types.js';
 import type { RenderPlan } from '../../src/compiler/plan/types.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
-import { blackbodyRGB } from '../../src/components/lights/blackbody.js';
+import { isBlackbody, type BlackbodyValue } from '../../src/compiler/types.js';
 
-const BLACKBODY: SpectrumProperty = { blackbody: { kelvin: 3000, scale: 5 } };
+const BLACKBODY: BlackbodyValue = { blackbody: { kelvin: 3000, scale: 5 } };
 
 function scene(emission: SpectrumProperty, extra: Partial<SceneDescription> = {}): SceneDescription {
     return {
@@ -76,7 +76,7 @@ function expectAuthoredLightsDescribeTheirRegions(p: RenderPlan, s: SceneDescrip
         const emission = p.materials.find((m) => m.id === region.materialId)!.values.emission;
         const fromRegion = LIGHT_KINDS[l.kind].valuesFromRegion;
         if (fromRegion === undefined) continue;   // softbeam: its cone is not a region property
-        expect(l.values).toEqual(fromRegion(region.parameters, emission as number[]));
+        expect(l.values).toEqual(fromRegion(region.parameters, emission as number[] | BlackbodyValue));
         checked++;
     }
     return checked;
@@ -96,9 +96,10 @@ const add = (a: number[], b: number[]) => a.map((x, i) => x + b[i]);
 const scaled = (s: number, v: number[]) => v.map((x) => s * x);
 
 /** `actual` has exactly the rows of `expected`, each equal to 12 decimal places. */
-function expectValues(actual: Record<string, unknown>, expected: Record<string, number | number[]>): void {
+function expectValues(actual: Record<string, unknown>, expected: Record<string, number | number[] | BlackbodyValue>): void {
     expect(Object.keys(actual).sort()).toEqual(Object.keys(expected).sort());
     for (const [row, want] of Object.entries(expected)) {
+        if (isBlackbody(want)) { expect(actual[row]).toEqual(want); continue; }
         const got = actual[row] as number | number[];
         const [g, w] = [[got].flat(), [want].flat()];
         expect(g.length, row).toBe(w.length);
@@ -126,11 +127,11 @@ describe('blackbody material emission', () => {
         expect(features.lighting.totalLightCount).toBe(1);
         expect(p.lights.map((l) => l.kind)).toEqual(['sphere']);
         expect(p.program.estimator.lighting).not.toBeNull();   // NEE really is on
-        expectValues(p.lights[0].values, { center: [0, 2, 0], radius: 0.5, radiance: blackbodyRGB(3000, 5) });
+        expectValues(p.lights[0].values, { center: [0, 2, 0], radius: 0.5, radiance: BLACKBODY });
         expect(() => new Compiler().compile(s, strategy({ directLighting: 'mis' }))).not.toThrow();
     });
 
-    it('a blackbody MESH emitter becomes a light with its folded radiance (not the raw spelling)', () => {
+    it('a blackbody MESH emitter becomes a light with its original temperature and scale', () => {
         const quad: SceneDescription['objects'][number] = {
             kind: 'mesh',
             positions: new Float32Array([-1, 2, -1, 1, 2, -1, 1, 2, 1, -1, 2, 1]),
@@ -141,7 +142,7 @@ describe('blackbody material emission', () => {
         s.objects = [s.objects[0], quad];
         const { plan: p } = planOf(s, strategy());
         expect(p.lights.map((l) => l.kind)).toEqual(['mesh']);
-        expectValues(p.lights[0].values, { radiance: blackbodyRGB(3000, 5), area: 4 });   // two triangles of area 2
+        expectValues(p.lights[0].values, { radiance: BLACKBODY, area: 4 });   // two triangles of area 2
     });
 
     it('a DRIVEN blackbody is not a samplable light (v1: power must bake) — it is path-found', () => {
@@ -211,7 +212,7 @@ describe("an emitter's light values describe its surface", () => {
         });
         expectValues(light(3), {
             center: rotate([1, 0, 0], 0.4, [2, 3, 1]), normal: rotate([1, 0, 0], 0.4, [0, -1, 0]), radius: 0.4,
-            radiance: blackbodyRGB(4500, 2),
+            radiance: { blackbody: { kelvin: 4500, scale: 2 } },
         });
         expectValues(light(4), { radiance: [1, 2, 3], area: 0.5 * 0.5 * 4 });   // a 2×2 square at scale 0.5
     });

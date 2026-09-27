@@ -1,5 +1,7 @@
 // compiler/types.ts
 
+export { isValueParam, isBlackbody, hasConstantNonzeroEmission } from '../components/color/values.js';
+
 import type { SceneDataPlan } from './sceneData.js';
 
 // ============================================================================
@@ -266,10 +268,6 @@ export interface ValueParam<T> {
     max?: number;
 }
 
-export function isValueParam<T>(v: Value<T>): v is ValueParam<T> {
-    return typeof v === 'object' && v !== null && !Array.isArray(v) && 'param' in v;
-}
-
 // --- Materials ---
 
 /** A parameter declared BY a GLSL expression (heterogeneous-media D4; general to any
@@ -299,15 +297,8 @@ export type ScalarProperty = Value<number> | GlslExpression;
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
 export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
 
-/** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty
- * minus GlslExpression). The Model B split surface for radiometric values that are read at a
- * point but never vary spatially: light emission and the constant-env color. */
-/** Blackbody emission spelling (impl-plan-blackbody-uv): the lamp's two PHYSICAL dials —
- *  temperature and power. kelvin → chroma is a pure function (components/lights/
- *  blackbody.ts), so this is a DERIVED value: constant kelvin+scale FOLD to a Vec3 at
- *  plan entry; a driven dial mints its float slider + ONE computed vec3 uniform
- *  (`u_<kelvinPath>_rgb`) at the Model-B split point. Chroma is max-channel normalized —
- *  `scale` carries all magnitude (the HDR-widget decomposition). */
+/** Authored temperature and magnitude, preserved through scene planning. The RGB model
+ * evaluates max-normalized linear-sRGB chroma × scale at its read boundaries. */
 export interface BlackbodyValue {
     blackbody: {
         kelvin: Value<number>;
@@ -316,10 +307,9 @@ export interface BlackbodyValue {
     };
 }
 
-export function isBlackbody(v: unknown): v is BlackbodyValue {
-    return typeof v === 'object' && v !== null && 'blackbody' in v;
-}
-
+/** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty
+ * minus GlslExpression). The Model B split surface for radiometric values that are read at a
+ * point but never vary spatially: light emission and the constant-env color. */
 export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
 
 /** Union used by generic planner helpers. Public fields use the narrower aliases above. */
@@ -370,28 +360,6 @@ export function mediumMayScatter(med: { sigma_s?: unknown }): boolean {
  *  Presence of `ior` is the marker — a constant `ior` is a valid (bending-free) degenerate case. */
 export function mediumIsDeflecting(med: { ior?: unknown }): boolean {
     return med.ior !== undefined;
-}
-
-/** CONSTANT nonzero emission — the v1 samplable-emitter leg (compiler-pass C3: ONE body
- *  for the Analyzer census, the Validator's sampleAsLight/phantom/driven-transform rules,
- *  and the Planner's registry route — these jointly guard pt ≡ pt-nee, so agreeing by
- *  convention was the audit's M6). Absent, `{param}`-driven, and expression emissions are
- *  all FALSE: a v1 samplable emitter's power must bake into the compile-time CDF.
- *  A BLACKBODY spelling counts when both dials are constant — it folds to a constant
- *  spectrum at plan time — and is nonzero iff its scale is (the chroma is max-normalized,
- *  so never zero). Callers may pass the raw authored value or the folded one and get the
- *  same answer; before this, raw callers (Analyzer, Validator) said "not a light" while
- *  folded callers (Planner) said "light", and the Validator crashed on the spelling.
- *  (Deliberately `!== 0`, matching the registry route; materials.ts's emission GATE uses
- *  `> 0` — a documented, separate fact.) */
-export function hasConstantNonzeroEmission(emission: unknown): boolean {
-    if (typeof emission === 'number') return emission !== 0;
-    if (Array.isArray(emission)) return emission.some((c) => typeof c === 'number' && c !== 0);
-    if (isBlackbody(emission)) {
-        const { kelvin, scale } = emission.blackbody;
-        return !isValueParam(kelvin) && (scale === undefined || (!isValueParam(scale) && scale !== 0));
-    }
-    return false;
 }
 
 /** The medium routes to the null-collision arms (heterogeneous 2×2, extended by
@@ -596,8 +564,10 @@ export interface MeasurementDescription {
     shadows?: 'opaque-dielectrics';
     /** Truncation — limit: 'spectral' (contracts §8). RGB transport is a biased surrogate
      *  of spectral transport (projection does not commute with multiplication).
-     *  'spectral' is reserved: Validator-rejected until §8 lands. */
+     *  Spectral currently supports the verified constant-RGB Lambert capability set. */
     color?: 'rgb' | 'spectral';
+    /** Measurement response; defaults to the colour model's compatible sensor. */
+    sensor?: string;
 }
 
 /**
@@ -606,6 +576,8 @@ export interface MeasurementDescription {
  * Estimator fields are provably safe as live uniforms (taxonomy §6.3).
  */
 export interface EstimatorDescription {
+    /** Wavelength proposal; changes variance, not the spectral measurement. */
+    wavelengths?: 'uniform' | 'visible';
     directLighting: 'none' | 'nee' | 'mis';
     /** NEE light-selection occupant (fable-light-bvh §2 — a registry id, not a union;
      *  B1 discipline: LIGHT_SELECTIONS in components/lights gatekeeps via the Validator).

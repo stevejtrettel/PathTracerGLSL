@@ -83,9 +83,15 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         { origin: 'glsl/core/math.glsl', source: mathGLSL },
     );
     if (plan.program.media.present) blocks.push({ origin: 'glsl/core/math_media.glsl', source: mathMediaGLSL });
+    if (color.supportGLSL) blocks.push({ origin: `components/color/${color.id}/lookup.glsl`, source: color.supportGLSL });
+    if (color.wavelengthSamplers) blocks.push({
+        origin: `components/color/${color.id}/${plan.program.estimator.wavelengths}.glsl`,
+        source: color.wavelengthSamplers[plan.program.estimator.wavelengths!],
+    });
+    const sensor = SENSORS[plan.program.measurement.sensor];
     blocks.push(
         // The colour projection calls the sensor's measurement response.
-        { origin: 'components/sensor/ideal/ideal.glsl', source: SENSORS.ideal.glsl },
+        { origin: `components/sensor/${sensor.id}/${sensor.id}.glsl`, source: sensor.glsl },
         { origin: `components/color/${color.id}/${color.id}.glsl`, source: color.glsl },
         // Ambient occupant from the registry (D3: the non-Euclidean door) — the plan's
         // measurement.ambient decision picks it; origin derived from the key.
@@ -102,6 +108,7 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
 
     return {
         ...emptyContribution('core'),
+        textures: color.textures ?? [],
         blocks,
         provides: [
             { name: 'wavelengths_sample', signature: 'WavelengthSample wavelengths_sample()', componentScoped: true },

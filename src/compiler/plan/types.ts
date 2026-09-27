@@ -49,11 +49,14 @@ export interface ProgramDescription {
         maxNullCrossings: number;
         scattering: 'full' | 'ignored';
         shadows: 'opaque-dielectrics';
-        color: 'rgb';
+        color: 'rgb' | 'spectral';
+        sensor: string;
+        colorModelVersion?: string;
     };
     /** Defines the computation (taxonomy §3): no field here may change the converged
      *  image — §11.2 cross-strategy convergence is the enforcement. */
     estimator: {
+        wavelengths?: string;
         /** null = BSDF-only transport (no NEE machinery in the program at all). */
         lighting: LightingDesc | null;
         russianRoulette: { startDepth: number; maxSurvival?: number } | null;

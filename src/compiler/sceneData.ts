@@ -6,7 +6,8 @@
 // from. What is left to the App is the expensive, data-sized work: building BVHs over meshes,
 // instance clouds and lights, and writing the bytes.
 
-import type { SceneDescription, MeshObject, PackedPlacements } from './types.js';
+import { projectRGB } from '../components/color/values.js';
+import type { SceneDescription, MeshObject, PackedPlacements, SpectrumValue } from './types.js';
 import type { PlacedScene, PlannedPrimitiveObject } from './plan/types.js';
 import { isAttributeValue } from './plan/types.js';
 import type { DataLayout, MeshSlot, MeshLightSlot, BatchSlot, SceneTableSlot, LightTreeSlot } from '../components/data/ledger.js';
@@ -166,7 +167,7 @@ export function sceneDataPlanOf(scene: SceneDescription, plan: PlacedScene): Sce
             // instance shares the material's constant emission colour.
             const emission = isAttributeValue(e)
                 ? { attribute: { slot: e.attribute.slot, rows: e.attribute.count } }
-                : { constant: Array.isArray(e) ? (e as number[]) : [0, 0, 0] };
+                : { constant: projectRGB(e as SpectrumValue) };
             // The light kind comes from the registry, like an emissive object's. A light-eligible
             // batch's prototype is a params-tier sphere (batchLightEligible).
             if (pb.prototype.backend !== 'primitive') throw new Error(`sceneData: light-eligible batch ${ordinal} has no primitive prototype`);

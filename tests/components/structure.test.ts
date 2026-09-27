@@ -33,7 +33,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'boundCheck.ts',                       // geometry shared part (twin-sampled bound containment — the §3 gate's core)
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)
-    'blackbody.ts',                        // lights shared part (kelvin → RGB parameterization — impl-plan-blackbody-uv)
+    'values.ts',                           // colour shared authored forms and RGB projection
     'table.ts',                            // lights shared part (light-table layout truth — fable-light-bvh §4)
 ]);
 

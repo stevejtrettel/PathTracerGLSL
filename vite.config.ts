@@ -23,6 +23,7 @@ export default defineConfig({
         environment: 'node', // or 'jsdom' if you want DOM APIs
     },
     build: {
+        rollupOptions: { input: { suite: 'index.html', lab: 'lab.html' } },
         minify: false,     // <- no minify (make true, or remove to go back to min)v
     },
     assetsInclude: ['**/*.hdr'],

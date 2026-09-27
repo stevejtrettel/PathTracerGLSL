@@ -2,23 +2,23 @@
 
 **Taxonomy:** measurement. **Kind:** pick-one.
 
-The implemented RGB interface is:
+`measurement.sensor` selects the response; when omitted, the colour model supplies its
+default. Sensor descriptors declare compatible colour models, checked by the compiler.
 
-```glsl
-Spectrum sensor_response(vec2 film, Direction ray_dir);
-```
+- `ideal` is the RGB default. `Spectrum sensor_response(vec2 film, Direction ray_dir)`
+  returns `SPECTRUM_ONE`; the RGB colour projection applies it component-wise.
+- `cie1931` is the spectral default. `vec3 sensor_response(float lambda, vec2 film,
+  Direction ray_dir)` returns the signed linear-sRGB response per wavelength in nm:
+  `M * xyz(lambda) / integral(ybar)`. Curves and normalization match the versioned
+  [spectral model](../color/spectral/README.md).
 
-`film` is the normalized film position consumed by the camera; `ray_dir` is its primary
-direction. The ideal RGB sensor returns `SPECTRUM_ONE`.
-
-The colour model's `color_to_pixel` applies this response to traced radiance before the
-accumulator updates its mean or variance. RGB uses component-wise multiplication. Display
+The sensor owns the measurement response, including the XYZ-to-RGB matrix and its
+normalization. The colour model owns transport representation and wavelength integration;
+it calls the response at each original camera wavelength, dividing by that lane's PDF.
+Accumulators receive signed linear RGB before updating the mean or variance. Display
 transforms remain downstream.
 
-The sensor owns the measurement response, including spectral response curves. The colour
-model owns the representation and wavelength integration. Spectral sensors will provide
-responses at sampled wavelengths; that interface and colour-model compatibility validation
-are not implemented yet. Sensor selection arrives with the second occupant.
-
-The compiler includes the sole ideal occupant through `core.ts`, before the colour projection
-that calls it. Exposure, vignetting and spectral sensor occupants remain deferred.
+`film` is normalized camera film position; `ray_dir` is the primary direction. Both
+current occupants are spatially uniform. Exposure, vignetting and camera-specific
+spectral curves remain deferred. The compiler includes the selected sensor after any
+colour-model curve helpers and before the colour projection that calls it.

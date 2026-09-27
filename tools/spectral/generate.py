@@ -1,0 +1,130 @@
+"""Generate the spectral model's float32 assets; Python standard library + a C++ compiler."""
+from pathlib import Path
+import hashlib
+import json
+import re
+import struct
+import subprocess
+import tempfile
+import time
+
+ROOT = Path(__file__).resolve().parents[2]
+VENDOR = Path(__file__).parent / 'vendor/rgb2spec'
+DEST = ROOT / 'src/components/color/spectral/data'
+DEST.mkdir(exist_ok=True)
+N = 64
+header = (VENDOR / 'details/cie1931.h').read_text()
+
+
+def f32(x):
+    return struct.unpack('<f', struct.pack('<f', x))[0]
+
+
+def array(name):
+    body = re.search(r'const double ' + name + r'\[CIE_SAMPLES\] = \{(.*?)\};', header, re.S)[1]
+    return [float(x) for x in re.findall(r'(?:N\()?([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)', body)]
+
+
+def inverse(a):
+    m = [a[i][:] + [float(i == j) for j in range(3)] for i in range(3)]
+    for i in range(3):
+        k = max(range(i, 3), key=lambda k: abs(m[k][i]))
+        m[i], m[k] = m[k], m[i]
+        divisor = m[i][i]
+        m[i] = [x / divisor for x in m[i]]
+        for j in range(3):
+            if j != i:
+                divisor = m[j][i]
+                m[j] = [x - divisor * y for x, y in zip(m[j], m[i])]
+    return [row[3:] for row in m]
+
+
+def matrix_vector(m, v):
+    return [sum(a * b for a, b in zip(row, v)) for row in m]
+
+
+def product_integral(a, b):
+    # Exact integral of the product of two piecewise-linear 5 nm functions.
+    return sum(5 / 6 * (2 * a[i] * b[i] + a[i] * b[i+1] + a[i+1] * b[i] + 2 * a[i+1] * b[i+1])
+               for i in range(94))
+
+
+xyz = [[f32(x) for x in array('cie_' + c)] for c in 'xyz']
+C = sum(2.5 * (xyz[1][i] + xyz[1][i+1]) for i in range(94))
+raw_d65 = array('cie_d65')
+d65 = [f32(x * C / product_integral(raw_d65, xyz[1])) for x in raw_d65]
+white = [product_integral(d65, c) / C for c in xyz]
+primaries = [
+    [.64 / .33, .30 / .60, .15 / .06],
+    [1., 1., 1.],
+    [(1 - .64 - .33) / .33, (1 - .30 - .60) / .60, (1 - .15 - .06) / .06],
+]
+scales = matrix_vector(inverse(primaries), white)
+to_xyz = [[row[j] * scales[j] for j in range(3)] for row in primaries]
+to_rgb = inverse(to_xyz)
+
+# Fit against precisely the float32 curves shipped to the GPU. Keep the vendor files intact.
+for name, values in zip(['cie_x', 'cie_y', 'cie_z', 'cie_d65'], [*xyz, [v / C for v in d65]]):
+    header = re.sub(
+        r'(const double ' + name + r'\[CIE_SAMPLES\] = )\{.*?\};',
+        lambda m: m[1] + '{' + ','.join(map(repr, values)) + '};', header, flags=re.S)
+for name, matrix in [('xyz_to_srgb', to_rgb), ('srgb_to_xyz', to_xyz)]:
+    header = re.sub(
+        r'(const double ' + name + r'\[3\]\[3\] = )\{.*?\};',
+        lambda m: m[1] + '{' + ','.join('{' + ','.join(map(repr, row)) + '}' for row in matrix) + '};',
+        header, flags=re.S)
+source = (VENDOR / 'rgb2spec_opt.cpp').read_text()
+# Store the fitted polynomial in t=(lambda-360)/470. Avoid subtracting large nm coefficients.
+source = source.replace('float(A*(c1*c1))', 'float(A)')
+source = source.replace('float(B*c1 - 2*A*c0*(c1*c1))', 'float(B)')
+source = source.replace('float(C - B*c0*c1 + A*(c0*c1)*(c0*c1))', 'float(C)')
+
+start = time.monotonic()
+with tempfile.TemporaryDirectory(prefix='spectral-fit-') as temp:
+    p = Path(temp)
+    (p / 'details').mkdir()
+    (p / 'details/cie1931.h').write_text(header)
+    (p / 'details/lu.h').write_bytes((VENDOR / 'details/lu.h').read_bytes())
+    (p / 'macros.h').write_bytes((VENDOR / 'macros.h').read_bytes())
+    (p / 'fit.cpp').write_text(source)
+    subprocess.run(['c++', '-std=c++17', '-O3', '-pthread', str(p / 'fit.cpp'), '-o', str(p / 'fit')], check=True)
+    subprocess.run([str(p / 'fit'), str(N), str(p / 'table.spec'), 'sRGB'], check=True)
+    raw = (p / 'table.spec').read_bytes()
+seconds = time.monotonic() - start
+
+assert raw[:4] == b'SPEC'
+z = struct.unpack_from('<' + str(N) + 'f', raw, 8)
+count = 3 * N**3
+coefficients = struct.unpack_from('<' + str(3 * count) + 'f', raw, 8 + 4 * N)
+atlas = bytearray(count * 16)
+for i in range(count):
+    struct.pack_into('<4f', atlas, 16 * i, *coefficients[3*i:3*i+3], 0)
+curves = bytearray(128 * 2 * 16)
+for i in range(95):
+    struct.pack_into('<4f', curves, 16 * i, *(c[i] for c in xyz), d65[i])
+for i, value in enumerate(z):
+    struct.pack_into('<f', curves, 16 * (128 + i), value)
+assets = [('coefficients.bin', atlas), ('curves.bin', curves)]
+for name, values in assets:
+    (DEST / name).write_bytes(values)
+
+meta = {
+    'version': 'jh-cie1931-d65-v1',
+    'resolution': N,
+    'atlasWidth': 2048, 'atlasHeight': count // 2048,
+    'curveWidth': 128, 'curveHeight': 2,
+    'lambdaMin': 360, 'lambdaMax': 830, 'step': 5,
+    'cieYIntegral': C,
+    'xyzToRGB': to_rgb, 'rgbToXYZ': to_xyz, 'white': white,
+    'zNodes': z,
+    'sourceRevision': (VENDOR / 'REVISION').read_text().strip(),
+    'sha256': {name: hashlib.sha256(values).hexdigest() for name, values in assets},
+}
+(ROOT / 'src/components/color/spectral/data.ts').write_text(
+    '// Generated by tools/spectral/generate.py.\nexport const spectralData = ' + json.dumps(meta, indent=4) + ' as const;\n')
+print(json.dumps({
+    'generationSeconds': seconds,
+    'downloadBytes': len(atlas) + len(curves),
+    'gpuBytes': len(atlas) + len(curves),
+    'sha256': meta['sha256'],
+}, indent=2))

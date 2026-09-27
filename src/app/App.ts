@@ -1,5 +1,7 @@
 // app/App.ts — Main orchestrator, facade over internal managers
 
+import { COLOR_MODELS, resolveWavelengthSampler } from '../components/color/index.js';
+import { BuiltinAssets } from './BuiltinAssets.js';
 import { Compiler } from '../compiler/Compiler.js';
 import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '../compiler/EnvironmentBake.js';
 import { envVariantSuffix } from '../compiler/generate/features/environment.js';
@@ -31,6 +33,7 @@ import { CompilationError } from '../errors/core/DiagnosticBag.js';
 import { DiagnosticBag } from '../errors/core/DiagnosticBag.js';
 
 export class App {
+    private builtinAssets = new BuiltinAssets();
     private compiler: ICompiler;
     private engine: Engine;
     private coordinator: RenderCoordinator;
@@ -178,6 +181,7 @@ export class App {
         // pass and hard-errors on a missing one); loading renderers does not bind them.
         try {
             await this.rendererManager.initialize(config);
+            await this.builtinAssets.upload(this.rendererManager.getCompiledRenderers(), this.engine);
         } catch (error: any) {
             this._showErrorOverlay(error);
             throw error;
@@ -266,6 +270,7 @@ export class App {
             }
             const sceneData = this.rendererManager.getSceneData();
             if (sceneData !== null) await this._uploadSceneGeometry(sceneData);
+            await this.builtinAssets.upload(this.rendererManager.getCompiledRenderers(), this.engine);
             await this._loadImageEnvironment(config);
             this.parameterStore.resendAll();
             this.coordinator.resetAccumulation('WebGL context restored');
@@ -351,6 +356,7 @@ export class App {
         presets: Record<string, StrategyPreset> = {}
     ): Promise<void> {
         await this.rendererManager.initializeWithPresets(scene, presetIds, presets);
+        await this.builtinAssets.upload(this.rendererManager.getCompiledRenderers(), this.engine);
     }
 
     /**
@@ -377,6 +383,7 @@ export class App {
             throw error;
         }
         try {
+            await this.builtinAssets.upload(this.rendererManager.getCompiledRenderers(), this.engine);
             await this._uploadSceneGeometry(this.rendererManager.getSceneData()!);
         } catch (error: any) {
             this._showErrorOverlay(error);
@@ -868,7 +875,10 @@ export class App {
             // Data scenes append the .inst provenance — the scene id alone does not
             // determine a data-built image (fable-instance-clouds §7).
             scene: scene == null ? 'unknown' : scene.provenance !== undefined ? `${scene.id} [${scene.provenance}]` : scene.id,
-            strategy,
+            strategy: strategy == null ? null : {
+                ...strategy,
+                estimator: { ...strategy.estimator, wavelengths: resolveWavelengthSampler(COLOR_MODELS[strategy.measurement.color ?? 'rgb'], strategy.estimator.wavelengths) },
+            },
             measurement: scene != null && strategy != null ? resolveMeasurement(scene, strategy) : null,
             // The values THIS image was rendered with (see imageParameters).
             parameters: this.imageParameters ?? this.parameterStore.serialize(),

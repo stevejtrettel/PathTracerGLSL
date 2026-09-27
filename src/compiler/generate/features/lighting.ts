@@ -7,8 +7,8 @@
 import { emitColor } from '../color.js';
 import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
-import { isValueParam, isBlackbody } from '../../types.js';
-import { blackbodyRGB } from '../../../components/lights/blackbody.js';
+import { isValueParam, isBlackbody, type Vec3, type BlackbodyValue } from '../../types.js';
+import { projectRGB, radiometricValueDeps } from '../../../components/color/values.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatVec3 } from '../../../components/glsl-format.js';
@@ -96,8 +96,8 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         const b = plan.instanceBatches.find((x) => x.ordinal === il.ordinal);
         if (b === undefined) throw new Error(`lighting: instanceLights ordinal ${il.ordinal} has no planned batch`);
         const le = plan.materials[b.materialId]?.values[EMISSION_KEY];
-        if (!Array.isArray(le) && !isAttributeValue(le)) throw new Error(`lighting: batch ${il.ordinal} light arm needs a constant or attribute vec3 emission (eligibility should have guaranteed it)`);
-        return { base: il.base, count: il.count, region: b.index, placementsBase: b.slot.placementsBase, le: Array.isArray(le) ? le as number[] : le };
+        if (!Array.isArray(le) && !isBlackbody(le) && !isAttributeValue(le)) throw new Error(`lighting: batch ${il.ordinal} light arm needs a constant radiometric form or attribute emission (eligibility should have guaranteed it)`);
+        return { base: il.base, count: il.count, region: b.index, placementsBase: b.slot.placementsBase, le: Array.isArray(le) ? le as Vec3 : le };
     });
 
     // Per-kind sampler libraries for the kinds present (registry-driven, R1b; declared
@@ -334,46 +334,12 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[],
     return lines.join('\n');
 }
 
-/** Substitute a light's driven RADIOMETRIC rows with concrete values (driven-lights
- *  Stage A) — a `ValueParam` row → `params[path] ?? default`, broadcasting a scalar to a
- *  Spectrum vec3 (§2.5); constant rows pass through. This is the ONE substitution truth:
- *  the plan-time bake calls it with `{}` (defaults) and the CDF compute closure with live
- *  store values, so `computeSelectPdf`/`power` see identical resolved values on both paths
- *  (the `similarityFromTransform` bake≡ship precedent). No-op for constant lights. */
+/** Evaluate radiometric rows for RGB packing and power selection. Geometry rows are
+ * constant by contract and pass through; parameter bindings occur only on emission. */
 export function resolveLightValues(l: Pick<PlannedLight, 'values'>, params: Record<string, unknown> = {}): Record<string, number | number[]> {
     const out: Record<string, number | number[]> = {};
-    for (const [k, v] of Object.entries(l.values)) out[k] = resolveRadiometricValue(v, params);
+    for (const [k, v] of Object.entries(l.values)) out[k] = isValueParam(v) || isBlackbody(v) ? projectRGB(v, params) : v;
     return out;
-}
-
-/** A radiometric value at the given parameter values — the ONE evaluator for driven
- *  radiometric values (light rows and the constant sky color): a `{param}` reads its
- *  value (a scalar broadcasts to a spectrum), a blackbody evaluates chroma × scale with
- *  its dials read live (the kelvin slider reshuffles the power CDF through the same
- *  body the bake used), and anything else is already a constant and passes through. */
-function resolveRadiometricValue(v: unknown, params: Record<string, unknown>): number | number[] {
-    if (isValueParam(v)) {
-        const raw = params[v.param] ?? v.default;
-        return typeof raw === 'number' ? [raw, raw, raw] : raw as number[];
-    }
-    if (isBlackbody(v)) {
-        const { kelvin, scale } = v.blackbody;
-        return blackbodyRGB(
-            isValueParam(kelvin) ? ((params[kelvin.param] as number) ?? kelvin.default ?? 6500) : kelvin,
-            scale === undefined ? 1 : isValueParam(scale) ? ((params[scale.param] as number) ?? scale.default ?? 1) : scale,
-        );
-    }
-    return v as number | number[];
-}
-
-/** The parameter paths a radiometric value reads (a {param}, or a blackbody's driven dials). */
-function radiometricValueDeps(v: unknown): string[] {
-    if (isValueParam(v)) return [v.param];
-    if (isBlackbody(v)) {
-        const { kelvin, scale } = v.blackbody;
-        return [...(isValueParam(kelvin) ? [kelvin.param] : []), ...(scale !== undefined && isValueParam(scale) ? [scale.param] : [])];
-    }
-    return [];
 }
 
 /** Emitted power for CDF selection — the kind descriptors carry the pbrt formulas
@@ -397,15 +363,7 @@ function lightKind(l: PlannedLight): LightKindDescriptor {
 /** Distinct driven-emission parameter paths across all lights — the `parameterPaths` the
  *  selection arrays depend on (any one changing recomputes the whole CDF). */
 function drivenEmissionPaths(lights: PlannedLight[]): string[] {
-    const s = new Set<string>();
-    for (const l of lights) for (const v of Object.values(l.values)) {
-        if (isValueParam(v)) s.add(v.param);
-        else if (isBlackbody(v)) {   // driven dials feed the CDF closures too
-            if (isValueParam(v.blackbody.kelvin)) s.add(v.blackbody.kelvin.param);
-            if (v.blackbody.scale !== undefined && isValueParam(v.blackbody.scale)) s.add(v.blackbody.scale.param);
-        }
-    }
-    return [...s];
+    return [...new Set(lights.flatMap(l => Object.values(l.values).flatMap(radiometricValueDeps)))];
 }
 
 /** Cumulative sum — the selection CDF from per-light selection pdfs (shipped, not derived on the GPU). */
@@ -529,8 +487,7 @@ export function envSelectionProbability(plan: RenderPlan, params: Record<string,
         ?? (env.type !== 'none' ? env.intensity : 1.0);   // C2: plan-resolved
     let meanL = 1.0;
     if (env.type === 'constant') {
-        const raw = resolveRadiometricValue(env.color, params);
-        const arr = typeof raw === 'number' ? [raw, raw, raw] : raw;
+        const arr = projectRGB(env.color, params);
         meanL = (arr[0] + arr[1] + arr[2]) / 3;
     } else if (env.type === 'image' || env.type === 'procedural') {
         const chart = plan.program.estimator.envSampler.chart;
@@ -723,14 +680,14 @@ type LightTreeSlotBaked = {
  *  [base, base+count), the batch's region, its placement-record base (the record IS
  *  the sphere-light row: center.xyz, radius), and Le — a baked constant, or the
  *  minted per-instance emission attribute ref (base/slot/count into records). */
-interface BatchLightArm { base: number; count: number; region: number; placementsBase: number; le: number[] | AttributeValue }
+interface BatchLightArm { base: number; count: number; region: number; placementsBase: number; le: Vec3 | BlackbodyValue | AttributeValue }
 
 /** The batch instance's SphereLight ctor from its placement record (params tier);
  *  attribute Le fetches the SAME records texel the hit-side fill reads (one truth). */
 function batchSphereExpr(a: BatchLightArm, indexExpr: string, wl: string): { fetch: string; ctor: string } {
-    const leExpr = Array.isArray(a.le)
-        ? formatVec3(a.le)
-        : `texelFetch(u_data_records, data_texel1d(uint(${a.le.attribute.base} + (${indexExpr}) * ${a.le.attribute.count} + ${a.le.attribute.slot})), 0).xyz`;
+    const leExpr = isAttributeValue(a.le)
+        ? `texelFetch(u_data_records, data_texel1d(uint(${a.le.attribute.base} + (${indexExpr}) * ${a.le.attribute.count} + ${a.le.attribute.slot})), 0).xyz`
+        : emitValue(a.le, formatVec3);
     return {
         fetch: `vec4 rec = texelFetch(u_data_records, data_texel1d(uint(${a.placementsBase} + (${indexExpr}))), 0);`,
         ctor: `SphereLight(rec.xyz, rec.w, ${emitColor(leExpr, 'emission', wl)})`,

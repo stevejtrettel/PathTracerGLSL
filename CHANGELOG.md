@@ -4,6 +4,100 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — spectral packed lights and instance colours
+
+Enabled the packed-data subset of S1b: ordinary light-tree rows, instanced Lambert
+surfaces and per-instance RGB albedo/emission arrays. The generated readers already
+lift authored RGB at their supplied wavelengths; this change admits those routes after
+verification and checks attribute values against their descriptor's radiometric role.
+Shared scene data remains authored RGB. Reflectance is still restricted to [0,1]; the
+proposed research-gain extension remains undecided. Live colours/expressions, non-RGB
+forms, other material models and media remain gated.
+
+Added `spectral-packed` and `spectral-packed-ref`, viewable in the lab. Four numeric
+scene checks pass at 48×36, 256 spp: packed attributes versus individual materials
+(0.14% mean difference), packed light rows versus inline lights (0.05%), and NEE versus
+MIS for instance and ordinary lights (0.04% and <0.01%). Reduced chi-squared values
+are 0.22–0.65 with the same pinned random salt. Direct GPU probes execute 13 generated
+readers against the actual scene-data packer and serialized spectral model: nested/flat
+attributes, params/frame placements, seven table-supported light kinds, and sampled
+instance emission versus hit-side emission. All four lanes pass at 2e-5 absolute
+tolerance; a deliberate lost-instance-index mutation is rejected.
+
+All 207 pre-existing synchronous scene digests are exactly unchanged, including the
+four spectral foundation scenes; the two new scenes are additions. Seven async scenes
+remain outside that digest check. Mixed RGB/spectral ordering preserves renderer output,
+scene-data plans and packed bytes. All 93 files / 3,224 tests, typecheck and production
+build pass. No full GPU
+witness sweep or native-GPU performance run was performed for this subset.
+
+## 2026-09-27 — restricted spectral foundation
+
+Implemented S1a: four wavelengths on rays, uniform/visible wavelength proposals, the
+Jakob–Hanika RGB lift and a CIE 1931 sensor. The sensor owns the signed linear-sRGB
+response; the colour model integrates four lanes using their individual camera PDFs.
+Resolved sensor, proposal and model version appear in export metadata. RGB shader output
+and authored shared data retain their existing meaning.
+
+The initial capability set is constant-RGB Lambert albedo in [0,1], constant RGB emitters
+and skies, PT/NEE/MIS, without media, instancing or light-tree reads. Validation rejects
+other spectral inputs. Runtime binding coverage, physical blackbody, media bounds, gain
+above one and dispersion are not implemented. Constants still perform the shader lookup;
+CPU coefficient folding is not claimed as built.
+
+Added a pinned, licensed offline generator and two versioned RGBA32F assets (12,587,008
+bytes total). Repeated generation produced identical bytes and metadata. The serialized
+lift's 1,367-colour quadrature audit measured RMS channel error 0.0005581, maximum error
+0.013779 and quadrature refinement discrepancy 2.30e-9. App provisioning follows declared
+texture references, reports missing/corrupt assets by name, and reuses cached bytes after
+context loss. Production builds now include the lab entry point as well as the gallery.
+
+Validation: typecheck/build and 92 test files / 3,192 tests pass. A yield between synchronous
+static shader checks prevents worker message-queue starvation; no production timeout was
+added. All 203 existing synchronous RGB scene digests are exactly unchanged (seven async
+scenes excluded). Mixed RGB/spectral compilation preserves renderer output and shared data
+under reordering. GPU lookup/sampling/signed-film probes pass and reject shared-PDF,
+omitted-lane and early-clamp mutations. Twelve transport checks cover direct emission,
+grey/coloured furnaces and a coloured plane under PT/NEE/MIS; 30 additional renders across
+three salts pass their predeclared channel tolerance. Dev and production context
+restoration reproduce identical pixels and do not refetch immutable assets. This is targeted
+coverage, not a complete witness sweep. Lookup microbenchmarks report SwiftShader draw/readback
+wall time; native GPU and heavy-scene ray-carriage costs remain unmeasured.
+
+## 2026-09-27 — authored blackbody preservation and two-channel enforcement
+
+Implemented S0c / scene-once step 4. Blackbody temperature and scale survive material, light
+and environment planning. The colour family owns authored-form predicates and `projectRGB`;
+the unchanged RGB approximation lives in `color/rgb/blackbody.ts`. Shader constants, live
+bindings, power selection and RGB packing share that projection. Planner and Validator share
+the driven predicate. Instanced light arms accept retained forms; their packed power data no
+longer falls back to black for a non-array emission.
+
+Fixed an existing zero-scale blackbody sky census inconsistency: it is now nonsamplable like
+an RGB black sky. Emission gates also recognize fixed zero scale, including driven temperature;
+a driven scale remains potentially emissive. No stricter authoring validation was introduced.
+Shared RGB rows and light headers stay unchanged. The form registry, form-code readers and
+physical spectral evaluation remain S1 work, as recorded in the spectral plan.
+
+Added 26 compiler tests for retained forms, exact RGB compiled/packed equivalence at six sites
+(surface, mesh, point, quad, batch, sky), zero scale, renderer order, and live colour/selection
+updates. Eleven equivalence cases passed before the refactor; zero-scale sky tests the census
+correction. The complete static shader suite now runs under both RGB and a test-only RG model:
+lifts take `.rg`, and film projection yields `(r,g,0)` after sensor response. The canary is not
+a public strategy. Its numerical GPU probes also reject wrong-channel and bypassed-sensor
+mutations.
+
+Validation: typecheck and build passed; all 90 files / 3113 tests passed, including 377 static
+shader cases in each representation. All 203 synchronous scene digests are exactly identical
+(seven async scenes excluded), including shader text, uniforms and packed scene data. Nineteen
+fixed-salt SwiftShader frames match the S0b baseline exactly at 32×24, 16 spp (oneshot: one
+sample): Cornell with all six cameras, furnace variance/oneshot, slab, GRIN scattering furnace,
+instanced tree lights with sky, medium shadows, procedural sky, and the six blackbody sites.
+The variance attachment also matches. All six cameras produce identical tiled/whole HDR and
+PNG pixel bytes at 96×80, four spp, four tiles. Colour probes pass 17 cases and reject five
+compiled mutations; carrier probes pass 30 cases and reject ten mutations. This is targeted
+GPU coverage, not a full high-sample witness sweep or a spectral performance measurement.
+
 ## 2026-09-26 — wavelength carriage and RGB conversion boundaries
 
 Implemented S0b: current wavelengths live on `Ray`, arrival wavelengths on `Hit`, and resolved

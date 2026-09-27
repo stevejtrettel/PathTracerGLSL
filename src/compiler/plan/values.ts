@@ -6,15 +6,14 @@
 
 import type { Vec3, MaterialProperty, GlslExpression, ValueParam, BlackbodyValue } from '../types.js';
 import { isGlslExpression, isValueParam, isBlackbody } from '../types.js';
-import { foldBlackbody } from '../../components/lights/blackbody.js';
 
-/** A spectrum-valued property: a constant broadcasts to vec3, a constant blackbody folds to
- *  its spectrum, {param} and GLSL spellings pass through (a {param}'s scalar default also
+/** A spectrum-valued property: a scalar broadcasts to vec3; blackbody, {param}, and
+ *  GLSL spellings pass through (a {param}'s scalar default also
  *  broadcasts), and an absent value takes the fallback. */
 export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> | BlackbodyValue {
     if (value === undefined) return fallback;
     if (isGlslExpression(value)) return value;
-    if (isBlackbody(value)) return foldBlackbody(value);   // constant dials bake; driven survive
+    if (isBlackbody(value)) return value;
     if (isValueParam(value)) {
         // Scalar spectra intentionally broadcast. Do the same for a parameter default so
         // the generated vec3 uniform can never receive a scalar on its initial upload.

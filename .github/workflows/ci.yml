@@ -46,6 +46,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Spectral asset audit
+        run: npm run audit:spectral
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Tests
@@ -67,6 +69,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Colour primitive witnesses
         run: npm run witness:color
+      - name: Spectral primitive witnesses
+        run: npm run witness:spectral
+      - name: Spectral packed-reader witnesses
+        run: npm run witness:spectral-bindings
       - name: Wavelength carrier witnesses
         run: npm run witness:wavelengths
       - name: Run the sweep

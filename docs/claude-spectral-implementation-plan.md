@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** implementation started, Sep 26, 2026. The RGB colour/film foundation (S0a) and wavelength carriage with RGB conversion seams (S0b) are implemented. Authored-form preservation (S0c) and spectral rendering remain planned.
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on constant-RGB Lambert fixtures with the CIE 1931 sensor. S1b now covers packed RGB lights and instance colour attributes; live bindings/media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -74,7 +74,7 @@ These are code observations, not claims that the proposed replacement already ex
 | Walk and path state | `src/components/transport/integrators/pt/pt.ts` | Preserve carrier; own one-time collapse state and ordering |
 | Material/medium resolution | `src/compiler/generate/features/materials.ts` | Explicit carrier; role-aware values; index evaluation; bounds |
 | Value binding | `src/compiler/plan/values.ts`, `generate/values.ts` | Preserve forms in planning; renderer conversion at binding/read sites |
-| Early blackbody folding | `resolveColorProperty` calls `foldBlackbody` | Stop discarding the authored form in the shared scene plan |
+| Blackbody forms | `resolveColorProperty` retains the form; `projectRGB` evaluates RGB at read boundaries | Preserve the original dials for spectral evaluation |
 | Ray-producing cameras | `src/components/camera/*/*.glsl`, `generate/features/camera.ts` | Receive sampled carrier and return fully initialized `Ray` (§3.2) |
 | Film entry | Three accumulator GLSL files | Camera sample creation and explicit colour projection |
 | Spectrum helpers | `src/glsl/core/math.glsl`; channel picks in volume occupants | Correct channel count; preserve RGB operation order in S0 |
@@ -296,6 +296,9 @@ evaluation during S0. Audit all downstream array assumptions identified in scene
 driven predicates, emission-zero predicates, instanced emission and packed tree rows.
 Predicates read authored facts, including a constant zero scale; an arbitrary expression is
 not proven black merely because one sample/default is zero.
+
+The form registry and GPU references below are implemented with their first spectral readers
+in S1b. S0c retains the descriptions in planned values and keeps the existing RGB packing.
 
 For a shared non-RGB light, retain its strategy-independent RGB projection plus a stable form
 reference. Spectral GLSL dispatches the reference to the original form. **Proposed concrete
@@ -651,6 +654,15 @@ media, GRIN, instancing, shadows, trees, sky, accumulators and tiling. Investiga
 rather than widening a tolerance automatically. Bitwise matching on tested devices is an
 empirical gate, not a universal claim about every driver's optimizer.
 
+S0c evidence (Sep 27): 26 preservation/equivalence/order/live-binding tests; all 377 static
+shader cases under both RGB and the RG canary; 203 scene digests exactly unchanged. Nineteen
+fixed-salt SwiftShader renders match the S0b baseline at 32×24, 16 spp (oneshot: one sample),
+including all six cameras, media/GRIN, instanced tree lights, medium shadows, procedural sky,
+three accumulators, and six blackbody binding sites. All six cameras match tiled versus whole
+HDR/PNG at 96×80, four spp, four tiles. Colour probes: 17 cases / five rejected mutations;
+carrier probes: 30 cases / ten rejected mutations. These are targeted comparisons, not a full
+high-sample witness sweep. See the changelog for the zero-scale sky classification correction.
+
 ### S1a — spectral data, sampling and film on controlled fixtures
 
 Generate/load the versioned assets and implement spectral types, uniform/visible wavelength
@@ -668,12 +680,52 @@ channels, and asset missing/load/context-restore behavior works. Validate runtim
 the Vite production build as well as dev. Record CPU generation cost, download size, padded
 GPU allocation, sampler roster and runtime lookup cost; do not claim an optimization is free.
 
+Implemented foundation: four-lane Jakob–Hanika lift; uniform and normalized visible
+proposals; signed film integration through the selected CIE 1931 sensor; immutable,
+checksummed built-in textures; resolved sensor, proposal and model version in exports.
+The compiler currently admits only constant RGB Lambert albedo in [0,1], constant
+nonnegative RGB emission/skies, and no media, instancing or light tree. It rejects
+unverified inputs. The proposed gain extension has not been implemented or accepted.
+Constants currently use the shader table lookup; CPU coefficient precomputation remains
+an optimization for S1b, not a completed path.
+
+Asset evidence: 12,587,008 bytes for two RGBA32F textures; 1,367-colour serialized-table
+quadrature measured RMS 0.0005581 and maximum channel error 0.013779. Half-step
+quadrature discrepancy was 2.30e-9. GPU lookup error against CPU evaluation was at most
+9.64e-7. Uniform/visible sampling and signed, unequal-PDF film probes pass; deliberately
+using one PDF, dropping a lane or clamping samples is detected. Twelve transport checks
+cover direct emission, grey/coloured furnaces and PT/NEE/MIS on a coloured plane. Thirty
+additional 32², 128-spp frames across salts 71, 173 and 907 pass a predeclared 0.008
+channel tolerance; maximum error is 0.005109, with all channel means within 1.58
+estimated standard errors of the reference. Dev
+and production asset loading/context restoration reproduce the same fixed-salt pixels.
+The existing 203 synchronous RGB scene digests remain exactly unchanged; the seven async
+scenes are outside that digest tool. No complete high-sample witness sweep was run here.
+
+`benchmark:spectral` records lookup versus precomputed polynomial cost on the same
+four-lane output. The available SwiftShader backend has no timer-query extension;
+its wall times are not native GPU timings. Native hardware lookup and the heavy-scene
+ray-carriage performance audit remain outstanding. See the model README for reproducible
+commands, layout, license and source provenance.
+
 ### S1b — complete all RGB-authored radiometric read paths
 
 Lift constants, live uniforms, expressions, attributes, ordinary/instanced light rows and all
 environment paths. Implement authored clamps and model-aware majorants, including live updates,
 main/shadow consistency, volume emission and GRIN carrier/index plumbing. Implement the first
 constant non-RGB form references needed for blackbody tree leaves.
+
+**Implemented subset (Sep 27):** constant-RGB packed light rows and instancing, including
+nested RGB, scalar-broadcast and packed float32 attributes. The existing generated readers
+already lift RGB at the supplied wavelengths; they are now admitted by validation after
+numeric checks. Attribute domains use the descriptor's radiometric role. Shared authored
+bytes and renderer outputs agree under mixed RGB/spectral compilation and reordered
+strategies. The full scene checks compare packed attributes to individual materials,
+light rows to inline lights, and NEE to MIS. Generated-reader probes separately test all
+four lanes and reject a dropped instance index. Live colour parameters/expressions remain
+validation-gated; spectral media bounds, non-RGB form codes and CPU constant
+precomputation remain unimplemented. Albedo above
+one still has the existing diagnostic while its proposed gain policy is unresolved.
 
 Add role-aware validation: finite nonnegative coefficients/emission, the proposed extended
 reflectance domain in §4.2, positive indices, form/role compatibility, and defined runtime

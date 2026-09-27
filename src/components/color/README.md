@@ -2,8 +2,10 @@
 
 **Taxonomy:** measurement. **Kind:** pick-one.
 
-`measurement.color` selects the colour model. RGB is currently the only implemented model;
-spectral selection remains validation-rejected.
+`measurement.color` selects the colour model. RGB preserves the existing renderer. The
+[spectral occupant](spectral/README.md) implements four-lane transport on a restricted
+RGB Lambert capability set, including packed light rows and per-instance colours;
+live colour parameters, expressions, media and non-RGB forms remain validation-rejected.
 
 An occupant supplies `types.glsl` and `<id>.glsl`:
 
@@ -29,17 +31,26 @@ stays with the accumulator for sensor integration.
 `color_lift_reflectance`, `color_lift_coefficient` and `color_lift_emission` evaluate authored
 RGB at an explicit carrier. Radiometric descriptor rows declare their role. All three are
 identities in RGB. Uniforms and packed rows stay authored RGB; filtering, expression evaluation
-and medium clamps happen before conversion. Blackbody still uses the existing RGB projection;
-preserving its authored form through scene planning is the next stage.
+and medium clamps happen before conversion. Blackbody temperature and scale survive scene planning. `values.ts` owns authored-form
+predicates and the shared `projectRGB` used by shader constants, live bindings, and light
+packing/power selection. `rgb/blackbody.ts` owns the existing RGB approximation. A zero fixed
+scale is black even when temperature is driven; a driven scale is potentially emissive.
+Original-form IDs and their spectral readers are not implemented yet.
 
 To add an occupant, define its descriptor and GLSL inside its own folder and register it in
 `index.ts`. Enable authoring/validation only when its supported paths are implemented. The
-RGB placeholder sampler draws nothing; future wavelength sampling policies are estimator
-choices, separate from the measurement's colour representation.
+RGB placeholder sampler draws nothing. Spectral `uniform` and `visible` wavelength
+proposals are estimator choices, separate from the measurement's colour representation.
+Descriptors declare their default sensor and any model version, sampling code and immutable
+texture references. The compiler checks sensor compatibility and selects the requested proposal.
 
 `npm run witness:color` executes the spectrum operations at N=2,3,4 and the RGB film projection
-with identity and nonidentity sensors. It also checks that deliberately broken versions fail.
+with identity and nonidentity sensors, plus the test-only two-channel lift/film conversion. It also checks that deliberately broken versions fail.
 
 `npm run witness:wavelengths` runs generated shaders with a visible four-value carrier,
 including cameras, arrivals, property resolution, lighting, phase continuation, shadow
 crossings and GRIN. Test-only nonidentity lifts expose conversion bypasses and clamp order.
+
+The static compiler suite runs every case under RGB and the test-only RG canary. Its lifts
+retain `.rg`; its film projection produces `(r,g,0)`. It is not a physical colour model or
+a public strategy.

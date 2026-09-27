@@ -33,8 +33,8 @@ export type RowConstraint =
 
 /** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
  *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —
- *  the caller substitutes via `resolveLightValues` first. */
-export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue;   // blackbody: driven-only past plan entry (constants fold)
+ *  the caller projects authored radiometric forms via `resolveLightValues` first. */
+export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue;
 
 export type RadiometricRole = 'reflectance' | 'coefficient' | 'emission';
 
@@ -230,7 +230,7 @@ export interface LightKindDescriptor {
         primitive: string;
         parameters(authored: Record<string, unknown>): Record<string, number | number[]>;
     };
-    valuesFromRegion?(parameters: Record<string, number | number[]>, Le: number[]): Record<string, number | number[]>;
+    valuesFromRegion?(parameters: Record<string, number | number[]>, Le: number[] | BlackbodyValue): Record<string, LightRowValue>;
     validateAuthored?(authored: Record<string, unknown>): string[];
     /** Struct rows, keyed into PlannedLight.values (row order = ctor order; the
      *  struct is GENERATED from them — A1). */

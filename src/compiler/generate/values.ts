@@ -29,7 +29,7 @@
 // computeSelectPdf). The environment's intensity/rotation are the deliberate always-live controls.
 
 import { isValueParam, isGlslExpression, isBlackbody, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata } from '../types.js';
-import { blackbodyRGB, foldBlackbody } from '../../components/lights/blackbody.js';
+import { projectRGB, isDrivenRadiometric } from '../../components/color/values.js';
 import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 
@@ -56,11 +56,7 @@ export function emitValue(
         throw new Error('emitValue: AttributeValue reached a non-attribute site — attribute rows are legal only in the material-properties fill');
     }
     if (isBlackbody(v)) {
-        // Constant dials bake (plan entry normally folds these already — this is the
-        // backstop); a driven dial reads its ONE derived vec3 uniform.
-        const folded = foldBlackbody(v);
-        if (!isBlackbody(folded)) return format(folded as never);
-        return blackbodyUniformName(v);
+        return isDrivenRadiometric(v) ? blackbodyUniformName(v) : format(projectRGB(v) as never);
     }
     if (isValueParam(v)) return paramToUniform(v.param);
     if (isGlslExpression(v)) return exprFormat(v);
@@ -123,11 +119,8 @@ export function mintValueUniform(
         return;
     }
     if (isBlackbody(prop)) {
-        // The blackbody DERIVED mint (impl-plan-blackbody-uv): each driven dial gets its
-        // float slider; ONE computed vec3 uniform carries chroma(kelvin)·scale — the
-        // u_majorant pattern (bake ≡ ship through blackbodyRGB, one body).
-        const folded = foldBlackbody(prop);
-        if (!isBlackbody(folded)) return;   // fully constant: emitValue baked the literal
+        // Each driven dial gets a slider; one computed RGB uniform carries the projection.
+        if (!isDrivenRadiometric(prop)) return;
         const { kelvin, scale } = prop.blackbody;
         const name = blackbodyUniformName(prop);
         if (seen.has(name)) return;
@@ -157,11 +150,8 @@ export function mintValueUniform(
             name, type: 'vec3',
             parameterPath: deps[0],
             ...(deps.length > 1 ? { parameterPaths: deps } : {}),
-            default: blackbodyRGB(kDefault, sDefault),
-            compute: (p) => blackbodyRGB(
-                isValueParam(kelvin) ? ((p[kelvin.param] as number) ?? kDefault) : kelvin,
-                scale === undefined ? 1 : isValueParam(scale) ? ((p[scale.param] as number) ?? sDefault) : scale,
-            ),
+            default: projectRGB(prop),
+            compute: (p) => projectRGB(prop, p),
         });
         return;
     }

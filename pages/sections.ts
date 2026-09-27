@@ -32,6 +32,11 @@ const e = (id: string, ...partners: string[]): SectionEntry =>
 
 export const gallerySections: GallerySection[] = [
     {
+        title: 'Spectral foundations',
+        blurb: 'four-wavelength transport, CIE sensor response, and constant RGB Lambert validation scenes',
+        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref')],
+    },
+    {
         title: 'Instance clouds',
         blurb: 'external .inst datasets — hundreds of thousands of instanced spheres per scene (untracked data files, async load)',
         entries: [e('clebsch'), e('clebsch-glow'), e('croissant'), e('steiner'), e('crixxi'), e('octic'), e('c32')],

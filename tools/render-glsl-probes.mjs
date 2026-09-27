@@ -1,6 +1,6 @@
 // Run small GLSL programs in a float framebuffer, without an app or dev server.
-export async function renderProbes(page, shaders, width = 1) {
-    return await page.evaluate(({ shaders, width }) => {
+export async function renderProbes(page, shaders, width = 1, sharedTextures = []) {
+    return await page.evaluate(({ shaders, width, sharedTextures }) => {
         const gl = document.createElement('canvas').getContext('webgl2');
         if (!gl || !gl.getExtension('EXT_color_buffer_float')) throw new Error('Float WebGL2 is required');
         const texture = gl.createTexture();
@@ -39,7 +39,7 @@ void main() {
                 else if (type === 'float') gl.uniform1f(location, value);
                 else gl[`uniform${type.slice(3)}fv`](location, value);
             }
-            const inputs = textures.map(({ uniform, width, height, data }, unit) => {
+            const inputs = [...sharedTextures, ...textures].map(({ uniform, width, height, data }, unit) => {
                 const input = gl.createTexture();
                 gl.activeTexture(gl.TEXTURE0 + unit);
                 gl.bindTexture(gl.TEXTURE_2D, input);
@@ -58,5 +58,5 @@ void main() {
             gl.deleteShader(fragment);
             return Array.from(pixels);
         });
-    }, { shaders, width });
+    }, { shaders, width, sharedTextures });
 }

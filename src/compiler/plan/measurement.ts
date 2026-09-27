@@ -4,6 +4,7 @@
 // writes it into export stamps, so a render's truncations are stated even where the author
 // left them at their defaults.
 
+import { COLOR_MODELS } from '../../components/color/index.js';
 import type { SceneDescription, RenderStrategy } from '../types.js';
 import type { ProgramDescription } from './types.js';
 
@@ -25,6 +26,8 @@ export function resolveMeasurement(scene: SceneDescription, strategy: RenderStra
         maxNullCrossings: m.maxNullCrossings ?? DEFAULT_MAX_NULL_CROSSINGS,
         scattering: m.scattering ?? 'full',
         shadows: m.shadows ?? 'opaque-dielectrics',
-        color: 'rgb',   // 'spectral' is Validator-rejected (reserved, contracts §8)
+        color: m.color ?? 'rgb',
+        sensor: m.sensor ?? COLOR_MODELS[m.color ?? 'rgb'].defaultSensor,
+        ...(COLOR_MODELS[m.color ?? 'rgb'].version ? { colorModelVersion: COLOR_MODELS[m.color ?? 'rgb'].version } : {}),
     };
 }
