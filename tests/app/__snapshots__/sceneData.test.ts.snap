@@ -725,6 +725,14 @@ exports[`scene-data textures (byte fingerprints) > spectral-direct 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-furnace 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-live 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-live-changed 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-live-changed-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-live-ref 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-packed 1`] = `
 {
   "nodes": "4096x1 f09f0195d6f270e3",

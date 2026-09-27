@@ -13,6 +13,7 @@
 // live here so a twin check's scene-id reference can never dangle when demos churn.
 // See ./README.md for the gate policy (χ² vs rmse) and how to add a witness.
 
+import { spectralLiveSuite } from './scenes/spectralLive.js';
 import { spectralPackedSuite } from './scenes/spectralPacked.js';
 import { spectralFoundationSuite } from './scenes/spectralFoundation.js';
 import type { SceneSuiteEntry } from './types.js';
@@ -134,6 +135,7 @@ const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
 export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralFoundationSuite,
     ...spectralPackedSuite,
+    ...spectralLiveSuite,
     'thinlens-zero': {
         scene: camCornell,
         strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy),

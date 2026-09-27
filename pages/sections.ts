@@ -34,7 +34,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'Spectral foundations',
         blurb: 'four-wavelength transport, CIE sensor response, and constant RGB Lambert validation scenes',
-        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref')],
+        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref')],
     },
     {
         title: 'Instance clouds',

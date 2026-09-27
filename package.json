@@ -18,7 +18,8 @@
     "audit:spectral": "vite-node scripts/audit-spectral.ts",
     "benchmark:spectral": "vite-node scripts/benchmark-spectral.ts",
     "witness:spectral-lifecycle": "node tools/witness-spectral-lifecycle.mjs",
-    "witness:spectral-bindings": "vite-node scripts/witness-spectral-bindings.ts"
+    "witness:spectral-bindings": "vite-node scripts/witness-spectral-bindings.ts",
+    "witness:spectral-live": "node tools/witness-spectral-live.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

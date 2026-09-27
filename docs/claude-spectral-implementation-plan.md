@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on constant-RGB Lambert fixtures with the CIE 1931 sensor. S1b now covers packed RGB lights and instance colour attributes; live bindings/media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored Lambert scenes with the CIE 1931 sensor. S1b now covers packed RGB lights, instance colour attributes and live RGB uniforms; expressions/media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -722,9 +722,13 @@ numeric checks. Attribute domains use the descriptor's radiometric role. Shared 
 bytes and renderer outputs agree under mixed RGB/spectral compilation and reordered
 strategies. The full scene checks compare packed attributes to individual materials,
 light rows to inline lights, and NEE to MIS. Generated-reader probes separately test all
-four lanes and reject a dropped instance index. Live colour parameters/expressions remain
-validation-gated; spectral media bounds, non-RGB form codes and CPU constant
-precomputation remain unimplemented. Albedo above
+four lanes and reject a dropped instance index. Live RGB uniforms are also enabled for
+Lambert albedo/emission, authored lights and constant-type skies. Defaults and declared
+slider bounds are checked at compilation; runtime writes retain the same author contract.
+`setParameter` does not enforce UI ranges or clamp the lift. Repeated live updates and
+session restoration are compared to constant renders, including changes to the selection
+CDF and sky/finite split. Expressions remain validation-gated; spectral media bounds,
+non-RGB form codes and CPU constant precomputation remain unimplemented. Albedo above
 one still has the existing diagnostic while its proposed gain policy is unresolved.
 
 Add role-aware validation: finite nonnegative coefficients/emission, the proposed extended

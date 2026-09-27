@@ -4,6 +4,32 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — live spectral colour controls
+
+Enabled RGB `{param}` values for spectral Lambert albedo/emission, authored lights and
+constant-type skies. The existing uniforms and wavelength-aware lift handle live values;
+the production change is in spectral input validation. Defaults are required and checked
+against the role's domain, as are declared slider bounds. Live writes carry that same
+author contract; slider ranges are UI metadata, with no new runtime clamp or validation
+layer. Reflectance remains in [0,1]. Expressions, non-RGB forms and media remain gated;
+existing light-tree and material-emitter eligibility restrictions still apply.
+
+Added `spectral-live` with surface, lamp and sky controls, plus constant references at
+default and changed values. Three GPU scene checks pass at 48×36, 256 spp: live defaults
+and changed colours agree with constants, and NEE agrees with MIS (0.08% mean difference,
+reduced chi-squared 0.56). `witness:spectral-live` exercises repeated edits in one running
+renderer at 32×24, 32 spp: defaults, changed RGB, zero lamp/albedo, scalar colours with
+unit albedo, restored session, and a sky changed to zero. The live renderer is not
+recompiled. The largest pixel-channel discrepancy from a constant render was 5.97e-8;
+defaults, zero lamp/albedo and restored defaults matched exactly. A zero live sky returned
+zero radiance. Unit checks additionally cover scalar broadcasts, default/range diagnostics,
+selection-weight updates, and mixed RGB/spectral compilation order.
+
+All 209 pre-existing synchronous scene digests remain exactly unchanged; four live-colour
+fixtures are additions. Seven async scenes are outside the digest check. All 94 files /
+3,279 tests, typecheck and production build pass. These are targeted GPU checks, not a
+full witness sweep or a native-GPU performance measurement.
+
 ## 2026-09-27 — spectral packed lights and instance colours
 
 Enabled the packed-data subset of S1b: ordinary light-tree rows, instanced Lambert

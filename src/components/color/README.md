@@ -4,8 +4,8 @@
 
 `measurement.color` selects the colour model. RGB preserves the existing renderer. The
 [spectral occupant](spectral/README.md) implements four-lane transport on a restricted
-RGB Lambert capability set, including packed light rows and per-instance colours;
-live colour parameters, expressions, media and non-RGB forms remain validation-rejected.
+RGB Lambert capability set, including live colour parameters, packed light rows and
+per-instance colours; expressions, media and non-RGB forms remain validation-rejected.
 
 An occupant supplies `types.glsl` and `<id>.glsl`:
 

@@ -1,9 +1,9 @@
 # Spectral colour model
 
 `measurement.color: 'spectral'` uses four wavelengths in nanometres on [360, 830],
-with a CIE 1931 sensor by default. Current public support is constant nonnegative RGB
-emission and skies, Lambert albedo in [0,1], PT/NEE/MIS, light-tree selection and
-instancing with constant or per-instance RGB colours. Media, live colour parameters,
+with a CIE 1931 sensor by default. Current public support is nonnegative RGB
+emission and skies, Lambert albedo in [0,1], live RGB colour parameters, PT/NEE/MIS,
+light-tree selection and instancing with constant or per-instance RGB colours. Media,
 expressions and non-RGB forms remain rejected.
 
 ## Measurement and sampling
@@ -55,6 +55,33 @@ fixtures have these plus the accumulation-history sampler. Existing scene-data
 textures add their usual samplers when needed. RGB programs reference neither asset.
 The App loads only referenced built-ins, checks length and checksum, and retains CPU
 bytes for context restoration. Missing or corrupt assets fail initialization by name.
+
+## Live colours
+
+A colour may be authored as `{param, default, min?, max?}`. The default is required
+and must be a finite scalar or three-component RGB value in its role's domain:
+[0,1] for reflectance, nonnegative for emission. Declared scalar slider bounds must
+also fit that domain and be ordered. Scalars broadcast on both initial upload and
+subsequent writes. Uniforms remain authored RGB; the shader lifts their current values
+at the ray's wavelengths. The existing computed bindings update finite-light and sky
+selection probabilities when their dependencies change.
+
+Live writes through `app.setParameter` / `setParameters` carry the same author contract.
+Slider limits are UI metadata; the App does not enforce them or clamp spectral inputs.
+Out-of-domain writes are unsupported. A parameter shared by several roles must satisfy
+every role's domain. The proposed gain extension above one is still undecided.
+
+Existing light eligibility rules remain: driven authored lights use power/uniform
+selection; light-tree rows are constant until refitting is implemented. A driven material
+emitter is path-found unless a supported authored-light accessor represents it. The
+`constant` sky model means spatially uniform; its colour can be live.
+
+The `spectral-live` lab scene exposes surface albedo/emission, quad emission and sky
+colour. `npm run witness -- spectral-live spectral-live-changed` compares defaults and
+changed values with constant scenes, and checks NEE/MIS. Against a running dev/preview
+server, `npm run witness:spectral-live` changes controls repeatedly in one renderer,
+compares with constant renders, tests scalar/zero values, restores the initial session,
+and asserts that the live renderer was not recompiled.
 
 ## Packed colours
 
