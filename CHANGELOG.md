@@ -4,6 +4,79 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-26 — review and close the RGB foundation gaps
+
+Added `npm run witness:color`: a standalone SwiftShader check of the shipped colour GLSL,
+with 14 numerical cases and three deliberately broken shaders that must fail numerically.
+It covers N=2,3,4 reductions/channel selection, signed/HDR RGB values and a nonidentity sensor.
+The check is documented and runs in the existing opt-in GPU CI job; it replaces the temporary
+primitive probe as the repeatable gate. Added the colour family to the structural tests and
+reconciled the stale film signature and camera wavelength guidance. No executable renderer
+behavior changed in this cleanup; wavelength carriage and value conversion remain outside
+this foundation's scope.
+
+Validation: typecheck/build passed; all 89 test files / 2707 tests passed, including the
+updated shader snapshots. The 14 GPU cases passed and all three defects were rejected.
+The previously recorded before/after image comparison remains a one-time measurement on
+SwiftShader, not a claim of complete S0 coverage or a permanent cross-device identity test.
+
+## 2026-09-26 — RGB colour and film foundation
+
+Added the colour family with an RGB occupant, explicit camera-sample/film projection boundary,
+and shared spectrum reductions/channel selection. The three accumulators now call
+`color_to_pixel`; its RGB implementation calls the existing `sensor_response`. The sensor
+owns the measurement response, including future spectral response curves. Analytic and GRIN
+media share the channel selector. No spectral renderer or wavelength-carrying ray is enabled.
+Value-conversion plumbing is scheduled with the real carrier in S0b rather than a temporary
+API; authored-form preservation stays in S0c.
+
+Validation: typecheck and production build passed; 89 test files / 2705 tests passed (including
+377 shader compile cases). Reviewed and updated 47 shader snapshots: their fields outside
+shaders/source maps are unchanged. All 203 synchronous scene digests retain their scene data,
+reader sets and warnings (7 async scenes excluded by the existing digest tool). Five fixed-
+seed before/after SwiftShader renders matched every float, covering all accumulators, an area
+light, absorbing media and scattering GRIN; variance output matched too. Targeted witness run
+(`furnace furnace-scatter slab grin-furnace-scatter`) passed all 6 checks. Separate GPU probes
+executed the shipped reductions and channel selector at N=2,3,4, and verified signed/HDR film
+values plus a nonidentity sensor response. The full witness sweep was not run.
+
+## 2026-09-26 — follow-up spectral correctness audit
+
+Extended the spectral implementation plan with explicit form-ID/header ownership, bounded
+float32 proof obligations, environment support and density corrections, and tests that detect
+metameric blackbody substitution. CPU probes of the current importance builder demonstrated
+empty-bake support loss and erased HDR probabilities; source analysis also found the equirect
+subcell sampling/PDF mismatch. Recorded reproducible inputs and remaining GPU gates in §12.
+These are proposed fixes and documentation changes; no renderer implementation changed.
+
+## 2026-09-26 — incorporate spectral plan review
+
+Revised the spectral plan after the review in §11: cameras receive sampled wavelengths;
+procedural sky radiance stays a direct formula evaluation; surface collapse requires a
+material that consumes region index; built-in assets are allowed external texture sources;
+carrier overhead gets an explicit benchmark. Proposed a scaled bounded lift for nonnegative
+research reflectances above one, with threshold and binding-site tests. Preserved the review
+record and its unchecked correctness gates. Updated related design/camera/resource contract
+documentation. Documentation checks only; no shader, TypeScript or runtime behavior changed.
+
+## 2026-09-26 — spectral implementation plan for adversarial review
+
+Added docs/claude-spectral-implementation-plan.md: accepted and proposed decisions, explicit
+ray/camera-sample contracts, authored forms and asset ownership, conservative medium bounds,
+collapse ordering, staged S0–S2 work, analytic/GPU gates and a reviewer brief. The plan records
+proposed departures from the design, including a typed camera geometry intermediate, initial
+binary-search table lookup and deferred arbitrary wavelength GLSL. Indexed and linked the
+plan; no renderer implementation. Checked documentation links, structure and whitespace.
+
+## 2026-09-26 — spectral wavelength ownership and design review
+
+Recorded the owner's decision: current wavelengths travel on `Ray` and the arrival record;
+original camera wavelengths and sampling PDFs stay with the estimator. Updated the spectral
+proposal and noted the approved, unimplemented extension in the trace-loop contract.
+The proposal records review requirements for one-time collapse, fully specified dispersion
+witnesses, the unverified pbrt bias claim, the two-channel canary, RGB rounding and GPU lookup
+precision. No renderer code changed; verification was a documentation diff and consistency review.
+
 ## 2026-09-26 — plan the scene once, then each renderer (steps 0–3)
 
 As planned in docs/claude-scene-once-plan.md (owner-approved). Decided with the owner first: keep
@@ -892,4 +965,3 @@ project's internal batch codes and doc-section references; the docs it cites exp
 **The SDF hygiene batch is BUILT** (Aug 11 2026, owner-ordered six-pack; record: memory `sdf-hygiene-batch`): (1) **`lipschitz` fact DELETED** (zero occupants; in-field safety factors + value/gradient authoring made it dead); (2) **`primitiveHitFill`** = THE one hit-fill for all SEVEN primitive-object arms (unrolled marched/analytic ×3, instanced params/frame tiers, both table leaves — audit D4 closed; the normalize rule settled ONCE: primitive normals are unit by contract + world maps are rotations ⇒ never re-normalize; mesh arms keep theirs, interpolated normals are genuinely non-unit); (3) **witness `field-glass`** (defineSDF tangle in real glass, X-GLASS pattern nee≡mis + pt tripwire — the door's numeric gate; the tangle definition MOVED to the witness fixture, demo imports it) + **`sdf-table + table` joined the generated-glsl byte snapshot** (first byte coverage of the table regime incl. the DATA-form material_of); (4) **epsilon-coupling test** (`epsilonCoupling.test.ts` — EPS_INTERFACE = 10× MARCH_EPSILON ∧ ≥ 2× the cap, parsed from the .glsl files: the derived-coupling rule enforceable); (5) **defineSDF twin OPTIONAL** (owner-decided: omit ⇒ the declared bound is TRUSTED, gate skipped — tested); (6) the **intersection refinement is the `refine: C` declared fact** (built same day: sign-only doubling-bracket sized by C + 8 bisections in the ONE generated loop — fixed the glass tangle's ring banding [accepted TRUE residual ≫ EPS_INTERFACE for conservative estimates], then scoped to declaration after always-on taxed the fractals; tangle re-authored VALUE/GRADIENT — the variety-port form, ~2× faster, `refine: 4`). vitest 2032.
 
 **Still Euclidean-only** (equiangular NEE is delta-lights + nee only — area arms and placement-MIS in `impl-plan-equiangular.md`), no spherical-rectangle quad sampling / two-sided quads / `Value<T>` light params (deferred table in `impl-plan-area-lights.md`), no curved spaces (the `ambient_*` seam is ready but H³/Schwarzschild are unbuilt). Glass *shadow rays* remain opaque — a DECLARED truncation (`measurement.shadows: 'opaque-dielectrics'`). Don't describe deferred items as built. **Discuss loop/interface structure before implementing** (owner preference); don't mix refactors with feature work.
-

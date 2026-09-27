@@ -65,6 +65,8 @@ jobs:
       - run: npm ci
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
+      - name: Colour primitive witnesses
+        run: npm run witness:color
       - name: Run the sweep
         shell: bash
         run: |

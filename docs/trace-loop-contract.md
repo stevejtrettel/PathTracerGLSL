@@ -14,6 +14,16 @@ stepper (`fable-compiler-contracts.md` §5) — see "Supersedes" below.**
 
 ---
 
+## Approved spectral extension (not implemented)
+
+For spectral mode, `Ray` is a seed for light propagation and gains the current wavelength
+carrier. `Hit` records the arriving carrier. The original camera wavelengths and sampling
+PDFs remain with the estimator; throughput and accumulated radiance remain on `PathState`.
+Search bounds still belong to queries. Transport ray construction must supply or inherit the
+carrier; wavelength-changing propagation or scattering must be able to produce a new one.
+See [spectral design §3.4](claude-spectral-design.md#34-wavelengths-belong-on-the-ray-d3--decided).
+The signatures below describe the current implementation until that extension is built.
+
 ## The loop — five abstractions
 
 ```

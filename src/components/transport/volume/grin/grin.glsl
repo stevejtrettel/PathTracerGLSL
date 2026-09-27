@@ -305,7 +305,7 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
     float n0 = grin_n(med, ray.origin);
 
     // Channel-MIS draw, up front: uniform channel, exponential target arc s*.
-    int   c  = min(int(xi.x * 3.0), 2);
+    int   c  = spectrum_sample_channel(xi.x);
     float sc = max(sigma_t[c], 1e-9);
     float s_star = -log(1.0 - xi.y) / sc;
 

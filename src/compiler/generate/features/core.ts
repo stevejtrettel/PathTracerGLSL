@@ -8,6 +8,8 @@ import { MATERIAL_MODELS, modelStructFields } from '../../../components/material
 import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { SAMPLERS } from '../../../components/sampler/index.js';
 import { SENSORS } from '../../../components/sensor/index.js';
+import { COLOR_MODELS } from '../../../components/color/index.js';
+import spectrumGLSL from '../../../components/color/spectrum.glsl?raw';
 
 import structsGLSL from '../../../glsl/core/structs.glsl?raw';
 import structsMediaGLSL from '../../../glsl/core/structs_media.glsl?raw';
@@ -31,7 +33,11 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     // Conditional INCLUSION, not preprocessor gating (item-9 commit D): media-free
     // programs contain no media structs/helpers at all. The last structural defines
     // died with this. (MIS math lives with its only caller: transport/math_mis.glsl.)
-    const blocks: ShaderBlock[] = [{ origin: 'glsl/core/structs.glsl', source: structsGLSL }];
+    const color = COLOR_MODELS[plan.program.measurement.color];
+    const blocks: ShaderBlock[] = [
+        { origin: `components/color/${color.id}/types.glsl`, source: color.typesGLSL },
+        { origin: 'glsl/core/structs.glsl', source: structsGLSL },
+    ];
 
     // Scene-scoped properties structs (§3.4, R2): the union of fields declared by the
     // models PRESENT. A Lambert-only program has no transmittance field; roughness
@@ -73,14 +79,14 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         // Sampler slot (pick-one): sole occupant today; a strategy knob arrives with the
         // second occupant (fable-components §3 — the Owen–Sobol record).
         { origin: 'components/sampler/pcg4d/pcg4d.glsl', source: SAMPLERS.pcg4d.glsl },
+        { origin: 'components/color/spectrum.glsl', source: spectrumGLSL },
         { origin: 'glsl/core/math.glsl', source: mathGLSL },
     );
     if (plan.program.media.present) blocks.push({ origin: 'glsl/core/math_media.glsl', source: mathMediaGLSL });
     blocks.push(
-        // Sensor slot (measurement pick-one, We ≡ 1 today): the measurement importance the
-        // accumulator main() multiplies into the traced radiance. Sole occupant — a strategy
-        // knob arrives with the first real sensor (exposure/vignette/spectral).
+        // The colour projection calls the sensor's measurement response.
         { origin: 'components/sensor/ideal/ideal.glsl', source: SENSORS.ideal.glsl },
+        { origin: `components/color/${color.id}/${color.id}.glsl`, source: color.glsl },
         // Ambient occupant from the registry (D3: the non-Euclidean door) — the plan's
         // measurement.ambient decision picks it; origin derived from the key.
         ambientBlock(plan.program.measurement.ambient),
@@ -97,6 +103,10 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     return {
         ...emptyContribution('core'),
         blocks,
+        provides: [
+            { name: 'wavelengths_sample', signature: 'WavelengthSample wavelengths_sample()', componentScoped: true },
+            { name: 'color_to_pixel', signature: 'vec3 color_to_pixel(vec2 film, Direction ray_dir, Radiance L, WavelengthSample camera_sample)', componentScoped: true },
+        ],
         uniforms: [
             // Engine builtins are declared where READ (exact linkage): nothing in the main
             // program reads u_resolution (pixel/camera use u_imageSize) or u_time today —

@@ -1,8 +1,7 @@
 // Math utilities
 // Provides: PI, TWO_PI, MARCH_CLEARANCE, SHADOW_BACKOFF, fp_uncertainty(), build_basis(),
 //           concentric_disk(), schlick_fresnel(),
-//           dielectric_fresnel(), SPECTRUM_ZERO/ONE, spectrum_average(), spectrum_max(),
-//           spectrum_is_black(), spectrum_exp() (math_media.glsl when media exist)
+//           dielectric_fresnel()
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
@@ -56,16 +55,6 @@ float fp_uncertainty(Point p) {
     return max(FP_UNCERTAINTY_ABS, FP_UNCERTAINTY_REL * max(abs(p.x), max(abs(p.y), abs(p.z))));
 }
 
-// Spectral discipline (§2.5): radiometric constants + named reductions (no raw vec3
-// literals or ad-hoc luminance() for throughput decisions in library/template GLSL).
-// Reductions are basis-agnostic (no RGB weights), so hero-wavelength spectral is a later
-// strategy-axis swap, not a rewrite. luminance()/Rec.709 was removed for exactly that reason:
-// it baked an RGB assumption into Russian roulette (see the review + item-6 plan).
-const Spectrum SPECTRUM_ZERO = Spectrum(0.0);
-const Spectrum SPECTRUM_ONE  = Spectrum(1.0);
-float spectrum_average(Spectrum s) { return (s.x + s.y + s.z) * (1.0 / 3.0); }
-float spectrum_max(Spectrum s) { return max(s.x, max(s.y, s.z)); }   // RR survival (PBRT MaxComponentValue)
-bool  spectrum_is_black(Spectrum s) { return s.x <= 0.0 && s.y <= 0.0 && s.z <= 0.0; }
 // Declared-EUCLIDEAN sampler helper (light samplers, phase ONBs — sites carrying the
 // METRIC EXEMPTION). Deliberately distinct from ambient_frame(), the METRIC SEAM that
 // builds shading frames and gets swapped per space: any construction/pivot works here

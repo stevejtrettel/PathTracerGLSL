@@ -16,7 +16,7 @@ const ROOT = resolve(__dirname, '../../src/components');
 
 const FAMILIES = [
     'materials', 'lights', 'volume_scattering', 'geometry', 'intersection', 'accel', 'data', 'ambient',
-    'sampler', 'sensor', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport',
+    'sampler', 'sensor', 'color', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport',
 ];
 
 // Family-root files that are NOT occupant folders (shared parts + registries + docs).
@@ -24,6 +24,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'index.ts', 'README.md',
     'combiner.ts', 'flags.ts',            // transport shared parts
     'math_mis.glsl',                       // transport shared part (β=2 power heuristic)
+    'spectrum.glsl',                       // colour shared reductions and channel selection
     'sampler_cdf.glsl',                    // env shared CDF walk
     'channels.ts', 'ledger.ts', 'pack.ts', // data substrate parts (fable-data-rail — roster/layout truth/assembly)
     'importance.ts',                       // env shared part (importance-table math — E6: mirrors the charts' Jacobians)

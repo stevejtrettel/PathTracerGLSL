@@ -38,6 +38,6 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
             { name: 'u_sampleCount', type: 'int', parameterPath: 'engine.sampleCount' },
             { name: 'u_pixelOffset', type: 'vec2', parameterPath: 'engine.pixelOffset', default: [0, 0] },
         ],
-        requires: ['pixel_sample', 'camera_generateRay', 'transport_trace'],
+        requires: ['pixel_sample', 'camera_generateRay', 'wavelengths_sample', 'transport_trace', 'color_to_pixel'],
     };
 }

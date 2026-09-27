@@ -35,14 +35,19 @@ The film occupant draws the samples from the stream (`pixel_sample` for the foot
 `xiLens` for the aperture) and hands the camera a `film` point + `xiLens`, keeping the
 camera a pure, stratifiable, TS-twin-able map.
 
-**Category B — shutter time (motion blur) and wavelength (spectral sensor) — are NOT
-`generateRay` arguments.** They are seeded once at the sensor and *carried through the
-whole path* (time → moving geometry in `scene_intersect`; wavelength → every downstream
-IOR/throughput), so they belong as fields on the `Ray`/`PathState` seed, not as more
-`xi`. Both are consciously prepared-for, not built (spectral is the reserved
-`color: 'spectral'` axis; a time coordinate on the seed also serves relativistic
-geodesics — `Point`→vec4). **Do not add a `xiTime`/`xiLambda` argument to
-`generateRay`** when they land — that is the wrong seam.
+**Category B — shutter time and wavelength — are path coordinates, not camera random inputs.**
+Their sampling belongs outside the camera. Shutter time and wavelength carriage are not yet
+implemented; `color: 'spectral'` remains reserved. Do not add `xiTime` or `xiLambda` draws to
+the camera interface.
+
+**Accepted spectral amendment (not implemented):** the reviewed spectral implementation plan
+passes an already-sampled `Wavelengths wl` into `camera_generateRay(film, xiLens, wl)`.
+Sampling remains in the accumulator; `wl` is a physical coordinate, not a new random input.
+Current camera models will pass it into `make_ray`, while a future dispersive lens can use it during
+camera ray construction. S0b must update the signature above, all callers and the camera
+contract test together. The amendment does not add a time input or build the deferred
+weighted/dispersive camera result.
+See [spectral plan §3.2](../../../docs/claude-spectral-implementation-plan.md#32-fully-initialized-rays-including-the-camera).
 
 ## Status
 

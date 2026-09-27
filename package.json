@@ -10,7 +10,8 @@
     "test": "vitest",
     "dump:shaders": "vite-node scripts/dump-shaders.ts",
     "digest": "vite-node scripts/digest-compiled.ts",
-    "witness": "node tools/witness.mjs"
+    "witness": "node tools/witness.mjs",
+    "witness:color": "node tools/witness-color.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

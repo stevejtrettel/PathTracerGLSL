@@ -21,6 +21,16 @@ lab), but nothing here imports from `compiler/scenes/`.
 - `scenes/` — the fixtures: scene + strategy definitions, with their derivations in
   comments (why 0.4, why RR is off, what a failure implicates).
 
+## Colour primitive checks
+
+`npm run witness:color` runs the shipped colour GLSL directly in headless Chromium/SwiftShader,
+without a dev server or scene. It uses the same Playwright installation as the scene runner.
+It checks reductions and channel selection at N=2,3,4, signed/HDR RGB projection, and a
+nonidentity sensor response. Three deliberately broken shaders must compile and then fail
+the numerical assertions: divide by three, select only three channels, and bypass the sensor.
+This is a repeatable primitive gate, separate from the scene witnesses and static Vitest checks.
+It runs before the scene sweep in the existing opt-in GPU CI job.
+
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):

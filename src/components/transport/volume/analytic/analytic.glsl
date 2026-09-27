@@ -9,7 +9,7 @@
 MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, vec2 xi) {
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
-    int   c  = min(int(xi.x * 3.0), 2);               // uniform channel selection
+    int   c  = spectrum_sample_channel(xi.x);
     float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
     float t  = -log(1.0 - xi.y) / sc;
 
@@ -18,7 +18,7 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     ms.eta_scale = 1.0;                               // no index change on a straight segment
     ms.radiance = SPECTRUM_ZERO;                      // mandatory (§3 partition rule)
     if (t < t_max) {
-        // Scatter event at t. pdf = (1/3) Σ_c σ_c e^{−σ_c t} (one-sample MIS over channels).
+        // Scatter event at t. pdf = (1/N) Σ_c σ_c e^{−σ_c t} (one-sample MIS over channels).
         Spectrum tr  = spectrum_exp(-sigma_t * t);
         float    pdf = spectrum_average(sigma_t * tr);
         ms.scattered = true;
@@ -30,7 +30,7 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
         ms.exit_dir  = ray.direction;
         ms.weight    = m.sigma_s * tr / max(pdf, 1e-20);
     } else {
-        // Survived to the boundary. pdf = P(t ≥ t_max) = (1/3) Σ_c e^{−σ_c t_max}.
+        // Survived to the boundary. pdf = P(t ≥ t_max) = (1/N) Σ_c e^{−σ_c t_max}.
         Spectrum tr  = spectrum_exp(-sigma_t * t_max);
         float    pdf = spectrum_average(tr);
         ms.scattered = false;
